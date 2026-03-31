@@ -67,8 +67,8 @@ sudo apt-get install -y qemu-utils
 # Install networking tools (Required for the Stage 4 UAT connectivity verification)
 sudo apt-get install -y curl iputils-ping netcat-openbsd
 
-# Ensure the OpenStack API client is available locally 
-pip3 install python-openstackclient
+# Ensure the OpenStack API client and web framework are available locally 
+pip3 install python-openstackclient python-octaviaclient flask
 ```
 
 ---
