@@ -79,10 +79,10 @@ The Engine utilizes a localized start script to isolate dependencies and spin up
 
 ```bash
 # Provide application execution permissions
-chmod +x start.sh
+chmod +x letsmove.sh
 
 # Spin up the Flask environment and launch the UI
-./start.sh
+./letsmove.sh
 ```
 
 Navigate your browser to `http://localhost:5001` or the network-assigned IP to access the Live Dashboard.
