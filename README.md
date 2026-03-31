@@ -48,6 +48,31 @@ A highly automated testing harness that ensures zero performance or access degra
 
 ---
 
+## 📦 Prerequisites & Installation
+
+The migration orchestrator is built to run natively on **Ubuntu Linux (22.04+)** or **Windows Subsystem for Linux (WSL)**.
+
+Before launching the engine, ensure your system has the required hypervisor, network, and OpenStack dependencies installed:
+
+```bash
+# Update local apt indices
+sudo apt-get update -y
+
+# Install Python 3, Pip, and Virtual Environment handlers
+sudo apt-get install -y python3 python3-pip python3-venv
+
+# Install QEMU Utilities (Crucial for the Stage 3 image conversion pipeline)
+sudo apt-get install -y qemu-utils 
+
+# Install networking tools (Required for the Stage 4 UAT connectivity verification)
+sudo apt-get install -y curl iputils-ping netcat-openbsd
+
+# Ensure the OpenStack API client is available locally 
+pip3 install python-openstackclient
+```
+
+---
+
 ## ⚡ Deployment & Initialization
 
 The Engine utilizes a localized start script to isolate dependencies and spin up the orchestration GUI.
