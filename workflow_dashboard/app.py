@@ -1,0 +1,4621 @@
+#!/usr/bin/env python3
+import csv
+import ipaddress
+import json
+import os
+import re
+import select
+import shlex
+import subprocess
+import tempfile
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
+
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
+from werkzeug.utils import secure_filename
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+FLAVOR_UPLOAD_DIR = UPLOAD_DIR / "flavors"
+FLAVOR_UPLOAD_DIR.mkdir(exist_ok=True)
+TOPOLOGY_UPLOAD_DIR = UPLOAD_DIR / "topologies"
+TOPOLOGY_UPLOAD_DIR.mkdir(exist_ok=True)
+IMAGES_DIR = BASE_DIR / "images"
+DASHBOARD_DIR = BASE_DIR / "dashboard"
+
+app = Flask(__name__, template_folder="templates", static_folder="static")
+NODE_TYPES = {"network", "subnet", "router", "security_group", "instance", "volume", "load_balancer"}
+ALLOWED_EDGE_PAIRS = {
+    ("instance", "network"),
+    ("instance", "security_group"),
+    ("instance", "volume"),
+    ("network", "router"),
+    ("network", "subnet"),
+    ("router", "subnet"),
+    ("instance", "load_balancer"),
+    ("load_balancer", "subnet"),
+}
+DEPLOY_JOBS: Dict[str, Dict[str, Any]] = {}
+DEPLOY_JOBS_LOCK = threading.Lock()
+MAX_DEPLOY_JOBS = 30
+
+
+def list_workspace_files() -> List[str]:
+    out: List[str] = []
+    for p in BASE_DIR.iterdir():
+        if p.is_file() and p.suffix.lower() in {".csv", ".sh", ".txt", ".log"}:
+            out.append(p.name)
+    for p in UPLOAD_DIR.iterdir():
+        if p.is_file() and p.suffix.lower() in {".csv", ".sh", ".txt", ".log"}:
+            out.append(f"uploads/{p.name}")
+    return sorted(out)
+
+
+def load_reference_data() -> Dict[str, Any]:
+    images: List[str] = []
+    image_candidates = [
+        UPLOAD_DIR / "images" / "images_3926.csv",
+        IMAGES_DIR / "images_3926.csv",
+        UPLOAD_DIR / "images_3926.csv",
+    ]
+    image_file: Optional[Path] = next((p for p in image_candidates if p.exists() and p.is_file()), None)
+    if image_file is not None:
+        with image_file.open(newline="", encoding="utf-8-sig") as f:
+            reader = csv.reader(f)
+            _ = next(reader, None)  # header
+            for row in reader:
+                if not row:
+                    continue
+                name = str(row[0]).strip()
+                if name:
+                    images.append(name)
+    images = sorted(set(images))
+
+    flavor_sets: List[Dict[str, Any]] = []
+    for flavor_file in sorted(FLAVOR_UPLOAD_DIR.glob("*.csv")):
+        with flavor_file.open(newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        out_rows: List[Dict[str, str]] = []
+        for r in rows:
+            out_rows.append(
+                {
+                    "name": str(r.get("Name", "")).strip(),
+                    "category": str(r.get("Category", "")).strip(),
+                    "disk_gib": str(r.get("Disk (GiB)", "")).strip(),
+                    "cpu": str(r.get("CPU", "")).strip(),
+                    "memory": str(r.get("Memory", "")).strip(),
+                    "internal_bw_gbps": str(r.get("Internal Network Bandwidth (Gbps)", "")).strip(),
+                    "ephemeral_disk_gib": str(r.get("Ephemeral Disk (GiB)", "")).strip(),
+                    "cost_per_hour": str(r.get("Cost per Hour", "")).strip(),
+                }
+            )
+        flavor_sets.append(
+            {
+                "file": f"uploads/flavors/{flavor_file.name}",
+                "region": re.sub(r"[^A-Za-z]", "", flavor_file.stem).upper() or flavor_file.stem,
+                "count": len(out_rows),
+                "rows": out_rows,
+            }
+        )
+
+    return {"images_file": str(image_file.relative_to(BASE_DIR)) if image_file is not None and image_file.is_relative_to(BASE_DIR) else "", "images": images, "flavor_sets": flavor_sets}
+
+
+def list_openrc_candidates() -> List[str]:
+    candidates: set[str] = set()
+
+    def maybe_add(path: Path, display_name: str) -> None:
+        if not path.is_file():
+            return
+        name_l = path.name.lower()
+        suffix_l = path.suffix.lower()
+        if "openrc" in name_l or suffix_l in {".rc", ".openrc"}:
+            candidates.add(display_name)
+            return
+        if suffix_l == ".sh":
+            try:
+                preview = path.read_text(encoding="utf-8", errors="ignore")[:4000].lower()
+            except OSError:
+                preview = ""
+            if "os_auth_url" in preview and ("os_username" in preview or "os_project_name" in preview):
+                candidates.add(display_name)
+
+    for p in BASE_DIR.iterdir():
+        if not p.is_file():
+            continue
+        maybe_add(p, p.name)
+
+    for p in UPLOAD_DIR.iterdir():
+        if not p.is_file():
+            continue
+        maybe_add(p, f"uploads/{p.name}")
+
+    return sorted(candidates)
+
+
+def resolve_input_path(name: str) -> Optional[Path]:
+    text = (name or "").strip()
+    if not text:
+        return None
+    candidate = BASE_DIR / text
+    try:
+        resolved = candidate.resolve()
+        base_resolved = BASE_DIR.resolve()
+        if not resolved.is_relative_to(base_resolved):
+            return None
+    except OSError:
+        return None
+    return resolved
+
+
+def resolve_target_flavor_catalog_for_region(region: str) -> Optional[Path]:
+    r = (region or "").strip().upper()
+    if not r:
+        return None
+    candidates = [
+        FLAVOR_UPLOAD_DIR / f"{r}Flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{r}_Flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{r.lower()}flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{r.lower()}_flavors.csv",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
+def run_cmd(args: List[str]) -> Tuple[int, str]:
+    proc = subprocess.run(
+        args,
+        cwd=str(BASE_DIR),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    output = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+    return proc.returncode, output.strip()
+
+
+def diff_files(before: List[str], after: List[str]) -> List[str]:
+    b = set(before)
+    return [f for f in after if f not in b]
+
+
+def parse_validation_report_path(log_output: str) -> Optional[Path]:
+    for line in (log_output or "").splitlines():
+        if line.startswith("Validation report:"):
+            path_text = line.split(":", 1)[1].strip()
+            if path_text:
+                return Path(path_text).expanduser()
+    return None
+
+
+def read_validation_findings(report_path: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
+    findings: List[Dict[str, str]] = []
+    counts = {"ERROR": 0, "WARN": 0, "INFO": 0}
+    with report_path.open(newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            severity = (row.get("severity") or "").strip().upper()
+            code = (row.get("code") or "").strip()
+            scope = (row.get("scope") or "").strip()
+            message = (row.get("message") or "").strip()
+            if severity in counts:
+                counts[severity] += 1
+            findings.append(
+                {
+                    "severity": severity,
+                    "code": code,
+                    "scope": scope,
+                    "message": message,
+                }
+            )
+    return findings, counts
+
+
+def read_csv_rows(path: Path) -> List[Dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def is_truthy_text(value: str) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def infer_instance_auth_mode(props: Dict[str, Any]) -> str:
+    mode = str(props.get("auth_mode", "")).strip().lower()
+    if mode in {"ssh_key", "windows_password"}:
+        return mode
+    image = str(props.get("image", "")).strip().lower()
+    if "windows" in image:
+        return "windows_password"
+    return "ssh_key"
+
+
+def validate_lb_mapping_rows(flavor_rows: List[Dict[str, str]], lb_rows: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]], int]:
+    findings: List[Dict[str, str]] = []
+    error_count = 0
+
+    def add_finding(severity: str, code: str, scope: str, message: str) -> None:
+        nonlocal error_count
+        sev = (severity or "").upper()
+        findings.append({"severity": sev, "code": code, "scope": scope, "message": message})
+        if sev == "ERROR":
+            error_count += 1
+
+    if not lb_rows:
+        add_finding("INFO", "lb_mapping_empty", "lbmap", "LB mapping has no rows.")
+        return findings, error_count
+
+    required_lb_cols = {
+        "load_balancer_name",
+        "provider",
+        "target_protocol",
+        "listener_port",
+        "member_port",
+        "source_server_id",
+        "source_member_ip",
+        "member_include_in_deploy",
+    }
+    lb_cols = set(lb_rows[0].keys())
+    missing_lb_cols = sorted(required_lb_cols - lb_cols)
+    if missing_lb_cols:
+        add_finding("ERROR", "missing_lb_columns", "lbmap", f"Missing required columns: {', '.join(missing_lb_cols)}")
+        return findings, error_count
+
+    included_server_ids = set()
+    for row in flavor_rows:
+        include_raw = row.get("include_in_deploy")
+        include = True if include_raw is None or include_raw.strip() == "" else is_truthy_text(include_raw)
+        if include:
+            server_id = (row.get("server_id") or "").strip()
+            if server_id:
+                included_server_ids.add(server_id)
+
+    valid_protocols = {"TCP", "HTTP", "HTTPS", "TERMINATED_HTTPS", "UDP"}
+    valid_providers = {"ovn", "amphora"}
+    member_rows = 0
+    included_member_rows = 0
+    load_balancer_names = set()
+
+    for idx, row in enumerate(lb_rows, start=2):
+        lb_name = (row.get("load_balancer_name") or "").strip()
+        provider = (row.get("provider") or "").strip().lower()
+        protocol = (row.get("target_protocol") or "").strip().upper()
+        listener_port_text = (row.get("listener_port") or "").strip()
+        member_port_text = (row.get("member_port") or "").strip()
+        source_server_id = (row.get("source_server_id") or "").strip()
+        source_member_ip = (row.get("source_member_ip") or "").strip()
+        include_member = is_truthy_text(row.get("member_include_in_deploy") or "")
+        member_note = (row.get("member_match_note") or "").strip()
+
+        if not lb_name:
+            add_finding("ERROR", "missing_lb_name", f"lbmap:row:{idx}", "load_balancer_name is required")
+        else:
+            load_balancer_names.add(lb_name)
+
+        if provider and provider not in valid_providers:
+            add_finding("WARN", "lb_provider_unexpected", f"lbmap:row:{idx}", f"provider={provider} is not one of ovn/amphora")
+        if protocol and protocol not in valid_protocols:
+            add_finding("WARN", "lb_protocol_unexpected", f"lbmap:row:{idx}", f"target_protocol={protocol} is not a common Octavia protocol")
+
+        for field_name, field_value in (("listener_port", listener_port_text), ("member_port", member_port_text)):
+            if not field_value:
+                add_finding("ERROR", "missing_lb_port", f"lbmap:row:{idx}", f"{field_name} is required")
+                continue
+            try:
+                port_num = int(field_value)
+                if port_num < 1 or port_num > 65535:
+                    raise ValueError("port out of range")
+            except ValueError:
+                add_finding("ERROR", "invalid_lb_port", f"lbmap:row:{idx}", f"{field_name} must be an integer in range 1-65535")
+
+        if source_member_ip or source_server_id:
+            member_rows += 1
+
+        if include_member:
+            included_member_rows += 1
+            if not source_server_id:
+                add_finding(
+                    "ERROR",
+                    "lb_member_missing_server_id",
+                    f"lbmap:row:{idx}",
+                    "member_include_in_deploy is enabled but source_server_id is empty",
+                )
+            elif source_server_id not in included_server_ids:
+                add_finding(
+                    "WARN",
+                    "lb_member_server_not_in_flavormap",
+                    f"lbmap:row:{idx}",
+                    f"source_server_id={source_server_id} is not included in flavor mapping deploy set",
+                )
+
+        if not source_server_id and source_member_ip:
+            add_finding(
+                "WARN",
+                "lb_member_ip_unmatched",
+                f"lbmap:row:{idx}",
+                f"source_member_ip={source_member_ip} did not match a source server_id ({member_note or 'no match note'})",
+            )
+
+    if not load_balancer_names:
+        add_finding("WARN", "no_load_balancers", "lbmap", "No load balancer names found in LB mapping.")
+    if member_rows == 0:
+        add_finding("WARN", "no_lb_members", "lbmap", "No load balancer member rows found.")
+
+    add_finding(
+        "INFO",
+        "lb_mapping_summary",
+        "lbmap",
+        f"LBs: {len(load_balancer_names)} | Member rows: {member_rows} | Included members: {included_member_rows}",
+    )
+
+    return findings, error_count
+
+
+def shell_quote(value: str) -> str:
+    return shlex.quote(str(value))
+
+
+def safe_script_name(text: str) -> str:
+    base = re.sub(r"[^a-zA-Z0-9._-]+", "-", (text or "").strip()).strip("-")
+    if not base:
+        base = f"topology_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return base
+
+
+def parse_topology_payload(payload: Dict[str, object]) -> Tuple[List[Dict[str, object]], List[Dict[str, object]], str]:
+    topology = payload.get("topology", {})
+    if not isinstance(topology, dict):
+        raise ValueError("topology must be an object")
+
+    nodes = topology.get("nodes", [])
+    edges = topology.get("edges", [])
+    if not isinstance(nodes, list) or not isinstance(edges, list):
+        raise ValueError("topology.nodes and topology.edges must be arrays")
+
+    normalized_nodes: List[Dict[str, object]] = []
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        node_id = str(n.get("id", "")).strip()
+        node_type = str(n.get("type", "")).strip()
+        label = str(n.get("label", "")).strip() or node_id
+        props = n.get("props", {})
+        if not node_id or node_type not in NODE_TYPES:
+            continue
+        if not isinstance(props, dict):
+            props = {}
+        normalized_nodes.append({"id": node_id, "type": node_type, "label": label, "props": props})
+
+    normalized_edges: List[Dict[str, object]] = []
+    for e in edges:
+        if not isinstance(e, dict):
+            continue
+        src = str(e.get("from", "")).strip()
+        dst = str(e.get("to", "")).strip()
+        edge_type = str(e.get("type", "link")).strip() or "link"
+        if src and dst:
+            normalized_edges.append({"from": src, "to": dst, "type": edge_type})
+
+    raw_script_name = str(payload.get("script_name", "")).strip()
+    script_name = safe_script_name(raw_script_name)
+    if not script_name.endswith(".sh"):
+        script_name += ".sh"
+    return normalized_nodes, normalized_edges, script_name
+
+
+def _node_name(node: Dict[str, object], fallback_prefix: str) -> str:
+    props = node.get("props", {})
+    if not isinstance(props, dict):
+        props = {}
+    explicit = str(props.get("name", "")).strip()
+    if explicit:
+        return explicit
+    label = str(node.get("label", "")).strip()
+    if label:
+        return safe_script_name(label)
+    return f"{fallback_prefix}-{safe_script_name(str(node.get('id', 'node')))}"
+
+
+def _heredoc_delimiter(base: str, content: str) -> str:
+    delim = re.sub(r"[^A-Za-z0-9_]", "_", base or "USER_DATA_EOF")
+    if not delim:
+        delim = "USER_DATA_EOF"
+    while delim in (content or ""):
+        delim += "_X"
+    return delim
+
+
+def _edge_match(
+    edges: List[Dict[str, object]],
+    src_id: str,
+    dst_id: str,
+    allow_types: Optional[set] = None,
+) -> bool:
+    for e in edges:
+        a = str(e.get("from", "")).strip()
+        b = str(e.get("to", "")).strip()
+        t = str(e.get("type", "link")).strip()
+        if allow_types is not None and t not in allow_types:
+            continue
+        if (a == src_id and b == dst_id) or (a == dst_id and b == src_id):
+            return True
+    return False
+
+
+def _pair_key(a: str, b: str) -> Tuple[str, str]:
+    return tuple(sorted((a, b)))
+
+
+def validate_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, object]]) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
+    findings: List[Dict[str, str]] = []
+    summary = {"ERROR": 0, "WARN": 0, "INFO": 0}
+
+    def add_finding(severity: str, code: str, scope: str, message: str) -> None:
+        s = severity.upper()
+        if s not in summary:
+            return
+        summary[s] += 1
+        findings.append({"severity": s, "code": code, "scope": scope, "message": message})
+
+    if not nodes:
+        add_finding("ERROR", "empty_topology", "topology", "Topology has no valid nodes.")
+        return findings, summary
+
+    nodes_by_id = {str(n["id"]): n for n in nodes}
+    connected_ids: set = set()
+    for e in edges:
+        src = str(e.get("from", "")).strip()
+        dst = str(e.get("to", "")).strip()
+        if src not in nodes_by_id or dst not in nodes_by_id:
+            add_finding("ERROR", "edge_missing_node", f"{src}->{dst}", "Edge references a node that does not exist.")
+            continue
+        connected_ids.add(src)
+        connected_ids.add(dst)
+        src_type = str(nodes_by_id[src]["type"])
+        dst_type = str(nodes_by_id[dst]["type"])
+        if _pair_key(src_type, dst_type) not in ALLOWED_EDGE_PAIRS:
+            add_finding(
+                "ERROR",
+                "invalid_edge_pair",
+                f"{src_type}<->{dst_type}",
+                "This resource pair cannot be connected in the current topology model.",
+            )
+
+    names_by_type: Dict[str, set] = {}
+    for n in nodes:
+        node_type = str(n["type"])
+        name = _node_name(n, node_type)
+        if node_type not in names_by_type:
+            names_by_type[node_type] = set()
+        if name in names_by_type[node_type]:
+            add_finding("WARN", "duplicate_name", node_type, f"Duplicate resource name detected: {name}")
+        names_by_type[node_type].add(name)
+
+    for n in nodes:
+        node_id = str(n["id"])
+        node_type = str(n["type"])
+        props = n.get("props", {}) if isinstance(n.get("props", {}), dict) else {}
+        display_name = _node_name(n, node_type)
+        if node_id not in connected_ids:
+            add_finding("WARN", "unconnected_node", display_name, "Node is not connected to anything.")
+
+        if node_type == "subnet":
+            has_net_link = any(
+                _edge_match(edges, node_id, str(net["id"]), {"member", "link"})
+                for net in nodes
+                if str(net["type"]) == "network"
+            )
+            if not has_net_link:
+                add_finding("ERROR", "subnet_no_network", display_name, "Subnet must be connected to a network.")
+            cidr = str(props.get("cidr", "")).strip()
+            if not cidr:
+                add_finding("ERROR", "subnet_missing_cidr", display_name, "Subnet CIDR is required.")
+            else:
+                try:
+                    ipaddress.ip_network(cidr, strict=False)
+                except ValueError:
+                    add_finding("ERROR", "subnet_invalid_cidr", display_name, f"Invalid CIDR: {cidr}")
+
+        if node_type == "instance":
+            flavor = str(props.get("flavor", "")).strip()
+            image = str(props.get("image", "")).strip()
+            key_name = str(props.get("key_name", "")).strip()
+            auth_mode = infer_instance_auth_mode(props)
+            admin_password = str(props.get("admin_password", "")).strip()
+            needs_fip = bool(props.get("needs_floating_ip", False))
+            floating_network = str(props.get("floating_network", "")).strip()
+            has_net_link = any(
+                _edge_match(edges, node_id, str(net["id"]), {"member", "link"})
+                for net in nodes
+                if str(net["type"]) == "network"
+            )
+            if not flavor:
+                add_finding("ERROR", "instance_missing_flavor", display_name, "Instance flavor is required.")
+            if not image:
+                add_finding("ERROR", "instance_missing_image", display_name, "Instance image is required.")
+            if auth_mode == "ssh_key" and not key_name:
+                add_finding("ERROR", "instance_missing_key_name", display_name, "Linux/SSH instance requires key_name.")
+            if auth_mode == "windows_password" and not admin_password:
+                add_finding("ERROR", "instance_missing_admin_password", display_name, "Windows/password instance requires admin_password.")
+            if not has_net_link:
+                add_finding("ERROR", "instance_no_network", display_name, "Instance must be connected to a network.")
+            if needs_fip and not floating_network:
+                add_finding("ERROR", "instance_missing_floating_network", display_name, "Instance has floating IP enabled but floating_network is empty.")
+
+        if node_type == "volume":
+            size_text = str(props.get("size_gb", "")).strip()
+            try:
+                size = int(size_text or "0")
+                if size <= 0:
+                    raise ValueError("non-positive")
+            except ValueError:
+                add_finding("ERROR", "volume_invalid_size", display_name, "Volume size_gb must be a positive integer.")
+
+        if node_type == "load_balancer":
+            provider = str(props.get("provider", "")).strip().lower() or "ovn"
+            protocol = str(props.get("protocol", "")).strip().upper() or "HTTP"
+            listener_port_text = str(props.get("listener_port", "")).strip() or "80"
+            member_port_text = str(props.get("member_port", "")).strip() or listener_port_text
+            needs_fip = bool(props.get("needs_floating_ip", False))
+            floating_network = str(props.get("floating_network", "")).strip()
+            has_subnet_link = any(
+                _edge_match(edges, node_id, str(s["id"]), {"member", "link"})
+                for s in nodes
+                if str(s["type"]) == "subnet"
+            )
+            has_member = any(
+                _edge_match(edges, node_id, str(i["id"]), {"member", "link"})
+                for i in nodes
+                if str(i["type"]) == "instance"
+            )
+            if provider not in {"ovn", "amphora"}:
+                add_finding("ERROR", "lb_invalid_provider", display_name, f"Unsupported LB provider: {provider}. Use ovn or amphora.")
+            if protocol not in {"HTTP", "HTTPS", "TCP"}:
+                add_finding("ERROR", "lb_invalid_protocol", display_name, f"Unsupported LB protocol: {protocol}")
+            if provider == "ovn" and protocol in {"HTTP", "HTTPS"}:
+                add_finding(
+                    "ERROR",
+                    "lb_provider_protocol_mismatch",
+                    display_name,
+                    "OVN provider does not support HTTP/HTTPS listeners on this platform. Use TCP or switch provider to amphora.",
+                )
+            for port_text, code in [(listener_port_text, "lb_invalid_listener_port"), (member_port_text, "lb_invalid_member_port")]:
+                try:
+                    p = int(port_text)
+                    if p < 1 or p > 65535:
+                        raise ValueError("out_of_range")
+                except ValueError:
+                    add_finding("ERROR", code, display_name, f"Invalid port value: {port_text}")
+            if not has_subnet_link:
+                add_finding("ERROR", "lb_no_subnet", display_name, "Load balancer must be connected to a subnet.")
+            if not has_member:
+                add_finding("WARN", "lb_no_members", display_name, "Load balancer has no backend instance members.")
+            if needs_fip and not floating_network:
+                add_finding("ERROR", "lb_missing_floating_network", display_name, "Load balancer has floating IP enabled but floating_network is empty.")
+
+    for r in [n for n in nodes if str(n["type"]) == "router"]:
+        rid = str(r["id"])
+        name = _node_name(r, "router")
+        has_route = any(
+            _edge_match(edges, rid, str(s["id"]), {"route", "link"})
+            for s in nodes
+            if str(s["type"]) == "subnet"
+        )
+        if not has_route:
+            add_finding("WARN", "router_no_subnet_route", name, "Router is not connected to any subnet.")
+
+    return findings, summary
+
+
+def plan_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, object]]) -> List[Dict[str, str]]:
+    actions: List[Dict[str, str]] = []
+
+    def add(step: int, resource: str, name: str, action: str, command: str) -> None:
+        actions.append(
+            {
+                "step": str(step),
+                "resource": resource,
+                "name": name,
+                "action": action,
+                "command": command,
+            }
+        )
+
+    step = 1
+    networks = [n for n in nodes if n["type"] == "network"]
+    subnets = [n for n in nodes if n["type"] == "subnet"]
+    routers = [n for n in nodes if n["type"] == "router"]
+    secgroups = [n for n in nodes if n["type"] == "security_group"]
+    instances = [n for n in nodes if n["type"] == "instance"]
+    volumes = [n for n in nodes if n["type"] == "volume"]
+    load_balancers = [n for n in nodes if n["type"] == "load_balancer"]
+
+    for n in networks:
+        name = _node_name(n, "net")
+        add(step, "network", name, "create_or_reuse", f"openstack network create {shell_quote(name)}")
+        step += 1
+
+    for s in subnets:
+        name = _node_name(s, "subnet")
+        props = s.get("props", {}) if isinstance(s.get("props", {}), dict) else {}
+        cidr = str(props.get("cidr", "")).strip() or "10.10.0.0/24"
+        network_name = str(props.get("network_name", "")).strip()
+        for net in networks:
+            if _edge_match(edges, str(s["id"]), str(net["id"]), {"member", "link"}):
+                network_name = _node_name(net, "net")
+                break
+        cmd = f"openstack subnet create --network {shell_quote(network_name)} --subnet-range {shell_quote(cidr)} {shell_quote(name)}"
+        add(step, "subnet", name, "create_or_reuse", cmd)
+        step += 1
+
+    for r in routers:
+        name = _node_name(r, "router")
+        add(step, "router", name, "create_or_reuse", f"openstack router create {shell_quote(name)}")
+        step += 1
+        props = r.get("props", {}) if isinstance(r.get("props", {}), dict) else {}
+        external_network = str(props.get("external_network", "")).strip()
+        if external_network:
+            add(
+                step,
+                "router",
+                name,
+                "set_gateway",
+                f"openstack router set --external-gateway {shell_quote(external_network)} {shell_quote(name)}",
+            )
+            step += 1
+
+    for sg in secgroups:
+        sg_name = _node_name(sg, "sg")
+        add(step, "security_group", sg_name, "create_or_reuse", f"openstack security group create {shell_quote(sg_name)}")
+        step += 1
+
+    for inst in instances:
+        name = _node_name(inst, "vm")
+        props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
+        flavor = str(props.get("flavor", "")).strip()
+        image = str(props.get("image", "")).strip()
+        user_data = str(props.get("user_data", "")).strip()
+        key_name = str(props.get("key_name", "")).strip()
+        auth_mode = infer_instance_auth_mode(props)
+        admin_password = str(props.get("admin_password", "")).strip()
+        network_name = str(props.get("network_name", "")).strip()
+        for net in networks:
+            if _edge_match(edges, str(inst["id"]), str(net["id"]), {"member", "link"}):
+                network_name = _node_name(net, "net")
+                break
+        if auth_mode == "windows_password":
+            auth_arg = "--password <node-admin-password>"
+        else:
+            auth_arg = f"--key-name {shell_quote(key_name)}"
+        cmd = (
+            f"openstack server create --flavor {shell_quote(flavor)} --image {shell_quote(image)} "
+            f"--network {shell_quote(network_name)} {auth_arg} {shell_quote(name)}"
+        )
+        if user_data:
+            cmd = cmd.replace(f"{shell_quote(name)}", f"--user-data <instance-user-data-file> {shell_quote(name)}")
+        add(step, "instance", name, "create_or_reuse", cmd)
+        step += 1
+        if bool(props.get("needs_floating_ip", False)):
+            floating_network = str(props.get("floating_network", "")).strip() or "PUBLICNET"
+            add(step, "instance", name, "assign_floating_ip", f"openstack floating ip create {shell_quote(floating_network)} && openstack server add floating ip {shell_quote(name)} <allocated-ip>")
+            step += 1
+
+    for vol in volumes:
+        name = _node_name(vol, "vol")
+        props = vol.get("props", {}) if isinstance(vol.get("props", {}), dict) else {}
+        size_gb = str(props.get("size_gb", "")).strip() or "50"
+        add(step, "volume", name, "create_or_reuse", f"openstack volume create --size {shell_quote(size_gb)} {shell_quote(name)}")
+        step += 1
+        for inst in instances:
+            if _edge_match(edges, str(vol["id"]), str(inst["id"]), {"attach", "link"}):
+                inst_name = _node_name(inst, "vm")
+                add(step, "volume", name, "attach", f"openstack server add volume {shell_quote(inst_name)} {shell_quote(name)}")
+                step += 1
+
+    for lb in load_balancers:
+        lb_name = _node_name(lb, "lb")
+        props = lb.get("props", {}) if isinstance(lb.get("props", {}), dict) else {}
+        provider = str(props.get("provider", "")).strip().lower() or "ovn"
+        protocol = str(props.get("protocol", "")).strip().upper() or "HTTP"
+        listener_port = str(props.get("listener_port", "")).strip() or "80"
+        member_port = str(props.get("member_port", "")).strip() or listener_port
+        algorithm = str(props.get("pool_algorithm", "")).strip().upper() or "ROUND_ROBIN"
+        subnet_name = str(props.get("subnet_name", "")).strip()
+        for s in subnets:
+            if _edge_match(edges, str(lb["id"]), str(s["id"]), {"member", "link"}):
+                subnet_name = _node_name(s, "subnet")
+                break
+        add(step, "load_balancer", lb_name, "create_or_reuse", f"openstack loadbalancer create --name {shell_quote(lb_name)} --provider {shell_quote(provider)} --vip-subnet-id <id:{subnet_name}>")
+        step += 1
+        listener_name = f"{lb_name}-listener"
+        pool_name = f"{lb_name}-pool"
+        add(step, "load_balancer", listener_name, "create_or_reuse", f"openstack loadbalancer listener create --name {shell_quote(listener_name)} --protocol {shell_quote(protocol)} --protocol-port {shell_quote(listener_port)} {shell_quote(lb_name)}")
+        step += 1
+        add(step, "load_balancer", pool_name, "create_or_reuse", f"openstack loadbalancer pool create --name {shell_quote(pool_name)} --lb-algorithm {shell_quote(algorithm)} --listener {shell_quote(listener_name)} --protocol {shell_quote(protocol)}")
+        step += 1
+        for inst in instances:
+            if _edge_match(edges, str(lb["id"]), str(inst["id"]), {"member", "link"}):
+                inst_name = _node_name(inst, "vm")
+                add(step, "load_balancer", pool_name, "add_member", f"openstack loadbalancer member create --subnet-id <id:{subnet_name}> --address <ip:{inst_name}> --protocol-port {shell_quote(member_port)} {shell_quote(pool_name)}")
+                step += 1
+        if bool(props.get("needs_floating_ip", False)):
+            floating_network = str(props.get("floating_network", "")).strip() or "PUBLICNET"
+            add(step, "load_balancer", lb_name, "assign_floating_ip", f"openstack floating ip create {shell_quote(floating_network)} && openstack floating ip set --port <vip-port:{lb_name}> <allocated-ip>")
+            step += 1
+
+    return actions
+
+
+def extract_instance_key_names(nodes: List[Dict[str, object]]) -> List[str]:
+    keys: set = set()
+    for n in nodes:
+        if str(n.get("type", "")) != "instance":
+            continue
+        props = n.get("props", {}) if isinstance(n.get("props", {}), dict) else {}
+        if infer_instance_auth_mode(props) != "ssh_key":
+            continue
+        key_name = str(props.get("key_name", "")).strip()
+        if key_name:
+            keys.add(key_name)
+    return sorted(keys)
+
+
+def verify_keypairs_via_openstack(
+    openrc_path: Path,
+    auth_secret: str,
+    key_names: List[str],
+    timeout_sec: int = 45,
+) -> Tuple[bool, List[str], str]:
+    if not key_names:
+        return True, [], ""
+
+    secret_export = ""
+    if auth_secret:
+        q = shell_quote(auth_secret)
+        secret_export = f"export OS_PASSWORD={q}; export OS_API_KEY={q}; "
+
+    cmd = (
+        f"set -a && {secret_export}source {shell_quote(str(openrc_path))} && "
+        f"{secret_export}set +a && openstack keypair list -f value -c Name"
+    )
+    try:
+        proc = subprocess.run(
+            ["bash", "-lc", cmd],
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired:
+        return False, key_names, f"Timed out after {timeout_sec}s while verifying keypairs."
+
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        if not detail:
+            detail = f"openstack keypair list failed with rc={proc.returncode}"
+        return False, key_names, detail
+
+    present = {line.strip() for line in (proc.stdout or "").splitlines() if line.strip()}
+    missing = [k for k in key_names if k not in present]
+    return len(missing) == 0, missing, ""
+
+
+def parse_openrc_exports(text: str) -> Dict[str, str]:
+    exports: Dict[str, str] = {}
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = re.match(r"^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$", line)
+        if not m:
+            continue
+        key = m.group(1).strip()
+        value = m.group(2).strip()
+        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+            value = value[1:-1]
+        exports[key] = value
+    return exports
+
+
+def openstack_json(env: Dict[str, str], args: List[str], timeout_sec: int = 45) -> Any:
+    proc = subprocess.run(
+        ["openstack", *args, "-f", "json"],
+        cwd=str(BASE_DIR),
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout_sec,
+    )
+    if proc.returncode != 0:
+        msg = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(msg or f"openstack {' '.join(args)} failed with rc={proc.returncode}")
+    out = (proc.stdout or "").strip()
+    return json.loads(out) if out else []
+
+
+def _value_from_row(row: Dict[str, Any], keys: List[str]) -> str:
+    keymap = {str(k).lower(): v for k, v in row.items()}
+    for k in keys:
+        lk = k.lower()
+        if lk in keymap and keymap[lk] is not None:
+            return str(keymap[lk])
+    return ""
+
+
+def import_live_topology(env: Dict[str, str]) -> Dict[str, Any]:
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    edge_seen: set = set()
+    idx = 0
+    type_y = {
+        "network": 80,
+        "subnet": 180,
+        "router": 280,
+        "load_balancer": 280,
+        "security_group": 380,
+        "instance": 120,
+        "volume": 260,
+    }
+    type_x = {"network": 80, "subnet": 80, "router": 80, "load_balancer": 300, "security_group": 520, "instance": 300, "volume": 720}
+    type_count: Dict[str, int] = {}
+    map_by_openstack_id: Dict[str, str] = {}
+    net_name_to_node: Dict[str, str] = {}
+    server_id_to_node: Dict[str, str] = {}
+    ip_to_instance_node: Dict[str, str] = {}
+
+    def place(node_type: str) -> Tuple[int, int]:
+        c = type_count.get(node_type, 0)
+        type_count[node_type] = c + 1
+        return type_x[node_type] + (c % 3) * 160, type_y[node_type] + (c // 3) * 110
+
+    def add_node(node_type: str, label: str, props: Dict[str, Any], openstack_id: str = "") -> str:
+        nonlocal idx
+        idx += 1
+        x, y = place(node_type)
+        node_id = f"imported_{node_type}_{idx}"
+        nodes.append({"id": node_id, "type": node_type, "label": label, "x": x, "y": y, "props": props})
+        if openstack_id:
+            map_by_openstack_id[openstack_id] = node_id
+        return node_id
+
+    def add_edge(from_id: str, to_id: str, edge_type: str) -> None:
+        key = (from_id, to_id, edge_type) if from_id <= to_id else (to_id, from_id, edge_type)
+        if key in edge_seen:
+            return
+        edge_seen.add(key)
+        edges.append({"from": from_id, "to": to_id, "type": edge_type})
+
+    def parse_server_addresses(addresses: Any) -> Tuple[bool, str]:
+        has_fip = False
+        fip_network = ""
+        if not isinstance(addresses, dict):
+            return has_fip, fip_network
+        for net_name, entries in addresses.items():
+            if isinstance(entries, list):
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    ip_type = str(entry.get("OS-EXT-IPS:type") or entry.get("type") or "").strip().lower()
+                    if ip_type == "floating":
+                        has_fip = True
+                        if not fip_network:
+                            fip_network = str(net_name).strip()
+        return has_fip, fip_network
+
+    networks = openstack_json(env, ["network", "list"])
+    for net in networks:
+        name = _value_from_row(net, ["Name"])
+        nid = _value_from_row(net, ["ID"])
+        node_id = add_node("network", name or nid, {"name": name or nid}, nid)
+        if name:
+            net_name_to_node[name] = node_id
+
+    subnets = openstack_json(env, ["subnet", "list"])
+    for sub in subnets:
+        sid = _value_from_row(sub, ["ID"])
+        sname = _value_from_row(sub, ["Name"]) or sid
+        net_id = _value_from_row(sub, ["Network"])
+        detail = openstack_json(env, ["subnet", "show", sid]) if sid else {}
+        cidr = _value_from_row(detail if isinstance(detail, dict) else {}, ["cidr", "CIDR"])
+        gateway = _value_from_row(detail if isinstance(detail, dict) else {}, ["gateway_ip", "Gateway IP"])
+        dns = _value_from_row(detail if isinstance(detail, dict) else {}, ["dns_nameservers", "DNS Nameservers"])
+        node_id = add_node(
+            "subnet",
+            sname,
+            {"name": sname, "cidr": cidr or "10.0.0.0/24", "gateway_ip": gateway, "dns_nameserver": dns},
+            sid,
+        )
+        if net_id and net_id in map_by_openstack_id:
+            add_edge(node_id, map_by_openstack_id[net_id], "member")
+
+    routers = openstack_json(env, ["router", "list"])
+    for r in routers:
+        rid = _value_from_row(r, ["ID"])
+        rname = _value_from_row(r, ["Name"]) or rid
+        detail = openstack_json(env, ["router", "show", rid]) if rid else {}
+        external = ""
+        interfaces: List[Dict[str, Any]] = []
+        if isinstance(detail, dict):
+            ext = detail.get("external_gateway_info") or detail.get("External Gateway Info")
+            if isinstance(ext, dict):
+                external = str(ext.get("network_id") or "")
+            interfaces = detail.get("interfaces_info") if isinstance(detail.get("interfaces_info"), list) else []
+        r_node = add_node("router", rname, {"name": rname, "external_network": external}, rid)
+        if external and external in map_by_openstack_id:
+            add_edge(r_node, map_by_openstack_id[external], "gateway")
+        for iface in interfaces:
+            if not isinstance(iface, dict):
+                continue
+            subnet_id = str(iface.get("subnet_id") or "")
+            if subnet_id and subnet_id in map_by_openstack_id:
+                add_edge(r_node, map_by_openstack_id[subnet_id], "route")
+
+    secgroups = openstack_json(env, ["security", "group", "list"])
+    for sg in secgroups:
+        sgid = _value_from_row(sg, ["ID"])
+        sgname = _value_from_row(sg, ["Name"]) or sgid
+        sg_rules_text = ""
+        try:
+            rules = openstack_json(env, ["security", "group", "rule", "list", "--ingress", sgid]) if sgid else []
+            lines: List[str] = []
+            for rule in rules:
+                proto = _value_from_row(rule, ["Protocol"])
+                port = _value_from_row(rule, ["Port Range"])
+                remote = _value_from_row(rule, ["IP Range"])
+                if proto and remote:
+                    lines.append(f"{proto} {port or '1:65535'} {remote}")
+            sg_rules_text = "\n".join(lines)
+        except Exception:
+            sg_rules_text = ""
+        add_node("security_group", sgname, {"name": sgname, "rules_text": sg_rules_text}, sgid)
+
+    servers = openstack_json(env, ["server", "list"])
+    for s in servers:
+        sid = _value_from_row(s, ["ID"])
+        sname = _value_from_row(s, ["Name"]) or sid
+        detail = openstack_json(env, ["server", "show", sid]) if sid else {}
+        flavor = ""
+        image = ""
+        imported_key_name = ""
+        sg_names: List[str] = []
+        needs_floating_ip = False
+        floating_network = "PUBLICNET"
+        if isinstance(detail, dict):
+            fl = detail.get("flavor")
+            if isinstance(fl, dict):
+                flavor = str(fl.get("original_name") or fl.get("name") or "")
+            image = _value_from_row(detail, ["image", "Image"])
+            imported_key_name = _value_from_row(detail, ["key_name", "Key Name"])
+            sgs = detail.get("security_groups")
+            if isinstance(sgs, list):
+                for item in sgs:
+                    if isinstance(item, dict):
+                        sg_n = str(item.get("name") or "")
+                        if sg_n:
+                            sg_names.append(sg_n)
+        try:
+            server_fips = openstack_json(env, ["floating", "ip", "list", "--server", sid]) if sid else []
+            if isinstance(server_fips, list) and server_fips:
+                needs_floating_ip = True
+                fn = _value_from_row(server_fips[0], ["Floating Network", "Pool"])
+                if fn:
+                    floating_network = fn
+        except Exception:
+            pass
+        if not needs_floating_ip and isinstance(detail, dict):
+            has_fip_from_addr, fip_net_from_addr = parse_server_addresses(detail.get("addresses"))
+            if has_fip_from_addr:
+                needs_floating_ip = True
+                if fip_net_from_addr:
+                    floating_network = fip_net_from_addr
+        node_id = add_node(
+            "instance",
+            sname,
+            {
+                "name": sname,
+                "flavor": flavor,
+                "image": image,
+                "key_name": imported_key_name,
+                "auth_mode": "windows_password" if "windows" in image.lower() else "ssh_key",
+                "admin_user": "Administrator",
+                "admin_password": "",
+                "needs_floating_ip": needs_floating_ip,
+                "floating_network": floating_network,
+            },
+            sid,
+        )
+        server_id_to_node[sid] = node_id
+        networks_field = _value_from_row(s, ["Networks"])
+        for chunk in [c.strip() for c in networks_field.split(",") if c.strip()]:
+            net_name = chunk.split("=")[0].strip()
+            if net_name and net_name in net_name_to_node:
+                add_edge(node_id, net_name_to_node[net_name], "member")
+        addresses = detail.get("addresses") if isinstance(detail, dict) else {}
+        if isinstance(addresses, dict):
+            for net_key, entries in addresses.items():
+                net_name = str(net_key).strip()
+                if net_name in net_name_to_node:
+                    add_edge(node_id, net_name_to_node[net_name], "member")
+                elif net_name in map_by_openstack_id:
+                    add_edge(node_id, map_by_openstack_id[net_name], "member")
+                if isinstance(entries, list):
+                    for entry in entries:
+                        if not isinstance(entry, dict):
+                            continue
+                        ip_addr = str(entry.get("addr") or "").strip()
+                        if ip_addr:
+                            ip_to_instance_node[ip_addr] = node_id
+        for sg_name in sg_names:
+            for sg_node in [n for n in nodes if n["type"] == "security_group" and n.get("props", {}).get("name") == sg_name]:
+                add_edge(node_id, sg_node["id"], "member")
+
+    volumes = openstack_json(env, ["volume", "list"])
+    for v in volumes:
+        vid = _value_from_row(v, ["ID"])
+        vname = _value_from_row(v, ["Name"]) or vid
+        size = _value_from_row(v, ["Size"]) or "1"
+        vtype = _value_from_row(v, ["Type"])
+        detail = openstack_json(env, ["volume", "show", vid]) if vid else {}
+        v_node = add_node("volume", vname, {"name": vname, "size_gb": size, "volume_type": vtype}, vid)
+        attachments = detail.get("attachments") if isinstance(detail, dict) else []
+        if isinstance(attachments, list):
+            for att in attachments:
+                if not isinstance(att, dict):
+                    continue
+                sid = str(att.get("server_id") or "")
+                if sid and sid in server_id_to_node:
+                    add_edge(v_node, server_id_to_node[sid], "attach")
+
+    try:
+        lbs = openstack_json(env, ["loadbalancer", "list"])
+    except Exception:
+        lbs = []
+    for lb in lbs if isinstance(lbs, list) else []:
+        lb_id = _value_from_row(lb, ["ID"])
+        lb_name = _value_from_row(lb, ["Name"]) or lb_id
+        lb_props: Dict[str, Any] = {
+            "name": lb_name,
+            "provider": "ovn",
+            "protocol": "HTTP",
+            "listener_port": "80",
+            "member_port": "80",
+            "pool_algorithm": "ROUND_ROBIN",
+            "needs_floating_ip": False,
+            "floating_network": "PUBLICNET",
+        }
+        lb_node = add_node("load_balancer", lb_name, lb_props, lb_id)
+
+        lb_detail = {}
+        try:
+            lb_detail = openstack_json(env, ["loadbalancer", "show", lb_id]) if lb_id else {}
+        except Exception:
+            lb_detail = {}
+        vip_subnet = _value_from_row(lb_detail if isinstance(lb_detail, dict) else {}, ["vip_subnet_id", "Vip Subnet Id"])
+        vip_port_id = _value_from_row(lb_detail if isinstance(lb_detail, dict) else {}, ["vip_port_id", "Vip Port Id"])
+        provider = _value_from_row(lb_detail if isinstance(lb_detail, dict) else {}, ["provider", "Provider"])
+        if provider:
+            lb_props["provider"] = provider.lower()
+        if vip_subnet and vip_subnet in map_by_openstack_id:
+            add_edge(lb_node, map_by_openstack_id[vip_subnet], "member")
+        if vip_port_id:
+            try:
+                vip_fips = openstack_json(env, ["floating", "ip", "list", "--port", vip_port_id])
+                if isinstance(vip_fips, list) and vip_fips:
+                    lb_props["needs_floating_ip"] = True
+                    fn = _value_from_row(vip_fips[0], ["Floating Network", "Pool"])
+                    if fn:
+                        lb_props["floating_network"] = fn
+            except Exception:
+                pass
+
+        listeners = []
+        try:
+            listeners = openstack_json(env, ["loadbalancer", "listener", "list", "--loadbalancer", lb_id]) if lb_id else []
+        except Exception:
+            listeners = []
+        listener_id = ""
+        if isinstance(listeners, list) and listeners:
+            first = listeners[0]
+            listener_id = _value_from_row(first, ["ID"])
+            lb_props["protocol"] = _value_from_row(first, ["Protocol"]) or lb_props["protocol"]
+            lb_props["listener_port"] = _value_from_row(first, ["Protocol Port"]) or lb_props["listener_port"]
+
+        pools = []
+        try:
+            if listener_id:
+                pools = openstack_json(env, ["loadbalancer", "pool", "list", "--listener", listener_id])
+            elif lb_id:
+                pools = openstack_json(env, ["loadbalancer", "pool", "list", "--loadbalancer", lb_id])
+        except Exception:
+            pools = []
+        pool_id = ""
+        if isinstance(pools, list) and pools:
+            first_pool = pools[0]
+            pool_id = _value_from_row(first_pool, ["ID"])
+            lb_props["pool_algorithm"] = _value_from_row(first_pool, ["LB Algorithm"]) or lb_props["pool_algorithm"]
+            lb_props["member_port"] = _value_from_row(first_pool, ["Protocol Port"]) or lb_props["member_port"]
+
+        if pool_id:
+            members = []
+            try:
+                members = openstack_json(env, ["loadbalancer", "member", "list", pool_id])
+            except Exception:
+                members = []
+            if isinstance(members, list):
+                for mem in members:
+                    addr = _value_from_row(mem, ["Address"])
+                    if addr and addr in ip_to_instance_node:
+                        add_edge(lb_node, ip_to_instance_node[addr], "member")
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def _expand_shell_vars(text: str, vars_map: Dict[str, str]) -> str:
+    value = str(text or "")
+
+    def replace_braced(match: re.Match[str]) -> str:
+        key = match.group(1)
+        return vars_map.get(key, match.group(0))
+
+    def replace_plain(match: re.Match[str]) -> str:
+        key = match.group(1)
+        return vars_map.get(key, match.group(0))
+
+    value = re.sub(r"\$\{([A-Z][A-Z0-9_]*)\}", replace_braced, value)
+    value = re.sub(r"\$([A-Z][A-Z0-9_]*)", replace_plain, value)
+    return value
+
+
+def _extract_script_commands(script_text: str, vars_map: Dict[str, str]) -> List[str]:
+    commands: List[str] = []
+    in_function = False
+    function_depth = 0
+    for raw_line in (script_text or "").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if not in_function and re.match(r"^(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\(\))?\s*\{$", line):
+            in_function = True
+            function_depth = 1
+            continue
+
+        if in_function:
+            function_depth += line.count("{")
+            function_depth -= line.count("}")
+            if function_depth <= 0:
+                in_function = False
+                function_depth = 0
+            continue
+
+        assign = re.match(r"^(?:export\s+)?([A-Z][A-Z0-9_]*)=(.+)$", line)
+        if assign and "openstack " not in line and not line.startswith("run_os ") and not line.startswith("run_os_retry "):
+            key = assign.group(1)
+            value = assign.group(2).strip()
+            if "$(" in value or "`" in value:
+                continue
+            if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                value = value[1:-1]
+            vars_map[key] = _expand_shell_vars(value, vars_map)
+            continue
+
+        line = _expand_shell_vars(line, vars_map)
+
+        for needle in ("openstack ", "run_os ", "run_os_retry "):
+            start = line.find(needle)
+            if start < 0:
+                continue
+            segment = line[start:]
+            for piece in re.split(r"\s*(?:&&|\|\||;)\s*", segment):
+                chunk = piece.strip()
+                if chunk.startswith("openstack "):
+                    commands.append(chunk)
+                elif chunk.startswith("run_os "):
+                    commands.append("openstack " + chunk[len("run_os "):].strip())
+                elif chunk.startswith("run_os_retry "):
+                    commands.append("openstack " + chunk[len("run_os_retry "):].strip())
+    return commands
+
+
+def _parse_openstack_tokens(cmd: str) -> List[str]:
+    cleaned = re.split(r"\s(?:>|<)\S*", cmd, maxsplit=1)[0].strip()
+    try:
+        return shlex.split(cleaned)
+    except ValueError:
+        return []
+
+
+def _parse_options(tokens: List[str], start_idx: int) -> Tuple[Dict[str, str], List[str]]:
+    opts: Dict[str, str] = {}
+    pos: List[str] = []
+    i = start_idx
+    while i < len(tokens):
+        t = tokens[i]
+        if t.startswith("--"):
+            if "=" in t:
+                k, v = t.split("=", 1)
+                opts[k] = v
+                i += 1
+                continue
+            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                opts[t] = tokens[i + 1]
+                i += 2
+                continue
+            opts[t] = "true"
+            i += 1
+            continue
+        if t.startswith("-"):
+            i += 1
+            continue
+        pos.append(t)
+        i += 1
+    return opts, pos
+
+
+def _clean_shell_token(token: str) -> str:
+    value = str(token or "").strip()
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        value = value[1:-1]
+    return value.strip()
+
+
+def import_topology_from_script(script_text: str) -> Tuple[Dict[str, Any], List[str]]:
+    nodes: List[Dict[str, Any]] = []
+    edges: List[Dict[str, Any]] = []
+    parse_notes: List[str] = []
+    edge_seen: set = set()
+    idx = 0
+    name_index: Dict[Tuple[str, str], str] = {}
+    type_count: Dict[str, int] = {}
+    listener_to_lb: Dict[str, str] = {}
+    pool_to_lb: Dict[str, str] = {}
+    vars_map: Dict[str, str] = {}
+    member_server_hints_by_pool: Dict[str, set] = {}
+    volume_var_to_name: Dict[str, str] = {}
+    volume_name_to_image: Dict[str, str] = {}
+    user_data_var_to_content: Dict[str, str] = {}
+    subnet_var_to_subnet_name: Dict[str, str] = {}
+    pending_member_server = ""
+
+    # Capture heredoc user-data blocks emitted by generated deploy scripts.
+    # Pattern:
+    #   VAR=$(mktemp)
+    #   cat > "${VAR}" <<'DELIM'
+    #   ...
+    #   DELIM
+    text_for_scan = script_text or ""
+    heredoc_re = re.compile(
+        r'([A-Z][A-Z0-9_]*)=\$\(mktemp\)\s*\n'
+        r'cat\s*>\s*"\$\{?\1\}?"\s*<<\'?([A-Za-z0-9_]+)\'?\n'
+        r'(.*?)\n\2',
+        re.DOTALL,
+    )
+    for m in heredoc_re.finditer(text_for_scan):
+        user_data_var_to_content[m.group(1)] = m.group(3).rstrip("\n")
+
+    type_y = {
+        "network": 80,
+        "subnet": 180,
+        "router": 280,
+        "load_balancer": 280,
+        "security_group": 380,
+        "instance": 120,
+        "volume": 260,
+    }
+    type_x = {"network": 80, "subnet": 80, "router": 80, "load_balancer": 300, "security_group": 520, "instance": 300, "volume": 720}
+
+    def place(node_type: str) -> Tuple[int, int]:
+        c = type_count.get(node_type, 0)
+        type_count[node_type] = c + 1
+        return type_x.get(node_type, 80) + (c % 3) * 160, type_y.get(node_type, 80) + (c // 3) * 110
+
+    def ensure_node(node_type: str, name: str, defaults: Optional[Dict[str, Any]] = None) -> str:
+        nonlocal idx
+        clean_name = (name or "").strip()
+        if not clean_name:
+            clean_name = f"{node_type}-{len([n for n in nodes if n['type'] == node_type]) + 1}"
+        key = (node_type, clean_name)
+        existing = name_index.get(key)
+        if existing:
+            for n in nodes:
+                if n["id"] == existing and isinstance(defaults, dict):
+                    props = n.setdefault("props", {})
+                    if isinstance(props, dict):
+                        for dk, dv in defaults.items():
+                            if props.get(dk, "") in {"", None, False} and dv not in {"", None}:
+                                props[dk] = dv
+            return existing
+        idx += 1
+        x, y = place(node_type)
+        node_id = f"script_{node_type}_{idx}"
+        props = {"name": clean_name}
+        if isinstance(defaults, dict):
+            props.update(defaults)
+        nodes.append({"id": node_id, "type": node_type, "label": clean_name, "x": x, "y": y, "props": props})
+        name_index[key] = node_id
+        return node_id
+
+    def add_edge(a_id: str, b_id: str, edge_type: str) -> None:
+        if not a_id or not b_id or a_id == b_id:
+            return
+        key = (a_id, b_id, edge_type) if a_id <= b_id else (b_id, a_id, edge_type)
+        if key in edge_seen:
+            return
+        edge_seen.add(key)
+        edges.append({"from": a_id, "to": b_id, "type": edge_type})
+
+    def resolve_subnet_ref(value: str) -> str:
+        token = _clean_shell_token(value)
+        var_ref = re.match(r"^\$\{?([A-Z][A-Z0-9_]*)\}?$", token)
+        if var_ref:
+            var_name = var_ref.group(1)
+            if var_name in subnet_var_to_subnet_name:
+                return _clean_shell_token(subnet_var_to_subnet_name[var_name])
+            if var_name in vars_map:
+                return _clean_shell_token(vars_map[var_name])
+            return token
+        if re.match(r"^[0-9a-fA-F-]{32,36}$", token):
+            subnet_names = [n.get("props", {}).get("name", "") for n in nodes if n.get("type") == "subnet"]
+            unique_names = sorted({str(name).strip() for name in subnet_names if str(name).strip()})
+            if len(unique_names) == 1:
+                return unique_names[0]
+        return token
+
+    def extract_option_values(tokens: List[str], option_name: str, start_index: int = 3) -> List[str]:
+        values: List[str] = []
+        i = start_index
+        while i < len(tokens):
+            t = str(tokens[i] or "")
+            if t == option_name:
+                if i + 1 < len(tokens):
+                    nxt = str(tokens[i + 1] or "")
+                    if nxt and not nxt.startswith("-"):
+                        values.append(_clean_shell_token(nxt))
+                        i += 2
+                        continue
+                i += 1
+                continue
+            if t.startswith(option_name + "="):
+                values.append(_clean_shell_token(t.split("=", 1)[1]))
+                i += 1
+                continue
+            i += 1
+        return [v for v in values if v]
+
+    for raw_line in (script_text or "").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        assign = re.match(r"^(?:export\s+)?([A-Z][A-Z0-9_]*)=(.+)$", line)
+        if assign and "openstack " not in line and not line.startswith("run_os ") and not line.startswith("run_os_retry "):
+            key = assign.group(1)
+            value = assign.group(2).strip()
+            if "$(" not in value and "`" not in value:
+                if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                    value = value[1:-1]
+                vars_map[key] = _expand_shell_vars(value, vars_map)
+
+        expanded = _expand_shell_vars(line, vars_map)
+
+        helper_tokens = _parse_openstack_tokens(expanded)
+        if helper_tokens and helper_tokens[0] == "assign_floating_ip" and len(helper_tokens) >= 3:
+            server_name = _clean_shell_token(helper_tokens[1])
+            floating_network = _clean_shell_token(helper_tokens[2]) or "PUBLICNET"
+            inst_id = ensure_node(
+                "instance",
+                server_name,
+                {"name": server_name, "needs_floating_ip": True, "floating_network": floating_network},
+            )
+            for n in nodes:
+                if n["id"] == inst_id and isinstance(n.get("props"), dict):
+                    n["props"]["needs_floating_ip"] = True
+                    n["props"]["floating_network"] = floating_network
+            continue
+
+        wait_match = re.search(r"wait_for_instance_ip_on_network\s+([^\s\)]+)\s+", expanded)
+        if wait_match:
+            pending_member_server = _clean_shell_token(wait_match.group(1))
+
+        assign_cmd = re.match(r"^([A-Z][A-Z0-9_]*)=\$\((.+)\)\s*$", expanded)
+        if assign_cmd:
+            var_name = assign_cmd.group(1)
+            inner_cmd = assign_cmd.group(2).strip()
+            inner_tokens = _parse_openstack_tokens(inner_cmd)
+            if len(inner_tokens) >= 3 and inner_tokens[0] == "openstack" and inner_tokens[1] == "volume" and inner_tokens[2] == "show":
+                _inner_opts, inner_pos = _parse_options(inner_tokens, 3)
+                if inner_pos:
+                    volume_var_to_name[var_name] = _clean_shell_token(inner_pos[-1])
+            if len(inner_tokens) >= 3 and inner_tokens[0] == "openstack" and inner_tokens[1] == "subnet" and inner_tokens[2] == "show":
+                _inner_opts, inner_pos = _parse_options(inner_tokens, 3)
+                if inner_pos:
+                    subnet_var_to_subnet_name[var_name] = _clean_shell_token(inner_pos[-1])
+
+        for piece in re.split(r"\s*(?:&&|\|\||;)\s*", expanded):
+            chunk = piece.strip()
+            if chunk.startswith("run_os "):
+                chunk = "openstack " + chunk[len("run_os "):].strip()
+            elif chunk.startswith("run_os_retry "):
+                chunk = "openstack " + chunk[len("run_os_retry "):].strip()
+            if not chunk.startswith("openstack "):
+                continue
+            tokens = _parse_openstack_tokens(chunk)
+            if len(tokens) >= 5 and tokens[0] == "openstack" and tokens[1] == "loadbalancer" and tokens[2] == "member" and tokens[3] == "create":
+                _hint_opts, hint_pos = _parse_options(tokens, 4)
+                pool_name = _clean_shell_token(hint_pos[-1]) if hint_pos else ""
+                if pool_name and pending_member_server:
+                    member_server_hints_by_pool.setdefault(pool_name, set()).add(pending_member_server)
+
+    commands = _extract_script_commands(script_text, vars_map)
+    if not commands:
+        parse_notes.append("No recognized OpenStack commands found in script.")
+        return {"nodes": nodes, "edges": edges}, parse_notes
+
+    for cmd in commands:
+        tokens = _parse_openstack_tokens(cmd)
+        if len(tokens) < 3 or tokens[0] != "openstack":
+            continue
+        group = tokens[1]
+        action = tokens[2]
+        opts, pos = _parse_options(tokens, 3)
+
+        if group == "network" and action == "create" and pos:
+            ensure_node("network", pos[-1], {"name": pos[-1]})
+            continue
+
+        if group == "subnet" and action == "create" and pos:
+            subnet_name = _clean_shell_token(pos[-1])
+            net_name = opts.get("--network", "")
+            cidr = opts.get("--subnet-range", "")
+            s_id = ensure_node("subnet", subnet_name, {"name": subnet_name, "cidr": cidr or "10.60.0.0/24"})
+            if net_name:
+                n_id = ensure_node("network", net_name, {"name": net_name})
+                add_edge(s_id, n_id, "member")
+            continue
+
+        if group == "router" and action == "create" and pos:
+            ensure_node("router", pos[-1], {"name": pos[-1]})
+            continue
+
+        if group == "router" and action == "set" and "--external-gateway" in opts and pos:
+            router_name = pos[-1]
+            ext_net = opts.get("--external-gateway", "")
+            r_id = ensure_node("router", router_name, {"name": router_name, "external_network": ext_net or "PUBLICNET"})
+            if ext_net:
+                n_id = ensure_node("network", ext_net, {"name": ext_net})
+                add_edge(r_id, n_id, "gateway")
+            continue
+
+        if group == "router" and action == "add" and pos[:1] == ["subnet"] and len(pos) >= 3:
+            router_name = pos[1]
+            subnet_name = pos[2]
+            r_id = ensure_node("router", router_name, {"name": router_name})
+            s_id = ensure_node("subnet", subnet_name, {"name": subnet_name})
+            add_edge(r_id, s_id, "route")
+            continue
+
+        if group == "security" and len(tokens) > 4 and tokens[2] == "group" and tokens[3] == "create" and pos:
+            ensure_node("security_group", pos[-1], {"name": pos[-1]})
+            continue
+
+        if group == "server" and action == "create" and pos:
+            server_name = pos[-1]
+            flavor = opts.get("--flavor", "")
+            image = opts.get("--image", "")
+            key_name = opts.get("--key-name", "")
+            security_groups = extract_option_values(tokens, "--security-group", 3)
+            user_data_ref = _clean_shell_token(opts.get("--user-data", ""))
+            user_data = ""
+            if user_data_ref:
+                var_ref = re.match(r"^\$\{?([A-Z][A-Z0-9_]*)\}?$", user_data_ref)
+                if var_ref:
+                    user_data = user_data_var_to_content.get(var_ref.group(1), "")
+            password_opt = opts.get("--password", "")
+            boot_volume_ref = _clean_shell_token(opts.get("--volume", ""))
+            if boot_volume_ref:
+                var_ref = re.match(r"^\$\{?([A-Z][A-Z0-9_]*)\}?$", boot_volume_ref)
+                if var_ref:
+                    boot_volume_ref = volume_var_to_name.get(var_ref.group(1), boot_volume_ref)
+            boot_volume_name = _clean_shell_token(boot_volume_ref)
+            if not image and boot_volume_name:
+                image = volume_name_to_image.get(boot_volume_name, "")
+            auth_mode = "ssh_key"
+            if password_opt:
+                auth_mode = "windows_password"
+            elif "windows" in str(image or "").lower():
+                auth_mode = "windows_password"
+            if auth_mode == "ssh_key" and not key_name:
+                key_name = _clean_shell_token(vars_map.get("KEY_NAME", ""))
+            net_name = opts.get("--network", "")
+            s_id = ensure_node(
+                "instance",
+                server_name,
+                {
+                    "name": server_name,
+                    "flavor": flavor,
+                    "image": image,
+                    "key_name": key_name,
+                    "user_data": user_data,
+                    "auth_mode": auth_mode,
+                    "admin_user": "Administrator",
+                    "admin_password": password_opt,
+                    "needs_floating_ip": False,
+                    "floating_network": "PUBLICNET",
+                },
+            )
+            if net_name:
+                n_id = ensure_node("network", net_name, {"name": net_name})
+                add_edge(s_id, n_id, "member")
+            for sg_name in security_groups:
+                sg_id = ensure_node("security_group", sg_name, {"name": sg_name})
+                add_edge(s_id, sg_id, "member")
+            if boot_volume_name:
+                v_id = ensure_node(
+                    "volume",
+                    boot_volume_name,
+                    {"name": boot_volume_name, "size_gb": "50", "volume_type": "Performance"},
+                )
+                add_edge(s_id, v_id, "boot")
+            continue
+
+        if group == "server" and action == "add" and pos[:1] == ["security"] and len(pos) >= 3 and pos[1] == "group":
+            server_name = pos[2] if len(pos) >= 4 else ""
+            sg_name = pos[3] if len(pos) >= 4 else ""
+            if server_name and sg_name:
+                s_id = ensure_node("instance", server_name, {"name": server_name})
+                sg_id = ensure_node("security_group", sg_name, {"name": sg_name})
+                add_edge(s_id, sg_id, "member")
+            continue
+
+        if group == "server" and action == "add" and pos[:1] == ["volume"] and len(pos) >= 3:
+            server_name = _clean_shell_token(pos[1])
+            volume_name = _clean_shell_token(pos[2])
+            var_ref = re.match(r"^\$\{?([A-Z][A-Z0-9_]*)\}?$", volume_name)
+            if var_ref:
+                volume_name = volume_var_to_name.get(var_ref.group(1), volume_name)
+            s_id = ensure_node("instance", server_name, {"name": server_name})
+            v_id = ensure_node("volume", volume_name, {"name": volume_name, "size_gb": "50", "volume_type": "Performance"})
+            add_edge(s_id, v_id, "attach")
+            continue
+
+        if group == "server" and action == "add" and pos[:1] == ["floating"] and len(pos) >= 4 and pos[1] == "ip":
+            server_name = pos[2]
+            inst_id = ensure_node("instance", server_name, {"name": server_name})
+            for n in nodes:
+                if n["id"] == inst_id:
+                    props = n.get("props", {})
+                    if isinstance(props, dict):
+                        props["needs_floating_ip"] = True
+            continue
+
+        if group == "volume" and action == "create" and pos:
+            volume_name = pos[-1]
+            image_name = opts.get("--image", "")
+            v_id = ensure_node(
+                "volume",
+                volume_name,
+                {
+                    "name": volume_name,
+                    "size_gb": opts.get("--size", "50"),
+                    "volume_type": opts.get("--type", "Performance"),
+                    "source_image": image_name,
+                },
+            )
+            if image_name:
+                volume_name_to_image[_clean_shell_token(volume_name)] = _clean_shell_token(image_name)
+            _ = v_id
+            continue
+
+        if group == "loadbalancer" and action == "create":
+            lb_name = opts.get("--name", "")
+            if not lb_name and pos:
+                lb_name = pos[-1]
+            if not lb_name:
+                lb_name = "load-balancer-1"
+            lb_id = ensure_node(
+                "load_balancer",
+                lb_name,
+                {
+                    "name": lb_name,
+                    "provider": opts.get("--provider", "amphora"),
+                    "protocol": "HTTP",
+                    "listener_port": "80",
+                    "member_port": "80",
+                    "pool_algorithm": "ROUND_ROBIN",
+                    "needs_floating_ip": False,
+                    "floating_network": "PUBLICNET",
+                },
+            )
+            subnet_name = resolve_subnet_ref(opts.get("--vip-subnet-id", ""))
+            if subnet_name:
+                s_id = ensure_node("subnet", subnet_name, {"name": subnet_name, "cidr": "10.60.0.0/24"})
+                add_edge(lb_id, s_id, "member")
+            continue
+
+        if group == "loadbalancer" and action == "listener" and len(tokens) > 3 and tokens[3] == "create":
+            listener_name = opts.get("--name", "")
+            lb_name = pos[-1] if pos else ""
+            if listener_name and lb_name:
+                listener_to_lb[listener_name] = lb_name
+            lb_id = ensure_node("load_balancer", lb_name or "load-balancer-1", {"name": lb_name or "load-balancer-1"})
+            for n in nodes:
+                if n["id"] == lb_id and isinstance(n.get("props"), dict):
+                    n["props"]["protocol"] = opts.get("--protocol", n["props"].get("protocol", "HTTP"))
+                    n["props"]["listener_port"] = opts.get("--protocol-port", n["props"].get("listener_port", "80"))
+            continue
+
+        if group == "loadbalancer" and action == "pool" and len(tokens) > 3 and tokens[3] == "create":
+            pool_name = opts.get("--name", "")
+            listener = opts.get("--listener", "")
+            lb_name = listener_to_lb.get(listener, pos[-1] if pos else "")
+            if pool_name and lb_name:
+                pool_to_lb[pool_name] = lb_name
+            lb_id = ensure_node("load_balancer", lb_name or "load-balancer-1", {"name": lb_name or "load-balancer-1"})
+            for n in nodes:
+                if n["id"] == lb_id and isinstance(n.get("props"), dict):
+                    n["props"]["protocol"] = opts.get("--protocol", n["props"].get("protocol", "HTTP"))
+                    n["props"]["pool_algorithm"] = opts.get("--lb-algorithm", n["props"].get("pool_algorithm", "ROUND_ROBIN"))
+            continue
+
+        if group == "loadbalancer" and action == "member" and len(tokens) > 3 and tokens[3] == "create":
+            pool_name = pos[-1] if pos else ""
+            subnet_name = resolve_subnet_ref(opts.get("--subnet-id", ""))
+            lb_name = pool_to_lb.get(pool_name, "")
+            if lb_name:
+                lb_id = ensure_node("load_balancer", lb_name, {"name": lb_name})
+                if subnet_name:
+                    s_id = ensure_node("subnet", subnet_name, {"name": subnet_name, "cidr": "10.60.0.0/24"})
+                    add_edge(lb_id, s_id, "member")
+                for hinted_server in sorted(member_server_hints_by_pool.get(pool_name, set())):
+                    inst_id = ensure_node("instance", hinted_server, {"name": hinted_server})
+                    add_edge(lb_id, inst_id, "member")
+            continue
+
+        if group == "floating" and action == "ip" and len(tokens) > 3 and tokens[3] == "set" and "--port" in opts:
+            port_ref = opts.get("--port", "")
+            for name_key, node_id in name_index.items():
+                node_type, _node_name = name_key
+                if node_type != "load_balancer":
+                    continue
+                if port_ref and _node_name and _node_name in port_ref:
+                    for n in nodes:
+                        if n["id"] == node_id and isinstance(n.get("props"), dict):
+                            n["props"]["needs_floating_ip"] = True
+            continue
+
+    if not nodes:
+        parse_notes.append("Script parsed, but no supported resource creation commands were detected.")
+    else:
+        parse_notes.append(f"Parsed {len(commands)} command lines into {len(nodes)} nodes and {len(edges)} edges.")
+    return {"nodes": nodes, "edges": edges}, parse_notes
+
+
+def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, object]], phases: List[str] = None) -> str:
+    if phases is None:
+        phases = ["net", "lb_scaffold", "vol_create", "vm", "vol_attach", "lb_members"]
+    # Normalise legacy 4-key phase names to the new 6-key granular set
+    _p = set(phases)
+    if "vol" in _p:        # old "Storage" checkbox → create + attach
+        _p.discard("vol"); _p.add("vol_create"); _p.add("vol_attach")
+    if "lb" in _p:         # old "Load Balancers" checkbox → scaffold + members
+        _p.discard("lb");  _p.add("lb_scaffold"); _p.add("lb_members")
+    phases = list(_p)
+    networks = [n for n in nodes if n["type"] == "network"]
+    subnets = [n for n in nodes if n["type"] == "subnet"]
+    routers = [n for n in nodes if n["type"] == "router"]
+    secgroups = [n for n in nodes if n["type"] == "security_group"]
+    instances = [n for n in nodes if n["type"] == "instance"]
+    # Linux VMs first (fast) — Windows last (slow, needs large RAM)
+    instances.sort(key=lambda x: 1 if infer_instance_auth_mode(
+        x.get("props", {}) if isinstance(x.get("props", {}), dict) else {}
+    ) == "windows_password" else 0)
+    volumes = [n for n in nodes if n["type"] == "volume"]
+    load_balancers = [n for n in nodes if n["type"] == "load_balancer"]
+    floating_targets: List[Tuple[str, str]] = []
+
+    lines: List[str] = [
+        "#!/usr/bin/env bash",
+        "# Generated by OSPC→FLEX Deployer — do NOT edit by hand.",
+        "# Floating IP association is intentionally SKIPPED — assign manually after deploy.",
+        "set -uo pipefail",  # no -e: continue on individual resource errors
+        "",
+        "# ── Runtime config (override from environment before running) ──────────────",
+        'SERVER_WAIT_SEC="${SERVER_WAIT_SEC:-600}"       # 10 min per server active-wait',
+        'VOLUME_WAIT_SEC="${VOLUME_WAIT_SEC:-300}"       # 5 min per volume available-wait',
+        'LB_WAIT_SEC="${LB_WAIT_SEC:-480}"               # 8 min per LB active-wait',
+        'OS_CMD_TIMEOUT_SEC="${OS_CMD_TIMEOUT_SEC:-30}"  # 30s per API call — skip if exceeded',
+        'RESOURCE_COLLISION_POLICY="${RESOURCE_COLLISION_POLICY:-reuse}"',
+        'ROLLBACK_AUTO_APPROVE=1                          # never prompt; rollback always runs',
+        f'ROLLBACK_SCRIPT_PATH="${{ROLLBACK_SCRIPT_PATH:-{shell_quote(str(UPLOAD_DIR))}/last_rollback_$(date +%Y%m%d_%H%M%S).sh}}"',
+
+        'DEPLOY_ERRORS=0',
+        'DEPLOY_SKIPPED=0',
+        'DEPLOY_CREATED=0',
+        'DEPLOY_TIMEOUTS=0',
+        '_ROLLBACK_CMDS=()   # populated at runtime; only resources CREATED (not reused) are added',
+        "",
+        "# ── Timestamped logging ──────────────────────────────────────────────────────",
+        "log()  { echo \"[$(date '+%H:%M:%S')] $*\"; }",
+        "warn() { echo \"[$(date '+%H:%M:%S')] ⚠  $*\" >&2; }",
+        "err()  { echo \"[$(date '+%H:%M:%S')] ✖  $*\" >&2; DEPLOY_ERRORS=$((DEPLOY_ERRORS+1)); }",
+        "ok()   { echo \"[$(date '+%H:%M:%S')] ✔  $*\"; DEPLOY_CREATED=$((DEPLOY_CREATED+1)); }",
+        "skip() { echo \"[$(date '+%H:%M:%S')] ↩  $*\"; DEPLOY_SKIPPED=$((DEPLOY_SKIPPED+1)); }",
+        "",
+        "phase_banner() {",
+        '  local msg="$1"',
+        '  local next="${2:-}"',
+        '  echo ""',
+        '  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+        '  log "🚀  $msg"',
+        '  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+        '  if [[ -n "$next" ]]; then',
+        '    log "   NEXT STEP: $next"',
+        '  fi',
+        "}",
+        "",
+        "# ── Guarded openstack wrapper ─────────────────────────────────────────────────",
+        "run_with_timeout() {",
+        '  local timeout_sec="$1"',
+        "  shift",
+        '  "$@" &',
+        "  local pid=$!",
+        "  local start_ts elapsed",
+        "  start_ts=$(date +%s)",
+        "  while kill -0 \"$pid\" 2>/dev/null; do",
+        "    elapsed=$(( $(date +%s) - start_ts ))",
+        "    if (( elapsed >= timeout_sec )); then",
+        '      warn "⏭  TIMEOUT ${timeout_sec}s — SKIPPING task and continuing deploy: $*"',
+        "      kill -TERM \"$pid\" 2>/dev/null || true; sleep 1",
+        "      kill -KILL \"$pid\" 2>/dev/null || true",
+        "      wait \"$pid\" 2>/dev/null || true",
+        "      DEPLOY_TIMEOUTS=$((DEPLOY_TIMEOUTS+1))",
+        "      return 0   # skip — do NOT block the rest of the deploy",
+        "    fi",
+        "    sleep 1",
+        "  done",
+        '  wait "$pid"',
+        "}",
+        "",
+        "os() {",
+        '  log "+ openstack $*"',
+        '  run_with_timeout "$OS_CMD_TIMEOUT_SEC" openstack "$@"',
+        "}",
+        "",
+        "# ── Resource idempotency ──────────────────────────────────────────────────────",
+        "resource_exists() {",
+        '  local kind="$1" name="$2"',
+        '  case "$kind" in',
+        '    network)       openstack network show "$name" >/dev/null 2>&1 ;;',
+        '    subnet)        openstack subnet show "$name" >/dev/null 2>&1 ;;',
+        '    router)        openstack router show "$name" >/dev/null 2>&1 ;;',
+        '    security_group) openstack security group show "$name" >/dev/null 2>&1 ;;',
+        '    instance)      openstack server show "$name" >/dev/null 2>&1 ;;',
+        '    volume)        openstack volume show "$name" >/dev/null 2>&1 ;;',
+        '    load_balancer) openstack loadbalancer show "$name" >/dev/null 2>&1 ;;',
+        '    listener)      openstack loadbalancer listener show "$name" >/dev/null 2>&1 ;;',
+        '    pool)          openstack loadbalancer pool show "$name" >/dev/null 2>&1 ;;',
+        "    *) return 1 ;;",
+        "  esac",
+        "}",
+        "",
+        "create_or_reuse() {",
+        '  local kind="$1" name="$2"',
+        "  shift 2",
+        '  if resource_exists "$kind" "$name"; then',
+        '    if [[ "$RESOURCE_COLLISION_POLICY" == "fail" ]]; then',
+        '      err "BLOCKER: $kind \'$name\' already exists and RESOURCE_COLLISION_POLICY=fail"',
+        "      return 1",
+        "    fi",
+        '    skip "Already exists — reusing $kind: $name"',
+        "    return 0",
+        "  fi",
+        '  log "Creating $kind: $name ..."',
+        '  if "$@"; then',
+        '    ok "Created $kind: $name"',
+        '    _rollback_push "$kind" "$name"',
+        "  else",
+        '    err "FAILED to create $kind: $name — check output above for reason"',
+        '    if [[ "$kind" == "instance" ]]; then',
+        '      warn "  Common blockers for instances:"',
+        '      warn "    • Flavor disk too small for image (check \'minimum_disk\' in image metadata)"',
+        '      warn "    • Quota exceeded (check \'openstack quota show\')"',
+        '      warn "    • Network not reachable (check phase 1 succeeded)"',
+        '      warn "    • Key pair does not exist in project"',
+        "    fi",
+        "  fi",
+        "}",
+        "",
+        "# ── Per-run rollback tracker (only NEW resources, not pre-existing ones) ─────",
+        "_rollback_push() {",
+        '  local kind="$1" name="$2" cmd',
+        '  case "$kind" in',
+        '    network)        cmd="openstack network delete \\"$name\\" || true" ;;',
+        '    subnet)         cmd="openstack subnet delete \\"$name\\" || true" ;;',
+        '    router)         cmd="openstack router remove subnet \\"$name\\" \\"${SUBNET_NAME:-tenant-subnet}\\" || true; openstack router unset --external-gateway \\"$name\\" || true; openstack router delete \\"$name\\" || true" ;;',
+        '    security_group) cmd="openstack security group delete \\"$name\\" || true" ;;',
+        '    instance)       cmd="openstack server delete --wait \\"$name\\" 2>/dev/null || openstack server delete \\"$name\\" || true" ;;',
+        '    volume)         cmd="openstack volume delete --force \\"$name\\" || true" ;;',
+        '    load_balancer)  cmd="openstack loadbalancer delete --cascade \\"$name\\" 2>/dev/null || openstack loadbalancer delete \\"$name\\" || true" ;;',
+        '    listener|pool)  return 0 ;;',
+        '    *)              return 0 ;;',
+        '  esac',
+        '  _ROLLBACK_CMDS=("$cmd" "${_ROLLBACK_CMDS[@]+${_ROLLBACK_CMDS[@]}}")',
+        "}",
+        "",
+        "_finalize_rollback() {",
+        '  [[ ${#_ROLLBACK_CMDS[@]} -eq 0 ]] && { warn "No new resources created — rollback script skipped."; return 0; }',
+        '  local n=${#_ROLLBACK_CMDS[@]} i',
+        '  {',
+        "    echo '#!/usr/bin/env bash'",
+        "    echo '# AUTO-GENERATED rollback — deletes ONLY resources created in THIS run.'",
+        "    echo '# Pre-existing (reused) resources are NOT touched.'",
+        "    echo 'set -uo pipefail'",
+        "    echo 'ROLLBACK_AUTO_APPROVE=1'",
+        "    echo 'log() { echo \"[$(date +%H:%M:%S)] $*\"; }'",
+        '    printf "log \\"Starting rollback: $n step(s) in reverse creation order\\"\\n"',
+        '    for (( i=0; i<n; i++ )); do',
+        '      printf "log \\"  [%d/%d] %s\\"\\n" "$((i+1))" "$n" "${_ROLLBACK_CMDS[$i]}"',
+        '      printf "%s\\n" "${_ROLLBACK_CMDS[$i]}"',
+        '    done',
+        "    echo 'log \"✅  Rollback complete.\"'",
+        '  } > "$ROLLBACK_SCRIPT_PATH"',
+        '  chmod +x "$ROLLBACK_SCRIPT_PATH"',
+        '  log "↩  Rollback script written: $ROLLBACK_SCRIPT_PATH ($n steps)"',
+        "}",
+        "",
+        "# ── Wait helpers (with live progress output) ──────────────────────────────────",
+        "wait_for_server_active() {",
+        '  local name="$1"',
+        '  local max_sec="${2:-$SERVER_WAIT_SEC}"',
+        '  local sleep_sec=10',
+        "  local elapsed=0 status fault",
+        '  log "⏳ Waiting for server \'$name\' to become ACTIVE (timeout: ${max_sec}s) ..."',
+        "  while (( elapsed < max_sec )); do",
+        '    status=$(openstack server show "$name" -f value -c status 2>/dev/null || echo "UNKNOWN")',
+        '    if [[ "$status" == "ACTIVE" ]]; then',
+        '      ok "Server \'$name\' is ACTIVE (elapsed: ${elapsed}s)"',
+        "      return 0",
+        "    fi",
+        '    if [[ "$status" == "ERROR" ]]; then',
+        '      fault=$(openstack server show "$name" -f value -c fault 2>/dev/null || echo "unknown fault")',
+        '      err "BLOCKER: Server \'$name\' entered ERROR state after ${elapsed}s"',
+        '      err "  Fault details: $fault"',
+        '      warn "  Common causes:"',
+        '      warn "    • Flavor disk smaller than image minimum_disk — use --boot-from-volume"',
+        '      warn "    • Host capacity insufficient — try a different availability zone"',
+        '      warn "    • Image not found or inaccessible in this region"',
+        '      warn "  NEXT STEP: Delete the error server and re-create with a larger flavor or boot-from-volume"',
+        "      return 1",
+        "    fi",
+        '    log "  ... server \'$name\' status=$status  elapsed=${elapsed}s / ${max_sec}s"',
+        '    sleep "$sleep_sec"',
+        '    elapsed=$((elapsed + sleep_sec))',
+        "  done",
+        '  err "TIMEOUT: Server \'$name\' did not reach ACTIVE after ${max_sec}s (last status: $status)"',
+        '  warn "  NEXT STEP: Check \'openstack server show $name\' — if still BUILD, try waiting longer"',
+        '  warn "            If ERROR, see fault reason above and re-create with corrected params"',
+        "  return 1",
+        "}",
+        "",
+        "wait_for_volume_available() {",
+        '  local name="$1"',
+        '  local max_sec="${2:-$VOLUME_WAIT_SEC}"',
+        '  local sleep_sec=5',
+        "  local elapsed=0 status",
+        '  log "⏳ Waiting for volume \'$name\' to become available (timeout: ${max_sec}s) ..."',
+        "  while (( elapsed < max_sec )); do",
+        '    status=$(openstack volume show "$name" -f value -c status 2>/dev/null || echo "UNKNOWN")',
+        '    if [[ "$status" == "available" ]]; then',
+        '      ok "Volume \'$name\' is available (elapsed: ${elapsed}s)"',
+        "      return 0",
+        "    fi",
+        '    if [[ "$status" == "error" ]]; then',
+        '      err "BLOCKER: Volume \'$name\' entered error state after ${elapsed}s"',
+        '      warn "  NEXT STEP: Delete the volume and re-create, or check Cinder quota"',
+        "      return 1",
+        "    fi",
+        '    log "  ... volume \'$name\' status=$status  elapsed=${elapsed}s"',
+        '    sleep "$sleep_sec"',
+        '    elapsed=$((elapsed + sleep_sec))',
+        "  done",
+        '  err "TIMEOUT: Volume \'$name\' not available after ${max_sec}s"',
+        "  return 1",
+        "}",
+        "",
+        "volume_status() {",
+        '  local name="$1"',
+        '  openstack volume show "$name" -f value -c status 2>/dev/null || true',
+        "}",
+        "",
+        "server_has_volume() {",
+        '  local server_name="$1" volume_name="$2" volume_id',
+        '  volume_id=$(openstack volume show "$volume_name" -f value -c id 2>/dev/null || true)',
+        '  [[ -n "$volume_id" ]] && openstack server volume list "$server_name" -f value -c ID 2>/dev/null | grep -Fx "$volume_id" >/dev/null 2>&1',
+        "}",
+        "",
+        "wait_for_loadbalancer_active() {",
+        '  local name="$1"',
+        '  local max_sec="${2:-$LB_WAIT_SEC}"',
+        '  local sleep_sec=10',
+        "  local elapsed=0 status",
+        '  log "⏳ Waiting for load balancer \'$name\' to become ACTIVE (timeout: ${max_sec}s) ..."',
+        "  while (( elapsed < max_sec )); do",
+        '    status=$(openstack loadbalancer show "$name" -f value -c provisioning_status 2>/dev/null || echo "UNKNOWN")',
+        '    if [[ "$status" == "ACTIVE" ]]; then',
+        '      ok "Load balancer \'$name\' is ACTIVE (elapsed: ${elapsed}s)"',
+        "      return 0",
+        "    fi",
+        '    if [[ "$status" == "ERROR" ]]; then',
+        '      err "BLOCKER: Load balancer \'$name\' provisioning ERROR after ${elapsed}s"',
+        '      warn "  NEXT STEP: \'openstack loadbalancer show $name\' for operating_status details"',
+        "      return 1",
+        "    fi",
+        '    log "  ... LB \'$name\' provisioning_status=$status  elapsed=${elapsed}s / ${max_sec}s"',
+        '    sleep "$sleep_sec"',
+        '    elapsed=$((elapsed + sleep_sec))',
+        "  done",
+        '  err "TIMEOUT: Load balancer \'$name\' did not reach ACTIVE after ${max_sec}s"',
+        "  return 1",
+        "}",
+        "",
+        "subnet_id_from_name() {",
+        '  openstack subnet show "$1" -f value -c id 2>/dev/null || true',
+        "}",
+        "",
+        "instance_ip_on_network() {",
+        '  local server_name="$1" network_name="$2" ports_line ip line',
+        '  ports_line=$(openstack port list --server "$server_name" --network "$network_name" -f value -c "Fixed IP Addresses" 2>/dev/null | head -n 1 || true)',
+        '  if [[ -n "$ports_line" ]]; then',
+        "    ip=$(echo \"$ports_line\" | grep -Eo '([0-9]{1,3}\\.){3}[0-9]{1,3}' | head -n 1 || true)",
+        '    [[ -n "$ip" ]] && { echo "$ip"; return 0; }',
+        "  fi",
+        '  line=$(openstack server show "$server_name" -f value -c addresses 2>/dev/null | tr "," "\\n" | sed "s/^ *//g" | grep "^${network_name}=" | head -n 1 || true)',
+        '  [[ -z "$line" ]] && return 0',
+        "  ip=$(echo \"$line\" | sed -E 's/^[^=]+=([0-9.]+).*/\\1/g')",
+        '  echo "$ip"',
+        "}",
+        "",
+        "wait_for_instance_ip_on_network() {",
+        '  local server_name="$1" network_name="$2"',
+        '  local max_sec="${3:-120}" sleep_sec=5',
+        "  local elapsed=0 ip",
+        '  log "⏳ Waiting for IP on network \'$network_name\' for server \'$server_name\' ..."',
+        "  while (( elapsed < max_sec )); do",
+        '    ip=$(instance_ip_on_network "$server_name" "$network_name")',
+        '    if [[ -n "$ip" ]]; then',
+        '      log "  IP resolved: $server_name → $ip"',
+        '      echo "$ip"; return 0',
+        "    fi",
+        '    sleep "$sleep_sec"; elapsed=$((elapsed + sleep_sec))',
+        "  done",
+        '  warn "Could not resolve IP for $server_name on $network_name after ${max_sec}s"',
+        "  return 1",
+        "}",
+        "",
+        "pool_has_member_ip() {",
+        '  openstack loadbalancer member list "$1" -f value -c address 2>/dev/null | grep -Fx "$2" >/dev/null 2>&1',
+        "}",
+        "",
+        "loadbalancer_vip_port_id() {",
+        '  openstack loadbalancer show "$1" -f value -c vip_port_id 2>/dev/null || true',
+        "}",
+        "",
+        "# NOTE: Floating IP helpers kept for reference but are NOT called by this script.",
+        "# Floating IPs are assigned MANUALLY after deployment completes.",
+        "server_has_floating_ip() {",
+        '  local out; out=$(openstack floating ip list --server "$1" -f value -c "Floating IP Address" 2>/dev/null || true)',
+        '  [[ -n "$(echo "$out" | tr -d "[:space:]")" ]]',
+        "}",
+        "",
+        "port_has_floating_ip() {",
+        '  local out; out=$(openstack floating ip list --port "$1" -f value -c "Floating IP Address" 2>/dev/null || true)',
+        '  [[ -n "$(echo "$out" | tr -d "[:space:]")" ]]',
+        "}",
+        "",
+        'log "Deploy script started at $(date)"',
+        'log "Floating IP assignment: SKIPPED (assign manually via Horizon or CLI after deploy)"',
+        'log "Server wait timeout   : ${SERVER_WAIT_SEC}s"',
+        'log "LB wait timeout       : ${LB_WAIT_SEC}s"',
+        'log "Collision policy      : ${RESOURCE_COLLISION_POLICY}"',
+        "",
+    ]
+
+
+    # ── PHASE 1: Networking Foundation ───────────────────────────────────────
+    # networks → subnets → routers → security groups
+    if "net" in phases:
+        lines.append('phase_banner "PHASE 1: Networking Foundation — networks, subnets, routers, security groups" "PHASE 2: LB Scaffold will start next"')
+        for n in networks:
+            name = _node_name(n, "net")
+            lines.append(f"create_or_reuse network {shell_quote(name)} os network create {shell_quote(name)}")
+
+        for s in subnets:
+            name = _node_name(s, "subnet")
+            props = s.get("props", {}) if isinstance(s.get("props", {}), dict) else {}
+            cidr = str(props.get("cidr", "")).strip() or "10.10.0.0/24"
+            gateway = str(props.get("gateway_ip", "")).strip()
+            dns_ns = str(props.get("dns_nameserver", "")).strip()
+            network_name = str(props.get("network_name", "")).strip()
+            for net in networks:
+                if _edge_match(edges, str(s["id"]), str(net["id"]), {"link", "member"}):
+                    network_name = _node_name(net, "net")
+                    break
+            if not network_name:
+                lines.append(f'echo "Skipping subnet {name}: no connected network."')
+                continue
+            cmd = [
+                f"create_or_reuse subnet {shell_quote(name)} os subnet create",
+                f"--network {shell_quote(network_name)}",
+                f"--subnet-range {shell_quote(cidr)}",
+            ]
+            if gateway:
+                cmd.append(f"--gateway {shell_quote(gateway)}")
+            if dns_ns:
+                cmd.append(f"--dns-nameserver {shell_quote(dns_ns)}")
+            cmd.append(shell_quote(name))
+            lines.append(" ".join(cmd))
+
+        for r in routers:
+            name = _node_name(r, "router")
+            props = r.get("props", {}) if isinstance(r.get("props", {}), dict) else {}
+            external_network = str(props.get("external_network", "")).strip()
+            if not external_network:
+                for net in networks:
+                    if _edge_match(edges, str(r["id"]), str(net["id"]), {"link", "member", "gateway"}):
+                        external_network = _node_name(net, "net")
+                        break
+            lines.append(f"create_or_reuse router {shell_quote(name)} os router create {shell_quote(name)}")
+            if external_network:
+                lines.append(f"os router set --external-gateway {shell_quote(external_network)} {shell_quote(name)}")
+            for s in subnets:
+                if _edge_match(edges, str(r["id"]), str(s["id"]), {"link", "route"}):
+                    subnet_name = _node_name(s, "subnet")
+                    lines.append(f"os router add subnet {shell_quote(name)} {shell_quote(subnet_name)} || true")
+
+        for sg in secgroups:
+            sg_name = _node_name(sg, "sg")
+            props = sg.get("props", {}) if isinstance(sg.get("props", {}), dict) else {}
+            lines.append(f"create_or_reuse security_group {shell_quote(sg_name)} os security group create {shell_quote(sg_name)}")
+            raw_rules = props.get("rules", [])
+            if isinstance(raw_rules, list):
+                for rule in raw_rules:
+                    if not isinstance(rule, dict):
+                        continue
+                    protocol = str(rule.get("protocol", "")).strip() or "tcp"
+                    remote_ip = str(rule.get("remote_ip", "")).strip() or "0.0.0.0/0"
+                    port = str(rule.get("port", "")).strip()
+                    rule_cmd = [
+                        "os security group rule create",
+                        f"--protocol {shell_quote(protocol)}",
+                        f"--remote-ip {shell_quote(remote_ip)}",
+                    ]
+                    if port:
+                        rule_cmd.append(f"--dst-port {shell_quote(port)}")
+                    rule_cmd.append(shell_quote(sg_name))
+                    rule_cmd.append("|| true")
+                    lines.append(" ".join(rule_cmd))
+
+    # ── PHASE 2: LB Scaffold (before VMs so Octavia Amphora spins up in parallel)
+    _lb_pool_meta: List[Dict[str, str]] = []
+    if "lb_scaffold" in phases:
+        lines.append('phase_banner "PHASE 2: LB Scaffold — LB + Listener + Pool (Octavia Amphora provisioning in parallel with VM boot)" "PHASE 3: Volume Creation next"')
+        for lb in load_balancers:
+            lb_name = _node_name(lb, "lb")
+            props = lb.get("props", {}) if isinstance(lb.get("props", {}), dict) else {}
+            provider = str(props.get("provider", "")).strip().lower() or "ovn"
+            protocol = str(props.get("protocol", "")).strip().upper() or "HTTP"
+            listener_port = str(props.get("listener_port", "")).strip() or "80"
+            member_port = str(props.get("member_port", "")).strip() or listener_port
+            algorithm = str(props.get("pool_algorithm", "")).strip().upper() or "ROUND_ROBIN"
+            needs_fip = bool(props.get("needs_floating_ip", False))
+            floating_network_lb = str(props.get("floating_network", "")).strip() or "PUBLICNET"
+            subnet_name_lb = str(props.get("subnet_name", "")).strip()
+            subnet_network_name_lb = ""
+            for s in subnets:
+                if _edge_match(edges, str(lb["id"]), str(s["id"]), {"member", "link"}):
+                    subnet_name_lb = _node_name(s, "subnet")
+                    sp = s.get("props", {}) if isinstance(s.get("props", {}), dict) else {}
+                    subnet_network_name_lb = str(sp.get("network_name", "")).strip()
+                    if not subnet_network_name_lb:
+                        for net in networks:
+                            if _edge_match(edges, str(s["id"]), str(net["id"]), {"member", "link"}):
+                                subnet_network_name_lb = _node_name(net, "net")
+                                break
+                    break
+            if not subnet_name_lb:
+                lines.append(f'echo "Skipping load balancer {lb_name}: no connected subnet."')
+                continue
+            listener_name = f"{lb_name}-listener"
+            pool_name = f"{lb_name}-pool"
+            _lb_pool_meta.append({
+                "lb_name": lb_name, "pool_name": pool_name,
+                "subnet_name": subnet_name_lb, "subnet_network_name": subnet_network_name_lb,
+                "member_port": member_port, "needs_fip": str(needs_fip),
+                "floating_network": floating_network_lb,
+                "lb_id": str(lb["id"]),
+            })
+            lines.append(f"lb_subnet_id=$(subnet_id_from_name {shell_quote(subnet_name_lb)})")
+            lines.append("if [[ -z \"$lb_subnet_id\" ]]; then")
+            lines.append(f'  echo "Skipping load balancer {lb_name}: subnet {subnet_name_lb} not found." >&2')
+            lines.append("else")
+            lines.append(
+                f"  create_or_reuse load_balancer {shell_quote(lb_name)} os loadbalancer create --name {shell_quote(lb_name)} --provider {shell_quote(provider)} --vip-subnet-id \"$lb_subnet_id\""
+            )
+            lines.append(f"  wait_for_loadbalancer_active {shell_quote(lb_name)}")
+            lines.append(
+                f"  create_or_reuse listener {shell_quote(listener_name)} os loadbalancer listener create --name {shell_quote(listener_name)} --protocol {shell_quote(protocol)} --protocol-port {shell_quote(listener_port)} {shell_quote(lb_name)}"
+            )
+            lines.append(f"  wait_for_loadbalancer_active {shell_quote(lb_name)}")
+            lines.append(
+                f"  create_or_reuse pool {shell_quote(pool_name)} os loadbalancer pool create --name {shell_quote(pool_name)} --lb-algorithm {shell_quote(algorithm)} --listener {shell_quote(listener_name)} --protocol {shell_quote(protocol)}"
+            )
+            lines.append(f"  wait_for_loadbalancer_active {shell_quote(lb_name)}")
+            lines.append("fi")
+
+    # ── PHASE 3: Volume CREATE (before VMs so Cinder is ready when VMs boot) ──
+    if "vol_create" in phases:
+        lines.append('phase_banner "PHASE 3: Volume Creation — pre-provision block storage (Cinder is fast, do it early)" "PHASE 4: Compute launch next"')
+        for vol in volumes:
+            vol_name = _node_name(vol, "vol")
+            props = vol.get("props", {}) if isinstance(vol.get("props", {}), dict) else {}
+            size_gb = str(props.get("size_gb", "")).strip() or "50"
+            vol_type = str(props.get("volume_type", "")).strip()
+            cmd = [
+                f"create_or_reuse volume {shell_quote(vol_name)} os volume create",
+                f"--size {shell_quote(size_gb)}",
+            ]
+            if vol_type:
+                cmd.append(f"--type {shell_quote(vol_type)}")
+            cmd.append(shell_quote(vol_name))
+            lines.append(" ".join(cmd))
+
+    # ── PHASE 4: Compute — Windows FIRST (background), then Linux inline ──────
+    if "vm" in phases:
+        lines.append('phase_banner "PHASE 4: Compute — Windows VMs fired in background first (sysprep is slow), Linux VMs inline" "PHASE 5: Volume Attach after all VMs are ACTIVE"')
+        floating_targets_vm: List[tuple] = []
+
+        linux_instances = [i for i in instances
+                           if infer_instance_auth_mode(i.get("props", {}) if isinstance(i.get("props", {}), dict) else {}) != "windows_password"]
+        windows_instances = [i for i in instances
+                             if infer_instance_auth_mode(i.get("props", {}) if isinstance(i.get("props", {}), dict) else {}) == "windows_password"]
+
+        def _vm_create_cmd(inst: Dict, inst_idx: int) -> List[str]:
+            out: List[str] = []
+            name = _node_name(inst, "vm")
+            props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
+            flavor = str(props.get("flavor", "")).strip()
+            image = str(props.get("image", "")).strip()
+            user_data = str(props.get("user_data", "")).rstrip("\n")
+            key_name = str(props.get("key_name", "")).strip()
+            auth_mode = infer_instance_auth_mode(props)
+            admin_password = str(props.get("admin_password", "")).strip()
+            network_name = str(props.get("network_name", "")).strip()
+            for net in networks:
+                if _edge_match(edges, str(inst["id"]), str(net["id"]), {"link", "member"}):
+                    network_name = _node_name(net, "net")
+                    break
+            sg_names_local: List[str] = []
+            for sg in secgroups:
+                if _edge_match(edges, str(inst["id"]), str(sg["id"]), {"link", "member"}):
+                    sg_names_local.append(_node_name(sg, "sg"))
+            if not (flavor and image and network_name):
+                out.append(f'echo "Skipping instance {name}: flavor, image, and network required."')
+                return out
+            if auth_mode == "ssh_key" and not key_name:
+                out.append(f'echo "Skipping instance {name}: key_name required for SSH mode."')
+                return out
+            if auth_mode == "windows_password" and not admin_password:
+                out.append(f'echo "Skipping instance {name}: admin_password required." >&2')
+                return out
+            user_data_var = ""
+            if user_data:
+                user_data_var = f"USER_DATA_FILE_{inst_idx}"
+                delim = _heredoc_delimiter(f"USER_DATA_EOF_{inst_idx}", user_data)
+                out.append(f'{user_data_var}=$(mktemp)')
+                out.append(f"cat > \"{user_data_var}\" <<'{delim}'")
+                out.extend(user_data.splitlines())
+                out.append(delim)
+            cmd_parts = [
+                f"create_or_reuse instance {shell_quote(name)} os server create",
+                f"--flavor {shell_quote(flavor)}",
+                f"--image {shell_quote(image)}",
+                f"--network {shell_quote(network_name)}",
+            ]
+            if user_data_var:
+                cmd_parts.append(f"--user-data \"{user_data_var}\"")
+            for sg_n in sg_names_local:
+                cmd_parts.append(f"--security-group {shell_quote(sg_n)}")
+            if auth_mode == "ssh_key":
+                cmd_parts.append(f"--key-name {shell_quote(key_name)}")
+            else:
+                cmd_parts.append(f"--password {shell_quote(admin_password)}")
+            cmd_parts.append(shell_quote(name))
+            out.append(" ".join(cmd_parts))
+            if user_data_var:
+                out.append(f"rm -f \"{user_data_var}\"")
+            return out
+
+        if windows_instances:
+            lines.append('echo "  -> Firing Windows VMs in background (sysprep takes longest)..."')
+            lines.append("_WIN_PIDS=()")
+            for idx, inst in enumerate(windows_instances, start=1):
+                win_name = _node_name(inst, "vm")
+                lines.append(f"( # Windows VM: {win_name}")
+                lines.extend(_vm_create_cmd(inst, idx))
+                lines.append(") &")
+                lines.append("_WIN_PIDS+=($!)")
+                inst_props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
+                if bool(inst_props.get("needs_floating_ip", False)):
+                    fnet = str(inst_props.get("floating_network", "")).strip() or "PUBLICNET"
+                    floating_targets_vm.append((win_name, fnet))
+
+        if linux_instances:
+            lines.append('echo "  -> Provisioning Linux VMs..."')
+            for idx, inst in enumerate(linux_instances, start=len(windows_instances) + 1):
+                lines.extend(_vm_create_cmd(inst, idx))
+                inst_props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
+                if bool(inst_props.get("needs_floating_ip", False)):
+                    fnet = str(inst_props.get("floating_network", "")).strip() or "PUBLICNET"
+                    floating_targets_vm.append((_node_name(inst, "vm"), fnet))
+
+        if windows_instances:
+            lines.append('echo "  -> Waiting for Windows VMs to finish provisioning..."')
+            lines.append("for _wpid in \"${_WIN_PIDS[@]}\"; do wait \"$_wpid\" || true; done")
+            lines.append('echo "  -> All Windows VMs provisioning complete."')
+
+        # Floating IPs are intentionally SKIPPED — list servers that wanted FIPs for manual action
+        if floating_targets_vm:
+            lines.append('echo ""')
+            lines.append('echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"')
+            lines.append('log "⚠  FLOATING IP ASSIGNMENT: SKIPPED (manual action required)"')
+            lines.append('log "   Assign Floating IPs manually via Horizon or CLI after deploy:"')
+            for server_name, public_network in floating_targets_vm:
+                lines.append(f'log "     openstack floating ip create {shell_quote(public_network)} | then: openstack server add floating ip {shell_quote(server_name)} <FIP>"')
+            lines.append('echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"')
+
+    # ── PHASE 5: Volume Attach (servers must exist) ───────────────────────────
+    if "vol_attach" in phases:
+        lines.append('phase_banner "PHASE 5: Volume Attachment — attach pre-created volumes to running instances" "PHASE 6: LB Member Wiring next"')
+        for inst in instances:
+            for vol in volumes:
+                if _edge_match(edges, str(vol["id"]), str(inst["id"]), {"link", "attach"}):
+                    inst_name = _node_name(inst, "vm")
+                    vol_name = _node_name(vol, "vol")
+                    lines.append(f"wait_for_server_active {shell_quote(inst_name)} || true")
+                    lines.append(f"if server_has_volume {shell_quote(inst_name)} {shell_quote(vol_name)}; then")
+                    lines.append(f'  echo "Volume {vol_name} is already attached to {inst_name}; skipping."')
+                    lines.append("else")
+                    lines.append(f"  vol_status=$(volume_status {shell_quote(vol_name)})")
+                    lines.append("  if [[ \"$vol_status\" == \"available\" ]]; then")
+                    lines.append(f"    os server add volume {shell_quote(inst_name)} {shell_quote(vol_name)} || true")
+                    lines.append("  elif [[ \"$vol_status\" == \"in-use\" ]]; then")
+                    lines.append(f'    echo "Volume {vol_name} is in-use and not attached to {inst_name}; skipping." >&2')
+                    lines.append("  else")
+                    lines.append(f"    wait_for_volume_available {shell_quote(vol_name)} || true")
+                    lines.append(f"    os server add volume {shell_quote(inst_name)} {shell_quote(vol_name)} || true")
+                    lines.append("  fi")
+                    lines.append("fi")
+
+    # ── PHASE 6: LB Member Wiring (VMs must be ACTIVE to resolve IPs) ─────────
+    if "lb_members" in phases and _lb_pool_meta:
+        lines.append('phase_banner "PHASE 6: Load Balancer Member Wiring — register server IPs as pool members, floating IPs are MANUAL" "Done — see summary below"')
+        for meta in _lb_pool_meta:
+            lb_name = meta["lb_name"]
+            pool_name = meta["pool_name"]
+            subnet_name_lb = meta["subnet_name"]
+            subnet_network_name_lb = meta["subnet_network_name"]
+            member_port = meta["member_port"]
+            needs_fip = meta["needs_fip"] == "True"
+            floating_network_lb = meta["floating_network"]
+            lb_id_str = meta["lb_id"]
+            lines.append(f"lb_subnet_id=$(subnet_id_from_name {shell_quote(subnet_name_lb)})")
+            lines.append("if [[ -n \"$lb_subnet_id\" ]]; then")
+            for inst in instances:
+                if _edge_match(edges, lb_id_str, str(inst["id"]), {"member", "link"}):
+                    inst_name = _node_name(inst, "vm")
+                    member_network_scope = subnet_network_name_lb or "subnet-network"
+                    lines.append(f"  wait_for_server_active {shell_quote(inst_name)} || true")
+                    if subnet_network_name_lb:
+                        lines.append(f"  member_ip=$(wait_for_instance_ip_on_network {shell_quote(inst_name)} {shell_quote(subnet_network_name_lb)} || true)")
+                    else:
+                        lines.append("  member_ip=''")
+                    lines.append("  if [[ -n \"$member_ip\" ]]; then")
+                    lines.append(f"    if pool_has_member_ip {shell_quote(pool_name)} \"$member_ip\"; then")
+                    lines.append(f'      echo "LB member already exists for $member_ip on {pool_name}; skipping."')
+                    lines.append("    else")
+                    lines.append(
+                        f"      os loadbalancer member create --subnet-id \"$lb_subnet_id\" --address \"$member_ip\" --protocol-port {shell_quote(member_port)} {shell_quote(pool_name)} || true"
+                    )
+                    lines.append("    fi")
+                    lines.append("  else")
+                    lines.append(f'    echo "Could not resolve IP for {inst_name} on {member_network_scope}; skipping." >&2')
+                    lines.append("  fi")
+            if needs_fip:
+                lines.append(f'  log "⚠  LB VIP FLOATING IP: SKIPPED (manual) — assign FIP to LB {lb_name} VIP port via Horizon or CLI after deploy"')
+            lines.append("fi")
+
+    lines += [
+        "",
+        "# Write per-run rollback script before summary",
+        "_finalize_rollback",
+        "",
+        'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+        'log "✅  DEPLOY COMPLETE at $(date)"',
+        'log "   Resources created  : $DEPLOY_CREATED"',
+        'log "   Resources skipped  : $DEPLOY_SKIPPED (already existed)"',
+        'log "   Tasks timed out    : $DEPLOY_TIMEOUTS (skipped after 30s \u2014 re-run or handle manually)"',
+        'log "   Errors encountered : $DEPLOY_ERRORS"',
+        'if (( DEPLOY_TIMEOUTS > 0 )); then',
+        '  warn "  ⏭  $DEPLOY_TIMEOUTS task(s) exceeded the 30s timeout and were skipped"',
+        '  warn "     Override limit:  OS_CMD_TIMEOUT_SEC=120 bash <script>"',
+        '  warn "     Re-run specific phases by setting RESOURCE_COLLISION_POLICY=reuse"',
+        'fi',
+        'log ""',
+        'log "NEXT STEPS (manual)"',
+        'log "  1. Assign Floating IPs to VMs and LB VIPs via Horizon or:"',
+        'log "       openstack floating ip create PUBLICNET"',
+        'log "       openstack server add floating ip <server> <fip>"',
+        'log "  2. Verify instances: openstack server list"',
+        'log "  3. Verify LBs:       openstack loadbalancer list"',
+        'log "  4. Verify volumes:   openstack volume list"',
+        'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+    ]
+    return "\n".join(lines) + "\n"
+
+
+
+# CRM Tracker Global State
+ACTIVE_CUSTOMER_ID = None
+TRACKER_DB = BASE_DIR / "data" / "migration_tracker_db.csv"
+TRACKER_DB.parent.mkdir(exist_ok=True)
+
+def init_tracker_db():
+    if not TRACKER_DB.exists():
+        with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "customer_id", "customer_name", "target_region", "status",
+                "ospc_vms_count", "ospc_volumes_count", "ospc_db_count",
+                "flex_migrated_vms", "flex_migrated_volumes", "start_date", "completion_date",
+                "flex_readiness", "size_complexity", "blast_radius"
+            ])
+
+init_tracker_db()
+
+
+@app.get("/")
+def index():
+    return render_template("combined.html")
+
+
+@app.get("/run/")
+def run_ui():
+    return render_template("index.html")
+
+
+@app.get("/migrate/")
+def migrate_ui():
+    return render_template("migrate.html")
+
+
+@app.get("/designer/")
+def designer_ui():
+    return render_template("designer.html")
+
+
+@app.get("/references/")
+def references_ui():
+    return render_template("references.html")
+
+
+@app.get("/agent1/")
+def agent1_ui():
+    return render_template("agent1.html")
+
+
+@app.get("/image_migrator/")
+def image_migrator_ui():
+    return render_template("image_migrator.html")
+
+
+@app.get("/dashboard/")
+def csv_dashboard_index():
+    return send_from_directory(str(DASHBOARD_DIR), "index.html")
+
+
+@app.get("/dashboard/<path:filename>")
+def csv_dashboard_assets(filename: str):
+    return send_from_directory(str(DASHBOARD_DIR), filename)
+
+
+@app.get("/api/dashboard/csv-files")
+def dashboard_csv_files():
+    """Return a list of CSV files in the project root, grouped by role."""
+    csv_files = []
+    for p in sorted(BASE_DIR.iterdir()):
+        if p.suffix.lower() == ".csv" and p.is_file():
+            csv_files.append(p.name)
+    # Also include uploads folder
+    for p in sorted(UPLOAD_DIR.iterdir()):
+        if p.suffix.lower() == ".csv" and p.is_file():
+            csv_files.append(f"uploads/{p.name}")
+
+    def score(name: str) -> int:
+        n = name.lower()
+        # Pick the highest-priority tenant (most numeric prefix digits first)
+        if "_overview.csv" in n:
+            return 0
+        if "_flavormap.csv" in n or "flavormap" in n:
+            return 1
+        if "_blockmap.csv" in n or "blockmap" in n:
+            return 2
+        if "_lbmap.csv" in n or "lbmap" in n:
+            return 3
+        return 9
+
+    csv_files.sort(key=lambda f: (score(f), f))
+    return jsonify({"ok": True, "files": csv_files})
+
+
+@app.get("/api/dashboard/csv-content/<path:filename>")
+def dashboard_csv_content(filename: str):
+    """Serve raw CSV text from the project root or uploads directory."""
+    # Security: no path traversal
+    safe_name = Path(filename).name
+    candidates = [
+        BASE_DIR / safe_name,
+        UPLOAD_DIR / safe_name,
+        BASE_DIR / filename,
+    ]
+    for path in candidates:
+        try:
+            resolved = path.resolve()
+            if (resolved.is_relative_to(BASE_DIR.resolve()) or
+                    resolved.is_relative_to(UPLOAD_DIR.resolve())):
+                if resolved.exists() and resolved.suffix.lower() == ".csv":
+                    return Response(
+                        resolved.read_text(encoding="utf-8", errors="replace"),
+                        mimetype="text/plain; charset=utf-8",
+                    )
+        except Exception:
+            continue
+    return jsonify({"ok": False, "error": f"File not found: {filename}"}), 404
+
+
+@app.get("/readme")
+def readme():
+    readme_path = BASE_DIR / "README.md"
+    if not readme_path.exists():
+        return Response("README.md not found.\n", mimetype="text/plain")
+
+    text = readme_path.read_text(encoding="utf-8")
+    plain = markdown_to_plain_text(text)
+    return Response(plain, mimetype="text/plain")
+
+
+@app.get("/topology-notes")
+def topology_notes():
+    notes_path = TOPOLOGY_UPLOAD_DIR / "TOPOLOGY_NOTES.md"
+    if not notes_path.exists():
+        return Response("TOPOLOGY_NOTES.md not found.\n", mimetype="text/plain")
+    text = notes_path.read_text(encoding="utf-8")
+    plain = markdown_to_plain_text(text)
+    return Response(plain, mimetype="text/plain")
+
+
+def markdown_to_plain_text(text: str) -> str:
+    lines = text.splitlines()
+    out: List[str] = []
+    in_code_block = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+
+        if in_code_block:
+            out.append(line)
+            continue
+
+        # Headers
+        line = re.sub(r"^\s{0,3}#{1,6}\s*", "", line)
+        # Unordered/ordered list markers
+        line = re.sub(r"^\s*[-*+]\s+", "- ", line)
+        line = re.sub(r"^\s*\d+\.\s+", "- ", line)
+        # Inline code markers
+        line = line.replace("`", "")
+        # Horizontal rules
+        if stripped in {"---", "***", "___"}:
+            continue
+
+        out.append(line)
+
+    return "\n".join(out).strip() + "\n"
+
+
+@app.get("/api/files")
+def files():
+    return jsonify({"files": list_workspace_files()})
+
+@app.get("/api/download/<filename>")
+def download_file(filename):
+    safe_name = safe_script_name(filename)
+    if not safe_name:
+        return jsonify({"error": "invalid filename"}), 400
+    target = UPLOAD_DIR / safe_name
+    if not target.exists() or not target.is_file():
+        return jsonify({"error": "file not found"}), 404
+    return send_from_directory(UPLOAD_DIR, safe_name, as_attachment=True)
+
+
+@app.get("/api/references/data")
+def references_data():
+    try:
+        data = load_reference_data()
+        return jsonify({"ok": True, **data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to load references: {e}"}), 500
+
+
+@app.get("/api/topology/list")
+def list_topologies():
+    topologies = sorted([p.name for p in TOPOLOGY_UPLOAD_DIR.glob("*.json") if p.is_file()])
+    return jsonify({"files": [f"uploads/topologies/{name}" for name in topologies]})
+
+
+# --- CRM Tracker API ---
+
+@app.get("/api/tracker/list")
+def tracker_list():
+    customers = []
+    if TRACKER_DB.exists():
+        with open(TRACKER_DB, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                customers.append(row)
+    return jsonify({"customers": customers, "active": ACTIVE_CUSTOMER_ID})
+
+@app.post("/api/tracker/upload")
+def tracker_upload():
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file uploaded"}), 400
+    file = request.files["file"]
+    if not file.filename.endswith(".csv"):
+        return jsonify({"ok": False, "error": "Only CSV allowed"}), 400
+    
+    # Read uploaded CSV
+    content = file.read().decode("utf-8").splitlines()
+    reader = csv.DictReader(content)
+    
+    # Read existing
+    existing = {}
+    if TRACKER_DB.exists():
+        with open(TRACKER_DB, "r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                existing[row.get("customer_id", "")] = row
+                
+    # Merge new (only insert new ones to avoid overwriting progress)
+    added = 0
+    for row in reader:
+        cid = row.get("customer_id", "").strip() or str(uuid4())[:8]
+        if cid and cid not in existing:
+            existing[cid] = {
+                "customer_id": cid,
+                "customer_name": row.get("customer_name", "Unknown"),
+                "target_region": row.get("target_region", "DFW3"),
+                "status": "Queue",
+                "ospc_vms_count": 0, "ospc_volumes_count": 0, "ospc_db_count": 0,
+                "flex_migrated_vms": 0, "flex_migrated_volumes": 0,
+                "start_date": "", "completion_date": ""
+            }
+            added += 1
+
+    # Save
+    with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
+        fields = ["customer_id", "customer_name", "target_region", "status",
+                  "ospc_vms_count", "ospc_volumes_count", "ospc_db_count",
+                  "flex_migrated_vms", "flex_migrated_volumes", "start_date", "completion_date"]
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(existing.values())
+        
+    return jsonify({"ok": True, "added": added})
+
+@app.post("/api/tracker/set_active")
+def tracker_set_active():
+    global ACTIVE_CUSTOMER_ID
+    data = request.json or {}
+    cid = data.get("customer_id", "").strip()
+    if not cid:
+        return jsonify({"ok": False, "error": "No customer ID provided"}), 400
+    ACTIVE_CUSTOMER_ID = cid
+    
+    # Update status to In Progress
+    rows = []
+    if TRACKER_DB.exists():
+        with open(TRACKER_DB, "r", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+    
+    for row in rows:
+        if row["customer_id"] == cid:
+            if row["status"] in ["Queue", "Failed", "Rolled Back"]:
+                row["status"] = "In Progress"
+                if not row["start_date"]:
+                    row["start_date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    
+    with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
+        fields = ["customer_id", "customer_name", "target_region", "status",
+                  "ospc_vms_count", "ospc_volumes_count", "ospc_db_count",
+                  "flex_migrated_vms", "flex_migrated_volumes", "start_date", "completion_date"]
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    return jsonify({"ok": True, "active": ACTIVE_CUSTOMER_ID})
+
+@app.post("/api/tracker/stage1_update")
+def tracker_stage1_update():
+    global ACTIVE_CUSTOMER_ID
+    if not ACTIVE_CUSTOMER_ID:
+        return jsonify({"ok": False, "error": "No active customer set"}), 400
+        
+    # Read discovery file to count
+    from collections import defaultdict
+    counts = defaultdict(int)
+    overview_path = resolve_input_path(f"uploads/test_account_overview.csv")
+    if not overview_path or not overview_path.exists():
+        return jsonify({"ok": False, "error": "test_account_overview.csv not found"}), 404
+        
+    with open(overview_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rt = row.get("resource_type", "").lower()
+            if rt == "server":
+                counts["vms"] += 1
+            elif rt == "volume":
+                counts["vols"] += 1
+            elif rt == "database":
+                counts["dbs"] += 1
+
+    # Update Tracking DB
+    if not TRACKER_DB.exists():
+        return jsonify({"ok": False, "error": "Tracker DB missing"}), 404
+
+    with open(TRACKER_DB, "r", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+        
+    for row in rows:
+        if row["customer_id"] == ACTIVE_CUSTOMER_ID:
+            row["ospc_vms_count"] = counts["vms"]
+            row["ospc_volumes_count"] = counts["vols"]
+            row["ospc_db_count"] = counts["dbs"]
+            
+    with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
+        fields = ["customer_id", "customer_name", "target_region", "status",
+                  "ospc_vms_count", "ospc_volumes_count", "ospc_db_count",
+                  "flex_migrated_vms", "flex_migrated_volumes", "start_date", "completion_date"]
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+        
+    return jsonify({"ok": True, "vms": counts["vms"], "vols": counts["vols"], "dbs": counts["dbs"]})
+
+@app.get("/api/tracker/export")
+def tracker_export():
+    import io
+    if not TRACKER_DB.exists():
+        return "No data", 404
+        
+    rows = read_csv_rows(TRACKER_DB)
+    t_queue = sum(1 for r in rows if r.get("status", "") in ["Queue", "In Progress", "Rolled Back"])
+    t_ready = sum(1 for r in rows if r.get("status", "") == "Queue" and r.get("flex_readiness", "") == "FLEX Ready")
+    t_success = sum(1 for r in rows if r.get("status", "") == "Success")
+    t_fail = sum(1 for r in rows if r.get("status", "") == "Failed")
+
+    output = io.StringIO()
+    output.write("MIGRATION LOG METRICS\n")
+    output.write("Customers to be Migrated,Customers Ready,Successfully Migrated,Failed Migrations\n")
+    output.write(f"{t_queue},{t_ready},{t_success},{t_fail}\n\n")
+    output.write("CUSTOMER MIGRATION LOG DETAILS\n")
+    output.write(TRACKER_DB.read_text(encoding="utf-8"))
+    
+    return (
+        output.getvalue(),
+        200,
+        {
+            "Content-Type": "text/csv",
+            "Content-Disposition": "attachment; filename=migration_summary_report.csv"
+        }
+    )
+
+@app.get("/api/topology/openrc-files")
+def list_topology_openrc_files():
+    return jsonify({"files": list_openrc_candidates()})
+
+
+@app.get("/api/topology/load")
+def load_topology():
+    file_name = (request.args.get("file", "") or "").strip()
+    target = resolve_input_path(file_name)
+    if target is None or not target.exists() or target.suffix.lower() != ".json":
+        return jsonify({"ok": False, "error": "topology file not found"}), 404
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return jsonify({"ok": False, "error": "failed to parse topology file"}), 400
+    return jsonify({"ok": True, "topology": data, "file": file_name})
+
+
+@app.post("/api/topology/save")
+def save_topology():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    topology_name = safe_script_name(str(payload.get("name", "")).strip())
+    if not topology_name:
+        return jsonify({"ok": False, "error": "name is required"}), 400
+    if not topology_name.endswith(".json"):
+        topology_name += ".json"
+
+    topology = payload.get("topology")
+    if not isinstance(topology, dict):
+        return jsonify({"ok": False, "error": "topology object is required"}), 400
+
+    target = TOPOLOGY_UPLOAD_DIR / topology_name
+    target.write_text(json.dumps(topology, indent=2), encoding="utf-8")
+    return jsonify({"ok": True, "saved_as": f"uploads/topologies/{topology_name}"})
+
+
+@app.post("/api/topology/validate")
+def validate_topology_api():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    try:
+        nodes, edges, _ = parse_topology_payload(payload)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    findings, summary = validate_topology(nodes, edges)
+    return jsonify(
+        {
+            "ok": summary["ERROR"] == 0,
+            "validation_findings": findings,
+            "validation_summary": summary,
+        }
+    )
+
+
+@app.post("/api/topology/plan")
+def topology_plan_api():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    try:
+        nodes, edges, _ = parse_topology_payload(payload)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    findings, summary = validate_topology(nodes, edges)
+    actions = plan_topology(nodes, edges)
+    script_text = topology_to_script(nodes, edges)
+    return jsonify(
+        {
+            "ok": summary["ERROR"] == 0,
+            "validation_findings": findings,
+            "validation_summary": summary,
+            "planned_actions": actions,
+            "script_preview": script_text,
+        }
+    )
+
+
+@app.post("/api/topology/import-live")
+def topology_import_live_api():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    openrc_content = str(payload.get("openrc_content", "")).strip()
+    openrc_file_name = str(payload.get("openrc_file", "")).strip()
+    auth_secret = str(payload.get("auth_secret", "")).strip()
+    if not openrc_content and not openrc_file_name:
+        return jsonify({"ok": False, "error": "openrc_content or openrc_file is required"}), 400
+
+    if not openrc_content and openrc_file_name:
+        resolved = resolve_input_path(openrc_file_name)
+        if resolved is None or not resolved.exists():
+            return jsonify({"ok": False, "error": "openrc_file does not exist"}), 400
+        try:
+            openrc_content = resolved.read_text(encoding="utf-8")
+        except OSError as e:
+            return jsonify({"ok": False, "error": f"failed reading openrc_file: {e}"}), 400
+
+    exports = parse_openrc_exports(openrc_content)
+    if "OS_AUTH_URL" not in exports or "OS_USERNAME" not in exports:
+        return jsonify({"ok": False, "error": "OpenRC is missing OS_AUTH_URL or OS_USERNAME exports"}), 400
+    if auth_secret:
+        exports["OS_PASSWORD"] = auth_secret
+        exports["OS_API_KEY"] = auth_secret
+
+    env = os.environ.copy()
+    env.update(exports)
+    try:
+        topology = import_live_topology(env)
+    except subprocess.TimeoutExpired as e:
+        return jsonify({"ok": False, "error": f"openstack command timed out after {e.timeout}s"}), 504
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to import live topology: {e}"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "topology": topology,
+            "node_count": len(topology.get("nodes", [])),
+            "edge_count": len(topology.get("edges", [])),
+        }
+    )
+
+
+@app.post("/api/topology/import-script")
+def topology_import_script_api():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    script_content = str(payload.get("script_content", "")).strip()
+    script_file_name = str(payload.get("script_file", "")).strip()
+
+    if not script_content and not script_file_name:
+        return jsonify({"ok": False, "error": "script_content or script_file is required"}), 400
+
+    if not script_content and script_file_name:
+        resolved = resolve_input_path(script_file_name)
+        if resolved is None or not resolved.exists():
+            return jsonify({"ok": False, "error": "script_file does not exist"}), 400
+        try:
+            script_content = resolved.read_text(encoding="utf-8")
+        except OSError as e:
+            return jsonify({"ok": False, "error": f"failed reading script_file: {e}"}), 400
+
+    topology, parse_notes = import_topology_from_script(script_content)
+    return jsonify(
+        {
+            "ok": len(topology.get("nodes", [])) > 0,
+            "topology": topology,
+            "parse_notes": parse_notes,
+            "node_count": len(topology.get("nodes", [])),
+            "edge_count": len(topology.get("edges", [])),
+        }
+    )
+
+
+@app.post("/api/topology/generate-script")
+def generate_topology_script():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    try:
+        nodes, edges, script_name = parse_topology_payload(payload)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    if not nodes:
+        return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
+    findings, summary = validate_topology(nodes, edges)
+    if summary["ERROR"] > 0:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Topology validation failed.",
+                "validation_findings": findings,
+                "validation_summary": summary,
+            }
+        ), 400
+
+    phases = payload.get("phases") or ["net", "vm", "vol", "lb"]
+    script_text = topology_to_script(nodes, edges, phases)
+    script_path = UPLOAD_DIR / script_name
+    script_path.write_text(script_text, encoding="utf-8")
+    script_path.chmod(0o750)
+    return jsonify(
+        {
+            "ok": True,
+            "script_path": f"uploads/{script_name}",
+            "script_content": script_text,
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+            "validation_summary": summary,
+        }
+    )
+
+
+def _deploy_job_create(script_path: str) -> str:
+    job_id = uuid4().hex
+    with DEPLOY_JOBS_LOCK:
+        DEPLOY_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "running",
+            "complete": False,
+            "ok": False,
+            "return_code": None,
+            "log": "",
+            "script_path": script_path,
+            "started_at": datetime.now().isoformat(),
+            "finished_at": None,
+            "proc": None,  # subprocess.Popen handle — stored for stop/kill
+        }
+        if len(DEPLOY_JOBS) > MAX_DEPLOY_JOBS:
+            removable = [k for k, v in DEPLOY_JOBS.items() if v.get("complete")]
+            for k in removable[: max(0, len(DEPLOY_JOBS) - MAX_DEPLOY_JOBS)]:
+                DEPLOY_JOBS.pop(k, None)
+    return job_id
+
+
+def _deploy_job_append(job_id: str, text: str) -> None:
+    if not text:
+        return
+    with DEPLOY_JOBS_LOCK:
+        job = DEPLOY_JOBS.get(job_id)
+        if not job:
+            return
+        current = str(job.get("log", ""))
+        job["log"] = current + text
+
+
+def _deploy_job_finish(job_id: str, rc: int) -> None:
+    with DEPLOY_JOBS_LOCK:
+        job = DEPLOY_JOBS.get(job_id)
+        if not job:
+            return
+        job["complete"] = True
+        job["return_code"] = rc
+        job["ok"] = rc == 0
+        job["status"] = "completed" if rc == 0 else "failed"
+        job["finished_at"] = datetime.now().isoformat()
+
+
+def _run_deploy_job(
+    job_id: str,
+    cmd: str,
+    temp_script_path: Path,
+    temp_openrc_path: Optional[Path],
+) -> None:
+    proc: Optional[subprocess.Popen[str]] = None
+    timed_out = False
+    rc = 1
+    try:
+        proc = subprocess.Popen(
+            ["bash", "-lc", cmd],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            stdin=subprocess.DEVNULL,
+        )
+        # Store proc so stop-deploy can kill it
+        with DEPLOY_JOBS_LOCK:
+            job_entry = DEPLOY_JOBS.get(job_id)
+            if job_entry:
+                job_entry["proc"] = proc
+        start = time.time()
+        assert proc.stdout is not None
+        while True:
+            if (time.time() - start) > 1800:
+                timed_out = True
+                proc.kill()
+                _deploy_job_append(job_id, "\nTopology deploy timed out after 1800 seconds.\n")
+                break
+
+            ready, _, _ = select.select([proc.stdout], [], [], 1.0)
+            if ready:
+                line = proc.stdout.readline()
+                if line:
+                    _deploy_job_append(job_id, line)
+
+            if proc.poll() is not None:
+                break
+
+        if proc.stdout is not None:
+            remaining = proc.stdout.read()
+            if remaining:
+                _deploy_job_append(job_id, remaining)
+
+        rc = 124 if timed_out else int(proc.returncode or 0)
+    except Exception as e:
+        _deploy_job_append(job_id, f"\nDeploy worker error: {e}\n")
+        rc = 1
+    finally:
+        try:
+            temp_script_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        if temp_openrc_path is not None:
+            try:
+                temp_openrc_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        _deploy_job_finish(job_id, rc)
+
+
+@app.post("/api/topology/deploy-async")
+def deploy_topology_async():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    try:
+        nodes, edges, script_name = parse_topology_payload(payload)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    if not nodes:
+        return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
+    findings, summary = validate_topology(nodes, edges)
+    if summary["ERROR"] > 0:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Topology validation failed.",
+                "validation_findings": findings,
+                "validation_summary": summary,
+            }
+        ), 400
+
+    openrc_content = str(payload.get("openrc_content", "")).strip()
+    openrc_file_name = str(payload.get("openrc_file", "")).strip()
+    auth_secret = str(payload.get("auth_secret", "")).strip()
+    if not openrc_content and not openrc_file_name:
+        return jsonify({"ok": False, "error": "openrc_content or openrc_file is required"}), 400
+
+    phases = payload.get("phases") or ["net", "vm", "vol", "lb"]
+    script_text = topology_to_script(nodes, edges, phases)
+    fail_fast = bool(payload.get("fail_fast", False))
+
+    openrc_path: Optional[Path] = None
+    temp_openrc_path: Optional[Path] = None
+    effective_openrc_content = openrc_content
+    if openrc_content:
+        temp_openrc_file = tempfile.NamedTemporaryFile(mode="w", prefix="openrc_", suffix=".sh", delete=False)
+        temp_openrc_file.write(openrc_content + "\n")
+        temp_openrc_file.flush()
+        temp_openrc_file.close()
+        openrc_path = Path(temp_openrc_file.name)
+        temp_openrc_path = openrc_path
+    else:
+        resolved = resolve_input_path(openrc_file_name)
+        if resolved is None or not resolved.exists():
+            return jsonify({"ok": False, "error": "openrc_file does not exist"}), 400
+        openrc_path = resolved
+        try:
+            effective_openrc_content = resolved.read_text(encoding="utf-8")
+        except OSError:
+            effective_openrc_content = ""
+
+    exports = parse_openrc_exports(effective_openrc_content)
+    auth_secret_in_openrc = bool(str(exports.get("OS_PASSWORD", "")).strip())
+    app_cred_secret = bool(str(exports.get("OS_APPLICATION_CREDENTIAL_SECRET", "")).strip())
+    token_auth = bool(str(exports.get("OS_TOKEN", "")).strip())
+    if not (auth_secret or auth_secret_in_openrc or app_cred_secret or token_auth):
+        if temp_openrc_path is not None:
+            try:
+                temp_openrc_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return jsonify(
+            {
+                "ok": False,
+                "error": "No non-interactive credential found. Provide API Key / Password, or include OS_PASSWORD / OS_APPLICATION_CREDENTIAL_SECRET / OS_TOKEN in OpenRC.",
+            }
+        ), 400
+
+    secret_exports: List[str] = []
+    if auth_secret:
+        q = shell_quote(auth_secret)
+        secret_exports.append(f"export OS_PASSWORD={q};")
+        secret_exports.append(f"export OS_API_KEY={q};")
+    secret_export = " ".join(secret_exports)
+    if secret_export:
+        secret_export += " "
+
+    auth_probe_cmd = (
+        f"set -a && {secret_export}source {shell_quote(str(openrc_path))} && "
+        f"{secret_export}set +a && openstack token issue -f value -c id >/dev/null"
+    )
+    try:
+        auth_probe = subprocess.run(
+            ["bash", "-lc", auth_probe_cmd],
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=90,
+            stdin=subprocess.DEVNULL,
+        )
+    except subprocess.TimeoutExpired:
+        auth_probe = subprocess.CompletedProcess(args=["bash", "-lc", auth_probe_cmd], returncode=124, stdout="", stderr="Auth probe timed out after 90 seconds.")
+    if auth_probe.returncode != 0:
+        probe_output = (auth_probe.stdout or "") + ("\n" + auth_probe.stderr if auth_probe.stderr else "")
+        if temp_openrc_path is not None:
+            try:
+                temp_openrc_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return jsonify({"ok": False, "error": f"OpenStack authentication failed before deploy. {probe_output.strip()}"}), 400
+
+    persisted_script = UPLOAD_DIR / script_name
+    persisted_script.write_text(script_text, encoding="utf-8")
+    persisted_script.chmod(0o750)
+
+    temp_script = tempfile.NamedTemporaryFile(mode="w", prefix="topology_", suffix=".sh", delete=False)
+    temp_script.write(script_text)
+    temp_script.flush()
+    temp_script.close()
+    temp_script_path = Path(temp_script.name)
+    temp_script_path.chmod(0o750)
+
+    cmd = (
+        f"set -a && {secret_export}source {shell_quote(str(openrc_path))} && "
+        f"{secret_export}set +a && bash {shell_quote(str(temp_script_path))}"
+    )
+
+    job_id = _deploy_job_create(f"uploads/{script_name}")
+    _deploy_job_append(job_id, "Starting topology deploy...\n")
+    worker = threading.Thread(
+        target=_run_deploy_job,
+        args=(job_id, cmd, temp_script_path, temp_openrc_path),
+        daemon=True,
+    )
+    worker.start()
+    return jsonify({"ok": True, "job_id": job_id, "script_path": f"uploads/{script_name}", "script_content": script_text})
+
+
+@app.get("/api/topology/deploy-status")
+def deploy_topology_status():
+    job_id = (request.args.get("job_id", "") or "").strip()
+    if not job_id:
+        return jsonify({"ok": False, "error": "job_id is required"}), 400
+    with DEPLOY_JOBS_LOCK:
+        job = DEPLOY_JOBS.get(job_id)
+        if not job:
+            return jsonify({"ok": False, "error": "deploy job not found"}), 404
+        data = {k: v for k, v in job.items() if k != "proc"}  # don't serialise Popen
+    return jsonify(data)
+
+
+@app.post("/api/topology/stop-deploy")
+def stop_deploy():
+    """Kill the running deployment process for a given job_id."""
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    job_id = str(payload.get("job_id", "")).strip()
+    if not job_id:
+        return jsonify({"ok": False, "error": "job_id is required"}), 400
+    import signal
+    with DEPLOY_JOBS_LOCK:
+        job = DEPLOY_JOBS.get(job_id)
+        if not job:
+            return jsonify({"ok": False, "error": "job not found"}), 404
+        if job.get("complete"):
+            return jsonify({"ok": False, "error": "job already complete"}), 400
+        proc: Optional[subprocess.Popen] = job.get("proc")  # type: ignore[type-arg]
+    if proc is None:
+        return jsonify({"ok": False, "error": "process not started yet — try again"}), 400
+    try:
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        _deploy_job_append(job_id, "\n[STOPPED BY USER]\n")
+        _deploy_job_finish(job_id, 130)
+        return jsonify({"ok": True, "message": "Deployment process stopped."})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/topology/latest-rollback-name")
+def latest_rollback_name():
+    """Return the name + step count of the newest per-run rollback script."""
+    candidates = sorted(
+        list(UPLOAD_DIR.glob("last_rollback_*.sh")) +
+        list(BASE_DIR.glob("*_tenant_deploy_rollback.sh")) +
+        list(BASE_DIR.glob("*_rollback*.sh")),
+        key=lambda p: p.stat().st_mtime, reverse=True
+    )
+    if not candidates:
+        return jsonify({"name": None, "steps": 0})
+    p = candidates[0]
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+        steps = sum(1 for l in lines if l.strip() and not l.startswith("#") and not l.startswith("log ") and not l.startswith("echo ") and l.strip() not in ("set -uo pipefail", "ROLLBACK_AUTO_APPROVE=1", ""))
+    except Exception:
+        steps = "?"
+    return jsonify({"name": p.name, "steps": steps, "path": str(p)})
+
+
+@app.post("/api/topology/rollback")
+def rollback_topology():
+    """Run the most recent *_tenant_deploy_rollback.sh (or any *_rollback.sh) asynchronously."""
+    import tempfile
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    openrc_content = str(payload.get("openrc_content", "")).strip()
+    openrc_file_name = str(payload.get("openrc_file", "")).strip()
+    rollback_script_name = str(payload.get("rollback_script", "")).strip()
+
+    # Auto-detect rollback script if not explicitly provided
+    if not rollback_script_name:
+        candidates: List[Path] = sorted(
+            list(BASE_DIR.glob("*_tenant_deploy_rollback.sh")) +
+            list(UPLOAD_DIR.glob("last_rollback_*.sh")),
+            key=lambda p: p.stat().st_mtime, reverse=True
+        ) or sorted(BASE_DIR.glob("*_rollback.sh"), reverse=True)
+        if not candidates:
+            return jsonify({"ok": False, "error": "No rollback script found. Run a deployment first."}), 404
+        rollback_script_name = candidates[0].name
+
+    # Resolve path — check uploads dir first, then base dir
+    rollback_path = UPLOAD_DIR / rollback_script_name
+    if not rollback_path.exists():
+        rollback_path = BASE_DIR / rollback_script_name
+    if not rollback_path.exists():
+        return jsonify({"ok": False, "error": f"Rollback script not found: {rollback_script_name}"}), 404
+
+    rollback_path.chmod(0o750)
+
+    # Write openrc to temp file if provided inline
+    temp_openrc_path: Optional[Path] = None
+    if openrc_content:
+        tf = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".sh", dir=str(BASE_DIR), delete=False, prefix="_openrc_rb_"
+        )
+        tf.write(openrc_content)
+        tf.flush()
+        tf.close()
+        temp_openrc_path = Path(tf.name)
+        openrc_file_name = temp_openrc_path.name
+    elif openrc_file_name:
+        orp = Path(openrc_file_name) if Path(openrc_file_name).is_absolute() else BASE_DIR / openrc_file_name
+        if not orp.exists():
+            return jsonify({"ok": False, "error": f"OpenRC file not found: {openrc_file_name}"}), 400
+
+    auth_secret = str(payload.get("auth_secret", "")).strip()
+
+    if openrc_file_name:
+        openrc_full = str(BASE_DIR / openrc_file_name) if not Path(openrc_file_name).is_absolute() else openrc_file_name
+        
+        secret_exports = ["export ROLLBACK_AUTO_APPROVE=1;"]
+        if auth_secret:
+            q = shell_quote(auth_secret)
+            secret_exports.append(f"export OS_PASSWORD={q};")
+            secret_exports.append(f"export OS_API_KEY={q};")
+        secret_export = " ".join(secret_exports) + " "
+        
+        cmd = f"{secret_export}source {shell_quote(openrc_full)} && bash {shell_quote(str(rollback_path))}"
+    else:
+        cmd = f"export ROLLBACK_AUTO_APPROVE=1; bash {shell_quote(str(rollback_path))}"
+
+    job_id = _deploy_job_create(rollback_script_name)
+    _deploy_job_append(job_id, f"Starting rollback: {rollback_script_name}\n")
+    temp_rb_path = Path(tempfile.mktemp(suffix=".sh", dir=str(BASE_DIR), prefix="_rb_run_"))
+    temp_rb_path.write_text(f"#!/usr/bin/env bash\n{cmd}\n")
+    temp_rb_path.chmod(0o750)
+
+    threading.Thread(
+        target=_run_deploy_job,
+        args=(job_id, f"bash {shell_quote(str(temp_rb_path))}", temp_rb_path, temp_openrc_path),
+        daemon=True,
+    ).start()
+
+    return jsonify({"ok": True, "job_id": job_id, "rollback_script": rollback_script_name})
+
+
+
+@app.post("/api/topology/deploy")
+def deploy_topology():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    try:
+        nodes, edges, script_name = parse_topology_payload(payload)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    if not nodes:
+        return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
+    findings, summary = validate_topology(nodes, edges)
+    if summary["ERROR"] > 0:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "Topology validation failed.",
+                "validation_findings": findings,
+                "validation_summary": summary,
+            }
+        ), 400
+
+    openrc_content = str(payload.get("openrc_content", "")).strip()
+    openrc_file_name = str(payload.get("openrc_file", "")).strip()
+    auth_secret = str(payload.get("auth_secret", "")).strip()
+    if not openrc_content and not openrc_file_name:
+        return jsonify({"ok": False, "error": "openrc_content or openrc_file is required"}), 400
+
+    phases = payload.get("phases") or ["net", "vm", "vol", "lb"]
+    script_text = topology_to_script(nodes, edges, phases)
+    fail_fast = bool(payload.get("fail_fast", False))
+
+    openrc_path: Optional[Path] = None
+    temp_openrc_file = None
+    effective_openrc_content = openrc_content
+    if openrc_content:
+        temp_openrc_file = tempfile.NamedTemporaryFile(mode="w", prefix="openrc_", suffix=".sh", delete=False)
+        temp_openrc_file.write(openrc_content + "\n")
+        temp_openrc_file.flush()
+        temp_openrc_file.close()
+        openrc_path = Path(temp_openrc_file.name)
+    else:
+        resolved = resolve_input_path(openrc_file_name)
+        if resolved is None or not resolved.exists():
+            return jsonify({"ok": False, "error": "openrc_file does not exist"}), 400
+        openrc_path = resolved
+        try:
+            effective_openrc_content = resolved.read_text(encoding="utf-8")
+        except OSError:
+            effective_openrc_content = ""
+
+    exports = parse_openrc_exports(effective_openrc_content)
+    auth_secret_in_openrc = bool(str(exports.get("OS_PASSWORD", "")).strip())
+    app_cred_secret = bool(str(exports.get("OS_APPLICATION_CREDENTIAL_SECRET", "")).strip())
+    token_auth = bool(str(exports.get("OS_TOKEN", "")).strip())
+    if not (auth_secret or auth_secret_in_openrc or app_cred_secret or token_auth):
+        if temp_openrc_file is not None:
+            try:
+                Path(temp_openrc_file.name).unlink(missing_ok=True)
+            except OSError:
+                pass
+        return jsonify(
+            {
+                "ok": False,
+                "error": "No non-interactive credential found. Provide API Key / Password, or include OS_PASSWORD / OS_APPLICATION_CREDENTIAL_SECRET / OS_TOKEN in OpenRC.",
+            }
+        ), 400
+
+    skip_keypair_precheck = bool(payload.get("skip_keypair_precheck", True))
+    if not skip_keypair_precheck:
+        key_names = extract_instance_key_names(nodes)
+        keys_ok, missing_keys, key_check_error = verify_keypairs_via_openstack(openrc_path, auth_secret, key_names)
+        if not keys_ok:
+            if temp_openrc_file is not None:
+                try:
+                    Path(temp_openrc_file.name).unlink(missing_ok=True)
+                except OSError:
+                    pass
+            if key_check_error:
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": f"Keypair verification failed: {key_check_error}",
+                        "missing_keypairs": missing_keys,
+                    }
+                ), 400
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "One or more keypairs were not found in the target project.",
+                    "missing_keypairs": missing_keys,
+                }
+            ), 400
+
+    temp_script = tempfile.NamedTemporaryFile(mode="w", prefix="topology_", suffix=".sh", delete=False)
+    temp_script.write(script_text)
+    temp_script.flush()
+    temp_script.close()
+    temp_script_path = Path(temp_script.name)
+    temp_script_path.chmod(0o750)
+
+    secret_exports: List[str] = []
+    if auth_secret:
+        q = shell_quote(auth_secret)
+        secret_exports.append(f"export OS_PASSWORD={q};")
+        secret_exports.append(f"export OS_API_KEY={q};")
+    secret_export = " ".join(secret_exports)
+    if secret_export:
+        secret_export += " "
+
+    cmd = (
+        f"set -a && {secret_export}source {shell_quote(str(openrc_path))} && "
+        f"{secret_export}set +a && bash {shell_quote(str(temp_script_path))}"
+    )
+    auth_probe_cmd = (
+        f"set -a && {secret_export}source {shell_quote(str(openrc_path))} && "
+        f"{secret_export}set +a && openstack token issue -f value -c id >/dev/null"
+    )
+    try:
+        auth_probe = subprocess.run(
+            ["bash", "-lc", auth_probe_cmd],
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=90,
+            stdin=subprocess.DEVNULL,
+        )
+    except subprocess.TimeoutExpired:
+        auth_probe = subprocess.CompletedProcess(args=["bash", "-lc", auth_probe_cmd], returncode=124, stdout="", stderr="Auth probe timed out after 90 seconds.")
+
+    if auth_probe.returncode != 0:
+        probe_output = (auth_probe.stdout or "") + ("\n" + auth_probe.stderr if auth_probe.stderr else "")
+        try:
+            temp_script_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        if temp_openrc_file is not None:
+            try:
+                Path(temp_openrc_file.name).unlink(missing_ok=True)
+            except OSError:
+                pass
+        return jsonify(
+            {
+                "ok": False,
+                "error": f"OpenStack authentication failed before deploy. {probe_output.strip()}",
+                "return_code": auth_probe.returncode,
+                "script_path": f"uploads/{script_name}",
+            }
+        ), 400
+
+    try:
+        proc = subprocess.run(
+            ["bash", "-lc", cmd],
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=1800,
+            stdin=subprocess.DEVNULL,
+        )
+        output = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+    except subprocess.TimeoutExpired as e:
+        proc = subprocess.CompletedProcess(args=["bash", "-lc", cmd], returncode=124, stdout=e.stdout or "", stderr=e.stderr or "")
+        output = ((e.stdout or "") + ("\n" + (e.stderr or "") if e.stderr else "")).strip()
+        if output:
+            output += "\n"
+        output += "Topology deploy timed out after 1800 seconds."
+    persisted_script = UPLOAD_DIR / script_name
+    persisted_script.write_text(script_text, encoding="utf-8")
+    persisted_script.chmod(0o750)
+
+    try:
+        temp_script_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    if temp_openrc_file is not None:
+        try:
+            Path(temp_openrc_file.name).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    return jsonify(
+        {
+            "ok": proc.returncode == 0,
+            "return_code": proc.returncode,
+            "log": output.strip(),
+            "script_path": f"uploads/{script_name}",
+        }
+    )
+
+
+@app.post("/api/upload")
+def upload():
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file part in request"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"ok": False, "error": "No file selected"}), 400
+
+    name = secure_filename(f.filename)
+    if not name:
+        return jsonify({"ok": False, "error": "Invalid filename"}), 400
+
+    target = UPLOAD_DIR / name
+    f.save(target)
+    return jsonify({"ok": True, "saved_as": f"uploads/{name}"})
+
+
+@app.post("/api/save-csv")
+def save_csv():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    target_name = secure_filename((payload.get("target_name") or "").strip())
+    content = payload.get("content") or ""
+
+    if not target_name:
+        return jsonify({"ok": False, "error": "target_name is required"}), 400
+    if not target_name.lower().endswith(".csv"):
+        return jsonify({"ok": False, "error": "Only .csv files are allowed"}), 400
+    if not isinstance(content, str):
+        return jsonify({"ok": False, "error": "content must be a string"}), 400
+
+    root_target = BASE_DIR / target_name
+    upload_target = UPLOAD_DIR / target_name
+
+    if root_target.exists():
+        dest = root_target
+        saved_path = target_name
+    elif upload_target.exists():
+        dest = upload_target
+        saved_path = f"uploads/{target_name}"
+    else:
+        dest = upload_target
+        saved_path = f"uploads/{target_name}"
+
+    try:
+        dest.write_text(content, encoding="utf-8", newline="")
+    except OSError as e:
+        return jsonify({"ok": False, "error": f"Failed to save CSV: {e}"}), 500
+
+    return jsonify({"ok": True, "saved_path": saved_path})
+
+
+@app.post("/api/run/account-overview")
+def run_account_overview():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    username = (payload.get("username") or "").strip()
+    api_key = (payload.get("api_key") or "").strip()
+    account_id = (payload.get("account_id") or "").strip()
+    regions = (payload.get("regions") or "dfw,iad,ord,hkg,syd").strip()
+
+    if not username or not api_key or not account_id:
+        return jsonify({"ok": False, "error": "username, api_key, and account_id are required"}), 400
+
+    before = list_workspace_files()
+    rc, out = run_cmd(
+        [
+            "python3",
+            "account_overview.py",
+            "--username",
+            username,
+            "--api-key",
+            api_key,
+            "--account-id",
+            account_id,
+            "--regions",
+            regions,
+        ]
+    )
+    after = list_workspace_files()
+    created = diff_files(before, after)
+
+    return jsonify({"ok": rc == 0, "return_code": rc, "log": out, "created": created})
+
+
+@app.post("/api/run/flavor-mapper")
+def run_flavor_mapper():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    inventory = resolve_input_path(payload.get("inventory", ""))
+    account_overview = resolve_input_path(payload.get("account_overview", ""))
+    include_db_as_servers = bool(payload.get("include_database_instances_as_servers", False))
+    include_floating_ips = bool(payload.get("include_floating_ips", True))
+    target_region = (payload.get("target_region") or "").strip()
+
+    if not inventory or not inventory.exists():
+        return jsonify({"ok": False, "error": "inventory file not found"}), 400
+    if not target_region:
+        return jsonify({"ok": False, "error": "target_region is required"}), 400
+    if target_region.upper() not in {"DFW", "SJC", "IAD"}:
+        return jsonify({"ok": False, "error": "target_region must be one of DFW, SJC, or IAD"}), 400
+    target_flavor_catalog = resolve_target_flavor_catalog_for_region(target_region)
+    if target_flavor_catalog is None:
+        return jsonify(
+            {
+                "ok": False,
+                "error": f"Target flavor catalog for region {target_region.upper()} not found in uploads/flavors/",
+            }
+        ), 400
+
+    args = [
+        "python3",
+        "flavor_mapper.py",
+        "--inventory",
+        str(inventory),
+        "--target-region",
+        target_region.upper(),
+        "--target-flavor-catalog",
+        str(target_flavor_catalog),
+    ]
+    if account_overview is not None and account_overview.exists():
+        args += ["--account-overview", str(account_overview)]
+    if include_db_as_servers:
+        args += ["--include-database-instances-as-servers"]
+    if not include_floating_ips:
+        args += ["--no-include-floating-ips"]
+
+    before = list_workspace_files()
+    rc, out = run_cmd(args)
+    after = list_workspace_files()
+    created = diff_files(before, after)
+
+    return jsonify({"ok": rc == 0, "return_code": rc, "log": out, "created": created})
+
+
+@app.post("/api/run/validate")
+def run_validate():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    flavor_map = resolve_input_path(payload.get("flavor_mapping", ""))
+    block_map = resolve_input_path(payload.get("block_storage_mapping", ""))
+    lb_map_name = (payload.get("lb_mapping") or "").strip()
+    lb_map = resolve_input_path(lb_map_name)
+
+    if not flavor_map or not block_map or not flavor_map.exists() or not block_map.exists():
+        return jsonify({"ok": False, "error": "flavor mapping and block mapping files are required"}), 400
+    if lb_map_name and (lb_map is None or not lb_map.exists()):
+        return jsonify({"ok": False, "error": "lb mapping file not found"}), 400
+
+    before = list_workspace_files()
+    rc, out = run_cmd(
+        [
+            "python3",
+            "validate_migration_inputs.py",
+            "--flavor-mapping",
+            str(flavor_map),
+            "--block-storage-mapping",
+            str(block_map),
+        ]
+    )
+    after = list_workspace_files()
+    created = diff_files(before, after)
+    report_path: Optional[Path] = None
+    if created:
+        report_candidates = [name for name in created if name.endswith("_validation_report.csv")]
+        if report_candidates:
+            report_path = resolve_input_path(report_candidates[-1])
+    if report_path is None:
+        report_path = parse_validation_report_path(out)
+
+    findings: List[Dict[str, str]] = []
+    summary = {"ERROR": 0, "WARN": 0, "INFO": 0}
+    if report_path is not None and report_path.exists():
+        try:
+            findings, summary = read_validation_findings(report_path)
+        except OSError:
+            findings = []
+            summary = {"ERROR": 0, "WARN": 0, "INFO": 0}
+
+    lb_exists = lb_map is not None and lb_map.exists()
+    if lb_exists:
+        try:
+            flavor_rows = read_csv_rows(flavor_map)
+            lb_rows = read_csv_rows(lb_map)
+            lb_findings, _ = validate_lb_mapping_rows(flavor_rows, lb_rows)
+            findings.extend(lb_findings)
+            for entry in lb_findings:
+                sev = (entry.get("severity") or "").upper()
+                if sev in summary:
+                    summary[sev] += 1
+        except OSError as e:
+            findings.append(
+                {
+                    "severity": "ERROR",
+                    "code": "lb_mapping_read_failed",
+                    "scope": "lbmap",
+                    "message": f"Failed reading LB map: {e}",
+                }
+            )
+            summary["ERROR"] += 1
+
+    return jsonify(
+        {
+            "ok": rc == 0 and summary["ERROR"] == 0,
+            "return_code": rc,
+            "log": out,
+            "created": created,
+            "validation_findings": findings,
+            "validation_summary": summary,
+            "validation_report_path": str(report_path) if report_path is not None else "",
+            "validation_flavor_mapping": str(flavor_map) if flavor_map is not None else "",
+            "validation_block_mapping": str(block_map) if block_map is not None else "",
+            "validation_lb_mapping": str(lb_map) if lb_exists and lb_map is not None else "",
+        }
+    )
+
+
+@app.post("/api/run/generate-app-dependencies")
+def run_generate_app_dependencies():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    overview_csv = resolve_input_path(payload.get("overview_csv", ""))
+    mode = payload.get("mode", "inference")
+    
+    if not overview_csv or not overview_csv.exists():
+        return jsonify({"ok": False, "error": "Valid overview CSV is required"}), 400
+
+    cmd = [
+        "python3", "generate_app_dependency_map.py",
+        "--inventory", str(overview_csv.name),
+        "--mode", mode
+    ]
+    rc, out = run_cmd(cmd)
+    
+    # Move output file manually to uploads if the generator put it in BASE_DIR
+    base_name = overview_csv.name.replace("_overview.csv", "").replace("_inventory.csv", "") if overview_csv else ""
+    if base_name:
+        generated_name = f"{base_name.replace('.csv', '')}_app_dependencies.csv" if mode == "inference" else f"{base_name.replace('.csv', '')}_active_dependency_scanner.sh"
+        base_file = BASE_DIR / generated_name
+        if base_file.exists():
+            target_file = UPLOAD_DIR / base_file.name
+            base_file.rename(target_file)
+            out += f"\nMoved {generated_name} to uploads/"
+    
+    if rc == 0:
+        return jsonify({"ok": True, "log": out})
+    else:
+        return jsonify({"ok": False, "error": out})
+
+
+_active_jobs: Dict[str, subprocess.Popen] = {}  # job_id -> proc
+
+
+@app.route("/api/stream/execute-bash", methods=["GET"])
+def stream_execute_bash():
+    script_name = request.args.get("script", "")
+    job_id = request.args.get("job_id", "") or str(uuid4())
+    script_file = resolve_input_path(script_name)
+
+    if not script_file or not script_file.exists():
+        return jsonify({"error": "script file not found or invalid path"}), 400
+    if not str(script_file).endswith(".sh"):
+        return jsonify({"error": "only .sh execution is allowed"}), 400
+
+    log_path = UPLOAD_DIR / (script_file.stem + "_execution.log")
+
+    def generate():
+        log_lines: List[str] = []
+        yield f"data: --- script output start ---\n\n"
+        
+        candidates = list_openrc_candidates()
+        openrc_cmd = ""
+        if candidates:
+            # Always prefer the latest uploaded/modified openrc file if there are multiples
+            rc_path = resolve_input_path(candidates[-1])
+            if rc_path and rc_path.exists():
+                openrc_cmd = f"set -a && source {shell_quote(str(rc_path))} && set +a && "
+        
+        cmd_str = f"{openrc_cmd}bash {shell_quote(str(script_file.name))}"
+
+        proc = subprocess.Popen(
+            ["bash", "-c", cmd_str],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            stdin=subprocess.DEVNULL,
+        )
+        _active_jobs[job_id] = proc
+        try:
+            if proc.stdout:
+                for line in iter(proc.stdout.readline, ""):
+                    if line:
+                        stripped = line.rstrip()
+                        log_lines.append(stripped)
+                        yield f"data: {stripped}\n\n"
+            proc.wait()
+        finally:
+            _active_jobs.pop(job_id, None)
+        # Persist full log to disk for report generation
+        try:
+            with open(log_path, "w") as lf:
+                lf.write("\n".join(log_lines))
+        except Exception:
+            pass
+        yield f"data: --- script output end ---\n\n"
+        yield f"data: [DONE] rc={proc.returncode} log={log_path.name}\n\n"
+
+    from flask import stream_with_context
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@app.post("/api/run/stop-script")
+def stop_script():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    job_id = (payload.get("job_id") or "").strip()
+    if not job_id:
+        return jsonify({"ok": False, "error": "job_id required"}), 400
+    proc = _active_jobs.get(job_id)
+    if not proc:
+        return jsonify({"ok": False, "error": "no active job with that ID"}), 404
+    try:
+        import signal as _signal
+        proc.send_signal(_signal.SIGTERM)
+        proc.wait(timeout=3)
+    except Exception:
+        proc.kill()
+    _active_jobs.pop(job_id, None)
+    return jsonify({"ok": True, "message": f"Job {job_id} terminated."})
+
+
+@app.route("/api/data/runbook-ips", methods=["GET"])
+def get_runbook_ips():
+    """Attempt to extract source IPs from stage 1 scan to pre-fill runbook"""
+    ips = {
+        "OSPC_FRONT": "", "OSPC_BACK": "", "OSPC_API": "", "OSPC_DB": ""
+    }
+    overview = resolve_input_path("test_account_overview.csv")
+    if overview and overview.exists():
+        try:
+            import csv
+            with open(overview, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    cat = row.get("category", "").lower()
+                    ip = row.get("private_ip", "")
+                    if ip:
+                        # try to guess the username, default to root or ubuntu
+                        ip_str = f"root@{ip}" # standard for legacy dedicated/cloud
+                        if "web" in cat or "front" in cat:
+                            if not ips["OSPC_FRONT"]: ips["OSPC_FRONT"] = ip_str
+                        elif "api" in cat:
+                            if not ips["OSPC_API"]: ips["OSPC_API"] = ip_str
+                        elif "db" in cat or "database" in cat or "mysql" in cat or "sql" in cat:
+                            if not ips["OSPC_DB"]: ips["OSPC_DB"] = ip_str
+                        elif "app" in cat or "back" in cat:
+                            if not ips["OSPC_BACK"]: ips["OSPC_BACK"] = ip_str
+        except Exception:
+            pass
+            
+    return jsonify(ips)
+
+
+@app.route("/api/run/execute-manual-cmd", methods=["POST"])
+def execute_manual_cmd():
+    """Execute a manual shell command from the dashboard runbook."""
+    data = request.json or {}
+    cmd = data.get("command", "").strip()
+    if not cmd:
+        return jsonify({"status": "error", "error": "No command provided"}), 400
+    
+    try:
+        proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+        output = proc.stdout + "\n" + proc.stderr
+        if proc.returncode == 0:
+            return jsonify({"status": "success", "output": output})
+        else:
+            return jsonify({"status": "error", "error": f"Exit code {proc.returncode}\n{output}"})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)})
+
+
+@app.route("/api/run/k8s-deploy", methods=["POST"])
+def run_k8s_deploy():
+    """Execute automated Kubernetes deployment from Stage 1 artifacts onto the FLEX cluster."""
+    """Execute automated Kubernetes deployment from Stage 1 artifacts onto the FLEX cluster."""
+    deploy_type = request.form.get("deployType", "")
+    flex_config = request.form.get("flexConfig", "").strip()
+    helm_release = request.form.get("helmRelease", "").strip()
+
+    file = request.files.get("artifactFile")
+    if not file or not file.filename:
+        return jsonify({"status": "error", "error": "Missing artifact file upload"}), 400
+    if not flex_config:
+        return jsonify({"status": "error", "error": "Missing FLEX kubeconfig path"}), 400
+
+    active_cust = get_active_customer()
+    customer_dir = BASE_DIR / "uploads" / (active_cust if active_cust else "default") / "k8s_artifacts"
+    customer_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Safe filename fallback since werkzeug might be tricky
+    safe_name = "".join(c for c in Path(file.filename).name if c.isalnum() or c in (".", "_", "-"))
+    if not safe_name:
+        safe_name = "k8s_export_bundle.yaml"
+    
+    artifact_path = customer_dir / safe_name
+    file.save(str(artifact_path))
+
+    # If Kustomize archive, unpack it
+    if deploy_type == "kustomize" and str(artifact_path).endswith((".zip", ".tar.gz", ".tgz")):
+        import shutil
+        extract_dir = customer_dir / f"{safe_name}_extracted"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.unpack_archive(str(artifact_path), str(extract_dir))
+            artifact_path = extract_dir
+        except Exception as e:
+            return jsonify({"status": "error", "error": f"Failed to unpack Kustomize archive: {e}"}), 400
+
+    env = os.environ.copy()
+    env["KUBECONFIG"] = flex_config
+
+    cmd = ""
+    if deploy_type == "yaml":
+        cmd = f"kubectl apply -f {shell_quote(str(artifact_path))}"
+    elif deploy_type == "kustomize":
+        cmd = f"kubectl apply -k {shell_quote(str(artifact_path))}"
+    elif deploy_type == "helm":
+        if not helm_release:
+            return jsonify({"status": "error", "error": "Helm deploy requires a release name"}), 400
+        cmd = f"helm upgrade --install {shell_quote(helm_release)} . -f {shell_quote(str(artifact_path))}"
+    else:
+        return jsonify({"status": "error", "error": "Unknown deployment type"}), 400
+
+    try:
+        proc = subprocess.run(cmd, env=env, shell=True, capture_output=True, text=True, timeout=300)
+        output = proc.stdout + "\n" + proc.stderr
+        if proc.returncode == 0:
+            return jsonify({"status": "success", "message": output})
+        else:
+            return jsonify({"status": "error", "error": f"Exit code {proc.returncode}\\n{output}"})
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)})
+
+@app.route("/api/run/migration-report", methods=["GET"])
+def run_migration_report():
+    """Parse the last execution log and produce an XLSX migration report."""
+    log_name = request.args.get("log", "")
+    if not log_name:
+        return jsonify({"error": "log parameter required"}), 400
+
+    log_file = resolve_input_path(log_name)
+    if not log_file or not log_file.exists():
+        return jsonify({"error": f"log file '{log_name}' not found"}), 400
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        return jsonify({"error": "openpyxl not installed; run: pip install openpyxl"}), 500
+
+    lines = log_file.read_text(errors="replace").splitlines()
+
+    # Parse lines into per-server rows
+    # Expected patterns emitted by generate_data_migration_script.py:
+    #  "# Server: <src> -> <tgt> (Category: <cat>)"
+    #  "TARGET_IP=..." -> captures target IP
+    #  "echo 'Syncing ... for <name>'"
+    #  rsync / ssh lines show paths
+    #  "rsync error:" or "ssh: connect" or exec failures signal errors
+
+    rows: List[Dict[str, Any]] = []
+    current: Dict[str, Any] = {}
+    errors_for_current: List[str] = []
+
+    def flush_current():
+        if current.get("source_name"):
+            status = "Failed" if errors_for_current else "Success"
+            rows.append({
+                "Source Server": current.get("source_name", ""),
+                "Category": current.get("category", ""),
+                "Source IP": current.get("source_ip", ""),
+                "Target Server": current.get("target_name", ""),
+                "Target IP": current.get("target_ip", ""),
+                "Paths Synced": current.get("paths", ""),
+                "Status": status,
+                "Error / Cause": "; ".join(errors_for_current) if errors_for_current else "",
+            })
+
+    for line in lines:
+        # Detect server block header
+        if line.startswith("# Server:"):
+            flush_current()
+            current = {}
+            errors_for_current = []
+            # "# Server: web-prod-01 -> web-prod-01 (Category: linux_app)"
+            try:
+                body = line[len("# Server:"):].strip()
+                parts = body.split("->")
+                src = parts[0].strip()
+                rest = parts[1].strip() if len(parts) > 1 else ""
+                cat_start = rest.find("(Category:")
+                tgt = rest[:cat_start].strip() if cat_start >= 0 else rest.strip()
+                cat = rest[cat_start + len("(Category:"):].rstrip(")").strip() if cat_start >= 0 else ""
+                current = {"source_name": src, "target_name": tgt, "category": cat, "paths": set()}
+            except Exception:
+                pass
+
+        elif line.startswith("TARGET_IP="):
+            ip = line.split("=", 1)[1].strip().strip('"')
+            if not ip.startswith("$("):
+                current["target_ip"] = ip
+
+        elif "rsync" in line and ":/var" in line:
+            # extract path from line like: rsync ... root@1.2.3.4:/var/www/html/ ...
+            try:
+                path_part = [p for p in line.split() if ":/var" in p]
+                if path_part:
+                    path = path_part[0].split(":")[-1]
+                    if isinstance(current.get("paths"), set):
+                        current["paths"].add(path)
+            except Exception:
+                pass
+
+        elif line.startswith("rsync error:") or "error" in line.lower() and ("rsync" in line.lower() or "ssh" in line.lower() or "mysql" in line.lower()):
+            errors_for_current.append(line.strip())
+
+        elif line.startswith("bash:") or "command not found" in line or "Permission denied" in line:
+            errors_for_current.append(line.strip())
+
+    flush_current()
+
+    # If no rows parsed (e.g. cutover/rollback scripts), create a single summary row
+    if not rows:
+        rows.append({
+            "Source Server": "(see log)",
+            "Category": "",
+            "Source IP": "",
+            "Target Server": "",
+            "Target IP": "",
+            "Paths Synced": "",
+            "Status": "See log for details",
+            "Error / Cause": "",
+        })
+
+    # Build XLSX
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Migration Report"  # type: ignore[assignment]
+
+    headers = ["Source Server", "Category", "Source IP", "Target Server", "Target IP", "Paths Synced", "Status", "Error / Cause"]
+    header_fill = PatternFill("solid", fgColor="1A3A5C")
+    header_font = Font(bold=True, color="FFFFFF")
+
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    green_fill = PatternFill("solid", fgColor="C6EFCE")
+    red_fill = PatternFill("solid", fgColor="FFC7CE")
+
+    for row_idx, row_data in enumerate(rows, start=2):
+        for col_idx, key in enumerate(headers, start=1):
+            val = row_data.get(key, "")
+            if isinstance(val, set):
+                val = "; ".join(sorted(val))
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+            if key == "Status":
+                cell.fill = green_fill if val == "Success" else red_fill
+
+    # Auto-fit columns roughly
+    col_widths = [20, 14, 16, 20, 16, 45, 10, 50]
+    for i, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width  # type: ignore[attr-defined]
+    ws.row_dimensions[1].height = 30
+
+    report_name = log_file.stem.replace("_execution", "") + "_migration_report.xlsx"
+    report_path = UPLOAD_DIR / report_name
+    wb.save(str(report_path))
+
+    return send_from_directory(str(UPLOAD_DIR), report_name, as_attachment=True)
+
+
+
+
+@app.post("/api/run/generate-data-migration")
+def run_generate_data_migration():
+    payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
+    strategy = str(payload.get("strategy") or "direct").strip()
+    use_custom_csv = bool(payload.get("use_custom_csv", False))
+
+    args = [
+        "python3",
+        "generate_data_migration_script.py",
+        "--strategy",
+        strategy,
+    ]
+
+    if use_custom_csv:
+        custom_csv = resolve_input_path(str(payload.get("custom_csv", "")).strip())
+        if not custom_csv or not custom_csv.exists():
+            return jsonify({"ok": False, "error": "custom CSV file is required but not found"}), 400
+        args.extend(["--custom-ips", str(custom_csv)])
+    else:
+        inventory_file = resolve_input_path(str(payload.get("inventory", "")).strip())
+        flavor_map_file = resolve_input_path(str(payload.get("flavor_mapping", "")).strip())
+
+        if not inventory_file or not inventory_file.exists():
+            return jsonify({"ok": False, "error": "inventory file is required"}), 400
+        if not flavor_map_file or not flavor_map_file.exists():
+            return jsonify({"ok": False, "error": "flavor mapping file is required"}), 400
+
+        args.extend([
+            "--inventory", str(inventory_file),
+            "--flavor-mapping", str(flavor_map_file),
+        ])
+
+    rc, out = run_cmd(args)
+    ok = rc == 0
+    created = []
+    for line in out.splitlines():
+        if line.strip().startswith("- ") and ".sh" in line:
+            created.append(line.replace("- ", "").strip())
+    
+    return jsonify({
+        "ok": ok,
+        "return_code": rc,
+        "log": out,
+        "created": created
+    })
+
+
+@app.post("/api/run/generate-deploy")
+def run_generate_deploy():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    flavor_map = resolve_input_path(payload.get("flavor_mapping", ""))
+    block_map = resolve_input_path(payload.get("block_storage_mapping", ""))
+    lb_map_name = (payload.get("lb_mapping") or "").strip()
+    lb_map = resolve_input_path(lb_map_name)
+    fail_fast = bool(payload.get("fail_fast", False))
+
+    if not flavor_map or not flavor_map.exists():
+        return jsonify({"ok": False, "error": "flavor mapping file is required"}), 400
+    if lb_map_name and (lb_map is None or not lb_map.exists()):
+        return jsonify({"ok": False, "error": "lb mapping file not found"}), 400
+
+    args = [
+        "python3",
+        "generate_project_deploy_script.py",
+        "--flavor-mapping",
+        str(flavor_map),
+        "--public-network",
+        (payload.get("public_network") or "PUBLICNET").strip(),
+        "--private-network",
+        (payload.get("private_network") or "tenant-net").strip(),
+        "--subnet-name",
+        (payload.get("subnet_name") or "tenant-subnet").strip(),
+        "--subnet-cidr",
+        (payload.get("subnet_cidr") or "10.60.0.0/24").strip(),
+        "--router-name",
+        (payload.get("router_name") or "tenant-router").strip(),
+        "--security-group",
+        (payload.get("security_group") or "default").strip(),
+        "--volume-type",
+        (payload.get("volume_type") or "Performance").strip(),
+    ]
+
+    key_name = (payload.get("key_name") or "").strip()
+    windows_password_length_raw = payload.get("windows_password_length", 14)
+    try:
+        windows_password_length = int(windows_password_length_raw)
+    except (TypeError, ValueError):
+        windows_password_length = 14
+    windows_password_length = max(12, min(16, windows_password_length))
+    windows_admin_user = (payload.get("windows_admin_user") or "Administrator").strip() or "Administrator"
+    generate_windows_passwords = bool(payload.get("generate_windows_passwords", True))
+
+    flavor_rows = read_csv_rows(flavor_map)
+    linux_included = False
+    for row in flavor_rows:
+        include_in_deploy = row.get("include_in_deploy")
+        include = True if include_in_deploy is None or str(include_in_deploy).strip() == "" else is_truthy_text(str(include_in_deploy))
+        if not include:
+            continue
+        image_name = str(row.get("recommended_target_image_name") or "").strip().lower()
+        if "windows" not in image_name:
+            linux_included = True
+            break
+
+    if linux_included and not key_name:
+        return jsonify({"ok": False, "error": "key_name is required when deploy includes Linux instances"}), 400
+    if key_name:
+        args += ["--key-name", key_name]
+    
+    ssh_pub_key = (payload.get("ssh_pub_key") or "").strip()
+    if ssh_pub_key:
+        args += ["--ssh-pub-key", ssh_pub_key]
+
+    args += ["--windows-password-length", str(windows_password_length), "--windows-admin-user", windows_admin_user]
+    if not generate_windows_passwords:
+        args += ["--no-generate-windows-passwords"]
+
+    output_prefix = (payload.get("output_prefix") or "").strip()
+    if output_prefix:
+        args += ["--output-prefix", output_prefix]
+
+    if block_map is not None and block_map.exists():
+        args += ["--block-storage-mapping", str(block_map)]
+    if lb_map is not None and lb_map.exists():
+        args += ["--load-balancer-mapping", str(lb_map)]
+    if fail_fast:
+        args += ["--fail-fast"]
+
+    before = list_workspace_files()
+    rc, out = run_cmd(args)
+    after = list_workspace_files()
+    created = diff_files(before, after)
+
+    return jsonify({"ok": rc == 0, "return_code": rc, "log": out, "created": created})
+
+
+@app.post("/api/run/verify")
+def run_verify():
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    plan = resolve_input_path(payload.get("plan", ""))
+
+    if not plan or not plan.exists():
+        return jsonify({"ok": False, "error": "plan file is required"}), 400
+
+    before = list_workspace_files()
+    rc, out = run_cmd(["python3", "verify_post_deploy.py", "--plan", str(plan)])
+    after = list_workspace_files()
+    created = diff_files(before, after)
+
+    return jsonify({"ok": rc == 0, "return_code": rc, "log": out, "created": created})
+
+
+
+
+@app.post("/api/flex/import-sgs")
+def flex_import_sgs():
+    """Run a pre-built bash script that creates Security Groups in FLEX via the openstack CLI."""
+    import tempfile, time as _time
+    payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
+    script = payload.get("script", "").strip()
+    if not script:
+        return jsonify({"ok": False, "error": "script payload is required"}), 400
+    tmp = BASE_DIR / f"_sg_import_{int(_time.time())}.sh"
+    try:
+        tmp.write_text(script, encoding="utf-8")
+        tmp.chmod(0o755)
+        rc, out = run_cmd(["bash", str(tmp)])
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return jsonify({"ok": rc == 0, "return_code": rc, "log": out})
+
+# --- OPTION 1: IMAGE MIGRATOR ROUTES ---
+from flask import stream_with_context
+@app.post("/api/image_migrator/run")
+def run_image_migrator():
+    req = request.get_json(force=True, silent=True) or {}
+    script_path = "/home/dzoan/OSPC2FLEX/ospc2Flex-Image-migtool/ospc2flex_image_migrator.py"
+    
+    cmd = [sys.executable, script_path]
+    
+    # Core
+    ospc_path = req.get('ospc_openrc')
+    flex_path = req.get('flex_openrc')
+    
+    # Auto-synthesize OSPC if raw creds provided
+    if req.get('ospc_username') and req.get('ospc_apikey') and not ospc_path:
+        import tempfile
+        fd, ospc_path = tempfile.mkstemp(suffix=".sh", prefix="ospc_auto_")
+        with os.fdopen(fd, 'w') as f:
+            f.write("export OS_AUTH_URL=https://identity.api.rackspacecloud.com/v2.0/\n")
+            f.write(f"export OS_USERNAME={req.get('ospc_username')}\n")
+            f.write(f"export OS_PASSWORD={req.get('ospc_apikey')}\n")
+            if req.get('ospc_account_id'): f.write(f"export OS_TENANT_ID={req.get('ospc_account_id')}\n")
+            
+    # Auto-synthesize FLEX if raw creds provided
+    if req.get('flex_username') and req.get('flex_password') and not flex_path:
+        import tempfile
+        fd, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_auto_")
+        with os.fdopen(fd, 'w') as f:
+            f.write(f"export OS_AUTH_URL={req.get('flex_auth_url', 'https://keystone.api.dfw3.rackspacecloud.com/v3/')}\n")
+            f.write("export OS_IDENTITY_API_VERSION=3\n")
+            f.write(f"export OS_USERNAME={req.get('flex_username')}\n")
+            f.write(f"export OS_PASSWORD={req.get('flex_password')}\n")
+            if req.get('flex_project_id'): f.write(f"export OS_PROJECT_ID={req.get('flex_project_id')}\n")
+            if req.get('flex_domain'):
+                f.write(f"export OS_USER_DOMAIN_NAME={req.get('flex_domain')}\n")
+                f.write(f"export OS_PROJECT_DOMAIN_NAME={req.get('flex_domain')}\n")
+
+    if ospc_path: cmd.extend(["--ospc-openrc", ospc_path])
+    if flex_path: cmd.extend(["--flex-openrc", flex_path])
+    if req.get('server_name'): cmd.extend(["--server-name", req.get('server_name')])
+    if req.get('snapshot_name'): cmd.extend(["--snapshot-name", req.get('snapshot_name')])
+    if req.get('workdir'): cmd.extend(["--workdir", req.get('workdir')])
+    if req.get('target_format'): cmd.extend(["--target-format", req.get('target_format')])
+    if req.get('source_format'): cmd.extend(["--source-format", req.get('source_format')])
+    if req.get('flex_image_name'): cmd.extend(["--flex-image-name", req.get('flex_image_name')])
+    if req.get('visibility'): cmd.extend(["--visibility", req.get('visibility')])
+    if req.get('container_format'): cmd.extend(["--container-format", req.get('container_format')])
+    if req.get('keep_export'): cmd.append("--keep-export")
+    if req.get('cleanup_snapshot'): cmd.append("--cleanup-snapshot")
+    if req.get('dry_run'): cmd.append("--dry-run")
+    
+    # Boot test
+    if req.get('boot_test_vm'):
+        cmd.append("--boot-test-vm")
+        if req.get('test_server_name'): cmd.extend(["--test-server-name", req.get('test_server_name')])
+        if req.get('flex_flavor'): cmd.extend(["--flex-flavor", req.get('flex_flavor')])
+        if req.get('flex_network_id'): cmd.extend(["--flex-network-id", req.get('flex_network_id')])
+        if req.get('flex_key_name'): cmd.extend(["--flex-key-name", req.get('flex_key_name')])
+        if req.get('flex_security_group'): cmd.extend(["--flex-security-group", req.get('flex_security_group')])
+        if req.get('floating_ip'): cmd.extend(["--floating-ip", req.get('floating_ip')])
+        if req.get('test_server_ip'): cmd.extend(["--test-server-ip", req.get('test_server_ip')])
+        
+    # Repair
+    if req.get('repair_guest'):
+        cmd.append("--repair-guest")
+        if req.get('ssh_key_path'): cmd.extend(["--ssh-key-path", req.get('ssh_key_path')])
+        if req.get('ssh_user'): cmd.extend(["--ssh-user", req.get('ssh_user')])
+        if req.get('ssh_port') and req.get('ssh_port') != 22: cmd.extend(["--ssh-port", str(req.get('ssh_port'))])
+        if req.get('jump_host'): cmd.extend(["--jump-host", req.get('jump_host')])
+        if req.get('new_hostname'): cmd.extend(["--new-hostname", req.get('new_hostname')])
+        if req.get('fix_fstab'): cmd.append("--fix-fstab")
+        if req.get('fix_netplan'): cmd.append("--fix-netplan")
+        if req.get('flex_net_iface'): cmd.extend(["--flex-net-iface", req.get('flex_net_iface')])
+        if req.get('no_dhcp'): cmd.append("--no-dhcp")
+        if req.get('skip_cloud_init_clean'): cmd.append("--skip-cloud-init-clean")
+        if req.get('skip_qemu_guest_agent'): cmd.append("--skip-qemu-guest-agent")
+        if req.get('clean_hosts_file'): cmd.append("--clean-hosts-file")
+        if req.get('app_endpoint_map_file'): cmd.extend(["--app-endpoint-map-file", req.get('app_endpoint_map_file')])
+        if req.get('systemd_services'): cmd.extend(["--systemd-services", req.get('systemd_services')])
+
+    safe_cmd_str = " ".join(shlex.quote(str(c)) for c in cmd)
+    cwd_dir = os.path.dirname(script_path)
+    
+    def generate():
+        yield f"data: --- EXECUTING --- \\n\\n"
+        yield f"data: {safe_cmd_str}\\n\\n"
+        yield f"data: \\n\\n"
+        try:
+            process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                cwd=cwd_dir, text=True, bufsize=1
+            )
+            for line in iter(process.stdout.readline, ''):
+                if not line: break
+                yield f"data: {line.rstrip()}\\n\\n"
+            process.wait()
+            yield f"data: \\n\\n"
+            yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\\n\\n"
+        except Exception as e:
+            yield f"data: [SUBPROCESS LAUNCH ERROR: {str(e)}]\\n\\n"
+        finally:
+            yield "data: [DONE]\\n\\n"
+            
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+# --- OPTION 2: AGENT 1 ROUTES ---
+@app.get("/api/agent1/results/topology")
+def agent1_topology():
+    return agent1_send_file_json("ospc-discovery/outputs/topology.json")
+
+def agent1_send_file_json(path):
+    if not os.path.exists(path): return jsonify({}), 404
+    with open(path, 'r') as f: return Response(f.read(), mimetype='application/json')
+
+@app.get("/api/agent1/results/discovery_csv")
+def agent1_discovery_csv():
+    path = "ospc-discovery/outputs/servers.csv"
+    if not os.path.exists(path): return jsonify({"ok":False}), 404
+    with open(path, 'r') as f:
+        return Response(f.read(), mimetype='text/csv')
+
+@app.get("/api/agent1/results/csv")
+def agent1_results_csv():
+    import glob
+    files = glob.glob('migration-csv/migration_results_*.csv')
+    if not files: return jsonify({"ok":False}), 404
+    latest = max(files, key=os.path.getmtime)
+    with open(latest, 'r') as f: return Response(f.read(), mimetype='text/csv')
+
+@app.get("/api/agent1/inventory/files")
+def agent1_inventory_files():
+    d = 'inventory-csv'
+    os.makedirs(d, exist_ok=True)
+    files = [{"name": f, "time": time.ctime(os.path.getmtime(os.path.join(d, f)))} for f in os.listdir(d) if f.endswith('.csv')]
+    files.sort(key=lambda x: x['time'], reverse=True)
+    return jsonify(files)
+
+@app.post("/api/agent1/run/migration")
+def agent1_run_migration():
+    script_data = request.data.decode('utf-8')
+    with open('/tmp/run_migration_live.sh', 'w') as f: f.write(script_data)
+    os.system('chmod +x /tmp/run_migration_live.sh')
+    
+    def generate():
+        process = subprocess.Popen(
+            ['bash', '/tmp/run_migration_live.sh'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+        )
+        with open('migration_log.txt', 'w') as f_log:
+            for line in iter(process.stdout.readline, ''):
+                if not line: break
+                f_log.write(line)
+                f_log.flush()
+                yield line
+    return Response(stream_with_context(generate()), mimetype='text/plain')
+
+@app.post("/api/agent1/stop/migration")
+def agent1_stop_migration():
+    os.system("pkill -f 'run_migration_live.sh'")
+    return jsonify({"status":"stopped"})
+
+@app.post("/api/agent1/run/dependency_check")
+def agent1_run_deps():
+    script_data = request.data.decode('utf-8')
+    with open('/tmp/run_deps.sh', 'w') as f: f.write(script_data)
+    os.system('chmod +x /tmp/run_deps.sh')
+    
+    def generate():
+        process = subprocess.Popen(
+            ['bash', '/tmp/run_deps.sh'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+        )
+        for line in iter(process.stdout.readline, ''):
+            if not line: break
+            yield line
+    return Response(stream_with_context(generate()), mimetype='text/plain')
+
+@app.post("/api/agent1/upload/inventory_csv")
+def agent1_upload_inv():
+    post_data = request.data.decode('utf-8')
+    os.makedirs('ospc-discovery/outputs', exist_ok=True)
+    with open('ospc-discovery/outputs/servers.csv', 'w', encoding='utf-8') as f: f.write(post_data)
+    d = 'inventory-csv'
+    os.makedirs(d, exist_ok=True)
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    with open(os.path.join(d, f"manual_upload_{stamp}.csv"), 'w', encoding='utf-8') as f: f.write(post_data)
+    return jsonify({"status":"success"})
+
+@app.post("/api/run/uat_tests")
+def run_uat_tests():
+    data = request.json or {}
+    flex_auth = data.get('flex_auth', '')
+    flex_proj = data.get('flex_proj', '')
+    flex_user = data.get('flex_user', '')
+    flex_pass = data.get('flex_pass', '')
+    flex_domain = data.get('flex_domain', 'default')
+    
+    app_url = data.get('uat_app_url', '')
+    app_ip = data.get('uat_app_ip', '')
+    db_ip = data.get('uat_db_ip', '')
+    ssh_user = data.get('uat_ssh_user', 'ubuntu')
+    ssh_key = data.get('uat_ssh_key', '')
+
+    openrc_content = f"""
+export OS_AUTH_URL="{flex_auth}"
+export OS_PROJECT_ID="{flex_proj}"
+export OS_PROJECT_NAME="{flex_proj}"
+export OS_USER_DOMAIN_NAME="{flex_domain}"
+export OS_USERNAME="{flex_user}"
+export OS_PASSWORD="{flex_pass}"
+export OS_IDENTITY_API_VERSION=3
+"""
+    with open('/tmp/flex_uat_openrc.sh', 'w') as f:
+        f.write(openrc_content)
+
+    bash_content = """#!/bin/bash
+echo "=== INITIALIZING FLEX AUTOMATED VALIDATION SUITE ==="
+echo "Loading OpenStack Credentials..."
+source /tmp/flex_uat_openrc.sh
+echo "[OK] Core Credentials Loaded."
+echo ""
+echo "=== 1. CLOUD LAYER: OPENSTACK API HEALTH ==="
+echo ">> Checking Compute (Nova) Status..."
+openstack server list --project $OS_PROJECT_ID
+echo ""
+echo ">> Checking Volumes (Cinder) Status..."
+openstack volume list --project $OS_PROJECT_ID
+echo ""
+echo ">> Checking Image Repository (Glance)..."
+openstack image list --limit 10
+echo ""
+echo ">> Checking Network Topology (Neutron Floating APIs)..."
+openstack floating ip list
+echo ""
+
+echo "=== 2. APPLICATION END-TO-END TARGET TESTS ==="
+"""
+    if app_ip:
+        bash_content += f"""echo ">> Pinging Migrated Application LoadBalancer ({app_ip})..."
+ping -c 4 -W 2 "{app_ip}" || echo "[WARNING] Ping failed or ICMP is blocked."
+echo ""
+"""
+    if app_url:
+        bash_content += f"""echo ">> Curling External Application Route ({app_url})..."
+curl -I -s -m 5 "https://{app_url}" | head -n 1 || curl -I -s -m 5 "http://{app_url}" | head -n 1 || echo "[WARNING] Web Endpoint unreachable or timing out."
+echo ""
+"""
+    if db_ip and ssh_key:
+        bash_content += f"""echo ">> Validating DB Node Network via Secure Shell ({db_ip})..."
+if [ -f "{ssh_key}" ]; then
+    chmod 400 "{ssh_key}"
+    echo "SSH Connection Test executing..."
+    ssh -i "{ssh_key}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 {ssh_user}@{db_ip} "echo '[SUCCESS] SSH Connection established to DB Backend!'" || echo "[WARNING] SSH Authentication rejected or Network Tunnel blocked."
+else
+    echo "[ERROR] Keyfile '{ssh_key}' not found on orchestration disk. Skipping DB SSH test."
+fi
+echo ""
+"""
+    
+    bash_content += """echo "=== UAT ENGINE COMPLETED ==="
+"""
+    with open('/tmp/run_uat.sh', 'w') as f:
+        f.write(bash_content)
+    os.system('chmod +x /tmp/run_uat.sh')
+
+    def generate():
+        process = subprocess.Popen(
+            ['bash', '/tmp/run_uat.sh'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+        )
+        for line in iter(process.stdout.readline, ''):
+            if not line: break
+            yield f"data: {line}\\n\\n"
+            
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+@app.post("/api/run/uat_rbac_check")
+def run_uat_rbac_check():
+    data = request.json or {}
+    flex_auth = data.get('flex_auth', '')
+    flex_proj = data.get('flex_proj', '')
+    flex_user = data.get('flex_user', '')
+    flex_pass = data.get('flex_pass', '')
+    flex_domain = data.get('flex_domain', 'default')
+
+    ospc_user = data.get('ospc_user', '')
+    ospc_pass = data.get('ospc_pass', '')
+    ospc_tenant = data.get('ospc_tenant', '')
+
+    flex_rc = f"""
+export OS_AUTH_URL="{flex_auth}"
+export OS_PROJECT_ID="{flex_proj}"
+export OS_PROJECT_NAME="{flex_proj}"
+export OS_USER_DOMAIN_NAME="{flex_domain}"
+export OS_USERNAME="{flex_user}"
+export OS_PASSWORD="{flex_pass}"
+export OS_IDENTITY_API_VERSION=3
+"""
+    with open('/tmp/flex_rbac_openrc.sh', 'w') as f:
+        f.write(flex_rc)
+
+    ospc_rc = f"""
+export OS_AUTH_URL="https://identity.api.rackspacecloud.com/v2.0/"
+export OS_TENANT_ID="{ospc_tenant}"
+export OS_USERNAME="{ospc_user}"
+export OS_PASSWORD="{ospc_pass}"
+export OS_IDENTITY_API_VERSION=2.0
+"""
+    with open('/tmp/ospc_rbac_openrc.sh', 'w') as f:
+        f.write(ospc_rc)
+
+    bash_content = """#!/bin/bash
+echo "=== 1. Inspecting Legacy OSPC Identity ==="
+source /tmp/ospc_rbac_openrc.sh
+openstack role assignment list --user "$OS_USERNAME" --names -f csv | tail -n +2 | awk -F',' '{print $1" on project "$4}' | sort | sed 's/"//g' > /tmp/ospc_roles.txt || echo "Failed to fetch OSPC roles."
+
+cat /tmp/ospc_roles.txt | while read r; do
+    [ -n "$r" ] && echo "OSPC assigned: $r"
+done
+echo ""
+
+echo "=== 2. Inspecting Destination FLEX Identity ==="
+source /tmp/flex_rbac_openrc.sh
+openstack role assignment list --user "$OS_USERNAME" --names -f csv | tail -n +2 | awk -F',' '{print $1" on project "$4}' | sort | sed 's/"//g' > /tmp/flex_roles.txt || echo "Failed to fetch FLEX roles."
+
+cat /tmp/flex_roles.txt | while read r; do
+    [ -n "$r" ] && echo "FLEX assigned: $r"
+done
+echo ""
+
+echo "=== 3. Calculating Permission Parity ==="
+if [ ! -s /tmp/ospc_roles.txt ]; then
+    echo "[WARNING] No roles found in source OSPC."
+else
+    cat /tmp/ospc_roles.txt | while read role; do
+        if grep -q "^$role$" /tmp/flex_roles.txt; then
+            echo "[MATCH] Role '$role' successfully ported to FLEX."
+        else
+            echo "[MISSING] CRITICAL: Role '$role' is missing in FLEX environment!"
+        fi
+    done
+fi
+
+echo ""
+echo "=== RBAC Validation Complete ==="
+"""
+    with open('/tmp/run_rbac.sh', 'w') as f:
+        f.write(bash_content)
+    os.system('chmod +x /tmp/run_rbac.sh')
+
+    def generate():
+        process = subprocess.Popen(
+            ['bash', '/tmp/run_rbac.sh'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+        )
+        for line in iter(process.stdout.readline, ''):
+            if not line: break
+            yield f"data: {line}\\n\\n"
+            
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+if __name__ == "__main__":
+    host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
+    port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))
+    app.run(host=host, port=port, debug=False)

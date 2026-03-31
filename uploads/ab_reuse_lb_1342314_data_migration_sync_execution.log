@@ -1,0 +1,25 @@
+Starting Initial Data Sync Phase
+Missing value auth-url required for auth plugin password
+Syncing Linux App Files for ospc-jumpHost
+ssh: Could not resolve hostname unknown_ip: Temporary failure in name resolution
+rsync: connection unexpectedly closed (0 bytes received so far) [Receiver]
+rsync error: unexplained error (code 255) at io.c(232) [Receiver=3.2.7]
+ssh: Could not resolve hostname target_ip_unknown: Temporary failure in name resolution
+rsync: connection unexpectedly closed (0 bytes received so far) [sender]
+rsync error: unexplained error (code 255) at io.c(232) [sender=3.2.7]
+Missing value auth-url required for auth plugin password
+Syncing Linux App Files for u24-postgresl
+ssh: Could not resolve hostname unknown_ip: Temporary failure in name resolution
+rsync: connection unexpectedly closed (0 bytes received so far) [Receiver]
+rsync error: unexplained error (code 255) at io.c(232) [Receiver=3.2.7]
+ssh: Could not resolve hostname target_ip_unknown: Temporary failure in name resolution
+rsync: connection unexpectedly closed (0 bytes received so far) [sender]
+rsync error: unexplained error (code 255) at io.c(232) [sender=3.2.7]
+Missing value auth-url required for auth plugin password
+Syncing Linux App Files for u24-FrontEnd
+ssh: Could not resolve hostname unknown_ip: Temporary failure in name resolution
+rsync: connection unexpectedly closed (0 bytes received so far) [Receiver]
+rsync error: unexplained error (code 255) at io.c(232) [Receiver=3.2.7]
+ssh: Could not resolve hostname target_ip_unknown: Temporary failure in name resolution
+rsync: connection unexpectedly closed (0 bytes received so far) [sender]
+rsync error: unexplained error (code 255) at io.c(232) [sender=3.2.7]

@@ -1,0 +1,7 @@
+region,source_server_id,source_server_name,target_server_name,target_flavor_name,source_volume_id,source_volume_name,volume_size_gb,source_device_path,target_device_path,volume_role,target_action,boot_strategy,boot_from_volume_size_gb
+iad,d9b51e0a-f7ae-4678-9e18-2971089c6af7,u24-postgresl,u24-postgresl,gp.5.2.2,67b2f866-474c-404d-91c9-44557e86cc4e,u14postgres,75,/dev/xvdb,/dev/vdb,data,create_and_attach_volume,,
+iad,7c7f7240-9973-43b6-9b14-bf4969806e86,u24-FrontEnd,u24-FrontEnd,gp.5.2.2,fc572074-c19e-4348-ab51-d6f055f284e1,u24-FrontEnd,75,/dev/xvdc,/dev/vdc,data,create_and_attach_volume,,
+iad,7c7f7240-9973-43b6-9b14-bf4969806e86,u24-FrontEnd,u24-FrontEnd,gp.5.2.2,323d6bac-cb24-4cb7-9338-f0feaaba9348,u24FrontEnd,75,/dev/xvdb,/dev/vdb,data,create_and_attach_volume,,
+iad,d8753e16-0039-4c04-993c-7e14be21e212,Windows Server 2019Re,Windows Server 2019Re,gp.5.2.4,b2a3b780-3834-4f63-9fce-8642390536f0,Windows Server 2019Re,75,/dev/xvdb,/dev/vdb,data,create_and_attach_volume,,
+iad,47f882bf-4d6d-41d6-baef-cfcc7a9c5e61,win2019websql2019,win2019websql2019,gp.5.2.4,9972f71f-4c48-4285-a7e3-9b7fa6ebe3fc,win2029websql2019,75,/dev/xvdb,/dev/vdb,data,create_and_attach_volume,,
+iad,741c63ea-e4ae-4048-b6cb-fc7b7716034e,Windows Server 2016 + SQL Server 2019,Windows Server 2016 + SQL Server 2019,gp.5.2.4,1a1232b3-5993-4c99-9647-46ad7f533c4e,Windows Server 2016 + SQL Server 2019,75,/dev/xvdb,/dev/vdb,data,create_and_attach_volume,,

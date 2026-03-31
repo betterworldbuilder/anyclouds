@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    {"id": "net_1", "type": "network", "label": "BGNet", "x": 80, "y": 80, "props": {"name": "bg-net"}},
+    {"id": "subnet_1", "type": "subnet", "label": "BGSubnet", "x": 250, "y": 80, "props": {"name": "bg-subnet", "cidr": "10.140.0.0/24", "gateway_ip": "", "dns_nameserver": "8.8.8.8"}},
+    {"id": "router_1", "type": "router", "label": "BGRouter", "x": 420, "y": 80, "props": {"name": "bg-router", "external_network": "PUBLICNET"}},
+    {"id": "lb_1", "type": "load_balancer", "label": "CutoverLB", "x": 600, "y": 80, "props": {"name": "bg-cutover-lb", "provider": "amphora", "protocol": "HTTP", "listener_port": "80", "member_port": "80", "pool_algorithm": "ROUND_ROBIN", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "sg_web", "type": "security_group", "label": "WebSG", "x": 760, "y": 80, "props": {"name": "bg-web-sg", "rules_text": "tcp 22 0.0.0.0/0\ntcp 80 0.0.0.0/0\ntcp 443 0.0.0.0/0"}},
+    {"id": "vm_b1", "type": "instance", "label": "Blue1", "x": 250, "y": 220, "props": {"name": "blue-web-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_b2", "type": "instance", "label": "Blue2", "x": 250, "y": 320, "props": {"name": "blue-web-2", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_g1", "type": "instance", "label": "Green1", "x": 420, "y": 220, "props": {"name": "green-web-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_g2", "type": "instance", "label": "Green2", "x": 420, "y": 320, "props": {"name": "green-web-2", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}}
+  ],
+  "edges": [
+    {"from": "net_1", "to": "subnet_1", "type": "member"},
+    {"from": "router_1", "to": "subnet_1", "type": "route"},
+    {"from": "router_1", "to": "net_1", "type": "gateway"},
+    {"from": "lb_1", "to": "subnet_1", "type": "member"},
+    {"from": "vm_b1", "to": "net_1", "type": "member"},
+    {"from": "vm_b2", "to": "net_1", "type": "member"},
+    {"from": "vm_g1", "to": "net_1", "type": "member"},
+    {"from": "vm_g2", "to": "net_1", "type": "member"},
+    {"from": "vm_b1", "to": "sg_web", "type": "member"},
+    {"from": "vm_b2", "to": "sg_web", "type": "member"},
+    {"from": "vm_g1", "to": "sg_web", "type": "member"},
+    {"from": "vm_g2", "to": "sg_web", "type": "member"},
+    {"from": "lb_1", "to": "vm_b1", "type": "member"},
+    {"from": "lb_1", "to": "vm_b2", "type": "member"},
+    {"from": "lb_1", "to": "vm_g1", "type": "member"},
+    {"from": "lb_1", "to": "vm_g2", "type": "member"}
+  ]
+}

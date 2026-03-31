@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {"id": "net_dmz", "type": "network", "label": "DMZNet", "x": 80, "y": 100, "props": {"name": "seg-dmz-net"}},
+    {"id": "sub_dmz", "type": "subnet", "label": "DMZSubnet", "x": 260, "y": 100, "props": {"name": "seg-dmz-subnet", "cidr": "10.120.10.0/24", "gateway_ip": "", "dns_nameserver": "8.8.8.8"}},
+    {"id": "rt_dmz", "type": "router", "label": "DMZRouter", "x": 440, "y": 100, "props": {"name": "seg-dmz-router", "external_network": "PUBLICNET"}},
+
+    {"id": "net_app", "type": "network", "label": "AppNet", "x": 80, "y": 250, "props": {"name": "seg-app-net"}},
+    {"id": "sub_app", "type": "subnet", "label": "AppSubnet", "x": 260, "y": 250, "props": {"name": "seg-app-subnet", "cidr": "10.120.20.0/24", "gateway_ip": "", "dns_nameserver": ""}},
+
+    {"id": "net_db", "type": "network", "label": "DbNet", "x": 80, "y": 400, "props": {"name": "seg-db-net"}},
+    {"id": "sub_db", "type": "subnet", "label": "DbSubnet", "x": 260, "y": 400, "props": {"name": "seg-db-subnet", "cidr": "10.120.30.0/24", "gateway_ip": "", "dns_nameserver": ""}},
+
+    {"id": "lb_web", "type": "load_balancer", "label": "WebLB", "x": 620, "y": 100, "props": {"name": "seg-web-lb", "provider": "amphora", "protocol": "HTTP", "listener_port": "80", "member_port": "8080", "pool_algorithm": "ROUND_ROBIN", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+
+    {"id": "sg_web", "type": "security_group", "label": "WebSG", "x": 960, "y": 100, "props": {"name": "seg-web-sg", "rules_text": "tcp 22 0.0.0.0/0\ntcp 80 0.0.0.0/0\ntcp 443 0.0.0.0/0"}},
+    {"id": "sg_app", "type": "security_group", "label": "AppSG", "x": 960, "y": 250, "props": {"name": "seg-app-sg", "rules_text": "tcp 22 10.120.10.0/24\ntcp 8080 10.120.10.0/24"}},
+    {"id": "sg_db", "type": "security_group", "label": "DbSG", "x": 960, "y": 400, "props": {"name": "seg-db-sg", "rules_text": "tcp 22 10.120.20.0/24\ntcp 5432 10.120.20.0/24"}},
+
+    {"id": "vm_web1", "type": "instance", "label": "Web1", "x": 760, "y": 80, "props": {"name": "seg-web-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_web2", "type": "instance", "label": "Web2", "x": 760, "y": 145, "props": {"name": "seg-web-2", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_app", "type": "instance", "label": "App1", "x": 620, "y": 250, "props": {"name": "seg-app-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_db", "type": "instance", "label": "Db1", "x": 620, "y": 400, "props": {"name": "seg-db-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}}
+  ],
+  "edges": [
+    {"from": "net_dmz", "to": "sub_dmz", "type": "member"},
+    {"from": "rt_dmz", "to": "sub_dmz", "type": "route"},
+    {"from": "rt_dmz", "to": "net_dmz", "type": "gateway"},
+
+    {"from": "net_app", "to": "sub_app", "type": "member"},
+    {"from": "net_db", "to": "sub_db", "type": "member"},
+
+    {"from": "vm_web1", "to": "net_dmz", "type": "member"},
+    {"from": "vm_web2", "to": "net_dmz", "type": "member"},
+    {"from": "vm_app", "to": "net_app", "type": "member"},
+    {"from": "vm_db", "to": "net_db", "type": "member"},
+
+    {"from": "vm_web1", "to": "sg_web", "type": "member"},
+    {"from": "vm_web2", "to": "sg_web", "type": "member"},
+    {"from": "vm_app", "to": "sg_app", "type": "member"},
+    {"from": "vm_db", "to": "sg_db", "type": "member"},
+
+    {"from": "lb_web", "to": "sub_dmz", "type": "member"},
+    {"from": "lb_web", "to": "vm_web1", "type": "member"},
+    {"from": "lb_web", "to": "vm_web2", "type": "member"}
+  ]
+}

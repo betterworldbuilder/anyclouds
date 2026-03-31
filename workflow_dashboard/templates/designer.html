@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visual OpenStack FLEX Topology Builder and Deployer</title>
+  <style>
+    :root {
+      --bg: #233a6b;
+      --card: #0f1e3e88;
+      --text: #ffffff;
+      --muted: #d4ddf5;
+      --border: #8ea2cc66;
+      --primary: #4b5f91;
+      --canvas: #091635cc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      background: linear-gradient(120deg, #2a4e8d 0%, #374a86 45%, #5a4b72 100%);
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      padding: 12px 14px;
+      background: #2a3f6d;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 { margin: 0; font-size: 18px; }
+    header p { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+
+    .layout {
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: 6px;
+      padding: 6px;
+      min-height: 0;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 208px minmax(0, 1fr) 260px;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      min-height: 0;
+      align-items: stretch;
+      grid-auto-rows: 560px;
+    }
+
+    .bottom-grid > .card {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #deployAuthCard {
+      overflow: auto;
+      padding-right: 6px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      backdrop-filter: blur(8px);
+      min-height: 0;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 5px;
+    }
+
+    .side-pane {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid #8ea2cc;
+      border-radius: 6px;
+      background: #4b5f91;
+      color: #fff;
+      padding: 5px 7px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    button:hover { background: #566ca3; }
+    button.active { background: #7667ab; }
+
+    .resource-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      align-content: start;
+    }
+
+    .resource-grid button {
+      font-size: 11px;
+      padding: 5px 6px;
+      min-height: 38px;
+      height: 38px;
+      line-height: 1.1;
+    }
+
+    .resource-network { background: #3f7cae; border-color: #dce5ff66; }
+    .resource-subnet { background: #4f8a73; border-color: #dce5ff66; }
+    .resource-router { background: #6b6fb3; border-color: #dce5ff66; }
+    .resource-security_group { background: #936697; border-color: #dce5ff66; }
+    .resource-instance { background: #b47b49; border-color: #dce5ff66; }
+    .resource-volume { background: #557aa7; border-color: #dce5ff66; }
+    .resource-load_balancer { background: #8d5a4a; border-color: #dce5ff66; }
+
+    input, select, textarea {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px;
+      background: #ffffff21;
+      color: var(--text);
+      width: 100%;
+    }
+
+    textarea { min-height: 80px; resize: vertical; }
+
+    .hint {
+      margin: 4px 0 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .tiny-link {
+      margin: -2px 0 2px;
+      font-size: 11px;
+      color: #dbe5ff;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      opacity: 0.95;
+    }
+
+    .tiny-link:hover {
+      color: #ffffff;
+    }
+
+    .legend {
+      margin-top: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      background: #ffffff10;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .legend strong {
+      color: #ffffff;
+    }
+
+    .legend ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+    }
+
+    .left-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      align-content: start;
+    }
+
+    .left-actions button {
+      font-size: 11px;
+      padding: 5px 6px;
+      min-height: 34px;
+      height: 34px;
+      line-height: 1.1;
+    }
+
+    .resources-divider {
+      margin: 4px 0;
+      border: 0;
+      border-top: 1px solid var(--border);
+      opacity: 0.9;
+    }
+
+    .resources-pane {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .resources-pane .hint {
+      margin: 2px 0 0;
+    }
+
+    #propertiesPanel {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 5px;
+      min-height: 0;
+    }
+
+    .canvas-wrap {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .canvas-tools {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+      align-items: center;
+    }
+
+    .canvas-tools button {
+      font-size: 11px;
+      min-height: 30px;
+      height: 30px;
+      padding: 4px 7px;
+    }
+
+    .canvas {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      --grid-step: 20px;
+      --grid-offset-x: 0px;
+      --grid-offset-y: 0px;
+      background-image:
+        linear-gradient(to right, #cfd9ff12 1px, transparent 1px),
+        linear-gradient(to bottom, #cfd9ff12 1px, transparent 1px),
+        radial-gradient(circle at 20% 10%, #2f3f6f 0%, var(--canvas) 55%);
+      background-size:
+        var(--grid-step) var(--grid-step),
+        var(--grid-step) var(--grid-step),
+        auto;
+      background-position:
+        var(--grid-offset-x) var(--grid-offset-y),
+        var(--grid-offset-x) var(--grid-offset-y),
+        center;
+      overflow: hidden;
+      height: clamp(500px, 62vh, 760px);
+      min-height: 500px;
+      flex: 1 1 auto;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      transform-origin: top left;
+    }
+
+    .scene::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px dashed #dce5ff66;
+      border-radius: 8px;
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+
+    .canvas-grid {
+      display: none;
+    }
+
+    .edges {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .node {
+      position: absolute;
+      min-width: 130px;
+      border-radius: 8px;
+      padding: 6px;
+      border: 1px solid #dce5ff66;
+      cursor: grab;
+      user-select: none;
+      box-shadow: 0 8px 18px #00000040;
+    }
+
+    .node .title {
+      font-size: 11px;
+      opacity: 0.95;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .node-badge {
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid #f2e8b4aa;
+      background: #f2e8b433;
+      color: #fff7cf;
+      border-radius: 999px;
+      padding: 1px 6px;
+      line-height: 1.2;
+    }
+
+    .node .name {
+      margin-top: 4px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .instance-name-row {
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .instance-name-row .name {
+      margin-top: 0;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1 1 auto;
+    }
+
+    .node-meta {
+      margin-top: 5px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .node-meta-badge {
+      font-size: 10px;
+      font-weight: 600;
+      border: 1px solid #dce5ff77;
+      background: #0b132f40;
+      color: #f4f8ff;
+      border-radius: 999px;
+      padding: 1px 6px;
+      line-height: 1.2;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .instance-flavor-chip {
+      font-size: 9px;
+      font-weight: 700;
+      border: 1px solid #dce5ff88;
+      background: #0b132f44;
+      color: #f4f8ff;
+      border-radius: 999px;
+      padding: 1px 7px;
+      line-height: 1.2;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .instance-os-chip {
+      margin-top: 4px;
+      width: 100%;
+      font-size: 8px;
+      font-weight: 700;
+      border: 1px solid #dce5ff88;
+      background: #0b132f48;
+      color: #f4f8ff;
+      border-radius: 999px;
+      padding: 2px 7px;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .instance-key-chip {
+      margin-top: 4px;
+      width: 100%;
+      font-size: 8px;
+      font-weight: 700;
+      border: 1px solid #dce5ff88;
+      background: #0b132f48;
+      color: #f4f8ff;
+      border-radius: 999px;
+      padding: 2px 7px;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .node.selected { outline: 2px solid #f7e08c; }
+    .node.multi-selected { outline: 2px solid #8cd8f7; }
+    .node.network { background: #3f7cae; }
+    .node.subnet { background: #4f8a73; }
+    .node.router { background: #6b6fb3; }
+    .node.security_group { background: #936697; }
+    .node.instance { background: #b47b49; }
+    .node.volume { background: #557aa7; }
+    .node.load_balancer { background: #8d5a4a; }
+
+    label {
+      display: grid;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    label input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #9fb5e3;
+      margin-right: 6px;
+    }
+
+    #logBox {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0e143f;
+      color: #e7eeff;
+      min-height: 150px;
+      max-height: 280px;
+      overflow: auto;
+      padding: 10px;
+      white-space: pre-wrap;
+      margin: 0;
+      font-size: 11px;
+    }
+
+    #scriptPreview, #validationPreview, #planPreview {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0e143f;
+      color: #e7eeff;
+      min-height: 120px;
+      max-height: 220px;
+      overflow: auto;
+      padding: 10px;
+      margin: 0;
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .preview-single {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 6px;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .preview-dual {
+      display: grid;
+      grid-template-rows: auto 1fr auto 1fr;
+      gap: 6px;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .preview-single #scriptPreview,
+    .preview-single #logBox,
+    .preview-dual #validationPreview,
+    .preview-dual #planPreview {
+      min-height: 0;
+      max-height: none;
+      height: 100%;
+    }
+
+    @media (max-width: 1200px) {
+      .layout { grid-template-rows: auto auto; height: auto; }
+      .top-grid { grid-template-columns: 1fr; }
+      .bottom-grid { grid-template-columns: 1fr; }
+      .canvas { height: 440px; min-height: 440px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Visual OpenStack FLEX Topology Builder and Deployer</h1>
+    <p>Clone from OSPC topology on FLEX, link resources, and either generate a shell script or deploy directly with OpenRC credentials.</p>
+    <div style="max-width:960px;margin:10px auto;background:rgba(0,0,0,.22);color:#e8eeff;padding:14px 24px;border-radius:8px;font-size:13px;line-height:1.75;">
+      <strong style="color:#7ecfff;">Prerequisites &amp; Workflow:</strong>
+      <ol style="margin:8px 0 0 18px;padding:0;">
+        <li><strong>OpenStack CLI &amp; Octavia CLI</strong> must be installed in the operator environment.</li>
+        <li><strong>FLEX OpenRC file</strong> (password version) downloaded &mdash; update it with your FLEX API password and place it in the <code>ospcflex/</code> folder.</li>
+        <li><strong>Paste the deployment script</strong> <code>XXXX_tenant_deploy.sh</code> generated in Stage 1 into the <em>Paste deployment script</em> box.</li>
+        <li>Click <strong>Import from Script</strong> &mdash; the topology will be extracted from the OSPC cloud definition.</li>
+        <li>Then click: <strong>Validate Topology</strong> &rarr; <strong>Preview Plan</strong> &rarr; <strong>Generate Shell Script</strong> or <strong>Deploy Now</strong>.<br/>
+            The script deploys the extracted OSPC topology on FLEX, automatically mapping to equivalent or superior FLEX flavors.</li>
+        <li>Monitor progress in the <strong>Activity Log</strong> window in real time.</li>
+      </ol>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div class="top-grid">
+      <section class="card resources-pane side-pane">
+      <h2>Resources</h2>
+      <div class="resource-grid">
+        <button data-add="network" class="resource-network">Add Network</button>
+        <button data-add="subnet" class="resource-subnet">Add Subnet</button>
+        <button data-add="router" class="resource-router">Add Router</button>
+        <button data-add="security_group" class="resource-security_group">Add Security Group</button>
+        <button data-add="instance" class="resource-instance">Add Instance</button>
+        <button data-add="volume" class="resource-volume">Add Volume</button>
+        <button data-add="load_balancer" class="resource-load_balancer">Add Load Balancer</button>
+      </div>
+      <hr class="resources-divider" />
+      <div class="left-actions">
+        <button id="connectModeBtn">Connect Nodes</button>
+        <button id="disconnectBtn">Disconnect Selected</button>
+        <button id="deleteNodeBtn">Delete Selected</button>
+        <button id="clearBtn">Clear Canvas</button>
+      </div>
+      <p class="hint">Use Connect Nodes, then click two nodes to create a relationship.</p>
+
+      <h2>Topologies</h2>
+      <a class="tiny-link" href="/topology-notes" target="_blank" rel="noopener noreferrer">Sample Topology Notes</a>
+      <label>Saved Topology
+        <select id="topologySelect"><option value="">-- select --</option></select>
+      </label>
+      <button id="loadTopologyBtn">Load Topology</button>
+      <label>Save As Name
+        <input id="topologyName" type="text" placeholder="team-a-topology" />
+      </label>
+      <button id="saveTopologyBtn">Save Topology</button>
+      </section>
+
+      <section class="card canvas-wrap">
+      <div class="canvas-tools">
+        <button id="zoomOutBtn">Zoom Out</button>
+        <button id="zoomInBtn">Zoom In</button>
+        <button id="zoomResetBtn">Reset Zoom</button>
+        <button id="autoLayoutBtn">Simple Auto Layout</button>
+        <button id="smartLayoutBtn">Smart Auto Layout</button>
+        <span id="zoomLabel" class="hint">Zoom: 100%</span>
+        <button id="validateBtn">Validate Topology</button>
+        <button id="planBtn">Preview Plan</button>
+        <button id="generateScriptBtn">Generate Shell Script</button>
+        <button id="deployBtn">Deploy Now</button>
+        <button id="stopDeployBtn" title="Terminate the running deployment process" style="display:none;background:linear-gradient(135deg,#b91c1c,#7f1d1d);border:1px solid #ef4444;color:#fff;">&#9209; Stop Deployment</button>
+        <button id="rollbackBtn" title="Run the rollback script to undo the last deployment" style="background:linear-gradient(135deg,#92400e,#78350f);border:1px solid #f59e0b;color:#fff;">&#8617; Roll Back</button>
+      </div>
+      <div id="canvas" class="canvas">
+        <div id="scene" class="scene">
+          <div class="canvas-grid"></div>
+          <svg id="edges" class="edges"></svg>
+        </div>
+      </div>
+      <p class="hint">Designer script target: <code>uploads/{account_id}_topology_deploy_{datetime}.sh</code></p>
+      <div class="legend">
+        <strong>Connection Legend</strong>
+        <ul>
+          <li><code>instance ↔ volume</code>: volume attach</li>
+          <li><code>instance ↔ volume</code>: boot volume link (<code>boot</code>)</li>
+          <li><code>network ↔ subnet</code>: subnet membership</li>
+          <li><code>router ↔ subnet</code>: route interface</li>
+          <li><code>network ↔ router</code>: external/internal gateway link</li>
+          <li><code>load_balancer ↔ subnet</code>: VIP subnet</li>
+          <li><code>load_balancer ↔ instance</code>: backend pool member</li>
+          <li><code>instance ↔ security_group</code>: applied security policy</li>
+        </ul>
+      </div>
+      </section>
+
+      <section class="card stack side-pane">
+      <h2>Properties</h2>
+      <div id="propertiesPanel" class="stack">
+        <p class="hint">Select a node to edit its properties.</p>
+      </div>
+
+      </section>
+    </div>
+
+    <div class="bottom-grid">
+      <section id="deployAuthCard" class="card stack">
+      <h2>Deploy Auth</h2>
+      <label>Account ID (for script filename)
+        <input id="scriptAccountId" type="text" placeholder="123456" />
+      </label>
+      <label>OpenRC File (workspace path)
+        <input id="openrcFile" type="text" placeholder="uploads/my-openrc.sh" />
+      </label>
+      <label>Detected OpenRC Files
+        <select id="openrcSelect">
+          <option value="">-- select detected OpenRC --</option>
+        </select>
+      </label>
+      <button id="refreshOpenrcBtn">Refresh OpenRC List</button>
+      <label>Or Paste OpenRC Content
+        <textarea id="openrcContent" placeholder="export OS_AUTH_URL=...\nexport OS_USERNAME=..."></textarea>
+      </label>
+      <label>API Key / Password (optional override)
+        <input id="authSecret" type="password" placeholder="Used as OS_PASSWORD when required by auth" />
+      </label>
+      <label>Deployment Phases (Batch Deployment)
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
+          <!-- Row: select-all toggle -->
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:2px;">
+            <button type="button" id="phaseSelectAll" title="Check or uncheck all phases" style="font-size:0.72rem;padding:2px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#c7d2fe;cursor:pointer;">☑ All</button>
+            <button type="button" id="phaseSelectNone" title="Uncheck all phases" style="font-size:0.72rem;padding:2px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#c7d2fe;cursor:pointer;">☐ None</button>
+            <span style="font-size:0.72rem;color:#94a3b8;font-style:italic;">Run only the phases you need — safe to re-run any phase.</span>
+          </div>
+          <!-- Phase rows -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 12px;">
+            <label title="Phase 1 — Create networks, subnets, routers, security groups. Must run before everything else." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+              <input type="checkbox" id="phaseNet" checked value="net" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">1</span>
+              Networks
+            </label>
+            <label title="Phase 2 — Create Load Balancer, listener and pool scaffold. Started BEFORE VMs so Octavia Amphora provisioning runs in parallel." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+              <input type="checkbox" id="phaseLbScaffold" checked value="lb_scaffold" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">2</span>
+              LB Scaffold
+            </label>
+            <label title="Phase 3 — Create block volumes (no attach yet). Runs in parallel with VM boot to hide Cinder provisioning latency." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+              <input type="checkbox" id="phaseVolCreate" checked value="vol_create" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">3</span>
+              Volume Create
+            </label>
+            <label title="Phase 4 — Launch compute. Windows VMs fired first (async background) while Linux VMs boot in parallel, then collect all PIDs. Assign floating IPs last." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+              <input type="checkbox" id="phaseVm" checked value="vm" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">4</span>
+              Compute
+            </label>
+            <label title="Phase 5 — Attach pre-created volumes to their servers. Servers must be ACTIVE first; waits and retries automatically." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+              <input type="checkbox" id="phaseVolAttach" checked value="vol_attach" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">5</span>
+              Volume Attach
+            </label>
+            <label title="Phase 6 — Wire LB members (server IPs → pool). Also assigns floating IPs to LB VIPs. Runs after compute so member IPs are resolvable." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+              <input type="checkbox" id="phaseLbMembers" checked value="lb_members" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">6</span>
+              LB Members
+            </label>
+          </div>
+        </div>
+      </label>
+      <label><input id="failFast" type="checkbox" /> Fail fast</label>
+
+      <button id="importLiveBtn">Import From Project</button>
+      <p class="hint">Import uses the same OpenRC credentials and discovers resources currently in your project.</p>
+      <label>Deployment Script File (workspace path)
+        <input id="scriptFile" type="text" placeholder="uploads/project_123_deploy.sh" />
+      </label>
+      <label>Or Paste Deployment Script
+        <textarea id="scriptContent" placeholder="#!/usr/bin/env bash\nopenstack network create tenant-net\n..."></textarea>
+      </label>
+      <button id="importScriptBtn">Import From Script</button>
+      <p class="hint">Script import performs a best-effort parse of OpenStack CLI commands and builds visual nodes/links.</p>
+      </section>
+
+      <section class="card stack preview-dual">
+      <h2>Validation</h2>
+      <pre id="validationPreview">No validation run yet.</pre>
+
+      <h2>Plan Preview</h2>
+      <pre id="planPreview">No plan generated yet.</pre>
+      </section>
+
+      <section class="card stack preview-single">
+      <h2>Generated Script</h2>
+      <pre id="scriptPreview">No script generated yet.</pre>
+      </section>
+
+      <section class="card stack preview-single">
+      <h2>Activity Log</h2>
+      <pre id="logBox">Ready.</pre>
+      </section>
+    </div>
+  </main>
+
+  <!-- ── Rollback Confirmation Modal ─────────────────────────────────────────── -->
+  <div id="rollbackModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center">
+    <div style="background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid rgba(239,68,68,.4);border-radius:16px;padding:32px 36px;max-width:460px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.6);position:relative">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+        <span style="font-size:2.2rem;line-height:1">&#9888;&#65039;</span>
+        <div>
+          <div style="font-size:1.15rem;font-weight:700;color:#f87171;margin-bottom:3px">Rollback Last Deployment</div>
+          <div style="font-size:.8rem;color:#94a3b8">This action cannot be undone</div>
+        </div>
+      </div>
+      <p style="color:#e2e8f0;font-size:.9rem;line-height:1.65;margin-bottom:10px">
+        This will <strong style="color:#f87171">delete all resources created during the last deployment</strong>.<br>
+        Resources that already existed (reused) will <strong>NOT</strong> be touched.
+      </p>
+      <p id="rollbackModalScriptName" style="font-size:.76rem;color:#94a3b8;font-family:monospace;margin-bottom:22px;word-break:break-all"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button id="rollbackModalCancel" style="padding:9px 22px;border-radius:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;font-size:.9rem;cursor:pointer;transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,.12)'" onmouseout="this.style.background='rgba(255,255,255,.07)'">Cancel</button>
+        <button id="rollbackModalConfirm" style="padding:9px 22px;border-radius:8px;background:linear-gradient(135deg,#dc2626,#991b1b);border:1px solid #ef4444;color:#fff;font-size:.9rem;font-weight:700;cursor:pointer;letter-spacing:.03em;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">&#10003; Yes, proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/designer.js"></script>
+  <script>
+  // ── Auto-fill Deploy Auth from Cloud Credentials (localStorage) ───────────
+  // These keys are written by the Cloud Credentials panel in the Scanner page.
+  (function applyStoredCredentials () {
+    const ls = window.localStorage;
+
+    // Helper: only set a field if it has no manually-entered value yet
+    function fill(id, value, force) {
+      if (!value) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (force || !el._credPrefilled) {
+        el.value = value;
+        el._credPrefilled = true;
+      }
+    }
+
+    // Build an OpenRC content string from FLEX credentials
+    function buildOpenrc() {
+      const url    = ls.getItem('cred_flex_auth_url')   || '';
+      const user   = ls.getItem('cred_flex_username')   || '';
+      const pass   = ls.getItem('cred_flex_password')   || '';
+      const projId = ls.getItem('cred_flex_project_id') || '';
+      const domain = ls.getItem('cred_flex_domain')     || 'rackspace_cloud_domain';
+      if (!url && !user) return '';
+      return [
+        '#!/usr/bin/env bash',
+        `export OS_AUTH_URL="${url}"`,
+        `export OS_USERNAME="${user}"`,
+        `export OS_PASSWORD="${pass}"`,
+        `export OS_PROJECT_ID="${projId}"`,
+        `export OS_USER_DOMAIN_NAME="${domain}"`,
+        'export OS_IDENTITY_API_VERSION=3',
+        'export OS_REGION_NAME="RegionOne"',
+      ].join('\n');
+    }
+
+    function populate(force) {
+      // Account ID → script filename prefix
+      fill('scriptAccountId', ls.getItem('cred_ospc_accountid'), force);
+
+      // FLEX credentials → openrcContent textarea
+      const orc = buildOpenrc();
+      if (orc) fill('openrcContent', orc, force);
+
+      // FLEX password → authSecret
+      fill('authSecret', ls.getItem('cred_flex_password'), force);
+    }
+
+    // Run immediately (after DOM + designer.js are loaded)
+    populate(false);
+
+    // Listen for changes from other tabs (e.g. user updates creds in scanner tab)
+    window.addEventListener('storage', function(e) {
+      if (e.key && e.key.startsWith('cred_')) populate(true);
+    });
+
+    // Expose globally so designer.js can call it if needed
+    window.applyStoredCredentials = () => populate(true);
+  })();
+  </script>
+</body>
+</html>

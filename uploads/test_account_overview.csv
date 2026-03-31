@@ -1,0 +1,6 @@
+hostname,os,cpu,ram,disk,stack_membership,ip_address
+server1,Windows,4,16,100,AD Service,10.0.0.10
+server2,Windows,2,8,50,App Web IIS,10.0.0.11
+server3,Linux,8,32,200,Database MySQL,10.0.0.12
+server4,Linux,2,4,20,DNS Server,10.0.0.13
+server5,Linux,4,16,50,API Gateway,10.0.0.14

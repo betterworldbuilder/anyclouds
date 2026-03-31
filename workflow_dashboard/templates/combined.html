@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OSPC to FLEX Migration Dashboard</title>
+  <style>
+    :root {
+      --bg: #233a6b; --card: #0f1e3e88; --text: #ffffff;
+      --muted: #d4ddf5; --border: #8ea2cc66; --primary: #4b5f91;
+      --orange: #c35f00; --orange-b: #d87000; --green: #27ae60;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, sans-serif; font-size: 14px;
+      background: linear-gradient(120deg,#2a4e8d 0%,#374a86 45%,#5a4b72 100%);
+      color: var(--text); height: 100vh; display: flex;
+      flex-direction: column; overflow: hidden;
+    }
+    header { background: #2a3f6d; padding: 10px 18px; flex-shrink: 0; display:flex; justify-content:space-between; align-items:center; }
+    header h1 { font-size: 19px; }
+    header p { font-size: 11px; opacity: .8; margin-top: 3px; }
+
+    /* Stage row */
+    .stage-bar {
+      display: flex; gap: 4px; padding: 6px 10px;
+      background: #ffffff14; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto; flex-wrap: nowrap; align-items: stretch;
+    }
+    .stage-btn {
+      flex: 1 1 0; min-width: 0; border: 1px solid var(--orange-b);
+      background: var(--orange); color: #fff; border-radius: 6px;
+      padding: 7px 8px; cursor: pointer; font-weight: 700; font-size: 11px;
+      text-align: center; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
+      line-height: 1.3;
+    }
+    .stage-btn.active {
+      background: var(--green); border-color: #2ecc71;
+      box-shadow: 0 0 8px rgba(46,204,113,.5);
+    }
+    .stage-tracker-btn {
+      flex: 1 1 0; min-width: 0; border: 1px solid #7ecfff !important;
+      background: #1a3a5c !important; color: #fff; border-radius: 6px;
+      padding: 7px 8px; cursor: pointer; font-weight: 700; font-size: 11px;
+      text-align: center; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
+      line-height: 1.3; text-decoration: none; flex-direction: column; justify-content: center; align-items: center; display: flex;
+    }
+    .stage-tracker-btn:hover { background: #2b5b8c !important; box-shadow: 0 0 8px rgba(126,207,255,.5); }
+
+    /* Sub-tab bar */
+    .sub-bar {
+      display: none; gap: 6px; padding: 5px 10px;
+      background: #0f1e3e55; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto;
+    }
+    .sub-bar.visible { display: flex; }
+    .sub-btn {
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--text); border-radius: 6px; padding: 5px 12px;
+      cursor: pointer; font-weight: 600; font-size: 12px; white-space: nowrap;
+    }
+    .sub-btn.active { background: var(--primary); border-color: #8ea2cc; }
+
+    /* Panel area */
+    .panel-area { flex: 1; overflow: hidden; position: relative; }
+    .panel { display: none; width: 100%; height: 100%; }
+    .panel.active { display: block; }
+    iframe { width: 100%; height: 100%; border: none; background: transparent; }
+
+    /* Info panels */
+    .info-panel { height: 100%; overflow-y: auto; padding: 20px 24px; }
+    .info-panel h2 { font-size: 17px; color: #7ecfff; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+    .info-panel h3 { font-size: 13px; color: #a8d8ff; margin: 14px 0 6px; }
+    .info-panel ul { padding-left: 20px; line-height: 1.75; color: var(--muted); }
+    .info-panel ul li { margin-bottom: 3px; }
+    .badge { display: inline-block; background: #1a3a5c; border: 1px solid #4b6fa0; border-radius: 4px; padding: 2px 7px; font-size: 11px; margin-right: 4px; }
+    .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    .matrix-table th { background: #1a3a5c; color: #7ecfff; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    .matrix-table td { padding: 7px 10px; border-bottom: 1px solid #ffffff15; color: var(--muted); vertical-align: top; }
+    .matrix-table tr:hover td { background: #ffffff08; }
+    .notice { display: inline-flex; align-items: center; gap: 8px; background: #1a3a5c; border: 1px solid #4b6fa0; border-radius: 6px; padding: 9px 14px; color: #a8d8ff; font-size: 13px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛡 OSPC to FLEX Migration Co-pilot</h1>
+    <p>End-to-end automated Migration lifecycle — from inventory, resources planning, infrastructure cloning, data transfer. A/B migration, cut off, validation to production...</p>
+  </div>
+</header>
+
+<!-- ── All 5 stage buttons on one row ───────────────── -->
+<div class="stage-bar" id="stageBar">
+  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customers Log<br><small>Migration Tracker</small></button>
+  <button class="stage-btn active" data-stage="s1">STAGE 1<br><small>Discovery</small></button>
+  <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Migration</small></button>
+  <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
+  <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
+  <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
+</div>
+
+<!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
+<div class="sub-bar visible" id="subBar1">
+  <button class="sub-btn active" data-sub="s1info">📋 Discovery &amp; Assessment</button>
+  <button class="sub-btn" data-sub="s1ospc">⚙️ OSPC Scanner and Deployment Script Generator</button>
+  <button class="sub-btn" data-sub="s1analyze">📄 OSPC Inventory and Flex Mapper</button>
+  <button class="sub-btn" data-sub="s1flavors">🖼 OSPC Flavors &amp; Images</button>
+  <button class="sub-btn" data-sub="s1k8s">☸️ Kubernetes Scanner</button>
+</div>
+
+<!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
+<div class="sub-bar" id="subBar2">
+  <button class="sub-btn active" data-sub="s2image">🚀 Option 1: Direct Shift and Lift of VM OSPC 2 FLEX</button>
+  <button class="sub-btn" data-sub="s2rehost_p1">🛠 Option 2: REHOST / Phase 1: OSPC 2FLEX infra cloning</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Option 2: REHOST / Phase 2 - Option 1: Apps Migration Manual semi Auto</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2">📊 Option 2: REHOST / Phase 2 - Option 2: Data Migration Full auto mode</button>
+</div>
+
+<!-- ── Panels ─────────────────────────────────────────── -->
+<div class="panel-area">
+
+  <!-- STAGE 0 · Customer Migration Log -->
+  <div class="panel" id="panel-s0">
+    <div style="padding:20px; max-width:1200px; margin:0 auto; overflow:auto; height:100%;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+          <h1 style="color:#7ecfff; margin:0; font-size:28px;">OSPC to FLEX Customers Migration Log</h1>
+          <p style="color:#a8d8ff; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btnExportCsv" style="padding:10px 20px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">Li Export Report (CSV)</button>
+          <button id="btnToggleUpload" style="padding:10px 20px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">+ Add Backlog CSV</button>
+        </div>
+      </div>
+
+      <div id="uploadZone" style="display:none; border:2px dashed #7ecfff; padding:30px; text-align:center; border-radius:8px; margin-bottom:20px; background:rgba(0,0,0,0.1); cursor:pointer;">
+        <p style="color:#a8d8ff; margin:0;">Drag & Drop your <code>customers_backlog.csv</code> here, or click to browse.</p>
+        <input type="file" id="fileBacklog" style="display:none;" accept=".csv" />
+      </div>
+
+      <div style="display:flex; gap:15px; margin-bottom:20px;">
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #fff; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">To Be Migrated</div>
+          <div id="kpiToMigrate" style="font-size:28px; font-weight:bold; color:#fff;">-</div>
+        </div>
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #f39c12; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Ready for Migration</div>
+          <div id="kpiReady" style="font-size:28px; font-weight:bold; color:#f39c12;">-</div>
+        </div>
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #2ecc71; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Successfully Migrated</div>
+          <div id="kpiSuccess" style="font-size:28px; font-weight:bold; color:#2ecc71;">-</div>
+        </div>
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #e74c3c; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Failed Migrations</div>
+          <div id="kpiFailed" style="font-size:28px; font-weight:bold; color:#e74c3c;">-</div>
+        </div>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; margin-top:20px; background:rgba(0,0,0,0.2); border-radius:8px; overflow:hidden;" id="trackerTable">
+        <thead>
+          <tr>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Priority Rank</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Customer Details</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Status</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Readiness &amp; Size</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Progress</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="trackerBody">
+          <tr><td colspan="8" style="text-align:center; padding:50px; color:#666; font-style:italic;">Loading Customer Migration Queue...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- STAGE 1 panels -->
+  <div class="panel active" id="panel-s1">
+
+    <!-- 1a: Info description -->
+    <div id="s1info-pane" style="width:100%;height:100%;">
+      <div class="info-panel">
+        <h2>Stage 1 – Discovery &amp; Assessment</h2>
+        <p style="color:var(--muted);margin-bottom:12px;">Collect a full picture of the current OSPC environment before any migration work begins. The outputs of this stage feed directly into Stage 2.</p>
+        <h3>📋 Tasks</h3>
+        <ul>
+          <li><strong>Collect environment inventory</strong> – Gather details of all accounts, instances, images, volumes, and security groups.</li>
+          <li><strong>Identify storage backend (Cinder)</strong> – Determine the storage technology in use to plan the appropriate migration approach.</li>
+          <li><strong>Identify networking configuration &amp; segmentation</strong> – ServiceNet, PublicNet, or Private Neutron Network.</li>
+          <li><strong>Review quotas and utilisation</strong> – Evaluate current resource quotas and usage to properly size the Flex environment.</li>
+          <li><strong>Identify unsupported features</strong> – Detect features/configurations not supported in Flex that require remediation before migration.</li>
+        </ul>
+        <h3>📦 Deliverables</h3>
+        <ul>
+          <li><strong>Environment inventory</strong> – Detailed record of existing infrastructure (instances, storage, networking, security).</li>
+          <li><strong>Capacity plan</strong> – Assessment of resource requirements to ensure Flex can support migrated workloads.</li>
+          <li><strong>Migration risk assessment</strong> – Identification of potential risks, limitations, or unsupported features impacting migration.</li>
+        </ul>
+        <div class="notice">ℹ️ Use the sub-tabs above to run discovery tools: OSPC Scanner and Deployment Script Generator · OSPC Inventory and Flex Mapper · OSPC Flavors &amp; Images</div>
+      </div>
+    </div>
+
+    <!-- 1b: OSPC2Flex Workflow Dashboard -->
+    <iframe id="s1ospc-pane" src="/run/" title="OSPC Scanner and Deployment Script Generator" style="display:none;"></iframe>
+
+    <!-- 1c: Analyze OSPC CSV -->
+    <iframe id="s1analyze-pane" src="/dashboard/" title="Analyze OSPC CSV" style="display:none;"></iframe>
+
+    <!-- 1d: OSPC Flavors & Images -->
+    <iframe id="s1flavors-pane" src="/references/" title="OSPC Flavors &amp; Images" style="display:none;"></iframe>
+
+    <!-- 1e: Kubernetes Dual-Layer Scanner -->
+    <div id="s1k8s-pane" style="width:100%; height:100%; display:none; overflow:auto;">
+      <div class="info-panel">
+        <h2>☸️ Kubernetes Dual-Layer Scanner</h2>
+        <p style="color:var(--muted); margin-bottom:12px;">Discover and map Kubernetes clusters to their underlying OpenStack compute and storage dependencies before migration.</p>
+        
+        <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; border-left:4px solid #7ecfff; margin-bottom:20px;">
+          <h3 style="margin-top:0; color:#fff;">Run Automated K8s &amp; OSPC Dual-Scan</h3>
+          <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Paste your <code>kubeconfig</code> below or connect to the Bastion node to automatically map Kubernetes workloads to OpenStack VMs.</p>
+          <textarea placeholder="Paste kubeconfig here..." style="width:100%; height:80px; background:#111; color:#5eead4; border:1px solid #4b6fa0; border-radius:4px; padding:10px; font-family:monospace; margin-bottom:10px;"></textarea>
+          <button style="background:#2b70c9; border:none; color:white; padding:10px 20px; font-weight:bold; cursor:pointer; border-radius:4px;">Run Full Cluster Inventory Scan</button>
+        </div>
+
+        <h3>📚 Simplest Discovery Path by Tooling</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">The best file to get from the existing OSPC deployment relies entirely on how the cluster was built. Do not blindly copy VM nodes or disks.</p>
+        
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #3498db;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">1) Helm-Managed App (Highest Priority)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">Export the app configuration and rendered YAML. The <code>values.yaml</code> is the single most reusable import path for Flex.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">helm list -A
+helm get values &lt;release&gt; -n &lt;namespace&gt; -a -o yaml &gt; &lt;release&gt;-values.yaml
+helm get manifest &lt;release&gt; -n &lt;namespace&gt; &gt; &lt;release&gt;-manifest.yaml</pre>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #f1c40f;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">2) Kustomize-Managed App</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">Download the entire repository folder containing the <code>kustomization.yaml</code>, base manifests, patches, and overlays.</p>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #e67e22;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">3) Raw Kubernetes YAML (Source Repo)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">If a Git repo exists without Helm/Kustomize, download all declarative objects: <code>deployment.yaml</code>, <code>statefulset.yaml</code>, <code>service.yaml</code>, <code>ingress.yaml</code>, <code>configmap.yaml</code>, <code>pvc.yaml</code>.</p>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #e74c3c;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">4) Live Cluster Export (Fallback Path)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">If there is ZERO source repository, fallback to exporting exactly what is running on OSPC. Note: this YAML will be messy and contain runtime state strings.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get all,cm,secret,ingress,pvc,networkpolicy -A -o yaml &gt; k8s-inventory-main.yaml
+kubectl get storageclass,pv -o yaml &gt; k8s-storage-export.yaml</pre>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #9b59b6;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">Infrastructure Mapping Database</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">You MUST execute these to map Kubernetes to OpenStack Nova VMs and Cinder Storage.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get nodes -o wide
+openstack server list --all-projects --long   # Map Internal K8s IPs to OSPC VM IDs
+kubectl get pvc -A -o wide
+openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STAGE 2 · Migration Options -->
+  <div class="panel" id="panel-s2">
+    <iframe id="s2image-pane" src="/image_migrator/" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p1-pane" src="/designer/" title="REHOST Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+  </div>
+
+  <!-- STAGE 4 · Validation & UAT -->
+  <div class="panel" id="panel-s4">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      
+      <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(165,180,252,.2); padding:20px; border-radius:8px;">
+        <h2 style="font-size: 19px; color: #7ecfff; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">🛡️ Stage 4 – Automated Migration Validation Engine</h2>
+        <p style="color:var(--muted); margin:10px 0;">Validation is split into Internal UAT (migration team) and Customer UAT. Supply your target IP addresses below to allow the Automated Engine to perform live Ping, Curl, SSH, and OpenStack API verification sweeps across the entire FLEX environment.</p>
+
+        <form id="uat-runner-form" novalidate onsubmit="return false;">
+            <!-- 1. CLOUD CREDENTIALS -->
+            <div style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:32px; background:rgba(0,0,0,0.2); border-radius:4px; padding:20px; border-left:4px solid #f39c12;">
+                <!-- OSPC -->
+                <div>
+                    <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Username
+                            <input id="uat_ospc_username" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">API Key / Password
+                            <input id="uat_ospc_apikey" type="password" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Account / Project ID
+                            <input id="uat_ospc_accountid" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- FLEX -->
+                <div>
+                    <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Auth URL
+                            <input id="uat_flex_os_auth_url" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Username
+                            <input id="uat_flex_os_username" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Password
+                            <input id="uat_flex_os_password" type="password" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Project ID
+                            <input id="uat_flex_os_project_id" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Domain
+                            <input id="uat_flex_os_user_domain_id" type="text" value="default" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1B. CROSS-CLOUD IDENTITY PARITY -->
+            <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #9b59b6; border-radius:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h3 style="margin-top:0; color:#fb7185; font-size:14px;">1B. User Profile &amp; Target Permissions Matching (RBAC validation)</h3>
+                        <p style="font-size:11px; color:#aaa; margin-bottom:10px;">Compare your assigned roles and permissions in OSPC against the new FLEX tenant to ensure no operational access was lost.</p>
+                        
+                        <div style="margin: 15px 0; background:rgba(0,0,0,0.3); border:1px solid #7c3aed; border-radius:6px; overflow:hidden;">
+                            <table style="width:100%; border-collapse:collapse; font-size:11px; color:#ddd; text-align:left;">
+                                <thead>
+                                    <tr style="background:#3b0764; border-bottom:1px solid #7c3aed;">
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">Identity / RBAC area</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">OSPC / legacy words</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">FLEX words people use now</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">What it really means</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Top business boundary</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Account + Domain</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX still sits under a Rackspace account, but OpenStack identity structure adds the domain concept.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Main resource ownership</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Tenant</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Project</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">In practice, old "tenant" thinking maps to FLEX project thinking. FLEX UI/docs explicitly surface project and domain.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Person who logs in</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">User / cloud user</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">User</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Same basic concept, but FLEX user access is more formally tied to project/domain permissions.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Team of users</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">List of users</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Group</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX / Keystone makes groups a clearer identity object for assigning access by team instead of one-by-one.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">What someone is allowed to do</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Permissions</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Permissions</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Same word exists, but FLEX docs emphasize explicit role/permission setup for users.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Named privilege bundle</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">"admin" / "read-only"</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Role</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX uses more formal role-based language under Keystone/OpenStack.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Access model</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Simpler account access model</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">RBAC on user/group/role</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX is more structured and closer to upstream OpenStack identity concepts.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth secret for humans</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">User+Pass / API creds</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Username + API key</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX explicitly calls out username, API key, project, and domain.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth secret for scripts/apps</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Reused user creds</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Application Credential</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX supports standalone execution credentials instead of reusing human login secrets.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Single sign-on</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">SSO</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Federation</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX/Rackspace supports identity federation to sign in with corporate credentials.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Admin manager</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account owner</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Account Administrator</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Account Admins manage users and platform permissions at the project level.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Login Context</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account/region/tenant</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Project + Domain + Region</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX login and CLI context explicitly require both project and domain variables.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Session proof</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Token</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX uses strictly token-based access headers behind the scenes via Keystone.</td>
+                                    </tr>
+                                    <tr style="background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Server login shell</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">SSH key</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">SSH keypair</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX explicitly mandates OpenStack SSH Keypair objects for initial VM deployment access.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top:20px; text-align:right;">
+                    <button id="btnRunRbac" type="button" onclick="executeRbacCheck()" style="padding:12px 25px; font-size:14px; font-weight:bold; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; box-shadow:0 0 15px rgba(124,58,237,.5); transition:0.2s;">🔍 VERIFY PLATFORM IDENTITY ROLES</button>
+                </div>
+                
+                <div id="rbac-terminal-box" style="margin-top:10px; display:none;">
+                    <div style="display:flex; justify-content:space-between; background:#3b0764; padding:6px 12px; border-radius:6px 6px 0 0; border:1px solid #7c3aed; border-bottom:0;">
+                        <span style="color:#fb7185; font-size:11px; font-weight:bold; font-family:monospace;">🔗 Cross-Cloud RBAC Comparator</span>
+                        <span id="rbac-status-indicator" style="color:#ffcc00; font-size:10px; font-weight:bold;">Authenticating...</span>
+                    </div>
+                    <div id="rbac-log-output" style="height:250px; background:#000; color:#f8fafc; font-family:'JetBrains Mono', monospace; font-size:12px; padding:12px; overflow-y:auto; border:1px solid #7c3aed; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+                </div>
+            </div>
+
+            <!-- 2. SPECIFIC TARGETS -->
+            <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #7ecfff; border-radius:4px;">
+                <h3 style="margin-top:0; color:#7ecfff; font-size:14px;">2. Explicit End-to-End Application Targets</h3>
+                <p style="font-size:11px; color:#aaa; margin-bottom:10px;">Enter the exact IP addresses the migrated VMs leased in the FLEX cloud to run deep connectivity validations.</p>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-top:10px;">
+                    <div><label style="font-size:11px; color:#aaa; display:block;">Web Application URL</label><input type="text" id="uat_app_url" placeholder="e.g. www.mypayroll.com" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div><label style="font-size:11px; color:#aaa; display:block;">App/LoadBalancer IP (Ping Test)</label><input type="text" id="uat_app_ip" placeholder="e.g. 10.250.0.15" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div><label style="font-size:11px; color:#aaa; display:block;">Database Node IP (SSH SQL Test)</label><input type="text" id="uat_db_ip" placeholder="e.g. 10.250.0.8" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div><label style="font-size:11px; color:#aaa; display:block;">SSH Username</label><input type="text" id="uat_ssh_user" value="ubuntu" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div style="grid-column: span 2;"><label style="font-size:11px; color:#aaa; display:block;">SSH Private Key (.pem Path)</label><input type="text" id="uat_ssh_key" placeholder="/home/dzoan/keys/target.pem" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                </div>
+            </div>
+
+            <!-- 3. EXECUTION BUTTON & TERMINAL -->
+            <button id="btnRunUAT" type="button" onclick="executeUATTests()" style="width:100%; padding:15px; font-size:16px; font-weight:bold; background:#2ecc71; color:white; border:none; border-radius:6px; cursor:pointer; box-shadow:0 0 10px rgba(46,204,113,.4); transition:0.2s;">▶️ RUN ALL AUTOMATED TESTS</button>
+        </form>
+
+        <div id="uat-terminal-box" style="margin-top:20px; display:none;">
+            <div style="display:flex; justify-content:space-between; background:#1a3a5c; padding:8px 12px; border-radius:6px 6px 0 0; border:1px solid #4b6fa0; border-bottom:0;">
+                <span style="color:#7ecfff; font-size:12px; font-weight:bold; font-family:monospace;">🟢 UAT Runtime Engine</span>
+                <span id="uat-status-indicator" style="color:#ffcc00; font-size:11px; font-weight:bold;">Waiting...</span>
+            </div>
+            <div id="uat-log-output" style="height:350px; background:#000; color:#00ff00; font-family:'JetBrains Mono', monospace; font-size:12px; padding:15px; overflow-y:auto; border:1px solid #4b6fa0; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+        </div>
+      </div>
+
+      <div style="opacity:0.75; padding-top:10px;">
+        <h3>🔬 Internal UAT Tasks Reference</h3>
+      <h3>🔬 Internal UAT Tasks</h3>
+      <ul>
+        <li><strong>Verify VM boot</strong> – Ensure VMs start successfully in Flex.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">openstack server list --project &lt;project_id&gt; -c Name -c Status | grep ACTIVE</pre>
+        </li>
+        <li><strong>Validate network connectivity</strong> – Confirm instances communicate as expected.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">ping -c 4 &lt;flex_floating_ip&gt;<br>nc -zv &lt;flex_private_ip&gt; 22</pre>
+        </li>
+        <li><strong>Confirm storage accessibility</strong> – Verify volumes and storage resources are accessible.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">openstack volume list --project &lt;project_id&gt; -c Name -c Status<br>ssh user@&lt;flex_ip&gt; 'df -h | grep /dev/vd'</pre>
+        </li>
+      </ul>
+      <h3>👤 Customer UAT Tasks</h3>
+      <ul>
+        <li><strong>Access confirmed</strong> – Customer confirmed access to the new Flex environment.</li>
+        <li><strong>Confirm application functionality</strong> – Applications operating correctly after migration.</li>
+      </ul>
+      <h3>📊 Validation Matrix</h3>
+      <table class="matrix-table">
+        <thead><tr><th>Workload Type</th><th>Internal UAT</th><th>Customer UAT</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge">Databases</span></td><td>Service up, replication healthy, storage OK, backup works</td><td>Queries correct, app reads/writes correct, reports match</td></tr>
+          <tr><td><span class="badge">App tiers</span></td><td>VM boots, services start, DNS resolves, storage mounts</td><td>Users log in, transactions succeed, integrations work</td></tr>
+          <tr><td><span class="badge">Containers</span></td><td>Pods healthy, PVCs mount, ingress works</td><td>App flow works, no missing data, no broken sessions</td></tr>
+          <tr><td><span class="badge">Legacy / Monolith</span></td><td>Boot and services stable</td><td>Core business workflow works exactly as expected</td></tr>
+          <tr><td><span class="badge">SaaS replacement</span></td><td>Import / reconciliation complete</td><td>Users validate records, process flow, reports</td></tr>
+          <tr><td><span class="badge">Archive / Retain</span></td><td>Data readable, access controlled</td><td>Business can retrieve required data</td></tr>
+        </tbody>
+      </table>
+      <h3>🛠 Automated Checking Commands</h3>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">Databases (Service &amp; Replication)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># MySQL Replication Status
+ssh admin@&lt;db_ip&gt; 'mysql -e "SHOW SLAVE STATUS\\G" | grep "Running:"'
+
+# PostgreSQL Replication
+ssh postgres@&lt;db_ip&gt; 'psql -xc "select * from pg_stat_replication;"'</pre>
+        </div>
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">App Tiers (DNS &amp; Services)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Check DNS Resolution
+dig @&lt;flex_dns&gt; +short &lt;app_url&gt;
+
+# Verify Web Service HTTP 200
+curl -I -s https://&lt;app_url&gt; | head -n 1
+
+# Systemd Service Status
+ssh user@&lt;app_ip&gt; 'systemctl is-active &lt;service_name&gt;'</pre>
+        </div>
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">Containers (Pod/PVC Health)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Verify Kubernetes Workload Health
+kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
+        </div>
+      </div>
+      <h3>📦 Deliverable</h3>
+      <ul><li>Internal team and customer sign off UAT confirming migration successful.</li></ul>
+    </div>
+  </div>
+
+  <!-- STAGE 5 · Cutover -->
+  <div class="panel" id="panel-s5">
+    <div class="info-panel">
+      <h2>Stage 5 – Cutover</h2>
+      <p style="color:var(--muted);margin-bottom:12px;">Redirect production traffic from OSPC to Flex. Typically done during a scheduled maintenance window to minimise impact.</p>
+      <h3>⚡ Tasks</h3>
+      <ul>
+        <li><strong>Update DNS or floating IPs</strong> – Redirect traffic by updating DNS records or reassigning floating IPs.</li>
+        <li><strong>Confirm production traffic flow</strong> – Verify live traffic is reaching the new environment.</li>
+        <li><strong>Monitor workloads</strong> – Observe system performance and stability after cutover.</li>
+      </ul>
+      <h3>📦 Deliverable</h3>
+      <ul><li>Customer confirms the application is running successfully in the Flex environment.</li></ul>
+      <div class="notice">⚠️ Ensure rollback scripts (generated in Stage 3) are ready before initiating cutover.</div>
+    </div>
+  </div>
+
+  <!-- STAGE 6 · Post-Migration -->
+  <div class="panel" id="panel-s6">
+    <div class="info-panel">
+      <h2>Stage 6 – Post-Migration Sign-off</h2>
+      <p style="color:var(--muted);margin-bottom:12px;">Review the completed migration tasks and close out the customer in the Migration Log.</p>
+      
+      <h3>✅ Migration Checklist</h3>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Stage 1 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox1">
+          <div><span id="stgIcon1" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 1:</strong> Discovery &amp; Assessment</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(1, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(1, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 2 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox2">
+          <div><span id="stgIcon2" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 2:</strong> Infrastructure Cloned to FLEX</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(2, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(2, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 3 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox3">
+          <div><span id="stgIcon3" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 3:</strong> Data Migrated Successfully</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(3, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(3, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 4 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox4">
+          <div><span id="stgIcon4" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 4:</strong> Validation &amp; UAT Signed Off</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(4, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(4, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 5 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox5">
+          <div><span id="stgIcon5" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 5:</strong> Production Cutover Complete</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(5, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(5, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; padding:15px; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid #4b6fa0;">
+        <h3 style="margin-top:0;">Update Migration Log</h3>
+        <p style="font-size:12px; color:#a8d8ff; margin-bottom:12px;">Finalize the customer migration status in the CRM Tracker.</p>
+        <div style="display:flex; gap:10px;">
+          <button id="btnStage6Success" style="background:#28a745; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">✅ Mark as Successful</button>
+          <button id="btnStage6Fail" style="background:#dc3545; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">❌ Mark as Failed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /panel-area -->
+
+<script>
+  const stageBtns = Array.from(document.querySelectorAll('.stage-btn'));
+  const panels    = Array.from(document.querySelectorAll('.panel'));
+  const subBar1 = document.getElementById('subBar1');
+  const subBar2 = document.getElementById('subBar2');
+  const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
+  const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2'];
+
+  function activateSub(paneIds, activeId) {
+    paneIds.forEach(id => {
+      const el = document.getElementById(id + '-pane');
+      if (!el) return;
+      el.style.display = id === activeId ? '' : 'none';
+    });
+  }
+
+  function activateStage(stageId) {
+    stageBtns.forEach(b => b.classList.toggle('active', b.dataset.stage === stageId));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + stageId));
+    if(subBar1) subBar1.classList.toggle('visible', stageId === 's1');
+    if(subBar2) subBar2.classList.toggle('visible', stageId === 's2');
+  }
+
+  // Stage 1 sub-btn clicks
+  document.querySelectorAll('#subBar1 .sub-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subBar1 .sub-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activateSub(s1Panes, btn.dataset.sub);
+    });
+  });
+
+  // Stage 2 sub-btn clicks
+  document.querySelectorAll('#subBar2 .sub-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subBar2 .sub-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activateSub(s2Panes, btn.dataset.sub);
+    });
+  });
+
+  // Stage btn clicks
+  // Stage 6 CRM Closeout
+  function completeMigration(statusStr) {
+      fetch('/api/tracker/update_status', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ status: statusStr })
+      }).then(res => res.json())
+      .then(data => {
+          if (data.ok) {
+              alert('Migration CRM Tracker updated to: ' + statusStr);
+              loadTracker();
+              activateStage('s0');
+          } else {
+              alert('Error updating CRM Log: ' + data.error);
+          }
+      }).catch(e => alert('Failed to contact backend API.'));
+  }
+  
+  const btnSuccess = document.getElementById('btnStage6Success');
+  const btnFail = document.getElementById('btnStage6Fail');
+  if (btnSuccess) {
+      btnSuccess.addEventListener('click', () => { 
+          if(confirm('Complete migration and mark customer as SUCCESSFUL in the log?')) completeMigration('Success'); 
+      });
+  }
+  if (btnFail) {
+      btnFail.addEventListener('click', () => { 
+          if(confirm('Mark customer migration as FAILED in the log?')) completeMigration('Failed'); 
+      });
+  }
+
+  // Handle stage tab clicks
+  stageBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const stage = btn.getAttribute('data-stage');
+      activateStage(stage);
+      
+      // Auto-update Stage 5 checklist based on existing UI status chips if we click Stage 5
+      if (stage === 's6') {
+         const mkS1 = document.getElementById('stgIcon1'); if(mkS1 && mkS1.innerText === '⬜') setStageState(1, 'Success');
+         const mkS2 = document.getElementById('stgIcon2'); if(mkS2 && mkS2.innerText === '⬜') setStageState(2, 'Success');
+         const mkS3 = document.getElementById('stgIcon3'); if(mkS3 && mkS3.innerText === '⬜') setStageState(3, 'Success');
+         const mkS4 = document.getElementById('stgIcon4'); if(mkS4 && mkS4.innerText === '⬜') setStageState(4, 'Success');
+         const mkS5 = document.getElementById('stgIcon5'); if(mkS5 && mkS5.innerText === '⬜') setStageState(5, 'Success');
+      }
+    });
+  });
+
+  // ========== Tracker Logic ==========
+  const trackerTbody = document.getElementById("trackerBody");
+  const uploadZone = document.getElementById("uploadZone");
+  const fileInput = document.getElementById("fileBacklog");
+
+  const priorityMatrix = [
+    { L1: 'FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'Earliest priority', Score: 1 },
+    { L1: 'FLEX Ready', L2: 'Small', L3: 'Important', Res: 'Early priority', Score: 2 },
+    { L1: 'FLEX Ready', L2: 'Small', L3: 'Core', Res: 'Early, but only after guardrail is satisfied', Score: 3 },
+    { L1: 'FLEX Ready', L2: 'Medium', L3: 'Secondary', Res: 'Early-mid priority', Score: 4 },
+    { L1: 'FLEX Ready', L2: 'Medium', L3: 'Important', Res: 'Mid priority', Score: 5 },
+    { L1: 'FLEX Ready', L2: 'Medium', L3: 'Core', Res: 'Mid priority', Score: 6 },
+    { L1: 'FLEX Ready', L2: 'Large', L3: 'Secondary', Res: 'Mid-late priority', Score: 7 },
+    { L1: 'FLEX Ready', L2: 'Large', L3: 'Important', Res: 'Late in FLEX-ready group', Score: 8 },
+    { L1: 'FLEX Ready', L2: 'Large', L3: 'Core', Res: 'Very late in FLEX-ready group', Score: 9 },
+    { L1: 'FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Secondary', Res: 'Very late', Score: 10 },
+    { L1: 'FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Important', Res: 'Very late', Score: 11 },
+    { L1: 'FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Core', Res: 'Final FLEX-ready wave', Score: 12 },
+    { L1: 'Partially FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'After all FLEX-ready equivalents', Score: 13 },
+    { L1: 'Partially FLEX Ready', L2: 'Small', L3: 'Important', Res: 'After all FLEX-ready equivalents', Score: 14 },
+    { L1: 'Partially FLEX Ready', L2: 'Small', L3: 'Core', Res: 'After guardrail and FLEX-ready maturity', Score: 15 },
+    { L1: 'Partially FLEX Ready', L2: 'Medium', L3: 'Secondary', Res: 'Later', Score: 16 },
+    { L1: 'Partially FLEX Ready', L2: 'Medium', L3: 'Important', Res: 'Later', Score: 17 },
+    { L1: 'Partially FLEX Ready', L2: 'Medium', L3: 'Core', Res: 'Later', Score: 18 },
+    { L1: 'Partially FLEX Ready', L2: 'Large', L3: 'Secondary', Res: 'Late', Score: 19 },
+    { L1: 'Partially FLEX Ready', L2: 'Large', L3: 'Important', Res: 'Late', Score: 20 },
+    { L1: 'Partially FLEX Ready', L2: 'Large', L3: 'Core', Res: 'Very late', Score: 21 },
+    { L1: 'Partially FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Secondary', Res: 'Very late', Score: 22 },
+    { L1: 'Partially FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Important', Res: 'Very late', Score: 23 },
+    { L1: 'Partially FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Core', Res: 'End of partial-ready group', Score: 24 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'After ready and partial groups', Score: 25 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Small', L3: 'Important', Res: 'Late-stage', Score: 26 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Small', L3: 'Core', Res: 'Late-stage', Score: 27 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Medium', L3: 'Secondary', Res: 'Late-stage', Score: 28 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Medium', L3: 'Important', Res: 'Late-stage', Score: 29 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Medium', L3: 'Core', Res: 'Late-stage', Score: 30 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Large', L3: 'Secondary', Res: 'Final-stage', Score: 31 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Large', L3: 'Important', Res: 'Final-stage', Score: 32 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Large', L3: 'Core', Res: 'Final-stage', Score: 33 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Secondary', Res: 'Near-final', Score: 34 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Important', Res: 'Near-final', Score: 35 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Core', Res: 'Absolute last', Score: 36 }
+  ];
+
+  function getPriority(r, s, b) {
+    const p = priorityMatrix.find(m => m.L1 === r && m.L2 === s && m.L3 === b);
+    return p ? p : { Score: 99, Res: 'Unassessed / Standard Priority' };
+  }
+
+  function loadTracker() {
+    fetch('/api/tracker/list')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.customers || data.customers.length === 0) {
+          trackerTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:50px; color:#666; font-style:italic;">No customers in the queue. Upload a backlog CSV to get started!</td></tr>';
+          return;
+        }
+
+        // Apply Priority Score mapping and Sort
+        let tQueue = 0, tReady = 0, tSuccess = 0, tFail = 0;
+        data.customers.forEach(c => {
+           let prio = getPriority(c.flex_readiness, c.size_complexity, c.blast_radius);
+           c._prioScore = prio.Score;
+           c._prioRank = prio.Res;
+           
+           if (c.status === 'Queue' || c.status === 'In Progress' || c.status === 'Rolled Back') tQueue++;
+           if (c.status === 'Queue' && c.flex_readiness === 'FLEX Ready') tReady++;
+           if (c.status === 'Success') tSuccess++;
+           if (c.status === 'Failed') tFail++;
+        });
+
+        const kTo = document.getElementById("kpiToMigrate");
+        if(kTo) kTo.innerText = tQueue;
+        const kRe = document.getElementById("kpiReady");
+        if(kRe) kRe.innerText = tReady;
+        const kSu = document.getElementById("kpiSuccess");
+        if(kSu) kSu.innerText = tSuccess;
+        const kFa = document.getElementById("kpiFailed");
+        if(kFa) kFa.innerText = tFail;
+
+        // Sort by Priority Score (1=highest)
+        data.customers.sort((a, b) => a._prioScore - b._prioScore);
+        
+        let html = '';
+        data.customers.forEach(c => {
+          let badgeColor = '#4a4a4a'; let badgeText = '#fff';
+          if (c.status === 'In Progress') badgeColor = '#2b70c9';
+          else if (c.status === 'Success') badgeColor = '#28a745';
+          else if (c.status === 'Failed') badgeColor = '#dc3545';
+          else if (c.status === 'Rolled Back') { badgeColor = '#ffbc2c'; badgeText = '#000'; }
+          
+          const infraStr = `${c.ospc_vms_count} / ${c.ospc_volumes_count} / ${c.ospc_db_count}`;
+          const flStr    = `${c.flex_readiness ? c.flex_readiness : 'Unknown'}`;
+          const szStr    = `${c.size_complexity ? c.size_complexity : '-'} • ${c.blast_radius ? c.blast_radius : '-'}`;
+          
+          const actionBtn = (c.status === 'Queue' || c.status === 'Failed' || c.status === 'Rolled Back') 
+            ? `<button style="background:#28a745;border:none;color:white;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;" onclick="setActiveCustomer('${c.customer_id}')">Start</button>`
+            : `<button style="background:#2b70c9;border:none;color:white;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;" onclick="setActiveCustomer('${c.customer_id}')">Resume</button>`;
+
+          html += `<tr>
+            <td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05);">
+               <div style="font-weight:bold; font-size:13px; color:#fff;">Score ${c._prioScore}</div>
+               <div style="color:#7ecfff; font-size:11px;">${c._prioRank}</div>
+            </td>
+            <td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05);">
+               <div style="font-weight:bold;">${c.customer_name}</div>
+               <div style="font-family:monospace; color:#aaa; font-size:11px;">${c.customer_id} • ${c.target_region}</div>
+            </td>
+            <td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05);">
+               <span style="padding:4px 8px; border-radius:12px; font-size:11px; font-weight:bold; text-transform:uppercase; background:${badgeColor}; color:${badgeText};">${c.status}</span>
+            </td>
+            <td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05);">
+               <div style="color:#eee; font-size:12px;">${flStr}</div>
+               <div style="color:#888; font-size:11px;">${szStr}</div>
+            </td>
+            <td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05);">
+               <div style="font-size:12px; color:#fff;">OSPC: <strong style="color:var(--orange-b);">${infraStr}</strong></div>
+               <div style="font-size:12px; color:#fff;">FLEX: <strong style="color:#2ecc71;">${c.flex_migrated_vms} VMs</strong></div>
+            </td>
+            <td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:right;">${actionBtn}</td>
+          </tr>`;
+        });
+        trackerTbody.innerHTML = html;
+      });
+  }
+  loadTracker();
+
+  document.getElementById("btnToggleUpload").addEventListener("click", () => {
+    uploadZone.style.display = uploadZone.style.display === 'none' ? 'block' : 'none';
+  });
+  uploadZone.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData(); fd.append("file", file);
+    fetch('/api/tracker/upload', { method: 'POST', body: fd })
+    .then(res => res.json())
+    .then(data => {
+        if(data.ok) { alert("Backlog added successfully!"); uploadZone.style.display = 'none'; loadTracker(); }
+        else alert("Error: " + data.error);
+    });
+  });
+
+  document.getElementById("btnExportCsv").addEventListener("click", () => {
+     window.location.href = '/api/tracker/export';
+  });
+
+  window.setActiveCustomer = function(customerId) {
+      fetch('/api/tracker/set_active', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ customer_id: customerId })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (data.ok) activateStage('s1');
+          else alert("Failed to set active customer: " + data.error);
+      });
+  };
+
+  // UAT Automation Runtime Engine
+  function loadFLEXCredentials_UAT() {
+      // Load FLEX keys
+      const flexKeys = ['os_auth_url', 'os_project_id', 'os_username', 'os_password', 'os_user_domain_id'];
+      flexKeys.forEach(k => {
+          const val = localStorage.getItem('cred_flex_' + k.replace('os_auth_url', 'auth_url').replace('os_project_id', 'project_id').replace('os_username', 'username').replace('os_password', 'password').replace('os_user_domain_id', 'domain'));
+          // Wait, index.html uses specific lsKeys. Let's map exactly:
+          // 'cred_flex_auth_url', 'cred_flex_username', 'cred_flex_password', 'cred_flex_project_id', 'cred_flex_domain'
+      });
+      
+      const valFAuth = localStorage.getItem('cred_flex_auth_url'); if(valFAuth) { const e = document.getElementById('uat_flex_os_auth_url'); if(e) e.value = valFAuth; }
+      const valFProj = localStorage.getItem('cred_flex_project_id'); if(valFProj) { const e = document.getElementById('uat_flex_os_project_id'); if(e) e.value = valFProj; }
+      const valFUser = localStorage.getItem('cred_flex_username'); if(valFUser) { const e = document.getElementById('uat_flex_os_username'); if(e) e.value = valFUser; }
+      const valFPass = localStorage.getItem('cred_flex_password'); if(valFPass) { const e = document.getElementById('uat_flex_os_password'); if(e) e.value = valFPass; }
+      const valFDom = localStorage.getItem('cred_flex_domain'); if(valFDom) { const e = document.getElementById('uat_flex_os_user_domain_id'); if(e) e.value = valFDom; }
+
+      // Load OSPC keys
+      const valOUser = localStorage.getItem('cred_ospc_username'); if(valOUser) { const e = document.getElementById('uat_ospc_username'); if(e) e.value = valOUser; }
+      const valOKey = localStorage.getItem('cred_ospc_apikey'); if(valOKey) { const e = document.getElementById('uat_ospc_apikey'); if(e) e.value = valOKey; }
+      const valOAcc = localStorage.getItem('cred_ospc_accountid'); if(valOAcc) { const e = document.getElementById('uat_ospc_accountid'); if(e) e.value = valOAcc; }
+  }
+  
+  // Bind credential loading to any stage button clicks (lazy sync)
+  document.querySelectorAll('.stage-btn').forEach(btn => {
+      btn.addEventListener('click', () => { setTimeout(loadFLEXCredentials_UAT, 300); });
+  });
+  setTimeout(loadFLEXCredentials_UAT, 500);
+
+  window.executeUATTests = function() {
+      const btn = document.getElementById('btnRunUAT');   
+      const statusText = document.getElementById('uat-status-indicator');
+      const termBox = document.getElementById('uat-terminal-box');
+      const logOut = document.getElementById('uat-log-output');
+
+      termBox.style.display = 'block';
+      logOut.innerHTML = 'Submitting FLEX credentials and firing validation suite...\n\n';
+      statusText.textContent = 'Executing...';
+      statusText.style.color = '#f39c12';
+      btn.disabled = true;
+
+      let bodyData = {
+          flex_auth: document.getElementById('uat_flex_os_auth_url').value,
+          flex_proj: document.getElementById('uat_flex_os_project_id').value,
+          flex_user: document.getElementById('uat_flex_os_username').value,
+          flex_pass: document.getElementById('uat_flex_os_password').value,
+          flex_domain: document.getElementById('uat_flex_os_user_domain_id').value,
+          uat_app_url: document.getElementById('uat_app_url').value,
+          uat_app_ip: document.getElementById('uat_app_ip').value,
+          uat_db_ip: document.getElementById('uat_db_ip').value,
+          uat_ssh_user: document.getElementById('uat_ssh_user').value,
+          uat_ssh_key: document.getElementById('uat_ssh_key').value
+      };
+
+      fetch('/api/run/uat_tests', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyData)
+      })
+      .then(response => {
+           let reader = response.body.getReader();
+           let decoder = new TextDecoder();
+           function read() {
+               reader.read().then(({done, value}) => {
+                   if (done) {
+                       statusText.textContent = 'Completed';
+                       statusText.style.color = '#2ecc71';
+                       btn.disabled = false;
+                       return;
+                   }
+                   let text = decoder.decode(value);
+                   text.split('\n').forEach(line => {
+                       if (line.startsWith('data: ')) {
+                           logOut.innerHTML += line.replace('data: ', '') + '\n';
+                           logOut.scrollTop = logOut.scrollHeight;
+                       }
+                   });
+                   read();
+               }).catch(e => {
+                   logOut.innerHTML += '\nStream Error: ' + e.message;
+                   btn.disabled = false;
+               });
+           }
+           read();
+      })
+      .catch(err => {
+                   logOut.innerHTML += '\nFetch Error: ' + err.message;
+          btn.disabled = false;
+      });
+  }
+
+  window.executeRbacCheck = function() {
+      const btn = document.getElementById('btnRunRbac');   
+      const statusText = document.getElementById('rbac-status-indicator');
+      const termBox = document.getElementById('rbac-terminal-box');
+      const logOut = document.getElementById('rbac-log-output');
+
+      termBox.style.display = 'block';
+      logOut.innerHTML = 'Connecting to OSPC and FLEX Keystone endpoints simultaneously...\n\n';
+      statusText.textContent = 'Comparing...';
+      statusText.style.color = '#f39c12';
+      btn.disabled = true;
+
+      let bodyData = {
+          flex_auth: document.getElementById('uat_flex_os_auth_url').value,
+          flex_proj: document.getElementById('uat_flex_os_project_id').value,
+          flex_user: document.getElementById('uat_flex_os_username').value,
+          flex_pass: document.getElementById('uat_flex_os_password').value,
+          flex_domain: document.getElementById('uat_flex_os_user_domain_id').value,
+          ospc_user: document.getElementById('uat_ospc_username').value,
+          ospc_pass: document.getElementById('uat_ospc_apikey').value,
+          ospc_tenant: document.getElementById('uat_ospc_accountid').value
+      };
+
+      fetch('/api/run/uat_rbac_check', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyData)
+      })
+      .then(response => {
+           let reader = response.body.getReader();
+           let decoder = new TextDecoder();
+           function read() {
+               reader.read().then(({done, value}) => {
+                   if (done) {
+                       statusText.textContent = 'Validation Complete';
+                       statusText.style.color = '#2ecc71';
+                       btn.disabled = false;
+                       return;
+                   }
+                   let text = decoder.decode(value);
+                   text.split('\n').forEach(line => {
+                       if (line.startsWith('data: ')) {
+                           let l = line.replace('data: ', '');
+                           if(l.includes('[MISSING]')) l = '<span style="color:#ef4444;">' + l + '</span>';
+                           if(l.includes('[MATCH]')) l = '<span style="color:#22c55e;">' + l + '</span>';
+                           logOut.innerHTML += l + '\n';
+                           logOut.scrollTop = logOut.scrollHeight;
+                       }
+                   });
+                   read();
+               }).catch(e => {
+                   logOut.innerHTML += '\nStream Error: ' + e.message;
+                   btn.disabled = false;
+               });
+           }
+           read();
+      })
+      .catch(err => {
+          logOut.innerHTML += '\nFetch Error: ' + err.message;
+          btn.disabled = false;
+      });
+  }
+
+  // Default activation
+  activateStage('s0');
+</script>
+</body>
+</html>

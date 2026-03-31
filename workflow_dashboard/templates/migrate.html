@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Migration Full auto mode</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Data Migration Full auto mode ( pre AI co pilot )</h1>
+    <p>OSPC2Flex Data Migration Dashboard: Orchestrates final payload file syncing, database replication, and safe A/B traffic split cutovers.</p>
+    <ul style="max-width: 900px; margin: 10px auto; text-align: left; background: rgba(0, 0, 0, 0.2); color: #fff; padding: 15px 35px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); line-height: 1.6;">
+      <li><strong>Step 6 (Data Migration)</strong>: Generate the sync, cutover, and rollback scripts required to migrate databases and application files.</li>
+      <li><strong>Step 7 (Execution)</strong>: Select a generated migration script and click the button to execute it securely from the dashboard.</li>
+      <li style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.2);"><strong>Manual Process (Step 9)</strong>: Use the manual runbook below for edge cases not covered by automated scripts, such as Kubernetes/Magnum container workloads, highly customised persistent volumes, custom clustered database topologies, or any legacy component requiring specific per-tier write freezes and data verification steps before cutover.</li>
+    </ul>
+  </header>
+
+  <main>
+
+
+    <section class="card">
+      <h2>File Manager & Uploads</h2>
+      <p class="hint">For typical data migrations, Step 6 will automatically inherit the Discovery and Mapping artifacts generated during Step 1.<br>
+      However, you can completely bypass Step 1 and supply a standalone CSV list of source and target IPs directly by uploading a <code>custom_data_targets.csv</code> file! <a href="/api/download/custom_data_targets.csv" style="color: #66b3ff; text-decoration: underline; font-weight: bold;">(Download Demo Template)</a><br>
+      Upload your custom overrides or artifact files here to instantly populate the active deployment dropdowns. <em>(Files are stored securely in the local <code>uploads/</code> directory).</em></p>
+      <div class="row">
+        <input type="file" id="uploadFile" />
+        <button id="uploadBtn">Upload</button>
+        <button id="refreshFilesBtn">Refresh Files</button>
+      </div>
+      <ul id="fileList" class="file-list"></ul>
+    </section>
+
+
+
+
+
+    <section class="card">
+      <h2>Step 6) Generate Data Migration Artifacts <span id="statusMigrateGen" class="status-chip idle">Idle</span></h2>
+      <div class="hint">
+        <p>This step is the <strong>planning and scripting engine</strong>. When you select your inputs (either the OpenStack mappings from Stage 1 or a custom CSV) and choose a Migration Strategy, the backend python script (<code>generate_data_migration_script.py</code>) analyzes the source servers and target clones to build a customized migration runbook.</p>
+        <p>It generates three distinct, reusable Bash scripts:</p>
+        <ul style="margin-top:5px; margin-bottom:10px; padding-left:20px;">
+          <li><strong>*_sync.sh (The Background Copy)</strong>: Securely copies files (<code>rsync</code>) or copies databases (<code>mysqldump</code>) from the live OSPC source to the FLEX target while the application is still running. This step is 100% non-disruptive and can be run multiple times to keep the target "warmed up."</li>
+          <li><strong>*_cutover.sh (The Final Switch)</strong>: The critical script that executes the strategy you chose (Direct, Local A/B, or External A/B). It stops the source services to freeze data writes, performs one final lightning-fast delta sync to the target, and updates local proxies or OpenStack Load Balancers to permanently route live user traffic to the new FLEX instance.</li>
+          <li><strong>*_rollback.sh (The Safety Net)</strong>: Automatically generated safety script that immediately reverses the cutover commands (e.g. removes the FLEX instance from the load balancer and restarts the legacy OSPC services) if the migration fails validation.</li>
+        </ul>
+      </div>
+      <div class="grid">
+        <p class="hint" style="grid-column: span 3; margin-bottom: 0;"><label class="hint-check"><input id="migUseCustomCsv" type="checkbox" /> Bypass step 6 migration artifacts generation and use a standalone Custom Server IP CSV</label></p>
+        
+        <div id="migStandardInputGroup" style="display: contents;">
+          <label>Overview CSV (Source Inventory)
+            <select id="migInventory"></select>
+          </label>
+          <label>Flavor Map CSV (Target Mappings)
+            <select id="migFlavorMap"></select>
+          </label>
+        </div>
+        
+        <div id="migCustomInputGroup" style="display: none; grid-column: span 2;">
+          <label>Custom Data Migration CSV (Must contain <code>source_ip</code> and <code>target_ip</code> columns)
+            <select id="migCustomList"></select>
+          </label>
+        </div>
+
+        <label>Migration Strategy
+          <select id="migStrategy">
+            <option value="direct">Direct Cutover (Stop Services & Final Sync)</option>
+            <option value="ab_haproxy">A/B Parallel: Install Local HAProxy (Local Split)</option>
+            <option value="ab_reuse_lb">A/B Parallel: Reuse OpenStack LB & HA DB (External Split)</option>
+          </select>
+        </label>
+      </div>
+      <button id="runMigrateGenBtn">Generate Data Migration Scripts</button>
+    </section>
+
+    <section class="card">
+      <h2>Step 7) Execute Data Migration <span id="statusExecuteBash" class="status-chip idle">Idle</span></h2>
+      <div class="hint">
+        <p>This step is the <strong>execution engine</strong>. Instead of forcing you to SSH into jump boxes to run the scripts manually, the dashboard acts as a secure control plane.</p>
+        <ul style="margin-top:5px; margin-bottom:10px; padding-left:20px;">
+          <li>You use the dropdown to select one of the three scripts generated in Step 6 (usually starting with the <code>_sync.sh</code> script).</li>
+          <li>When you click <strong>Execute Migration Script</strong>, the dashboard's backend securely spawns a bash sub-process.</li>
+          <li>The script executes the remote payload delivery (e.g., streaming <code>rsync</code> over SSH between the source and target IPs).</li>
+          <li>All standard output and errors are captured live and streamed directly into the <strong>Execution Output</strong> window at the bottom of the dashboard, giving you complete visibility into the progress of the packet transfers and database dumps.</li>
+        </ul>
+      </div>
+      <div class="grid">
+        <label>Migration Script (*.sh)
+          <select id="exeBashScript"></select>
+        </label>
+      </div>
+      <button id="runExecuteBashBtn">Execute Migration Script</button>
+      <button id="stopExecuteBashBtn" style="display:none; background:linear-gradient(135deg,#c0392b,#922b21); margin-left:10px;" title="Stop the running migration script">⏹ Stop Execution</button>
+    </section>
+
+    <section id="deployNextStepsCard" class="card" style="display:none;">
+      <h2>Next Step</h2>
+      <p id="deployNextStepsText" class="hint"></p>
+    </section>
+
+    <section id="migrationReportCard" class="card" style="display:none;">
+      <h2>Step 8) Migration Results Report <span class="status-chip idle" id="statusMigReport">Ready</span></h2>
+      <p class="hint">After executing your migration script, download a full XLSX report summarising every server that was migrated — including source/target IPs, folder paths synced, status (✅ Success / ❌ Failed), and the exact cause of any failures.</p>
+      <div style="margin-top: 12px;">
+        <a id="downloadReportLink" href="#" class="btn-download" download style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:linear-gradient(135deg,#27ae60,#1e8449);color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.95rem;box-shadow:0 2px 8px rgba(39,174,96,0.4);transition:opacity 0.2s;">
+          ⬇️ Download Migration Report (.xlsx)
+        </a>
+        <span id="reportFilename" style="margin-left:12px; color: #aaa; font-size: 0.85rem;"></span>
+      </div>
+    </section>
+
+    <!-- Step 8.5: Kubernetes Data Migration Runbook -->
+    <section class="card" id="k8sMigrationCard">
+      <h2>Step 8.5) Kubernetes (K8s) Migration <span class="status-chip idle">Manual &amp; Automated</span></h2>
+      <div class="hint">
+        <p>Because Kubernetes manages its own state and storage dependencies, we do not migrate them using standard VM-level <code>rsync</code> scripts. Choose the Automated Pipeline or one of the manual fallback strategies below:</p>
+        <div style="margin-top: 15px; background: rgba(0,0,0,0.1); padding: 15px; border-radius: 6px; border-left: 3px solid #7ecfff;">
+          <h4 style="margin: 0 0 10px 0; color: #7ecfff;">How it works</h4>
+          <ol style="margin: 0 0 10px 0; padding-left: 20px; font-size: 13px;">
+            <li>You select the Deployment Type dropdown (Helm, Kustomize, or Raw YAML).</li>
+            <li>You <strong>upload</strong> your Stage 1 Export Configuration (e.g. <code>k8s-inventory-main.yaml</code> or ZIP).</li>
+            <li>You provide the path to your target FLEX Kubeconfig file.</li>
+            <li>You click the big purple <strong>Execute Kubernetes Redeployment</strong> button.</li>
+          </ol>
+          <p style="margin: 0 0 10px 0; font-size: 13px;">The Python backend engine (<code>app.py</code>) will automatically take those exact parameters, inject the Kubeconfig context into an isolated environment, and execute the correct deployment binary for you:</p>
+          <ul style="margin: 0 0 10px 0; padding-left: 20px; font-size: 13px;">
+            <li>For <strong>Helm</strong>, it runs: <code>helm upgrade --install &lt;release&gt; . -f &lt;values-path&gt;</code></li>
+            <li>For <strong>Kustomize</strong>, it runs: <code>kubectl apply -k &lt;kustomize-path&gt;</code></li>
+            <li>For <strong>Raw YAML</strong>, it runs: <code>kubectl apply -f &lt;yaml-path&gt;</code></li>
+          </ul>
+          <p style="margin: 0; font-size: 13px;">The execution logs are then streamed straight back into the dashboard! This makes rebuilding the K8s configurations a true 1-click operation without your operators ever having to touch a terminal.</p>
+        </div>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; margin-bottom:20px; border-left:4px solid #8e44ad;">
+        <h3 style="margin-top:0; color:#fff;">⚡ Automated Pipeline: Stage 1 Artifact Deployment</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Automatically deploy the Kubernetes configurations (YAML/Helm/Kustomize) exported during Stage 1 directly onto the new FLEX cluster.</p>
+        <ol style="font-size:13px; color:#eee; padding-left:20px; line-height:1.6; margin-bottom:15px;">
+          <li>Ensure the newly provisioned FLEX Kubernetes Cluster is online.</li>
+          <li>Ensure any Cinder storage volumes have been successfully snapshot and re-attached in FLEX.</li>
+          <li>Select the deployment type (Helm, Kustomize, or Raw YAML) and provide the file paths below.</li>
+        </ol>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <label style="font-size:12px; color:#aaa;">Deployment Type
+            <select id="k8sDeployType" style="width:100%; padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; margin-top:2px;">
+              <option value="yaml">Raw YAML Manifest (e.g. k8s-inventory-main.yaml)</option>
+              <option value="kustomize">Kustomize Directory (.zip or .tar.gz)</option>
+              <option value="helm">Helm Values (values.yaml)</option>
+            </select>
+          </label>
+          <label style="font-size:12px; color:#aaa; margin-top:5px;">Stage 1 Configuration File (YAML, Zip, or Tar)
+            <input type="file" id="k8sArtifactFile" style="width:100%; padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; font-family:monospace; font-size:12px; margin-top:2px;">
+          </label>
+          <input type="text" id="k8sFlexConfig" placeholder="Path to target FLEX kubeconfig (e.g. /home/user/.kube/config-flex)" style="padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; font-family:monospace; font-size:12px; margin-top:5px;">
+          <input type="text" id="k8sHelmRelease" placeholder="Helm Release Name / Chart (Required for Helm only)" style="padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; font-family:monospace; font-size:12px; display:none;">
+          <button id="btnRunK8sDeploy" style="background:#8e44ad; border:none; color:white; padding:10px 15px; font-weight:bold; cursor:pointer; border-radius:4px; margin-top:5px;">Execute Kubernetes Redeployment</button>
+        </div>
+      </div>
+      
+      <script>
+        document.getElementById('k8sDeployType').addEventListener('change', (e) => {
+            const helmInput = document.getElementById('k8sHelmRelease');
+            helmInput.style.display = (e.target.value === 'helm') ? 'block' : 'none';
+        });
+
+        document.getElementById('btnRunK8sDeploy').addEventListener('click', () => {
+            const deployType = document.getElementById('k8sDeployType').value;
+            const fileInput = document.getElementById('k8sArtifactFile');
+            const flexConfig = document.getElementById('k8sFlexConfig').value.trim();
+            const helmRelease = document.getElementById('k8sHelmRelease').value.trim();
+
+            if (fileInput.files.length === 0 || !flexConfig) {
+                alert("Please upload the Stage 1 configuration file and provide the FLEX Kubeconfig path.");
+                return;
+            }
+            if (deployType === 'helm' && !helmRelease) {
+                alert("Helm requires a Release Name / Chart Name.");
+                return;
+            }
+
+            const btn = document.getElementById('btnRunK8sDeploy');
+            btn.textContent = "⏳ Uploading & Executing Pipeline...";
+            btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('deployType', deployType);
+            formData.append('artifactFile', fileInput.files[0]);
+            formData.append('flexConfig', flexConfig);
+            formData.append('helmRelease', helmRelease);
+
+            fetch('/api/run/k8s-deploy', {
+                method: 'POST',
+                body: formData // No explicit JSON headers needed for FormData
+            })
+            .then(res => res.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = "Execute Kubernetes Redeployment";
+                if (data.status === 'success') {
+                    alert("K8s Pipeline Executed Successfully!\n\n" + data.message);
+                } else {
+                    alert("Pipeline Error:\n" + data.error);
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.textContent = "Execute Kubernetes Redeployment";
+                alert("Network error calling Pipeline API.");
+            });
+        });
+      </script>
+
+      <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; margin-bottom:20px; border-left:4px solid #f39c12;">
+        <h3 style="margin-top:0; color:#fff;">Manual Strategy A: Cinder Volume Snapshot &amp; Configuration Rebuild</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Best for clusters with giant Persistent Volumes (Databases, Message Queues) when you don't want to use Velero.</p>
+        <ol style="font-size:13px; color:#eee; padding-left:20px; line-height:1.6; margin-bottom:0;">
+          <li>Back in <strong>Stage 1 (Discovery)</strong>, export all configurations based on the source tooling (e.g. Helm values, Kustomize folder, or cleaned raw YAML).</li>
+          <li>Scale down the StatefulSets in OSPC to freeze data pipelines: <code>kubectl scale statefulset &lt;name&gt; --replicas=0</code>.</li>
+          <li>Snapshot the underlying Cinder Volumes in the OSPC OpenStack project.</li>
+          <li>Create new Cinder Volumes from those snapshots in the FLEX project, ensuring they match capacity.</li>
+          <li>Deploy the new FLEX Kubernetes Cluster.</li>
+          <li>Update your <code>PersistentVolume</code> manifests in FLEX to bind directly to the newly cloned FLEX Volume IDs.</li>
+          <li>During <strong>Stage 3</strong>, switch your terminal context to the new FLEX cluster's API and apply your exported configurations:</li>
+          <ul style="list-style-type:circle; margin-top:5px; margin-bottom:10px;">
+            <li><strong>Helm:</strong> <code>helm upgrade --install &lt;release&gt; &lt;chart&gt; -n &lt;namespace&gt; -f values.yaml</code></li>
+            <li><strong>Kustomize:</strong> <code>kubectl apply -k &lt;directory&gt;</code></li>
+            <li><strong>Raw YAML / Live Export:</strong> <code>kubectl apply -f k8s-inventory-main.yaml</code> (ensure you removed old runtime uids/ips).</li>
+          </ul>
+          <li>Update Ingress Route53/DNS.</li>
+        </ol>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; border-left:4px solid #2ecc71;">
+        <h3 style="margin-top:0; color:#fff;">Manual Strategy B: Backup &amp; Restore via Velero (Cloud-Native Sync)</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">The recommended Kubernetes-native manual approach that perfectly preserves all Custom Resources, Secrets, and Namespaces.</p>
+        <ol style="font-size:13px; color:#eee; padding-left:20px; line-height:1.6; margin-bottom:0;">
+          <li>Provision an empty target Kubernetes cluster running on your FLEX OpenStack VMs.</li>
+          <li>Install Velero on the legacy OSPC Cluster, configured to backup workloads to an S3/Swift Object Storage bucket.</li>
+          <li>Run a full cluster backup: <code>velero backup create k8s-migration --include-namespaces &lt;your-apps&gt;</code>.</li>
+          <li>Install Velero on the new FLEX Cluster, pointing to the exact same shared bucket.</li>
+          <li>Run the restore command onto FLEX: <code>velero restore create --from-backup k8s-migration</code>.</li>
+          <li>Validate the restored pods, test workload communication over the new FLEX overlay network, and cutover DNS.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Step 9: Manual Data Migration Runbook -->
+    <section class="card" id="manualRunbookCard">
+      <h2>Step 9) Manual Data Migration Runbook <span class="status-chip idle">Reference</span></h2>
+      <p class="hint">A/B OSPC → FLEX manual runbook for operators. Covers Frontend · Backend · API · Shared Files · MySQL · PostgreSQL · Kubernetes/Magnum · Write-Freeze · Cutover · Health Check · Rollback.</p>
+
+      <!-- Variable config -->
+      <details open style="margin:10px 0;background:#0d1a3a;border:1px solid #8ea2cc44;border-radius:8px;padding:10px 14px;">
+        <summary style="cursor:pointer;font-weight:700;color:#7ecfff;font-size:13px;">⚙️ Configure Placeholder Variables (fill in your IPs)</summary>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:10px;">
+          <label style="font-size:12px;">OSPC_FRONT IP<input id="rb_ospc_front" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">OSPC_BACK IP<input id="rb_ospc_back" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">OSPC_API IP<input id="rb_ospc_api" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">OSPC_DB IP<input id="rb_ospc_db" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">FLEX_FRONT IP<input id="rb_flex_front" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">FLEX_BACK IP<input id="rb_flex_back" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">FLEX_API IP<input id="rb_flex_api" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">FLEX_DB IP<input id="rb_flex_db" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">SSH Key path<input id="rb_ssh_key" class="rb-var" placeholder="~/.ssh/ospc2flex" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">OSPC K8s API<input id="rb_k8s_ospc" class="rb-var" placeholder="https://OSPC_K8S_API" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+          <label style="font-size:12px;">FLEX K8s API<input id="rb_k8s_flex" class="rb-var" placeholder="https://FLEX_K8S_API" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
+        </div>
+        <button onclick="applyRbVars()" type="button" style="margin-top:10px;padding:6px 14px;background:#4b5f91;border:none;border-radius:5px;color:#fff;font-weight:700;cursor:pointer;">Apply Variables</button>
+      </details>
+
+      <!-- Section tabs -->
+      <div id="rbTabs" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;">
+        <button class="rb-tab active" data-rb="rb1">1 Frontend</button>
+        <button class="rb-tab" data-rb="rb2">2 Backend</button>
+        <button class="rb-tab" data-rb="rb3">3 API</button>
+        <button class="rb-tab" data-rb="rb4">4 Shared Files</button>
+        <button class="rb-tab" data-rb="rb5">5 MySQL</button>
+        <button class="rb-tab" data-rb="rb6">6 PostgreSQL</button>
+        <button class="rb-tab" data-rb="rb7">☸ K8s / Magnum</button>
+        <button class="rb-tab" data-rb="rb8">7 Write-Freeze</button>
+        <button class="rb-tab" data-rb="rb9">8 Cutover</button>
+        <button class="rb-tab" data-rb="rb10">9 Health Check</button>
+        <button class="rb-tab" data-rb="rb11">10 Rollback</button>
+        <button class="rb-tab" data-rb="rb12">11 Best Practices</button>
+      </div>
+
+      <!-- Runbook tables -->
+      <div id="rbContent" style="overflow-x:auto;font-size:12px;">
+
+        <!-- 1 Frontend -->
+        <div class="rb-panel active" id="rb1">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">1) Frontend Runbook — Nginx / Static Web</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>Initial sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Sync deployed web files</td></tr>
+            <tr><td>Nginx config backup</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_FRONT 'sudo tar czf /tmp/frontend-nginx.tgz /etc/nginx' &amp;&amp; scp -i $SSH_KEY $OSPC_FRONT:/tmp/frontend-nginx.tgz /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/frontend-nginx.tgz $FLEX_FRONT:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move config for review</td></tr>
+            <tr><td>Restore config on Flex</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'sudo tar xzf /tmp/frontend-nginx.tgz -C / &amp;&amp; sudo nginx -t &amp;&amp; sudo systemctl reload nginx'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Validate and reload</td></tr>
+            <tr><td>Delta sync (pre-cutover)</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Re-run before cutover</td></tr>
+            <tr><td>Smoke test</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm HTTP response</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 2 Backend -->
+        <div class="rb-panel" id="rb2">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">2) Backend Runbook — App Service</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>App code sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete --exclude 'venv/' --exclude 'node_modules/' --exclude 'logs/' --exclude 'tmp/' -e "ssh -i $SSH_KEY" $OSPC_BACK:/opt/myapp/ $FLEX_BACK:/opt/myapp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move app tree, skip rebuildable dirs</td></tr>
+            <tr><td>Service file export</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_BACK 'sudo tar czf /tmp/backend-systemd.tgz /etc/systemd/system' &amp;&amp; scp -i $SSH_KEY $OSPC_BACK:/tmp/backend-systemd.tgz /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/backend-systemd.tgz $FLEX_BACK:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Carry service definitions</td></tr>
+            <tr><td>Restore service files</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo tar xzf /tmp/backend-systemd.tgz -C / &amp;&amp; sudo systemctl daemon-reload'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Load service units</td></tr>
+            <tr><td>Reinstall deps</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'cd /opt/myapp &amp;&amp; [ -f requirements.txt ] &amp;&amp; python3 -m pip install -r requirements.txt; [ -f package.json ] &amp;&amp; npm ci'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Rebuild dependencies on Flex</td></tr>
+            <tr><td>Start service</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl restart myapp &amp;&amp; sudo systemctl status myapp --no-pager'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Verify service comes up</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 3 API -->
+        <div class="rb-panel" id="rb3">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">3) API Runbook</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>API code sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete --exclude '.git/' --exclude 'venv/' --exclude 'node_modules/' -e "ssh -i $SSH_KEY" $OSPC_API:/srv/api/ $FLEX_API:/srv/api/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Sync API code</td></tr>
+            <tr><td>Env/config export</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_API 'sudo tar czf /tmp/api-config.tgz /etc/myapi /srv/api/.env' &amp;&amp; scp -i $SSH_KEY $OSPC_API:/tmp/api-config.tgz /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/api-config.tgz $FLEX_API:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move env/config carefully</td></tr>
+            <tr><td>Restore config</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'sudo tar xzf /tmp/api-config.tgz -C /'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Restore config</td></tr>
+            <tr><td>Dependency rebuild</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'cd /srv/api &amp;&amp; [ -f requirements.txt ] &amp;&amp; python3 -m pip install -r requirements.txt; [ -f package.json ] &amp;&amp; npm ci'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Rebuild API dependencies</td></tr>
+            <tr><td>API health test</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'curl -fsS http://127.0.0.1:8000/health || curl -fsS http://127.0.0.1:5000/health'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm API responds</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 4 Shared Files -->
+        <div class="rb-panel" id="rb4">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">4) Shared Files / Uploads</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>Initial file sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --progress -e "ssh -i $SSH_KEY" $OSPC_BACK:/srv/uploads/ $FLEX_BACK:/srv/uploads/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Initial bulk transfer</td></tr>
+            <tr><td>Large archive option</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_BACK 'sudo tar czf /tmp/uploads.tgz /srv/uploads' &amp;&amp; scp -i $SSH_KEY $OSPC_BACK:/tmp/uploads.tgz $FLEX_BACK:/tmp/ &amp;&amp; ssh -i $SSH_KEY $FLEX_BACK 'sudo tar xzf /tmp/uploads.tgz -C /'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Use for many tiny files</td></tr>
+            <tr><td>Delta sync (pre-cutover)</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_BACK:/srv/uploads/ $FLEX_BACK:/srv/uploads/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final incremental sync</td></tr>
+            <tr><td>Verify size/count</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_BACK 'du -sh /srv/uploads &amp;&amp; find /srv/uploads | wc -l' &amp;&amp; ssh -i $SSH_KEY $FLEX_BACK 'du -sh /srv/uploads &amp;&amp; find /srv/uploads | wc -l'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Compare counts both sides</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 5 MySQL -->
+        <div class="rb-panel" id="rb5">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">5) MySQL / MariaDB Runbook</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>Logical dump</td><td>Admin box → OSPC DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'mysqldump -u root -p --single-transaction --routines --triggers --events --databases appdb > /tmp/appdb.sql'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Consistent InnoDB export</td></tr>
+            <tr><td>Transfer dump</td><td>Admin box</td><td><code class="rb-cmd">scp -i $SSH_KEY $OSPC_DB:/tmp/appdb.sql /tmp/appdb.sql &amp;&amp; scp -i $SSH_KEY /tmp/appdb.sql $FLEX_DB:/tmp/appdb.sql</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move dump</td></tr>
+            <tr><td>Create DB on Flex</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS appdb;"'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Prepare target</td></tr>
+            <tr><td>Restore dump</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -p appdb < /tmp/appdb.sql'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Import DB</td></tr>
+            <tr><td>App validation</td><td>Admin box → Flex API</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'mysql -h $FLEX_DB_IP -u appuser -p appdb -e "SHOW TABLES;"'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm app→DB connectivity</td></tr>
+            <tr><td>Final freeze dump</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'mysqldump -u root -p --single-transaction --routines --triggers --events appdb > /tmp/appdb-final.sql' &amp;&amp; scp -i $SSH_KEY $OSPC_DB:/tmp/appdb-final.sql /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/appdb-final.sql $FLEX_DB:/tmp/ &amp;&amp; ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -p appdb < /tmp/appdb-final.sql'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final delta after write freeze</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 6 PostgreSQL -->
+        <div class="rb-panel" id="rb6">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">6) PostgreSQL Runbook</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>Archive dump</td><td>Admin box → OSPC DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'pg_dump -U postgres -Fc appdb > /tmp/appdb.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Portable custom-format dump</td></tr>
+            <tr><td>Transfer dump</td><td>Admin box</td><td><code class="rb-cmd">scp -i $SSH_KEY $OSPC_DB:/tmp/appdb.dump /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/appdb.dump $FLEX_DB:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move archive</td></tr>
+            <tr><td>Create target DB</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'createdb -U postgres appdb'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Prepare target</td></tr>
+            <tr><td>Restore archive</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'pg_restore -U postgres -d appdb /tmp/appdb.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Restore DB</td></tr>
+            <tr><td>Parallel restore (faster)</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'pg_restore -U postgres -j 4 -d appdb /tmp/appdb.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>4 parallel jobs for speed</td></tr>
+            <tr><td>App validation</td><td>Admin box → Flex API</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'psql -h $FLEX_DB_IP -U appuser -d appdb -c "\dt"'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm connectivity + tables</td></tr>
+            <tr><td>Final freeze dump</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'pg_dump -U postgres -Fc appdb > /tmp/appdb-final.dump' &amp;&amp; scp -i $SSH_KEY $OSPC_DB:/tmp/appdb-final.dump /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/appdb-final.dump $FLEX_DB:/tmp/ &amp;&amp; ssh -i $SSH_KEY $FLEX_DB 'dropdb -U postgres appdb &amp;&amp; createdb -U postgres appdb &amp;&amp; pg_restore -U postgres -d appdb /tmp/appdb-final.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final delta after write freeze</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- K8s / Magnum -->
+        <div class="rb-panel" id="rb7">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">☸ Kubernetes / OpenStack Magnum Migration</h3>
+          <p style="color:#d4ddf5;margin-bottom:10px;font-size:12px;">OSPC does not offer Magnum. Migrate containerised workloads by exporting manifests and PVC data from the source cluster and re-deploying on a new Flex Magnum cluster.</p>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
+            <tr><td>Export all manifests</td><td>Admin box (kubectl → OSPC cluster)</td><td><code class="rb-cmd">kubectl --kubeconfig=ospc-kubeconfig get all,configmap,secret,ingress,pvc -A -o yaml > ospc-cluster-export.yaml</code><button class="cp-btn" title="Copy">⎘</button></td><td>Capture all workload definitions</td></tr>
+            <tr><td>Create Flex Magnum cluster</td><td>Admin box (openstack CLI)</td><td><code class="rb-cmd">openstack coe cluster create flex-k8s --cluster-template k8s-v1.29 --node-count 3 --master-count 1 --keypair ospc2flex</code><button class="cp-btn" title="Copy">⎘</button></td><td>Provision target K8s cluster on Flex</td></tr>
+            <tr><td>Get Flex kubeconfig</td><td>Admin box</td><td><code class="rb-cmd">openstack coe cluster config flex-k8s --dir ~/.kube/ --force &amp;&amp; export KUBECONFIG=~/.kube/config</code><button class="cp-btn" title="Copy">⎘</button></td><td>Configure kubectl for Flex cluster</td></tr>
+            <tr><td>Migrate PVC data (Velero)</td><td>Admin box</td><td><code class="rb-cmd">velero backup create ospc-backup --kubeconfig=ospc-kubeconfig --include-namespaces=prod &amp;&amp; velero restore create --from-backup ospc-backup --kubeconfig=flex-kubeconfig</code><button class="cp-btn" title="Copy">⎘</button></td><td>Backup &amp; restore PVCs via Velero</td></tr>
+            <tr><td>Manual PVC rsync fallback</td><td>Admin box</td><td><code class="rb-cmd">kubectl --kubeconfig=ospc-kubeconfig exec -n prod deploy/myapp -- tar czf - /data | kubectl --kubeconfig=flex-kubeconfig exec -i -n prod deploy/myapp -- tar xzf - -C /data</code><button class="cp-btn" title="Copy">⎘</button></td><td>Direct pod-to-pod data transfer</td></tr>
+            <tr><td>Apply manifests on Flex</td><td>Admin box (kubectl → Flex)</td><td><code class="rb-cmd">kubectl --kubeconfig=flex-kubeconfig apply -f ospc-cluster-export.yaml</code><button class="cp-btn" title="Copy">⎘</button></td><td>Deploy workloads on Flex cluster</td></tr>
+            <tr><td>Verify pods healthy</td><td>Admin box (kubectl → Flex)</td><td><code class="rb-cmd">kubectl --kubeconfig=flex-kubeconfig get pods -A &amp;&amp; kubectl --kubeconfig=flex-kubeconfig get pvc -A</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm all pods running, PVCs bound</td></tr>
+            <tr><td>Update ingress / DNS</td><td>DNS / LB control plane</td><td><code class="rb-cmd"># Point your DNS / Flex Octavia LB to the new Flex Magnum cluster ingress IP<br>openstack floating ip list | grep &lt;flex-ingress-ip&gt;</code><button class="cp-btn" title="Copy">⎘</button></td><td>Route traffic to Flex cluster</td></tr>
+          </tbody></table>
+          <p style="color:#a8d8ff;margin-top:10px;font-size:12px;">⚠️ <strong>Prerequisites:</strong> kubectl, Helm, Velero (optional), openstack CLI with Magnum plugin. Update image registry references if your OSPC cluster used a private registry.</p>
+        </div>
+
+        <!-- 7 Write-Freeze -->
+        <div class="rb-panel" id="rb8">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">7) Write-Freeze Sequence</h3>
+          <table class="rb-table"><thead><tr><th>Step</th><th>Where</th><th>Command</th><th>Goal</th></tr></thead><tbody>
+            <tr><td>Stop backend</td><td>OSPC backend</td><td><code class="rb-cmd">sudo systemctl stop myapp</code><button class="cp-btn" title="Copy">⎘</button></td><td>Freeze writes</td></tr>
+            <tr><td>Stop API</td><td>OSPC API</td><td><code class="rb-cmd">sudo systemctl stop myapi</code><button class="cp-btn" title="Copy">⎘</button></td><td>Freeze writes</td></tr>
+            <tr><td>Maintenance page</td><td>OSPC frontend</td><td><code class="rb-cmd">sudo ln -sf /var/www/html/maintenance.html /var/www/html/index.html</code><button class="cp-btn" title="Copy">⎘</button></td><td>Prevent user writes during sync</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 8 Cutover -->
+        <div class="rb-panel" id="rb9">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">8) Cutover Sequence</h3>
+          <table class="rb-table"><thead><tr><th>#</th><th>Where</th><th>Action</th><th>Goal</th></tr></thead><tbody>
+            <tr><td>1</td><td>OSPC app/API</td><td>Stop writes on OSPC app/API</td><td>Freeze state</td></tr>
+            <tr><td>2</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_BACK:/srv/uploads/ $FLEX_BACK:/srv/uploads/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final file sync</td></tr>
+            <tr><td>3</td><td>Admin box</td><td>Final MySQL / PostgreSQL dump + restore (see tabs 5 & 6)</td><td>Last DB changes</td></tr>
+            <tr><td>4</td><td>Flex app/API</td><td>Update Flex app env vars / DB endpoints to point to Flex DB</td><td>Repoint Flex app</td></tr>
+            <tr><td>5</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl restart myapp' &amp;&amp; ssh -i $SSH_KEY $FLEX_API 'sudo systemctl restart myapi'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Bring Flex live</td></tr>
+            <tr><td>6</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1' &amp;&amp; ssh -i $SSH_KEY $FLEX_API 'curl -fsS http://127.0.0.1:8000/health'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Health before exposure</td></tr>
+            <tr><td>7</td><td>DNS / LB control plane</td><td>Switch LB / DNS / public entrypoint to Flex IPs</td><td>Send users to Flex</td></tr>
+            <tr><td>8</td><td>Flex servers + monitoring</td><td>Monitor logs and transactions</td><td>Validate success</td></tr>
+            <tr><td>9</td><td>—</td><td>Keep OSPC intact for rollback window</td><td>Safe fallback</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 9 Health Check -->
+        <div class="rb-panel" id="rb10">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">9) Flex Restart / Health Check</h3>
+          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Goal</th></tr></thead><tbody>
+            <tr><td>Reload frontend</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'sudo nginx -t &amp;&amp; sudo systemctl reload nginx'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Frontend ready</td></tr>
+            <tr><td>Restart backend</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl restart myapp &amp;&amp; sudo systemctl status myapp --no-pager'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Backend ready</td></tr>
+            <tr><td>Restart API</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'sudo systemctl restart myapi &amp;&amp; sudo systemctl status myapi --no-pager'</code><button class="cp-btn" title="Copy">⎘</button></td><td>API ready</td></tr>
+            <tr><td>Frontend health</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1'</code><button class="cp-btn" title="Copy">⎘</button></td><td>HTTP health</td></tr>
+            <tr><td>API health</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'curl -fsS http://127.0.0.1:8000/health || curl -fsS http://127.0.0.1:5000/health'</code><button class="cp-btn" title="Copy">⎘</button></td><td>API health</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 10 Rollback -->
+        <div class="rb-panel" id="rb11">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">10) Rollback Table</h3>
+          <table class="rb-table"><thead><tr><th>Failure Point</th><th>Where</th><th>Rollback Action</th></tr></thead><tbody>
+            <tr><td>Flex frontend broken</td><td>DNS / LB control plane</td><td>Point DNS/LB back to OSPC frontend</td></tr>
+            <tr><td>Flex backend/API broken</td><td>OSPC/Flex servers</td><td>Stop Flex services, re-enable OSPC services</td></tr>
+            <tr><td>Flex DB fails before cutover</td><td>DB / app side</td><td>Keep OSPC DB primary, fix and retry</td></tr>
+            <tr><td>Post-cutover functional issue</td><td>DNS/LB + app ops</td><td>Repoint traffic to OSPC, keep Flex offline</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- 11 Best Practices -->
+        <div class="rb-panel" id="rb12">
+          <h3 style="color:#7ecfff;margin-bottom:8px;">11) Best Practices — What to Sync / What to Exclude</h3>
+          <table class="rb-table"><thead><tr><th>Tier</th><th>Sync</th><th>Exclude</th><th>Note</th></tr></thead><tbody>
+            <tr><td>Frontend</td><td>/var/www/html, selected /etc/nginx</td><td>cache, logs</td><td>Review nginx conf before overwrite</td></tr>
+            <tr><td>Backend</td><td>/opt/myapp, selected /etc/systemd/system</td><td>venv, node_modules, logs, tmp</td><td>Reinstall deps on Flex</td></tr>
+            <tr><td>API</td><td>/srv/api, selected /etc/…, .env after review</td><td>build cache, logs</td><td>Rotate secrets on Flex</td></tr>
+            <tr><td>Shared files</td><td>/srv/uploads, /data/media</td><td>temp processing folders</td><td>Use rsync + verify counts</td></tr>
+            <tr><td>MySQL / PgSQL</td><td>Logical dump only</td><td>Raw DB files</td><td>Never copy raw data dir</td></tr>
+            <tr><td>K8s</td><td>Manifests (YAML) + PVC data via Velero</td><td>Local images, node-specific resources</td><td>Update image registry refs</td></tr>
+          </tbody></table>
+          <h3 style="color:#e06c6c;margin:14px 0 8px;">❌ What NOT to Migrate</h3>
+          <table class="rb-table"><thead><tr><th>Do NOT blindly migrate</th><th>Why</th></tr></thead><tbody>
+            <tr><td>OS image from OSPC</td><td>Carries old environment assumptions — not the supported pattern</td></tr>
+            <tr><td>Old package binaries</td><td>Often breaks on target — reinstall on Flex instead</td></tr>
+            <tr><td>Cache / temp dirs</td><td>Useless — recreated automatically</td></tr>
+            <tr><td>Logs</td><td>Archive separately, not migrated as live workload data</td></tr>
+            <tr><td>Secrets without review</td><td>Risk of broken auth or leakage — rotate and re-inject on Flex</td></tr>
+          </tbody></table>
+        </div>
+
+      </div><!-- /rbContent -->
+
+      <!-- Download button -->
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button onclick="downloadRunbook()" type="button" style="padding:9px 18px;background:linear-gradient(135deg,#1565c0,#0d47a1);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">⬇️ Download Runbook (HTML)</button>
+        <span style="color:#aaa;font-size:12px;align-self:center;">Opens a self-contained HTML file you can save, print, or share with your team.</span>
+      </div>
+    </section>
+
+    <style>
+      .rb-tab { background:#1a2e5a; border:1px solid #4b6fa0; color:#d4ddf5; border-radius:5px; padding:5px 10px; cursor:pointer; font-size:12px; font-weight:600; }
+      .rb-tab.active { background:#4b5f91; border-color:#8ea2cc; color:#fff; }
+      .rb-panel { display:none; }
+      .rb-panel.active { display:block; }
+      .rb-table { width:100%; border-collapse:collapse; margin-top:4px; }
+      .rb-table th { background:#1a3a5c; color:#7ecfff; padding:7px 8px; text-align:left; font-size:12px; border-bottom:1px solid #8ea2cc44; }
+      .rb-table td { padding:6px 8px; border-bottom:1px solid #ffffff12; color:#d4ddf5; vertical-align:top; font-size:12px; }
+      .rb-table tr:hover td { background:#ffffff08; }
+      .rb-table code.rb-cmd { font-family:monospace; font-size:11px; color:#a8ffc8; background:#0d1a3a; padding:3px 6px; border-radius:3px; word-break:break-all; }
+      code.rb-cmd[contenteditable="true"] { outline:none; border-bottom:1px dashed #7ecfff; transition: background 0.2s; }
+      code.rb-cmd[contenteditable="true"]:focus { background:#1a2e5a; }
+      .cp-btn { background:none; border:none; color:#7ecfff; cursor:pointer; font-size:13px; margin-left:6px; vertical-align:middle; }
+      .cp-btn:hover { color:#fff; }
+      .run-btn { color:#ffbc2c; font-size:14px; margin-left:2px; }
+      .run-btn:hover { color:#fff; }
+    </style>
+
+    <script>
+      // Tab switching
+      document.getElementById('rbTabs').addEventListener('click', e => {
+        const btn = e.target.closest('.rb-tab');
+        if (!btn) return;
+        document.querySelectorAll('.rb-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.rb-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.rb).classList.add('active');
+      });
+
+      // Copy command
+      document.getElementById('rbContent').addEventListener('click', e => {
+        const btn = e.target.closest('.cp-btn');
+        if (!btn) return;
+        const code = btn.previousElementSibling;
+        navigator.clipboard.writeText(code.innerText).then(() => {
+          btn.textContent = '✓'; setTimeout(() => btn.textContent = '⎘', 1500);
+        });
+      });
+
+      // Apply variables
+      function getRbVars() {
+        return {
+          '$SSH_KEY':    document.getElementById('rb_ssh_key').value    || '~/.ssh/ospc2flex',
+          '$OSPC_FRONT': document.getElementById('rb_ospc_front').value || 'ubuntu@OSPC_FRONTEND_IP',
+          '$OSPC_BACK':  document.getElementById('rb_ospc_back').value  || 'ubuntu@OSPC_BACKEND_IP',
+          '$OSPC_API':   document.getElementById('rb_ospc_api').value   || 'ubuntu@OSPC_API_IP',
+          '$OSPC_DB':    document.getElementById('rb_ospc_db').value    || 'ubuntu@OSPC_DB_IP',
+          '$FLEX_FRONT': document.getElementById('rb_flex_front').value || 'ubuntu@FLEX_FRONTEND_IP',
+          '$FLEX_BACK':  document.getElementById('rb_flex_back').value  || 'ubuntu@FLEX_BACKEND_IP',
+          '$FLEX_API':   document.getElementById('rb_flex_api').value   || 'ubuntu@FLEX_API_IP',
+          '$FLEX_DB':    document.getElementById('rb_flex_db').value    || 'ubuntu@FLEX_DB_IP',
+        };
+      }
+      function applyRbVars() {
+        const vars = getRbVars();
+        document.querySelectorAll('code.rb-cmd').forEach(el => {
+          let text = el.getAttribute('data-orig') || el.innerText;
+          el.setAttribute('data-orig', text);
+          Object.entries(vars).forEach(([k, v]) => { text = text.replaceAll(k, v); });
+          el.innerText = text;
+        });
+      }
+
+      // Download runbook as HTML
+      function downloadRunbook() {
+        const vars = getRbVars();
+        const html = document.getElementById('manualRunbookCard').outerHTML;
+        let processed = html;
+        Object.entries(vars).forEach(([k, v]) => { processed = processed.replaceAll(k, v); });
+        const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OSPC→FLEX Manual Migration Runbook</title>
+<style>body{font-family:Segoe UI,sans-serif;background:#1a2744;color:#d4ddf5;padding:20px;}
+table{width:100%;border-collapse:collapse;margin:8px 0;}
+th{background:#1a3a5c;color:#7ecfff;padding:7px 8px;text-align:left;border-bottom:1px solid #8ea2cc44;}
+td{padding:6px 8px;border-bottom:1px solid #ffffff12;vertical-align:top;font-size:12px;}
+code{font-family:monospace;font-size:11px;color:#a8ffc8;background:#0d1a3a;padding:3px 6px;border-radius:3px;word-break:break-all;display:block;margin:4px 0;}
+h1{color:#7ecfff;}h2,h3{color:#a8d8ff;}
+.rb-panel{display:block!important;margin-bottom:30px;}
+button,.rb-tab,.rb-var,.cp-btn{display:none;}
+details{open:true;}
+</style></head><body><h1>OSPC → FLEX Manual Data Migration Runbook</h1>${processed}</body></html>`;
+        const blob = new Blob([full], {type:'text/html'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'ospc_flex_migration_runbook.html';
+        a.click(); URL.revokeObjectURL(a.href);
+      }
+
+      // Initialize Runbook enhancements
+      document.addEventListener('DOMContentLoaded', () => {
+        // 1. Make commands editable and append Run button
+        document.querySelectorAll('code.rb-cmd').forEach(el => {
+            el.setAttribute('contenteditable', 'true');
+            el.setAttribute('spellcheck', 'false');
+            el.title = 'Click to edit command before running';
+            
+            const runBtn = document.createElement('button');
+            runBtn.className = 'cp-btn run-btn';
+            runBtn.title = 'Run Command';
+            runBtn.textContent = '🚀';
+            
+            el.insertAdjacentElement('afterend', runBtn);
+        });
+
+        // 2. Auto-Prefill IPs
+        fetch('/api/data/runbook-ips')
+          .then(res => res.json())
+          .then(data => {
+              let updated = false;
+              if (data.OSPC_FRONT) { document.getElementById('rb_ospc_front').value = data.OSPC_FRONT; updated = true; }
+              if (data.OSPC_BACK) { document.getElementById('rb_ospc_back').value = data.OSPC_BACK; updated = true; }
+              if (data.OSPC_API) { document.getElementById('rb_ospc_api').value = data.OSPC_API; updated = true; }
+              if (data.OSPC_DB) { document.getElementById('rb_ospc_db').value = data.OSPC_DB; updated = true; }
+              if (updated) applyRbVars();
+          })
+          .catch(err => console.error("Prefill failed", err));
+      });
+
+      // 3. Run command handler
+      document.getElementById('rbContent').addEventListener('click', e => {
+        const runBtn = e.target.closest('.run-btn');
+        if (!runBtn) return;
+        
+        const code = runBtn.parentElement.querySelector('code.rb-cmd');
+        if (!code) return;
+        const cmd = code.innerText.trim();
+        
+        if (!confirm("Execute this manual command on the target server?\n\n$ " + cmd)) return;
+        
+        runBtn.textContent = '⏳';
+        runBtn.disabled = true;
+        
+        // Ensure execution log section is visible and scrolled to
+        const logBox = document.getElementById('logBox');
+        if (logBox) logBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        fetch('/api/run/execute-manual-cmd', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                runBtn.textContent = '✅';
+                if (logBox) {
+                    if (logBox.textContent === 'Ready.') logBox.textContent = '';
+                    logBox.textContent += "\n--- MANUAL EXECUTION ---\n$ " + cmd + "\n" + data.output + "\n";
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+            } else {
+                runBtn.textContent = '❌';
+                alert("Execution failed:\n" + data.error);
+                if (logBox) {
+                    logBox.textContent += "\n--- EXECUTION FAILED ---\n$ " + cmd + "\n" + data.error + "\n";
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+            }
+            setTimeout(() => {
+                runBtn.textContent = '🚀';
+                runBtn.disabled = false;
+            }, 4000);
+        })
+        .catch(err => {
+            alert("API error executing command.");
+            runBtn.textContent = '🚀';
+            runBtn.disabled = false;
+        });
+      });
+    </script>
+
+
+      <div class="row log-tools">
+        <button id="logFilterAll" class="active" type="button">All</button>
+        <button id="logFilterInfo" type="button">Info</button>
+        <button id="logFilterWarn" type="button">Warn</button>
+        <button id="logFilterError" type="button">Error</button>
+        <button id="copyLogBtn" type="button">Copy Log</button>
+        <button id="clearLogBtn" type="button">Clear</button>
+      </div>
+      <pre id="logBox">Ready.</pre>
+    </section>
+
+    <section class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2>Step 10) Migration CRM Closeout</h2>
+          <p class="hint" style="margin-bottom:0;">Once all validation checks pass (or fail), mark the final status in the global Customer Migration Tracker.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btnMarkSuccess" style="background:#28a745; border:none; color:white; padding:10px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">✅ Mark as Successful</button>
+          <button id="btnMarkRollback" style="background:#ffbc2c; border:none; color:#000; padding:10px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">↩️ Mark as Rolled Back</button>
+        </div>
+      </div>
+      <script>
+        document.addEventListener('DOMContentLoaded', () => {
+           function setCRMStatus(statusStr) {
+               fetch('/api/tracker/update_status', {
+                   method: 'POST',
+                   headers: {'Content-Type': 'application/json'},
+                   body: JSON.stringify({ status: statusStr })
+               }).then(res => res.json())
+               .then(data => {
+                   if (data.ok) {
+                       alert('Migration CRM Tracker updated to: ' + statusStr);
+                       window.location.href = '/tracker'; // Go back to global tracker
+                   } else {
+                       alert('Error updating CRM: ' + data.error);
+                   }
+               }).catch(e => alert('Failed to contact backend API.'));
+           }
+           document.getElementById('btnMarkSuccess').addEventListener('click', () => { if(confirm('Mark this customer migration as SUCCESSFUL and close the project?')) setCRMStatus('Success'); });
+           document.getElementById('btnMarkRollback').addEventListener('click', () => { if(confirm('Mark this customer migration as ROLLED BACK?')) setCRMStatus('Rolled Back'); });
+        });
+      </script>
+    </section>
+
+    <section class="card">
+      <a href="/readme" target="_blank" rel="noopener noreferrer">Open README (Plain Text)</a>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=8"></script>
+</body>
+</html>

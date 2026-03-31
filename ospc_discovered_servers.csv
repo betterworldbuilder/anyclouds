@@ -1,0 +1,9 @@
+Name,ID,Project,Status,IPs,OS,Services,Role,Confidence
+ospc-jumpHost,39e0d438-46cf-47c3-88e6-5a5f84859a84,1342314,ACTIVE,"23.253.159.193, 10.176.193.186",Ubuntu 24.04.2 LTS,python-backend,backend-api,High
+u24-postgresl,d9b51e0a-f7ae-4678-9e18-2971089c6af7,1342314,ACTIVE,"104.130.169.61, 10.176.195.103",Ubuntu 24.04.2 LTS,"postgres, python-backend",database:postgresql,High
+u24-FrontEnd,7c7f7240-9973-43b6-9b14-bf4969806e86,1342314,ACTIVE,"23.253.159.176, 10.176.193.161",Ubuntu 24.04.2 LTS,"nginx-or-apache, nginx, python-backend",lb/reverse-proxy,High
+php-ospc,b6bbe416-0eac-4aa2-8dd1-89b8e0fbd969,1342314,ACTIVE,"23.253.159.128, 10.176.193.89",Unknown,,Unknown,Low
+Windows Server 2019Re,d8753e16-0039-4c04-993c-7e14be21e212,1342314,ACTIVE,"104.130.13.83, 10.176.194.179",Unknown,,Unknown,Low
+win2019websql2019,47f882bf-4d6d-41d6-baef-cfcc7a9c5e61,1342314,ACTIVE,"104.130.26.6, 10.176.192.4",Unknown,,Unknown,Low
+Windows Server 2016 + SQL Server 2019,741c63ea-e4ae-4048-b6cb-fc7b7716034e,1342314,ACTIVE,"23.253.159.213, 10.176.193.239",Unknown,,Unknown,Low
+u24Backend,6b24fa27-fada-461b-b50a-41cb64e453ab,1342314,ACTIVE,"104.130.26.171, 10.176.192.220",Ubuntu 24.04.2 LTS,"postgres, python-backend",database:postgresql,High

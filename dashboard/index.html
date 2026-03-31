@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Footprint Dashboard</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="bg-shape bg-shape-a"></div>
+  <div class="bg-shape bg-shape-b"></div>
+
+  <main class="app">
+    <header class="hero">
+      <p class="eyebrow">Rackspace Footprint Viewer</p>
+      <h1>CSV Dashboard</h1>
+      <p class="sub">Top section is for <code>account_overview.py</code>. Bottom section is optional for <code>flavor_mapper.py</code>.</p>
+    </header>
+
+    <section class="panel upload-panel">
+      <label for="csvFile" class="upload-label">Account Overview CSV</label>
+      <input id="csvFile" type="file" accept=".csv,text/csv" />
+      <p id="fileMeta" class="meta">No file loaded</p>
+    </section>
+
+    <section id="controls" class="panel controls hidden">
+      <div class="field">
+        <label for="search">Search</label>
+        <input id="search" type="text" placeholder="Search all visible columns" />
+      </div>
+      <div class="field">
+        <label for="groupBy">Group</label>
+        <select id="groupBy"></select>
+      </div>
+      <div class="field">
+        <label for="groupValue">Filter Value</label>
+        <select id="groupValue"></select>
+      </div>
+      <div class="field">
+        <label>Columns</label>
+        <button id="toggleColumns" type="button" class="btn">Choose Columns</button>
+      </div>
+      <div class="field">
+        <label>Export</label>
+        <button id="exportFiltered" type="button" class="btn">Export Filtered CSV</button>
+      </div>
+      <div class="field">
+        <label>Export XLSX</label>
+        <button id="exportAllXlsx" type="button" class="btn btn-xlsx">⬇️ Export Full Inventory XLSX</button>
+      </div>
+      <div class="field">
+        <label>Edit</label>
+        <button id="toggleEditPrimary" type="button" class="btn">Enable Edit Mode</button>
+      </div>
+      <div class="field">
+        <label>Export Edited</label>
+        <button id="exportEditedPrimary" type="button" class="btn">Download Edited Overview CSV</button>
+      </div>
+      <div class="field">
+        <label>Save Edited</label>
+        <button id="saveEditedPrimary" type="button" class="btn">Save Edited Overview (Overwrite)</button>
+      </div>
+    </section>
+    <section id="columnPickerPanel" class="panel hidden">
+      <h3 class="picker-title">Visible Columns</h3>
+      <div id="columnPicker" class="column-picker"></div>
+    </section>
+
+    <section id="summary" class="summary hidden"></section>
+
+    <section class="panel hidden" id="sourceChartPanel">
+      <div class="table-header">
+        <h2>Source Inventory Chart</h2>
+        <span id="sourceChartCount" class="pill">0 resources</span>
+      </div>
+      <div class="chart-layout">
+        <div class="pie-wrap">
+          <div id="sourcePie" class="pie-chart" aria-label="Source resource distribution"></div>
+        </div>
+        <div id="sourceLegend" class="chart-legend"></div>
+      </div>
+    </section>
+
+    <section class="panel table-panel hidden" id="tablePanel">
+      <div class="table-header">
+        <h2>Records</h2>
+        <span id="rowCount" class="pill">0 rows</span>
+      </div>
+      <div class="table-wrap">
+        <table id="dataTable"></table>
+      </div>
+    </section>
+
+    <section class="panel upload-panel mapper-upload">
+      <label for="mapperFile" class="upload-label">Optional Flavor Mapper CSV</label>
+      <input id="mapperFile" type="file" accept=".csv,text/csv" />
+      <p id="mapperMeta" class="meta">No flavor mapper file loaded</p>
+    </section>
+
+    <section id="mapperSummary" class="summary hidden"></section>
+
+    <section class="panel table-panel hidden" id="mapperTablePanel">
+      <div class="table-header">
+        <h2>Flavor Mapping Records</h2>
+        <span id="mapperRowCount" class="pill">0 rows</span>
+      </div>
+      <div class="field mapper-search">
+        <label for="mapperSearch">Search</label>
+        <input id="mapperSearch" type="text" placeholder="Search flavor mapper rows" />
+      </div>
+      <div class="mapper-actions">
+        <button id="toggleMapperColumns" type="button" class="btn">Choose Columns</button>
+        <button id="exportMapperFiltered" type="button" class="btn">Export Filtered CSV</button>
+        <button id="toggleEditMapper" type="button" class="btn">Enable Edit Mode</button>
+        <button id="exportEditedMapper" type="button" class="btn">Download Edited Mapper CSV</button>
+        <button id="saveEditedMapper" type="button" class="btn">Save Edited Mapper (Overwrite)</button>
+      </div>
+      <div id="mapperColumnPickerPanel" class="panel hidden">
+        <h3 class="picker-title">Visible Mapper Columns</h3>
+        <div id="mapperColumnPicker" class="column-picker"></div>
+      </div>
+      <div class="table-wrap">
+        <table id="mapperTable"></table>
+      </div>
+    </section>
+
+    <section class="panel upload-panel mapper-upload">
+      <label for="blockFile" class="upload-label">Optional Block Storage Mapping CSV</label>
+      <input id="blockFile" type="file" accept=".csv,text/csv" />
+      <p id="blockMeta" class="meta">No block storage mapping file loaded</p>
+    </section>
+
+    <section class="panel table-panel hidden" id="blockTablePanel">
+      <div class="table-header">
+        <h2>Block Storage Mapping</h2>
+        <span id="blockRowCount" class="pill">0 rows</span>
+      </div>
+      <div class="field mapper-search">
+        <label for="blockSearch">Search</label>
+        <input id="blockSearch" type="text" placeholder="Search block storage rows" />
+      </div>
+      <div class="mapper-actions">
+        <button id="toggleEditBlock" type="button" class="btn">Enable Edit Mode</button>
+        <button id="exportEditedBlock" type="button" class="btn">Download Edited Block CSV</button>
+        <button id="saveEditedBlock" type="button" class="btn">Save Edited Block (Overwrite)</button>
+      </div>
+      <div class="table-wrap">
+        <table id="blockTable"></table>
+      </div>
+    </section>
+
+    <section class="panel upload-panel mapper-upload">
+      <label for="lbFile" class="upload-label">Optional LB Mapper CSV</label>
+      <input id="lbFile" type="file" accept=".csv,text/csv" />
+      <p id="lbMeta" class="meta">No LB mapper file loaded</p>
+    </section>
+
+    <section id="lbSummary" class="summary hidden"></section>
+
+    <section class="panel table-panel hidden" id="lbTablePanel">
+      <div class="table-header">
+        <h2>Load Balancer Mapping</h2>
+        <span id="lbRowCount" class="pill">0 rows</span>
+      </div>
+      <div class="field mapper-search">
+        <label for="lbSearch">Search</label>
+        <input id="lbSearch" type="text" placeholder="Search LB mapping rows" />
+      </div>
+      <div class="table-wrap">
+        <table id="lbTable"></table>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="inventoryPanel">
+      <div class="table-header">
+        <h2>Flavor Inventory Summary</h2>
+        <span id="inventoryCount" class="pill">0 mapped rows</span>
+      </div>
+      <p class="meta" id="inventoryNote">Counts are based on currently visible mapper rows.</p>
+      <div class="inventory-grid">
+        <div class="inventory-card">
+          <h3>Source Platform Flavors</h3>
+          <div class="inventory-metrics">
+            <span>RAM (GB): <strong id="sourceRamTotal">0</strong></span>
+            <span>vCPUs: <strong id="sourceVcpuTotal">0</strong></span>
+          </div>
+          <table id="sourceFlavorTable" class="simple-table"></table>
+          <p class="meta inventory-total" id="sourceFlavorTotal">Total: 0</p>
+        </div>
+        <div class="inventory-card">
+          <h3>Target Platform Flavors</h3>
+          <div class="inventory-metrics">
+            <span>RAM (GB): <strong id="targetRamTotal">0</strong></span>
+            <span>vCPUs: <strong id="targetVcpuTotal">0</strong></span>
+          </div>
+          <table id="targetFlavorTable" class="simple-table"></table>
+          <p class="meta inventory-total" id="targetFlavorTotal">Total: 0</p>
+        </div>
+      </div>
+      <div class="inventory-card volume-summary-card">
+        <h3>Volume Inventory Summary</h3>
+        <p class="meta">Source comes from <code>block_storage_volume</code> in account overview. Destination is expected from mapper logic.</p>
+        <table id="volumeInventoryTable" class="simple-table"></table>
+      </div>
+      <div class="inventory-card volume-summary-card">
+        <h3>Load Balancer Inventory Summary</h3>
+        <p class="meta">Based on the optional LB mapper CSV. Shows discovered source LBs and planned Octavia LB/member build counts.</p>
+        <table id="lbInventoryTable" class="simple-table"></table>
+      </div>
+    </section>
+    <!-- Autoload status banner -->
+    <div id="autoloadBanner" style="
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+      background: rgba(30,34,60,0.96); color: #e0e6ff;
+      border: 1px solid rgba(140,160,255,0.3); border-radius: 12px;
+      padding: 0.9rem 1.4rem; font-size: 0.85rem; max-width: 340px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); display: none;
+      backdrop-filter: blur(8px);
+    ">
+      <b style="color:#a78bfa">⚡ Auto-Loading CSVs…</b>
+      <div id="autoloadStatus" style="margin-top:0.4rem; line-height:1.6;"></div>
+    </div>
+  </main>
+
+  <script src="./app.js"></script>
+  <script>
+    // ── Auto-load CSVs from server on page start ──────────────────────────────
+    (async function autoloadCSVs() {
+      const banner  = document.getElementById('autoloadBanner');
+      const status  = document.getElementById('autoloadStatus');
+      const BASE    = window.location.origin;   // http://127.0.0.1:5001
+
+      function log(msg) {
+        if (status) status.innerHTML += msg + '<br>';
+      }
+
+      async function pickAndLoad(files, rolePredicate, inputId, mode) {
+        const match = files.find(rolePredicate);
+        if (!match) return;
+        try {
+          const res = await fetch(`${BASE}/api/dashboard/csv-content/${encodeURIComponent(match)}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          const file = new File([text], match, { type: 'text/csv' });
+          const input = document.getElementById(inputId);
+          if (!input) return;
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          input.files = dt.files;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          log(`✅ ${match}`);
+        } catch (e) {
+          log(`⚠️ ${match}: ${e.message}`);
+        }
+      }
+
+      try {
+        const res = await fetch(`${BASE}/api/dashboard/csv-files`);
+        if (!res.ok) return;  // not served via Flask yet — skip silently
+        const data = await res.json();
+        const files = data.files || [];
+        if (!files.length) return;
+
+        banner.style.display = 'block';
+        log('Scanning server CSVs…');
+
+        await pickAndLoad(files, f => /_overview\.csv$/i.test(f),  'csvFile',    false);
+        await pickAndLoad(files, f => /_flavormap\.csv$/i.test(f), 'mapperFile', true);
+        await pickAndLoad(files, f => /_blockmap\.csv$/i.test(f),  'blockFile',  'block');
+        await pickAndLoad(files, f => /_lbmap\.csv$/i.test(f),     'lbFile',     'lb');
+
+        log('<span style="color:#86efac">Done.</span>');
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+      } catch (e) {
+        // Dashboard opened as file:// or server not available — silent fail
+      }
+    })();
+    // ── Export Full Inventory XLSX (all loaded sheets) ─────────────────────
+    document.getElementById('exportAllXlsx').addEventListener('click', function () {
+      if (typeof XLSX === 'undefined') {
+        alert('SheetJS library not loaded. Please check your internet connection.');
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      let sheetCount = 0;
+
+      function addSheet(rows, name) {
+        if (!rows || !rows.length) return;
+        const headers = Object.keys(rows[0]);
+        const data = [headers, ...rows.map(r => headers.map(h => r[h] ?? ''))];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        // Auto column widths
+        const colWidths = headers.map((h, ci) => ({
+          wch: Math.max(h.length, ...rows.map(r => String(r[h] ?? '').length))
+        }));
+        ws['!cols'] = colWidths;
+        XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
+        sheetCount++;
+      }
+
+      // Access state from app.js (exposed on window)
+      addSheet(window._dashState ? window._dashState.rows        : [], 'Account Overview');
+      addSheet(window._dashState ? window._dashState.mapperRows  : [], 'Flavor Mapper');
+      addSheet(window._dashState ? window._dashState.blockRows   : [], 'Block Storage');
+      addSheet(window._dashState ? window._dashState.lbRows      : [], 'LB Mapper');
+
+      if (!sheetCount) {
+        alert('No data loaded yet. Please upload at least one CSV file first.');
+        return;
+      }
+      const ts = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `ospc_inventory_${ts}.xlsx`);
+    });
+  </script>
+</body>
+</html>

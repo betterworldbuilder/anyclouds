@@ -1,0 +1,4 @@
+ospc2flecredential.txt
+*.pem
+inventory-csv/
+ospc-discovery/outputs/

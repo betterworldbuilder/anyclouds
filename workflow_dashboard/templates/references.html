@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>References</title>
+  <style>
+    :root {
+      --bg: #233a6b;
+      --card: #0f1e3e88;
+      --text: #ffffff;
+      --muted: #d4ddf5;
+      --border: #8ea2cc66;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      background: linear-gradient(120deg, #2a4e8d 0%, #374a86 45%, #5a4b72 100%);
+      min-height: 100vh;
+    }
+    .wrap {
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      backdrop-filter: blur(8px);
+    }
+    h1, h2 { margin: 0 0 8px; }
+    h1 { font-size: 18px; }
+    h2 { font-size: 15px; }
+    .meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    .pill {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    .table-wrap {
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: 56vh;
+      background: #0d1735c7;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 680px;
+    }
+    th, td {
+      text-align: left;
+      padding: 7px 8px;
+      border-bottom: 1px solid #b8c4ff33;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #1e2f5cae;
+      z-index: 1;
+    }
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    th.sortable:hover {
+      background: #283c74d6;
+    }
+    ul.images {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      columns: 2;
+      column-gap: 24px;
+    }
+    li { margin: 3px 0; }
+    @media (max-width: 900px) {
+      ul.images { columns: 1; }
+      table { min-width: 560px; }
+    }
+    .btn-export {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, #27ae60, #1e8449);
+      color: #fff; border: none; border-radius: 5px;
+      padding: 5px 12px; font-size: 12px; font-weight: 600;
+      cursor: pointer; margin-top: 6px;
+      box-shadow: 0 1px 4px rgba(39,174,96,.35);
+      text-decoration: none;
+    }
+    .btn-export:hover { opacity: .88; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>References</h1>
+      <p class="meta">Shows available public images and available flavors from your CSV reference folders.</p>
+    </section>
+
+    <section class="card">
+      <h2>Public Images <span id="imagesCount" class="pill">0</span></h2>
+      <p id="imagesSource" class="meta">Source: not found</p>
+      <button class="btn-export" id="exportImagesBtn">⬇️ Export Images CSV</button>
+      <ul id="imagesList" class="images"></ul>
+    </section>
+
+    <section class="grid" id="flavorSections"></section>
+  </main>
+
+  <script>
+    const flavorColumns = [
+      { key: "name", label: "Name", numeric: false },
+      { key: "category", label: "Category", numeric: false },
+      { key: "disk_gib", label: "Disk (GiB)", numeric: true },
+      { key: "cpu", label: "CPU", numeric: true },
+      { key: "memory", label: "Memory", numeric: true },
+      { key: "internal_bw_gbps", label: "Internal Network Bandwidth (Gbps)", numeric: true },
+      { key: "ephemeral_disk_gib", label: "Ephemeral Disk (GiB)", numeric: true },
+      { key: "cost_per_hour", label: "Cost per Hour", numeric: true },
+    ];
+
+    function downloadCSV(filename, rows, headers) {
+      const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      const lines = [headers.map(q).join(',')];
+      rows.forEach(r => lines.push(headers.map(h => q(r[h] ?? '')).join(',')));
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    let referenceData = { images: [], flavor_sets: [] };
+    const flavorSortByIdx = {};
+
+    function esc(text) {
+      return String(text || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function parseNumeric(value) {
+      const raw = String(value || "").trim();
+      if (!raw) return Number.NaN;
+      const n = Number(raw.replace(/[^0-9.+-]/g, ""));
+      return Number.isFinite(n) ? n : Number.NaN;
+    }
+
+    function sortRows(rows, sortKey, sortDir, numeric) {
+      const sorted = [...rows];
+      sorted.sort((a, b) => {
+        const av = a?.[sortKey] ?? "";
+        const bv = b?.[sortKey] ?? "";
+        if (numeric) {
+          const an = parseNumeric(av);
+          const bn = parseNumeric(bv);
+          const aIsNum = Number.isFinite(an);
+          const bIsNum = Number.isFinite(bn);
+          if (aIsNum && bIsNum) return an - bn;
+          if (aIsNum && !bIsNum) return -1;
+          if (!aIsNum && bIsNum) return 1;
+        }
+        return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" });
+      });
+      if (sortDir === "desc") sorted.reverse();
+      return sorted;
+    }
+
+    function sortArrow(idx, key) {
+      const s = flavorSortByIdx[idx];
+      if (!s || s.key !== key) return "";
+      return s.dir === "asc" ? " ▲" : " ▼";
+    }
+
+    function renderFlavorSections() {
+      const flavorSections = document.getElementById("flavorSections");
+      const sets = Array.isArray(referenceData.flavor_sets) ? referenceData.flavor_sets : [];
+      if (!sets.length) {
+        flavorSections.innerHTML = '<section class="card"><h2>Flavors</h2><p class="meta">No CSV files found in uploads/flavors.</p></section>';
+        return;
+      }
+
+      flavorSections.innerHTML = sets.map((set, idx) => {
+        const sortCfg = flavorSortByIdx[idx] || { key: "name", dir: "asc" };
+        const colCfg = flavorColumns.find((c) => c.key === sortCfg.key) || flavorColumns[0];
+        const sortedRows = sortRows(Array.isArray(set.rows) ? set.rows : [], sortCfg.key, sortCfg.dir, Boolean(colCfg.numeric));
+        return `
+        <section class="card">
+          <h2>${esc(set.region)} Flavors <span class="pill">${Number(set.count || 0).toLocaleString()}</span></h2>
+          <p class="meta">Source: ${esc(set.file)}</p>
+          <button class="btn-export" data-export-idx="${idx}">⬇️ Export ${esc(set.region)} Flavors CSV</button>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  ${flavorColumns.map((c) => `<th class="sortable" data-set-idx="${idx}" data-sort-key="${c.key}">${esc(c.label)}${sortArrow(idx, c.key)}</th>`).join("")}
+                </tr>
+              </thead>
+              <tbody>
+                ${sortedRows.map((r) => `
+                  <tr>
+                    <td>${esc(r.name)}</td>
+                    <td>${esc(r.category)}</td>
+                    <td>${esc(r.disk_gib)}</td>
+                    <td>${esc(r.cpu)}</td>
+                    <td>${esc(r.memory)}</td>
+                    <td>${esc(r.internal_bw_gbps)}</td>
+                    <td>${esc(r.ephemeral_disk_gib)}</td>
+                    <td>${esc(r.cost_per_hour)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+      }).join("");
+    }
+
+    async function loadReferences() {
+      const res = await fetch("/api/references/data");
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Failed to load references");
+      }
+
+      const images = Array.isArray(data.images) ? data.images : [];
+      document.getElementById("imagesCount").textContent = images.length.toLocaleString();
+      document.getElementById("imagesSource").textContent = data.images_file
+        ? `Source: ${data.images_file}`
+        : "Source: images/images_3926.csv not found";
+      document.getElementById("imagesList").innerHTML = images.length
+        ? images.map((i) => `<li>${esc(i)}</li>`).join("")
+        : "<li>No images found.</li>";
+
+      referenceData = {
+        images,
+        flavor_sets: Array.isArray(data.flavor_sets) ? data.flavor_sets : [],
+      };
+      renderFlavorSections();
+    }
+
+    document.getElementById("flavorSections").addEventListener("click", (ev) => {
+      const target = ev.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      // Export button
+      const exportIdx = target.getAttribute("data-export-idx");
+      if (exportIdx !== null) {
+        const idx = Number(exportIdx);
+        const set = referenceData.flavor_sets[idx];
+        if (set && Array.isArray(set.rows) && set.rows.length) {
+          const headers = flavorColumns.map(c => c.key);
+          const region = String(set.region || 'flavors').replace(/[^a-z0-9_-]/gi, '_');
+          downloadCSV(`${region}_flavors.csv`, set.rows, headers);
+        }
+        return;
+      }
+
+      // Sort header
+      const key = target.getAttribute("data-sort-key");
+      const idxText = target.getAttribute("data-set-idx");
+      if (!key || idxText === null) return;
+      const idx = Number(idxText);
+      if (!Number.isFinite(idx)) return;
+
+      const prev = flavorSortByIdx[idx];
+      if (!prev || prev.key !== key) {
+        flavorSortByIdx[idx] = { key, dir: "asc" };
+      } else {
+        flavorSortByIdx[idx] = { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      renderFlavorSections();
+    });
+
+    loadReferences().catch((e) => {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        `<div style="padding:10px;color:#ffd6d6;">Failed to load references: ${esc(e.message)}</div>`
+      );
+    });
+
+    document.getElementById('exportImagesBtn').addEventListener('click', () => {
+      const imgs = referenceData.images;
+      if (!imgs || !imgs.length) { alert('No images loaded yet.'); return; }
+      downloadCSV('ospc_images.csv', imgs.map(name => ({ image_name: name })), ['image_name']);
+    });
+  </script>
+</body>
+</html>

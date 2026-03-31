@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {"id": "net_ingress", "type": "network", "label": "IngressNet", "x": 80, "y": 120, "props": {"name": "seg-ingress-net"}},
+    {"id": "sub_ingress", "type": "subnet", "label": "IngressSubnet", "x": 260, "y": 120, "props": {"name": "seg-ingress-subnet", "cidr": "10.140.10.0/24", "gateway_ip": "", "dns_nameserver": "8.8.8.8"}},
+    {"id": "rt_ingress", "type": "router", "label": "IngressRouter", "x": 440, "y": 120, "props": {"name": "seg-ingress-router", "external_network": "PUBLICNET"}},
+
+    {"id": "net_backend", "type": "network", "label": "BackendNet", "x": 80, "y": 300, "props": {"name": "seg-backend-net"}},
+    {"id": "sub_backend", "type": "subnet", "label": "BackendSubnet", "x": 260, "y": 300, "props": {"name": "seg-backend-subnet", "cidr": "10.140.20.0/24", "gateway_ip": "", "dns_nameserver": ""}},
+
+    {"id": "lb_ingress", "type": "load_balancer", "label": "IngressLB", "x": 620, "y": 120, "props": {"name": "seg-ingress-lb", "provider": "amphora", "protocol": "HTTP", "listener_port": "80", "member_port": "8080", "pool_algorithm": "ROUND_ROBIN", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+
+    {"id": "sg_web", "type": "security_group", "label": "WebSG", "x": 960, "y": 120, "props": {"name": "seg-web-sg", "rules_text": "tcp 22 10.140.10.0/24\ntcp 8080 10.140.10.0/24"}},
+    {"id": "vm_web1", "type": "instance", "label": "Web1", "x": 760, "y": 260, "props": {"name": "seg-web-back-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_web2", "type": "instance", "label": "Web2", "x": 900, "y": 260, "props": {"name": "seg-web-back-2", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}}
+  ],
+  "edges": [
+    {"from": "net_ingress", "to": "sub_ingress", "type": "member"},
+    {"from": "rt_ingress", "to": "sub_ingress", "type": "route"},
+    {"from": "rt_ingress", "to": "net_ingress", "type": "gateway"},
+
+    {"from": "net_backend", "to": "sub_backend", "type": "member"},
+
+    {"from": "lb_ingress", "to": "sub_ingress", "type": "member"},
+    {"from": "lb_ingress", "to": "vm_web1", "type": "member"},
+    {"from": "lb_ingress", "to": "vm_web2", "type": "member"},
+
+    {"from": "vm_web1", "to": "net_backend", "type": "member"},
+    {"from": "vm_web2", "to": "net_backend", "type": "member"},
+    {"from": "vm_web1", "to": "sg_web", "type": "member"},
+    {"from": "vm_web2", "to": "sg_web", "type": "member"}
+  ]
+}

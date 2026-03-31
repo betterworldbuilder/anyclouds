@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Shift and Lift of VM OSPC 2 FLEX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+      .batch-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+      .batch-table th { background: rgba(255, 255, 255, 0.1); text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.2); color: #a5b4fc; }
+      .batch-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+      .batch-table tr:hover { background: rgba(255, 255, 255, 0.05); }
+      fieldset.csv-group { border: 1px solid rgba(165,180,252,.2); padding: 15px; border-radius: 8px; margin-bottom: 15px; background: rgba(0,0,0,0.1); }
+      legend.csv-legend { color: #a5b4fc; padding: 0 10px; font-weight: 500; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+    <div class="background-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
+    
+    <div class="app-container">
+        <!-- Unified Header and Topbar Navigation (Future Punk Style) -->
+        <header class="app-header" style="border-bottom: 2px solid #ff00aa; box-shadow: 0 4px 15px rgba(255, 0, 170, 0.4);">
+            <div class="header-left">
+                <div class="brand">
+                    <svg class="brand-icon" style="color: #00ffff; filter: drop-shadow(0 0 5px #00ffff);" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    <span style="color: #ff00aa; font-weight: 800; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 8px #ff00aa, 0 0 20px #ff00aa;">FLEXDEPLOY PLATFORM</span>
+                </div>
+            </div>
+            <nav class="header-nav" style="font-weight: bold; font-family: 'JetBrains Mono', monospace; text-transform: uppercase;">
+                <a href="/csv" style="color: #00ffff; text-shadow: 0 0 5px #00ffff; border: 1px solid transparent; padding: 5px 10px;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg> Stage 1 Discovery</a>
+                <a href="/image_migrator/" class="active" style="color: #ff00aa; text-shadow: 0 0 8px #ff00aa, 0 0 15px #ff00aa; border-bottom: 3px solid #ff00aa; background: rgba(255,0,170,0.1); padding: 5px 10px;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2-9 5 18 3-9h5"></path></svg> Stage 2 Migration</a>
+                <a href="/agent1/" style="color: #00ffff; text-shadow: 0 0 5px #00ffff; border: 1px solid transparent; padding: 5px 10px;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 19 21 12 17 5 21 12 2"></polygon></svg> Stage 3 Deployment</a>
+            </nav>
+        </header>
+
+        <main class="main-content dashboard-layout">
+            <section class="form-section glass-panel">
+                <div class="section-header">
+                    <h2>Direct Shift and Lift of VM (Batch Engine)</h2>
+                    <p>Load your target maps to automatically inject infrastructure specifications and trigger fleet migrations.</p>
+                    
+                    <details style="margin-top: 20px; text-align: left; padding: 15px; background: rgba(0,0,0,0.3); border-left: 4px solid #f43f5e; border-radius: 6px;">
+                        <summary style="font-weight: bold; color: #f43f5e; cursor: pointer; outline: none; display: flex; align-items: center; gap: 8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                            How this tool works
+                        </summary>
+                        <div style="margin-top: 15px; font-size: 0.9rem; color: #cbd5e1; line-height: 1.6;">
+                            <p>The Direct Shift and Lift tool is an automated "Snapshot & Re-deploy" pipeline driven entirely by the <code>ospc2flex_image_migrator.py</code> engine. <strong>It does not alter the live source VM.</strong> Instead, it creates an exact, point-in-time copy and processes that copy.</p>
+                            
+                            <h4 style="color: #a5b4fc; margin: 15px 0 5px; font-size: 1rem;">1. The OSPC Export Phase</h4>
+                            <p style="margin-bottom: 5px;"><strong>Live Snapshot:</strong> The tool connects to the OSPC cloud via its OpenRC token and commands OpenStack to take an instantaneous Snapshot of the live Server Name you selected. Your original VM keeps running uninterrupted.</p>
+                            <p><strong>Local Download:</strong> It waits for the snapshot to transition to an ACTIVE state, then uses Glance to download the massive image file directly onto the local filesystem of your migration server (in a temporary working directory).</p>
+                            
+                            <h4 style="color: #a5b4fc; margin: 15px 0 5px; font-size: 1rem;">2. The Local Conversion Phase</h4>
+                            <p><strong>Format Shifting (QEMU):</strong> Depending on your "Target Format" selection in the UI, the tool takes the downloaded image (usually vhd or raw) and runs it through <code>qemu-img convert</code> to transcode the entire filesystem package into a FLEX-native raw or qcow2 image.</p>
+                            
+                            <h4 style="color: #a5b4fc; margin: 15px 0 5px; font-size: 1rem;">3. The FLEX Import Phase</h4>
+                            <p style="margin-bottom: 5px;"><strong>Glance Upload:</strong> The tool switches context, loading your FLEX OpenRC tokens. It uploads your newly converted image package directly into the FLEX OpenStack Image repository, tagging the visibility (e.g., Private or Shared).</p>
+                            <p><strong>Snapshot Cleanup:</strong> If you checked "Cleanup OSPC Snapshot", the tool logs back into the source OSPC cloud and deletes the temporary snapshot it created in Step 1 to save you storage costs.</p>
+
+                            <h4 style="color: #a5b4fc; margin: 15px 0 5px; font-size: 1rem;">4. The FLEX Deployment Phase</h4>
+                            <p><strong>Auto-Provisioning:</strong> If "Test VM Options" are toggled ON, the tool skips the manual labor and immediately asks the FLEX compute scheduler (nova) to spawn a brand new VM using your uploaded image, applying the Target Flavor extracted from your CSV mapping, and attaching it to your target Network/Keypair.</p>
+
+                            <h4 style="color: #a5b4fc; margin: 15px 0 5px; font-size: 1rem;">5. The In-Flight Healing Phase</h4>
+                            <p style="margin-bottom: 10px;">Because cloud IP addresses and volume UUIDs change between OSPC and FLEX, many VMs will crash during boot if they are severely hardcoded.</p>
+                            <p style="margin-bottom: 5px;"><strong>SSH Repair Injection:</strong> If "Guest Repair Options" are toggled ON, the tool uses your provided SSH Key to tunnel into the newly spawned Test VM in FLEX the second it boots up.</p>
+                            <p><strong>Automated Surgery:</strong> Once inside the guest OS, it:</p>
+                            <ul style="list-style-type: disc; padding-left: 25px; margin-bottom: 10px;">
+                                <li>Strips broken mounts from <code>/etc/fstab</code> so the VM doesn't hang looking for missing OSPC block volumes.</li>
+                                <li>Restructures <code>/etc/netplan</code> or <code>/etc/network/interfaces</code> to force the VM to accept the new FLEX DHCP lease.</li>
+                                <li>Wipes old cloud-init remnants and leftover qemu-guest-agent locks.</li>
+                                <li>Automatically reloads explicitly listed Systemd services (like nginx or apache2) so your web applications come online.</li>
+                            </ul>
+                            
+                            <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); padding: 10px; border-radius: 4px; margin-top: 15px;">
+                                <span style="font-weight: 600; color: #f43f5e;">Simply put:</span> It clones it via a snapshot, shifts the format locally, uploads the clone to the new cloud, boots it up, and runs emergency surgery inside the OS to make sure it survives the transplant.
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- 1. CLOUD CREDENTIALS SECTION -->
+                <div class="config-group">
+                    <div class="group-header">
+                        <h3><span style="width:4px;height:22px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:2px;display:inline-block;margin-right:10px;"></span> Cloud Credentials</h3>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
+
+        <!-- OSPC -->
+        <div>
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
+              <input id="credOspcUsername" type="text" placeholder="e.g. dzng.8294" value="dzng.8294"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">API Key / Password
+              <input id="credOspcApiKey" type="password" placeholder="Rackspace API key"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Account / Project ID
+              <input id="credOspcAccountId" type="text" placeholder="e.g. 1342314"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+          </div>
+        </div>
+
+        <!-- FLEX -->
+        <div>
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Auth URL
+              <input id="credFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
+              <input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
+              <input id="credFlexPassword" type="password" placeholder="FLEX password"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
+              <input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain
+              <input id="credFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Import OpenRC File
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="credOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;font-size:.8rem;color:#94a3b8;" />
+                <button id="credOpenrcImportBtn" type="button"
+                  style="padding:6px 14px;background:linear-gradient(135deg,#4f46e5,#6366f1);border:none;border-radius:6px;color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                  📂 Import OpenRC File
+                </button>
+              </div>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Auto-propagate hint -->
+      <p style="margin:14px 0 0;font-size:.75rem;color:#64748b;font-style:italic;">
+        ✦ OSPC credentials auto-fill the scanner fields below. FLEX credentials are available to Validation (Step 3) and Deploy Generation (Step 4).
+      </p>
+                </div>
+                
+                <script>
+                // ── Credential localStorage keys ──────────────────────────────────────────
+    const CRED_KEYS = {
+      credOspcUsername:  'cred_ospc_username',
+      credOspcApiKey:    'cred_ospc_apikey',
+      credOspcAccountId: 'cred_ospc_accountid',
+      credFlexAuthUrl:   'cred_flex_auth_url',
+      credFlexUsername:  'cred_flex_username',
+      credFlexPassword:  'cred_flex_password',
+      credFlexProjectId: 'cred_flex_project_id',
+      credFlexDomain:    'cred_flex_domain',
+    };
+
+    // Load saved values on page init
+    Object.entries(CRED_KEYS).forEach(([elId, lsKey]) => {
+      const el = document.getElementById(elId);
+      const saved = localStorage.getItem(lsKey);
+      if (el && saved) el.value = saved;
+    });
+
+    // Persist on every change
+    Object.entries(CRED_KEYS).forEach(([elId, lsKey]) => {
+      document.getElementById(elId)?.addEventListener('input', function () {
+        localStorage.setItem(lsKey, this.value);
+      });
+    });
+
+    // ── OpenRC file parser → FLEX fields + localStorage ───────────────────────
+    document.getElementById('credOpenrcImportBtn')?.addEventListener('click', function() {
+      const file = document.getElementById('credOpenrcFile')?.files?.[0];
+      if (!file) { alert('Please select an OpenRC file first.'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result.replace(/\r\n/g, '\n');  // normalise CRLF
+
+        // Robust line-by-line parser — handles quoted/unquoted, with or without 'export'
+        function parseOpenrc(src) {
+          const map = {};
+          src.split('\n').forEach(line => {
+            // Strip leading whitespace and ignore comments
+            const l = line.trim();
+            if (!l || l.startsWith('#')) return;
+            // Match:  [export] KEY=VALUE  (value may be quoted or bare, may have trailing comment)
+            const m = l.match(/^(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)(?:\s+#.*)?$/);
+            if (!m) return;
+            let val = m[2].trim();
+            // Strip wrapping single or double quotes
+            if ((val.startsWith('"') && val.endsWith('"')) ||
+                (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            // Skip shell subshell values like $(...)
+            if (val.startsWith('$(')) return;
+            if (val) map[m[1]] = val;
+          });
+          return map;
+        }
+
+        const env = parseOpenrc(text);
+
+        const vals = {
+          credFlexAuthUrl:   env['OS_AUTH_URL']          || '',
+          credFlexUsername:  env['OS_USERNAME']           || '',
+          credFlexPassword:  env['OS_PASSWORD']           || '',
+          credFlexProjectId: env['OS_PROJECT_ID']         || env['OS_TENANT_ID'] || '',
+          credFlexDomain:    env['OS_USER_DOMAIN_NAME']   || env['OS_DOMAIN_NAME'] || env['OS_PROJECT_DOMAIN_NAME'] || 'rackspace_cloud_domain',
+        };
+
+        let filled = 0;
+        Object.entries(vals).forEach(([id, val]) => {
+          if (!val) return;
+          const el = document.getElementById(id);
+          if (el) { el.value = val; el.dispatchEvent(new Event('input')); filled++; }
+          if (CRED_KEYS[id]) localStorage.setItem(CRED_KEYS[id], val);
+        });
+
+        // Show a quick toast
+        const btn = document.getElementById('credOpenrcImportBtn');
+        const orig = btn.textContent;
+        btn.textContent = filled > 0 ? `✅ Filled ${filled} fields` : '⚠️ No values found';
+        btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#b45309,#f59e0b)';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 3000);
+      };
+      reader.readAsText(file);
+    });
+                </script>
+
+                <hr class="divider">
+
+                <!-- 2. DATA IMPORT & SELECTION -->
+                <div class="config-group">
+                    <div class="group-header">
+                        <h3>Batch Target Selection Maps</h3>
+                    </div>
+                    <fieldset class="csv-group">
+                        <legend class="csv-legend">Flavor Mapper Import</legend>
+                        <div class="form-control mb-3">
+                            <label for="flavor_csv_file">Upload `_flavormap.csv`</label>
+                            <input type="file" id="flavor_csv_file" accept=".csv" class="mb-2">
+                        </div>
+                        <div style="overflow-x: auto; max-height: 300px;">
+                            <table class="batch-table" id="flavor-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px"><input type="checkbox" id="checkAllFlavors"></th>
+                                        <th>Source Server (OSPC)</th>
+                                        <th>Target Server (FLEX)</th>
+                                        <th>Target Flavor (FLEX)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="4" style="text-align: center; font-style: italic;">Upload a flavormap.csv to populate queue...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="csv-group">
+                        <legend class="csv-legend">Block Storage Mapper Import</legend>
+                        <div class="form-control mb-3">
+                            <label for="block_csv_file">Upload `_blockmap.csv`</label>
+                            <input type="file" id="block_csv_file" accept=".csv" class="mb-2">
+                        </div>
+                        <div style="overflow-x: auto; max-height: 200px;">
+                            <table class="batch-table" id="block-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px"><input type="checkbox" id="checkAllBlocks"></th>
+                                        <th>Source Volume</th>
+                                        <th>Target Server Attached To</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="3" style="text-align: center; font-style: italic;">Upload a blockmap.csv to populate queue...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </fieldset>
+                </div>
+
+                <hr class="divider">
+
+                <!-- 3. GLOBAL MIGRATION SETTINGS -->
+                <form id="batch-mig-form" novalidate onsubmit="return false;">
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>Global Migration Settings</h3>
+                        </div>
+                        
+                        <div class="form-grid mb-3">
+                            <div class="form-control">
+                                <label for="target_format">Target Format</label>
+                                <select id="target_format" name="target_format">
+                                    <option value="qcow2">qcow2</option>
+                                    <option value="raw">raw</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="visibility">Visibility</label>
+                                <select id="visibility" name="visibility">
+                                    <option value="private">Private</option>
+                                    <option value="public">Public</option>
+                                    <option value="shared">Shared</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <!-- SNAPSHOT STORAGE LOCATION -->
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>SAVE VM Snapshot Location</h3>
+                        </div>
+                        <div class="form-control mb-3">
+                            <label for="storage_preset">Select Storage Target</label>
+                            <select id="storage_preset" style="width: 100%; border: 1px solid rgba(165,180,252,0.3); background: rgba(0,0,0,0.2); color: white; padding: 12px; border-radius: 4px;" onchange="updateStorageInput(this.value)">
+                                <option value="/home/dzoan/snapshotbackup">1) Local WSL folder (/home/dzoan/snapshotbackup)</option>
+                                <option value="/mnt/c/Users/dzoan/Downloads/OSPC_Exports">2) Windows Local Folder (Downloads)</option>
+                                <option value="/mnt/c/Users/dzoan/OneDrive - Company">3) Microsoft Shared Env / OneDrive</option>
+                                <option value="/mnt/cloud_bucket">4) Mounted Cloud Storage (AWS/Swift/S3)</option>
+                                <option value="">Custom Mount Path (Enter manually below)</option>
+                            </select>
+                        </div>
+                        <div class="form-control mb-3" id="workdir_container" style="background: rgba(99, 102, 241, 0.05); padding: 15px; border-radius: 6px; border: 1px dashed rgba(165,180,252,0.4);">
+                            <label id="workdir_label" for="workdir" style="color: #00ffff; font-weight: bold;">💻 Internal Linux Workspace</label>
+                            <input type="text" id="workdir" name="workdir" value="/home/dzoan/snapshotbackup" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid #4f46e5; color: #fff; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;">
+                            <p id="workdir_help" class="help-text" style="margin-top: 10px;">This path saves the massive snapshot directly into the isolated Linux filesystem.</p>
+                        </div>
+
+                        <script>
+                            function updateStorageInput(val) {
+                                const input = document.getElementById('workdir');
+                                const label = document.getElementById('workdir_label');
+                                const help = document.getElementById('workdir_help');
+                                
+                                input.value = val;
+                                
+                                if (val.includes('/home/')) {
+                                    label.textContent = "💻 Internal Linux Workspace";
+                                    help.textContent = "This path saves the massive snapshot directly into the isolated Linux filesystem.";
+                                } else if (val.includes('Downloads')) {
+                                    label.textContent = "🪟 Windows Translation Path";
+                                    help.textContent = "Notice the /mnt/c/ prefix. This tells Linux to cleanly pipe the snapshot over to your Windows C: Drive.";
+                                } else if (val.includes('OneDrive')) {
+                                    label.textContent = "☁️ Microsoft OneDrive Sync Path";
+                                    help.textContent = "This drops the file into your local OneDrive folder, prompting your Windows agent to silently sync it up to the MS cloud.";
+                                } else if (val.includes('cloud_bucket')) {
+                                    label.textContent = "🌐 External Network Mount";
+                                    help.textContent = "Ensure this external bucket is actively mounted via rclone or s3fs before starting the migration.";
+                                } else {
+                                    label.textContent = "🔧 Custom Manual Path";
+                                    help.textContent = "Enter any raw linux path. Must be an absolute path starting with a forward-slash (/).";
+                                    input.focus();
+                                }
+                            }
+                        </script>
+                        <div style="margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.2); border-left: 4px solid #6366f1; border-radius: 4px; font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 25px;">
+                            <strong style="color: #a5b4fc;">Local Disk on the Operator Laptop:</strong> You just type a folder path on your machine into the UI. The script will download the massive OSPC image locally, convert it utilizing your laptop's CPU, and upload it to FLEX.<br/><br/>
+                            <strong style="color: #a5b4fc;">Shared Drive Storage (NFS, SMB, Jumpserver share):</strong> Over in your Linux terminal, you mount your shared NAS drive or Jumpserver to a folder (e.g., <code>sudo mount -t nfs 10.0.0.5:/shared /mnt/jumpserver</code>). Then, you just type <code>/mnt/jumpserver</code> into the UI! The Python engine is completely tricked into downloading and converting the image straight across the network bridge onto the Jumpserver's storage disks.<br/><br/>
+                            <strong style="color: #a5b4fc;">Cloud Storage (S3, Swift, Rackspace Cloud Files):</strong> You use a tool like <code>s3fs</code> or <code>rclone</code> to mount your remote cloud bucket directly to your laptop. The migrator pipes the 100GB export file directly through the internet shell into the Cloud Storage bucket without filling up your laptop's hard drive!
+                        </div>
+
+                        <div class="checkbox-grid">
+                            <div class="checkbox-group compact">
+                                <input type="checkbox" id="dry_run" name="dry_run">
+                                <label for="dry_run">Dry Run (Print actions only)</label>
+                            </div>
+                            <div class="checkbox-group compact">
+                                <input type="checkbox" id="cleanup_snapshot" name="cleanup_snapshot">
+                                <label for="cleanup_snapshot">Cleanup OSPC Snapshot</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <!-- TEST VM OPTIONS -->
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>Global Test VM Deploy Options</h3>
+                            <label class="toggle-switch accent-green">
+                                <input type="checkbox" id="boot_test_vm" checked name="boot_test_vm" onchange="document.getElementById('test-vm-fields').classList.toggle('collapsed')">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="test-vm-fields" class="collapsable">
+                            <div class="form-grid">
+                                <div class="form-control">
+                                    <label>FLEX Flavor</label>
+                                    <input type="text" disabled placeholder="[AUTO-FILLED BY MAPPER]">
+                                </div>
+                                <div class="form-control">
+                                    <label>Test Server Name</label>
+                                    <input type="text" disabled placeholder="[AUTO-APPENDED '-lift-test']">
+                                </div>
+                                <div class="form-control">
+                                    <label for="flex_network_id">FLEX Network ID *</label>
+                                    <input type="text" id="flex_network_id" name="flex_network_id" placeholder="UUID">
+                                </div>
+                                <div class="form-control">
+                                    <label for="flex_key_name">FLEX Keypair Name *</label>
+                                    <input type="text" id="flex_key_name" name="flex_key_name" placeholder="my-key">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <!-- GUEST REPAIR OPTIONS -->
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>Guest Repair Options</h3>
+                            <label class="toggle-switch accent-purple">
+                                <input type="checkbox" id="repair_guest" name="repair_guest" onchange="document.getElementById('guest-repair-fields').classList.toggle('collapsed')">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="guest-repair-fields" class="collapsable collapsed">
+                            <div class="form-grid mb-3">
+                                <div class="form-control">
+                                    <label for="ssh_key_path">SSH Key Path *</label>
+                                    <input type="text" id="ssh_key_path" name="ssh_key_path" placeholder="~/.ssh/id_rsa">
+                                </div>
+                                <div class="form-control">
+                                    <label for="ssh_user">SSH User</label>
+                                    <input type="text" id="ssh_user" name="ssh_user" value="ubuntu">
+                                </div>
+                                <div class="form-control full-width">
+                                    <label for="systemd_services">Systemd Services to Restart</label>
+                                    <input type="text" id="systemd_services" name="systemd_services" placeholder="nginx,myapp.service">
+                                </div>
+                            </div>
+                            
+                            <div class="checkbox-grid">
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="fix_fstab" name="fix_fstab">
+                                    <label for="fix_fstab">Fix /etc/fstab</label>
+                                </div>
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="fix_netplan" name="fix_netplan">
+                                    <label for="fix_netplan">Write Simple Netplan</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-primary" id="start-batch-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            Start Batch Migration Task
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- EXECUTION TERMINAL -->
+            <section class="console-section glass-panel">
+                <div class="console-header">
+                    <div class="window-controls">
+                        <span class="control red"></span><span class="control yellow"></span><span class="control green"></span>
+                    </div>
+                    <span class="console-title">Execution Terminal (Batch Processor)</span>
+                    <button class="icon-btn" id="clear-log-btn" title="Clear Console" onclick="document.getElementById('console-output').innerHTML=''">🗑️</button>
+                </div>
+                <div class="console-body" id="console-output">
+                    <div class="log-line system">Waiting for batch execution...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- BATCH PROCESSING JS SCRIPT -->
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        // --- CSV Parsing Logic ---
+        document.getElementById('flavor_csv_file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            Papa.parse(file, {
+                header: true, skipEmptyLines: true,
+                complete: function(results) {
+                    const tbody = document.querySelector('#flavor-table tbody');
+                    tbody.innerHTML = '';
+                    results.data.forEach((row, i) => {
+                        const sname = row.source_server_name || row.server_name || "Unknown";
+                        const tname = row.target_server_name || row.server_name || sname;
+                        const tflavor = row.target_flavor_name || row.target_flavor_id || "Unknown";
+                        if(sname === 'Unknown') return; // skip empty/invalid rows
+                        
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><input type="checkbox" class="vm-checkbox" data-source-name="${sname}" data-target-name="${tname}" data-flavor="${tflavor}"></td>
+                                <td>${sname}</td>
+                                <td>${tname}</td>
+                                <td><span class="pill status-running" style="padding:2px 8px;font-size:0.75rem">${tflavor}</span></td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+        });
+
+        document.getElementById('block_csv_file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            Papa.parse(file, {
+                header: true, skipEmptyLines: true,
+                complete: function(results) {
+                    const tbody = document.querySelector('#block-table tbody');
+                    tbody.innerHTML = '';
+                    results.data.forEach(row => {
+                        const sname = row.source_server_name || row.source_volume_id || "Unknown";
+                        const tname = row.target_server_name || "Unknown";
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><input type="checkbox" class="vol-checkbox" data-vol="${sname}"></td>
+                                <td>${sname}</td>
+                                <td>${tname}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+        });
+
+        // Toggle All logic
+        document.getElementById('checkAllFlavors').addEventListener('change', e => {
+            document.querySelectorAll('.vm-checkbox').forEach(cb => cb.checked = e.target.checked);
+        });
+        document.getElementById('checkAllBlocks').addEventListener('change', e => {
+            document.querySelectorAll('.vol-checkbox').forEach(cb => cb.checked = e.target.checked);
+        });
+
+        // --- Batch Execution Logic ---
+        const startBtn = document.getElementById('start-batch-btn');
+        const consoleOut = document.getElementById('console-output');
+
+        function appendLog(text, type='info') {
+            const el = document.createElement('div');
+            el.className = `log-line ${type}`;
+            el.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            consoleOut.appendChild(el);
+            consoleOut.scrollTop = consoleOut.scrollHeight;
+        }
+
+        startBtn.addEventListener('click', async () => {
+            const checkedVMs = document.querySelectorAll('.vm-checkbox:checked');
+            if (checkedVMs.length === 0) {
+                alert("Please select at least one VM from the Flavor Mapper table.");
+                return;
+            }
+            
+
+            startBtn.disabled = true;
+            appendLog(`=== Starting Batch Migration of ${checkedVMs.length} VMs ===`, 'system');
+
+            // Gather global form data
+            const payloadTemplate = {
+                ospc_username: document.getElementById('credOspcUsername') ? document.getElementById('credOspcUsername').value : '',
+                ospc_apikey: document.getElementById('credOspcApiKey') ? document.getElementById('credOspcApiKey').value : '',
+                ospc_account_id: document.getElementById('credOspcAccountId') ? document.getElementById('credOspcAccountId').value : '',
+                flex_auth_url: document.getElementById('credFlexAuthUrl') ? document.getElementById('credFlexAuthUrl').value : '',
+                flex_username: document.getElementById('credFlexUsername') ? document.getElementById('credFlexUsername').value : '',
+                flex_password: document.getElementById('credFlexPassword') ? document.getElementById('credFlexPassword').value : '',
+                flex_project_id: document.getElementById('credFlexProjectId') ? document.getElementById('credFlexProjectId').value : '',
+                flex_domain: document.getElementById('credFlexDomain') ? document.getElementById('credFlexDomain').value : '',
+                workdir: document.getElementById('workdir').value,
+                target_format: document.getElementById('target_format').value,
+                visibility: document.getElementById('visibility').value,
+                dry_run: document.getElementById('dry_run').checked,
+                cleanup_snapshot: document.getElementById('cleanup_snapshot').checked,
+                boot_test_vm: document.getElementById('boot_test_vm').checked,
+                flex_network_id: document.getElementById('flex_network_id').value,
+                flex_key_name: document.getElementById('flex_key_name').value,
+                repair_guest: document.getElementById('repair_guest').checked,
+                ssh_key_path: document.getElementById('ssh_key_path').value,
+                ssh_user: document.getElementById('ssh_user').value,
+                systemd_services: document.getElementById('systemd_services').value,
+                fix_fstab: document.getElementById('fix_fstab').checked,
+                fix_netplan: document.getElementById('fix_netplan').checked
+            };
+
+            for (let i = 0; i < checkedVMs.length; i++) {
+                const cb = checkedVMs[i];
+                const sName = cb.dataset.sourceName;
+                const tName = cb.dataset.targetName;
+                const flavor = cb.dataset.flavor;
+                
+                appendLog(`► BATCH [${i+1}/${checkedVMs.length}]: Dispatching VM '${sName}' -> FLEX '${tName}' with flavor '${flavor}'...`, 'system');
+
+                // Clone payload and inject VM specifics
+                const payload = Object.assign({}, payloadTemplate);
+                payload.server_name = sName;
+                payload.flex_flavor = flavor;
+                payload.test_server_name = tName + "-lift-test";
+                
+                let sseSource = null;
+                
+                try {
+                    // Start SSE streaming connection first
+                    const uuid = Math.random().toString(36).substring(7);
+                    sseSource = new EventSource('/api/image_migrator/stream');
+                    
+                    // Promise to wait for the SSE stream to cleanly finish
+                    const streamDone = new Promise((resolve, reject) => {
+                        sseSource.onmessage = function(e) {
+                            try {
+                                const data = JSON.parse(e.data);
+                                if (data.status === "DONE" || data.status === "ERROR") {
+                                    sseSource.close();
+                                    resolve(data);
+                                } else if (data.log) {
+                                    appendLog(`[VM: ${sName}] ` + data.log);
+                                }
+                            } catch(err) {
+                                appendLog(`[VM: ${sName}] ` + e.data);
+                            }
+                        };
+                        sseSource.onerror = function() {
+                            sseSource.close();
+                            resolve({status: "DONE"});
+                        };
+                    });
+
+                    // Trigger the background worker run
+                    await fetch('/api/image_migrator/run', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    // Wait for background worker to flush stream
+                    await streamDone;
+                    appendLog(`✔ Finished processing VM: ${sName}`, 'system');
+
+                } catch (e) {
+                    appendLog(`✖ FAILED processing VM ${sName}: ${e.message}`, 'error');
+                } finally {
+                    if(sseSource) sseSource.close();
+                }
+            }
+            appendLog("=== Batch Migration Complete ===", 'system');
+            startBtn.disabled = false;
+        });
+    });
+    </script>
+</body>
+</html>

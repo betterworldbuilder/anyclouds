@@ -1,0 +1,5 @@
+Starting Rollback Phase
+Removing HAProxy and restoring 100% traffic to local OSPC node
+ssh: Could not resolve hostname unknown_ip: Temporary failure in name resolution
+Removing HAProxy and restoring 100% traffic to local OSPC node
+ssh: Could not resolve hostname unknown_ip: Temporary failure in name resolution

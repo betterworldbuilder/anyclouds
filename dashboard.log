@@ -1,0 +1,36 @@
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5001
+Press CTRL+C to quit
+127.0.0.1 - - [31/Mar/2026 23:53:51] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /run/ HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /references/ HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /dashboard/ HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /image_migrator/ HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /designer/ HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /agent1/ HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/tracker/list HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /migrate/ HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /static/app.js?v=5 HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /static/style.css HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /dashboard/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /dashboard/app.js HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /static/designer.js HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/references/data HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /static/style.css HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /static/style.css HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /static/app.js?v=8 HTTP/1.1" 304 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/topology/list HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/agent1/inventory/files HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/files HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/files HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/topology/openrc-files HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:53] "GET /api/data/runbook-ips HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:54] "GET /api/files HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:54] "GET /api/dashboard/csv-files HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:54] "GET /api/dashboard/csv-content/1342314_overview.csv HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:54] "GET /api/dashboard/csv-content/1342314_flavormap.csv HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:55] "GET /api/dashboard/csv-content/1342314_blockmap.csv HTTP/1.1" 200 -
+127.0.0.1 - - [31/Mar/2026 23:53:55] "GET /api/dashboard/csv-content/1342314_lbmap.csv HTTP/1.1" 200 -

@@ -1,0 +1,854 @@
+{
+  "nodes": [
+    {
+      "id": "script_instance_1",
+      "type": "instance",
+      "label": "ospc-jumpHost",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 24.04",
+        "key_name": "ospc2flex",
+        "name": "ospc-jumpHost",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_2",
+      "type": "instance",
+      "label": "u24-postgresl",
+      "x": 838.5,
+      "y": 170.5,
+      "props": {
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 24.04",
+        "key_name": "ospc2flex",
+        "name": "u24-postgresl",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_3",
+      "type": "instance",
+      "label": "u24-FrontEnd",
+      "x": 838.5,
+      "y": 30.5,
+      "props": {
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 24.04",
+        "key_name": "ospc2flex",
+        "name": "u24-FrontEnd",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_4",
+      "type": "instance",
+      "label": "php-ospc",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.4.4",
+        "floating_network": "PUBLICNET",
+        "image": "Rocky Linux 8",
+        "key_name": "ospc2flex",
+        "name": "php-ospc",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_5",
+      "type": "instance",
+      "label": "Windows Server 2019Re",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "j63I89kTd4FTKs",
+        "admin_user": "Administrator",
+        "auth_mode": "windows_password",
+        "flavor": "gp.5.2.4",
+        "floating_network": "PUBLICNET",
+        "image": "Windows Server 2019",
+        "name": "Windows Server 2019Re",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_6",
+      "type": "instance",
+      "label": "win2019websql2019",
+      "x": 838.5,
+      "y": 350.5,
+      "props": {
+        "admin_password": "fcFx2Z11DeggET",
+        "admin_user": "Administrator",
+        "auth_mode": "windows_password",
+        "flavor": "gp.5.2.4",
+        "floating_network": "PUBLICNET",
+        "image": "Windows Server 2019 with SQL 2019 Web",
+        "name": "win2019websql2019",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_7",
+      "type": "instance",
+      "label": "Windows Server 2016 + SQL Server 2019",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "UL8SdLBWz5WIHB",
+        "admin_user": "Administrator",
+        "auth_mode": "windows_password",
+        "flavor": "gp.5.2.4",
+        "floating_network": "PUBLICNET",
+        "image": "Windows Server 2016",
+        "name": "Windows Server 2016 + SQL Server 2019",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_instance_8",
+      "type": "instance",
+      "label": "u24Backend",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 24.04",
+        "key_name": "ospc2flex",
+        "name": "u24Backend",
+        "needs_floating_ip": true
+      }
+    },
+    {
+      "id": "script_security_group_9",
+      "type": "security_group",
+      "label": "default",
+      "x": 1018.5,
+      "y": 120.5,
+      "props": {
+        "name": "default",
+        "rules": []
+      }
+    },
+    {
+      "id": "script_network_10",
+      "type": "network",
+      "label": "tenant-net",
+      "x": 478.5,
+      "y": 210.5,
+      "props": {
+        "name": "tenant-net"
+      }
+    },
+    {
+      "id": "script_subnet_11",
+      "type": "subnet",
+      "label": "tenant-subnet",
+      "x": 478.5,
+      "y": 120.5,
+      "props": {
+        "cidr": "10.60.0.0/24",
+        "name": "tenant-subnet"
+      }
+    },
+    {
+      "id": "script_router_12",
+      "type": "router",
+      "label": "tenant-router",
+      "x": 478.5,
+      "y": 30.5,
+      "props": {
+        "external_network": "PUBLICNET",
+        "name": "tenant-router"
+      }
+    },
+    {
+      "id": "script_network_13",
+      "type": "network",
+      "label": "PUBLICNET",
+      "x": 298.5,
+      "y": 30.5,
+      "props": {
+        "name": "PUBLICNET"
+      }
+    },
+    {
+      "id": "script_instance_14",
+      "type": "instance",
+      "label": "HA percona 8-02",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA percona 8-02",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_15",
+      "type": "instance",
+      "label": "drupal",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "drupal",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_16",
+      "type": "instance",
+      "label": "HA-Mysql8-01",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA-Mysql8-01",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_17",
+      "type": "instance",
+      "label": "HA-mariaDB-02",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA-mariaDB-02",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_18",
+      "type": "instance",
+      "label": "php-ospc_Database",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "php-ospc_Database",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_19",
+      "type": "instance",
+      "label": "HA percona 8-03",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA percona 8-03",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_20",
+      "type": "instance",
+      "label": "HA-mariaDB-03",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA-mariaDB-03",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_21",
+      "type": "instance",
+      "label": "Stack-05_Database",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "Stack-05_Database",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_22",
+      "type": "instance",
+      "label": "sql",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "sql",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_23",
+      "type": "instance",
+      "label": "HA-Mysql8-02",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA-Mysql8-02",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_24",
+      "type": "instance",
+      "label": "HA-mariaDB-01",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA-mariaDB-01",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_25",
+      "type": "instance",
+      "label": "Instance-05-03",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "Instance-05-03",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_26",
+      "type": "instance",
+      "label": "HA percona 8-01",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA percona 8-01",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_27",
+      "type": "instance",
+      "label": "Instance-05-02",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "Instance-05-02",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_instance_28",
+      "type": "instance",
+      "label": "HA-Mysql8-03",
+      "x": 838.5,
+      "y": 461.5,
+      "props": {
+        "admin_password": "",
+        "admin_user": "Administrator",
+        "auth_mode": "ssh_key",
+        "flavor": "gp.5.2.2",
+        "floating_network": "PUBLICNET",
+        "image": "Ubuntu 22.04",
+        "key_name": "ospc2flex",
+        "name": "HA-Mysql8-03",
+        "needs_floating_ip": false,
+        "user_data": ""
+      }
+    },
+    {
+      "id": "script_volume_29",
+      "type": "volume",
+      "label": "data-u24-postgresl-1",
+      "x": 1198.5,
+      "y": 210.5,
+      "props": {
+        "name": "data-u24-postgresl-1",
+        "size_gb": "75",
+        "source_image": "",
+        "volume_type": "Performance"
+      }
+    },
+    {
+      "id": "script_volume_30",
+      "type": "volume",
+      "label": "data-windows-server-2016-sql-server-2019-1",
+      "x": 1018.5,
+      "y": 461.5,
+      "props": {
+        "name": "data-windows-server-2016-sql-server-2019-1",
+        "size_gb": "50",
+        "volume_type": "Performance"
+      }
+    },
+    {
+      "id": "script_volume_31",
+      "type": "volume",
+      "label": "data-u24-frontend-1",
+      "x": 1198.5,
+      "y": 30.5,
+      "props": {
+        "name": "data-u24-frontend-1",
+        "size_gb": "75",
+        "source_image": "",
+        "volume_type": "Performance"
+      }
+    },
+    {
+      "id": "script_volume_32",
+      "type": "volume",
+      "label": "data-u24-frontend-2",
+      "x": 1198.5,
+      "y": 120.5,
+      "props": {
+        "name": "data-u24-frontend-2",
+        "size_gb": "75",
+        "source_image": "",
+        "volume_type": "Performance"
+      }
+    },
+    {
+      "id": "script_volume_33",
+      "type": "volume",
+      "label": "data-windows-server-2019re-1",
+      "x": 1198.5,
+      "y": 390.5,
+      "props": {
+        "name": "data-windows-server-2019re-1",
+        "size_gb": "75",
+        "source_image": "",
+        "volume_type": "Performance"
+      }
+    },
+    {
+      "id": "script_volume_34",
+      "type": "volume",
+      "label": "data-win2019websql2019-1",
+      "x": 1198.5,
+      "y": 300.5,
+      "props": {
+        "name": "data-win2019websql2019-1",
+        "size_gb": "75",
+        "source_image": "",
+        "volume_type": "Performance"
+      }
+    },
+    {
+      "id": "script_load_balancer_35",
+      "type": "load_balancer",
+      "label": "frontend- Load-Balancer-01",
+      "x": 658.5,
+      "y": 30.5,
+      "props": {
+        "floating_network": "PUBLICNET",
+        "listener_port": "80",
+        "member_port": "80",
+        "name": "frontend- Load-Balancer-01",
+        "needs_floating_ip": false,
+        "pool_algorithm": "LEAST_CONNECTIONS",
+        "protocol": "HTTP",
+        "provider": "amphora"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "script_subnet_11",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_router_12",
+      "to": "script_network_13",
+      "type": "gateway"
+    },
+    {
+      "from": "script_router_12",
+      "to": "script_subnet_11",
+      "type": "route"
+    },
+    {
+      "from": "script_instance_1",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_1",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_2",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_2",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_3",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_3",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_4",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_4",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_5",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_5",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_6",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_6",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_7",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_7",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_8",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_8",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_14",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_14",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_15",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_15",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_16",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_16",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_17",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_17",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_18",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_18",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_19",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_19",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_20",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_20",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_21",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_21",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_22",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_22",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_23",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_23",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_24",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_24",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_25",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_25",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_26",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_26",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_27",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_27",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_28",
+      "to": "script_network_10",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_28",
+      "to": "script_security_group_9",
+      "type": "member"
+    },
+    {
+      "from": "script_instance_2",
+      "to": "script_volume_30",
+      "type": "attach"
+    },
+    {
+      "from": "script_instance_3",
+      "to": "script_volume_30",
+      "type": "attach"
+    },
+    {
+      "from": "script_instance_5",
+      "to": "script_volume_30",
+      "type": "attach"
+    },
+    {
+      "from": "script_instance_6",
+      "to": "script_volume_30",
+      "type": "attach"
+    },
+    {
+      "from": "script_instance_7",
+      "to": "script_volume_30",
+      "type": "attach"
+    },
+    {
+      "from": "script_load_balancer_35",
+      "to": "script_subnet_11",
+      "type": "member"
+    },
+    {
+      "from": "script_load_balancer_35",
+      "to": "script_instance_3",
+      "type": "member"
+    }
+  ]
+}

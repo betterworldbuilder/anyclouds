@@ -1,0 +1,123 @@
+{
+  "nodes": [
+    {
+      "id": "network_1",
+      "type": "network",
+      "label": "Network-1",
+      "x": 120,
+      "y": 120,
+      "props": {
+        "name": "demo-net"
+      }
+    },
+    {
+      "id": "subnet_1",
+      "type": "subnet",
+      "label": "Subnet-1",
+      "x": 320,
+      "y": 120,
+      "props": {
+        "name": "demo-subnet",
+        "cidr": "10.60.0.0/24",
+        "gateway_ip": "",
+        "dns_nameserver": "8.8.8.8"
+      }
+    },
+    {
+      "id": "router_1",
+      "type": "router",
+      "label": "Router-1",
+      "x": 520,
+      "y": 120,
+      "props": {
+        "name": "demo-router",
+        "external_network": "PUBLICNET"
+      }
+    },
+    {
+      "id": "security_group_1",
+      "type": "security_group",
+      "label": "SG-1",
+      "x": 320,
+      "y": 300,
+      "props": {
+        "name": "demo-sg",
+        "rules_text": "tcp 22 0.0.0.0/0\ntcp 80 0.0.0.0/0\ntcp 443 0.0.0.0/0",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "port": "22",
+            "remote_ip": "0.0.0.0/0"
+          },
+          {
+            "protocol": "tcp",
+            "port": "80",
+            "remote_ip": "0.0.0.0/0"
+          },
+          {
+            "protocol": "tcp",
+            "port": "443",
+            "remote_ip": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "instance_1",
+      "type": "instance",
+      "label": "Instance-1",
+      "x": 120,
+      "y": 320,
+      "props": {
+        "name": "demo-vm-1",
+        "flavor": "gp.5.4.4",
+        "image": "Ubuntu 22.04",
+        "key_name": "my-keypair"
+      }
+    },
+    {
+      "id": "volume_1",
+      "type": "volume",
+      "label": "Volume-1",
+      "x": 520,
+      "y": 320,
+      "props": {
+        "name": "demo-data-vol-1",
+        "size_gb": "50",
+        "volume_type": "Performance"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "network_1",
+      "to": "subnet_1",
+      "type": "member"
+    },
+    {
+      "from": "router_1",
+      "to": "subnet_1",
+      "type": "route"
+    },
+    {
+      "from": "router_1",
+      "to": "network_1",
+      "type": "gateway"
+    },
+    {
+      "from": "instance_1",
+      "to": "network_1",
+      "type": "member"
+    },
+    {
+      "from": "instance_1",
+      "to": "security_group_1",
+      "type": "member"
+    },
+    {
+      "from": "volume_1",
+      "to": "instance_1",
+      "type": "attach"
+    }
+  ]
+}
