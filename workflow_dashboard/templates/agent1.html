@@ -167,7 +167,13 @@
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">FLEX Server & DB Credentials</div></h2>
                     <div class="form-group"><label>SSH User</label><input type="text" id="flex_ssh_user" value="ubuntu" required></div>
-                    
+                    <div class="form-group">
+                        <label style="display:flex; align-items:center; gap:8px;">🔑 FLEX Key Pair Name
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:400;">(resolves to ~/.ssh/&lt;name&gt;.pem)</span>
+                        </label>
+                        <input type="text" id="flex_keypair_name" placeholder="e.g. my-flex-keypair" style="font-family:'Fira Code',monospace;">
+                    </div>
+
                     <div class="form-group">
                         <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                             <label>Use local SSH key path or paste Private Key</label>
@@ -177,7 +183,7 @@
                                 <button type="button" onclick="savePemKey('flex_ssh_key', 'flex')" class="secondary" style="font-size:0.75rem; padding: 3px 8px; border-radius:6px; border:1px solid #10b981; background: rgba(16,185,129,0.1); color: #6ee7b7; cursor:pointer; margin-bottom: 4px;">💾 Save .pem</button>
                             </div>
                         </div>
-                        <textarea id="flex_ssh_key" placeholder="Paste -----BEGIN... or $HOME/.ssh/id_rsa">$HOME/.ssh/id_rsa</textarea>
+                        <textarea id="flex_ssh_key" placeholder="Paste -----BEGIN... or /home/dzoan/.ssh/id_rsa">/home/dzoan/.ssh/id_rsa</textarea>
                     </div>
 
                     <div class="form-group"><label>Database Name</label><input type="text" id="flex_db_name" value="pocdb" required></div>
@@ -446,51 +452,12 @@
                         </tr></thead>
                         <tbody id="ospc-flex-match-body"></tbody>
                     </table>
-                    <div style="margin-top: 12px; text-align: right;">
-                        <button type="button" onclick="autoFillFlexIPs()" style="padding: 8px 18px; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">⚡ Auto-Fill FLEX Target IPs in Stage 1</button>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ══════ STAGE 1.1: SERVER OS IDENTIFICATION ══════ -->
-    <div class="panel" style="margin-bottom: 30px; border-color: #818cf8;">
-        <h2 class="section-title"><div class="section-title-wrapper">Stage 1.1: Server & DB OS Identification</div></h2>
-        <p style="color: var(--text-muted); margin-bottom: 15px;">Quick view of each server's IP and OS type. Auto-populated from Discovery results above.</p>
-        <div style="overflow-x: auto;">
-            <table class="grid-table" style="width: 100%; text-align: left; border-collapse: collapse;">
-                <thead><tr style="border-bottom: 2px solid var(--border);">
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Server Name</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">IP Address</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">OS</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Type</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Status</th>
-                </tr></thead>
-                <tbody id="os-scan-body"></tbody>
-            </table>
-        </div>
-    </div>
 
-    <!-- ══════ STAGE 1.2: PER-SERVER CREDENTIAL PROFILES ══════ -->
-    <div class="panel" style="margin-bottom: 30px; border-color: #f59e0b;">
-        <h2 class="section-title"><div class="section-title-wrapper">Stage 1.2: Per-Server Credential Profiles</div></h2>
-        <p style="color: var(--text-muted); margin-bottom: 15px;">Each discovered server/DB gets its own login credential, pre-filled by OS type.</p>
-        <div style="overflow-x: auto;">
-            <table class="grid-table" style="width: 100%; text-align: left; border-collapse: collapse;">
-                <thead><tr style="border-bottom: 2px solid var(--border);">
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Server</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">IP</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">OS Type</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Username</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Auth Method</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Credential</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Test</th>
-                </tr></thead>
-                <tbody id="cred-table-body"></tbody>
-            </table>
-        </div>
-    </div>
 
     <!-- ══════ STAGE 1.4: DEEP STACK SCAN ══════ -->
     <div class="panel" style="margin-bottom: 30px; border-color: #6366f1;">
@@ -514,100 +481,8 @@
         </div>
     </div>
 
-        <div class="panel" style="margin-bottom: 30px; border-color: var(--success);">
-            <h2 class="section-title"><div class="section-title-wrapper">Stage 1.4: OS Packages, Runtimes, and Env Installation</div></h2>
-            
-            <div class="form-grid" style="margin-bottom: 25px; grid-template-columns: 1fr 1fr 1fr;">
-                <div class="form-group">
-                    <label>Customer / Project Identity</label>
-                    <input type="text" id="project_customer_name" placeholder="e.g. UnknownCustomer_Prod" style="background: rgba(99, 102, 241, 0.1); font-weight: bold;">
-                </div>
-                <div class="form-group">
-                    <label>FLEX Deploy Region</label>
-                    <select id="flex_deploy_region" style="background: rgba(16, 185, 129, 0.1); font-weight: bold; border-color: rgba(16, 185, 129, 0.4);">
-                        <option value="IAD">IAD (Virginia)</option>
-                        <option value="DFW">DFW (Dallas)</option>
-                <option value="DFW3">DFW3 (Dallas FLEX)</option>
-                        <option value="ORD">ORD (Chicago)</option>
-                        <option value="SYD">SYD (Sydney)</option>
-                        <option value="HKG">HKG (Hong Kong)</option>
-                        <option value="LON">LON (London)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Select Deployment Architecture Target</label>
-                    <select id="architecture_mode">
-                        <option value="monolith">Option 1: Monolith Web App (2 FE, 1 BE, 1 DB, 1 LB, 1 Redis)</option>
-                        <option value="frontend_api">Option 2: Frontend + API + DB (2-3 FE, 2-4 BE, 2 DB, 1 LB, 1 Redis, 1-2 Worker)</option>
-                        <option value="ecommerce_medium">Option 3: Medium Ecommerce (4 FE, 6 BE, 3 DB, 2 LB, 1 Cache, 4 Worker, 2 Search)</option>
-                        <option value="ecommerce_large">Option 4: Large Marketplace (8+ FE, 12+ BE, 4 DB, 3 LB, 3 Cache, 8 Worker, 4 Search)</option>
-                    </select>
-                </div>
-            </div>
 
-            <div class="form-grid" style="margin-bottom: 30px;">
-                <div style="display: none;">
-                    <h2 class="section-title"><div class="section-title-wrapper">OSPC Source Nodes</div></h2>
-                    <div id="ospc-fields-stage1"></div>
-                    <div id="ospc-custom-fields-stage1"></div>
-                </div>
-                <div style="grid-column: span 2;">
-                    <h2 class="section-title">
-                        <div class="section-title-wrapper">FLEX Target Nodes</div>
-                    </h2>
-                    <div id="flex-fields-stage1"></div>
-                    <div id="flex-custom-fields-stage1"></div>
-                </div>
-            </div>
-            
-            <div class="btn-wrapper">
-                <button type="button" id="generate-install-btn" style="background: linear-gradient(135deg, #10b981, #059669);">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                    Generate Installation Script
-                </button>
-            </div>
-        </div>
 
-    <div class="panel output-panel" id="output-container-stage1" style="display: none; margin-bottom: 30px; border-color: #10b981;">
-        <h2 class="section-title" style="justify-content: space-between;">
-            <div class="section-title-wrapper">Stage 1.4: Generated Bash Script</div>
-            <div style="display: flex; gap: 10px;">
-                <button class="secondary" id="copy-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;">Copy</button>
-                <button class="secondary" id="download-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;">Download .sh</button>
-                <button type="button" class="secondary" id="execute-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem; border-color: var(--primary); color: var(--primary);">🚀 Execute Script</button>
-                <button type="button" class="secondary" id="stop-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem; border-color: #ef4444; color: #ef4444; display: none;">🛑 Stop Script</button>
-            </div>
-        </h2>
-        <pre><code id="script-output-stage1"></code></pre>
-    </div>
-    
-    <div class="panel output-panel" id="execution-logs-container-stage1" style="display: none; margin-bottom: 30px; border-color: #10b981;">
-        <h2 class="section-title">Execution Logs <span id="exec-spinner-stage1" style="font-size: 0.8rem; margin-left: 10px; color: var(--primary); display: none;">Tracking via API...</span></h2>
-        <pre><code id="live-logs-stage1" style="color: #a5d6ff;">Terminal starting...</code></pre>
-    </div>
-    
-    <div class="panel output-panel" id="results-table-container-stage1" style="display: none; margin-bottom: 30px; border-color: #10b981;">
-        <h2 class="section-title">
-            <div class="section-title-wrapper">Stage 1.4: Live Installation Results</div>
-            <button type="button" class="secondary" id="export-csv-btn-stage1" style="padding: 6px 14px; font-size: 0.9rem;">💾 Export CSV</button>
-        </h2>
-        <div style="overflow-x: auto;">
-            <table class="grid-table" style="width: 100%; text-align: left; border-collapse: collapse; margin-top: 15px;">
-                <thead>
-                    <tr style="border-bottom: 2px solid var(--border);">
-                        <th style="padding: 10px 5px; color: var(--text-muted);">Component</th>
-                        <th style="padding: 10px 5px; color: var(--text-muted);">Target IP</th>
-                        <th style="padding: 10px 5px; color: var(--text-muted);">Dependencies Required</th>
-                        <th style="padding: 10px 5px; color: var(--text-muted);">Dep Status</th>
-                        <th style="padding: 10px 5px; color: var(--text-muted);">Error</th>
-                    </tr>
-                </thead>
-                <tbody id="results-table-body-stage1">
-                    <!-- Dynamic rows generated here -->
-                </tbody>
-            </table>
-        </div>
-    </div>
 
 <div class="panel">
             <h2 class="section-title" style="justify-content: space-between;">
@@ -617,6 +492,45 @@
                     <span id="stage2-title-wrapper">Nodes ready for data migration = 0</span>
                 </div>
             </h2>
+
+            <!-- ── Project / Region / Architecture config ── -->
+            <div class="form-grid" style="margin-bottom: 20px; grid-template-columns: 1fr 1fr 1fr 1fr; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 10px; border: 1px solid rgba(255,255,255,0.07);">
+                <div class="form-group">
+                    <label>Customer / Project Identity</label>
+                    <input type="text" id="project_customer_name" placeholder="e.g. UnknownCustomer_Prod" style="background: rgba(99, 102, 241, 0.1); font-weight: bold;">
+                </div>
+                <div class="form-group">
+                    <label>FLEX Deploy Region</label>
+                    <select id="flex_deploy_region" style="background: rgba(16, 185, 129, 0.1); font-weight: bold; border-color: rgba(16, 185, 129, 0.4);">
+                        <option value="IAD">IAD (Virginia)</option>
+                        <option value="DFW">DFW (Dallas)</option>
+                        <option value="DFW3" selected>DFW3 (Dallas FLEX)</option>
+                        <option value="ORD">ORD (Chicago)</option>
+                        <option value="SYD">SYD (Sydney)</option>
+                        <option value="HKG">HKG (Hong Kong)</option>
+                        <option value="LON">LON (London)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Deployment Architecture</label>
+                    <select id="architecture_mode">
+                        <option value="monolith">Option 1: Monolith Web App (2 FE, 1 BE, 1 DB, 1 LB, 1 Redis)</option>
+                        <option value="frontend_api">Option 2: Frontend + API + DB (2-3 FE, 2-4 BE, 2 DB, 1 LB, 1 Redis, 1-2 Worker)</option>
+                        <option value="ecommerce_medium">Option 3: Medium Ecommerce (4 FE, 6 BE, 3 DB, 2 LB, 1 Cache, 4 Worker, 2 Search)</option>
+                        <option value="ecommerce_large">Option 4: Large Marketplace (8+ FE, 12+ BE, 4 DB, 3 LB, 3 Cache, 8 Worker, 4 Search)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; gap:6px;">
+                        🔑 FLEX Keypair Name
+                        <span style="font-size:0.72rem; color:#10b981; font-weight:400;">global</span>
+                    </label>
+                    <input type="text" id="flex_keypair_global"
+                           placeholder="e.g. my-flex-keypair"
+                           style="font-family:'Fira Code',monospace; background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.4);"
+                           oninput="applyGlobalKeypair(this.value)">
+                </div>
+            </div>
 
             <div class="form-grid" style="margin-bottom: 30px;">
                 <div>
@@ -633,8 +547,58 @@
                     <div id="flex-custom-fields"></div>
                 </div>
             </div>
-            
+
+            <!-- ── Generate Installation Script ── -->
+            <div style="padding: 20px 0; border-top: 1px solid var(--border); margin-top: 10px; text-align: center;">
+                <p style="color: var(--text-muted); margin-bottom: 14px; font-size: 0.9rem;">All OSPC packages, runtimes, services and ports will be installed on matched FLEX servers.</p>
+                <button type="button" id="generate-install-btn" style="background: linear-gradient(135deg, #10b981, #059669); font-size: 1rem; padding: 14px 32px;">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                    Generate Installation Script
+                </button>
+            </div>
+
+            <!-- Generated script output -->
+            <div id="output-container-stage1" style="display: none; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 class="section-title"><div class="section-title-wrapper">Generated Bash Script</div></h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="secondary" id="copy-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;">Copy</button>
+                        <button class="secondary" id="download-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;">Download .sh</button>
+                        <button type="button" class="secondary" id="execute-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem; border-color: var(--primary); color: var(--primary);">🚀 Execute Script</button>
+                        <button type="button" class="secondary" id="stop-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem; border-color: #ef4444; color: #ef4444; display: none;">🛑 Stop Script</button>
+                    </div>
+                </div>
+                <pre><code id="script-output-stage1"></code></pre>
+            </div>
+
+            <!-- Execution logs -->
+            <div id="execution-logs-container-stage1" style="display: none; margin-top: 10px;">
+                <h2 class="section-title">Execution Logs <span id="exec-spinner-stage1" style="font-size: 0.8rem; margin-left: 10px; color: var(--primary); display: none;">Tracking via API...</span></h2>
+                <pre><code id="live-logs-stage1" style="color: #a5d6ff;">Terminal starting...</code></pre>
+            </div>
+
+            <!-- Results table -->
+            <div id="results-table-container-stage1" style="display: none; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 class="section-title"><div class="section-title-wrapper">Live Installation Results</div></h2>
+                    <button type="button" class="secondary" id="export-csv-btn-stage1" style="padding: 6px 14px; font-size: 0.9rem;">💾 Export CSV</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="grid-table" style="width: 100%; text-align: left; border-collapse: collapse; margin-top: 15px;">
+                        <thead><tr style="border-bottom: 2px solid var(--border);">
+                            <th style="padding: 10px 5px; color: var(--text-muted);">Component</th>
+                            <th style="padding: 10px 5px; color: var(--text-muted);">Target IP</th>
+                            <th style="padding: 10px 5px; color: var(--text-muted);">Dependencies Required</th>
+                            <th style="padding: 10px 5px; color: var(--text-muted);">Dep Status</th>
+                            <th style="padding: 10px 5px; color: var(--text-muted);">Error</th>
+                        </tr></thead>
+                        <tbody id="results-table-body-stage1"></tbody>
+                    </table>
+                </div>
+            </div>
+
             <div class="form-grid" id="global-exec-controls" style="margin-bottom: 30px; padding-top: 30px; border-top: 1px solid var(--border); transition: all 1s ease;">
+
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">Global Execution Controls</div></h2>
                     
@@ -976,14 +940,26 @@
         try {
             const selectedRegion = document.getElementById('ospc_discovery_region').value;
             const sshUser = document.getElementById('ospc_ssh_user').value || 'ubuntu';
-            const sshKey = document.getElementById('ospc_ssh_key').value || '';
+            const sshKey  = document.getElementById('ospc_ssh_key').value || '';
+            // OSPC cloud credentials — required for live API scan
+            const ospcUser   = (document.getElementById('ospc_cloud_user')    || {}).value || '';
+            const ospcApiKey = (document.getElementById('ospc_cloud_key')     || {}).value || '';
+            const ospcTenant = (document.getElementById('ospc_cloud_account') || {}).value || '';
+            if (!ospcUser || !ospcApiKey || !ospcTenant) {
+                logsEle.textContent = '[ERROR] Missing OSPC credentials.\nPlease fill in OSPC Username, API Key, and Account/Tenant ID before scanning.';
+                document.getElementById('discovery-spinner').style.display = 'none';
+                return;
+            }
             const resp = await fetch('/api/agent1/run/discovery', { 
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    region: selectedRegion,
-                    ssh_user: sshUser,
-                    ssh_key: sshKey
+                    region:        selectedRegion,
+                    ssh_user:      sshUser,
+                    ssh_key:       sshKey,
+                    ospc_username: ospcUser,
+                    ospc_apikey:   ospcApiKey,
+                    ospc_tenant:   ospcTenant
                 }) 
             });
             const data = await resp.json();
@@ -1190,9 +1166,22 @@
                 const rawName = node.id || "server_" + customCount;
                 const normalized = rawName.toLowerCase().replace(/[^a-z0-9]/g, '_');
                 
-                let ip = "0.0.0.0";
-                if(node.ips && node.ips.length > 0) ip = node.ips[0];
-                
+
+                let ip = (node.ips && node.ips.length > 0) ? node.ips[0] : '0.0.0.0';  // OSPC source IP fallback
+
+                // Single match table lookup for BOTH ospc + flex IPs
+                let flexIp = '';
+                const _normKey = normalized.replace(/[\s_-]/g, '');
+                for (const row of document.querySelectorAll('#ospc-flex-match-body tr[data-ospc-name]')) {
+                    if ((row.dataset.ospcName || '').toLowerCase().replace(/[\s_-]/g, '') === _normKey) {
+                        // Prefer match-table OSPC IP (verified external)
+                        if (row.dataset.ospcIp && row.dataset.ospcIp !== '—') ip = row.dataset.ospcIp;
+                        const fCand = row.dataset.flexIp || '';
+                        if (fCand && fCand !== 'N/A' && fCand !== '—') flexIp = fCand;
+                        break;
+                    }
+                }
+
                 // Smart guess path and service
                 let sPath = "/opt/" + normalized;
                 let sService = normalized;
@@ -1287,7 +1276,7 @@
                         <div class="form-group" style="margin-bottom: 20px;">
                             <label>Provision Target FLEX IP</label>
                             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <input type="text" name="flex_custom_ip[]" value="${ip}" placeholder="Enter target 10.60.x.x" style="flex: 1;" required>
+                                <input type="text" name="flex_custom_ip[]" value="${flexIp}" placeholder="Enter FLEX target IP" style="flex: 1;${flexIp ? ' border-color:#10b981; background:rgba(16,185,129,0.08);' : ''}" required>
                                 <input type="text" name="flex_custom_port[]" value="22" style="width: 70px;" title="SSH Port">
                                 <input type="text" name="flex_custom_user[]" value="${defaultUser}" style="width: 85px;" title="SSH Admin Name">
                                 <input type="text" name="flex_custom_cred[]" style="width: 100px;" title="SSH Key Path Override" placeholder="Key (opt)">
@@ -1303,6 +1292,26 @@
                                 <a href="javascript:void(0)" onclick="var ip=this.parentElement.querySelector('input[name=\\'flex_custom_ip[]\\']').value; if(ip) window.open('http://'+ip, '_blank');" class="secondary" style="padding: 10px; border-radius: 8px; color: var(--text-main); fill: currentColor; cursor:pointer;" title="Test Targeted Environment Connection">
                                     <svg width="20" height="20" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </a>
+                            </div>
+                            <!-- Per-node keypair row -->
+                            <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+                                <span style="font-size:0.78rem; color:#10b981; white-space:nowrap;">🔑 Keypair Name</span>
+                                <input type="text" name="flex_custom_keypair[]"
+                                       value="${(document.getElementById('flex_keypair_global')||{value:''}).value}"
+                                       placeholder="keypair-name  (→ ~/.ssh/name.pem)"
+                                       title="FLEX key pair name for this node — resolves to ~/.ssh/<name>.pem"
+                                       style="flex:1; font-family:'Fira Code',monospace; font-size:0.85rem; background:rgba(16,185,129,0.06); border-color:rgba(16,185,129,0.3);">
+                                <button type="button" title="Auto-fill key path from keypair name"
+                                        onclick="(function(btn){
+                                            const row=btn.closest('div');
+                                            const kpIn=row.querySelector('input[name=\\'flex_custom_keypair[]\\']');
+                                            const credIn=btn.closest('.custom-node-group-s2').querySelector('input[name=\\'flex_custom_cred[]\\']');
+                                            if(kpIn&&kpIn.value&&credIn){ credIn.value='~/.ssh/'+kpIn.value+'.pem'; credIn.style.borderColor='#10b981'; }
+                                            else if(credIn){ credIn.value='~/.ssh/id_rsa'; credIn.style.borderColor='#f9a8d4'; }
+                                        })(this)"
+                                        style="padding:4px 10px; font-size:0.78rem; white-space:nowrap; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.4); border-radius:6px; color:#6ee7b7; cursor:pointer;">
+                                    ⚡ Fill Key Path
+                                </button>
                             </div>
                         </div>
                         <div class="form-group">
@@ -1442,99 +1451,154 @@
                   .replace(/(\$[{]?[A-Za-z0-9_]+[}]?)/g, '<span class="bash-var">$1</span>');
     }
 
-        document.getElementById('generate-install-btn').addEventListener('click', async () => {
-        let bashEnv = `#!/usr/bin/env bash
-set -eu
-
-# =========================================================
-# Stage 1: OS Packages, Runtimes, and Environments Setup
-# =========================================================
-
-echo "Starting Installation and Verification Phase..."
-
-`;
-        const fUser = document.getElementById('flex_ssh_user').value || 'ubuntu';
-        const custNameS1 = document.getElementById('project_customer_name').value || 'UnknownCustomer';
-        const safeNameS1 = custNameS1.replace(/[^a-zA-Z0-9_-]/g, '_');
-        let fRawKey = document.getElementById('flex_ssh_key').value || '';
-        let fKeyPath = 'FLEX_KEY_FILE';
-        if (fRawKey.includes('BEGIN')) { 
-            fKeyPath = '/tmp/flex_install_key.pem'; 
-            bashEnv += `echo "${fRawKey.replace(/\n/g, '\\n')}" > ${fKeyPath}\nchmod 600 ${fKeyPath}\n`; 
-        } else { 
-            fKeyPath = fRawKey; 
-        }
-
-        bashEnv += `\nexport INSTALL_USER="${fUser}"\nexport INSTALL_KEY="${fKeyPath}"\n\n`;
-
-        bashEnv += `RUN_TS=$(date +%Y%m%dT%H%M%SZ)\nmkdir -p ./migration-csv\nRESULTS_CSV="./migration-csv/${safeNameS1}-Stage1-\\${RUN_TS}-IN_PROGRESS.csv"\n`
-        bashEnv += `trap 'if [ $? -eq 0 ]; then mv "$RESULTS_CSV" "./migration-csv/${safeNameS1}-Stage1-\\${RUN_TS}-SUCCESS.csv" 2>/dev/null; else mv "$RESULTS_CSV" "./migration-csv/${safeNameS1}-Stage1-\\${RUN_TS}-FAILED.csv" 2>/dev/null; fi' EXIT\n`;
-        bashEnv += `echo "step_id,phase,component,source,target,action,status,exit_code,error" > $RESULTS_CSV\n\n`;
-
-
-        // Gather all Custom Target IPs and their required packages from Stage 1 panels
-        const ips = Array.from(document.getElementById('flex-custom-fields-stage1').querySelectorAll('input[name="flex_custom_ip[]"]')).map(el => el.value);
-        const pkgs = Array.from(document.getElementById('flex-custom-fields-stage1').querySelectorAll('input[name="flex_custom_packages[]"]')).map(el => el.value);
-        const runtimes = Array.from(document.getElementById('flex-custom-fields-stage1').querySelectorAll('input[name="flex_custom_runtimes[]"]')).map(el => el.value);
-        const names = Array.from(document.getElementById('flex-custom-fields-stage1').querySelectorAll('input[name="flex_custom_ip[]"]')).map(el => {
-            const container = el.closest('.custom-node-group-s1') || el.closest('.node-group');
-            return container ? container.getAttribute('data-name') || 'UnknownNode' : 'UnknownNode';
+    // ── Global keypair propagation ──
+    window.applyGlobalKeypair = function(val) {
+        // 1. Sync credential panel field
+        const credField = document.getElementById('flex_keypair_name');
+        if (credField) credField.value = val;
+        // 2. Sync every per-node keypair input in Stage 2 cards
+        document.querySelectorAll('input[name="flex_custom_keypair[]"]').forEach(el => {
+            el.value = val;
+            el.style.borderColor = val ? '#10b981' : '';
         });
+        if (val) showToast(`🔑 Keypair "${val}" applied to all FLEX nodes`);
+    };
 
-        if (ips.length > 0) {
-            for (let i = 0; i < ips.length; i++) {
-                if (!ips[i] || ips[i] === '0.0.0.0' || ips[i] === 'N/A') continue;
-                let cName = names[i];
-                bashEnv += `echo "========================================================="\n`;
-                bashEnv += `echo "[NODE] Executing Installation Phase on ${cName} (${ips[i]})"\n`;
-                let cmd = "";
-                let all_packages = [];
-                if(pkgs[i]) all_packages.push(...pkgs[i].split(" ").filter(p => p.trim() !== ''));
-                if(runtimes[i]) all_packages.push(...runtimes[i].split(" ").filter(p => p.trim() !== ''));
-                
-                let deps_str = all_packages.join(" ");
-                if (!deps_str) deps_str = "None";
+    const _genBtn = document.getElementById('generate-install-btn');
+    if (_genBtn) _genBtn.addEventListener('click', function() {
+        try {
+            const fUser      = (document.getElementById('flex_ssh_user')     || {value:'ubuntu'}).value || 'ubuntu';
+            const custName   = (document.getElementById('project_customer_name') || {value:'UnknownCustomer'}).value || 'UnknownCustomer';
+            const safeName   = custName.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const keyPair    = (document.getElementById('flex_keypair_name')  || {value:''}).value.trim();
+            const fRawKey    = (document.getElementById('flex_ssh_key')       || {value:'$HOME/.ssh/id_rsa'}).value || '$HOME/.ssh/id_rsa';
+            // Key resolution: inline PEM → /tmp key file; otherwise default to ~/.ssh/id_rsa
+            const fKeyPath   = fRawKey.includes('BEGIN') ? '/tmp/flex_install_key.pem' : '$HOME/.ssh/id_rsa';
 
-                if (all_packages.length > 0) {
-                    let apt_str = all_packages.join(" ");
-                    cmd = `ssh -i "$INSTALL_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=15 "$INSTALL_USER@${ips[i]}" "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${apt_str}"`;
-                    bashEnv += `echo "   [TASK] Running remote update & apt-get pipeline for: ${apt_str}..."\n`;
-                    bashEnv += `if ${cmd}; then \n`;
-                    bashEnv += `    echo "   [OK] Installation sequence completed successfully."; \n`;
-                    bashEnv += `    echo "DEP_INSTALL,dependency_check,${cName},-,${ips[i]},verify dependencies on target: ${deps_str},PASS,0," >> $RESULTS_CSV; \n`;
-                    bashEnv += `else \n`;
-                    bashEnv += `    echo "   [ERROR] APT installation or SSH connection failed on ${ips[i]}. Review previous lines for exact cause."; \n`;
-                    bashEnv += `    echo "DEP_INSTALL,dependency_check,${cName},-,${ips[i]},verify dependencies on target: ${deps_str},FAIL,1,Apt install or connection failed" >> $RESULTS_CSV; \n`;
-                    bashEnv += `    exit 1; \n`;
-                    bashEnv += `fi\n\n`;
-                    
-                    // Add quick verification check
-                    for(let pkg of all_packages) {
-                        bashEnv += `echo "   [OP] Verifying ${pkg} is registered to OS path..."\n`;
-                        bashEnv += `if ssh -i "$INSTALL_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 "$INSTALL_USER@${ips[i]}" "dpkg -l | grep -E '^ii' | grep -q ${pkg} || command -v ${pkg} > /dev/null"; then \n`;
-                        bashEnv += `    echo "      -> [PASS] Verified: ${pkg}"; \n`;
-                        bashEnv += `else \n`;
-                        bashEnv += `    echo "      -> [FAIL] Missing: ${pkg}"; \n`;
-                        bashEnv += `fi\n\n`;
-                    }
-                } else {
-                    bashEnv += `echo "   [INFO] No specific packages/runtimes strictly required for ${ips[i]}."\n`;
-                    bashEnv += `echo "DEP_NONE,dependency_check,${cName},-,${ips[i]},verify dependencies on target: ${deps_str},PASS,0," >> $RESULTS_CSV\n\n`;
-                }
+            let script = `#!/usr/bin/env bash\nset -eu\n\n`;
+            script += `# ======================================================\n`;
+            script += `# Installation Script — generated by OSPC→FLEX Dashboard\n`;
+            script += `# Customer: ${custName}\n`;
+            script += `# ======================================================\n\n`;
+
+            if (fRawKey.includes('BEGIN')) {
+                script += `printf '%s\\n' '${fRawKey.replace(/'/g, "'\\''")}' > ${fKeyPath}\nchmod 600 ${fKeyPath}\n\n`;
             }
-        } else {
-            bashEnv += `echo "No custom nodes with packages loaded. Make sure to import topology!"\n`;
+
+            script += `export INSTALL_USER="${fUser}"\nexport INSTALL_KEY="${fKeyPath}"\n\n`;
+            script += `RUN_TS=$(date +%Y%m%dT%H%M%SZ)\n`;
+            script += `mkdir -p ./migration-csv\n`;
+            script += `RESULTS_CSV="./migration-csv/${safeName}-Stage1-\${RUN_TS}-IN_PROGRESS.csv"\n`;
+            script += `trap 'mv "\$RESULTS_CSV" "./migration-csv/${safeName}-Stage1-\${RUN_TS}-\$([ \$? -eq 0 ] && echo SUCCESS || echo FAILED).csv" 2>/dev/null' EXIT\n`;
+            script += `echo "step_id,phase,component,target,packages,status" > "\$RESULTS_CSV"\n\n`;
+
+            // Helper: detect package manager from OS string
+            function pkgMgr(osStr) {
+                const o = (osStr || '').toLowerCase();
+                if (o.includes('rocky') || o.includes('alma') || o.includes('centos') || o.includes('rhel') || o.includes('fedora')) return 'dnf';
+                if (o.includes('windows')) return 'windows';
+                return 'apt'; // ubuntu, debian, etc.
+            }
+
+            // Helper: sanitize — only valid apt/dnf package tokens (lowercase, no spaces, alphanumeric+.-_)
+            function validPkgs(raw) {
+                return (raw || '').split(/\s+/).filter(p => p && /^[a-z0-9][a-z0-9.+\-_]*$/i.test(p) && !/^[A-Z]/.test(p) && !p.includes('.') || /^[a-z0-9][a-z0-9.\-+_]+$/.test(p));
+            }
+
+            // Collect nodes — deduplicate by FLEX IP
+            const seenIPs = new Set();
+            const cards = document.querySelectorAll('.custom-node-group-s2');
+
+            if (cards.length === 0) {
+                script += `echo "No nodes loaded — import topology first."\n`;
+            } else {
+                cards.forEach(card => {
+                    const name    = card.getAttribute('data-name') || 'node';
+                    const ipEl    = card.querySelector('input[name="flex_custom_ip[]"]');
+                    const pkgEl   = card.querySelector('input[name="flex_custom_packages[]"]');
+                    const osEl    = card.querySelector('input[name="flex_custom_os[]"]');
+                    const kpEl    = card.querySelector('input[name="flex_custom_keypair[]"]');
+                    const userEl  = card.querySelector('input[name="flex_custom_user[]"]');
+                    const ip      = ipEl   ? ipEl.value.trim()   : '';
+                    const osStr   = osEl   ? osEl.value          : '';
+                    const nodeKP  = kpEl   ? kpEl.value.trim()   : '';
+                    const nodeUser= userEl ? userEl.value.trim()  : fUser;
+
+                    const nodeKey = '/home/dzoan/.ssh/id_rsa';
+
+                    if (!ip || ip === '0.0.0.0' || ip === 'N/A' || ip === '') {
+                        script += `echo "[SKIP] ${name} — no FLEX IP"\n\n`;
+                        return;
+                    }
+
+                    // Deduplicate by FLEX IP
+                    if (seenIPs.has(ip)) {
+                        script += `echo "[SKIP] ${name} — same FLEX IP ${ip} already processed"\n\n`;
+                        return;
+                    }
+                    seenIPs.add(ip);
+
+                    const mgr = pkgMgr(osStr);
+
+                    if (mgr === 'windows') {
+                        script += `echo "[SKIP] ${name} (${ip}) — Windows: manual install required"\n\n`;
+                        return;
+                    }
+
+                    // Only use flex_custom_packages[] — real package names (not runtime display labels)
+                    const rawPkgs = pkgEl ? pkgEl.value : '';
+                    const pkgList = rawPkgs.split(/\s+/).filter(p => {
+                        return p && /^[a-z][a-z0-9.\-+_]*$/.test(p);
+                    });
+
+                    // Root cause: remove stale Rackspace mirror repos causing GPG errors
+                    const cleanReposCmd = [
+                        `sudo sed -i '/rax\\.mirror\\.rackspace\\.com/d' /etc/apt/sources.list 2>/dev/null || true`,
+                        `sudo sed -i '/mirror\\.rackspace\\.com\\/opensuse/d' /etc/apt/sources.list 2>/dev/null || true`,
+                        `sudo find /etc/apt/sources.list.d/ -name 'holland*' -delete 2>/dev/null || true`,
+                        `sudo find /etc/apt/sources.list.d/ -name '*rackspace*' -delete 2>/dev/null || true`
+                    ].join(' && ');
+
+                    const installCmd = mgr === 'dnf'
+                        ? `sudo dnf install -y ${pkgList.join(' ')}`
+                        : `${cleanReposCmd} && sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ${pkgList.join(' ')}`;
+
+                    script += `echo "========================================================="\n`;
+                    script += `echo "[NODE] ${name}  (${osStr || 'Linux'})  →  ${ip}  [${mgr}]"\n`;
+                    script += `echo "[KEY]  ${nodeKey}  USER: ${nodeUser}"\n`;
+
+                    if (pkgList.length > 0) {
+                        const pkgStr = pkgList.join(' ');
+                        script += `echo "[TASK] Installing: ${pkgStr}"\n`;
+                        script += `if ssh -i "${nodeKey}" -o StrictHostKeyChecking=no -o ConnectTimeout=15 "${nodeUser}@${ip}" \\\n`;
+                        script += `     "${installCmd}"; then\n`;
+                        script += `    echo "[OK] ${name} — packages installed"\n`;
+                        script += `    echo "INSTALL,pkg,${name},${ip},${pkgStr},PASS" >> "\$RESULTS_CSV"\n`;
+                        script += `else\n`;
+                        script += `    echo "[FAIL] ${name} — install failed"\n`;
+                        script += `    echo "INSTALL,pkg,${name},${ip},${pkgStr},FAIL" >> "\$RESULTS_CSV"\n`;
+                        script += `    exit 1\n`;
+                        script += `fi\n\n`;
+                    } else {
+                        script += `echo "[INFO] ${name} — no packages defined"\n`;
+                        script += `echo "INSTALL,pkg,${name},${ip},none,SKIP" >> "\$RESULTS_CSV"\n\n`;
+                    }
+                });
+            }
+
+            script += `\necho "Done. Results: \$RESULTS_CSV"\n`;
+
+            const codeEl = document.getElementById('script-output-stage1');
+            const panel  = document.getElementById('output-container-stage1');
+            if (codeEl) { codeEl.innerHTML = syntaxHighlight(script); codeEl.setAttribute('data-raw', script); }
+            if (panel)  { panel.style.display = 'block'; setTimeout(() => panel.scrollIntoView({behavior:'smooth'}), 100); }
+
+        } catch(err) {
+            console.error('Generate script error:', err);
+            if(typeof showToast === 'function') showToast('❌ ' + err.message);
         }
-        
-        bashEnv += `echo "Stage 1 Environment Setup Complete. You may proceed to Stage 2."\n`;
-        
-        document.getElementById('script-output-stage1').innerHTML = syntaxHighlight(bashEnv);
-        document.getElementById('script-output-stage1').setAttribute('data-raw', bashEnv);
-        
-        const outputPanel = document.getElementById('output-container-stage1');
-        outputPanel.style.display = 'block';
-        setTimeout(() => outputPanel.scrollIntoView({ behavior: 'smooth' }), 100);
     });
+
 
     document.getElementById('generate-btn').addEventListener('click', async () => {
         const mode = document.getElementById('architecture_mode').value;
@@ -2189,79 +2253,84 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
 
     document.getElementById('execute-btn-stage1').addEventListener('click', async () => {
         let scriptContent = document.getElementById('script-output-stage1').getAttribute('data-raw');
-        // CRLF FIX FOR STAGE 1
+        if (!scriptContent) { showToast('⚠️ Generate the script first'); return; }
         scriptContent = scriptContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        
-        const term = document.getElementById('execution-logs-container-stage1');
-        const rtc = document.getElementById('results-table-container-stage1');
-        const logsEle = document.getElementById('live-logs-stage1');
-        document.getElementById('exec-spinner-stage1').style.display = 'inline';
-        term.style.display = 'block';
-        term.scrollIntoView({ behavior: 'smooth' });
-        logsEle.textContent = "Connecting to API Backend...\n";
-        
-        try {
-            const resp = await fetch('/api/agent1/run/migration', { method: 'POST', body: scriptContent });
-            const data = await resp.json();
-            if (data.status === "started") {
-                document.getElementById('execute-btn-stage1').style.display = 'none';
-                document.getElementById('stop-btn-stage1').style.display = 'inline-block';
-                document.getElementById('results-table-body-stage1').innerHTML = '';
-                logsEle.textContent += "Process started! Streaming logs...\n";
-                
-                let pollInterval = setInterval(async () => {
-                    try {
-                        let logReq = await fetch('/migration_log.txt?t=' + new Date().getTime());
-                        if(logReq.ok) {
-                            let text = await logReq.text();
-                            logsEle.textContent = text;
-                            logsEle.parentElement.scrollTop = logsEle.parentElement.scrollHeight;                            
-                            if(text.includes("Stage 1 Environment Setup Complete.") || text.includes("Migration API Server Error") || text.includes("forcefully stopped")) {
-                                clearInterval(pollInterval);
-                                document.getElementById('exec-spinner-stage1').style.display = 'none';
-                                document.getElementById('execute-btn-stage1').style.display = 'inline-block';
-                                document.getElementById('stop-btn-stage1').style.display = 'none';
-                                rtc.style.display = 'block';
-                                showToast(text.includes("forcefully stopped") ? "Execution Stopped!" : "Execution Completed!");
-                            }
-                            
-                            // Propagate changes to Stage 2 UI dynamically
-                            globalStateTableS1.forEach(n => {
-                                let s2Node = document.querySelector(`.custom-node-group-s2[data-name="${n.comp}"]`);
-                                if (s2Node && n.depStatus === 'PASS') {
-                                    s2Node.setAttribute('data-verified', 'true');
-                                    s2Node.style.borderColor = '#10b981';
-                                    ['os', 'runtimes', 'packages', 'env'].forEach(t => {
-                                        let chk = document.getElementById(`chk_${n.comp}_${t}`);
-                                        let stat = document.getElementById(`stat_${n.comp}_${t}`);
-                                        if(chk) chk.checked = true;
-                                        if(stat) { stat.textContent = '# installed'; stat.style.color = '#10b981'; }
-                                    });
-                                } else if (s2Node && n.depStatus !== '' && n.depStatus !== 'PASS') {
-                                    s2Node.setAttribute('data-verified', 'false');
-                                    s2Node.style.borderColor = '#ef4444';
-                                    ['os', 'runtimes', 'packages', 'env'].forEach(t => {
-                                        let chk = document.getElementById(`chk_${n.comp}_${t}`);
-                                        let stat = document.getElementById(`stat_${n.comp}_${t}`);
-                                        if(chk) chk.checked = false;
-                                        if(stat) { stat.textContent = '# not installed'; stat.style.color = '#ef4444'; }
-                                    });
-                                }
-                            });
-                            if(window.updateStage2Count) window.updateStage2Count();
 
-                        }
-                        
-                        try {
-                            let csvReq = await fetch('/api/agent1/results/csv?t=' + new Date().getTime());
-                            if(csvReq.ok) parseCSVToTableStage1(await csvReq.text());
-                        } catch(e) {}
-                    } catch(err) { console.error(err); }
-                }, 1000);
+        const term    = document.getElementById('execution-logs-container-stage1');
+        const rtc     = document.getElementById('results-table-container-stage1');
+        const logsEle = document.getElementById('live-logs-stage1');
+        const spinner = document.getElementById('exec-spinner-stage1');
+        const execBtn = document.getElementById('execute-btn-stage1');
+        const stopBtn = document.getElementById('stop-btn-stage1');
+
+        spinner.style.display = 'inline';
+        execBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        term.style.display = 'block';
+        rtc.style.display = 'none';
+        logsEle.textContent = 'Connecting...\n';
+        term.scrollIntoView({ behavior: 'smooth' });
+
+        try {
+            // API streams text/plain — do NOT parse as JSON
+            const resp = await fetch('/api/agent1/run/migration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: scriptContent
+            });
+
+            if (!resp.ok) { throw new Error(`API error ${resp.status}: ${await resp.text()}`); }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let done = false;
+            while (!done) {
+                const { value, done: d } = await reader.read();
+                done = d;
+                if (value) {
+                    logsEle.textContent += decoder.decode(value, { stream: !done });
+                    logsEle.parentElement.scrollTop = logsEle.parentElement.scrollHeight;
+
+                    // Poll CSV results while streaming
+                    try {
+                        let csvReq = await fetch('/api/agent1/results/csv?t=' + Date.now());
+                        if (csvReq.ok) parseCSVToTableStage1(await csvReq.text());
+                    } catch(e) {}
+                }
             }
+
+            // Done
+            spinner.style.display = 'none';
+            execBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            rtc.style.display = 'block';
+
+            // Propagate dep results to Stage 2 node cards
+            globalStateTableS1.forEach(n => {
+                const s2Node = document.querySelector(`.custom-node-group-s2[data-name="${n.comp}"]`);
+                if (!s2Node) return;
+                if (n.depStatus === 'PASS') {
+                    s2Node.setAttribute('data-verified', 'true');
+                    s2Node.style.borderColor = '#10b981';
+                    ['os','runtimes','packages','env'].forEach(t => {
+                        const chk = document.getElementById(`chk_${n.comp}_${t}`);
+                        const stat = document.getElementById(`stat_${n.comp}_${t}`);
+                        if (chk) chk.checked = true;
+                        if (stat) { stat.textContent = '# installed'; stat.style.color = '#10b981'; }
+                    });
+                } else if (n.depStatus) {
+                    s2Node.setAttribute('data-verified', 'false');
+                    s2Node.style.borderColor = '#ef4444';
+                }
+            });
+            if (window.updateStage2Count) window.updateStage2Count();
+            showToast('✅ Execution complete');
+
         } catch(err) {
-            logsEle.textContent = "Error executing script: " + err;
-            document.getElementById('exec-spinner-stage1').style.display = 'none';
+            logsEle.textContent += '\n[ERROR] ' + err.message;
+            spinner.style.display = 'none';
+            execBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
         }
     });
 
@@ -2274,47 +2343,59 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         }
     });
 
-    // --- PHASE 6: CONFIGURATION PERSISTENCE LOADER ---
-    const persistIds = [
-        'ospc_cloud_user', 'ospc_cloud_key', 'ospc_cloud_account',
-        'flex_cloud_user', 'flex_cloud_key', 'flex_cloud_account',
-        'ospc_ssh_user', 'ospc_db_name', 'ospc_db_admin', 'ospc_db_pass', 'ospc_jump_host',
-        'flex_ssh_user', 'flex_db_name', 'flex_db_admin', 'flex_db_pass', 'flex_jump_host',
-        'project_customer_name', 'ospc_discovery_region', 'flex_deploy_region', 'architecture_mode'
-    ];
+    // --- PHASE 6: CONFIGURATION PERSISTENCE (runs immediately — DOM already built) ---
+    (function initCredPersistence() {
+        const persistIds = [
+            // Cloud API credentials
+            'ospc_cloud_user', 'ospc_cloud_key', 'ospc_cloud_account',
+            'flex_auth_url', 'flex_cloud_user', 'flex_cloud_key', 'flex_cloud_account', 'flex_cloud_domain',
+            // SSH + DB credentials
+            'ospc_ssh_user', 'ospc_ssh_key', 'ospc_db_name', 'ospc_db_admin', 'ospc_db_pass',
+            'flex_ssh_user', 'flex_keypair_name', 'flex_keypair_global', 'flex_ssh_key', 'flex_db_name', 'flex_db_admin', 'flex_db_pass',
+            // Project / region config
+            'project_customer_name', 'ospc_discovery_region', 'flex_deploy_region', 'architecture_mode'
+        ];
 
-    document.addEventListener('DOMContentLoaded', () => {
-        persistIds.forEach(id => {
-            let el = document.getElementById(id);
-            if(el) {
+        function doInit() {
+            persistIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                // Restore saved value
                 const saved = localStorage.getItem('op_conf_' + id);
-                if(saved !== null) {
-                    el.value = saved;
-                }
-                
-                // Bind real-time change listener
-                el.addEventListener('input', (e) => {
+                if (saved !== null) el.value = saved;
+                // Save on every change
+                const evts = el.tagName === 'SELECT' ? ['change'] : ['input', 'change'];
+                evts.forEach(evt => el.addEventListener(evt, e => {
                     localStorage.setItem('op_conf_' + id, e.target.value);
-                });
-                if(el.tagName === 'SELECT') {
-                    el.addEventListener('change', (e) => {
-                        localStorage.setItem('op_conf_' + id, e.target.value);
-                    });
+                }));
+            });
+
+            // On load: propagate restored global keypair to all node fields
+            const globalKP = document.getElementById('flex_keypair_global');
+            if (globalKP && globalKP.value) {
+                setTimeout(() => window.applyGlobalKeypair(globalKP.value), 600);
+            }
+
+            // Re-trigger architecture dropdown so topology DOM updates
+            setTimeout(() => {
+                const modeEl = document.getElementById('architecture_mode');
+                if (!modeEl) return;
+                if (!modeEl.value.endsWith('.csv')) {
+                    if (typeof generateDOM === 'function') generateDOM(modeEl.value);
+                } else {
+                    modeEl.dispatchEvent(new Event('change'));
                 }
-            }
-        });
-        
-        // Let the dropdown initialization naturally trigger if the local Storage architecture mode is CSV
-        setTimeout(() => {
-            const reloadedMode = document.getElementById('architecture_mode').value;
-            if(!reloadedMode.endsWith('.csv')) {
-                generateDOM(reloadedMode);
-            } else {
-                // If it is CSV, trigger the change listener gracefully to reload topology
-                document.getElementById('architecture_mode').dispatchEvent(new Event('change'));
-            }
-        }, 500);
-    });
+            }, 500);
+        }
+
+        // Script is at bottom of body — DOM is already ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', doInit);
+        } else {
+            doInit();
+        }
+    })();
+
 
     // ══════ NEW STAGE TABLE POPULATION (1.2, 1.3, 1.4) ══════
     function autoPlaybook(n) {
@@ -2337,11 +2418,9 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
     }
 
     function populateNewStageTables(topData) {
-        const osScan = document.getElementById('os-scan-body');
-        const credTbl = document.getElementById('cred-table-body');
         const deepScan = document.getElementById('deep-scan-body');
-        if (!osScan || !credTbl || !deepScan) return;
-        osScan.innerHTML = ''; credTbl.innerHTML = ''; deepScan.innerHTML = '';
+        if (!deepScan) return;  // only Stage 1.3 remains
+        deepScan.innerHTML = '';
 
         const defaultUser = document.getElementById('ospc_ssh_user') ? document.getElementById('ospc_ssh_user').value : 'ubuntu';
 
@@ -2350,34 +2429,9 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
             const os = n.os || 'Unknown';
             const isWin = (os + ' ' + n.id).toLowerCase().match(/windows|win201|win202/);
             const isDB = (n.group || '').toLowerCase().includes('database');
-            const osType = isWin ? 'Windows' : isDB ? 'Database' : 'Linux';
-            const defUser = isWin ? 'Administrator' : isDB ? 'postgres' : defaultUser;
-            const authMethod = isWin ? 'Password' : isDB ? 'Password' : 'SSH Key';
             const typeColor = isWin ? '#79c0ff' : isDB ? '#fcd34d' : '#6ee7b7';
 
-            // 1.2 OS Scan
-            osScan.insertAdjacentHTML('beforeend',
-                `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 5px;">${n.id}</td>
-                    <td style="padding: 10px 5px; font-family: 'Fira Code', monospace; color: #79c0ff;">${ip}</td>
-                    <td style="padding: 10px 5px;">${os}</td>
-                    <td style="padding: 10px 5px;"><span style="color:${typeColor}">${osType}</span></td>
-                    <td style="padding: 10px 5px; color: var(--success);">✅ Identified</td>
-                </tr>`);
-
-            // 1.3 Per-server credential
-            credTbl.insertAdjacentHTML('beforeend',
-                `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 10px 5px;">${n.id}</td>
-                    <td style="padding: 10px 5px; font-family: 'Fira Code', monospace; color: #79c0ff;">${ip}</td>
-                    <td style="padding: 10px 5px;"><span style="color:${typeColor}">${osType}</span></td>
-                    <td style="padding: 8px 5px;"><input type="text" value="${defUser}" style="padding:6px 10px; width:110px; background:var(--input-bg); border:1px solid var(--border); border-radius:6px; color:var(--text-main); font-size:0.85rem;"></td>
-                    <td style="padding: 8px 5px;"><select style="padding:6px 8px; width:100px; background:var(--input-bg); border:1px solid var(--border); border-radius:6px; color:var(--text-main); font-size:0.85rem;"><option ${authMethod==='SSH Key'?'selected':''}>SSH Key</option><option ${authMethod==='Password'?'selected':''}>Password</option></select></td>
-                    <td style="padding: 8px 5px;"><input type="${authMethod==='Password'?'password':'text'}" value="${authMethod==='SSH Key'?'(default key)':''}" placeholder="${authMethod==='Password'?'password':''}" style="padding:6px 10px; width:130px; background:var(--input-bg); border:1px solid var(--border); border-radius:6px; color:var(--text-main); font-size:0.85rem;"></td>
-                    <td style="padding: 8px 5px;"><span id="cred-result-${i}" style="color: var(--text-muted);">—</span></td>
-                </tr>`);
-
-            // 1.4 Deep scan
+            // 1.3 Deep scan
             const svcs = (n.services || []).join(', ') || 'None';
             const rts = (n.runtimes || []).join(', ') || '—';
             const ports = (n.ports || []).join(', ') || '—';
@@ -2784,7 +2838,11 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
                 : '<span style="color:#f87171; font-weight:600;">❌ Not Found</span>';
             
             matchBody.insertAdjacentHTML('beforeend', `
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.04);"
+                    data-ospc-name="${ospc.name}"
+                    data-ospc-ip="${ospc.ip}"
+                    data-flex-name="${flexMatch ? flexMatch.name : ''}"
+                    data-flex-ip="${flexMatch ? (flexMatch.external_ip || '') : ''}">
                     <td style="padding:8px 5px; font-size:0.85rem; color:#f9a8d4;">${ospc.name}</td>
                     <td style="padding:8px 5px; font-size:0.85rem; font-family:Fira Code,monospace;">${ospc.ip}</td>
                     <td style="padding:8px 5px; font-size:0.85rem; color:#6ee7b7;">${flexMatch ? flexMatch.name : '—'}</td>
@@ -2792,6 +2850,7 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
                     <td style="padding:8px 5px; font-size:0.85rem;">${statusHtml}</td>
                 </tr>
             `);
+
         });
         
         // Show any FLEX servers that don't have OSPC matches
@@ -2811,73 +2870,89 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         });
         
         showToast(`🔗 Matching complete: ${matchCount}/${ospcServers.length} OSPC servers matched on FLEX`);
-    }
 
-    // ═══════ AUTO-FILL FLEX IPs ═══════
-    window.autoFillFlexIPs = function() {
-        if (!flexDiscoveryData || !flexDiscoveryData.servers) {
-            showToast('⚠️ Run FLEX Discovery first!');
-            return;
-        }
-        
-        const flexMap = {};
-        flexDiscoveryData.servers.forEach(fs => { flexMap[fs.name.toLowerCase()] = fs; });
-        
-        let filled = 0;
-        
-        // Find all FLEX target node groups in Stage 1
-        const nodeGroups = document.querySelectorAll('#flex-fields-stage1 .custom-node-group-s1, #flex-custom-fields-stage1 .custom-node-group-s1');
-        nodeGroups.forEach(group => {
-            const nodeName = group.getAttribute('data-name') || '';
-            const ipInput = group.querySelector('input[name="flex_custom_ip[]"]');
-            if (!ipInput) return;
-            
-            // Try exact match first, then partial
-            let match = flexMap[nodeName.toLowerCase()];
-            if (!match) {
-                // Try partial match (e.g., "frontend_01" matches "frontend-01")
-                const normalized = nodeName.toLowerCase().replace(/[_-]/g, '');
-                for (const [key, val] of Object.entries(flexMap)) {
-                    if (key.replace(/[_-]/g, '') === normalized) {
-                        match = val;
-                        break;
+        // ── Automatically propagate FLEX IPs into Stage 2 node cards ──
+        let autoPropCount = 0;
+        document.querySelectorAll('#ospc-flex-match-body tr[data-ospc-name]').forEach(row => {
+            const ospcNameNorm = (row.dataset.ospcName || '').toLowerCase().replace(/[\s_-]/g, '');
+            const flexIp = row.dataset.flexIp || '';
+            const ospcIp = row.dataset.ospcIp || '';
+
+            document.querySelectorAll('.custom-node-group-s2').forEach(card => {
+                const cardName = (card.getAttribute('data-name') || '').toLowerCase().replace(/[\s_-]/g, '');
+                if (cardName !== ospcNameNorm) return;
+
+                // Update FLEX target IP
+                const flexIpInput = card.querySelector('input[name="flex_custom_ip[]"]');
+                if (flexIpInput && flexIp && flexIp !== 'N/A' && flexIp !== '—') {
+                    flexIpInput.value = flexIp;
+                    flexIpInput.style.borderColor = '#10b981';
+                    flexIpInput.style.background = 'rgba(16,185,129,0.08)';
+                    autoPropCount++;
+                }
+
+                // Update OSPC source IP (in paired ospc block)
+                const ospcBlock = document.querySelector(`#ospc-custom-fields .custom-node-group[data-name="${card.getAttribute('data-name')}"]`);
+                if (ospcBlock && ospcIp && ospcIp !== '—') {
+                    const ospcIpInput = ospcBlock.querySelector('input[name="ospc_custom_ip[]"]');
+                    if (ospcIpInput && ospcIpInput.value !== ospcIp) {
+                        ospcIpInput.value = ospcIp;
+                        ospcIpInput.style.borderColor = '#f9a8d4';
                     }
                 }
-            }
-            
-            if (match && match.external_ip && match.external_ip !== '—') {
-                ipInput.value = match.external_ip;
-                ipInput.style.borderColor = '#10b981';
-                ipInput.style.background = 'rgba(16,185,129,0.1)';
-                filled++;
-            }
+            });
         });
-        
-        // Also try filling Stage 2 fields
+        if (autoPropCount > 0) showToast(`⚡ Auto-updated ${autoPropCount} FLEX IPs in Stage 2`);
+    }
+
+    // ═══════ AUTO-FILL BOTH OSPC + FLEX IPs FROM MATCH TABLE ═══════
+    window.autoFillFlexIPs = function() {
+        const matchBody = document.getElementById('ospc-flex-match-body');
+        if (!matchBody || matchBody.children.length === 0) {
+            showToast('⚠️ Run FLEX discovery and matching first!');
+            return;
+        }
+
+        // Build lookup maps from match table rows
+        const ospcMap = {};  // ospc name (normalized) → { ospcIp, flexName, flexIp }
+        matchBody.querySelectorAll('tr[data-ospc-name]').forEach(tr => {
+            const ospcName = tr.dataset.ospcName || '';
+            const ospcIp   = tr.dataset.ospcIp   || '';
+            const flexIp   = tr.dataset.flexIp   || '';
+            if (ospcName) ospcMap[ospcName.toLowerCase().replace(/[\s_-]/g, '')] = { ospcIp, flexIp };
+        });
+
+        let filled = 0;
         const s2Groups = document.querySelectorAll('.custom-node-group-s2');
         s2Groups.forEach(group => {
-            const nodeName = group.getAttribute('data-name') || '';
-            const ipInput = group.querySelector('input[name="flex_custom_ip[]"]');
-            if (!ipInput || (ipInput.value && ipInput.value !== '' && ipInput.value !== 'Enter target 10.60.x.x')) return;
-            
-            let match = flexMap[nodeName.toLowerCase()];
-            if (!match) {
-                const normalized = nodeName.toLowerCase().replace(/[_-]/g, '');
-                for (const [key, val] of Object.entries(flexMap)) {
-                    if (key.replace(/[_-]/g, '') === normalized) { match = val; break; }
-                }
-            }
-            
-            if (match && match.external_ip && match.external_ip !== '—') {
-                ipInput.value = match.external_ip;
-                ipInput.style.borderColor = '#10b981';
-                ipInput.style.background = 'rgba(16,185,129,0.1)';
+            const nodeName = (group.getAttribute('data-name') || '').toLowerCase().replace(/[\s_-]/g, '');
+            const entry = ospcMap[nodeName];
+            if (!entry) return;
+
+            // Fill FLEX IP
+            const flexIpInput = group.querySelector('input[name="flex_custom_ip[]"]');
+            if (flexIpInput && entry.flexIp && entry.flexIp !== 'N/A' && entry.flexIp !== '—') {
+                flexIpInput.value = entry.flexIp;
+                flexIpInput.style.borderColor = '#10b981';
+                flexIpInput.style.background = 'rgba(16,185,129,0.08)';
                 filled++;
             }
+
+            // Fill OSPC IP (into the paired ospc block)
+            const ospcBlock = document.querySelector(`#ospc-custom-fields .custom-node-group[data-name="${group.getAttribute('data-name')}"]`);
+            if (ospcBlock && entry.ospcIp && entry.ospcIp !== '—') {
+                const ospcIpInput = ospcBlock.querySelector('input[name="ospc_custom_ip[]"]');
+                if (ospcIpInput) {
+                    ospcIpInput.value = entry.ospcIp;
+                    ospcIpInput.style.borderColor = '#f9a8d4';
+                    ospcIpInput.style.background = 'rgba(249,168,212,0.08)';
+                }
+            }
         });
-        
-        showToast(`⚡ Auto-filled ${filled} FLEX target IPs from discovery`);
+
+        showToast(`⚡ Auto-filled ${filled} OSPC + FLEX target IPs from match table`);
     };
+
 
     // ═══════ OpenRC FILE PARSER ═══════
     function parseOpenRC(event) {

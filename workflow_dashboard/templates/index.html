@@ -8,6 +8,20 @@
 </head>
 <body>
   <header>
+    <div id="activeCustomerBanner" style="display:none; background: linear-gradient(135deg, rgba(46,204,113,0.1), rgba(46,204,113,0.2)); border: 1px solid #2ecc71; border-radius: 8px; padding: 15px 25px; margin-bottom: 25px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <div style="font-size: 0.85rem; text-transform: uppercase; color: #2ecc71; font-weight: bold; margin-bottom: 5px; letter-spacing: 1px;">🟢 Active Migration Target</div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+                <div id="acName" style="font-size: 1.6rem; font-weight: 700; color: #fff; margin-bottom: 5px;"></div>
+                <div id="acContact" style="font-size: 1rem; color: #a8d8ff;"></div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.85rem; color: #a8d8ff; margin-bottom: 3px;">Start Date</div>
+                <div id="acDate" style="font-size: 1.1rem; color: #fff; font-weight: 600;"></div>
+            </div>
+        </div>
+    </div>
+    
     <h1>OSPC Scanner and Deployment Script Generator</h1>
     <p>Connects to your OSPC Rackspace account, scans your existing server inventory, maps legacy OSPC flavors to equivalent FLEX flavors, validates your target environment, then auto-generates ready-to-run deployment shell scripts to clone your entire OSPC infrastructure into the Flex OpenStack cloud.</p>
     <ul style="max-width: 900px; margin: 10px auto; text-align: left; background: rgba(0, 0, 0, 0.2); color: #fff; padding: 15px 35px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); line-height: 1.6;">
@@ -425,5 +439,31 @@
   </main>
 
   <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
+    <script>
+        // Auto-persist index credentials
+        document.addEventListener("DOMContentLoaded", () => {
+            const cName = localStorage.getItem('mig_active_customer_name');
+            if (cName) {
+                document.getElementById('activeCustomerBanner').style.display = 'block';
+                document.getElementById('acName').innerText = cName;
+                document.getElementById('acContact').innerText = localStorage.getItem('mig_active_customer_contact') || 'Contact details N/A';
+                document.getElementById('acDate').innerText = localStorage.getItem('mig_active_customer_start') || new Date().toISOString().split('T')[0];
+            }
+            
+            const indexCredIds = [
+                'authUrl', 'username', 'password', 'projectId', 'domain',
+                'flexAuthUrl', 'flexUsername', 'flexPassword', 'flexProjectId', 'flexDomain',
+                'sshUser', 'sshPass'
+            ];
+            indexCredIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    const saved = localStorage.getItem('mig_idx_' + id);
+                    if (saved) el.value = saved;
+                    el.addEventListener('input', () => localStorage.setItem('mig_idx_' + id, el.value));
+                }
+            });
+        });
+    </script>
 </body>
 </html>

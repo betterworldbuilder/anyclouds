@@ -35,7 +35,7 @@ def main():
     parser.add_argument("--flavor-mapping", required=False, help="Path to generated flavor map CSV e.g., 123456_flavormap.csv")
     parser.add_argument("--custom-ips", required=False, help="Path to custom override CSV containing source_ip and target_ip")
     parser.add_argument("--resource-map", required=False, help="Path to OSPC→FLEX resource mapping CSV from Stage 2 deploy (e.g., 123456_tenant_deploy_resource_map.csv)")
-    parser.add_argument("--strategy", default="direct", choices=["direct", "ab_haproxy", "ab_reuse_lb"], help="Migration strategy logic")
+    parser.add_argument("--strategy", default="direct", choices=["direct", "ab_haproxy", "ab_reuse_lb", "fip_swap", "dns_swap"], help="Migration strategy logic")
     args = parser.parse_args()
 
     strategy = args.strategy
@@ -174,7 +174,7 @@ def main():
             sync_commands.append(f"TARGET_IP=\"{spec['target_ip']}\"")
 
         if category == "database":
-            if strategy in ["ab_haproxy", "ab_reuse_lb"]:
+            if strategy in ["ab_haproxy", "ab_reuse_lb", "fip_swap", "dns_swap"]:
                 sync_commands.extend([
                     f"echo 'Syncing highly-available DB Replica for {source_name}'",
                     f"# Configure OSPC DB to act as Replication Primary and FLEX target to act as Replica",
@@ -268,6 +268,89 @@ def main():
                     f"echo 'Removing FLEX clone $TARGET_IP from OpenStack Load Balancer Pool'",
                     f"read -p \"Confirm OpenStack LB Pool Name/ID to remove $TARGET_IP from: \" OSPC_OCTAVIA_POOL_NAME",
                     f"openstack loadbalancer member delete \"$OSPC_OCTAVIA_POOL_NAME\" \"{target_server_name}-ab-member\"",
+                    ""
+                ])
+            elif strategy == "fip_swap":
+                sync_commands.extend([
+                    f"echo 'Syncing Linux App Files for {source_name}'",
+                    f"mkdir -p /tmp/sync_{source_name}",
+                    f"rsync -avz --progress -e \"ssh -o StrictHostKeyChecking=no\" root@{mgmt_ip}:/var/www/html/ /tmp/sync_{source_name}/",
+                    f"rsync -avz --progress -e \"ssh -o StrictHostKeyChecking=no\" /tmp/sync_{source_name}/ centos@$TARGET_IP:/var/www/html/",
+                    ""
+                ])
+                cutover_commands.extend([
+                    f"# Cutover Linux App for {source_name} (Floating IP Swap)",
+                    f"echo 'Stopping app writes and final rsync for {source_name}'",
+                    f"ssh -o StrictHostKeyChecking=no root@{mgmt_ip} 'systemctl stop nginx apache2 || true'",
+                    f"rsync -avz --delete -e \"ssh -o StrictHostKeyChecking=no\" root@{mgmt_ip}:/var/www/html/ /tmp/sync_{source_name}/",
+                    f"rsync -avz --delete -e \"ssh -o StrictHostKeyChecking=no\" /tmp/sync_{source_name}/ centos@$TARGET_IP:/var/www/html/",
+                    f"echo 'Swapping Floating IP from {source_name} to {target_server_name}'",
+                    f"read -p \"Provide the Floating IP to move to {target_server_name} [leave blank to auto-detect from source]: \" USER_FIP",
+                    f"if [ -n \"$USER_FIP\" ]; then",
+                    f"  FIP=$USER_FIP",
+                    f"else",
+                    f"  # Attempt auto-detection",
+                    f"  FIP=$(openstack server show {source_name} -f json | grep -o '\"[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\"' | tr -d '\"' | grep -v '^10\\.' | grep -v '^192\\.168\\.' | grep -v '^172\\.' | head -n 1 || echo \"\")",
+                    f"fi",
+                    f"if [ -z \"$FIP\" ]; then",
+                    f"  echo 'ERROR: Could not autodetect FIP. Please run manually.'",
+                    f"else",
+                    f"  openstack server remove floating ip {source_name} \"$FIP\" || true",
+                    f"  openstack server add floating ip {target_server_name} \"$FIP\"",
+                    f"  echo \"Successfully moved FIP $FIP\"",
+                    f"fi",
+                    ""
+                ])
+                rollback_commands.extend([
+                    f"# Rollback Linux App for {source_name} (Floating IP Swap)",
+                    f"echo 'Reverting Floating IP and restarting source app for {source_name}'",
+                    f"read -p \"Provide the Floating IP to revert to {source_name} [leave blank to auto-detect from target]: \" USER_FIP",
+                    f"if [ -n \"$USER_FIP\" ]; then",
+                    f"  FIP=$USER_FIP",
+                    f"else",
+                    f"  FIP=$(openstack server show {target_server_name} -f json | grep -o '\"[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\"' | tr -d '\"' | grep -v '^10\\.' | grep -v '^192\\.168\\.' | grep -v '^172\\.' | head -n 1 || echo \"\")",
+                    f"fi",
+                    f"if [ -n \"$FIP\" ]; then",
+                    f"  openstack server remove floating ip {target_server_name} \"$FIP\" || true",
+                    f"  openstack server add floating ip {source_name} \"$FIP\"",
+                    f"else",
+                    f"  echo 'No FIP found to revert.'",
+                    f"fi",
+                    f"ssh -o StrictHostKeyChecking=no root@{mgmt_ip} 'systemctl start nginx apache2 || true'",
+                    ""
+                ])
+            elif strategy == "dns_swap":
+                sync_commands.extend([
+                    f"echo 'Syncing Linux App Files for {source_name}'",
+                    f"mkdir -p /tmp/sync_{source_name}",
+                    f"rsync -avz --progress -e \"ssh -o StrictHostKeyChecking=no\" root@{mgmt_ip}:/var/www/html/ /tmp/sync_{source_name}/",
+                    f"rsync -avz --progress -e \"ssh -o StrictHostKeyChecking=no\" /tmp/sync_{source_name}/ centos@$TARGET_IP:/var/www/html/",
+                    ""
+                ])
+                cutover_commands.extend([
+                    f"# Cutover Linux App for {source_name} (DNS Swap)",
+                    f"echo 'Stopping app writes and final rsync for {source_name}'",
+                    f"ssh -o StrictHostKeyChecking=no root@{mgmt_ip} 'systemctl stop nginx apache2 || true'",
+                    f"rsync -avz --delete -e \"ssh -o StrictHostKeyChecking=no\" root@{mgmt_ip}:/var/www/html/ /tmp/sync_{source_name}/",
+                    f"rsync -avz --delete -e \"ssh -o StrictHostKeyChecking=no\" /tmp/sync_{source_name}/ centos@$TARGET_IP:/var/www/html/",
+                    f"echo \"==================================================\"",
+                    f"echo \" OPERATIONAL PAUSE: DNS SWAP REQUIRED\"",
+                    f"echo \"==================================================\"",
+                    f"echo \"Please update your DNS Provider (e.g., Route53 / Cloudflare)\"",
+                    f"echo \"to point the A-Record / CNAME for {source_name} to the new FLEX target IP: $TARGET_IP\"",
+                    f"read -p 'Press [Enter] once the DNS record has been updated and propagated...'",
+                    f"echo \"Traffic is transitioning to FLEX. Monitor DNS resolution logs.\"",
+                    ""
+                ])
+                rollback_commands.extend([
+                    f"# Rollback Linux App for {source_name} (DNS Swap)",
+                    f"echo 'Restarting source app services for {source_name}'",
+                    f"ssh -o StrictHostKeyChecking=no root@{mgmt_ip} 'systemctl start nginx apache2 || true'",
+                    f"echo \"==================================================\"",
+                    f"echo \" OPERATIONAL PAUSE: DNS REVERSION REQUIRED\"",
+                    f"echo \"==================================================\"",
+                    f"echo \"Please update your DNS Provider to point the A-Record\"",
+                    f"echo \"back to the legacy OSPC IP.\"",
                     ""
                 ])
             else:

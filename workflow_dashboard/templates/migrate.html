@@ -68,9 +68,11 @@
 
         <label>Migration Strategy
           <select id="migStrategy">
-            <option value="direct">Direct Cutover (Stop Services & Final Sync)</option>
-            <option value="ab_haproxy">A/B Parallel: Install Local HAProxy (Local Split)</option>
-            <option value="ab_reuse_lb">A/B Parallel: Reuse OpenStack LB & HA DB (External Split)</option>
+            <option value="fip_swap">Floating IP Swap (Lowest Downtime / Hot Swap)</option>
+            <option value="dns_swap">DNS CNAME / A-Record Swap (Low Downtime)</option>
+            <option value="ab_reuse_lb">A/B Parallel: Reuse OpenStack LB & HA DB (Medium Downtime)</option>
+            <option value="ab_haproxy">A/B Parallel: Install Local HAProxy (Medium-High Downtime)</option>
+            <option value="direct">Direct Cutover (Highest Downtime / Stop Services)</option>
           </select>
         </label>
       </div>

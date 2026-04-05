@@ -427,20 +427,22 @@ def build_volume_actions(
 
         counter_by_server[target_server_name] = counter_by_server.get(target_server_name, 0) + 1
         idx = counter_by_server[target_server_name]
-        volume_name = f"data-{slugify(target_server_name)}-{idx}"
+        # Volume name explicitly matches the instance name for clear traceability
+        volume_name = f"{slugify(target_server_name)}-data-{idx}"
 
         commands.extend(
             [
                 f'wait_for_server_active {shell_quote(target_server_name)}',
-                f'echo "Creating data volume {volume_name} for {target_server_name}"',
+                f'echo "Creating data volume {volume_name} for instance {target_server_name}"',
                 f"openstack volume create --size {size_gb} --type \"$VOLUME_TYPE\" {shell_quote(volume_name)}",
                 f'wait_for_volume_available {shell_quote(volume_name)}',
                 f'VOL_ID=$(openstack volume show -f value -c id {shell_quote(volume_name)})',
+                f'echo "Attaching volume {volume_name} to instance {target_server_name} at {target_device} (max 5 retries)"',
                 (
-                    "openstack server add volume "
+                    f"attach_volume_with_retry "
                     f"{shell_quote(target_server_name)} "
-                    '"$VOL_ID" '
-                    f"--device {shell_quote(target_device)}"
+                    f"\"$VOL_ID\" "
+                    f"{shell_quote(target_device)}"
                 ),
                 "",
             ]
@@ -661,8 +663,9 @@ def build_script(
 
     planned_steps: List[Tuple[Dict[str, str], List[str]]] = []
     planned_steps.extend((row, block) for row, block in zip(compute_plan, compute_blocks))
-    planned_steps.extend((row, block) for row, block in zip(volume_plan, volume_blocks))
     planned_steps.extend((row, block) for row, block in zip(lb_plan, lb_blocks))
+    # Volume attachment is intentionally LAST — after all instances and LBs are created
+    planned_steps.extend((row, block) for row, block in zip(volume_plan, volume_blocks))
 
     preflight = [
         "#!/usr/bin/env bash",
@@ -893,6 +896,29 @@ def build_script(
         "    return 1",
         "  fi",
         "  openstack server add floating ip \"$server_name\" \"$fip\"",
+        "}",
+        "",
+        "attach_volume_with_retry() {",
+        "  local server_name=\"$1\"",
+        "  local vol_id=\"$2\"",
+        "  local device=\"$3\"",
+        "  local max_retries=5",
+        "  local attempt=0",
+        "  local delay=10",
+        "  while [ \"$attempt\" -lt \"$max_retries\" ]; do",
+        "    attempt=$((attempt + 1))",
+        "    echo \"Attach attempt $attempt/$max_retries: server=$server_name vol=$vol_id device=$device\"",
+        "    if openstack server add volume \"$server_name\" \"$vol_id\" --device \"$device\"; then",
+        "      echo \"Volume $vol_id successfully attached to $server_name at $device\"",
+        "      return 0",
+        "    fi",
+        "    if [ \"$attempt\" -lt \"$max_retries\" ]; then",
+        "      echo \"Attach failed (attempt $attempt/$max_retries); retrying in ${delay}s...\" >&2",
+        "      sleep \"$delay\"",
+        "    fi",
+        "  done",
+        "  echo \"ERROR: Failed to attach volume $vol_id to $server_name after $max_retries attempts.\" >&2",
+        "  return 1",
         "}",
         "",
         'echo "Preflight checks..."',
@@ -1261,7 +1287,8 @@ def main() -> None:
     volume_commands, volume_plan, volume_unresolved = build_volume_actions(block_rows, source_map, included_server_ids)
     lb_commands, lb_plan, lb_unresolved = build_load_balancer_actions(lb_rows, source_map, included_server_ids)
 
-    plan_rows = compute_plan + volume_plan + lb_plan
+    # Execution order: compute first, LBs next, volume attachments LAST
+    plan_rows = compute_plan + lb_plan + volume_plan
     unresolved_rows = compute_unresolved + volume_unresolved + lb_unresolved
 
     account_id = infer_account_id_from_filename(flavor_path)
