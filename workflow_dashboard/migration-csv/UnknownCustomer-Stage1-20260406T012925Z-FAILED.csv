@@ -1,0 +1,2 @@
+step_id,phase,component,target,action,status
+INSTALL,pkg,u24_backend_2,50.56.158.247,python3-pip python3 Python 3.10,FAIL

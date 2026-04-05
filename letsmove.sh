@@ -3,6 +3,18 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ── PERMANENT PERMISSION FIX ──────────────────────────────────────────────────
+# Prevent Python from ever writing __pycache__ files (avoids root-owned debris)
+export PYTHONDONTWRITEBYTECODE=1
+
+# Self-healing: reclaim any root-owned files silently (happens if someone ran
+# "sudo python3" directly in the past).
+if find "$SCRIPT_DIR" -not -user "$(whoami)" -print -quit 2>/dev/null | grep -q .; then
+    echo "-> Fixing file ownership (root-owned files detected)..."
+    sudo chown -R "$(whoami)":"$(whoami)" "$SCRIPT_DIR" 2>/dev/null || true
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Ensure ~/.local/bin is on PATH (where pip installs CLIs like openstack)
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -21,9 +33,9 @@ pip3 install --break-system-packages -q -r "$SCRIPT_DIR/requirements/requirement
 # Navigate to dashboard directory
 cd "$SCRIPT_DIR/workflow_dashboard" || exit 1
 
-# Check syntax before launching
+# Check syntax before launching (no bytecode writing)
 echo "-> Verifying app.py syntax..."
-if ! python3 -m py_compile app.py; then
+if ! python3 -B -m py_compile app.py; then
     echo "ERROR: app.py has a syntax error. Dashboard cannot start."
     exit 1
 fi
@@ -48,13 +60,15 @@ for i in $(seq 1 30); do
     echo "   ... waiting ($i/30)"
 done
 
-echo "-> Opening your default web browser to http://127.0.0.1:5001..."
-if command -v explorer.exe >/dev/null 2>&1; then
+echo "-> Opening Google Chrome to http://127.0.0.1:5001..."
+if command -v cmd.exe >/dev/null 2>&1; then
+    cmd.exe /C start chrome "http://127.0.0.1:5001"
+elif command -v explorer.exe >/dev/null 2>&1; then
     explorer.exe "http://127.0.0.1:5001"
 elif command -v xdg-open >/dev/null 2>&1; then
     xdg-open "http://127.0.0.1:5001"
 else
-    echo "Please manually open http://127.0.0.1:5001 in your browser."
+    echo "Please manually open http://127.0.0.1:5001 in Google Chrome."
 fi
 
 echo "================================================"

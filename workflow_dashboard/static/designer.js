@@ -808,6 +808,97 @@ function applySmartAutoLayout(options = {}) {
   log('Applied smart auto layout.');
 }
 
+// ── Deployment Layout: Networks | Compute+Volumes | DB+DB Volumes ──────────────
+/**
+ * Groups nodes into 3 zones:
+ *   Zone 0 (left)  : network, subnet, router, security_group, load_balancer
+ *   Zone 1 (centre): non-DB instances, each with its attached volumes to the right
+ *   Zone 2 (right) : DB instances,     each with its attached volumes to the right
+ * DB detection: instance name contains mysql/mariadb/postgres/mongo/redis/sql/database/oracle
+ */
+function applyDeploymentLayout(options = {}) {
+  const autoFit = Boolean(options.autoFit);
+  const DB_KW = ['mysql','mariadb','postgres','percona','mongo','redis','sql','db','database','oracle','cassandra'];
+
+  function isDb(node) {
+    const n = nodeDisplayName(node).toLowerCase();
+    return DB_KW.some((k) => n.includes(k));
+  }
+
+  // Build vol -> owner instance map via attach/boot/link edges
+  const nodeById = new Map(state.nodes.map((n) => [n.id, n]));
+  const volOwner = new Map();
+  for (const e of state.edges) {
+    if (!['attach','boot','link'].includes(e.type)) continue;
+    const a = nodeById.get(e.from), b = nodeById.get(e.to);
+    if (!a || !b) continue;
+    const vol  = a.type === 'volume'   ? a : (b.type === 'volume'   ? b : null);
+    const inst = a.type === 'instance' ? a : (b.type === 'instance' ? b : null);
+    if (vol && inst && !volOwner.has(vol.id)) volOwner.set(vol.id, inst.id);
+  }
+
+  const netNodes      = state.nodes.filter((n) => ['network','subnet','router','security_group','load_balancer'].includes(n.type));
+  const computeInst   = state.nodes.filter((n) => n.type === 'instance' && !isDb(n));
+  const dbInst        = state.nodes.filter((n) => n.type === 'instance' &&  isDb(n));
+  const volFor = (instList) => state.nodes.filter(
+    (n) => n.type === 'volume' && instList.some((i) => volOwner.get(n.id) === i.id)
+  );
+  const computeVols   = volFor(computeInst);
+  const dbVols        = volFor(dbInst);
+  const orphanVols    = state.nodes.filter((n) => n.type === 'volume' && !volOwner.has(n.id));
+
+  const PAD   = 40;
+  const ROW_H = 100;
+  const VOL_H =  85;
+  const NET_X = PAD;           // Column 0: network infra
+  const COM_X = 280;           // Column 1: compute instances
+  const VOL_X = COM_X + 170;  // Volumes beside their compute instance
+  const DB_X  = 580;           // Column 2: DB instances
+  const DBV_X = DB_X  + 170;  // Volumes beside their DB instance
+
+  // Sort within each group alphabetically
+  const byName = (a, b) => nodeDisplayName(a).localeCompare(nodeDisplayName(b));
+  netNodes.sort(byName);
+  computeInst.sort(byName);
+  dbInst.sort(byName);
+
+  // Zone 0: Network infra stacked vertically
+  let y = PAD;
+  for (const n of netNodes) { n.x = NET_X; n.y = y; y += ROW_H; }
+
+  // Zone 1: Compute instances + adjacent volumes
+  y = PAD;
+  for (const inst of computeInst) {
+    inst.x = COM_X;
+    inst.y = y;
+    const vols = computeVols.filter((v) => volOwner.get(v.id) === inst.id);
+    vols.sort(byName);
+    let vy = y;
+    for (const vol of vols) { vol.x = VOL_X; vol.y = vy; vy += VOL_H; }
+    y += Math.max(ROW_H, vols.length * VOL_H + 15);
+  }
+
+  // Zone 2: DB instances + adjacent volumes
+  y = PAD;
+  for (const inst of dbInst) {
+    inst.x = DB_X;
+    inst.y = y;
+    const vols = dbVols.filter((v) => volOwner.get(v.id) === inst.id);
+    vols.sort(byName);
+    let vy = y;
+    for (const vol of vols) { vol.x = DBV_X; vol.y = vy; vy += VOL_H; }
+    y += Math.max(ROW_H, vols.length * VOL_H + 15);
+  }
+
+  // Orphan volumes appended below compute zone
+  for (const vol of orphanVols) { vol.x = COM_X; vol.y = y; y += VOL_H; }
+
+  if (autoFit) fitTopologyToCanvas();
+  centerLayoutInCanvas();
+  render();
+  log('🗂 Deployment layout applied: Networks | Compute+Volumes | DB+Volumes');
+}
+
 async function apiGet(url) {
   const res = await fetch(url);
   const data = await res.json();
@@ -993,6 +1084,10 @@ document.getElementById('smartLayoutBtn').addEventListener('click', () => {
   applySmartAutoLayout({ autoFit: false });
 });
 
+document.getElementById('deployLayoutBtn')?.addEventListener('click', () => {
+  applyDeploymentLayout({ autoFit: false });
+});
+
 document.getElementById('saveTopologyBtn').addEventListener('click', async () => {
   const name = document.getElementById('topologyName').value.trim();
   if (!name) {
@@ -1041,6 +1136,8 @@ document.getElementById('loadTopologyBtn').addEventListener('click', async () =>
     state.selectedNodeIds = [];
     render();
     log(`Loaded topology: ${file}`);
+    await injectLbmapEdges();
+    await injectBlockmapEdges();
   } catch (e) {
     log(`Load failed: ${e.message}`);
   }
@@ -1094,6 +1191,106 @@ document.getElementById('planBtn').addEventListener('click', async () => {
   }
 });
 
+// ── LB Map Auto-Edge Injection ───────────────────────────────────────────────
+/**
+ * Reads /api/topology/lbmap-edges and creates 'member' edges between
+ * load_balancer nodes and instance nodes matched by name.
+ * Safe to call multiple times — skips edges that already exist.
+ */
+async function injectLbmapEdges() {
+  try {
+    const data = await apiGet('/api/topology/lbmap-edges');
+    const pairs = Array.isArray(data.edges) ? data.edges : [];
+    if (!pairs.length) {
+      log(`LB map: no member edges to inject (source: ${data.source || 'none'}).`);
+      return 0;
+    }
+    let added = 0;
+    for (const pair of pairs) {
+      const lbNode = state.nodes.find(
+        (n) => n.type === 'load_balancer' && nodeDisplayName(n) === pair.lb_name
+      );
+      const serverNode = state.nodes.find(
+        (n) => n.type === 'instance' && nodeDisplayName(n) === pair.server_name
+      );
+      if (!lbNode) { log(`LB map: LB node not found on canvas: "${pair.lb_name}"`); continue; }
+      if (!serverNode) { log(`LB map: server node not found on canvas: "${pair.server_name}"`); continue; }
+      // Skip if edge already exists in either direction
+      const exists = state.edges.some(
+        (e) => (e.from === lbNode.id && e.to === serverNode.id) ||
+               (e.from === serverNode.id && e.to === lbNode.id)
+      );
+      if (exists) continue;
+      state.edges.push({
+        id: `lbmap-${lbNode.id}-${serverNode.id}`,
+        from: lbNode.id,
+        to: serverNode.id,
+        type: 'member',
+      });
+      added++;
+    }
+    if (added > 0) {
+      render();
+      log(`🔗 Auto-wired ${added} LB member edge(s) from ${data.source}`);
+    } else {
+      log(`LB map: ${pairs.length} pair(s) found in ${data.source} — edges already exist, nothing added.`);
+    }
+    return added;
+  } catch (e) {
+    log(`LB map edge injection skipped: ${e.message}`);
+    return 0;
+  }
+}
+
+/**
+ * Reads /api/topology/blockmap-edges and creates 'attach' edges between
+ * volume nodes and instance nodes matched by name via slugify convention.
+ * Safe to call multiple times — skips edges that already exist.
+ */
+async function injectBlockmapEdges() {
+  try {
+    const data = await apiGet('/api/topology/blockmap-edges');
+    const pairs = Array.isArray(data.edges) ? data.edges : [];
+    if (!pairs.length) {
+      log(`Block map: no volume edges to inject (source: ${data.source || 'none'}).`);
+      return 0;
+    }
+    let added = 0;
+    for (const pair of pairs) {
+      const volNode = state.nodes.find(
+        (n) => n.type === 'volume' && nodeDisplayName(n) === pair.volume_name
+      );
+      const serverNode = state.nodes.find(
+        (n) => n.type === 'instance' && nodeDisplayName(n) === pair.server_name
+      );
+      if (!volNode)    { log(`Block map: volume node not found on canvas: "${pair.volume_name}"`); continue; }
+      if (!serverNode) { log(`Block map: server node not found on canvas: "${pair.server_name}"`); continue; }
+      const exists = state.edges.some(
+        (e) => (e.from === volNode.id && e.to === serverNode.id) ||
+               (e.from === serverNode.id && e.to === volNode.id)
+      );
+      if (exists) continue;
+      state.edges.push({
+        id: `bkmap-${volNode.id}-${serverNode.id}`,
+        from: volNode.id,
+        to: serverNode.id,
+        type: 'attach',
+      });
+      added++;
+    }
+    if (added > 0) {
+      render();
+      log(`📦 Auto-wired ${added} volume→server edge(s) from ${data.source}`);
+    } else {
+      log(`Block map: ${pairs.length} pair(s) found in ${data.source} — edges already exist, nothing added.`);
+    }
+    return added;
+  } catch (e) {
+    log(`Block map edge injection skipped: ${e.message}`);
+    return 0;
+  }
+}
+
 document.getElementById('importLiveBtn').addEventListener('click', async () => {
   await withButtonBusy('importLiveBtn', 'Import from project', async () => {
     try {
@@ -1108,6 +1305,8 @@ document.getElementById('importLiveBtn').addEventListener('click', async () => {
       state.selectedNodeIds = [];
       applySmartAutoLayout({ autoFit: true });
       log(`Imported live topology: nodes=${data.node_count} edges=${data.edge_count}`);
+      await injectLbmapEdges();
+      await injectBlockmapEdges();
     } catch (e) {
       log(`Import failed: ${e.message}`);
     }
@@ -1128,6 +1327,8 @@ document.getElementById('importScriptBtn').addEventListener('click', async () =>
       applySmartAutoLayout({ autoFit: true });
       const notes = Array.isArray(data.parse_notes) ? data.parse_notes.join(' | ') : '';
       log(`Imported script topology: nodes=${data.node_count} edges=${data.edge_count}${notes ? ` | ${notes}` : ''}`);
+      await injectLbmapEdges();
+      await injectBlockmapEdges();
     } catch (e) {
       log(`Script import failed: ${e.message}`);
     }
@@ -1326,6 +1527,75 @@ document.getElementById('phaseSelectNone')?.addEventListener('click', () => {
 
 refreshTopologies().catch((e) => log(`Topology list load failed: ${e.message}`));
 refreshOpenrcFiles().catch((e) => log(`OpenRC list load failed: ${e.message}`));
+
+// ── Wire LB Members button ────────────────────────────────────────────────────
+document.getElementById('wireLbBtn')?.addEventListener('click', async () => {
+  if (!state.nodes.length) { log('Load or import a topology first before wiring LB members.'); return; }
+  await injectLbmapEdges();
+  applySmartAutoLayout({ autoFit: false });
+});
+
+document.getElementById('wireVolBtn')?.addEventListener('click', async () => {
+  if (!state.nodes.length) { log('Load or import a topology first before wiring volumes.'); return; }
+  await injectBlockmapEdges();
+  applySmartAutoLayout({ autoFit: false });
+});
+// ── Generated Script & Activity Log — Export / Clear ─────────────────────────
+function downloadText(filename, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById('exportScriptBtn')?.addEventListener('click', () => {
+  const text = scriptPreview.textContent || '';
+  if (!text || text === 'No script generated yet.') { log('No script to export yet.'); return; }
+  const name = buildTopologyScriptName();
+  downloadText(name, text);
+  log(`Script exported as ${name}`);
+});
+
+document.getElementById('clearScriptBtn')?.addEventListener('click', () => {
+  scriptPreview.textContent = 'No script generated yet.';
+  log('Generated script cleared.');
+});
+
+document.getElementById('exportLogBtn')?.addEventListener('click', () => {
+  const text = logBox.textContent || '';
+  if (!text || text.trim() === 'Ready.') { log('Nothing to export.'); return; }
+  const ts = timestampForScriptName();
+  const filename = `activity_log_${ts}.txt`;
+  downloadText(filename, text);
+  log(`Activity log exported as ${filename}`);
+});
+
+document.getElementById('clearLogBtn')?.addEventListener('click', () => {
+  logBox.textContent = 'Ready.';
+});
+
+// ── Canvas resize handle ──────────────────────────────────────────────────────
+let _resizeDrag = null;
+const _resizeHandle = document.getElementById('canvasResizeHandle');
+if (_resizeHandle) {
+  _resizeHandle.addEventListener('mousedown', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const rect = canvas.getBoundingClientRect();
+    _resizeDrag = { startX: ev.clientX, startY: ev.clientY, startW: rect.width, startH: rect.height };
+  });
+}
+document.addEventListener('mousemove', (ev) => {
+  if (!_resizeDrag) return;
+  const newW = Math.max(420, _resizeDrag.startW + (ev.clientX - _resizeDrag.startX));
+  const newH = Math.max(420, _resizeDrag.startH + (ev.clientY - _resizeDrag.startY));
+  canvas.style.width  = `${newW}px`;
+  canvas.style.height = `${newH}px`;
+  renderEdges();
+});
+document.addEventListener('mouseup', () => { _resizeDrag = null; });
+
 const canvasResizeObserver = new ResizeObserver(() => renderEdges());
 canvasResizeObserver.observe(canvas);
 window.addEventListener('resize', () => renderEdges());

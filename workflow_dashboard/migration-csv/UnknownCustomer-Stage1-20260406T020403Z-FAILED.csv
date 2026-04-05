@@ -1,0 +1,4 @@
+step_id,phase,component,target,packages,status
+INSTALL,pkg,u24_backend_2,50.56.158.247,python3-pip python3,PASS
+INSTALL,pkg,u24_frontend_2,50.56.158.17,nginx nodejs npm,PASS
+INSTALL,pkg,rocky8,50.56.158.196,base-system openssh-server,FAIL

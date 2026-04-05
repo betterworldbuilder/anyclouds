@@ -274,11 +274,36 @@
         var(--grid-offset-x) var(--grid-offset-y),
         var(--grid-offset-x) var(--grid-offset-y),
         center;
+      width: clamp(260px, 100%, 100%);
       overflow: hidden;
       height: clamp(500px, 62vh, 760px);
       min-height: 500px;
       flex: 1 1 auto;
     }
+
+    /* Drag-resize handle at canvas bottom-right */
+    .canvas-resize-handle {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 22px;
+      height: 22px;
+      cursor: se-resize;
+      z-index: 30;
+      opacity: 0.45;
+      transition: opacity 0.15s;
+      pointer-events: all;
+    }
+    .canvas-resize-handle::before,
+    .canvas-resize-handle::after {
+      content: '';
+      position: absolute;
+      border-radius: 1px;
+      background: #a5b4fc;
+    }
+    .canvas-resize-handle::before { width: 16px; height: 2px; bottom: 6px; right: 2px; }
+    .canvas-resize-handle::after  { width: 2px; height: 16px; bottom: 2px; right: 6px; }
+    .canvas-resize-handle:hover { opacity: 1; }
 
     .scene {
       position: absolute;
@@ -513,6 +538,29 @@
       height: 100%;
     }
 
+    /* ── Phase status badges ───────────────────────────────────── */
+    .phase-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 1px 7px;
+      line-height: 1.4;
+      transition: background 0.3s, color 0.3s;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .phase-status.idle   { background: rgba(255,255,255,0.07); color: #7a8ab0; border-color: rgba(255,255,255,0.12); }
+    .phase-status.running { background: rgba(234,179,8,0.18); color: #fde68a; border-color: rgba(234,179,8,0.4); animation: pulseBadge 1.2s ease-in-out infinite; }
+    .phase-status.success { background: rgba(34,197,94,0.18); color: #86efac; border-color: rgba(34,197,94,0.4); }
+    .phase-status.fail    { background: rgba(239,68,68,0.18);  color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+    @keyframes pulseBadge {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.55; }
+    }
+
     @media (max-width: 1200px) {
       .layout { grid-template-rows: auto auto; height: auto; }
       .top-grid { grid-template-columns: 1fr; }
@@ -580,6 +628,7 @@
         <button id="zoomResetBtn">Reset Zoom</button>
         <button id="autoLayoutBtn">Simple Auto Layout</button>
         <button id="smartLayoutBtn">Smart Auto Layout</button>
+        <button id="deployLayoutBtn" title="Groups: Networks | Compute+Volumes | DB+DB Volumes">🗂 Deployment Layout</button>
         <span id="zoomLabel" class="hint">Zoom: 100%</span>
         <button id="validateBtn">Validate Topology</button>
         <button id="planBtn">Preview Plan</button>
@@ -593,6 +642,7 @@
           <div class="canvas-grid"></div>
           <svg id="edges" class="edges"></svg>
         </div>
+        <div id="canvasResizeHandle" class="canvas-resize-handle" title="Drag to resize canvas"></div>
       </div>
       <p class="hint">Designer script target: <code>uploads/{account_id}_topology_deploy_{datetime}.sh</code></p>
       <div class="legend">
@@ -641,49 +691,127 @@
         <input id="authSecret" type="password" placeholder="Used as OS_PASSWORD when required by auth" />
       </label>
       <label>Deployment Phases (Batch Deployment)
+        <!-- ── How it works ─────────────────────────────────────────────────── -->
+        <details open style="margin:6px 0 4px 0;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.25);border-radius:6px;padding:0;">
+          <summary style="cursor:pointer;padding:6px 10px;font-size:0.76rem;font-weight:600;color:#a5b4fc;list-style:none;display:flex;align-items:center;gap:6px;user-select:none;">
+            <span style="font-size:0.85rem;">ℹ️</span> How each phase works
+          </summary>
+          <div style="padding:8px 12px 10px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.74rem;line-height:1.5;color:#cbd5e1;">
+
+            <div style="border-left:3px solid #818cf8;padding-left:8px;">
+              <strong style="color:#e0e7ff;">①  Networks</strong><br>
+              Creates networks, subnets, routers &amp; security groups — the foundation everything else depends on.
+              Must always run first.
+            </div>
+
+            <div style="border-left:3px solid #818cf8;padding-left:8px;">
+              <strong style="color:#e0e7ff;">②  LB Scaffold</strong><br>
+              Creates the <em>empty</em> Load Balancer + Listener + Pool (Octavia Amphora).
+              Runs <strong>before</strong> Compute because Amphora provisioning takes ~8 min —
+              it completes in the background while VMs boot.
+            </div>
+
+            <div style="border-left:3px solid #818cf8;padding-left:8px;">
+              <strong style="color:#e0e7ff;">③  Volume Create</strong><br>
+              Pre-provisions Cinder block storage volumes.
+              Done early so volumes are <code>available</code> by the time VMs are ACTIVE.
+            </div>
+
+            <div style="border-left:3px solid #818cf8;padding-left:8px;">
+              <strong style="color:#e0e7ff;">④  Compute &amp; DB</strong><br>
+              Launches all instances from migrated OSPC images (DB servers included — they boot with their data intact from the Glance image).
+              Windows VMs fire in background (sysprep is slow); Linux VMs run inline.
+            </div>
+
+            <div style="border-left:3px solid #818cf8;padding-left:8px;">
+              <strong style="color:#e0e7ff;">⑤  LB Creation</strong><br>
+              Waits for each VM to be <code>ACTIVE</code>, resolves its private IP, then registers it
+              as a pool member in the LB created in Phase 2.
+              Floating IPs are assigned <em>manually</em> after deploy.
+            </div>
+
+            <div style="border-left:3px solid #818cf8;padding-left:8px;">
+              <strong style="color:#e0e7ff;">⑥  Volume Attach</strong><br>
+              Runs <strong>last</strong> — attaches pre-created volumes to running instances.
+              Up to 5 retries per attachment. Volumes must be <code>available</code>
+              and instances must be <code>ACTIVE</code>.
+            </div>
+
+          </div>
+        </details>
+
         <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
           <!-- Row: select-all toggle -->
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:2px;">
             <button type="button" id="phaseSelectAll" title="Check or uncheck all phases" style="font-size:0.72rem;padding:2px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#c7d2fe;cursor:pointer;">☑ All</button>
             <button type="button" id="phaseSelectNone" title="Uncheck all phases" style="font-size:0.72rem;padding:2px 8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#c7d2fe;cursor:pointer;">☐ None</button>
+            <button type="button" id="resetStatusBtn" title="Clear all phase status badges and reset stored state" style="font-size:0.72rem;padding:2px 8px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);border-radius:4px;color:#fca5a5;cursor:pointer;">↺ Reset Status</button>
             <span style="font-size:0.72rem;color:#94a3b8;font-style:italic;">Run only the phases you need — safe to re-run any phase.</span>
           </div>
+
           <!-- Phase rows -->
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 12px;">
-            <label title="Phase 1 — Create networks, subnets, routers, security groups. Must run before everything else." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+
+            <label title="Phase 1 — Create networks, subnets, routers, security groups." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;flex-wrap:wrap;">
               <input type="checkbox" id="phaseNet" checked value="net" style="accent-color:#818cf8;" />
               <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">1</span>
               Networks
+              <span id="status-net" class="phase-status idle">⬜ —</span>
             </label>
-            <label title="Phase 2 — Create Load Balancer, listener and pool scaffold. Started BEFORE VMs so Octavia Amphora provisioning runs in parallel." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+
+            <label title="Phase 2 — Create Load Balancer scaffold before VMs." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;flex-wrap:wrap;">
               <input type="checkbox" id="phaseLbScaffold" checked value="lb_scaffold" style="accent-color:#818cf8;" />
               <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">2</span>
               LB Scaffold
+              <span id="status-lb_scaffold" class="phase-status idle">⬜ —</span>
             </label>
-            <label title="Phase 3 — Create block volumes (no attach yet). Runs in parallel with VM boot to hide Cinder provisioning latency." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+
+            <label title="Phase 3 — Create block volumes (no attach yet)." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;flex-wrap:wrap;">
               <input type="checkbox" id="phaseVolCreate" checked value="vol_create" style="accent-color:#818cf8;" />
               <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">3</span>
               Volume Create
+              <span id="status-vol_create" class="phase-status idle">⬜ —</span>
             </label>
-            <label title="Phase 4 — Launch compute. Windows VMs fired first (async background) while Linux VMs boot in parallel, then collect all PIDs. Assign floating IPs last." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+
+            <label title="Phase 4 — Launch all compute instances including database servers (recreated from migrated OSPC images)." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;flex-wrap:wrap;">
               <input type="checkbox" id="phaseVm" checked value="vm" style="accent-color:#818cf8;" />
               <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">4</span>
-              Compute
+              Compute &amp; DB
+              <span id="status-vm" class="phase-status idle">⬜ —</span>
             </label>
-            <label title="Phase 5 — Attach pre-created volumes to their servers. Servers must be ACTIVE first; waits and retries automatically." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
-              <input type="checkbox" id="phaseVolAttach" checked value="vol_attach" style="accent-color:#818cf8;" />
-              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">5</span>
-              Volume Attach
-            </label>
-            <label title="Phase 6 — Wire LB members (server IPs → pool). Also assigns floating IPs to LB VIPs. Runs after compute so member IPs are resolvable." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;">
+
+            <label title="Phase 5 — Copy LB/Listener/Pool from OSPC and wire server IPs as members (no floating IP needed)." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;flex-wrap:wrap;">
               <input type="checkbox" id="phaseLbMembers" checked value="lb_members" style="accent-color:#818cf8;" />
-              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">6</span>
-              LB Members
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">5</span>
+              LB Creation
+              <span id="status-lb_members" class="phase-status idle">⬜ —</span>
             </label>
+
+            <label title="Phase 6 — Optional: attach volumes to running instances. Can also be done manually via Horizon or CLI after deploy." style="display:inline-flex;align-items:center;gap:5px;color:#e0e7ff;font-size:0.82rem;cursor:pointer;flex-wrap:wrap;">
+              <input type="checkbox" id="phaseVolAttach" checked value="vol_attach" style="accent-color:#818cf8;" />
+              <span style="background:#312e81;color:#a5b4fc;border-radius:4px;padding:1px 5px;font-size:0.7rem;font-weight:700;margin-right:2px;">6</span>
+              Vol Attach <span style="color:#94a3b8;font-size:0.7rem;font-style:italic;">(optional — manual)</span>
+              <span id="status-vol_attach" class="phase-status idle">⬜ —</span>
+            </label>
+
           </div>
         </div>
       </label>
       <label><input id="failFast" type="checkbox" /> Fail fast</label>
+
+      <!-- ── Inline Deploy shortcut ─────────────────────────────────────────── -->
+      <div style="margin-top:8px;">
+        <button id="deployBtn2"
+          title="Deploy selected phases now (same as Deploy Now button above)"
+          style="width:100%;padding:9px 0;font-size:0.9rem;font-weight:700;
+                 background:linear-gradient(135deg,#4f46e5,#7c3aed);
+                 border:1px solid #818cf8;border-radius:6px;color:#fff;
+                 cursor:pointer;letter-spacing:0.03em;
+                 box-shadow:0 0 12px rgba(99,102,241,0.45);
+                 transition:filter 0.15s,box-shadow 0.15s;">
+          🚀 Deploy Now
+        </button>
+      </div>
 
       <button id="importLiveBtn">Import From Project</button>
       <p class="hint">Import uses the same OpenRC credentials and discovers resources currently in your project.</p>
@@ -695,6 +823,9 @@
       </label>
       <button id="importScriptBtn">Import From Script</button>
       <p class="hint">Script import performs a best-effort parse of OpenStack CLI commands and builds visual nodes/links.</p>
+      <button id="wireLbBtn" title="Reads the latest *_lbmap.csv and auto-draws member edges from LB nodes to server nodes" style="background:rgba(99,102,241,0.18);border:1px solid #818cf8;color:#a5b4fc;border-radius:5px;padding:4px 12px;cursor:pointer;font-size:0.8rem;margin-top:2px;">🔗 Wire LB Members from lbmap.csv</button>
+      <button id="wireVolBtn" title="Reads the latest *_blockmap.csv and auto-draws attach edges from volume nodes to server nodes" style="background:rgba(99,102,241,0.18);border:1px solid #818cf8;color:#a5b4fc;border-radius:5px;padding:4px 12px;cursor:pointer;font-size:0.8rem;margin-top:2px;">📦 Wire Volumes from blockmap.csv</button>
+      <p class="hint">Auto-draws edges between nodes and their servers based on <em>*_lbmap.csv</em> and <em>*_blockmap.csv</em>. Safe to re-run.</p>
       </section>
 
       <section class="card stack preview-dual">
@@ -706,12 +837,24 @@
       </section>
 
       <section class="card stack preview-single">
-      <h2>Generated Script</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:6px;">
+        <h2 style="margin:0;">Generated Script</h2>
+        <span style="display:flex;gap:4px;">
+          <button id="exportScriptBtn" title="Download script as .sh file" style="font-size:10px;padding:3px 8px;background:rgba(99,102,241,0.25);border:1px solid #818cf8;color:#c7d2fe;">&#8681; Export</button>
+          <button id="clearScriptBtn" title="Clear script preview" style="font-size:10px;padding:3px 8px;background:rgba(220,38,38,0.18);border:1px solid #f87171;color:#fca5a5;">&#10005; Clear</button>
+        </span>
+      </div>
       <pre id="scriptPreview">No script generated yet.</pre>
       </section>
 
       <section class="card stack preview-single">
-      <h2>Activity Log</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:6px;">
+        <h2 style="margin:0;">Activity Log</h2>
+        <span style="display:flex;gap:4px;">
+          <button id="exportLogBtn" title="Download activity log as .txt file" style="font-size:10px;padding:3px 8px;background:rgba(99,102,241,0.25);border:1px solid #818cf8;color:#c7d2fe;">&#8681; Export</button>
+          <button id="clearLogBtn" title="Clear activity log" style="font-size:10px;padding:3px 8px;background:rgba(220,38,38,0.18);border:1px solid #f87171;color:#fca5a5;">&#10005; Clear</button>
+        </span>
+      </div>
       <pre id="logBox">Ready.</pre>
       </section>
     </div>
@@ -740,6 +883,186 @@
   </div>
 
   <script src="/static/designer.js"></script>
+
+  <!-- ── Phase Status Badge Logic ─────────────────────────────────────────── -->
+  <script>
+  (function phaseStatusTracker() {
+
+    // ── Config ────────────────────────────────────────────────────────────────
+    // Phase order matches the numbered list in the UI (1–6)
+    const PHASE_ORDER = ['net', 'lb_scaffold', 'vol_create', 'vm', 'lb_members', 'vol_attach'];
+    const PHASE_IDS   = {
+      net:         'status-net',
+      lb_scaffold: 'status-lb_scaffold',
+      vol_create:  'status-vol_create',
+      vm:          'status-vm',
+      lb_members:  'status-lb_members',
+      vol_attach:  'status-vol_attach',
+    };
+
+    // Match the EXACT rocket-banner line: "[HH:MM:SS] 🚀  PHASE N: <title>"
+    const PHASE_START_RE = [
+      { re: /🚀\s+PHASE\s+1[:\s]/,  phase: 'net'         },
+      { re: /🚀\s+PHASE\s+2[:\s]/,  phase: 'lb_scaffold' },
+      { re: /🚀\s+PHASE\s+3[:\s]/,  phase: 'vol_create'  },
+      { re: /🚀\s+PHASE\s+4[:\s]/,  phase: 'vm'          },
+      { re: /🚀\s+PHASE\s+5[:\s]/,  phase: 'lb_members'  },
+      { re: /🚀\s+PHASE\s+6[:\s]/,  phase: 'vol_attach'  },
+    ];
+
+    // ── Signals ───────────────────────────────────────────────────────────────
+    // PRIMARY: frontend JS emits this exact line after every deploy job:
+    //   "[H:MM:SS PM] Deploy complete: ok=true rc=0 script=uploads/..."
+    //   ok=true  → phase succeeded (trust rc=0 even if ✖ lines present)
+    //   ok=false → phase failed at bash exit level
+    const DONE_OK_RE   = /Deploy complete:\s*ok=true/i;
+    const DONE_FAIL_RE = /Deploy complete:\s*ok=false/i;
+
+    // SECONDARY: bash script summary line — "Errors encountered : N"
+    //   Emitted BEFORE the frontend's Deploy complete line.
+    //   Used only for the bash DEPLOY COMPLETE fallback path.
+    const ERR_COUNT_RE = /Errors encountered\s*:\s*(\d+)/;
+
+    // FALLBACK: bash script final echo (fires before frontend's Deploy complete)
+    const BASH_DONE_RE = /✅\s+DEPLOY COMPLETE/;
+
+    // ✖ from err() function — silent tracking only; badge NOT set here
+    const ERR_RE = /✖\s/;
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    let currentPhase  = null;   // key from PHASE_IDS
+    let phaseHadError = false;  // accumulated error flag (painted only on close)
+
+    // ── localStorage persistence ───────────────────────────────────────────────
+    const LS_PREFIX = 'phase_badge_';
+
+    function saveBadge(phase, state, label) {
+      try {
+        localStorage.setItem(LS_PREFIX + phase, JSON.stringify({ state, label }));
+      } catch (_) {}
+    }
+
+    function loadBadge(phase) {
+      try {
+        const raw = localStorage.getItem(LS_PREFIX + phase);
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) { return null; }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function setBadge(phase, state, label) {
+      const el = document.getElementById(PHASE_IDS[phase]);
+      if (!el) return;
+      el.className = 'phase-status ' + state;
+      el.textContent = label;
+      saveBadge(phase, state, label);
+    }
+
+    function closeCurrentPhase(forceOk) {
+      if (!currentPhase) return;
+      const failed = (forceOk === true)  ? false
+                   : (forceOk === false) ? true
+                   : phaseHadError;
+      setBadge(currentPhase, failed ? 'fail' : 'success', failed ? '❌ Failed' : '✅ Success');
+      currentPhase  = null;
+      phaseHadError = false;
+    }
+
+    // Full reset — clears localStorage too.
+    function resetAllBadges() {
+      PHASE_ORDER.forEach(p => {
+        setBadge(p, 'idle', '⬜ —');
+        try { localStorage.removeItem(LS_PREFIX + p); } catch (_) {}
+      });
+      currentPhase  = null;
+      phaseHadError = false;
+    }
+    window.resetPhaseBadges = resetAllBadges; // expose for console + button
+
+    document.getElementById('resetStatusBtn')?.addEventListener('click', () => {
+      resetAllBadges();
+    });
+
+    // ── Restore saved badge state on load ────────────────────────────────────
+    // Any badge stuck at 'running' from a crashed previous session → idle.
+    PHASE_ORDER.forEach(p => {
+      const saved = loadBadge(p);
+      if (!saved) return;
+      const state = saved.state === 'running' ? 'idle' : saved.state;
+      const label = saved.state === 'running' ? '⬜ —' : saved.label;
+      const el = document.getElementById(PHASE_IDS[p]);
+      if (el) { el.className = 'phase-status ' + state; el.textContent = label; }
+    });
+
+    function processLogLine(line) {
+      // ── PRIORITY 1: Frontend final verdict ─────────────────────────────────
+      // "[3:01:30 PM] Deploy complete: ok=true rc=0 script=uploads/..."
+      // This is the single authoritative signal. ok=true wins even if ✖ lines
+      // appeared during the run (rc=0 means bash exited cleanly).
+      if (DONE_OK_RE.test(line))   { closeCurrentPhase(true);  return; }
+      if (DONE_FAIL_RE.test(line)) { closeCurrentPhase(false); return; }
+
+      // ── PRIORITY 2: Bash "Errors encountered : N" summary line ─────────────
+      // Emitted ~1s before the frontend's Deploy complete line.
+      // Only used as tiebreaker if bash DEPLOY COMPLETE fires before the
+      // frontend line (e.g. streaming ends abruptly).
+      const errMatch = line.match(ERR_COUNT_RE);
+      if (errMatch && parseInt(errMatch[1], 10) > 0) {
+        phaseHadError = true;
+        return;  // do NOT close yet — wait for DEPLOY COMPLETE or Deploy complete
+      }
+
+      // ── PRIORITY 3 (removed as closer): Bash DEPLOY COMPLETE banner ─────────
+      // "✅  DEPLOY COMPLETE at Sun Apr  5 ..."
+      // We intentionally do NOT close the phase here.
+      // Reason: this banner fires *before* the frontend's "Deploy complete:" line.
+      // If we closed here using phaseHadError, ok=true rc=0 would be ignored
+      // because closeCurrentPhase() would find currentPhase already null.
+      // The frontend's Deploy complete: ok=true/false is always the final word.
+
+      // ── PRIORITY 4: New phase rocket-banner ───────────────────────────────
+      // "[14:54:10] 🚀  PHASE 2: LB Scaffold ..."
+      // Close the previous phase (marks it done) and start the new one.
+      for (const { re, phase } of PHASE_START_RE) {
+        if (re.test(line)) {
+          closeCurrentPhase();
+          currentPhase  = phase;
+          phaseHadError = false;
+          setBadge(phase, 'running', '⏳ Running');
+          return;
+        }
+      }
+
+      if (!currentPhase) return;
+
+      // ── PRIORITY 5: Error tracking — SILENT, badge NOT updated here ────────
+      // "✖  FAILED to create instance: win2019websql2019 ..."
+      // We ONLY set the flag; the badge is painted at closeCurrentPhase() time.
+      // This avoids flickering: Phase 4 had 3 × ✖ but ended ok=true rc=0.
+      if (ERR_RE.test(line)) {
+        phaseHadError = true;
+      }
+    }
+
+    // ── Hook into the Activity Log — MutationObserver ────────────────────────
+    const logBox = document.getElementById('logBox');
+    if (logBox) {
+      let lastLen = 0;
+      const observer = new MutationObserver(() => {
+        const text = logBox.textContent || '';
+        if (text.length <= lastLen) return;
+        const newText = text.slice(lastLen);
+        lastLen = text.length;
+        newText.split('\n').forEach(processLogLine);
+      });
+      observer.observe(logBox, { childList: true, characterData: true, subtree: true });
+    }
+
+    // ── Expose manual full-reset for console use ─────────────────────────────
+    // Call window.resetPhaseBadges() in DevTools to clear all stages.
+    window.resetPhaseBadges = resetAllBadges;
+  })();
+  </script>
   <script>
   // ── Auto-fill Deploy Auth from Cloud Credentials (localStorage) ───────────
   // These keys are written by the Cloud Credentials panel in the Scanner page.
@@ -799,6 +1122,22 @@
 
     // Expose globally so designer.js can call it if needed
     window.applyStoredCredentials = () => populate(true);
+  })();
+  </script>
+
+  <!-- ── deployBtn2 relay ──────────────────────────────────────────────────── -->
+  <script>
+  (function () {
+    const btn2    = document.getElementById('deployBtn2');
+    const primary = document.getElementById('deployBtn');
+    if (!btn2 || !primary) return;
+
+    // Relay click → fires all existing deploy logic on the primary button
+    btn2.addEventListener('click', () => primary.click());
+
+    // Hover brightness (can't use :hover in inline style)
+    btn2.addEventListener('mouseenter', () => btn2.style.filter = 'brightness(1.18)');
+    btn2.addEventListener('mouseleave', () => btn2.style.filter = '');
   })();
   </script>
 </body>

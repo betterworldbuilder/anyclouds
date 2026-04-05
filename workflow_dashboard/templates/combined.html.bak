@@ -1,0 +1,2024 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OSPC to FLEX Migration Dashboard</title>
+  <style>
+    :root {
+      --bg: #233a6b; --card: #0f1e3e88; --text: #ffffff;
+      --muted: #d4ddf5; --border: #8ea2cc66; --primary: #4b5f91;
+      --orange: #c35f00; --orange-b: #d87000; --green: #27ae60;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Tahoma, sans-serif; font-size: 14px;
+      background: linear-gradient(120deg,#2a4e8d 0%,#374a86 45%,#5a4b72 100%);
+      color: var(--text); height: 100vh; display: flex;
+      flex-direction: column; overflow: hidden;
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
+    @keyframes neon-flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 40px #fff,
+          0 0 80px #00f3ff, 0 0 120px #00f3ff, 0 0 160px #00f3ff,
+          0 0 200px #00f3ff;
+        color: #fff;
+      }
+      20%, 24%, 55% { text-shadow: none; color: #99ccdd; }
+    }
+    @keyframes neon-pulse {
+      0%, 100% { opacity: 1; text-shadow: 0 0 10px #ff00ff, 0 0 30px #ff00ff, 0 0 60px #ff00ff, 0 0 100px #ff00ff; }
+      50% { opacity: 0.85; text-shadow: 0 0 5px #ff66ff, 0 0 15px #ff66ff, 0 0 35px #ff66ff; }
+    }
+    @keyframes scanline {
+      0% { background-position: 0 0; }
+      100% { background-position: 0 200px; }
+    }
+    @keyframes ticker-scroll {
+      0%   { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+    @keyframes corner-glow {
+      0%, 100% { opacity: 0.6; } 50% { opacity: 1; }
+    }
+    header {
+      background: linear-gradient(180deg, #000d1a 0%, #021628 50%, #061e3a 100%);
+      padding: 18px 30px 14px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 3px solid #00f3ff;
+      box-shadow: 0 0 40px rgba(0,243,255,0.5), 0 0 80px rgba(0,243,255,0.2), inset 0 -2px 30px rgba(0,243,255,0.15);
+      position: relative;
+      overflow: hidden;
+      min-height: 110px;
+    }
+    /* CRT scanlines */
+    header::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,243,255,0.03) 0px, rgba(0,243,255,0.03) 1px,
+        transparent 1px, transparent 5px
+      );
+      pointer-events: none;
+      animation: scanline 6s linear infinite;
+      z-index: 0;
+    }
+    /* Corner neon decorators */
+    header::after {
+      content: '◈ ─────────────── ◈';
+      position: absolute;
+      bottom: 38px; left: 50%; transform: translateX(-50%);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: rgba(0,243,255,0.3);
+      letter-spacing: 6px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .header-inner { position: relative; z-index: 1; text-align: center; }
+    header h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(28px, 4vw, 52px);
+      font-weight: 900;
+      letter-spacing: clamp(3px, 0.6vw, 10px);
+      text-transform: uppercase;
+      color: #00f3ff;
+      animation: neon-flicker 6s infinite alternate;
+      line-height: 1.1;
+      margin: 0;
+      white-space: nowrap;
+    }
+    header h1 .shield {
+      margin-right: 10px;
+      font-size: 1em;
+      filter: drop-shadow(0 0 12px #00f3ff) drop-shadow(0 0 24px #00f3ff);
+    }
+    header h1 .accent {
+      color: #ff00ff;
+      animation: neon-pulse 2s ease-in-out infinite;
+      font-style: italic;
+    }
+    /* Scrolling ticker subtitle */
+    .header-ticker-wrap {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      overflow: hidden;
+      margin-top: 8px;
+      border-top: 1px solid rgba(0,243,255,0.2);
+      border-bottom: 1px solid rgba(0,243,255,0.2);
+      padding: 4px 0;
+    }
+    .header-ticker {
+      display: inline-block;
+      white-space: nowrap;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: clamp(10px, 1.1vw, 13px);
+      color: #7ecfff;
+      letter-spacing: 1px;
+      text-shadow: 0 0 8px rgba(0,243,255,0.7);
+      animation: ticker-scroll 40s linear infinite;
+    }
+    .header-ticker .sep { color: #ff00ff; margin: 0 16px; opacity: 0.8; }
+
+    /* Stage row */
+    .stage-bar {
+      display: flex; gap: 4px; padding: 6px 10px;
+      background: #ffffff14; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; overflow-x: auto; flex-wrap: nowrap; align-items: stretch;
+    }
+    .stage-btn {
+      flex: 1 1 0; min-width: 0; border: 2px solid #00f3ff;
+      background: rgba(0, 24, 70, 0.7); color: #fff; border-radius: 8px;
+      padding: 10px 10px; cursor: pointer; font-weight: 700; font-size: 18px;
+      text-align: center; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
+      line-height: 1.4;
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.2);
+      text-shadow: 0 0 8px rgba(0,243,255,0.7);
+    }
+    .stage-btn small {
+        font-size: 12px; font-weight: normal; text-shadow: none; opacity: 0.8;
+    }
+    .stage-btn.active {
+      background: rgba(0, 243, 255, 0.2); border-color: #00f3ff;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.8), inset 0 0 15px rgba(0, 243, 255, 0.5);
+    }
+    .stage-tracker-btn {
+      flex: 1 1 0; min-width: 0; border: 2px solid #00f3ff !important;
+      background: rgba(0, 24, 70, 0.7) !important; color: #fff; border-radius: 8px;
+      padding: 10px 10px; cursor: pointer; font-weight: 700; font-size: 18px;
+      text-align: center; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
+      line-height: 1.4; text-decoration: none; flex-direction: column; justify-content: center; align-items: center; display: flex;
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.2) !important;
+      text-shadow: 0 0 8px rgba(0,243,255,0.7);
+    }
+    .stage-tracker-btn:hover { background: rgba(0, 243, 255, 0.15) !important; box-shadow: 0 0 15px rgba(0,243,255,.8), inset 0 0 15px rgba(0,243,255,.5) !important; }
+
+    /* Sub-tab bar */
+    .sub-bar {
+      display: none; gap: 6px; padding: 5px 10px;
+      background: #0f1e3e55; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto;
+    }
+    .sub-bar.visible { display: flex; }
+    .sub-btn {
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--text); border-radius: 6px; padding: 5px 12px;
+      cursor: pointer; font-weight: 600; font-size: 12px; white-space: nowrap;
+    }
+    .sub-btn.active { background: var(--primary); border-color: #8ea2cc; }
+
+    /* Panel area */
+    .panel-area { flex: 1; overflow: hidden; position: relative; }
+    .panel { display: none; width: 100%; height: 100%; }
+    .panel.active { display: block; }
+    iframe { width: 100%; height: 100%; border: none; background: transparent; }
+
+    /* Info panels */
+    .info-panel { height: 100%; overflow-y: auto; padding: 20px 24px; }
+    .info-panel h2 { font-size: 17px; color: #7ecfff; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+    .info-panel h3 { font-size: 13px; color: #a8d8ff; margin: 14px 0 6px; }
+    .info-panel ul { padding-left: 20px; line-height: 1.75; color: var(--muted); }
+    .info-panel ul li { margin-bottom: 3px; }
+    .badge { display: inline-block; background: #1a3a5c; border: 1px solid #4b6fa0; border-radius: 4px; padding: 2px 7px; font-size: 11px; margin-right: 4px; }
+    .matrix-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    .matrix-table th { background: #1a3a5c; color: #7ecfff; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    .matrix-table td { padding: 7px 10px; border-bottom: 1px solid #ffffff15; color: var(--muted); vertical-align: top; }
+    .matrix-table tr:hover td { background: #ffffff08; }
+    .notice { display: inline-flex; align-items: center; gap: 8px; background: #1a3a5c; border: 1px solid #4b6fa0; border-radius: 6px; padding: 9px 14px; color: #a8d8ff; font-size: 13px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1><span class="shield">🛡</span> OSPC <span class="accent">to</span> FLEX Migration Workflows</h1>
+  </div>
+  <div class="header-ticker-wrap">
+    <span class="header-ticker">
+      ✦ End-to-end automated Migration lifecycle
+      <span class="sep">◈</span>
+      OSPC infra Audit &amp; inventory
+      <span class="sep">◈</span>
+      Resources planning &amp; Optimization
+      <span class="sep">◈</span>
+      OSPC to FLEX Infrastructure Migration &amp; Upgrade
+      <span class="sep">◈</span>
+      VM Shift and Lift
+      <span class="sep">◈</span>
+      System Data Transfer
+      <span class="sep">◈</span>
+      A/B Migration Strategy
+      <span class="sep">◈</span>
+      Cut Off &amp; Validation
+      <span class="sep">◈</span>
+      Production Go-Live ✦
+    </span>
+  </div>
+</header>
+
+<!-- ── All 5 stage buttons on one row ───────────────── -->
+<div class="stage-bar" id="stageBar">
+  <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 WHY Move to FLEX<br><small>Business Value</small></button>
+  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customers Log<br><small>Migration Tracker</small></button>
+  <button class="stage-btn" data-stage="s1">STAGE 1<br><small>Discovery</small></button>
+  <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Migration</small></button>
+  <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
+  <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
+  <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
+</div>
+
+<!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
+<div class="sub-bar visible" id="subBar1">
+  <button class="sub-btn active" data-sub="s1info">📋 Discovery &amp; Assessment</button>
+  <button class="sub-btn" data-sub="s1ospc">⚙️ OSPC Scanner and Deployment Script Generator</button>
+  <button class="sub-btn" data-sub="s1analyze">📄 OSPC Inventory and Flex Mapper</button>
+  <button class="sub-btn" data-sub="s1flavors">🖼 OSPC Flavors &amp; Images</button>
+  <button class="sub-btn" data-sub="s1k8s">☸️ Kubernetes Scanner</button>
+</div>
+
+<!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
+<div class="sub-bar" id="subBar2">
+  <button class="sub-btn active" data-sub="s2image">🚀 Option 1: Direct Shift and Lift of VM OSPC 2 FLEX</button>
+  <button class="sub-btn" data-sub="s2rehost_p1">🛠 Option 2: REHOST / Phase 1: OSPC 2FLEX infra cloning</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Option 2: REHOST / Phase 2 - Option 1: Apps Migration Manual semi Auto</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2">📊 Option 2: REHOST / Phase 2 - Option 2: Data Migration Full auto mode</button>
+</div>
+
+<!-- ── Panels ─────────────────────────────────────────── -->
+<div class="panel-area">
+
+  <!-- WHY MOVE TO FLEX PROMO PAGE -->
+  <div class="panel active" id="panel-s_why">
+    <div style="padding:40px; max-width:1000px; margin:0 auto; overflow:auto; height:100%;">
+      <h1 style="color:#7ecfff; font-size:36px; margin-bottom:10px; text-align:center;">Why Move to FLEX?</h1>
+      <p style="color:#a8d8ff; font-size:18px; text-align:center; margin-bottom:40px;">Rackspace encourages OSPC (OpenStack Public Cloud) customers to upgrade to FLEX for its superior performance, cost savings, and modern capabilities.</p>
+      
+      <div style="display:flex; flex-direction:column; gap:25px;">
+        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #2ecc71; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+          <h2 style="color:#2ecc71; margin-top:0; margin-bottom:15px; font-size:22px;">🌟 Key Advantages</h2>
+          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0;">
+            FLEX delivers enhanced scalability, high availability, and fault tolerance compared to legacy OSPC, enabling seamless handling of modern workloads like AI and Kubernetes. It avoids vendor lock-in through its open-source foundation, supports hybrid cloud strategies, and provides enterprise-grade security with 24/7 expert support. Customers can migrate workloads gradually without disruption, spinning up new projects on FLEX for better tooling and flexibility.
+          </p>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #f39c12; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+          <h2 style="color:#f39c12; margin-top:0; margin-bottom:15px; font-size:22px;">💰 Cost Benefits</h2>
+          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0;">
+            Upgrading reduces total cost of ownership (TCO) with license-free operations and efficient resource scaling, outperforming proprietary platforms. FLEX offers cost management tools and no licensing fees, making it ideal for optimizing spend while maintaining reliability.
+          </p>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #e056fd; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+          <h2 style="color:#e056fd; margin-top:0; margin-bottom:15px; font-size:22px;">🚀 Future-Proofing</h2>
+          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0;">
+            FLEX supports innovation with community-driven updates, custom networking, and multiple storage options for secure, performant environments. It's positioned as the successor to OSPC, bridging dedicated and multi-tenant clouds for long-term agility.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 0 · Customer Migration Log -->
+  <div class="panel" id="panel-s0">
+    <div style="padding:20px 40px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+          <h1 style="color:#7ecfff; margin:0; font-size:28px;">Customer FLEX migration readiness and backlog</h1>
+          <p style="color:#a8d8ff; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btnAddNewRow" style="padding:10px 15px; background:#17a2b8; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">➕ Add Row</button>
+          <button id="btnSaveEdits" style="padding:10px 15px; background:#2ecc71; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; display:none; box-shadow:0 0 10px #2ecc71;">💾 Save Edits</button>
+          <button id="btnExportCsv" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">Li Export Report (CSV)</button>
+          <button id="btnToggleUploadAppend" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">+ Append Missing</button>
+          <button id="btnToggleUploadOver" style="padding:10px 15px; background:#dc3545; color:white; border:1px solid #ff4d4d; border-radius:4px; cursor:pointer;">⚠ Overwrite All</button>
+        </div>
+      </div>
+
+      <div id="uploadZone" style="display:none; border:2px dashed #7ecfff; padding:30px; text-align:center; border-radius:8px; margin-bottom:20px; background:rgba(0,0,0,0.1); cursor:pointer;">
+        <p style="color:#a8d8ff; margin:0; font-weight:bold;" id="uploadModeText">Drag & Drop your <code>customers_backlog.csv</code> or <code>.xlsx</code> here, or click to browse.</p>
+        <input type="file" id="fileBacklog" style="display:none;" accept=".csv, .xls, .xlsx" />
+      </div>
+
+      <div style="display:flex; gap:15px; margin-bottom:20px;">
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #fff; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">To Be Migrated</div>
+          <div id="kpiToMigrate" style="font-size:28px; font-weight:bold; color:#fff;">-</div>
+        </div>
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #f39c12; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Ready for Migration</div>
+          <div id="kpiReady" style="font-size:28px; font-weight:bold; color:#f39c12;">-</div>
+        </div>
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #2ecc71; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Successfully Migrated</div>
+          <div id="kpiSuccess" style="font-size:28px; font-weight:bold; color:#2ecc71;">-</div>
+        </div>
+        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #e74c3c; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Failed Migrations</div>
+          <div id="kpiFailed" style="font-size:28px; font-weight:bold; color:#e74c3c;">-</div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+        <input type="text" id="trackerSearch" placeholder="🔍 Search backlog by customer, status, readiness..." style="width:100%; max-width:400px; padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#fff; font-size:14px; outline:none;" />
+      </div>
+
+      <div style="width:100%; overflow-x:auto; margin-top:20px; background:rgba(0,0,0,0.2); border-radius:8px; border: 2px solid #00f3ff; box-shadow: 0 0 15px rgba(0,243,255,0.4), inset 0 0 10px rgba(0,243,255,0.2);">
+        <table style="width:100%; border-collapse:collapse; white-space:nowrap;" id="trackerTable">
+        <thead>
+          <tr>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Priority Rank</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Customer Details</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Status</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Readiness &amp; Size</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Progress</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="trackerBody">
+          <tr><td colspan="8" style="text-align:center; padding:50px; color:#666; font-style:italic;">Loading Customer Migration Queue...</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <!-- Documentation / Guidelines Tables -->
+      <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+        <h2 style="color:#2ecc71; margin-bottom:15px; font-size: 22px;">📚 Migration Prioritization Guidelines</h2>
+        
+        <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; margin-bottom: 30px;">
+          <h3 style="color:#f39c12; margin-top:0; font-size:16px;">1️⃣ What Can and Should be Migrated to Flex</h3>
+          <div style="overflow-x:auto;">
+            <table class="matrix-table" style="min-width: 1000px;">
+              <thead>
+                <tr>
+                  <th style="width:15%">Category</th>
+                  <th style="width:25%">FLEX Ready app stacks</th>
+                  <th style="width:20%">Why FLEX Ready</th>
+                  <th style="width:20%">Not Yet FLEX Ready app stacks</th>
+                  <th style="width:20%">Why not yet FLEX Ready</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Open-source web apps</td><td>WordPress, Drupal, Magento, Laravel, Django, Flask, Node.js web apps</td><td>Standard Linux runtimes, portable app/data tiers, easy VM or app-tier rebuild</td><td>Very old PHP/Apache apps tied to obsolete OS or local legacy modules</td><td>Old runtime, unsupported packages, hidden dependencies</td></tr>
+                <tr><td>Standard 3-tier business apps</td><td>Web + API + DB on supported Linux/Windows</td><td>Clean separation of app and data tiers, easier rehost or replatform</td><td>Monolith with app + DB + files + scheduler all on one VM</td><td>Tight coupling, hardcoded paths, embedded dependencies</td></tr>
+                <tr><td>Open-source databases</td><td>MySQL, Percona, PostgreSQL, Redis</td><td>Easy to move with replication, backup/restore, export/import</td><td>DB versions too old, unsupported, or bound to obsolete OS/storage stack</td><td>Upgrade and schema compatibility issues</td></tr>
+                <tr><td>Standard Windows business apps</td><td>Windows Server 2019/2022 app servers, IIS apps, .NET-supported apps</td><td>Modern OS, portable workloads, easier rebuild on FLEX VMs</td><td>Windows 2003/2008 legacy apps, old IIS/.NET dependencies</td><td>Unsupported OS, security risk, migration blockers</td></tr>
+                <tr><td>Linux application tiers</td><td>Ubuntu 20.04/22.04/24.04, RHEL 8/9, Rocky, AlmaLinux, Debian 11/12</td><td>Supported guest OS, predictable package ecosystem</td><td>RHEL/CentOS 5/6, Ubuntu 14/16, old Debian, old custom kernels</td><td>Legacy kernel/userspace, driver and package issues</td></tr>
+                <tr><td>API / middleware tiers</td><td>Java app servers, Tomcat, Spring Boot, Nginx, HAProxy, RabbitMQ, modern middleware</td><td>Usually portable if config and connectivity are understood</td><td>Middleware requiring old libraries, old JVM, legacy init scripts, appliance-like packaging</td><td>Runtime drift and dependency fragility</td></tr>
+                <tr><td>Containerized workloads</td><td>Kubernetes apps with portable images, separated PVs, standard registries</td><td>Stateless layers easy to move, stateful parts manageable with storage plan</td><td>K8s workloads with tangled storage, old CSI bindings, hidden infra dependencies</td><td>PV portability and platform coupling issues</td></tr>
+                <tr><td>File/content platforms</td><td>Shared content repos, NFS-backed app content, object-compatible app data</td><td>Can be copied/synced and repointed</td><td>Apps with business logic tightly coupled to local filesystem layouts</td><td>Hardcoded mounts and path assumptions</td></tr>
+                <tr><td>ERP/CRM/custom LOB on supported stack</td><td>Supported OS + supported DB + normal app/data separation</td><td>Can often be stabilized on FLEX first</td><td>Old ERP/CRM on obsolete OS or vendor stack with no clean export path</td><td>Better treated as replacement/replatform project</td></tr>
+                <tr><td>Analytics / reporting apps</td><td>Modern BI/reporting apps using supported DBs and standard app hosts</td><td>Often portable if data sources are reachable</td><td>Old report servers with brittle dependencies and low business value</td><td>Usually better to retire or archive</td></tr>
+                <tr><td>Batch / worker tiers</td><td>ETL jobs, schedulers, queue workers on supported OS</td><td>Easy to relocate if dependencies are documented</td><td>Cron-heavy legacy boxes with undocumented local scripts and old runtimes</td><td>Hidden operational logic and local-state risk</td></tr>
+                <tr><td>Customer-built apps</td><td>Modern custom apps using standard stacks and supported OS</td><td>Best candidates for phased migration</td><td>Deeply customized legacy monoliths</td><td>Need refactor/replatform, not simple move</td></tr>
+                <tr><td>Appliance-like stacks</td><td>Few, unless virtual appliance is vendor-supported on KVM/FLEX</td><td>Possible only with explicit support</td><td>Xen-dependent virtual appliances, proprietary clusters, special kernel appliances</td><td>Hypervisor dependency or vendor lock-in</td></tr>
+                <tr><td>Mainframe / proprietary core</td><td>Downstream integration to FLEX data only</td><td>FLEX can host replicas, feeds, analytics</td><td>Mainframe DBs, RAC appliances, proprietary hardware platforms</td><td>Retain in place, integrate rather than move</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:30px; margin-bottom:30px;">
+          <div style="flex:1; background:rgba(0,0,0,0.2); padding:20px; border-radius:8px;">
+            <h3 style="color:#3498db; margin-top:0; font-size:16px;">2️⃣ Best Examples</h3>
+            <div style="overflow-x:auto;">
+              <table class="matrix-table" style="min-width: 500px;">
+                <thead>
+                  <tr>
+                    <th style="width:50%; background:rgba(46,204,113,0.1); border-color:#2ecc71;">FLEX Ready examples</th>
+                    <th style="width:50%; background:rgba(231,76,60,0.1); border-color:#e74c3c;">Not Yet FLEX Ready examples</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>WordPress on Ubuntu 22.04 + MySQL</td><td>WordPress on CentOS 6 + old PHP + local legacy plugins</td></tr>
+                  <tr><td>Drupal on RHEL 8 + MariaDB</td><td>Drupal on old Apache/PHP stack tied to obsolete OS</td></tr>
+                  <tr><td>Spring Boot API + PostgreSQL</td><td>Java app requiring old JVM and deprecated middleware</td></tr>
+                  <tr><td>IIS/.NET app on Windows Server 2022</td><td>IIS app on Windows 2008 with legacy .NET dependencies</td></tr>
+                  <tr><td>Node.js app + Redis + Postgres</td><td>Single VM monolith with app, DB, cron, files all together</td></tr>
+                  <tr><td>Kubernetes app with clean PVC strategy</td><td>Old K8s/stateful app with tightly coupled legacy storage</td></tr>
+                  <tr><td>Nginx + Flask + PostgreSQL</td><td>Xen-dependent appliance or proprietary virtual machine</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div style="flex:1; background:rgba(0,0,0,0.2); padding:20px; border-radius:8px;">
+            <h3 style="color:#9b59b6; margin-top:0; font-size:16px;">3️⃣ Migration Prioritization Guidelines</h3>
+            <div style="overflow-x:auto;">
+              <table class="matrix-table" style="min-width: 500px;">
+                <thead>
+                  <tr>
+                    <th>Layer 1: FLEX readiness</th>
+                    <th>Layer 2: Size / complexity</th>
+                    <th>Layer 3: Blast radius</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>FLEX Ready</td><td>Small</td><td>Secondary</td><td><strong>Earliest priority</strong></td></tr>
+                  <tr><td>FLEX Ready</td><td>Small</td><td>Important</td><td><strong>Early priority</strong></td></tr>
+                  <tr><td>FLEX Ready</td><td>Small</td><td>Core</td><td>Early, but only after guardrail is satisfied</td></tr>
+                  <tr><td>FLEX Ready</td><td>Medium</td><td>Secondary</td><td>Early-mid priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Medium</td><td>Important</td><td>Mid priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Medium</td><td>Core</td><td>Mid priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Large</td><td>Secondary</td><td>Mid-late priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Large</td><td>Important</td><td>Late in FLEX-ready group</td></tr>
+                  <tr><td>FLEX Ready</td><td>Large</td><td>Core</td><td>Very late in FLEX-ready group</td></tr>
+                  <tr><td>FLEX Ready</td><td>Very Large / Interconnected</td><td>Secondary</td><td>Very late</td></tr>
+                  <tr><td>FLEX Ready</td><td>Very Large / Interconnected</td><td>Important</td><td>Very late</td></tr>
+                  <tr><td>FLEX Ready</td><td>Very Large / Interconnected</td><td>Core</td><td>Final FLEX-ready wave</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Small</td><td>Secondary</td><td>After all FLEX-ready equivalents</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Small</td><td>Important</td><td>After all FLEX-ready equivalents</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Small</td><td>Core</td><td>After guardrail and FLEX-ready maturity</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Medium</td><td>Secondary</td><td>Later</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Medium</td><td>Important</td><td>Later</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Medium</td><td>Core</td><td>Later</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Large</td><td>Secondary</td><td>Late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Large</td><td>Important</td><td>Late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Large</td><td>Core</td><td>Very late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Very Large / Interconnected</td><td>Secondary</td><td>Very late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Very Large / Interconnected</td><td>Important</td><td>Very late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Very Large / Interconnected</td><td>Core</td><td>End of partial-ready group</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Small</td><td>Secondary</td><td>After ready and partial groups</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Small</td><td>Important</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Small</td><td>Core</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Medium</td><td>Secondary</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Medium</td><td>Important</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Medium</td><td>Core</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Large</td><td>Secondary</td><td>Final-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Large</td><td>Important</td><td>Final-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Large</td><td>Core</td><td>Final-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Very Large / Interconnected</td><td>Secondary</td><td>Near-final</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Very Large / Interconnected</td><td>Important</td><td>Near-final</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Very Large / Interconnected</td><td>Core</td><td>Absolute last</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 1 panels -->
+  <div class="panel" id="panel-s1">
+
+    <!-- 1a: Info description -->
+    <div id="s1info-pane" style="width:100%;height:100%;">
+      <div class="info-panel">
+        <h2>Stage 1 – Discovery &amp; Assessment</h2>
+        <p style="color:var(--muted);margin-bottom:12px;">Collect a full picture of the current OSPC environment before any migration work begins. The outputs of this stage feed directly into Stage 2.</p>
+        <h3>📋 Tasks</h3>
+        <ul>
+          <li><strong>Collect environment inventory</strong> – Gather details of all accounts, instances, images, volumes, and security groups.</li>
+          <li><strong>Identify storage backend (Cinder)</strong> – Determine the storage technology in use to plan the appropriate migration approach.</li>
+          <li><strong>Identify networking configuration &amp; segmentation</strong> – ServiceNet, PublicNet, or Private Neutron Network.</li>
+          <li><strong>Review quotas and utilisation</strong> – Evaluate current resource quotas and usage to properly size the Flex environment.</li>
+          <li><strong>Identify unsupported features</strong> – Detect features/configurations not supported in Flex that require remediation before migration.</li>
+        </ul>
+        <h3>📦 Deliverables</h3>
+        <ul>
+          <li><strong>Environment inventory</strong> – Detailed record of existing infrastructure (instances, storage, networking, security).</li>
+          <li><strong>Capacity plan</strong> – Assessment of resource requirements to ensure Flex can support migrated workloads.</li>
+          <li><strong>Migration risk assessment</strong> – Identification of potential risks, limitations, or unsupported features impacting migration.</li>
+        </ul>
+        <div class="notice">ℹ️ Use the sub-tabs above to run discovery tools: OSPC Scanner and Deployment Script Generator · OSPC Inventory and Flex Mapper · OSPC Flavors &amp; Images</div>
+      </div>
+    </div>
+
+    <!-- 1b: OSPC2Flex Workflow Dashboard -->
+    <iframe id="s1ospc-pane" src="/run/" title="OSPC Scanner and Deployment Script Generator" style="display:none;"></iframe>
+
+    <!-- 1c: Analyze OSPC CSV -->
+    <iframe id="s1analyze-pane" src="/dashboard/" title="Analyze OSPC CSV" style="display:none;"></iframe>
+
+    <!-- 1d: OSPC Flavors & Images -->
+    <iframe id="s1flavors-pane" src="/references/" title="OSPC Flavors &amp; Images" style="display:none;"></iframe>
+
+    <!-- 1e: Kubernetes Dual-Layer Scanner -->
+    <div id="s1k8s-pane" style="width:100%; height:100%; display:none; overflow:auto;">
+      <div class="info-panel">
+        <h2>☸️ Kubernetes Dual-Layer Scanner</h2>
+        <p style="color:var(--muted); margin-bottom:12px;">Discover and map Kubernetes clusters to their underlying OpenStack compute and storage dependencies before migration.</p>
+        
+        <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; border-left:4px solid #7ecfff; margin-bottom:20px;">
+          <h3 style="margin-top:0; color:#fff;">Run Automated K8s &amp; OSPC Dual-Scan</h3>
+          <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Paste your <code>kubeconfig</code> below or connect to the Bastion node to automatically map Kubernetes workloads to OpenStack VMs.</p>
+          <textarea placeholder="Paste kubeconfig here..." style="width:100%; height:80px; background:#111; color:#5eead4; border:1px solid #4b6fa0; border-radius:4px; padding:10px; font-family:monospace; margin-bottom:10px;"></textarea>
+          <button style="background:#2b70c9; border:none; color:white; padding:10px 20px; font-weight:bold; cursor:pointer; border-radius:4px;">Run Full Cluster Inventory Scan</button>
+        </div>
+
+        <h3>📚 Simplest Discovery Path by Tooling</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">The best file to get from the existing OSPC deployment relies entirely on how the cluster was built. Do not blindly copy VM nodes or disks.</p>
+        
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #3498db;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">1) Helm-Managed App (Highest Priority)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">Export the app configuration and rendered YAML. The <code>values.yaml</code> is the single most reusable import path for Flex.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">helm list -A
+helm get values &lt;release&gt; -n &lt;namespace&gt; -a -o yaml &gt; &lt;release&gt;-values.yaml
+helm get manifest &lt;release&gt; -n &lt;namespace&gt; &gt; &lt;release&gt;-manifest.yaml</pre>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #f1c40f;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">2) Kustomize-Managed App</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">Download the entire repository folder containing the <code>kustomization.yaml</code>, base manifests, patches, and overlays.</p>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #e67e22;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">3) Raw Kubernetes YAML (Source Repo)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">If a Git repo exists without Helm/Kustomize, download all declarative objects: <code>deployment.yaml</code>, <code>statefulset.yaml</code>, <code>service.yaml</code>, <code>ingress.yaml</code>, <code>configmap.yaml</code>, <code>pvc.yaml</code>.</p>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #e74c3c;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">4) Live Cluster Export (Fallback Path)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">If there is ZERO source repository, fallback to exporting exactly what is running on OSPC. Note: this YAML will be messy and contain runtime state strings.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get all,cm,secret,ingress,pvc,networkpolicy -A -o yaml &gt; k8s-inventory-main.yaml
+kubectl get storageclass,pv -o yaml &gt; k8s-storage-export.yaml</pre>
+          </div>
+          
+          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #9b59b6;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">Infrastructure Mapping Database</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">You MUST execute these to map Kubernetes to OpenStack Nova VMs and Cinder Storage.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get nodes -o wide
+openstack server list --all-projects --long   # Map Internal K8s IPs to OSPC VM IDs
+kubectl get pvc -A -o wide
+openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STAGE 2 · Migration Options -->
+  <div class="panel" id="panel-s2">
+    <iframe id="s2image-pane" src="/image_migrator/" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p1-pane" src="/designer/" title="REHOST Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+  </div>
+
+  <!-- STAGE 4 · Validation & UAT -->
+  <div class="panel" id="panel-s4">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      
+      <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(165,180,252,.2); padding:20px; border-radius:8px;">
+        <h2 style="font-size: 19px; color: #7ecfff; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">🛡️ Stage 4 – Automated Migration Validation Engine</h2>
+        <p style="color:var(--muted); margin:10px 0;">Validation is split into Internal UAT (migration team) and Customer UAT. Supply your target IP addresses below to allow the Automated Engine to perform live Ping, Curl, SSH, and OpenStack API verification sweeps across the entire FLEX environment.</p>
+
+        <form id="uat-runner-form" novalidate onsubmit="return false;">
+            <!-- 1. CLOUD CREDENTIALS -->
+            <div style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:32px; background:rgba(0,0,0,0.2); border-radius:4px; padding:20px; border-left:4px solid #f39c12;">
+                <!-- OSPC -->
+                <div>
+                    <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Username
+                            <input id="uat_ospc_username" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">API Key / Password
+                            <input id="uat_ospc_apikey" type="password" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Account / Project ID
+                            <input id="uat_ospc_accountid" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- FLEX -->
+                <div>
+                    <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Auth URL
+                            <input id="uat_flex_os_auth_url" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Username
+                            <input id="uat_flex_os_username" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Password
+                            <input id="uat_flex_os_password" type="password" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Project ID
+                            <input id="uat_flex_os_project_id" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Domain
+                            <input id="uat_flex_os_user_domain_id" type="text" value="default" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1B. CROSS-CLOUD IDENTITY PARITY -->
+            <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #9b59b6; border-radius:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h3 style="margin-top:0; color:#fb7185; font-size:14px;">1B. User Profile &amp; Target Permissions Matching (RBAC validation)</h3>
+                        <p style="font-size:11px; color:#aaa; margin-bottom:10px;">Compare your assigned roles and permissions in OSPC against the new FLEX tenant to ensure no operational access was lost.</p>
+                        
+                        <div style="margin: 15px 0; background:rgba(0,0,0,0.3); border:1px solid #7c3aed; border-radius:6px; overflow:hidden;">
+                            <table style="width:100%; border-collapse:collapse; font-size:11px; color:#ddd; text-align:left;">
+                                <thead>
+                                    <tr style="background:#3b0764; border-bottom:1px solid #7c3aed;">
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">Identity / RBAC area</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">OSPC / legacy words</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">FLEX words people use now</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">What it really means</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Top business boundary</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Account + Domain</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX still sits under a Rackspace account, but OpenStack identity structure adds the domain concept.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Main resource ownership</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Tenant</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Project</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">In practice, old "tenant" thinking maps to FLEX project thinking. FLEX UI/docs explicitly surface project and domain.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Person who logs in</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">User / cloud user</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">User</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Same basic concept, but FLEX user access is more formally tied to project/domain permissions.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Team of users</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">List of users</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Group</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX / Keystone makes groups a clearer identity object for assigning access by team instead of one-by-one.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">What someone is allowed to do</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Permissions</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Permissions</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Same word exists, but FLEX docs emphasize explicit role/permission setup for users.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Named privilege bundle</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">"admin" / "read-only"</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Role</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX uses more formal role-based language under Keystone/OpenStack.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Access model</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Simpler account access model</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">RBAC on user/group/role</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX is more structured and closer to upstream OpenStack identity concepts.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth secret for humans</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">User+Pass / API creds</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Username + API key</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX explicitly calls out username, API key, project, and domain.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth secret for scripts/apps</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Reused user creds</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Application Credential</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX supports standalone execution credentials instead of reusing human login secrets.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Single sign-on</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">SSO</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Federation</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX/Rackspace supports identity federation to sign in with corporate credentials.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Admin manager</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account owner</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Account Administrator</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Account Admins manage users and platform permissions at the project level.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Login Context</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account/region/tenant</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Project + Domain + Region</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX login and CLI context explicitly require both project and domain variables.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Session proof</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Token</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX uses strictly token-based access headers behind the scenes via Keystone.</td>
+                                    </tr>
+                                    <tr style="background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Server login shell</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">SSH key</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">SSH keypair</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX explicitly mandates OpenStack SSH Keypair objects for initial VM deployment access.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top:20px; text-align:right;">
+                    <button id="btnRunRbac" type="button" onclick="executeRbacCheck()" style="padding:12px 25px; font-size:14px; font-weight:bold; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; box-shadow:0 0 15px rgba(124,58,237,.5); transition:0.2s;">🔍 VERIFY PLATFORM IDENTITY ROLES</button>
+                </div>
+                
+                <div id="rbac-terminal-box" style="margin-top:10px; display:none;">
+                    <div style="display:flex; justify-content:space-between; background:#3b0764; padding:6px 12px; border-radius:6px 6px 0 0; border:1px solid #7c3aed; border-bottom:0;">
+                        <span style="color:#fb7185; font-size:11px; font-weight:bold; font-family:monospace;">🔗 Cross-Cloud RBAC Comparator</span>
+                        <span id="rbac-status-indicator" style="color:#ffcc00; font-size:10px; font-weight:bold;">Authenticating...</span>
+                    </div>
+                    <div id="rbac-log-output" style="height:250px; background:#000; color:#f8fafc; font-family:'JetBrains Mono', monospace; font-size:12px; padding:12px; overflow-y:auto; border:1px solid #7c3aed; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+                </div>
+            </div>
+
+            <!-- 2. SPECIFIC TARGETS -->
+            <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #7ecfff; border-radius:4px;">
+                <h3 style="margin-top:0; color:#7ecfff; font-size:14px;">2. Explicit End-to-End Application Targets</h3>
+                <p style="font-size:11px; color:#aaa; margin-bottom:10px;">Enter the exact IP addresses the migrated VMs leased in the FLEX cloud to run deep connectivity validations.</p>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-top:10px;">
+                    <div><label style="font-size:11px; color:#aaa; display:block;">Web Application URL</label><input type="text" id="uat_app_url" placeholder="e.g. www.mypayroll.com" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div><label style="font-size:11px; color:#aaa; display:block;">App/LoadBalancer IP (Ping Test)</label><input type="text" id="uat_app_ip" placeholder="e.g. 10.250.0.15" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div><label style="font-size:11px; color:#aaa; display:block;">Database Node IP (SSH SQL Test)</label><input type="text" id="uat_db_ip" placeholder="e.g. 10.250.0.8" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div><label style="font-size:11px; color:#aaa; display:block;">SSH Username</label><input type="text" id="uat_ssh_user" value="ubuntu" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                    <div style="grid-column: span 2;"><label style="font-size:11px; color:#aaa; display:block;">SSH Private Key (.pem Path)</label><input type="text" id="uat_ssh_key" placeholder="/home/dzoan/keys/target.pem" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                </div>
+            </div>
+
+            <!-- 3. EXECUTION BUTTON & TERMINAL -->
+            <button id="btnRunUAT" type="button" onclick="executeUATTests()" style="width:100%; padding:15px; font-size:16px; font-weight:bold; background:#2ecc71; color:white; border:none; border-radius:6px; cursor:pointer; box-shadow:0 0 10px rgba(46,204,113,.4); transition:0.2s;">▶️ RUN ALL AUTOMATED TESTS</button>
+        </form>
+
+        <div id="uat-terminal-box" style="margin-top:20px; display:none;">
+            <div style="display:flex; justify-content:space-between; background:#1a3a5c; padding:8px 12px; border-radius:6px 6px 0 0; border:1px solid #4b6fa0; border-bottom:0;">
+                <span style="color:#7ecfff; font-size:12px; font-weight:bold; font-family:monospace;">🟢 UAT Runtime Engine</span>
+                <span id="uat-status-indicator" style="color:#ffcc00; font-size:11px; font-weight:bold;">Waiting...</span>
+            </div>
+            <div id="uat-log-output" style="height:350px; background:#000; color:#00ff00; font-family:'JetBrains Mono', monospace; font-size:12px; padding:15px; overflow-y:auto; border:1px solid #4b6fa0; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+        </div>
+      </div>
+
+      <div style="opacity:0.75; padding-top:10px;">
+        <h3>🔬 Internal UAT Tasks Reference</h3>
+      <h3>🔬 Internal UAT Tasks</h3>
+      <ul>
+        <li><strong>Verify VM boot</strong> – Ensure VMs start successfully in Flex.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">openstack server list --project &lt;project_id&gt; -c Name -c Status | grep ACTIVE</pre>
+        </li>
+        <li><strong>Validate network connectivity</strong> – Confirm instances communicate as expected.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">ping -c 4 &lt;flex_floating_ip&gt;<br>nc -zv &lt;flex_private_ip&gt; 22</pre>
+        </li>
+        <li><strong>Confirm storage accessibility</strong> – Verify volumes and storage resources are accessible.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">openstack volume list --project &lt;project_id&gt; -c Name -c Status<br>ssh user@&lt;flex_ip&gt; 'df -h | grep /dev/vd'</pre>
+        </li>
+      </ul>
+      <h3>👤 Customer UAT Tasks</h3>
+      <ul>
+        <li><strong>Access confirmed</strong> – Customer confirmed access to the new Flex environment.</li>
+        <li><strong>Confirm application functionality</strong> – Applications operating correctly after migration.</li>
+      </ul>
+      <h3>📊 Validation Matrix</h3>
+      <table class="matrix-table">
+        <thead><tr><th>Workload Type</th><th>Internal UAT</th><th>Customer UAT</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge">Databases</span></td><td>Service up, replication healthy, storage OK, backup works</td><td>Queries correct, app reads/writes correct, reports match</td></tr>
+          <tr><td><span class="badge">App tiers</span></td><td>VM boots, services start, DNS resolves, storage mounts</td><td>Users log in, transactions succeed, integrations work</td></tr>
+          <tr><td><span class="badge">Containers</span></td><td>Pods healthy, PVCs mount, ingress works</td><td>App flow works, no missing data, no broken sessions</td></tr>
+          <tr><td><span class="badge">Legacy / Monolith</span></td><td>Boot and services stable</td><td>Core business workflow works exactly as expected</td></tr>
+          <tr><td><span class="badge">SaaS replacement</span></td><td>Import / reconciliation complete</td><td>Users validate records, process flow, reports</td></tr>
+          <tr><td><span class="badge">Archive / Retain</span></td><td>Data readable, access controlled</td><td>Business can retrieve required data</td></tr>
+        </tbody>
+      </table>
+      <h3>🛠 Automated Checking Commands</h3>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">Databases (Service &amp; Replication)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># MySQL Replication Status
+ssh admin@&lt;db_ip&gt; 'mysql -e "SHOW SLAVE STATUS\\G" | grep "Running:"'
+
+# PostgreSQL Replication
+ssh postgres@&lt;db_ip&gt; 'psql -xc "select * from pg_stat_replication;"'</pre>
+        </div>
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">App Tiers (DNS &amp; Services)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Check DNS Resolution
+dig @&lt;flex_dns&gt; +short &lt;app_url&gt;
+
+# Verify Web Service HTTP 200
+curl -I -s https://&lt;app_url&gt; | head -n 1
+
+# Systemd Service Status
+ssh user@&lt;app_ip&gt; 'systemctl is-active &lt;service_name&gt;'</pre>
+        </div>
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">Containers (Pod/PVC Health)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Verify Kubernetes Workload Health
+kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
+        </div>
+      </div>
+      <h3>📦 Deliverable</h3>
+      <ul><li>Internal team and customer sign off UAT confirming migration successful.</li></ul>
+    </div>
+  </div>
+  </div>
+
+  <!-- STAGE 5 · Cutover -->
+  <div class="panel" id="panel-s5">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      
+      <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(46,204,113,.2); padding:20px; border-radius:8px;">
+        <h2 style="font-size: 19px; color: #2ecc71; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">🟢 Stage 5 – Cutover & Migration Strategy Options</h2>
+        
+        <h3 style="margin-top:15px; margin-bottom:10px; color:#7ecfff; font-size:14px;">App Migration and Rollback Strategy — Fastest to Slowest</h3>
+        <div style="margin-bottom:20px; background:rgba(0,0,0,0.3); border:1px solid #4b6fa0; border-radius:6px; overflow:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:11px; color:#ddd; text-align:left; min-width:1200px;">
+                <thead>
+                    <tr style="background:#1a3a5c; border-bottom:1px solid #4b6fa0;">
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:3%;">Rank</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:10%;">Method</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:8%;">A/B?</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:8%;">Typical downtime</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:5%;">Risk</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:6%;">Complexity</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:10%;">Best for apps</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:10%;">Why this rank</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:15%;">How it’s done</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:15%;">Rollback how it’s done</th>
+                        <th style="padding:10px; font-weight:bold; color:#7ecfff; width:10%;">Core implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(255,255,255,0.02);">
+                        <td style="padding:10px; text-align:center;">1</td>
+                        <td style="padding:10px; font-weight:bold; color:#fff;">Blue-green + weighted LB cutover</td>
+                        <td style="padding:10px; color:#a5b4fc; font-weight:bold;">Yes — classic A/B</td>
+                        <td style="padding:10px; color:#2ecc71;">Seconds to low minutes</td>
+                        <td style="padding:10px; color:#f1c40f;">Low-Medium</td>
+                        <td style="padding:10px; color:#e74c3c;">High</td>
+                        <td style="padding:10px; color:#94a3b8;">LB-based apps, multi-node app tiers</td>
+                        <td style="padding:10px; color:#94a3b8;">Very fast and precise when traffic is already LB-controlled</td>
+                        <td style="padding:10px; color:#94a3b8;">Add FLEX app nodes/pool behind LB, keep OSPC pool active, then change traffic weights gradually until FLEX serves everything.</td>
+                        <td style="padding:10px; color:#94a3b8;">Reweight LB back to OSPC, re-enable old pool members, and drain FLEX.</td>
+                        <td style="padding:10px; color:#94a3b8;">Keep both pools live behind LB, configure health checks, start FLEX at low weight, increase gradually, remove OSPC members</td>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:10px; text-align:center;">3</td>
+                        <td style="padding:10px; font-weight:bold; color:#fff;">Database replication switchover + app cutover</td>
+                        <td style="padding:10px; color:#e67e22; font-weight:bold;">Yes — partial A/B</td>
+                        <td style="padding:10px; color:#f1c40f;">Seconds to a few minutes</td>
+                        <td style="padding:10px; color:#e67e22;">Medium</td>
+                        <td style="padding:10px; color:#e74c3c;">High</td>
+                        <td style="padding:10px; color:#94a3b8;">DB-backed apps, CMS, ERP, 3-tier apps</td>
+                        <td style="padding:10px; color:#94a3b8;">App cutover depends on DB switchover timing</td>
+                        <td style="padding:10px; color:#94a3b8;">Prepare FLEX DB first, keep it replicated, then do a short write freeze and repoint the application once FLEX DB is primary.</td>
+                        <td style="padding:10px; color:#94a3b8;">Repoint the app back to the old DB/app path, freeze writes if needed to avoid divergence, and restore service on OSPC.</td>
+                        <td style="padding:10px; color:#94a3b8;">Build FLEX DB, replicate, validate, freeze writes briefly, catch up, promote FLEX DB, repoint app</td>
+                    </tr>
+                    <tr style="background:rgba(255,255,255,0.02);">
+                        <td style="padding:10px; text-align:center;">4</td>
+                        <td style="padding:10px; font-weight:bold; color:#fff;">DNS cutover after full sync</td>
+                        <td style="padding:10px; color:#e74c3c; font-weight:bold;">Usually no, or weak A/B</td>
+                        <td style="padding:10px; color:#e74c3c;">Minutes to hours</td>
+                        <td style="padding:10px; color:#e67e22;">Medium</td>
+                        <td style="padding:10px; color:#f1c40f;">Low-Medium</td>
+                        <td style="padding:10px; color:#94a3b8;">Small/simple apps, low-change websites</td>
+                        <td style="padding:10px; color:#94a3b8;">Slowest app cutover because DNS is less deterministic</td>
+                        <td style="padding:10px; color:#94a3b8;">Sync app/data first, validate FLEX privately, then change public DNS and wait for external users to resolve the new destination over time.</td>
+                        <td style="padding:10px; color:#94a3b8;">Update DNS back to OSPC, keep source app live, and wait for caches to expire.</td>
+                        <td style="padding:10px; color:#94a3b8;">Build FLEX target, sync data, lower TTL, validate privately, update DNS, wait for propagation</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3 style="margin-top:15px; margin-bottom:10px; color:#f39c12; font-size:14px;">DB Migration Strategy Options</h3>
+        <div style="margin-bottom:20px; background:rgba(0,0,0,0.3); border:1px solid #e67e22; border-radius:6px; overflow:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:11px; color:#ddd; text-align:left; min-width:1200px;">
+                <thead>
+                    <tr style="background:#5c351a; border-bottom:1px solid #e67e22;">
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:3%;">Rank</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:10%;">Method</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:8%;">A/B?</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:8%;">Typical downtime</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:5%;">Risk</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:6%;">Complexity</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:10%;">Best for DB</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:10%;">Why this rank</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:15%;">How it’s done</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:15%;">Rollback how it’s done</th>
+                        <th style="padding:10px; font-weight:bold; color:#f39c12; width:10%;">Core implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <td style="padding:10px; text-align:center;">1</td>
+                        <td style="padding:10px; font-weight:bold; color:#fff;">Database replication switchover + app cutover</td>
+                        <td style="padding:10px; color:#e67e22; font-weight:bold;">Yes — partial A/B</td>
+                        <td style="padding:10px; color:#f1c40f;">Seconds to a few minutes</td>
+                        <td style="padding:10px; color:#e67e22;">Medium</td>
+                        <td style="padding:10px; color:#e74c3c;">High</td>
+                        <td style="padding:10px; color:#94a3b8;">Production databases behind apps</td>
+                        <td style="padding:10px; color:#94a3b8;">Fastest real DB cutover</td>
+                        <td style="padding:10px; color:#94a3b8;">Create FLEX DB, replicate continuously from OSPC, validate data/lag, pause writes briefly, let last changes sync, then promote FLEX DB and reconnect apps.</td>
+                        <td style="padding:10px; color:#94a3b8;">Fail back to the original DB if it remains consistent and writable, or restore from the last clean backup/snapshot and reconnect the app to OSPC.</td>
+                        <td style="padding:10px; color:#94a3b8;">Build FLEX DB, replicate continuously, validate lag/schema/users/jobs, freeze writes briefly, catch up, promote FLEX DB</td>
+                    </tr>
+
+                    <tr style="background:rgba(255,255,255,0.02);">
+                        <td style="padding:10px; text-align:center;">4</td>
+                        <td style="padding:10px; font-weight:bold; color:#fff;">DNS cutover after full sync</td>
+                        <td style="padding:10px; color:#e74c3c; font-weight:bold;">Usually no, or weak A/B</td>
+                        <td style="padding:10px; color:#e74c3c;">Minutes to hours</td>
+                        <td style="padding:10px; color:#e67e22;">Medium</td>
+                        <td style="padding:10px; color:#f1c40f;">Low-Medium</td>
+                        <td style="padding:10px; color:#94a3b8;">Small/simple DB-backed systems</td>
+                        <td style="padding:10px; color:#94a3b8;">Slowest and least precise for DB</td>
+                        <td style="padding:10px; color:#94a3b8;">Finish sync, validate FLEX DB/app, then change DNS and wait for clients and services to start resolving to the new environment.</td>
+                        <td style="padding:10px; color:#94a3b8;">Revert DNS to the OSPC endpoint, keep the original DB available, and wait for DNS caches to clear before resuming normal state.</td>
+                        <td style="padding:10px; color:#94a3b8;">Sync data, lower TTL, validate target, update DNS, wait for propagation</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:20px; margin-top:20px;">
+            <!-- Execution Runbooks -->
+            <h3 style="margin:0; color:#fff; font-size:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">🛠️ Migration Switch options (Select your method below)</h3>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:15px;">
+                
+                <!-- APP Method: Blue-Green + LB -->
+                <div style="background:rgba(0,0,0,0.2); padding:15px; border-left:4px solid #9b59b6; border-radius:4px; display:flex; flex-direction:column;">
+                    <h3 style="margin-top:0; color:#9b59b6; font-size:15px;">1️⃣ Blue-Green + Weighted Load Balancer (APPS)</h3>
+                    
+                    <script>
+                        function updateABStrategyUI() {
+                            var val = document.getElementById('ab_lb_type').value;
+                            var btn = document.getElementById('btn_ab_deploy');
+                            var desc = document.getElementById('ab_lb_description');
+                            
+                            if (val === 'haproxy') {
+                                btn.innerText = '⚙️ 1. PROVISION HAPROXY VM & DB REPLICA';
+                                desc.innerHTML = '<strong>For HAProxy:</strong> The script does not create a standalone VM, nor does it run on your laptop. It actually uses SSH to connect directly to the OSPC Source Application VM, installs the lightweight HAProxy package locally (via yum or apt-get), and configures it on ported 80. It then shifts the original OSPC app to 8080 internally. HAProxy then splits incoming traffic 50/50 between 127.0.0.1 (the local OSPC app) and the new $TARGET_IP in FLEX over the network boundary!';
+                            } else {
+                                btn.innerText = '⚙️ 1. CONFIGURE OCTAVIA L7 ROUTING & DB REPLICA';
+                                desc.innerHTML = '<strong>For Octavia:</strong> The script authenticates against the existing OSPC OpenStack API, looks up the existing Octavia Load Balancer pool routing to that app, and injects the new FLEX $TARGET_IP directly into that OSPC pool as a new member!';
+                            }
+                        }
+                    </script>
+
+                    <select id="ab_lb_type" onchange="updateABStrategyUI()" style="width:100%; padding:8px; background:#111; color:#fff; border:1px solid #4b6fa0; border-radius:4px; margin-bottom:15px;">
+                        <option value="haproxy">HAProxy Dedicated VM</option>
+                        <option value="octavia">OSPC Octavia Native LB</option>
+                    </select>
+
+                    <p id="ab_lb_description" style="font-size:12px; color:#aaa; margin-bottom:15px; line-height:1.4; background:rgba(0,0,0,0.3); padding:10px; border-radius:4px; border-left:3px solid #9b59b6;">
+                        <strong>For HAProxy:</strong> The script does not create a standalone VM, nor does it run on your laptop. It actually uses SSH to connect directly to the OSPC Source Application VM, installs the lightweight HAProxy package locally (via yum or apt-get), and configures it on ported 80. It then shifts the original OSPC app to 8080 internally. HAProxy then splits incoming traffic 50/50 between 127.0.0.1 (the local OSPC app) and the new $TARGET_IP in FLEX over the network boundary!
+                    </p>
+
+                    <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:15px;">
+                      <button id="btn_ab_deploy" onclick="executeStage5Task('ab_strategy')" style="width:100%; padding:10px; background:#8e44ad; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">⚙️ 1. PROVISION HAPROXY VM & DB REPLICA</button>
+                      <button onclick="executeStage5Task('ghost_traffic')" style="width:100%; padding:10px; background:#e67e22; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">👻 2. INJECT GHOST TRAFFIC TEST</button>
+                      <button onclick="executeStage5Task('db_health')" style="width:100%; padding:10px; background:#27ae60; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">💓 3. VERIFY HEALTH CHECK</button>
+                    </div>
+
+                    <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:15px; margin-bottom:15px; flex-grow:1;">
+                        <h4 style="margin:0 0 10px 0; color:#e056fd; font-size:13px;">🎛️ Live Traffic Routing</h4>
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <span style="font-size:12px; font-weight:bold; color:#7f8c8d;">OSPC</span>
+                            <input type="range" id="traffic_slider" min="0" max="100" value="0" style="flex:1; cursor:pointer;" oninput="document.getElementById('flex_weight_label').innerText = this.value + '%'">
+                            <span style="font-size:12px; font-weight:bold; color:#2ecc71;">FLEX: <span id="flex_weight_label">0%</span></span>
+                        </div>
+                        <button onclick="applyTrafficWeight()" style="width:100%; padding:10px; background:#16a085; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; margin-top:10px; transition:0.2s;">APPLY TRAFFIC WEIGHT</button>
+                    </div>
+                    <button onclick="executeStage5Task('rollback')" style="width:100%; padding:12px; background:#c0392b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;">🚨 PANIC: INSTANT ROLLBACK TO OSPC</button>
+                </div>
+
+                <!-- DB Method: DB Switchover -->
+                <div style="background:rgba(0,0,0,0.2); padding:15px; border-left:4px solid #f39c12; border-radius:4px; display:flex; flex-direction:column;">
+                    <h3 style="margin-top:0; color:#f39c12; font-size:15px;">2️⃣ Database Switchover + App Cutover (DB)</h3>
+                    <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Prepare FLEX DB, keep it replicated, do a short write freeze, and repoint the application.</p>
+                    <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:15px; flex-grow:1;">
+                      <button onclick="executeStage5Task('db_init')" style="width:100%; padding:10px; background:#d35400; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">⚙️ 1. INITIALIZE DB REPLICATION</button>
+                      <button onclick="executeStage5Task('db_lag')" style="width:100%; padding:10px; background:#f39c12; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">⏱️ 2. VERIFY REPLICATION LAG</button>
+                      <button onclick="executeStage5Task('db_freeze')" style="width:100%; padding:10px; background:#c0392b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">❄️ 3. FREEZE OSPC WRITES (READ-ONLY)</button>
+                      <button onclick="executeStage5Task('db_promote')" style="width:100%; padding:10px; background:#27ae60; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">👑 4. PROMOTE FLEX DB PRIMARY</button>
+                      <button onclick="executeStage5Task('db_repoint')" style="width:100%; padding:10px; background:#2980b9; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">🔗 5. REPOINT APP / ENABLE WRITES</button>
+                    </div>
+                    <button onclick="executeStage5Task('rollback_db')" style="width:100%; padding:12px; background:#7f8c8d; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;">🚨 REVERT APP ROUTING & DB STABILITY</button>
+                </div>
+
+                <!-- APP Method 3: DNS Cutover -->
+                <div style="background:rgba(0,0,0,0.2); padding:15px; border-left:4px solid #e74c3c; border-radius:4px; display:flex; flex-direction:column;">
+                    <h3 style="margin-top:0; color:#e74c3c; font-size:15px;">3️⃣ APP DNS Cutover After Full Sync</h3>
+                    <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Change public App DNS and wait for external users to resolve to FLEX.</p>
+                    <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:15px; flex-grow:1;">
+                      <button onclick="executeStage5Task('app_dns_ttl')" style="width:100%; padding:10px; background:#c0392b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">📉 1. LOWER EXTERNAL APP DNS TTL</button>
+                      <button onclick="executeStage5Task('app_dns_update')" style="width:100%; padding:10px; background:#2980b9; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">🌐 2. UPDATE PUBLIC APP DNS TO FLEX</button>
+                    </div>
+                    <button onclick="executeStage5Task('app_rollback_dns')" style="width:100%; padding:12px; background:#7f8c8d; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;">🚨 REVERT APP DNS & FLUSH CACHE</button>
+                </div>
+
+                <!-- DB Method 4: DNS Cutover -->
+                <div style="background:rgba(0,0,0,0.2); padding:15px; border-left:4px solid #3498db; border-radius:4px; display:flex; flex-direction:column;">
+                    <h3 style="margin-top:0; color:#3498db; font-size:15px;">4️⃣ DB DNS Cutover After Full Sync</h3>
+                    <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Change internal DB DNS and wait for apps to resolve to FLEX DB.</p>
+                    <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:15px; flex-grow:1;">
+                      <button onclick="executeStage5Task('db_dns_ttl')" style="width:100%; padding:10px; background:#c0392b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">📉 1. LOWER INTERNAL DB DNS TTL</button>
+                      <button onclick="executeStage5Task('db_dns_update')" style="width:100%; padding:10px; background:#2980b9; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">🌐 2. UPDATE INTERNAL DB DNS TO FLEX</button>
+                    </div>
+                    <button onclick="executeStage5Task('db_rollback_dns')" style="width:100%; padding:12px; background:#7f8c8d; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;">🚨 REVERT DB DNS & FLUSH CACHE</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- POST-SWITCH VALIDATION, STABILIZATION & CLEANUP -->
+        <div style="background:rgba(0,0,0,0.2); padding:15px; border-left:4px solid #00e5ff; border-radius:4px; margin-top:20px; display:flex; flex-direction:column;">
+            <h3 style="margin-top:0; color:#00e5ff; font-size:15px;">✅ Post-Switch Validation, Stabilization & Cleanup</h3>
+            <p style="font-size:12px; color:#aaa; margin-bottom:15px;">
+                After traffic has been switched to FLEX, validate live production behavior, confirm DB health,
+                monitor workloads, keep rollback available, then stabilize and finalize the migration.
+            </p>
+
+            <div style="display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:15px;">
+                <button onclick="executeStage5Task('traffic_flex', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">1. CONFIRM PRODUCTION TRAFFIC REACHES FLEX</button>
+                <button onclick="executeStage5Task('val_txn', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">2. VALIDATE CRITICAL APP TRANSACTIONS / USER JOURNEYS</button>
+                <button onclick="executeStage5Task('val_db', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">3. VALIDATE DB READS / WRITES / JOBS / REPLICATION STATE</button>
+                <button onclick="executeStage5Task('mon_workloads', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">4. MONITOR WORKLOADS, LOGS, LATENCY, ERRORS, CPU, MEMORY, IOPS</button>
+                <button onclick="executeStage5Task('verify_jobs', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">5. VERIFY BACKGROUND JOBS, QUEUES, CRON, INTEGRATIONS, API DEPENDENCIES</button>
+                <button onclick="executeStage5Task('keep_rollback', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">6. KEEP ROLLBACK / FAILBACK WINDOW OPEN</button>
+                <button onclick="executeStage5Task('confirm_sec', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">7. CONFIRM FLEX BACKUPS, ALERTING, MONITORING, CERTIFICATES, SECURITY CONTROLS</button>
+                <button onclick="executeStage5Task('val_consistency', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">8. VALIDATE POST-CUTOVER DATA CONSISTENCY</button>
+                <button onclick="executeStage5Task('disable_ospc', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">9. DISABLE OLD WRITE PATHS / OLD REPLICATION AFTER ACCEPTANCE</button>
+                <button onclick="executeStage5Task('update_docs', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">10. UPDATE DOCS, RUNBOOKS, OWNERSHIP, DR, BACKUP REFERENCES (Mockup)</button>
+                <button onclick="executeStage5Task('archive_evidence', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">11. ARCHIVE MIGRATION EVIDENCE & SIGNOFF ARTIFACTS</button>
+                <button onclick="executeStage5Task('close_rollback', this)" style="width:100%; padding:10px; background:#3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">12. CLOSE ROLLBACK WINDOW & DECOMMISSION OSPC LATER</button>
+                <button onclick="executeStage5Task('tco_comparison')" style="width:100%; padding:12px; background:#2c3e50; color:#1abc9c; border:1px solid #1abc9c; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left; margin-bottom: 2px;">📊 13. GENERATE TCO OSPC VS FLEX COMPARISON</button>
+                <button onclick="executeStage5Task('generate_report_xls')" style="width:100%; padding:12px; background:#2c3e50; color:#1abc9c; border:1px solid #1abc9c; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s; text-align:left;">📊 14. GENERATE FULL MIGRATION REPORTS (.XLSX & .CSV)</button>
+            </div>
+            
+            <button onclick="executeStage5Task('rollback_full')" style="width:100%; padding:12px; background:#c0392b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;">🚨 REVERT TO OSPC / FAIL BACK IF VALIDATION FAILS</button>
+            
+            <div id="report-output-container" style="margin-top:20px; display:none; background:rgba(0,0,0,0.3); padding:20px; border-radius:8px; border:1px solid #1abc9c;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 id="report-table-title" style="margin:0; color:#1abc9c; font-size:16px;">📊 Verification & Reporting Table</h3>
+                    <a id="report-download-btn" href="#" style="background:#1a3a5c; color:#7ecfff; border:1px solid #4b6fa0; padding:6px 12px; border-radius:4px; text-decoration:none; font-size:12px; font-weight:bold;">⬇️ Download CSV</a>
+                </div>
+                <div id="report-table-content" style="margin-top:15px; overflow-x:auto;"></div>
+            </div>
+        </div>
+
+        <!-- Terminal Output Moved to Bottom -->
+        <div id="s5-terminal-box" style="margin-top:20px; display:none;">
+            <div style="display:flex; justify-content:space-between; background:#1a3a5c; padding:8px 12px; border-radius:6px 6px 0 0; border:1px solid #4b6fa0; border-bottom:0;">
+                <span style="color:#7ecfff; font-size:12px; font-weight:bold; font-family:monospace;">🟢 Cutover Execution Engine</span>
+                <span id="s5-status-indicator" style="color:#ffcc00; font-size:11px; font-weight:bold;">Waiting...</span>
+            </div>
+            <div id="s5-log-output" style="height:250px; background:#000; color:#00ff00; font-family:'JetBrains Mono', monospace; font-size:12px; padding:15px; overflow-y:auto; border:1px solid #4b6fa0; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+        </div>
+      </div>
+
+      <div style="padding-top:10px;">
+          <h3>📦 Deliverable</h3>
+          <ul><li style="color:#2ecc71;">Customer confirms the application is running successfully in the Flex environment.</li></ul>
+          <div class="notice" style="border-color:#e74c3c; color:#ffbaba; background:rgba(231,76,60,0.1);">⚠️ Ensure rollback scripts (generated in Stage 3) are ready before initiating cutover.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 6 · Post-Migration -->
+  <div class="panel" id="panel-s6">
+    <div class="info-panel">
+      <h2>Stage 6 – Post-Migration Sign-off</h2>
+      <p style="color:var(--muted);margin-bottom:12px;">Review the completed migration tasks and close out the customer in the Migration Log.</p>
+      
+      <h3>✅ Migration Checklist</h3>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Stage 1 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox1">
+          <div><span id="stgIcon1" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 1:</strong> Discovery &amp; Assessment</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(1, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(1, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 2 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox2">
+          <div><span id="stgIcon2" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 2:</strong> Infrastructure Cloned to FLEX</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(2, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(2, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 3 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox3">
+          <div><span id="stgIcon3" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 3:</strong> Data Migrated Successfully</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(3, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(3, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 4 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox4">
+          <div><span id="stgIcon4" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 4:</strong> Validation &amp; UAT Signed Off</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(4, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(4, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 5 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox5">
+          <div><span id="stgIcon5" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 5:</strong> Production Cutover Complete</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(5, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(5, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; padding:15px; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid #4b6fa0;">
+        <h3 style="margin-top:0;">Update Migration Log</h3>
+        <p style="font-size:12px; color:#a8d8ff; margin-bottom:12px;">Finalize the customer migration status in the CRM Tracker.</p>
+        <div style="display:flex; gap:10px;">
+          <button id="btnStage6Success" style="background:#28a745; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">✅ Mark as Successful</button>
+          <button id="btnStage6Fail" style="background:#dc3545; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">❌ Mark as Failed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /panel-area -->
+
+<script>
+  const stageBtns = Array.from(document.querySelectorAll('.stage-btn'));
+  const panels    = Array.from(document.querySelectorAll('.panel'));
+  const subBar1 = document.getElementById('subBar1');
+  const subBar2 = document.getElementById('subBar2');
+  const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
+  const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2'];
+
+  function activateSub(paneIds, activeId) {
+    paneIds.forEach(id => {
+      const el = document.getElementById(id + '-pane');
+      if (!el) return;
+      el.style.display = id === activeId ? '' : 'none';
+    });
+  }
+
+  function activateStage(stageId) {
+    stageBtns.forEach(b => b.classList.toggle('active', b.dataset.stage === stageId));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + stageId));
+    if(subBar1) subBar1.classList.toggle('visible', stageId === 's1');
+    if(subBar2) subBar2.classList.toggle('visible', stageId === 's2');
+  }
+
+  // Stage 1 sub-btn clicks
+  document.querySelectorAll('#subBar1 .sub-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subBar1 .sub-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activateSub(s1Panes, btn.dataset.sub);
+    });
+  });
+
+  // Stage 2 sub-btn clicks
+  document.querySelectorAll('#subBar2 .sub-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#subBar2 .sub-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activateSub(s2Panes, btn.dataset.sub);
+    });
+  });
+
+  // Stage btn clicks
+  // Stage 6 CRM Closeout
+  function completeMigration(statusStr) {
+      fetch('/api/tracker/update_status', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ status: statusStr })
+      }).then(res => res.json())
+      .then(data => {
+          if (data.ok) {
+              alert('Migration CRM Tracker updated to: ' + statusStr);
+              loadTracker();
+              activateStage('s0');
+          } else {
+              alert('Error updating CRM Log: ' + data.error);
+          }
+      }).catch(e => alert('Failed to contact backend API.'));
+  }
+  
+  const btnSuccess = document.getElementById('btnStage6Success');
+  const btnFail = document.getElementById('btnStage6Fail');
+  if (btnSuccess) {
+      btnSuccess.addEventListener('click', () => { 
+          if(confirm('Complete migration and mark customer as SUCCESSFUL in the log?')) completeMigration('Success'); 
+      });
+  }
+  if (btnFail) {
+      btnFail.addEventListener('click', () => { 
+          if(confirm('Mark customer migration as FAILED in the log?')) completeMigration('Failed'); 
+      });
+  }
+
+  // Handle stage tab clicks
+  stageBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const stage = btn.getAttribute('data-stage');
+      activateStage(stage);
+      
+      // Auto-update Stage 5 checklist based on existing UI status chips if we click Stage 5
+      if (stage === 's6') {
+         const mkS1 = document.getElementById('stgIcon1'); if(mkS1 && mkS1.innerText === '⬜') setStageState(1, 'Success');
+         const mkS2 = document.getElementById('stgIcon2'); if(mkS2 && mkS2.innerText === '⬜') setStageState(2, 'Success');
+         const mkS3 = document.getElementById('stgIcon3'); if(mkS3 && mkS3.innerText === '⬜') setStageState(3, 'Success');
+         const mkS4 = document.getElementById('stgIcon4'); if(mkS4 && mkS4.innerText === '⬜') setStageState(4, 'Success');
+         const mkS5 = document.getElementById('stgIcon5'); if(mkS5 && mkS5.innerText === '⬜') setStageState(5, 'Success');
+      }
+    });
+  });
+
+  // ========== Tracker Logic ==========
+  const trackerTbody = document.getElementById("trackerBody");
+  const uploadZone = document.getElementById("uploadZone");
+  const fileInput = document.getElementById("fileBacklog");
+
+  const priorityMatrix = [
+    { L1: 'FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'Earliest priority', Score: 1 },
+    { L1: 'FLEX Ready', L2: 'Small', L3: 'Important', Res: 'Early priority', Score: 2 },
+    { L1: 'FLEX Ready', L2: 'Small', L3: 'Core', Res: 'Early, but only after guardrail is satisfied', Score: 3 },
+    { L1: 'FLEX Ready', L2: 'Medium', L3: 'Secondary', Res: 'Early-mid priority', Score: 4 },
+    { L1: 'FLEX Ready', L2: 'Medium', L3: 'Important', Res: 'Mid priority', Score: 5 },
+    { L1: 'FLEX Ready', L2: 'Medium', L3: 'Core', Res: 'Mid priority', Score: 6 },
+    { L1: 'FLEX Ready', L2: 'Large', L3: 'Secondary', Res: 'Mid-late priority', Score: 7 },
+    { L1: 'FLEX Ready', L2: 'Large', L3: 'Important', Res: 'Late in FLEX-ready group', Score: 8 },
+    { L1: 'FLEX Ready', L2: 'Large', L3: 'Core', Res: 'Very late in FLEX-ready group', Score: 9 },
+    { L1: 'FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Secondary', Res: 'Very late', Score: 10 },
+    { L1: 'FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Important', Res: 'Very late', Score: 11 },
+    { L1: 'FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Core', Res: 'Final FLEX-ready wave', Score: 12 },
+    { L1: 'Partially FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'After all FLEX-ready equivalents', Score: 13 },
+    { L1: 'Partially FLEX Ready', L2: 'Small', L3: 'Important', Res: 'After all FLEX-ready equivalents', Score: 14 },
+    { L1: 'Partially FLEX Ready', L2: 'Small', L3: 'Core', Res: 'After guardrail and FLEX-ready maturity', Score: 15 },
+    { L1: 'Partially FLEX Ready', L2: 'Medium', L3: 'Secondary', Res: 'Later', Score: 16 },
+    { L1: 'Partially FLEX Ready', L2: 'Medium', L3: 'Important', Res: 'Later', Score: 17 },
+    { L1: 'Partially FLEX Ready', L2: 'Medium', L3: 'Core', Res: 'Later', Score: 18 },
+    { L1: 'Partially FLEX Ready', L2: 'Large', L3: 'Secondary', Res: 'Late', Score: 19 },
+    { L1: 'Partially FLEX Ready', L2: 'Large', L3: 'Important', Res: 'Late', Score: 20 },
+    { L1: 'Partially FLEX Ready', L2: 'Large', L3: 'Core', Res: 'Very late', Score: 21 },
+    { L1: 'Partially FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Secondary', Res: 'Very late', Score: 22 },
+    { L1: 'Partially FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Important', Res: 'Very late', Score: 23 },
+    { L1: 'Partially FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Core', Res: 'End of partial-ready group', Score: 24 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'After ready and partial groups', Score: 25 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Small', L3: 'Important', Res: 'Late-stage', Score: 26 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Small', L3: 'Core', Res: 'Late-stage', Score: 27 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Medium', L3: 'Secondary', Res: 'Late-stage', Score: 28 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Medium', L3: 'Important', Res: 'Late-stage', Score: 29 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Medium', L3: 'Core', Res: 'Late-stage', Score: 30 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Large', L3: 'Secondary', Res: 'Final-stage', Score: 31 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Large', L3: 'Important', Res: 'Final-stage', Score: 32 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Large', L3: 'Core', Res: 'Final-stage', Score: 33 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Secondary', Res: 'Near-final', Score: 34 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Important', Res: 'Near-final', Score: 35 },
+    { L1: 'Not Yet FLEX Ready', L2: 'Very Large / Interconnected', L3: 'Core', Res: 'Absolute last', Score: 36 }
+  ];
+
+  function getPriority(r, s, b) {
+    const p = priorityMatrix.find(m => m.L1 === r && m.L2 === s && m.L3 === b);
+    return p ? p : { Score: 99, Res: 'Unassessed / Standard Priority' };
+  }
+
+  function loadTracker() {
+    fetch('/api/tracker/list')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.customers || data.customers.length === 0) {
+          trackerTbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:50px; color:#666; font-style:italic;">No customers in the queue. Upload a backlog CSV to get started!</td></tr>';
+          return;
+        }
+
+        // Apply Priority Score mapping and Sort
+        let tQueue = 0, tReady = 0, tSuccess = 0, tFail = 0;
+        data.customers.forEach(c => {
+           let prio = getPriority(c.flex_readiness, c.size_complexity, c.blast_radius);
+           c._prioScore = prio.Score;
+           c._prioRank = prio.Res;
+           
+           if (c.status === 'Queue' || c.status === 'In Progress' || c.status === 'Rolled Back') tQueue++;
+           if (c.status === 'Queue' && c.flex_readiness === 'FLEX Ready') tReady++;
+           if (c.status === 'Success') tSuccess++;
+           if (c.status === 'Failed') tFail++;
+        });
+
+        const kTo = document.getElementById("kpiToMigrate");
+        if(kTo) kTo.innerText = tQueue;
+        const kRe = document.getElementById("kpiReady");
+        if(kRe) kRe.innerText = tReady;
+        const kSu = document.getElementById("kpiSuccess");
+        if(kSu) kSu.innerText = tSuccess;
+        const kFa = document.getElementById("kpiFailed");
+        if(kFa) kFa.innerText = tFail;
+
+        // Sorting disabled as per user request: "just display the uploaded file as is without sorting anything"
+        // Preserve exact file columns natively via backend CSV DictReader extracting fieldnames
+        let allKeys = [];
+        if (data.columns && data.columns.length > 0) {
+            allKeys = data.columns;
+        } else if (data.customers.length > 0) {
+            allKeys = Object.keys(data.customers[0]).filter(k => k !== '_prioScore' && k !== '_prioRank');
+        } else {
+            allKeys = ['customer_id', 'customer_name', 'status', 'start_date', 'flex_readiness', 'size'];
+        }
+        
+        // Force 'current_stage' to exist directly after 'status' if it's found
+        let statusIdx = allKeys.indexOf('status');
+        if (statusIdx !== -1 && !allKeys.includes('current_stage')) {
+            allKeys.splice(statusIdx + 1, 0, 'current_stage');
+        } else if (!allKeys.includes('current_stage')) {
+            allKeys.push('current_stage');
+        }
+
+        let theadHtml = `<tr>
+            <th style="padding:15px 15px; text-align:center; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; text-shadow:0 0 8px rgba(0,243,255,0.6);">Action</th>`;
+        allKeys.forEach((col, idx) => {
+            let colName = col === 'stage_failed' || col === 'fail_cause' ? 'Stage Failed' : col.replace(/_/g, ' ');
+            theadHtml += `<th style="padding:15px 15px; text-align:left; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; cursor:pointer; text-shadow:0 0 8px rgba(0,243,255,0.6);" onclick="sortTracker(${idx + 1})">${colName} <span style="font-size:14px; opacity:0.8">⇕</span></th>`;
+        });
+        theadHtml += `<th style="padding:15px 15px; text-align:center; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; text-shadow:0 0 8px rgba(0,243,255,0.6);">Del</th></tr>`;
+        
+        let theadEl = document.querySelector("#trackerTable thead");
+        if(theadEl) theadEl.innerHTML = theadHtml;
+
+        let html = '';
+        data.customers.forEach((c) => {
+          let displayStatus = c.status || 'Not Started';
+          let sRaw = displayStatus.toLowerCase();
+          
+          let neonColor = '#00d2ff'; // default cyan
+          let textGlow = '0 0 5px #00d2ff';
+          let btnText = 'Start';
+          let btnBg = 'rgba(0, 210, 255, 0.15)';
+          let btnBorder = '#00d2ff';
+          
+          if (sRaw.includes('in progress') || sRaw === 'queue') { 
+              neonColor = '#f39c12'; textGlow = '0 0 5px #f39c12'; btnText = 'Continue'; btnBg = 'rgba(243, 156, 18, 0.15)'; btnBorder = '#f39c12';
+          }
+          else if (sRaw.includes('finish') || sRaw.includes('success')) { 
+              neonColor = '#00ff88'; textGlow = '0 0 8px #00ff88'; btnText = 'Monitor'; btnBg = 'rgba(0, 255, 136, 0.15)'; btnBorder = '#00ff88';
+          }
+          else if (sRaw.includes('fail')) { 
+              neonColor = '#ff2a5f'; textGlow = '0 0 8px #ff2a5f'; btnText = 'Review'; btnBg = 'rgba(255, 42, 95, 0.15)'; btnBorder = '#ff2a5f';
+          }
+          else if (sRaw.includes('roll')) { 
+              neonColor = '#ff00ff'; textGlow = '0 0 8px #ff00ff'; btnText = 'Start'; btnBg = 'rgba(255, 0, 255, 0.15)'; btnBorder = '#ff00ff';
+          }
+          
+          const cDataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(c))));
+          
+          let actionBtn;
+          if (btnText === 'Monitor') {
+              actionBtn = `<button style="background:${btnBg}; border:1px solid ${btnBorder}; color:${neonColor}; box-shadow:0 0 10px ${btnBg}; padding:6px 14px; border-radius:6px; font-weight:800; font-size:12px; cursor:default; opacity:0.8; letter-spacing: 0.5px;">${btnText}</button>`;
+          } else {
+              actionBtn = `<button style="background:${btnBg}; border:1px solid ${btnBorder}; color:${neonColor}; box-shadow:0 0 10px ${btnBg}; padding:6px 14px; border-radius:6px; cursor:pointer; font-weight:800; font-size:12px; transition:all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); letter-spacing: 0.5px;" onmouseover="this.style.boxShadow='0 0 20px ${btnBorder}'; this.style.transform='scale(1.05)';" onmouseout="this.style.boxShadow='0 0 10px ${btnBg}'; this.style.transform='scale(1)';" onclick="setActiveCustomer('${c.customer_id}', '${cDataB64}')">${btnText}</button>`;
+          }
+
+          html += `<tr class="tracker-row" style="background-color: rgba(15, 20, 35, 0.8); backdrop-filter: blur(8px); transition: background 0.2s;" onmouseover="this.style.backgroundColor='rgba(30, 40, 60, 0.95)'" onmouseout="this.style.backgroundColor='rgba(15, 20, 35, 0.8)'">
+            <td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:center;">${actionBtn}</td>`;
+            
+          allKeys.forEach(col => {
+              let val = c[col] || '';
+              if(col === 'status') {
+                  html += `<td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); color:${neonColor}; text-shadow: ${textGlow}; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:1px; border:1px dashed transparent;" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
+              } else {
+                  html += `<td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0; font-size:13px; border:1px dashed transparent; font-weight:500;" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
+              }
+          });
+          html += `<td style="padding:14px 15px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:center;"><button onclick="deleteRow(this)" style="background:transparent; border:none; cursor:pointer; font-size:16px; filter: grayscale(100%) opacity(50%); transition: all 0.2s;" onmouseover="this.style.filter='grayscale(0%) opacity(100%)'" onmouseout="this.style.filter='grayscale(100%) opacity(50%)'" title="Delete Row">❌</button></td></tr>`;
+        });
+        trackerTbody.innerHTML = html;
+        if(typeof window.markEdits === 'function') {
+           window.markEdits();
+           document.getElementById('btnSaveEdits').style.display = 'none';
+        }
+      });
+  }
+  loadTracker();
+
+  let uploadMode = "append";
+  window.markEdits = function() {
+      document.getElementById('btnSaveEdits').style.display = 'inline-block';
+      let toMig=0, ready=0, succ=0, fail=0;
+      document.querySelectorAll('.tracker-row').forEach(tr => {
+         let statCell = tr.querySelector('td[data-key="status"]');
+         if(statCell) {
+             let sStr = statCell.innerText.toLowerCase();
+             let neonColor = '#00d2ff'; let btnBg = 'rgba(0, 210, 255, 0.15)';
+             if(sStr.includes('finish') || sStr.includes('success')) {
+                 succ++; neonColor = '#00ff88'; btnBg = 'rgba(0, 255, 136, 0.15)';
+             } else if(sStr.includes('fail')) {
+                 fail++; neonColor = '#ff2a5f'; btnBg = 'rgba(255, 42, 95, 0.15)';
+             } else if(sStr.includes('progress') || sStr.includes('queue')) { 
+                 toMig++; neonColor = '#f39c12'; btnBg = 'rgba(243, 156, 18, 0.15)';
+                 let readCell = tr.querySelector('td[data-key="flex_readiness"]');
+                 if(readCell && readCell.innerText.toLowerCase().includes('flex ready')) ready++;
+             } else if(sStr.includes('roll')) {
+                 neonColor = '#ff00ff'; toMig++; btnBg = 'rgba(255, 0, 255, 0.15)';
+             } else {
+                 toMig++;
+             }
+             
+             // Update Status Cell directly
+             statCell.style.color = neonColor;
+             statCell.style.textShadow = `0 0 8px ${neonColor}`;
+             statCell.style.fontWeight = '800';
+             statCell.style.textTransform = 'uppercase';
+
+             let aBtn = tr.querySelector('td > button');
+             if (aBtn && aBtn.innerText !== '❌') {
+                 aBtn.style.color = neonColor;
+                 aBtn.style.border = `1px solid ${neonColor}`;
+                 aBtn.style.backgroundColor = btnBg;
+                 aBtn.style.boxShadow = `0 0 10px ${btnBg}`;
+                 aBtn.onmouseover = () => { aBtn.style.boxShadow = `0 0 20px ${neonColor}`; aBtn.style.transform = 'scale(1.05)'; };
+                 aBtn.onmouseout = () => { aBtn.style.boxShadow = `0 0 10px ${btnBg}`; aBtn.style.transform = 'scale(1)'; };
+             }
+             
+             tr.style.backgroundColor = 'rgba(15, 20, 35, 0.8)';
+         }
+      });
+      document.getElementById("kpiToMigrate").innerText = toMig;
+      document.getElementById("kpiReady").innerText = ready;
+      document.getElementById("kpiSuccess").innerText = succ;
+      document.getElementById("kpiFailed").innerText = fail;
+  };
+  
+  window.deleteRow = function(btn) {
+      if(confirm('Delete this row?')) {
+          btn.closest('tr').remove();
+          markEdits();
+      }
+  };
+
+  document.getElementById("btnAddNewRow").addEventListener("click", () => {
+      let allKeys = [];
+      let trHead = document.querySelector('#trackerTable thead tr');
+      if (trHead) {
+          Array.from(trHead.cells).slice(1, -1).forEach(th => {
+              allKeys.push(th.innerText.toLowerCase().replace(/ /g, '_'));
+          });
+      }
+      if (allKeys.length === 0) allKeys = ['customer_id', 'customer_name', 'status'];
+
+      let html = `<tr class="tracker-row"><td style="padding:12px 15px; text-align:center;">-</td>`;
+      allKeys.forEach(col => {
+          let val = col === 'customer_id' ? 'NEW-' + Math.floor(Math.random()*10000) : '';
+          html += `<td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05); color:#fff; font-size:12px; border:1px dashed #7ecfff; background:rgba(126,207,255,0.1);" contenteditable="true" oninput="markEdits()" data-key="${col}">${val}</td>`;
+      });
+      html += `<td style="padding:12px 15px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:center;"><button onclick="deleteRow(this)" style="background:transparent; border:none; cursor:pointer; font-size:16px;">❌</button></td></tr>`;
+      trackerTbody.insertAdjacentHTML('afterbegin', html);
+      markEdits();
+  });
+
+  document.getElementById("btnSaveEdits").addEventListener("click", () => {
+      let rows = document.querySelectorAll('.tracker-row');
+      let payload = [];
+      rows.forEach(r => {
+          let rowObj = {};
+          let cells = r.querySelectorAll('td[contenteditable="true"]');
+          cells.forEach(c => {
+             rowObj[c.getAttribute('data-key')] = c.innerText.trim();
+          });
+          if(Object.keys(rowObj).length > 0) payload.push(rowObj);
+      });
+      fetch('/api/tracker/save_manual', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+      }).then(res => res.json()).then(data => {
+          if (data.ok) {
+              document.getElementById('btnSaveEdits').style.display = 'none';
+              loadTracker();
+          } else {
+              alert('Failed to save changes: ' + data.error);
+          }
+      });
+  });
+
+  document.getElementById("btnToggleUploadAppend").addEventListener("click", () => {
+    uploadMode = "append";
+    document.getElementById("uploadModeText").innerText = "Append Mode: Drag & Drop missing customers here.";
+    uploadZone.style.display = uploadZone.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById("btnToggleUploadOver").addEventListener("click", () => {
+    uploadMode = "overwrite";
+    document.getElementById("uploadModeText").innerText = "OVERWRITE Mode: Drag & Drop. WARNING: DELETES ALL EXISTING DATA.";
+    uploadZone.style.display = uploadZone.style.display === 'none' ? 'block' : 'none';
+  });
+
+  uploadZone.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData(); fd.append("file", file);
+    fd.append("mode", uploadMode);
+    
+    document.getElementById("uploadModeText").innerText = "Uploading...";
+    fetch('/api/tracker/upload', { method: 'POST', body: fd })
+    .then(res => res.json())
+    .then(data => {
+        if(data.ok) { uploadZone.style.display = 'none'; loadTracker(); }
+        else alert("Error: " + data.error);
+        fileInput.value = '';
+    });
+  });
+
+  document.getElementById("btnExportCsv").addEventListener("click", () => {
+     window.location.href = '/api/tracker/export';
+  });
+  
+  window.renderGlobalStageHeaders = function(cName = "No Active Customer Selected") {
+      const panels = [
+        {id: 'panel-s1', key: 's1', label: 'Stage 1 (Discovery & Assessment)'},
+        {id: 'panel-s2', key: 's2', label: 'Stage 2 (Migration Pipeline)'},
+        {id: 'panel-s4', key: 's4', label: 'Stage 3 (Validation & UAT)'},
+        {id: 'panel-s5', key: 's5', label: 'Stage 4 (Cutover & Handover)'},
+        {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration)'}
+      ];
+      panels.forEach(p => {
+          const panelEl = document.querySelector(`#${p.id}`);
+          if(!panelEl) return;
+          
+          let old = panelEl.querySelector('.stage-status-ctrl');
+          if(old) old.remove();
+          
+          let d = document.createElement('div');
+          d.className = 'stage-status-ctrl';
+          d.style.margin = '15px 20px 0 20px';
+          d.style.padding = '15px'; d.style.background = 'rgba(0,0,0,0.4)';
+          d.style.borderRadius = '8px'; d.style.borderLeft = '4px solid #00f3ff';
+          d.style.display = 'flex'; d.style.alignItems = 'center'; d.style.gap = '25px';
+          d.style.backdropFilter = 'blur(10px)';
+          d.style.boxShadow = '0 0 10px rgba(0,243,255,0.2)';
+
+          d.innerHTML = `
+              <strong style="color:#00f3ff; font-size:16px; text-shadow:0 0 5px rgba(0,243,255,0.5);">${cName} • ${p.label} Status:</strong>
+              <label style="cursor:pointer; display:flex; align-items:center; gap:5px; color:#00ff88; font-weight:800; font-size:14px; padding:6px 10px; background:rgba(0,255,136,0.1); border-radius:4px; border:1px solid #00ff88; box-shadow:0 0 8px rgba(0,255,136,0.3);">
+                 <input type="radio" name="${p.id}_st" value="Finished" onchange="submitStageStatus('${p.key}', 'Finished')"> ✅ DONE
+              </label>
+              <label style="cursor:pointer; display:flex; align-items:center; gap:5px; color:#f39c12; font-weight:800; font-size:14px; padding:6px 10px; background:rgba(243,156,18,0.1); border-radius:4px; border:1px solid #f39c12; box-shadow:0 0 8px rgba(243,156,18,0.3);">
+                 <input type="radio" name="${p.id}_st" value="In Progress" onchange="submitStageStatus('${p.key}', 'In Progress')"> ⏳ IN PROGRESS
+              </label>
+              <label style="cursor:pointer; display:flex; align-items:center; gap:5px; color:#ff2a5f; font-weight:800; font-size:14px; padding:6px 10px; background:rgba(255,42,95,0.1); border-radius:4px; border:1px solid #ff2a5f; box-shadow:0 0 8px rgba(255,42,95,0.3);">
+                 <input type="radio" name="${p.id}_st" value="Failed" onchange="submitStageStatus('${p.key}', 'Failed')"> ❌ FAILED
+              </label>
+          `;
+          
+          panelEl.insertBefore(d, panelEl.firstChild);
+      });
+  };
+  
+  // Run on first load
+  renderGlobalStageHeaders();
+
+  window.submitStageStatus = function(stageName, status) {
+      let payload = { status: status };
+      
+      const niceStageMap = {
+          's1': 'Stage 1 (Discovery)',
+          's2': 'Stage 2 (Migration Pipeline)',
+          's4': 'Stage 3 (Validation & UAT)',
+          's5': 'Stage 4 (Cutover & Handover)',
+          's6': 'Stage 5 (Post-Migration)'
+      };
+      
+      if(status === 'Failed') {
+          payload.stage_failed = niceStageMap[stageName] || stageName;
+      } else {
+          payload.stage_failed = ''; 
+      }
+      
+      if(status === 'In Progress') {
+          payload.current_stage = niceStageMap[stageName] || stageName;
+      }
+      
+      fetch('/api/tracker/update_status', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+      }).then(res => res.json()).then(data => {
+          if(!data.ok) console.log("Failed to update status", data);
+          loadTracker();
+      });
+  };
+
+  document.getElementById("trackerSearch")?.addEventListener("input", function(e) {
+      const term = e.target.value.toLowerCase();
+      document.querySelectorAll("#trackerBody .tracker-row").forEach(tr => {
+          const txt = tr.innerText.toLowerCase();
+          tr.style.display = txt.includes(term) ? '' : 'none';
+      });
+  });
+
+  window.sortTracker = function(colIdx) {
+      const tbody = document.getElementById("trackerBody");
+      const rows = Array.from(tbody.querySelectorAll(".tracker-row"));
+      const isAsc = tbody.dataset.sortOrder === 'asc' && tbody.dataset.sortCol === colIdx.toString();
+      
+      rows.sort((a, b) => {
+          const aVal = a.cells[colIdx].innerText.trim();
+          const bVal = b.cells[colIdx].innerText.trim();
+          return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+      });
+      
+      rows.forEach(r => tbody.appendChild(r));
+      tbody.dataset.sortOrder = isAsc ? 'desc' : 'asc';
+      tbody.dataset.sortCol = colIdx.toString();
+  };
+
+  window.setActiveCustomer = function(customerId, b64Data) {
+      let routeTarget = 's1';
+      let cName = 'Customer';
+      if(b64Data) {
+          try {
+              const c = JSON.parse(decodeURIComponent(escape(atob(b64Data))));
+              cName = c.customer_name || 'Customer';
+              
+              if(c.status && c.status.toLowerCase().includes('fail') && c.stage_failed) {
+                  routeTarget = c.stage_failed;
+              }
+              
+              const mapping = {
+                  'mig_ag1_ospcUsername': c.ospc_username || c.ospcUsername || '',
+                  'mig_ag1_ospcApiKey': c.ospc_password || c.ospcPassword || c.ospc_apikey || c.ospcApiKey || '',
+                  'mig_ag1_ospcAccountId': c.ospc_project_id || c.ospcProjectId || c.ospc_account_id || c.ospcAccountId || '',
+                  'mig_ag1_flexAuthUrl': c.flex_auth_url || c.flexAuthUrl || '',
+                  'mig_ag1_flexUsername': c.flex_username || c.flexUsername || '',
+                  'mig_ag1_flexPassword': c.flex_password || c.flexPassword || '',
+                  'mig_ag1_flexProjectId': c.flex_project_id || c.flexProjectId || '',
+                  'mig_ag1_flexDomain': c.flex_domain || c.flexDomain || '',
+                  'mig_active_customer_name': c.customer_name || '',
+                  'mig_active_customer_contact': c.contact_details || c.contact || c.business_poc || '',
+                  'mig_active_customer_start': c.start_date || new Date().toISOString().split('T')[0]
+              };
+              for(let lsKey in mapping) { 
+                  if(mapping[lsKey]) localStorage.setItem(lsKey, mapping[lsKey]); 
+              }
+          } catch(e) { console.error("Prefill Error", e); }
+      }
+
+      fetch('/api/tracker/set_active', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ customer_id: customerId })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (data.ok) {
+              renderGlobalStageHeaders(cName);
+
+              activateStage(routeTarget);
+              let SubBtn = document.querySelector(`[data-sub="${routeTarget}ospc"]`) || document.querySelector('[data-sub="s1ospc"]');
+              if(SubBtn) SubBtn.click();
+              
+              let f = document.getElementById('s1ospc-pane');
+              if(f && f.contentWindow) { f.contentWindow.location.reload(); }
+          }
+          else alert("Failed to set active customer: " + data.error);
+      });
+  };
+
+  // UAT Automation Runtime Engine
+  function loadFLEXCredentials_UAT() {
+      // Load FLEX keys
+      const flexKeys = ['os_auth_url', 'os_project_id', 'os_username', 'os_password', 'os_user_domain_id'];
+      flexKeys.forEach(k => {
+          const val = localStorage.getItem('cred_flex_' + k.replace('os_auth_url', 'auth_url').replace('os_project_id', 'project_id').replace('os_username', 'username').replace('os_password', 'password').replace('os_user_domain_id', 'domain'));
+          // Wait, index.html uses specific lsKeys. Let's map exactly:
+          // 'cred_flex_auth_url', 'cred_flex_username', 'cred_flex_password', 'cred_flex_project_id', 'cred_flex_domain'
+      });
+      
+      const valFAuth = localStorage.getItem('cred_flex_auth_url'); if(valFAuth) { const e = document.getElementById('uat_flex_os_auth_url'); if(e) e.value = valFAuth; }
+      const valFProj = localStorage.getItem('cred_flex_project_id'); if(valFProj) { const e = document.getElementById('uat_flex_os_project_id'); if(e) e.value = valFProj; }
+      const valFUser = localStorage.getItem('cred_flex_username'); if(valFUser) { const e = document.getElementById('uat_flex_os_username'); if(e) e.value = valFUser; }
+      const valFPass = localStorage.getItem('cred_flex_password'); if(valFPass) { const e = document.getElementById('uat_flex_os_password'); if(e) e.value = valFPass; }
+      const valFDom = localStorage.getItem('cred_flex_domain'); if(valFDom) { const e = document.getElementById('uat_flex_os_user_domain_id'); if(e) e.value = valFDom; }
+
+      // Load OSPC keys
+      const valOUser = localStorage.getItem('cred_ospc_username'); if(valOUser) { const e = document.getElementById('uat_ospc_username'); if(e) e.value = valOUser; }
+      const valOKey = localStorage.getItem('cred_ospc_apikey'); if(valOKey) { const e = document.getElementById('uat_ospc_apikey'); if(e) e.value = valOKey; }
+      const valOAcc = localStorage.getItem('cred_ospc_accountid'); if(valOAcc) { const e = document.getElementById('uat_ospc_accountid'); if(e) e.value = valOAcc; }
+  }
+  
+  // Bind credential loading to any stage button clicks (lazy sync)
+  document.querySelectorAll('.stage-btn').forEach(btn => {
+      btn.addEventListener('click', () => { setTimeout(loadFLEXCredentials_UAT, 300); });
+  });
+  setTimeout(loadFLEXCredentials_UAT, 500);
+
+  window.executeUATTests = function() {
+      const btn = document.getElementById('btnRunUAT');   
+      const statusText = document.getElementById('uat-status-indicator');
+      const termBox = document.getElementById('uat-terminal-box');
+      const logOut = document.getElementById('uat-log-output');
+
+      termBox.style.display = 'block';
+      logOut.innerHTML = 'Submitting FLEX credentials and firing validation suite...\n\n';
+      statusText.textContent = 'Executing...';
+      statusText.style.color = '#f39c12';
+      btn.disabled = true;
+
+      let bodyData = {
+          flex_auth: document.getElementById('uat_flex_os_auth_url').value,
+          flex_proj: document.getElementById('uat_flex_os_project_id').value,
+          flex_user: document.getElementById('uat_flex_os_username').value,
+          flex_pass: document.getElementById('uat_flex_os_password').value,
+          flex_domain: document.getElementById('uat_flex_os_user_domain_id').value,
+          uat_app_url: document.getElementById('uat_app_url').value,
+          uat_app_ip: document.getElementById('uat_app_ip').value,
+          uat_db_ip: document.getElementById('uat_db_ip').value,
+          uat_ssh_user: document.getElementById('uat_ssh_user').value,
+          uat_ssh_key: document.getElementById('uat_ssh_key').value
+      };
+
+      fetch('/api/run/uat_tests', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyData)
+      })
+      .then(response => {
+           let reader = response.body.getReader();
+           let decoder = new TextDecoder();
+           function read() {
+               reader.read().then(({done, value}) => {
+                   if (done) {
+                       statusText.textContent = 'Completed';
+                       statusText.style.color = '#2ecc71';
+                       btn.disabled = false;
+                       return;
+                   }
+                   let text = decoder.decode(value);
+                   text.split('\n').forEach(line => {
+                       if (line.startsWith('data: ')) {
+                           logOut.innerHTML += line.replace('data: ', '') + '\n';
+                           logOut.scrollTop = logOut.scrollHeight;
+                       }
+                   });
+                   read();
+               }).catch(e => {
+                   logOut.innerHTML += '\nStream Error: ' + e.message;
+                   btn.disabled = false;
+               });
+           }
+           read();
+      })
+      .catch(err => {
+                   logOut.innerHTML += '\nFetch Error: ' + err.message;
+          btn.disabled = false;
+      });
+  }
+
+  window.executeRbacCheck = function() {
+      const btn = document.getElementById('btnRunRbac');   
+      const statusText = document.getElementById('rbac-status-indicator');
+      const termBox = document.getElementById('rbac-terminal-box');
+      const logOut = document.getElementById('rbac-log-output');
+
+      termBox.style.display = 'block';
+      logOut.innerHTML = 'Connecting to OSPC and FLEX Keystone endpoints simultaneously...\n\n';
+      statusText.textContent = 'Comparing...';
+      statusText.style.color = '#f39c12';
+      btn.disabled = true;
+
+      let bodyData = {
+          flex_auth: document.getElementById('uat_flex_os_auth_url').value,
+          flex_proj: document.getElementById('uat_flex_os_project_id').value,
+          flex_user: document.getElementById('uat_flex_os_username').value,
+          flex_pass: document.getElementById('uat_flex_os_password').value,
+          flex_domain: document.getElementById('uat_flex_os_user_domain_id').value,
+          ospc_user: document.getElementById('uat_ospc_username').value,
+          ospc_pass: document.getElementById('uat_ospc_apikey').value,
+          ospc_tenant: document.getElementById('uat_ospc_accountid').value
+      };
+
+      fetch('/api/run/uat_rbac_check', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyData)
+      })
+      .then(response => {
+           let reader = response.body.getReader();
+           let decoder = new TextDecoder();
+           function read() {
+               reader.read().then(({done, value}) => {
+                   if (done) {
+                       statusText.textContent = 'Validation Complete';
+                       statusText.style.color = '#2ecc71';
+                       btn.disabled = false;
+                       return;
+                   }
+                   let text = decoder.decode(value);
+                   text.split('\n').forEach(line => {
+                       if (line.startsWith('data: ')) {
+                           let l = line.replace('data: ', '');
+                           if(l.includes('[MISSING]')) l = '<span style="color:#ef4444;">' + l + '</span>';
+                           if(l.includes('[MATCH]')) l = '<span style="color:#22c55e;">' + l + '</span>';
+                           logOut.innerHTML += l + '\n';
+                           logOut.scrollTop = logOut.scrollHeight;
+                       }
+                   });
+                   read();
+               }).catch(e => {
+                   logOut.innerHTML += '\nStream Error: ' + e.message;
+                   btn.disabled = false;
+               });
+           }
+           read();
+      })
+      .catch(err => {
+          logOut.innerHTML += '\nFetch Error: ' + err.message;
+          btn.disabled = false;
+      });
+  }
+
+  window.executeStage5Task = function(taskType, passedBtn) {
+      // 1. Capture the triggering button
+      let btnElem = passedBtn || (window.event ? window.event.currentTarget : null);
+      let originalText = "";
+      if (btnElem) {
+          originalText = btnElem.innerText.replace(/^(OK ✔️ |NOT OK ❌ |EXECUTING ⏳ )/, '');
+          btnElem.style.background = '#f39c12'; // Orange while executing
+          btnElem.style.color = '#fff';
+          btnElem.style.border = 'none';
+          btnElem.innerText = 'EXECUTING ⏳ ' + originalText;
+          btnElem.disabled = true;
+          btnElem.style.opacity = '0.9';
+      }
+
+      const termBox = document.getElementById('s5-terminal-box');
+      const logOut = document.getElementById('s5-log-output');
+      const statusText = document.getElementById('s5-status-indicator');
+
+      termBox.style.display = 'block';
+      logOut.innerHTML = 'Initializing Cutover Operation: ' + taskType.toUpperCase() + '...\n\n';
+      statusText.textContent = 'Executing...';
+      statusText.style.color = '#f39c12';
+
+      let lbType = 'haproxy';
+      const lbSelect = document.getElementById('ab_lb_type');
+      if (lbSelect) lbType = lbSelect.value;
+      
+      let bodyData = { task: taskType, lb_type: lbType };
+      let hasError = false;
+
+      fetch('/api/run/stage5_task', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyData)
+      })
+      .then(response => {
+           let reader = response.body.getReader();
+           let decoder = new TextDecoder();
+           function read() {
+               reader.read().then(({done, value}) => {
+                   if (value) {
+                       let text = decoder.decode(value);
+                       text.split('\n').forEach(line => {
+                           if (line.startsWith('data: ')) {
+                               let l = line.replace('data: ', '');
+                               if(l.includes('[TABLE_PAYLOAD]')) {
+                                   let parts = l.replace('[TABLE_PAYLOAD]', '').split('|');
+                                   if (parts.length >= 2) {
+                                       let tableHtml = parts[0].trim();
+                                       let downloadUrl = parts[1].trim();
+                                       
+                                       let container = document.getElementById('report-output-container');
+                                       let contentDiv = document.getElementById('report-table-content');
+                                       let dlBtn = document.getElementById('report-download-btn');
+                                       
+                                       contentDiv.innerHTML = tableHtml;
+                                       dlBtn.href = downloadUrl;
+                                       dlBtn.download = downloadUrl.split('/').pop();
+                                       container.style.display = 'block';
+                                   }
+                                   return;
+                               }
+                               if(l.includes('[ERROR]') || l.includes('Unknown task') || l.includes('[FATAL]')) {
+                                   hasError = true;
+                                   l = '<span style="color:#ef4444;">' + l + '</span>';
+                               }
+                               if(l.includes('[SUCCESS]') || l.includes('[OK]')) l = '<span style="color:#22c55e;">' + l + '</span>';
+                               logOut.innerHTML += l + '\n';
+                               logOut.scrollTop = logOut.scrollHeight;
+                           }
+                       });
+                   }
+                   if (done) {
+                       statusText.textContent = hasError ? 'Failed' : 'Completed';
+                       statusText.style.color = hasError ? '#e74c3c' : '#2ecc71';
+                       if (btnElem) {
+                           btnElem.disabled = false;
+                           btnElem.style.opacity = '1.0';
+                           btnElem.style.color = '#fff';
+                           btnElem.style.border = 'none';
+                           if (hasError) {
+                               btnElem.style.background = '#c0392b'; // Red
+                               btnElem.innerText = 'NOT OK ❌ ' + originalText;
+                           } else {
+                               btnElem.style.background = '#27ae60'; // Green
+                               btnElem.innerText = 'OK ✔️ ' + originalText;
+                           }
+                       }
+                       return;
+                   }
+                   read();
+               }).catch(e => {
+                   logOut.innerHTML += '\nStream Error: ' + e.message;
+                   if (btnElem) {
+                       btnElem.disabled = false;
+                       btnElem.style.background = '#c0392b';
+                       btnElem.innerText = 'NOT OK ❌ ' + originalText;
+                   }
+               });
+           }
+           read();
+      })
+      .catch(err => {
+          logOut.innerHTML += '\nFetch Error: ' + err.message;
+          if (btnElem) {
+              btnElem.disabled = false;
+              btnElem.style.background = '#c0392b';
+              btnElem.innerText = 'NOT OK ❌ ' + originalText;
+          }
+      });
+  }
+
+  window.applyTrafficWeight = function() {
+      const slider = document.getElementById('traffic_slider');
+      if (!slider) return;
+      const flexWeight = parseInt(slider.value, 10);
+      
+      const termBox = document.getElementById('s5-terminal-box');
+      const logOut = document.getElementById('s5-log-output');
+      const statusText = document.getElementById('s5-status-indicator');
+
+      termBox.style.display = 'block';
+      logOut.innerHTML = 'Executing Live Traffic Shift: FLEX=' + flexWeight + '% / OSPC=' + (100 - flexWeight) + '%\n\n';
+      statusText.textContent = 'Applying...';
+      statusText.style.color = '#f39c12';
+
+      let lbType = 'haproxy';
+      const lbSelect = document.getElementById('ab_lb_type');
+      if (lbSelect) lbType = lbSelect.value;
+      
+      let bodyData = { task: 'traffic_shift', lb_type: lbType, weight: flexWeight };
+
+      fetch('/api/run/stage5_task', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyData)
+      })
+      .then(response => {
+           let reader = response.body.getReader();
+           let decoder = new TextDecoder();
+           function read() {
+               reader.read().then(({done, value}) => {
+                   if (done) {
+                       statusText.textContent = 'Completed';
+                       statusText.style.color = '#2ecc71';
+                       return;
+                   }
+                   let text = decoder.decode(value);
+                   text.split('\n').forEach(line => {
+                       if (line.startsWith('data: ')) {
+                           let l = line.replace('data: ', '');
+                           if(l.includes('[ERROR]')) l = '<span style="color:#ef4444;">' + l + '</span>';
+                           if(l.includes('[SUCCESS]') || l.includes('[OK]')) l = '<span style="color:#22c55e;">' + l + '</span>';
+                           logOut.innerHTML += l + '\n';
+                           logOut.scrollTop = logOut.scrollHeight;
+                       }
+                   });
+                   read();
+               }).catch(e => { logOut.innerHTML += '\nStream Error: ' + e.message; });
+           }
+           read();
+      })
+      .catch(err => { logOut.innerHTML += '\nFetch Error: ' + err.message; });
+  }
+
+  // Default activation
+  activateStage('s0');
+</script>
+</body>
+</html>

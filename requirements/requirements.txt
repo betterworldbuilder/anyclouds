@@ -2,3 +2,6 @@ flask
 requests
 python-openstackclient
 python-octaviaclient
+pandas
+openpyxl
+xlrd

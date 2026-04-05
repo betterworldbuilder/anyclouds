@@ -1,7 +1,1 @@
 customer_id,customer_name,target_region,status,ospc_vms_count,ospc_volumes_count,ospc_db_count,flex_migrated_vms,flex_migrated_volumes,start_date,completion_date
-CUST-1001,Global Tech Industries,DFW3,In Progress,0,0,0,0,0,2026-03-31 06:10,
-CUST-1002,Acme Corp E-Commerce,IAD3,Queue,0,0,0,0,0,,
-CUST-1003,Stark Logistics,ORD1,Queue,0,0,0,0,0,,
-CUST-1004,Wayne Financial,DFW3,Queue,0,0,0,0,0,,
-CUST-1005,Globex SaaS Cloud,IAD3,Queue,0,0,0,0,0,,
-CUST-1006,Massive Dynamic,DFW3,Queue,0,0,0,0,0,,

@@ -571,15 +571,92 @@ function renderSummary(rows, headers, summaryEl) {
     cards.push(card('Source Flavors', rows.filter(r => r.source_flavor_id).length.toLocaleString()));
   }
 
+  let tcoTableHtml = '';
   if (headers.includes('target_daily_cost_min_usd') || headers.includes('target_monthly_cost_min_usd')) {
-    const dailyTotal = sumCurrency(rows, 'target_daily_cost_min_usd');
-    const monthlyTotal = sumCurrency(rows, 'target_monthly_cost_min_usd');
-    if (dailyTotal > 0) cards.push(card('Min Est. Daily Cost', `$${dailyTotal.toFixed(2)}`));
-    if (monthlyTotal > 0) cards.push(card('Min Est. Monthly Cost', `$${monthlyTotal.toFixed(2)}`));
-    if (dailyTotal > 0 || monthlyTotal > 0) cards.push(card('Cost Note', 'Minimum estimate for mapped server types'));
+    const flexDailyTotal = sumCurrency(rows, 'target_daily_cost_min_usd');
+    const flexMonthlyTotal = sumCurrency(rows, 'target_monthly_cost_min_usd');
+    
+    if (flexMonthlyTotal > 0) {
+      // Automatically sum actual OSPC cost figures from the CSV, falling back to legacy multiplier if missing.
+      let ospcDailyTotal = sumCurrency(rows, 'source_daily_cost_usd') || sumCurrency(rows, 'source_daily_cost') || sumCurrency(rows, 'TCO_OSPC_Daily');
+      let ospcMonthlyTotal = sumCurrency(rows, 'source_monthly_cost_usd') || sumCurrency(rows, 'source_monthly_cost') || sumCurrency(rows, 'TCO_OSPC_Monthly') || sumCurrency(rows, 'TCO_OSPC_Estimate');
+      
+      let isEstimated = false;
+      if (!ospcMonthlyTotal) {
+        const multiplier = 2.45; // Approx baseline OSPC vs target savings ratio
+        ospcDailyTotal = flexDailyTotal * multiplier;
+        ospcMonthlyTotal = flexMonthlyTotal * multiplier;
+        isEstimated = true;
+      } else if (!ospcDailyTotal && ospcMonthlyTotal > 0) {
+        ospcDailyTotal = ospcMonthlyTotal / 30;
+      }
+      
+      const ospcLabel = isEstimated ? 'Legacy OSPC (Estimated)' : 'Legacy OSPC (Actual)';
+      
+      const monthlySavings = ospcMonthlyTotal - flexMonthlyTotal;
+      const yearlySavings = monthlySavings * 12;
+      const savingsPercent = Math.round((monthlySavings / ospcMonthlyTotal) * 100) || 0;
+
+      tcoTableHtml = `
+      <div class="tco-comparison-panel" style="grid-column: 1 / -1; margin-top: 10px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(165, 180, 252, 0.2); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <div style="background: linear-gradient(90deg, rgba(30, 58, 138, 0.8), rgba(49, 46, 129, 0.8)); padding: 14px 22px; border-bottom: 1px solid rgba(165, 180, 252, 0.2); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; color: #e0e7ff; font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                TCO Comparison & Projected Savings
+            </h3>
+            <span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; border: 1px solid rgba(34, 197, 94, 0.3);">
+                ↓ ${savingsPercent}% Cost Reduction
+            </span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                  <tr style="background: rgba(255,255,255,0.02);">
+                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Environment</th>
+                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Min Est. Daily Cost</th>
+                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Min Est. Monthly Cost</th>
+                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Annualized Cost</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                      <td style="padding: 14px 22px; border-right: 1px solid rgba(255,255,255,0.05);">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                              <div style="width: 10px; height: 10px; border-radius: 50%; background: #f43f5e; box-shadow: 0 0 8px rgba(244,63,94,0.6);"></div>
+                              <span style="color: #cbd5e1; font-weight: 500;">${ospcLabel}</span>
+                          </div>
+                      </td>
+                      <td style="padding: 14px 22px; color: #f87171; font-family: 'JetBrains Mono', monospace;">$${ospcDailyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      <td style="padding: 14px 22px; color: #f87171; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${ospcMonthlyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      <td style="padding: 14px 22px; color: #f87171; font-family: 'JetBrains Mono', monospace;">$${(ospcMonthlyTotal * 12).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  </tr>
+                  <tr>
+                      <td style="padding: 14px 22px; border-right: 1px solid rgba(255,255,255,0.05); background: rgba(34, 197, 94, 0.05);">
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                              <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6);"></div>
+                              <span style="color: #fff; font-weight: 600;">Target FLEX Platform</span>
+                          </div>
+                      </td>
+                      <td style="padding: 14px 22px; color: #4ade80; font-family: 'JetBrains Mono', monospace; background: rgba(34, 197, 94, 0.05);">$${flexDailyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      <td style="padding: 14px 22px; color: #4ade80; font-family: 'JetBrains Mono', monospace; font-weight: 600; background: rgba(34, 197, 94, 0.05);">$${flexMonthlyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                      <td style="padding: 14px 22px; color: #4ade80; font-family: 'JetBrains Mono', monospace; background: rgba(34, 197, 94, 0.05);">$${(flexMonthlyTotal * 12).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  </tr>
+              </tbody>
+              <tfoot>
+                  <tr style="background: rgba(0,0,0,0.25); border-top: 1px solid rgba(165, 180, 252, 0.2);">
+                      <td style="padding: 16px 22px; color: #a5b4fc; font-weight: 600; text-align: right; border-right: 1px solid rgba(255,255,255,0.05);">Projected Platform Savings</td>
+                      <td style="padding: 16px 22px; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-weight: 600;">+$${monthlySavings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}/mo</td>
+                      <td colspan="2" style="padding: 16px 22px; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.05rem;">+$${yearlySavings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}/yr</td>
+                  </tr>
+              </tfoot>
+          </table>
+        </div>
+      </div>
+      `;
+    }
   }
 
-  summaryEl.innerHTML = cards.join('');
+  summaryEl.innerHTML = cards.join('') + tcoTableHtml;
 }
 
 function renderMapperTable(rows) {
