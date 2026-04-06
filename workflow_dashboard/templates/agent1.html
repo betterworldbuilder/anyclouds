@@ -1233,6 +1233,9 @@
                         break;
                     }
                 }
+                // localStorage fallback — survives hard refresh
+                if (!flexIp) flexIp = localStorage.getItem('node_flex_ip_' + normalized) || '';
+                if (!ip || ip === '0.0.0.0') ip = localStorage.getItem('node_ospc_ip_' + normalized) || ip;
 
                 // Smart guess path and service
                 let sPath = "/opt/" + normalized;
@@ -1276,7 +1279,9 @@
                         <div class="form-group" style="margin-bottom: 20px;">
                             <label style="font-weight: 500;">Provision Source OSPC IP</label>
                             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <input type="text" name="ospc_custom_ip[]" value="${ip}" style="flex: 1; background: rgba(244,114,182,0.1); padding: 12px;" required readonly>
+                                <input type="text" name="ospc_custom_ip[]" value="${ip}" 
+                                    oninput="localStorage.setItem('node_ospc_ip_${normalized}', this.value); this.style.borderColor=this.value?'#f9a8d4':''; this.style.background=this.value?'rgba(249,168,212,0.08)':'';" 
+                                    style="flex: 1;${ip && ip !== '0.0.0.0' ? ' border-color:#f9a8d4; background:rgba(249,168,212,0.08);' : ''}" required>
                                 <input type="text" name="ospc_custom_port[]" value="22" style="width: 70px;" title="SSH Port">
                                 <input type="text" name="ospc_custom_user[]" value="${defaultUser}" style="width: 85px;" title="SSH Admin Name">
                                 <input type="text" name="ospc_custom_cred[]" style="width: 100px;" title="SSH Key Path Override" placeholder="Key (opt)">
@@ -1328,7 +1333,9 @@
                         <div class="form-group" style="margin-bottom: 20px;">
                             <label>Provision Target FLEX IP</label>
                             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <input type="text" name="flex_custom_ip[]" value="${flexIp}" placeholder="Enter FLEX target IP" style="flex: 1;${flexIp ? ' border-color:#10b981; background:rgba(16,185,129,0.08);' : ''}" required>
+                                <input type="text" name="flex_custom_ip[]" value="${flexIp}" placeholder="Enter FLEX target IP"
+                                    oninput="localStorage.setItem('node_flex_ip_${normalized}', this.value); this.style.borderColor=this.value?'#10b981':''; this.style.background=this.value?'rgba(16,185,129,0.08)':'';" 
+                                    style="flex: 1;${flexIp ? ' border-color:#10b981; background:rgba(16,185,129,0.08);' : ''}" required>
                                 <input type="text" name="flex_custom_port[]" value="22" style="width: 70px;" title="SSH Port">
                                 <input type="text" name="flex_custom_user[]" value="${defaultUser}" style="width: 85px;" title="SSH Admin Name">
                                 <input type="text" name="flex_custom_cred[]" style="width: 100px;" title="SSH Key Path Override" placeholder="Key (opt)">
@@ -3011,10 +3018,12 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
                 flexIpInput.value = entry.flexIp;
                 flexIpInput.style.borderColor = '#10b981';
                 flexIpInput.style.background = 'rgba(16,185,129,0.08)';
+                // ── persist so it survives refresh ──
+                localStorage.setItem('node_flex_ip_' + group.getAttribute('data-name'), entry.flexIp);
                 filled++;
             }
 
-            // Fill OSPC IP (into the paired ospc block)
+            // Fill OSPC IP (into the paired ospc block) + persist
             const ospcBlock = document.querySelector(`#ospc-custom-fields .custom-node-group[data-name="${group.getAttribute('data-name')}"]`);
             if (ospcBlock && entry.ospcIp && entry.ospcIp !== '—') {
                 const ospcIpInput = ospcBlock.querySelector('input[name="ospc_custom_ip[]"]');
@@ -3022,6 +3031,8 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
                     ospcIpInput.value = entry.ospcIp;
                     ospcIpInput.style.borderColor = '#f9a8d4';
                     ospcIpInput.style.background = 'rgba(249,168,212,0.08)';
+                    // ── persist so it survives refresh ──
+                    localStorage.setItem('node_ospc_ip_' + group.getAttribute('data-name'), entry.ospcIp);
                 }
             }
         });
