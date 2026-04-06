@@ -548,13 +548,65 @@
                 </div>
             </div>
 
-            <!-- ── Generate Installation Script ── -->
-            <div style="padding: 20px 0; border-top: 1px solid var(--border); margin-top: 10px; text-align: center;">
-                <p style="color: var(--text-muted); margin-bottom: 14px; font-size: 0.9rem;">All OSPC packages, runtimes, services and ports will be installed on matched FLEX servers.</p>
-                <button type="button" id="generate-install-btn" style="background: linear-gradient(135deg, #10b981, #059669); font-size: 1rem; padding: 14px 32px;">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                    Generate Installation Script
-                </button>
+            <!-- ── Script Mode Selector ── -->
+            <div style="padding: 18px 0 0 0; border-top: 1px solid var(--border); margin-top: 10px;">
+                <div style="display:flex; justify-content:center; gap:0; margin-bottom:16px;">
+                    <button type="button" id="mode-quick-btn"
+                        onclick="setScriptMode('quick')"
+                        style="padding:10px 28px; font-size:0.92rem; border-radius:8px 0 0 8px; background:rgba(16,185,129,0.85); border:1px solid #10b981; color:#fff; cursor:pointer; font-weight:600;">
+                        📦 Quick Install
+                    </button>
+                    <button type="button" id="mode-rehost-btn"
+                        onclick="setScriptMode('rehost')"
+                        style="padding:10px 28px; font-size:0.92rem; border-radius:0 8px 8px 0; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15); color:#94a3b8; cursor:pointer; font-weight:600;">
+                        🖥️ Full Rehost Clone
+                    </button>
+                </div>
+
+                <!-- Quick Install description -->
+                <p id="mode-quick-desc" style="color:var(--text-muted); margin-bottom:14px; font-size:0.9rem; text-align:center;">
+                    Installs required packages on matched FLEX servers via apt/dnf.
+                </p>
+
+                <!-- Full Rehost options panel -->
+                <div id="mode-rehost-panel" style="display:none; background:rgba(0,0,0,0.25); border:1px solid rgba(99,102,241,0.3); border-radius:10px; padding:16px; margin-bottom:16px;">
+                    <p style="color:#a5b4fc; font-weight:600; margin-bottom:12px; font-size:0.92rem;">🖥️ Full Rehost Clone — 13-Layer Options</p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 24px; margin-bottom:14px; font-size:0.85rem;">
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_identity" checked> 1. Server Identity</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_ssh" checked> 2. SSH &amp; Access</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_users" checked> 3. Users &amp; Permissions</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_disk"> 4. Disk / Mounts <span style="color:#f59e0b;font-size:0.75rem;">⚠ opt-in</span></label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_packages" checked> 5. Packages &amp; Repos</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_kernel" checked> 6. Kernel / Sysctl</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_network"> 7. Network <span style="color:#94a3b8;font-size:0.75rem;">(export only)</span></label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_runtime" checked> 8. Runtime Env</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_appcode" checked> 9. App Code &amp; Config</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_services" checked> 10. Service Units &amp; Cron</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_data"> 11. Data <span style="color:#f59e0b;font-size:0.75rem;">⚠ opt-in</span></label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_tls" checked> 12. TLS &amp; Certs</label>
+                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_external"> 13. External Deps <span style="color:#94a3b8;font-size:0.75rem;">(audit only)</span></label>
+                    </div>
+                    <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; border-top:1px solid rgba(255,255,255,0.07); padding-top:12px;">
+                        <label style="display:flex;align-items:center;gap:6px; font-size:0.85rem; color:#fbbf24;">
+                            <input type="checkbox" id="rehost_dry_run" checked> 🔍 DRY RUN (safe — prints commands, no changes applied)
+                        </label>
+                        <div style="flex:1; min-width:260px;">
+                            <label style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:4px;">App paths to clone (space-separated)</label>
+                            <input type="text" id="rehost_app_paths" value="/opt/app /srv /var/www /var/lib/app"
+                                   style="width:100%; font-family:'Fira Code',monospace; font-size:0.82rem;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align:center;">
+                    <p id="mode-rehost-desc" style="display:none; color:var(--text-muted); margin-bottom:14px; font-size:0.9rem;">
+                        Full 13-layer server clone: audit OSPC source → copy to FLEX target in safe order → validate.
+                    </p>
+                    <button type="button" id="generate-install-btn" style="background: linear-gradient(135deg, #10b981, #059669); font-size: 1rem; padding: 14px 32px;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                        Generate Installation Script
+                    </button>
+                </div>
             </div>
 
             <!-- Generated script output -->
@@ -1464,8 +1516,32 @@
         if (val) showToast(`🔑 Keypair "${val}" applied to all FLEX nodes`);
     };
 
+    // ── Script mode toggle ──
+    window._scriptMode = 'quick';
+    window.setScriptMode = function(mode) {
+        window._scriptMode = mode;
+        const qb = document.getElementById('mode-quick-btn');
+        const rb = document.getElementById('mode-rehost-btn');
+        const qd = document.getElementById('mode-quick-desc');
+        const rd = document.getElementById('mode-rehost-desc');
+        const rp = document.getElementById('mode-rehost-panel');
+        const gen = document.getElementById('generate-install-btn');
+        if (mode === 'quick') {
+            qb.style.background = 'rgba(16,185,129,0.85)'; qb.style.color = '#fff'; qb.style.borderColor = '#10b981';
+            rb.style.background = 'rgba(255,255,255,0.04)'; rb.style.color = '#94a3b8'; rb.style.borderColor = 'rgba(255,255,255,0.15)';
+            qd.style.display = 'block'; rd.style.display = 'none'; rp.style.display = 'none';
+            gen.textContent = ''; gen.insertAdjacentHTML('afterbegin','<svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg> Generate Installation Script');
+        } else {
+            rb.style.background = 'rgba(99,102,241,0.7)'; rb.style.color = '#fff'; rb.style.borderColor = '#6366f1';
+            qb.style.background = 'rgba(255,255,255,0.04)'; qb.style.color = '#94a3b8'; qb.style.borderColor = 'rgba(255,255,255,0.15)';
+            qd.style.display = 'none'; rd.style.display = 'block'; rp.style.display = 'block';
+            gen.textContent = ''; gen.insertAdjacentHTML('afterbegin','🖥️ Generate Full Rehost Clone Script');
+        }
+    };
+
     const _genBtn = document.getElementById('generate-install-btn');
     if (_genBtn) _genBtn.addEventListener('click', function() {
+        if (window._scriptMode === 'rehost') { generateRehostScript(); return; }
         try {
             const fUser      = (document.getElementById('flex_ssh_user')     || {value:'ubuntu'}).value || 'ubuntu';
             const custName   = (document.getElementById('project_customer_name') || {value:'UnknownCustomer'}).value || 'UnknownCustomer';
@@ -2982,5 +3058,6 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
     }
 
 </script>
+<script src="/static/rehost_generator.js"></script>
 </body>
 </html>
