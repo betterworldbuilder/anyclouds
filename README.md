@@ -139,37 +139,94 @@ Three paths depending on workload type:
 
 #### Option 1: Direct Shift & Lift (Image Migration)
 
-GUI wrapper for `ospc2flex_image_migrator.py` — migrates running VMs as raw disk images without downtime.
+GUI wrapper for `ospc2flex_image_migrator.py` — three migration modes via a dedicated **Jump Host**, with automatic offline boot repair before upload.
+
+**Migration Modes**
 
 ```
  OSPC VM (live)
       │
-      │  live snapshot (no halt)
-      ▼
- raw image
-      │
-      │  scp over SSH tunnel
-      ▼
- local disk
-      │
-      │  qemu-img convert
-      ▼
- FLEX-compatible image
-      │
-      │  upload + boot
-      ▼
- FLEX VM ✓
+      ├─ Mode A: PRODUCTION ──── SSH-pipe /dev/vda ──────────────────────────────────────┐
+      │          (no snapshot)    origin VM → jumphost (stream + convert in one step)     │
+      │                                                                                   │
+      ├─ Mode B: EXTERNAL OFFLOAD ── OSPC Glance snapshot ──► download to jumphost ──────┤
+      │          (snapshot-based)                                                         │
+      │                                                                                   │
+      └─ Mode C: DIRECT EXPORT ── qemu-img reads live disk directly on jumphost ─────────┘
+                 (no snapshot)                                                            │
+                                                                                         ▼
+                                                                              ┌──────────────────┐
+                                                                              │  Stage 4: Convert │
+                                                                              │  qemu-img → qcow2 │
+                                                                              └────────┬─────────┘
+                                                                                       │
+                                                                              ┌────────▼─────────┐
+                                                                              │ Stage 4.5: Offline│
+                                                                              │  Guest Repair     │
+                                                                              │  (custom_os /     │
+                                                                              │   generic mode)   │
+                                                                              └────────┬─────────┘
+                                                                                       │
+                                                                              ┌────────▼─────────┐
+                                                                              │ Stage 5: Upload   │
+                                                                              │ to FLEX Glance    │
+                                                                              └────────┬─────────┘
+                                                                                       │
+                                                                                  FLEX VM ✓
 ```
 
-| Feature | Detail |
-|---------|--------|
-| Live snapshot | Snapshots OSPC instances without halting production |
-| Secure download | Pulls raw images over SSH tunnel |
-| QEMU conversion | `qemu-img` reformats raw → FLEX-compatible |
-| SSH key injection | `.pem` keypair override per instance |
-| Storage validation | Calculates local disk space needed before download |
-| K8s artifact support | Applies Helm charts and raw YAML configs post-lift |
-| Live terminal | SSE streaming panel shows conversion progress in real time |
+**Pipeline Stages**
+
+| Stage | Name | What happens |
+|-------|------|-------------|
+| 1 | Validate Dependencies | Check `openstack` CLI + `qemu-img` on jumphost |
+| 2 | Create OSPC Snapshot | Glance snapshot (skipped in Production / Direct Export modes) |
+| 2.5 | Clean Workspace | Remove leftover `.img` / `.qcow2` from previous runs |
+| 3 | Disk Acquisition | **Production**: SSH-pipe `/dev/vda` from origin VM · **Offload**: download from Glance · **Direct**: read live disk |
+| 4 | Convert Image | `qemu-img` auto-detect source format → convert to `qcow2` or `raw` |
+| 4.5 | Offline Guest Repair | Mount image via `qemu-nbd`, run OS-profile repair (see below) |
+| 4.6 | Repair Fallback | If 4.5 fails — retry with standalone `ospc2flex_offline_repair.sh` |
+| 5 | Upload to FLEX Glance | Stream repaired image from jumphost → FLEX Glance |
+| 5.5 | Clean Workspace | Remove uploaded artifact from jumphost |
+
+**Offline Guest Repair — OS Profiles (Stage 4.5)**
+
+Repairs the image while it is offline so it boots cleanly on FLEX on first try. Two modes:
+
+| Mode | How it works |
+|------|-------------|
+| `custom_os` *(default)* | Connects image via `qemu-nbd`, runs `fsck`, auto-detects OS from `/etc/os-release`, applies per-OS profile |
+| `generic` | Runs standalone `ospc2flex_offline_repair.sh` directly — no OS detection, no mount |
+
+Per-OS repair profiles applied in `custom_os` mode:
+
+| OS | Repair actions |
+|----|---------------|
+| **Ubuntu 24.04** | Delete `50-cloud-init.yaml`, write `99-ospc2flex.yaml` netplan (enp3s0), fix fstab UUID refs |
+| **Ubuntu 20/22** | Write netplan config, fix fstab, clean cloud-init state, install `qemu-guest-agent` via chroot |
+| **Debian** | Same as Ubuntu (apt safe from Ubuntu jumphost), netplan / interfaces fix |
+| **Rocky / AlmaLinux** | Fix fstab, write NetworkManager config, enable legacy network via systemd symlink *(no chroot — RPM from Ubuntu jumphost unsafe)* |
+| **CentOS / RHEL** | Fix fstab, ifcfg network config, disable cloud-init lock |
+| **Fallback** | Detect fails → default to Ubuntu 24.04 netplan profile + generic repair |
+
+All profiles: backup original `fstab` → `fstab.ospc2flex.bak`, strip OSPC MAC bindings, set correct network interface name for FLEX.
+
+**Key Options**
+
+| Option | Detail |
+|--------|--------|
+| `--jump-host` | Dedicated jumphost IP — all processing runs here (required) |
+| `--origin-vm-ip` | Source VM IP for Production Mode (SSH-pipe `/dev/vda`) |
+| `--direct-export` | Image live disk directly on jumphost — no snapshot |
+| `--offline-repair-method` | `custom_os` (smart per-OS) or `generic` (standalone script) |
+| `--dry-run` | Print all commands, make no changes |
+| `--stop-before-snapshot` | Cleanly stop VM before snapshot for consistency |
+| `--boot-test-vm` | Launch a test VM on FLEX after upload to verify boot |
+| `--repair-guest` | Re-run offline repair on an already-uploaded image |
+| `--fix-fstab` / `--fix-netplan` | Targeted repair flags |
+| `--ssh-key-path` | `.pem` keypair for jumphost + origin VM access |
+| `--target-format` | `qcow2` *(default)* or `raw` |
+| Live terminal | SSE streaming panel — every stage logged in real time to browser |
 
 ---
 
