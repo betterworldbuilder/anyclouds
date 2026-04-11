@@ -1,4 +1,38 @@
 ospc2flecredential.txt
 *.pem
+
+# OpenRC credential files — all variants
+openrc*.sh
+*openrc*.sh
+*openrc*
+ospc-openrc.sh
+ospc-iad-openrc.sh
+flex-openrc*.sh
+flexopenrc*.sh
+appcredopenrc.sh
+goodopenrc.sh
+01bestopenrc.sh
+openrcfixed.sh
+
+# Zone.Identifier files (Windows WSL artefacts)
+*Zone.Identifier
+
+# Credential and secret files
+ospc2flexlast.json
+cred-cache.js
+
+# Runtime outputs
 inventory-csv/
 ospc-discovery/outputs/
+dashboard.log
+migration_log.txt
+*.log
+
+# Backup files
+*.bak
+*.bak.*
+backups/
+
+# Python cache
+__pycache__/
+*.pyc
