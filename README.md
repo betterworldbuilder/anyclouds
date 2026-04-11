@@ -386,14 +386,97 @@ Lifecycle cards filter the action table by phase group. Each stage has an expand
 
 ---
 
-**Method 2 — Automated Deployment (Genestack)**
+**Method 2 — Automated Deployment: Genestack / Kubespray  ·or·  OpenCenter**
+
+Two deployment engines are available as selectable tabs. Both are fully driven from the browser via SSE-streaming Run buttons.
 
 | Feature | Detail |
 |---------|--------|
+| Engine tabs | Switch between 🟩 Genestack / Kubespray and 🔵 OpenCenter in one click |
 | Command table | Step · description · editable CLI command · target host · status |
-| Run button | Each row executes via SSE streaming and auto-marks status |
+| Run button | Each row executes via SSE streaming, auto-marks row status on completion |
 | IP injection | Genestack host + jump host IPs auto-fill all command templates |
-| Coverage | Genestack bootstrap → K8s cluster → namespaces → Helm → PV migration → health checks |
+| OSPC → Genestack mapping table | Maps collected OSPC data (IPs, K8s version, roles) to exact Genestack config file paths |
+
+---
+
+**🟩 Genestack / Kubespray** — Ansible-driven cluster build on bare FLEX VMs
+
+```
+ OSPC scan output (IPs, K8s version, node roles)
+        │
+        │  map to Genestack inventory + group_vars
+        ▼
+ /etc/genestack/inventory/inventory.yaml
+ /etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml
+        │
+        │  ansible-playbook host-setup.yml  (pre-flight)
+        │  ansible-playbook cluster.yml     (Kubespray — 30–60 min)
+        ▼
+ Kubernetes cluster on FLEX VMs
+        │
+        │  install-kube-ovn.sh  (Kube-OVN CNI)
+        │  apply Helm overrides + your OSPC workload manifests
+        ▼
+ Workloads running on FLEX ✓
+```
+
+| Step | What happens |
+|------|-------------|
+| 1 | SSH key distribution to all FLEX nodes |
+| 2 | Clone Genestack repo + run `bootstrap.sh` |
+| 3 | Write `inventory.yaml` from OSPC scan (masters, workers, IPs) |
+| 4 | Set `kube_version`, `container_manager` in `group_vars` |
+| 5 | Run `host-setup.yml` pre-flight playbook |
+| 6 | Run `cluster.yml` via Kubespray (full K8s cluster) |
+| 7 | Configure + install Kube-OVN CNI |
+| 8 | Apply OSPC workload manifests, Helm charts, PV configs |
+
+**When to choose Genestack:** Full control over every node, network plugin, and K8s version. Best for large production clusters where you need to match the exact OSPC configuration.
+
+---
+
+**🔵 OpenCenter** — CLI-driven GitOps bootstrap (FluxCD + Kind)
+
+```
+ opencenter CLI
+        │
+        │  cluster init my-first-cluster --type kind   (~10 min config)
+        ▼
+ Kind cluster provisioned
+        │
+        │  opencenter cluster bootstrap                (~30–50 min)
+        ▼
+ FluxCD installed → reconciles all platform services automatically
+        │
+        │  cert-manager, kyverno, Headlamp UI, etc. — zero manual YAML
+        ▼
+ Cluster + platform services running ✓
+```
+
+| Step | Command | Output |
+|------|---------|--------|
+| 1 Install CLI | `curl -Lo opencenter .../opencenter-linux-amd64` | `opencenter` binary in `/usr/local/bin` |
+| 2 Verify | `opencenter version` | `opencenter version 1.0.0` |
+| 3 Init cluster | `opencenter cluster init my-first-cluster --type kind` | Cluster config generated |
+| 4 Provision | `opencenter cluster setup my-first-cluster` | Cluster provisioned (30–50 min) |
+| 5 GitOps | `opencenter cluster bootstrap my-first-cluster` | FluxCD reconciliation started |
+| 6 Verify | `kubectl get pods -A` | All platform pods Running |
+| 7 UI | `kubectl port-forward -n headlamp svc/headlamp 8080:80` | Headlamp dashboard at `:8080` |
+
+**Why OpenCenter over Genestack?**
+
+| Benefit | Detail |
+|---------|--------|
+| **Faster setup** | ~10 min config vs 30–60 min Ansible playbook tuning |
+| **No inventory files** | `cluster init` generates config — no manual `inventory.yaml` editing |
+| **GitOps by default** | FluxCD reconciles platform services automatically — no `helm install` per chart |
+| **Self-healing** | FluxCD continuously reconciles desired state — drift is corrected automatically |
+| **Platform services included** | `cert-manager`, `kyverno`, `Headlamp UI` bootstrapped automatically |
+| **Simpler upgrades** | Update the Git repo → FluxCD propagates changes cluster-wide |
+| **Best for** | Smaller clusters, fast bring-up, teams already using GitOps workflows |
+
+> **Rule of thumb:** Use **Genestack** when you need node-level control and exact OSPC parity. Use **OpenCenter** when you want a production-grade cluster running in under an hour with GitOps from day one.
 
 ---
 
