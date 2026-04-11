@@ -1337,18 +1337,20 @@ fi
 # ══════════════════════════════════════════════════════════════════════
 echo ""; echo "── PHASE 0a: Ensure mysql client available ──────────────────────"
 if ! command -v mysql &>/dev/null; then
-  echo "[INFO] mysql not found locally — installing mysql-client on jumphost..."
-  sudo apt-get install -y mysql-client 2>&1 | tail -3
-  command -v mysql &>/dev/null && echo "[OK]   mysql client installed on jumphost" || { echo "[ERR]  mysql client install failed — install manually: sudo apt-get install -y mysql-client"; exit 1; }
+  echo "[WARN] mysql not found locally — run this on your jumphost terminal then re-execute:"
+  echo "       sudo apt-get install -y mysql-client"
+  echo "[WARN] Continuing — mysql commands will fail until client is installed"
 else
-  echo "[OK]   mysql client already present on jumphost ($(mysql --version | head -1))"
+  echo "[OK]   mysql client present on jumphost ($(mysql --version 2>&1 | head -1))"
 fi
-if ! ssh -i "$SSH_KEY" -o ConnectTimeout=8 "$SSH_USER@$FLEX_IP" 'command -v mysql' &>/dev/null; then
-  echo "[INFO] mysql not found on Flex DB — installing mysql-client..."
-  ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" 'sudo apt-get install -y mysql-client 2>&1 | tail -3'
-  ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" 'command -v mysql' &>/dev/null && echo "[OK]   mysql client installed on Flex DB" || echo "[WARN] mysql install on Flex DB may have failed — continuing"
+if ssh -i "$SSH_KEY" -o ConnectTimeout=8 "$SSH_USER@$FLEX_IP" 'command -v mysql' &>/dev/null; then
+  echo "[OK]   mysql client present on Flex DB"
 else
-  echo "[OK]   mysql client already present on Flex DB"
+  echo "[INFO] mysql not found on Flex DB — installing..."
+  ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" 'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-client 2>&1 | tail -5'
+  ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" 'command -v mysql' &>/dev/null \
+    && echo "[OK]   mysql client installed on Flex DB" \
+    || echo "[WARN] mysql install on Flex DB failed — restore commands may fail"
 fi
 
 # PHASE 0 — Pre-flight: LB TCP + DBaaS auth + Flex SSH
