@@ -166,6 +166,20 @@ window.generateRehostScript = function() {
             });
         }
 
+        // Fallback 3: read directly from custom node group cards (Stage 2 manual entry)
+        if (pairList.length === 0) {
+            document.querySelectorAll('.custom-node-group-s2').forEach(fCard => {
+                const name   = fCard.getAttribute('data-name');
+                if (!name) return;
+                const flexIp = (fCard.querySelector('input[name="flex_custom_ip[]"]') || {}).value || '';
+                const oCard  = document.querySelector(`.custom-node-group:not(.custom-node-group-s2)[data-name="${name}"]`);
+                const ospcIp = oCard ? ((oCard.querySelector('input[name="ospc_custom_ip[]"]') || {}).value || '') : '';
+                if (flexIp && flexIp !== '0.0.0.0') {
+                    pairList.push({ name, ospcIp, flexIp, osStr: '' });
+                }
+            });
+        }
+
         const ospcCount = pairList.length;
         const flexCount = pairList.filter(p => p.flexIp).length;
 
