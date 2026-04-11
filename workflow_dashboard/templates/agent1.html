@@ -1136,6 +1136,18 @@
                     <pre id="db-log-output" style="margin:0; padding:14px 18px; height:320px; overflow-y:auto; background:#0b0618; font-family:'Courier New',monospace; font-size:12px; color:#a78bfa; white-space:pre-wrap; line-height:1.6;"></pre>
                 </div>
 
+                <!-- DB Comparison Panel -->
+                <div id="db-compare-panel" style="display:none; margin-top:14px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <span style="color:#c4b5fd; font-weight:700; font-size:0.9rem;">📊 OSPC DBaaS vs Flex DB — Content Comparison</span>
+                        <button type="button" onclick="runDbComparison()" id="compare-btn"
+                            style="padding:5px 14px; font-size:0.8rem; background:rgba(124,58,237,0.15); border:1px solid rgba(124,58,237,0.4); border-radius:6px; color:#c4b5fd; cursor:pointer; font-weight:700;">
+                            🔄 Refresh Comparison
+                        </button>
+                    </div>
+                    <div id="db-compare-output"></div>
+                </div>
+
                 <script>
                 // ── DB mode toggle ────────────────────────────────────────────
                 function dbModeChanged() {
@@ -1207,6 +1219,12 @@
                     }
 
                     // ── HA scenario header (SSH-accessible OSPC VM) ───────────
+                    // ⚠️  BASH-IN-JS TEMPLATE LITERAL — ESCAPING RULES:
+                    //   $VARNAME        → safe, JS ignores bare dollar signs
+                    //   ${VAR}          → JS INTERPOLATES THIS → BREAKS generateDbScript() !!!
+                    //   \${VAR}         → generates literal ${VAR} in bash → CORRECT
+                    //   \${VAR:-default}→ generates literal ${VAR:-default} in bash → CORRECT
+                    // ALWAYS escape every bash \${...} as \\\${...} inside this template literal.
                     const HEADER_HA = `#!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════════
 #  DB MIGRATION  —  OSPC → FLEX  [HA + REPLICA]
@@ -1244,6 +1262,12 @@ mysql_dst() { ssh -i "$SSH_KEY" "$SSH_USER@${flexPri}"  "mysql -u root -p\\"$FLE
 
                     // ── Single DBaaS scenario header (no SSH to managed DBaaS) ─
                     const lbPublicIp = dbaasLbOver || ospcPri; // manual override takes priority
+                    // ⚠️  BASH-IN-JS TEMPLATE LITERAL — ESCAPING RULES:
+                    //   $VARNAME        → safe, JS ignores bare dollar signs
+                    //   ${VAR}          → JS INTERPOLATES THIS → BREAKS generateDbScript() !!!
+                    //   \${VAR}         → generates literal ${VAR} in bash → CORRECT
+                    //   \${VAR:-default}→ generates literal ${VAR:-default} in bash → CORRECT
+                    // ALWAYS escape every bash \${...} as \\\${...} inside this template literal.
                     const HEADER_DBAAS = `#!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════════
 #  DB MIGRATION  —  OSPC DBaaS → FLEX DB  [SINGLE — via Cloud Load Balancer]
@@ -1330,6 +1354,12 @@ fi
 `;
 
                     // ── DBaaS single: all source ops run locally via LB ────────
+                    // ⚠️  BASH-IN-JS TEMPLATE LITERAL — ESCAPING RULES:
+                    //   $VARNAME        → safe, JS ignores bare dollar signs
+                    //   ${VAR}          → JS INTERPOLATES THIS → BREAKS generateDbScript() !!!
+                    //   \${VAR}         → generates literal ${VAR} in bash → CORRECT
+                    //   \${VAR:-default}→ generates literal ${VAR:-default} in bash → CORRECT
+                    // ALWAYS escape every bash \${...} as \\\${...} inside this template literal.
                     const DISCOVER_DBAAS = `
 # ══════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════
@@ -1353,6 +1383,72 @@ else
     || echo "[WARN] mysql install on Flex DB failed — restore commands may fail"
 fi
 
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 0b — Detect OSPC DBaaS engine version → install same on Flex
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 0b: DB engine version match ────────────────────────────"
+
+# Defaults — always set to avoid unbound variable errors under set -u
+DB_ENGINE="mysql"
+DB_MAJOR="8"
+DB_MINOR="0"
+OSPC_VERSION=""
+
+# Detect version from OSPC DBaaS via LB
+OSPC_VERSION=$(mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" -p"$DBAAS_PASS" \
+  -N -B -e "SELECT VERSION();" 2>/dev/null | head -1) || true
+
+if [ -z "$OSPC_VERSION" ]; then
+  echo "[WARN] Could not detect OSPC DBaaS version via LB — defaulting to mysql 8.0"
+else
+  DB_MAJOR=$(echo "$OSPC_VERSION" | cut -d. -f1)
+  DB_MINOR=$(echo "$OSPC_VERSION" | cut -d. -f2)
+  echo "$OSPC_VERSION" | grep -qi "mariadb" && DB_ENGINE="mariadb" || true
+fi
+echo "[INFO] OSPC DBaaS version : \${OSPC_VERSION:-unknown}  →  engine: $DB_ENGINE $DB_MAJOR.$DB_MINOR"
+
+  # Check if Flex already has a DB server installed
+  FLEX_VERSION=$(ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+    'mysql --version 2>/dev/null || mariadb --version 2>/dev/null || echo ""' | head -1)
+  echo "[INFO] Flex DB current    : \${FLEX_VERSION:-none installed}"
+
+  FLEX_RUNNING=$(ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+    'sudo ss -tlnp | grep 3306 | wc -l' 2>/dev/null)
+
+  if [ "\${FLEX_RUNNING:-0}" -gt 0 ]; then
+    echo "[OK]   DB server already running on Flex — skipping install"
+  else
+    echo "[INFO] Installing $DB_ENGINE $DB_MAJOR.$DB_MINOR on Flex DB..."
+    if [ "$DB_ENGINE" = "mariadb" ]; then
+      ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+        "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server 2>&1 | tail -5"
+    else
+      # MySQL — use version-specific package if available, else default
+      ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+        "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server-\${DB_MAJOR}.\${DB_MINOR} 2>/dev/null \
+         || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server 2>&1 | tail -5"
+    fi
+
+    # Start and enable
+    ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+      'sudo systemctl enable mysql mariadb 2>/dev/null; sudo systemctl start mysql 2>/dev/null || sudo systemctl start mariadb 2>/dev/null'
+
+    # Set root password to match FLEX_ROOT_PASS
+    ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+      "sudo mysql -e \\"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '\$FLEX_ROOT_PASS'; FLUSH PRIVILEGES;\\" 2>/dev/null \
+       || sudo mysql -e \\"SET PASSWORD FOR 'root'@'localhost' = PASSWORD('\$FLEX_ROOT_PASS'); FLUSH PRIVILEGES;\\" 2>/dev/null"
+
+    FLEX_RUNNING2=$(ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+      'sudo ss -tlnp | grep 3306 | wc -l' 2>/dev/null)
+    [ "\${FLEX_RUNNING2:-0}" -gt 0 ] \
+      && echo "[OK]   $DB_ENGINE installed and running on Flex" \
+      || echo "[ERR]  DB server install on Flex may have failed — check manually"
+  fi
+
+FLEX_VER_AFTER=$(ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
+  'mysql --version 2>/dev/null | head -1 || mariadb --version 2>/dev/null | head -1')
+echo "[INFO] Flex DB after install: \$FLEX_VER_AFTER"
+
 # PHASE 0 — Pre-flight: LB TCP + DBaaS auth + Flex SSH
 # (OSPC DBaaS has no SSH — all source checks are via mysql client locally)
 # ══════════════════════════════════════════════════════════════════════
@@ -1363,7 +1459,7 @@ run_cmd "nc -zv $LB_PUBLIC_IP $LB_PORT 2>&1 | head -2" "TCP $LB_PUBLIC_IP:$LB_PO
 run_cmd "mysql -h '$LB_PUBLIC_IP' -P '$LB_PORT' -u '$DBAAS_USER' -p\\"$DBAAS_PASS\\" -e \\"SELECT 1 AS dbaas_ok;\\"" \\
   "DBaaS auth via Cloud LB"
 run_cmd "ssh -i $SSH_KEY -o ConnectTimeout=8 $SSH_USER@$FLEX_IP 'echo ok'" "SSH → Flex DB"
-run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'systemctl is-active mysql mariadb 2>/dev/null | grep -q active'" \\
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'sudo ss -tlnp | grep -q 3306'" \\
   "MySQL running on Flex DB"
 run_cmd "df -h /tmp" "Local disk space for dumps (jumphost)"
 run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'df -h /tmp'" "Disk space on Flex DB"
@@ -1392,7 +1488,7 @@ run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'mkdir -p $DUMP_DIR'" "Create dump 
 for DB in $DATABASES; do
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC \\
     'mysqldump -u root -p\\"$OSPC_ROOT_PASS\\" \\
-      --single-transaction --routines --triggers --events \\
+      --single-transaction --no-tablespaces --routines --triggers --events \\
       --master-data=2 --flush-logs \\
       \\"$DB\\" | gzip > $DUMP_DIR/\\"$DB\\".sql.gz'" \\
     "Dump $DB"
@@ -1426,6 +1522,12 @@ done
 `;
 
                     // ── DBaaS single: dump locally via LB, scp to Flex ────────
+                    // ⚠️  BASH-IN-JS TEMPLATE LITERAL — ESCAPING RULES:
+                    //   $VARNAME        → safe, JS ignores bare dollar signs
+                    //   ${VAR}          → JS INTERPOLATES THIS → BREAKS generateDbScript() !!!
+                    //   \${VAR}         → generates literal ${VAR} in bash → CORRECT
+                    //   \${VAR:-default}→ generates literal ${VAR:-default} in bash → CORRECT
+                    // ALWAYS escape every bash \${...} as \\\${...} inside this template literal.
                     const DUMP_DBAAS = `
 # ══════════════════════════════════════════════════════════════════════
 # PHASE 2 — Dump from OSPC DBaaS via Cloud LB (runs locally — no SSH to DBaaS)
@@ -1459,7 +1561,7 @@ done
 echo ""; echo "── PHASE 4: Restore on Flex DB ──────────────────────────────────"
 for DB in $DATABASES; do
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
-    'mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"CREATE DATABASE IF NOT EXISTS \\\`$DB\\\`;\\"'" \\
+    'mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"CREATE DATABASE IF NOT EXISTS $DB;\\"'" \\
     "Create DB $DB on Flex"
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
     'zcat $DUMP_DIR/\\"$DB\\".sql.gz | mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\"'" \\
@@ -1468,6 +1570,12 @@ done
 `;
 
                     // ── DBaaS single: validate + cutover + cleanup ────────────
+                    // ⚠️  BASH-IN-JS TEMPLATE LITERAL — ESCAPING RULES:
+                    //   $VARNAME        → safe, JS ignores bare dollar signs
+                    //   ${VAR}          → JS INTERPOLATES THIS → BREAKS generateDbScript() !!!
+                    //   \${VAR}         → generates literal ${VAR} in bash → CORRECT
+                    //   \${VAR:-default}→ generates literal ${VAR:-default} in bash → CORRECT
+                    // ALWAYS escape every bash \${...} as \\\${...} inside this template literal.
                     const VALIDATE_DBAAS = `
 # ══════════════════════════════════════════════════════════════════════
 # PHASE 5 — Validate row counts: DBaaS (via LB, local) vs Flex DB (SSH)
@@ -1829,6 +1937,8 @@ echo "       Log           : $LOG_FILE"
                             log.scrollTop = log.scrollHeight;
                         }
                         log.textContent += `\n[${new Date().toLocaleTimeString()}] ✓ DB migration complete`;
+                        // Auto-trigger comparison panel after successful migration
+                        runDbComparison();
                     } catch(e) {
                         log.textContent += `\n[ERROR] ${e.message}`;
                     } finally {
@@ -1848,6 +1958,291 @@ echo "       Log           : $LOG_FILE"
                     if (stopBtn) stopBtn.style.display = 'none';
                     if (spinner) spinner.style.display = 'none';
                     if (log) log.textContent += '\n[STOPPED by operator]';
+                };
+
+                window.runDbComparison = async function() {
+                    const fv = id => (document.getElementById(id)||{value:''}).value.trim();
+                    const lbIp       = fv('dbaas_lb_ip');
+                    const dbaasUser  = fv('dbaas_user') || 'admin';
+                    const dbaasPass  = fv('dbaas_pass');
+                    const flexIp     = fv('target_ip') || (() => {
+                        const c = document.querySelector('.custom-node-group-s2[data-role="db-primary"] input[name="flex_custom_ip[]"]');
+                        return c ? c.value.trim() : '';
+                    })();
+                    const sshKey     = fv('ssh_key_path') || '~/.ssh/id_rsa';
+                    const sshUser    = fv('ssh_user') || 'ubuntu';
+                    const flexPass   = fv('flex_root_pass');
+
+                    if (!lbIp || !flexIp) {
+                        document.getElementById('db-compare-panel').style.display = 'block';
+                        document.getElementById('db-compare-output').innerHTML =
+                            '<p style="color:#f87171;padding:10px;">LB IP or Flex IP not set — generate script first.</p>';
+                        return;
+                    }
+
+                    // ⚠️  BASH-IN-JS TEMPLATE LITERAL — ESCAPING RULES:
+                    //   $VARNAME        → safe, JS ignores bare dollar signs
+                    //   ${VAR}          → JS INTERPOLATES THIS → BREAKS runDbComparison() !!!
+                    //   \${VAR}         → generates literal ${VAR} in bash → CORRECT
+                    //   \${VAR:-default}→ generates literal ${VAR:-default} in bash → CORRECT
+                    //   \\`             → DO NOT USE — closes the template literal!
+                    //   \\\`            → generates literal \` in bash → CORRECT
+                    // ALWAYS escape every bash \${...} as \\\${...} inside this template literal.
+                    const compScript = `#!/usr/bin/env bash
+LB="${lbIp}" PORT="3306" USR="${dbaasUser}" PW="${dbaasPass || '\${DBAAS_PASS:-}'}"
+FLEX="${flexIp}" SKEY="${sshKey}" SUSR="${sshUser}" FPW="${flexPass || '\${FLEX_ROOT_PASS:-}'}"
+
+# ── OSPC DBaaS server overview ───────────────────────────────
+OSPC_VER=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B -e "SELECT VERSION();" 2>/dev/null | head -1)
+echo "SRV|OSPC|version|$OSPC_VER"
+
+OSPC_USERS=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+  -e "SELECT CONCAT(User,'@',Host) FROM mysql.user ORDER BY User;" 2>/dev/null | tr '\\n' ',' | sed 's/,$//')
+echo "SRV|OSPC|users|$OSPC_USERS"
+
+OSPC_MAX_CONN=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+  -e "SHOW VARIABLES LIKE 'max_connections';" 2>/dev/null | awk '{print $2}')
+echo "SRV|OSPC|max_conn|$OSPC_MAX_CONN"
+
+OSPC_BUF=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+  -e "SHOW VARIABLES LIKE 'innodb_buffer_pool_size';" 2>/dev/null | awk '{printf "%.0f MB", $2/1048576}')
+echo "SRV|OSPC|buffer_pool|$OSPC_BUF"
+
+# ── Flex VM + DB server overview ─────────────────────────────
+FLEX_VER=$(ssh -i "$SKEY" "$SUSR@$FLEX" \\
+  "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" -N -B -e \\"SELECT VERSION();\\"" 2>/dev/null | head -1)
+echo "SRV|FLEX|version|$FLEX_VER"
+
+FLEX_MEM=$(ssh -i "$SKEY" "$SUSR@$FLEX" 'free -h 2>/dev/null | grep "^Mem"' 2>/dev/null | awk '{print $2" total / "$3" used"}')
+echo "SRV|FLEX|mem|$FLEX_MEM"
+
+FLEX_DISK=$(ssh -i "$SKEY" "$SUSR@$FLEX" 'df -h / 2>/dev/null | tail -1' 2>/dev/null | awk '{print $2" total / "$3" used ("$5")"}')
+echo "SRV|FLEX|disk|$FLEX_DISK"
+
+FLEX_CPU=$(ssh -i "$SKEY" "$SUSR@$FLEX" 'nproc 2>/dev/null || grep -c "^processor" /proc/cpuinfo 2>/dev/null' 2>/dev/null | head -1)
+echo "SRV|FLEX|cpu|\${FLEX_CPU:-?} vCPU"
+
+FLEX_USERS=$(ssh -i "$SKEY" "$SUSR@$FLEX" \\
+  "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" -N -B -e \\"SELECT CONCAT(User,'@',Host) FROM mysql.user ORDER BY User;\\"" 2>/dev/null | tr '\\n' ',' | sed 's/,$//')
+echo "SRV|FLEX|users|$FLEX_USERS"
+
+FLEX_MAX_CONN=$(ssh -i "$SKEY" "$SUSR@$FLEX" \\
+  "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" -N -B -e \\"SHOW VARIABLES LIKE 'max_connections';\\"" 2>/dev/null | awk '{print $2}')
+echo "SRV|FLEX|max_conn|$FLEX_MAX_CONN"
+
+# ── Per-database stats + first table content ─────────────────
+DBS=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B -e "SHOW DATABASES;" 2>/dev/null \\
+  | grep -vE '^(information_schema|performance_schema|mysql|sys)$')
+
+for DB in $DBS; do
+  OSPC_TBLS=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+    -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB';" 2>/dev/null)
+  OSPC_SIZE=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+    -e "SELECT IFNULL(ROUND(SUM(data_length+index_length)/1048576,2),0) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB';" 2>/dev/null)
+  echo "DB_INFO|OSPC|$DB|$OSPC_TBLS|$OSPC_SIZE"
+
+  FLEX_TBLS=$(ssh -i "$SKEY" "$SUSR@$FLEX" \\
+    "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" -N -B -e \\"SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB';\\"" 2>/dev/null)
+  FLEX_SIZE=$(ssh -i "$SKEY" "$SUSR@$FLEX" \\
+    "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" -N -B -e \\"SELECT IFNULL(ROUND(SUM(data_length+index_length)/1048576,2),0) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DB';\\"" 2>/dev/null)
+  echo "DB_INFO|FLEX|$DB|$FLEX_TBLS|$FLEX_SIZE"
+
+  FIRST_TBL=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+    -e "SHOW TABLES FROM $DB;" 2>/dev/null | head -1)
+  [ -z "$FIRST_TBL" ] && continue
+
+  OSPC_CNT=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+    -e "SELECT COUNT(*) FROM $DB.$FIRST_TBL;" 2>/dev/null)
+  FLEX_CNT=$(ssh -i "$SKEY" "$SUSR@$FLEX" \\
+    "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" -N -B -e \\"SELECT COUNT(*) FROM $DB.$FIRST_TBL;\\"" 2>/dev/null)
+  OSPC_COLS=$(mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" -N -B \\
+    -e "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='$DB' AND TABLE_NAME='$FIRST_TBL';" 2>/dev/null)
+  echo "TABLE|$DB|$FIRST_TBL|$OSPC_CNT|$FLEX_CNT|$OSPC_COLS"
+
+  mysql -h "$LB" -P "$PORT" -u "$USR" -p"$PW" "$DB" \\
+    -e "SELECT * FROM $FIRST_TBL LIMIT 20;" 2>/dev/null \\
+    | tail -n +2 | sed 's/\\t/|/g' | while read -r line; do
+    echo "OSPC_ROW|$FIRST_TBL|$line"
+  done
+
+  ssh -i "$SKEY" "$SUSR@$FLEX" \\
+    "mysql -h 127.0.0.1 -u root -p\\"$FPW\\" \\"$DB\\" -e \\"SELECT * FROM $FIRST_TBL LIMIT 20;\\"" 2>/dev/null \\
+    | tail -n +2 | sed 's/\\t/|/g' | while read -r line; do
+    echo "FLEX_ROW|$FIRST_TBL|$line"
+  done
+done
+echo "DONE"
+`;
+                    const panel  = document.getElementById('db-compare-panel');
+                    const output = document.getElementById('db-compare-output');
+                    panel.style.display = 'block';
+                    output.innerHTML = '<p style="color:#a78bfa; padding:8px;">⏳ Running comparison...</p>';
+
+                    let raw = '';
+                    try {
+                        const resp = await fetch('/api/agent1/run/migration', {
+                            method:'POST', headers:{'Content-Type':'text/plain'}, body: compScript
+                        });
+                        const reader = resp.body.getReader();
+                        const dec = new TextDecoder();
+                        while (true) {
+                            const {value, done} = await reader.read();
+                            if (done) break;
+                            raw += dec.decode(value, {stream:true});
+                        }
+                    } catch(e) {
+                        output.innerHTML = `<p style="color:#f87171;">Error: ${e.message}</p>`;
+                        return;
+                    }
+
+                    // Parse output
+                    const lines = raw.split('\n');
+                    const srv   = { OSPC:{}, FLEX:{} };
+                    const dbInfo = {};   // { 'dbname': { ospcTbls, ospcSize, flexTbls, flexSize } }
+                    const tables = {};   // { 'db.tbl': { cols, ospcRows:[], flexRows:[], ospcCnt, flexCnt } }
+
+                    lines.forEach(line => {
+                        const p = line.split('|');
+                        if (p[0] === 'SRV') {
+                            const side = p[1]; // 'OSPC' or 'FLEX'
+                            if (srv[side]) srv[side][p[2]] = p.slice(3).join('|');
+                        } else if (p[0] === 'DB_INFO') {
+                            const side = p[1], db = p[2];
+                            if (!dbInfo[db]) dbInfo[db] = {};
+                            if (side === 'OSPC') { dbInfo[db].ospcTbls = p[3]||'?'; dbInfo[db].ospcSize = p[4]||'?'; }
+                            else                  { dbInfo[db].flexTbls = p[3]||'?'; dbInfo[db].flexSize = p[4]||'?'; }
+                        } else if (p[0] === 'TABLE') {
+                            const key = `${p[1]}.${p[2]}`;
+                            tables[key] = { db:p[1], tbl:p[2], ospcCnt:p[3]||'?', flexCnt:p[4]||'?', cols:(p[5]||'').split(','), ospcRows:[], flexRows:[] };
+                        } else if (p[0] === 'OSPC_ROW') {
+                            const key = Object.keys(tables).find(k => k.endsWith('.'+p[1]));
+                            if (key) tables[key].ospcRows.push(p.slice(2));
+                        } else if (p[0] === 'FLEX_ROW') {
+                            const key = Object.keys(tables).find(k => k.endsWith('.'+p[1]));
+                            if (key) tables[key].flexRows.push(p.slice(2));
+                        }
+                    });
+
+                    // ── Helper: info row ─────────────────────────────────────────
+                    const infoRow = (label, ospcVal, flexVal, matchCheck) => {
+                        const match = matchCheck === false ? null : (ospcVal && flexVal && ospcVal.trim() === flexVal.trim());
+                        const dot = match === null ? '' : match
+                            ? '<span style="color:#4ade80;font-size:10px;">●</span>'
+                            : '<span style="color:#f87171;font-size:10px;">●</span>';
+                        return `<tr>
+                            <td style="padding:4px 10px;color:#94a3b8;font-size:0.72rem;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.04);">${label}</td>
+                            <td style="padding:4px 10px;color:#c4b5fd;font-size:0.72rem;font-family:monospace;border-bottom:1px solid rgba(255,255,255,0.04);">${ospcVal||'—'}</td>
+                            <td style="padding:4px 10px;color:#4ade80;font-size:0.72rem;font-family:monospace;border-bottom:1px solid rgba(255,255,255,0.04);">${flexVal||'—'} ${dot}</td>
+                        </tr>`;
+                    };
+
+                    // ── Section 1: Server Overview ───────────────────────────────
+                    let html = `
+                    <div style="margin-bottom:18px; border:1px solid rgba(124,58,237,0.3); border-radius:10px; overflow:hidden;">
+                        <div style="background:rgba(124,58,237,0.15); padding:8px 14px; font-weight:700; color:#c4b5fd; font-size:0.82rem; border-bottom:1px solid rgba(124,58,237,0.25);">
+                            🖥 Server Overview
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0;">
+                            <div style="border-right:1px solid rgba(124,58,237,0.2); padding:6px 0;">
+                                <div style="padding:4px 10px 8px; font-size:0.72rem; font-weight:700; color:#7c3aed;">🗄 OSPC DBaaS (via LB: ${lbIp})</div>
+                                <table style="width:100%;border-collapse:collapse;">
+                                    ${infoRow('MySQL version', srv.OSPC.version, null, false)}
+                                    ${infoRow('Max connections', srv.OSPC.max_conn, null, false)}
+                                    ${infoRow('InnoDB buffer', srv.OSPC.buffer_pool, null, false)}
+                                    ${infoRow('DB users', srv.OSPC.users, null, false)}
+                                </table>
+                            </div>
+                            <div style="padding:6px 0;">
+                                <div style="padding:4px 10px 8px; font-size:0.72rem; font-weight:700; color:#22c55e;">🖥 Flex VM (${flexIp})</div>
+                                <table style="width:100%;border-collapse:collapse;">
+                                    ${infoRow('MySQL version', srv.OSPC.version, srv.FLEX.version)}
+                                    ${infoRow('Max connections', srv.OSPC.max_conn, srv.FLEX.max_conn)}
+                                    ${infoRow('Memory', '—', srv.FLEX.mem, false)}
+                                    ${infoRow('Disk (/)', '—', srv.FLEX.disk, false)}
+                                    ${infoRow('vCPU', '—', srv.FLEX.cpu, false)}
+                                    ${infoRow('DB users', srv.OSPC.users, srv.FLEX.users)}
+                                </table>
+                            </div>
+                        </div>
+                    </div>`;
+
+                    // ── Section 2: Per-DB Summary ────────────────────────────────
+                    if (Object.keys(dbInfo).length) {
+                        html += `<div style="margin-bottom:18px; border:1px solid rgba(124,58,237,0.25); border-radius:10px; overflow:hidden;">
+                            <div style="background:rgba(124,58,237,0.12); padding:8px 14px; font-weight:700; color:#c4b5fd; font-size:0.82rem; border-bottom:1px solid rgba(124,58,237,0.2);">
+                                🗃 Database Summary
+                            </div>
+                            <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.75rem;font-family:'Fira Code',monospace;">
+                                <thead><tr style="background:rgba(124,58,237,0.08);">
+                                    <th style="padding:6px 12px;text-align:left;color:#94a3b8;border-bottom:1px solid rgba(124,58,237,0.2);">Database</th>
+                                    <th style="padding:6px 12px;text-align:center;color:#a78bfa;border-bottom:1px solid rgba(124,58,237,0.2);">OSPC Tables</th>
+                                    <th style="padding:6px 12px;text-align:center;color:#a78bfa;border-bottom:1px solid rgba(124,58,237,0.2);">OSPC Size (MB)</th>
+                                    <th style="padding:6px 12px;text-align:center;color:#4ade80;border-bottom:1px solid rgba(124,58,237,0.2);">Flex Tables</th>
+                                    <th style="padding:6px 12px;text-align:center;color:#4ade80;border-bottom:1px solid rgba(124,58,237,0.2);">Flex Size (MB)</th>
+                                    <th style="padding:6px 12px;text-align:center;color:#94a3b8;border-bottom:1px solid rgba(124,58,237,0.2);">Status</th>
+                                </tr></thead>
+                                <tbody>`;
+                        for (const [db, d] of Object.entries(dbInfo)) {
+                            const tMatch = d.ospcTbls === d.flexTbls;
+                            const sMatch = d.ospcSize  === d.flexSize;
+                            const ok = tMatch && sMatch;
+                            const badge = ok
+                                ? '<span style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);padding:2px 7px;border-radius:8px;">✓ MATCH</span>'
+                                : '<span style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);padding:2px 7px;border-radius:8px;">✗ DIFF</span>';
+                            html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:5px 12px;color:#e2e8f0;font-weight:700;">${db}</td>
+                                <td style="padding:5px 12px;text-align:center;color:#c4b5fd;">${d.ospcTbls||'?'}</td>
+                                <td style="padding:5px 12px;text-align:center;color:#c4b5fd;">${d.ospcSize||'?'}</td>
+                                <td style="padding:5px 12px;text-align:center;color:#4ade80;">${d.flexTbls||'?'}</td>
+                                <td style="padding:5px 12px;text-align:center;color:#4ade80;">${d.flexSize||'?'}</td>
+                                <td style="padding:5px 12px;text-align:center;">${badge}</td>
+                            </tr>`;
+                        }
+                        html += `</tbody></table></div></div>`;
+                    }
+
+                    // ── Section 3: Per-table content comparison ──────────────────
+                    if (!Object.keys(tables).length && !Object.keys(dbInfo).length) {
+                        output.innerHTML = '<p style="color:#f87171;padding:8px;">No data returned — check credentials or run migration first.</p>';
+                        return;
+                    }
+
+                    for (const [key, t] of Object.entries(tables)) {
+                        const match = t.ospcCnt === t.flexCnt;
+                        const badge = match
+                            ? '<span style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:10px;font-size:0.72rem;">✓ MATCH</span>'
+                            : '<span style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);padding:2px 8px;border-radius:10px;font-size:0.72rem;">✗ MISMATCH</span>';
+
+                        html += `<div style="margin-bottom:18px; border:1px solid rgba(124,58,237,0.25); border-radius:10px; overflow:hidden;">
+                            <div style="background:rgba(124,58,237,0.12); padding:8px 14px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(124,58,237,0.2);">
+                                <span style="font-weight:700; color:#c4b5fd; font-family:monospace;">${t.db}.${t.tbl}</span>
+                                ${badge}
+                                <span style="color:#64748b; font-size:0.75rem; margin-left:auto;">OSPC: <b style="color:#a78bfa;">${t.ospcCnt} rows</b> &nbsp;|&nbsp; Flex: <b style="color:#4ade80;">${t.flexCnt} rows</b></span>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0;">
+                                <div style="border-right:1px solid rgba(124,58,237,0.2);">
+                                    <div style="padding:6px 12px; background:rgba(124,58,237,0.07); font-size:0.72rem; font-weight:700; color:#7c3aed; border-bottom:1px solid rgba(124,58,237,0.15);">🗄 OSPC DBaaS</div>
+                                    <div style="overflow-x:auto;">
+                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; font-family:'Fira Code',monospace;">
+                                            <thead><tr>${t.cols.map(c=>`<th style="padding:5px 8px; text-align:left; color:#94a3b8; border-bottom:1px solid rgba(124,58,237,0.15); white-space:nowrap;">${c}</th>`).join('')}</tr></thead>
+                                            <tbody>${t.ospcRows.map((r,i)=>`<tr style="background:${i%2?'rgba(124,58,237,0.04)':'transparent'}">${r.map(v=>`<td style="padding:4px 8px; color:#e2e8f0; border-bottom:1px solid rgba(255,255,255,0.04);">${v}</td>`).join('')}</tr>`).join('')}</tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="padding:6px 12px; background:rgba(34,197,94,0.05); font-size:0.72rem; font-weight:700; color:#22c55e; border-bottom:1px solid rgba(34,197,94,0.15);">🖥 Flex DB</div>
+                                    <div style="overflow-x:auto;">
+                                        <table style="width:100%; border-collapse:collapse; font-size:0.75rem; font-family:'Fira Code',monospace;">
+                                            <thead><tr>${t.cols.map(c=>`<th style="padding:5px 8px; text-align:left; color:#94a3b8; border-bottom:1px solid rgba(34,197,94,0.15); white-space:nowrap;">${c}</th>`).join('')}</tr></thead>
+                                            <tbody>${t.flexRows.map((r,i)=>`<tr style="background:${i%2?'rgba(34,197,94,0.03)':'transparent'}">${r.map(v=>`<td style="padding:4px 8px; color:#e2e8f0; border-bottom:1px solid rgba(255,255,255,0.04);">${v}</td>`).join('')}</tr>`).join('')}</tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                    }
+                    output.innerHTML = html;
                 };
                 </script>
             </div>
