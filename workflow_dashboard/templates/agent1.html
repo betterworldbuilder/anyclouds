@@ -1176,44 +1176,34 @@
 
                     let ospcPri, flexPri, ospcRep, flexRep;
 
-                    if (useMock) {
-                        // Use IPs from the mock pairs table
+                    // Always try real node cards first — real data beats mock checkbox
+                    function ipFromCard(role, inputName) {
+                        const isFlex = inputName.startsWith('flex_');
+                        const sel = isFlex
+                            ? `.custom-node-group-s2[data-role="${role}"]`
+                            : `.custom-node-group:not(.custom-node-group-s2)[data-role="${role}"]`;
+                        const card = document.querySelector(sel);
+                        if (!card) return null;
+                        const inp = card.querySelector(`input[name="${inputName}"]`);
+                        return inp ? inp.value.trim() : null;
+                    }
+
+                    ospcPri = ipFromCard('db-primary', 'ospc_custom_ip[]') || fv('source_ip') || null;
+                    flexPri = ipFromCard('db-primary', 'flex_custom_ip[]') || fv('target_ip') || null;
+                    ospcRep = ipFromCard('db-replica', 'ospc_custom_ip[]') || fv('source_ip_ha') || null;
+                    flexRep = ipFromCard('db-replica', 'flex_custom_ip[]') || fv('target_ip_ha') || null;
+
+                    // Fall back to mock only when real IPs are absent
+                    if (!ospcPri || !flexPri) {
                         ospcPri = MOCK_DB[mockScenario].ospcPri;
                         flexPri = MOCK_DB[mockScenario].flexPri;
                         ospcRep = MOCK_DB[mockScenario].ospcRep || '<OSPC_DB_REPLICA_IP>';
                         flexRep = MOCK_DB[mockScenario].flexRep || '<FLEX_DB_REPLICA_IP>';
+                        const mockChk = document.getElementById('use-mock-data');
+                        if (mockChk && !mockChk.checked) { mockChk.checked = true; mockDataToggled(mockChk); }
                     } else {
-                        // Auto-populate IPs from verified DB node cards (data-role="db-primary" / "db-replica")
-                        // OSPC cards: .custom-node-group WITHOUT .custom-node-group-s2
-                        // FLEX cards: .custom-node-group-s2
-                        function ipFromCard(role, inputName) {
-                            const isFlex = inputName.startsWith('flex_');
-                            const sel = isFlex
-                                ? `.custom-node-group-s2[data-role="${role}"]`
-                                : `.custom-node-group:not(.custom-node-group-s2)[data-role="${role}"]`;
-                            const card = document.querySelector(sel);
-                            if (!card) return null;
-                            const inp = card.querySelector(`input[name="${inputName}"]`);
-                            return inp ? inp.value.trim() : null;
-                        }
-
-                        ospcPri = ipFromCard('db-primary', 'ospc_custom_ip[]') || fv('source_ip') || '<OSPC_DB_PRIMARY_IP>';
-                        flexPri = ipFromCard('db-primary', 'flex_custom_ip[]') || fv('target_ip') || '<FLEX_DB_PRIMARY_IP>';
-                        ospcRep = ipFromCard('db-replica', 'ospc_custom_ip[]') || fv('source_ip_ha') || '<OSPC_DB_REPLICA_IP>';
-                        flexRep = ipFromCard('db-replica', 'flex_custom_ip[]') || fv('target_ip_ha') || '<FLEX_DB_REPLICA_IP>';
-
-                        // Auto-fallback to mock if IPs are still placeholders
-                        const missingIps = [ospcPri, flexPri].filter(ip => ip.startsWith('<'));
-                        if (missingIps.length) {
-                            // Silently use mock data — no real nodes discovered yet
-                            ospcPri = MOCK_DB[mockScenario].ospcPri;
-                            flexPri = MOCK_DB[mockScenario].flexPri;
-                            ospcRep = MOCK_DB[mockScenario].ospcRep || '<OSPC_DB_REPLICA_IP>';
-                            flexRep = MOCK_DB[mockScenario].flexRep || '<FLEX_DB_REPLICA_IP>';
-                            // Activate the mock checkbox visually
-                            const mockChk = document.getElementById('use-mock-data');
-                            if (mockChk && !mockChk.checked) { mockChk.checked = true; mockDataToggled(mockChk); }
-                        }
+                        ospcRep = ospcRep || MOCK_DB[mockScenario].ospcRep || '<OSPC_DB_REPLICA_IP>';
+                        flexRep = flexRep || MOCK_DB[mockScenario].flexRep || '<FLEX_DB_REPLICA_IP>';
                     }
 
                     // ── HA scenario header (SSH-accessible OSPC VM) ───────────
@@ -1742,6 +1732,9 @@ echo "       Log           : $LOG_FILE"
                 }
 
                 window.executeDbScript = async function() {
+                    // Always regenerate from current UI state so DRY_RUN flag and IPs are fresh
+                    generateDbScript();
+
                     const codeEl  = document.getElementById('script-output-db');
                     const raw     = (codeEl ? codeEl.getAttribute('data-raw') : '') || '';
                     const execBtn = document.getElementById('execute-btn-db');
@@ -3058,6 +3051,13 @@ echo "       Log           : $LOG_FILE"
         const userField = document.getElementById('dbaas_user');
         if (lbField   && !lbField.value)   lbField.value   = ospcIp;
         if (userField && dbaasUser)         userField.value = dbaasUser;
+
+        // Real pair added — disable mock data so generateDbScript() uses real IPs
+        const mockChk = document.getElementById('use-mock-data');
+        if (mockChk && mockChk.checked) {
+            mockChk.checked = false;
+            mockDataToggled(mockChk);
+        }
     }
 
     window.removeManualPair = function(normalized, btn) {
