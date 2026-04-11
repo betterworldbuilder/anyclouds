@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REHOST Full Manual Runbook</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#1a2d5a; --surface:rgba(26,45,90,0.82); --surface2:rgba(20,38,80,0.9);
+  --border:rgba(100,140,255,0.18); --border2:rgba(100,140,255,0.10);
+  --primary:#4f7ef8; --primary-g:rgba(79,126,248,0.28);
+  --success:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+  --text:#e8edf8; --muted:#8ba3cc; --code:#93c5fd;
+  --tab-active-bg:rgba(79,126,248,0.22); --tab-active-border:#4f7ef8;
+  --header-bg:rgba(15,28,65,0.92);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Outfit',sans-serif;color:var(--text);
+  background:linear-gradient(135deg,#1b3070 0%,#2a4e8d 40%,#374a86 70%,#4a3a72 100%);
+  background-attachment:fixed;
+  min-height:100vh; padding:24px 18px;}
+.container{max-width:1480px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+
+/* Header */
+.page-header{background:var(--header-bg);border:1px solid var(--border);border-radius:14px;
+  padding:18px 26px;backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:space-between;gap:16px;
+  box-shadow:0 2px 18px rgba(0,0,0,0.35);}
+.page-header h1{font-size:1.35rem;font-weight:700;color:#c8d9ff;letter-spacing:0.01em;}
+.page-header p{color:var(--muted);font-size:0.8rem;margin-top:4px;line-height:1.5;}
+.ref-badge{background:rgba(79,126,248,.18);border:1px solid var(--primary);color:#93b4ff;
+  border-radius:6px;padding:4px 12px;font-size:0.78rem;font-weight:600;white-space:nowrap;cursor:default;}
+
+/* Variable panel */
+.var-panel{background:rgba(18,32,72,0.88);border:1px solid var(--border);border-radius:12px;
+  padding:0;backdrop-filter:blur(14px);overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,0.3);}
+.var-toggle{display:flex;align-items:center;gap:10px;padding:12px 20px;cursor:pointer;
+  user-select:none;background:rgba(10,20,55,0.6);}
+.var-toggle:hover{background:rgba(79,126,248,.09);}
+.var-toggle span{font-weight:600;font-size:0.88rem;color:#aac3f8;}
+.var-body{padding:16px 20px;display:none;background:rgba(15,25,60,0.5);}
+.var-body.open{display:block;}
+.var-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:12px;}
+.var-grid2{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px;}
+.var-group label{font-size:0.73rem;color:var(--muted);display:block;margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;}
+.var-group input{width:100%;padding:7px 10px;background:rgba(5,15,50,0.55);border:1px solid rgba(100,140,255,0.2);
+  border-radius:7px;color:var(--text);font-family:'Fira Code',monospace;font-size:0.79rem;outline:none;}
+.var-group input:focus{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-g);}
+.apply-btn{background:linear-gradient(135deg,#2563eb,#4f7ef8);color:#fff;border:none;
+  padding:8px 22px;border-radius:7px;font-weight:600;font-size:0.87rem;cursor:pointer;
+  transition:all .2s;box-shadow:0 2px 8px rgba(37,99,235,.35);}
+.apply-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(79,126,248,.45);}
+
+/* Tabs */
+.tab-bar{display:flex;gap:5px;flex-wrap:wrap;background:rgba(10,20,60,0.7);
+  border:1px solid var(--border);border-radius:12px;padding:8px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.3);}
+.tab-btn{padding:8px 15px;border-radius:7px;border:1px solid transparent;background:transparent;
+  color:var(--muted);font-family:'Outfit',sans-serif;font-size:0.82rem;font-weight:500;
+  cursor:pointer;transition:all .18s;white-space:nowrap;}
+.tab-btn:hover{background:rgba(79,126,248,.1);color:#c8d9ff;border-color:rgba(79,126,248,.2);}
+.tab-btn.active{background:rgba(234,88,12,0.22);border-color:#f97316;color:#fed7aa;font-weight:700;
+  box-shadow:0 0 0 2px rgba(249,115,22,0.35), 0 3px 10px rgba(234,88,12,0.3);
+  text-shadow:0 0 8px rgba(249,115,22,0.5);}
+
+/* Section panel */
+.section-panel{background:rgba(14,26,65,0.85);border:1px solid var(--border);border-radius:12px;
+  padding:20px 22px;backdrop-filter:blur(14px);display:none;
+  box-shadow:0 2px 16px rgba(0,0,0,0.3);}
+.section-panel.active{display:block;}
+.section-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.section-title-row h2{font-size:1rem;font-weight:700;color:#c8d9ff;}
+
+/* Runbook table */
+.rb-table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+.rb-table th{padding:9px 12px;text-align:left;color:#8ba3cc;font-weight:600;
+  border-bottom:2px solid rgba(79,126,248,.25);white-space:nowrap;background:rgba(10,20,60,0.4);}
+.rb-table td{padding:8px 12px;border-bottom:1px solid rgba(79,126,248,.07);vertical-align:middle;}
+.rb-table tr:hover td{background:rgba(79,126,248,.06);}
+.phase-cell{color:#b794f4;font-weight:600;white-space:nowrap;min-width:120px;}
+.where-cell{color:#f6ad55;font-size:0.77rem;white-space:nowrap;}
+.cmd-cell{font-family:'Fira Code',monospace;font-size:0.75rem;color:#93c5fd;
+  word-break:break-all;line-height:1.5;}
+.cmd-wrap{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
+.cmd-text{flex:1;min-width:0;word-break:break-all;outline:none;border-radius:4px;
+  padding:2px 5px;margin:-2px -5px;transition:background .15s,box-shadow .15s;cursor:text;}
+.cmd-text:hover{background:rgba(79,126,248,.1);}
+.cmd-text:focus{background:rgba(5,15,50,.7);box-shadow:0 0 0 2px rgba(249,115,22,.5);
+  color:#ffe4b5;caret-color:#f97316;}
+.cmd-inline-btns{display:flex;gap:4px;flex-shrink:0;}
+.purpose-cell{color:var(--muted);font-size:0.79rem;min-width:130px;}
+.run-btn{background:rgba(79,126,248,.18);border:1px solid rgba(79,126,248,.5);color:#aac3f8;
+  border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.run-btn:hover{background:rgba(79,126,248,.35);color:#dce8ff;}
+.copy-cmd-btn{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.4);color:#86efac;
+  border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.copy-cmd-btn:hover{background:rgba(34,197,94,.22);}
+
+/* Download button */
+.dl-btn{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#1d4ed8,#4f7ef8);
+  color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:600;
+  font-size:0.85rem;cursor:pointer;transition:all .2s;box-shadow:0 2px 10px rgba(29,78,216,.4);}
+.dl-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(79,126,248,.5);}
+
+/* Log terminal */
+.log-panel{background:rgba(10,18,50,0.9);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;backdrop-filter:blur(14px);box-shadow:0 2px 14px rgba(0,0,0,0.35);}
+.log-header{display:flex;align-items:center;gap:8px;padding:10px 16px;
+  background:rgba(6,12,40,0.7);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.log-filter-btn{padding:4px 11px;border-radius:6px;border:1px solid rgba(100,140,255,.2);
+  background:transparent;color:var(--muted);font-size:0.77rem;cursor:pointer;transition:all .15s;}
+.log-filter-btn:hover,.log-filter-btn.active{background:rgba(79,126,248,.15);color:#c8d9ff;border-color:var(--primary);}
+.log-body{height:220px;overflow-y:auto;padding:12px 16px;font-family:'Fira Code',monospace;
+  font-size:12px;background:#050d22;display:flex;flex-direction:column;gap:2px;}
+.log-entry{line-height:1.5;}
+.log-info{color:#60a5fa;}
+.log-warn{color:#fbbf24;}
+.log-error{color:#f87171;}
+.log-ok{color:#4ade80;}
+
+/* CRM Closeout */
+.crm-panel{background:rgba(14,26,65,0.85);border:1px solid var(--border);border-radius:12px;
+  padding:18px 22px;backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  box-shadow:0 2px 14px rgba(0,0,0,0.3);}
+.crm-info h3{font-size:0.97rem;font-weight:700;color:#c8d9ff;margin-bottom:4px;}
+.crm-info p{color:var(--muted);font-size:0.8rem;}
+.crm-btns{display:flex;gap:10px;flex-shrink:0;}
+.crm-success{background:#16a34a;color:#fff;border:none;padding:10px 22px;border-radius:9px;
+  font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;}
+.crm-success:hover{background:#15803d;}
+.crm-rollback{background:#d97706;color:#fff;border:none;padding:10px 22px;border-radius:9px;
+  font-weight:700;font-size:0.9rem;cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .2s;}
+.crm-rollback:hover{background:#b45309;}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:rgba(20,35,80,0.95);border:1px solid var(--border);
+  color:var(--text);padding:10px 18px;border-radius:10px;font-size:0.85rem;
+  opacity:0;pointer-events:none;transition:opacity .3s;z-index:9999;
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>FULL Manual Data Migration Runbook</h1>
+      <p>A/B OSPC → FLEX manual runbook for operators. Covers Frontend · Backend · API · Shared Files · MySQL · PostgreSQL · Kubernetes/Magnum · Write-Freeze · Cutover · Health Check · Rollback.</p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-shrink:0;">
+      <span class="ref-badge">Reference</span>
+      <button class="dl-btn" onclick="downloadRunbook()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Download Runbook (HTML)
+      </button>
+    </div>
+  </div>
+
+  <!-- Variable Configuration -->
+  <div class="var-panel">
+    <div class="var-toggle" onclick="toggleVars()">
+      <span id="var-arrow" style="font-size:12px;color:var(--muted);">▲</span>
+      <span>⚙ Configure Placeholder Variables (fill in your IPs)</span>
+      <span style="margin-left:auto;font-size:0.75rem;color:var(--muted);">Click to collapse</span>
+    </div>
+    <div class="var-body open" id="var-body">
+      <div class="var-grid">
+        <div class="var-group"><label>OSPC_FRONT IP</label><input id="v_ospc_front" placeholder="user@IP" /></div>
+        <div class="var-group"><label>OSPC_BACK IP</label><input id="v_ospc_back" placeholder="user@IP" /></div>
+        <div class="var-group"><label>OSPC_API IP</label><input id="v_ospc_api" placeholder="user@IP" /></div>
+        <div class="var-group"><label>OSPC_DB IP</label><input id="v_ospc_db" placeholder="user@IP" /></div>
+      </div>
+      <div class="var-grid">
+        <div class="var-group"><label>FLEX_FRONT IP</label><input id="v_flex_front" placeholder="user@IP" /></div>
+        <div class="var-group"><label>FLEX_BACK IP</label><input id="v_flex_back" placeholder="user@IP" /></div>
+        <div class="var-group"><label>FLEX_API IP</label><input id="v_flex_api" placeholder="user@IP" /></div>
+        <div class="var-group"><label>FLEX_DB IP</label><input id="v_flex_db" placeholder="user@IP" /></div>
+      </div>
+      <div class="var-grid2">
+        <div class="var-group"><label>SSH Key path</label><input id="v_ssh_key" value="~/.ssh/ospc2flex" /></div>
+        <div class="var-group"><label>OSPC K8s API</label><input id="v_ospc_k8s" placeholder="https://OSPC_K8S_API" /></div>
+        <div class="var-group"><label>FLEX K8s API</label><input id="v_flex_k8s" placeholder="https://FLEX_K8S_API" /></div>
+      </div>
+      <button class="apply-btn" onclick="applyVars()">Apply Variables</button>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="frontend">1 Frontend</button>
+    <button class="tab-btn" data-tab="backend">2 Backend</button>
+    <button class="tab-btn" data-tab="api">3 API</button>
+    <button class="tab-btn" data-tab="shared">4 Shared Files</button>
+    <button class="tab-btn" data-tab="mysql">5 MySQL</button>
+    <button class="tab-btn" data-tab="postgres">6 PostgreSQL</button>
+    <button class="tab-btn" data-tab="k8s">☸ K8s / Magnum</button>
+    <button class="tab-btn" data-tab="freeze">7 Write-Freeze</button>
+    <button class="tab-btn" data-tab="cutover">8 Cutover</button>
+    <button class="tab-btn" data-tab="health">9 Health Check</button>
+    <button class="tab-btn" data-tab="rollback">10 Rollback</button>
+    <button class="tab-btn" data-tab="bestpractice">11 Best Practices</button>
+  </div>
+
+  <!-- ── TAB PANELS ─────────────────────────────────────────────────────── -->
+
+  <!-- 1. Frontend -->
+  <div class="section-panel active" id="tab-frontend">
+    <div class="section-title-row">
+      <h2>1) Frontend Runbook — Nginx / Static Web</h2>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table">
+      <thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+      <tbody id="rb-frontend"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- 2. Backend -->
+  <div class="section-panel" id="tab-backend">
+    <div class="section-title-row"><h2>2) Backend Runbook — App Server / Gunicorn / uWSGI</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-backend"></tbody></table></div>
+  </div>
+
+  <!-- 3. API -->
+  <div class="section-panel" id="tab-api">
+    <div class="section-title-row"><h2>3) API Runbook — REST / FastAPI / Express</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-api"></tbody></table></div>
+  </div>
+
+  <!-- 4. Shared Files -->
+  <div class="section-panel" id="tab-shared">
+    <div class="section-title-row"><h2>4) Shared Files Runbook — NFS / Object Storage / Ceph</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-shared"></tbody></table></div>
+  </div>
+
+  <!-- 5. MySQL -->
+  <div class="section-panel" id="tab-mysql">
+    <div class="section-title-row"><h2>5) MySQL Runbook — Dump / Transfer / Restore</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-mysql"></tbody></table></div>
+  </div>
+
+  <!-- 6. PostgreSQL -->
+  <div class="section-panel" id="tab-postgres">
+    <div class="section-title-row"><h2>6) PostgreSQL Runbook — pg_dump / pg_restore</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-postgres"></tbody></table></div>
+  </div>
+
+  <!-- K8s -->
+  <div class="section-panel" id="tab-k8s">
+    <div class="section-title-row"><h2>K8s / Magnum Runbook — Cluster Migration</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-k8s"></tbody></table></div>
+  </div>
+
+  <!-- 7. Write-Freeze -->
+  <div class="section-panel" id="tab-freeze">
+    <div class="section-title-row"><h2>7) Write-Freeze — Pre-Cutover Maintenance Window</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-freeze"></tbody></table></div>
+  </div>
+
+  <!-- 8. Cutover -->
+  <div class="section-panel" id="tab-cutover">
+    <div class="section-title-row"><h2>8) Cutover — DNS / LB Switch</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-cutover"></tbody></table></div>
+  </div>
+
+  <!-- 9. Health Check -->
+  <div class="section-panel" id="tab-health">
+    <div class="section-title-row"><h2>9) Health Check — Post-Cutover Validation</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-health"></tbody></table></div>
+  </div>
+
+  <!-- 10. Rollback -->
+  <div class="section-panel" id="tab-rollback">
+    <div class="section-title-row"><h2>10) Rollback — Revert to OSPC</h2></div>
+    <div style="overflow-x:auto;">
+    <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead>
+    <tbody id="rb-rollback"></tbody></table></div>
+  </div>
+
+  <!-- 11. Best Practices -->
+  <div class="section-panel" id="tab-bestpractice">
+    <div class="section-title-row"><h2>11) Best Practices Checklist</h2></div>
+    <div id="rb-bestpractice" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <!-- Log Terminal -->
+  <div class="log-panel">
+    <div class="log-header">
+      <span style="color:#a5b4fc;font-size:0.82rem;font-weight:700;margin-right:8px;">▶ Execution Log</span>
+      <button class="log-filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="log-filter-btn" onclick="setFilter('info',this)">Info</button>
+      <button class="log-filter-btn" onclick="setFilter('warn',this)">Warn</button>
+      <button class="log-filter-btn" onclick="setFilter('error',this)">Error</button>
+      <button class="log-filter-btn" onclick="copyLog()" style="margin-left:auto;">📋 Copy Log</button>
+      <button class="log-filter-btn" onclick="clearLog()">🗑 Clear</button>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-entry log-info">[INFO] Loaded runbook. Fill in your IPs and click Apply Variables.</div>
+    </div>
+  </div>
+
+  <!-- Step 10: CRM Closeout -->
+  <div class="crm-panel">
+    <div class="crm-info">
+      <h3>Step 10) Migration CRM Closeout</h3>
+      <p>Once all validation checks pass (or fail), mark the final status in the global Customer Migration Tracker.</p>
+    </div>
+    <div class="crm-btns">
+      <button class="crm-success" onclick="crmClose('success')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Mark as Successful
+      </button>
+      <button class="crm-rollback" onclick="crmClose('rollback')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        Mark as Rolled Back
+      </button>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Runbook data ────────────────────────────────────────────────────────────
+const RB = {
+  frontend: [
+    { phase:'Initial sync',          where:'Admin box', cmd:`rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/`, purpose:'Sync deployed web files' },
+    { phase:'Nginx config backup',   where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_FRONT 'sudo tar czf /tmp/frontend-nginx.tgz /etc/nginx' && scp -i $SSH_KEY $OSPC_FRONT:/tmp/frontend-nginx.tgz /tmp/ && scp -i $SSH_KEY /tmp/frontend-nginx.tgz $FLEX_FRONT:/tmp/`, purpose:'Move config for review' },
+    { phase:'Restore config on Flex',where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_FRONT 'sudo tar xzf /tmp/frontend-nginx.tgz -C / && sudo nginx -t && sudo systemctl reload nginx'`, purpose:'Validate and reload' },
+    { phase:'Delta sync (pre-cutover)',where:'Admin box',cmd:`rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/`, purpose:'Re-run before cutover' },
+    { phase:'Smoke test',            where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1'`, purpose:'Confirm HTTP response' },
+  ],
+  backend: [
+    { phase:'Sync app code',         where:'Admin box', cmd:`rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_BACK:/opt/app/ $FLEX_BACK:/opt/app/`, purpose:'Replicate application directory' },
+    { phase:'Export env vars',       where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_BACK 'cat /etc/environment && printenv | grep -E "^(APP_|DB_|REDIS_|SECRET)"' > /tmp/ospc_env.txt`, purpose:'Capture runtime config' },
+    { phase:'Import env vars',       where:'Admin box', cmd:`scp -i $SSH_KEY /tmp/ospc_env.txt $FLEX_BACK:/tmp/ && ssh -i $SSH_KEY $FLEX_BACK 'sudo cat /tmp/ospc_env.txt >> /etc/environment'`, purpose:'Apply env config on FLEX' },
+    { phase:'Systemd unit export',   where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_BACK 'sudo systemctl list-units --type=service --state=running --no-pager | awk "{print \\$1}" | xargs -I{} sudo systemctl cat {} > /tmp/systemd_units.txt 2>/dev/null'`, purpose:'Export active service units' },
+    { phase:'Start services',        where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl daemon-reload && sudo systemctl start app && sudo systemctl enable app'`, purpose:'Launch app on FLEX' },
+    { phase:'Health check',          where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl status app && curl -sf http://127.0.0.1:8080/health'`, purpose:'Confirm backend responding' },
+  ],
+  api: [
+    { phase:'Sync API code',         where:'Admin box', cmd:`rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_API:/opt/api/ $FLEX_API:/opt/api/`, purpose:'Replicate API codebase' },
+    { phase:'Copy service config',   where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_API 'sudo tar czf /tmp/api-conf.tgz /etc/api /etc/systemd/system/api*.service' && scp -i $SSH_KEY $OSPC_API:/tmp/api-conf.tgz /tmp/ && scp -i $SSH_KEY /tmp/api-conf.tgz $FLEX_API:/tmp/`, purpose:'Transfer configs' },
+    { phase:'Restore & start',       where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_API 'sudo tar xzf /tmp/api-conf.tgz -C / && sudo systemctl daemon-reload && sudo systemctl enable --now api'`, purpose:'Activate API on FLEX' },
+    { phase:'API smoke test',        where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_API 'curl -sf http://127.0.0.1:3000/api/health | python3 -m json.tool'`, purpose:'Verify JSON health response' },
+    { phase:'Rate-limit check',      where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_API 'for i in $(seq 5); do curl -sf -o /dev/null -w "%{http_code} " http://127.0.0.1:3000/api/health; done; echo'`, purpose:'Ensure no 429 on basic load' },
+  ],
+  shared: [
+    { phase:'Audit shared mounts',   where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_BACK 'df -hT | grep -E "nfs|ceph|gluster|fuse"'`, purpose:'Identify shared filesystems' },
+    { phase:'Sync shared data',      where:'Admin box', cmd:`rsync -avz --numeric-ids -e "ssh -i $SSH_KEY" $OSPC_BACK:/mnt/shared/ $FLEX_BACK:/mnt/shared/`, purpose:'Copy shared files to FLEX' },
+    { phase:'Delta sync',            where:'Admin box', cmd:`rsync -avz --delete --checksum -e "ssh -i $SSH_KEY" $OSPC_BACK:/mnt/shared/ $FLEX_BACK:/mnt/shared/`, purpose:'Final delta before cutover' },
+    { phase:'Mount validation',      where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'df -h /mnt/shared && ls -la /mnt/shared/ | head -20'`, purpose:'Confirm share is accessible' },
+    { phase:'Object storage sync',   where:'Admin box', cmd:`rclone sync ospc:bucket flex:bucket --progress --transfers=8 --checkers=16`, purpose:'Sync Swift/S3 object buckets' },
+  ],
+  mysql: [
+    { phase:'Lock tables (write freeze)', where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_DB 'mysql -u root -e "FLUSH TABLES WITH READ LOCK;"'`, purpose:'Prevent writes during dump' },
+    { phase:'Full dump',             where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_DB 'mysqldump -u root --all-databases --single-transaction --routines --triggers --events --hex-blob > /tmp/full_dump.sql'`, purpose:'Dump all DBs' },
+    { phase:'Transfer dump',         where:'Admin box', cmd:`scp -i $SSH_KEY $OSPC_DB:/tmp/full_dump.sql /tmp/ && scp -i $SSH_KEY /tmp/full_dump.sql $FLEX_DB:/tmp/`, purpose:'Move dump to FLEX' },
+    { phase:'Unlock tables',         where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_DB 'mysql -u root -e "UNLOCK TABLES;"'`, purpose:'Re-enable writes on OSPC' },
+    { phase:'Restore',               where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'mysql -u root < /tmp/full_dump.sql'`, purpose:'Load dump into FLEX MySQL' },
+    { phase:'Verify DB list',        where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -e "SHOW DATABASES; SELECT table_schema, COUNT(*) FROM information_schema.tables GROUP BY 1;"'`, purpose:'Confirm databases imported' },
+    { phase:'Replication setup (optional)', where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -e "CHANGE MASTER TO MASTER_HOST=\\"$OSPC_DB\\", MASTER_USER=\\"repl\\", MASTER_PASSWORD=\\"REPLPASS\\"; START SLAVE;"'`, purpose:'Live replication until cutover' },
+  ],
+  postgres: [
+    { phase:'Dump all databases',    where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_DB 'pg_dumpall -U postgres > /tmp/pg_full.sql'`, purpose:'Full PostgreSQL dump' },
+    { phase:'Transfer dump',         where:'Admin box', cmd:`scp -i $SSH_KEY $OSPC_DB:/tmp/pg_full.sql /tmp/ && scp -i $SSH_KEY /tmp/pg_full.sql $FLEX_DB:/tmp/`, purpose:'Move dump to FLEX' },
+    { phase:'Restore',               where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'psql -U postgres < /tmp/pg_full.sql 2>&1 | tail -20'`, purpose:'Load dump into FLEX Postgres' },
+    { phase:'Per-DB restore (alt)',  where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'pg_restore -U postgres -d mydb -Fc /tmp/mydb.dump --verbose 2>&1 | tail -30'`, purpose:'Custom format per-DB restore' },
+    { phase:'Sequence reset',        where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'psql -U postgres -c "SELECT setval(c.oid, (SELECT MAX(id) FROM t)) FROM pg_class c WHERE relkind=\\'S\\';"'`, purpose:'Fix sequences post-restore' },
+    { phase:'Verify row counts',     where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_DB 'psql -U postgres -c "SELECT schemaname, tablename, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC LIMIT 20;"'`, purpose:'Sanity check record counts' },
+    { phase:'Replication slot (opt)',where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_DB 'psql -U postgres -c "SELECT * FROM pg_create_physical_replication_slot(\\'flex_slot\\');"'`, purpose:'Streaming replication to FLEX' },
+  ],
+  k8s: [
+    { phase:'Export OSPC cluster config', where:'Admin box', cmd:`kubectl --kubeconfig=$OSPC_KUBECONFIG get all --all-namespaces -o yaml > /tmp/ospc_k8s_full.yaml`, purpose:'Dump all K8s resources' },
+    { phase:'Export PVCs',           where:'Admin box', cmd:`kubectl --kubeconfig=$OSPC_KUBECONFIG get pvc --all-namespaces -o yaml > /tmp/ospc_pvcs.yaml`, purpose:'Capture persistent volume claims' },
+    { phase:'Export secrets',        where:'Admin box', cmd:`kubectl --kubeconfig=$OSPC_KUBECONFIG get secrets --all-namespaces -o yaml > /tmp/ospc_secrets.yaml`, purpose:'Capture cluster secrets' },
+    { phase:'Create FLEX cluster',   where:'Admin box', cmd:`openstack coe cluster create flex-k8s --cluster-template k8s-template --master-count 3 --node-count 5 --keypair ospc2flex`, purpose:'Provision Magnum cluster on FLEX' },
+    { phase:'Get FLEX kubeconfig',   where:'Admin box', cmd:`openstack coe cluster config flex-k8s --dir ~/.kube && export FLEX_KUBECONFIG=~/.kube/config`, purpose:'Authenticate to FLEX cluster' },
+    { phase:'Apply resources',       where:'Admin box', cmd:`kubectl --kubeconfig=$FLEX_KUBECONFIG apply -f /tmp/ospc_k8s_full.yaml --dry-run=client 2>&1 | head -40`, purpose:'Dry-run apply on FLEX' },
+    { phase:'Deploy workloads',      where:'Admin box', cmd:`kubectl --kubeconfig=$FLEX_KUBECONFIG apply -f /tmp/ospc_k8s_full.yaml`, purpose:'Apply all workloads to FLEX' },
+    { phase:'Verify pods',           where:'Admin box', cmd:`kubectl --kubeconfig=$FLEX_KUBECONFIG get pods --all-namespaces | grep -v Running | grep -v Completed`, purpose:'Find non-running pods' },
+  ],
+  freeze: [
+    { phase:'Notify stakeholders',   where:'Operator',  cmd:`echo "MAINTENANCE WINDOW STARTED $(date -u)" | mail -s "OSPC→FLEX cutover" ops@company.com`, purpose:'Announce write-freeze start' },
+    { phase:'Enable maintenance page',where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_FRONT 'sudo ln -sf /etc/nginx/sites-available/maintenance /etc/nginx/sites-enabled/ && sudo nginx -t && sudo nginx -s reload'`, purpose:'Show maintenance page to users' },
+    { phase:'Stop app writes',       where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_BACK 'sudo systemctl stop app api worker scheduler'`, purpose:'Halt all write processes' },
+    { phase:'Drain job queues',      where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_BACK 'redis-cli -h 127.0.0.1 DBSIZE && redis-cli -h 127.0.0.1 BGSAVE'`, purpose:'Ensure queue empty + Redis persisted' },
+    { phase:'Final DB sync',         where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_DB 'mysqldump -u root --all-databases --single-transaction > /tmp/final_delta.sql' && scp -i $SSH_KEY $OSPC_DB:/tmp/final_delta.sql $FLEX_DB:/tmp/`, purpose:'Last data sync before cutover' },
+    { phase:'Final file sync',       where:'Admin box', cmd:`rsync -avz --delete --checksum -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/`, purpose:'Last file delta' },
+  ],
+  cutover: [
+    { phase:'DNS TTL pre-reduction', where:'DNS admin', cmd:`# Reduce DNS TTL to 60s at least 24h before cutover\ndig $DOMAIN +short`, purpose:'Enable fast DNS rollback' },
+    { phase:'Update DNS A record',   where:'DNS admin', cmd:`# Point $DOMAIN A record to FLEX floating IP\n# Old: OSPC_FLOAT_IP → New: FLEX_FLOAT_IP\nopenstack floating ip list`, purpose:'Cut traffic to FLEX' },
+    { phase:'LB listener switch',    where:'Admin box', cmd:`openstack loadbalancer listener set --default-pool flex-pool ospc-listener`, purpose:'Route LB to FLEX pool' },
+    { phase:'Start FLEX services',   where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl start app api worker scheduler && sudo systemctl status app'`, purpose:'Activate full FLEX stack' },
+    { phase:'Remove maintenance page',where:'Admin box',cmd:`ssh -i $SSH_KEY $FLEX_FRONT 'sudo rm /etc/nginx/sites-enabled/maintenance && sudo nginx -s reload'`, purpose:'Re-enable live site' },
+    { phase:'Verify cutover',        where:'Admin box', cmd:`curl -s -o /dev/null -w "%{http_code} %{redirect_url}" https://$DOMAIN && dig $DOMAIN +short`, purpose:'Confirm traffic on FLEX' },
+  ],
+  health: [
+    { phase:'VM boot status',        where:'Admin box', cmd:`openstack server list --project $PROJECT_ID -c Name -c Status | grep -v ACTIVE`, purpose:'All VMs should be ACTIVE' },
+    { phase:'Service health',        where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'systemctl is-active app api worker && echo ALL_OK || echo SOME_FAILED'`, purpose:'Core services running' },
+    { phase:'HTTP 200 check',        where:'Admin box', cmd:`curl -sSf -o /dev/null -w "%{http_code}" https://$DOMAIN && echo OK`, purpose:'Site returns 200' },
+    { phase:'DB connection test',    where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'python3 -c "import psycopg2; c=psycopg2.connect(host=\\\"$FLEX_DB_IP\\\"); print(\\\"DB OK\\\")"'`, purpose:'App can reach DB' },
+    { phase:'Redis ping',            where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'redis-cli -h $FLEX_CACHE_IP PING'`, purpose:'Cache layer responding' },
+    { phase:'SSL cert valid',        where:'Admin box', cmd:`echo | openssl s_client -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -dates`, purpose:'TLS cert not expired' },
+    { phase:'Disk & memory',         where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'df -h / && free -h'`, purpose:'No resource exhaustion' },
+    { phase:'Log tail (errors)',     where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'sudo journalctl -u app --since "10 minutes ago" | grep -iE "error|critical|fatal" | tail -20'`, purpose:'Check for startup errors' },
+  ],
+  rollback: [
+    { phase:'Decision gate',         where:'Operator',  cmd:`# Rollback criteria: HTTP error rate >5% OR DB write failures OR team decision\necho "Initiating rollback $(date -u)"`, purpose:'Document rollback decision' },
+    { phase:'Revert DNS',            where:'DNS admin', cmd:`# Restore OSPC A record\n# $DOMAIN A record → OSPC_FLOAT_IP\nopenstack floating ip list`, purpose:'Route traffic back to OSPC' },
+    { phase:'Restart OSPC services', where:'Admin box', cmd:`ssh -i $SSH_KEY $OSPC_BACK 'sudo systemctl start app api worker scheduler && sudo systemctl status app'`, purpose:'Re-activate OSPC stack' },
+    { phase:'Remove FLEX maintenance',where:'Admin box',cmd:`ssh -i $SSH_KEY $FLEX_FRONT 'sudo rm -f /etc/nginx/sites-enabled/maintenance && sudo nginx -s reload'`, purpose:'Remove FLEX maintenance page' },
+    { phase:'Stop FLEX writes',      where:'Admin box', cmd:`ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl stop app api worker scheduler'`, purpose:'Halt FLEX to avoid split-brain' },
+    { phase:'Verify rollback',       where:'Admin box', cmd:`curl -s -o /dev/null -w "%{http_code}" https://$DOMAIN && dig $DOMAIN +short`, purpose:'Confirm traffic on OSPC' },
+    { phase:'Post-mortem note',      where:'Operator',  cmd:`echo "Rollback completed at $(date -u). Root cause TBD. Ticket: $TICKET_ID" >> /tmp/migration_log.txt`, purpose:'Log event for post-mortem' },
+  ],
+  bestpractice: [
+    { cat:'Before Migration',  items:['Take VM snapshots of all OSPC instances before starting','Reduce DNS TTL to 60s at least 24 hours before cutover','Test all runbook commands in a staging environment first','Ensure FLEX floating IPs are pre-allocated and confirmed','Validate SSH key access to all FLEX nodes before the window','Communicate maintenance window to all stakeholders'] },
+    { cat:'During Migration',  items:['Execute write-freeze before final data sync','Use --checksum on rsync for final delta (not just timestamp)','Capture before/after row counts for all database tables','Keep OSPC services halted until cutover is fully verified','Run health checks at every stage before proceeding'] },
+    { cat:'After Cutover',     items:['Monitor error rates for 30 minutes post-cutover','Keep OSPC services stopped (not deleted) for 48 hours','Restore DNS TTL to standard values (300s+) after stability confirmed','Archive migration logs and audit reports','Schedule post-mortem within 72 hours (success or failure)','Clean up OSPC resources only after customer UAT sign-off'] },
+    { cat:'Security',          items:['Remove temporary SSH keys deployed to OSPC (/tmp/.mig_flex_key)','Rotate database passwords post-migration','Revoke migration service accounts after completion','Verify FLEX security groups match OSPC rules exactly','Enable FLEX logging (OS Activity Log) from day 1'] },
+  ],
+};
+
+// Variables store
+let VARS = {
+  SSH_KEY:'~/.ssh/ospc2flex', OSPC_FRONT:'user@IP', OSPC_BACK:'user@IP',
+  OSPC_API:'user@IP', OSPC_DB:'user@IP', FLEX_FRONT:'user@IP',
+  FLEX_BACK:'user@IP', FLEX_API:'user@IP', FLEX_DB:'user@IP',
+  OSPC_KUBECONFIG:'~/.kube/ospc.yaml', FLEX_KUBECONFIG:'~/.kube/flex.yaml',
+};
+
+function applyVars() {
+  VARS.SSH_KEY   = document.getElementById('v_ssh_key').value   || VARS.SSH_KEY;
+  VARS.OSPC_FRONT= document.getElementById('v_ospc_front').value|| VARS.OSPC_FRONT;
+  VARS.OSPC_BACK = document.getElementById('v_ospc_back').value || VARS.OSPC_BACK;
+  VARS.OSPC_API  = document.getElementById('v_ospc_api').value  || VARS.OSPC_API;
+  VARS.OSPC_DB   = document.getElementById('v_ospc_db').value   || VARS.OSPC_DB;
+  VARS.FLEX_FRONT= document.getElementById('v_flex_front').value|| VARS.FLEX_FRONT;
+  VARS.FLEX_BACK = document.getElementById('v_flex_back').value || VARS.FLEX_BACK;
+  VARS.FLEX_API  = document.getElementById('v_flex_api').value  || VARS.FLEX_API;
+  VARS.FLEX_DB   = document.getElementById('v_flex_db').value   || VARS.FLEX_DB;
+  const ok8 = document.getElementById('v_ospc_k8s').value;
+  const fk8 = document.getElementById('v_flex_k8s').value;
+  if (ok8) VARS.OSPC_KUBECONFIG = ok8;
+  if (fk8) VARS.FLEX_KUBECONFIG = fk8;
+  renderAllTabs();
+  logAdd('INFO', 'Variables applied — commands updated with your IPs.');
+  showToast('✅ Variables applied to all commands');
+}
+
+function sub(cmd) {
+  return cmd
+    .replace(/\$SSH_KEY/g,    VARS.SSH_KEY)
+    .replace(/\$OSPC_FRONT/g, VARS.OSPC_FRONT)
+    .replace(/\$OSPC_BACK/g,  VARS.OSPC_BACK)
+    .replace(/\$OSPC_API/g,   VARS.OSPC_API)
+    .replace(/\$OSPC_DB/g,    VARS.OSPC_DB)
+    .replace(/\$FLEX_FRONT/g, VARS.FLEX_FRONT)
+    .replace(/\$FLEX_BACK/g,  VARS.FLEX_BACK)
+    .replace(/\$FLEX_API/g,   VARS.FLEX_API)
+    .replace(/\$FLEX_DB/g,    VARS.FLEX_DB)
+    .replace(/\$OSPC_KUBECONFIG/g, VARS.OSPC_KUBECONFIG)
+    .replace(/\$FLEX_KUBECONFIG/g, VARS.FLEX_KUBECONFIG);
+}
+
+// ── Render tables ──────────────────────────────────────────────────────────
+function makeRow(row, idx, tab) {
+  const cmd = sub(row.cmd);
+  const safe = cmd.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+  return `<tr>
+    <td class="phase-cell">${row.phase}</td>
+    <td class="where-cell">${row.where}</td>
+    <td class="cmd-cell">
+      <div class="cmd-wrap">
+        <span class="cmd-text" contenteditable="true" spellcheck="false">${cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+        <span class="cmd-inline-btns">
+          <button class="run-btn" onclick="runCmd(this, ${idx}, '${tab}')">🚀</button>
+          <button class="copy-cmd-btn" onclick="copyCmd(this)">📋</button>
+        </span>
+      </div>
+    </td>
+    <td class="purpose-cell">${row.purpose}</td>
+  </tr>`;
+}
+
+const TABS_WITH_TABLE = ['frontend','backend','api','shared','mysql','postgres','k8s','freeze','cutover','health','rollback'];
+
+function renderAllTabs() {
+  TABS_WITH_TABLE.forEach(tab => {
+    const tbody = document.getElementById('rb-' + tab);
+    if (tbody && RB[tab]) tbody.innerHTML = RB[tab].map((r,i) => makeRow(r,i,tab)).join('');
+  });
+  // Best practices (special)
+  const bp = document.getElementById('rb-bestpractice');
+  if (bp) bp.innerHTML = RB.bestpractice.map(sec => `
+    <div style="background:rgba(0,0,0,0.2);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <h3 style="color:#a5b4fc;font-size:0.9rem;margin-bottom:10px;">${sec.cat}</h3>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:7px;">
+        ${sec.items.map(it => `<li style="display:flex;gap:8px;align-items:flex-start;">
+          <span style="color:var(--success);flex-shrink:0;margin-top:2px;">✓</span>
+          <span style="color:var(--muted);font-size:0.83rem;">${it}</span>
+        </li>`).join('')}
+      </ul>
+    </div>`).join('');
+}
+
+// ── Run a command ──────────────────────────────────────────────────────────
+const activeReaders = [];
+async function runCmd(btn, idx, tab) {
+  const row  = RB[tab][idx];
+  // read live edited text from the contenteditable span if available
+  const editSpan = btn.closest('tr')?.querySelector('.cmd-text');
+  const cmd = editSpan ? editSpan.innerText.trim() : sub(row.cmd);
+  const script = `#!/usr/bin/env bash\nset -uo pipefail\n${cmd}\n`;
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  logAdd('INFO', `▶ [${tab.toUpperCase()}] ${row.phase}`);
+  try {
+    const resp = await fetch('/api/agent1/run/migration', { method:'POST', headers:{'Content-Type':'text/plain'}, body: script });
+    const reader = resp.body.getReader();
+    activeReaders.push(reader);
+    const dec = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      dec.decode(value,{stream:true}).split('\n').forEach(l => {
+        if (!l.trim()) return;
+        const t = l.includes('[ERROR]')||l.includes('FAILED') ? 'ERROR' : l.includes('[WARN]') ? 'WARN' : 'OK';
+        logAdd(t, l);
+      });
+    }
+    logAdd('OK', `✅ Done: ${row.phase}`);
+  } catch(e) {
+    logAdd('ERROR', `❌ ${e.message}`);
+  }
+  btn.disabled = false;
+  btn.textContent = '🚀 Run';
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────
+let currentFilter = 'all';
+const logEntries  = [];
+
+function logAdd(type, msg) {
+  const ts = new Date().toLocaleTimeString();
+  logEntries.push({ type, msg, ts });
+  renderLog();
+}
+function renderLog() {
+  const body = document.getElementById('log-body');
+  const show = logEntries.filter(e => currentFilter==='all' || e.type.toLowerCase()===currentFilter);
+  body.innerHTML = show.map(e => {
+    const cls = e.type==='ERROR'?'log-error':e.type==='WARN'?'log-warn':e.type==='OK'?'log-ok':'log-info';
+    return `<div class="log-entry ${cls}">[${e.ts}] [${e.type}] ${e.msg}</div>`;
+  }).join('');
+  body.scrollTop = body.scrollHeight;
+}
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLog();
+}
+function copyLog() {
+  navigator.clipboard.writeText(logEntries.map(e=>`[${e.ts}] [${e.type}] ${e.msg}`).join('\n'));
+  showToast('📋 Log copied');
+}
+function clearLog() { logEntries.length = 0; renderLog(); }
+
+function copyCmd(btn) {
+  // read live edited text from the contenteditable span
+  const editSpan = btn.closest('tr')?.querySelector('.cmd-text');
+  const text = editSpan ? editSpan.innerText.trim() : '';
+  navigator.clipboard.writeText(text);
+  showToast('📋 Command copied');
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Variable panel toggle ──────────────────────────────────────────────────
+function toggleVars() {
+  const body  = document.getElementById('var-body');
+  const arrow = document.getElementById('var-arrow');
+  const open  = body.classList.toggle('open');
+  arrow.textContent = open ? '▲' : '▼';
+}
+
+// ── CRM Closeout ──────────────────────────────────────────────────────────
+function crmClose(outcome) {
+  const ts  = new Date().toISOString();
+  const msg = outcome==='success'
+    ? `✅ Migration marked SUCCESSFUL at ${ts}`
+    : `⚠ Migration marked ROLLED BACK at ${ts}`;
+  logAdd(outcome==='success'?'OK':'WARN', msg);
+  try { localStorage.setItem('osflex_crm_outcome_'+Date.now(), JSON.stringify({outcome,ts})); } catch(e){}
+  showToast(msg);
+}
+
+// ── Download Runbook ──────────────────────────────────────────────────────
+function downloadRunbook() {
+  const html = document.documentElement.outerHTML;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+  a.download = `rehost-runbook_${new Date().toISOString().substring(0,10)}.html`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  showToast('📥 Runbook downloaded');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+renderAllTabs();
+logAdd('INFO', 'Loaded runbook. Fill in your IPs above and click Apply Variables.');
+</script>
+</body>
+</html>

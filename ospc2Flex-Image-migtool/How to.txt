@@ -1,0 +1,304 @@
+How to 
+
+Run it from the machine that has:
+
+openstack CLI
+qemu-img
+python3
+access to both OSPC and FLEX APIs
+enough disk space to hold the exported image
+SSH reachability to the FLEX test VM if you use --repair-guest
+
+So in practice, the best place is usually:
+
+Best place to run it
+Option 1 — your laptop
+
+Run it on your laptop if your laptop can:
+
+source both ospc-openrc.sh and flex-openrc.sh
+run openstack commands successfully
+reach the internet/VPN/API endpoints for both clouds
+store the exported image file locally
+SSH to the FLEX test VM
+
+This is fine for small or medium images.
+
+Option 2 — a jump host / admin VM
+
+Run it on an admin VM / jump host if:
+
+your laptop does not have direct API access
+your laptop disk is too small
+image export/convert will be large
+SSH to FLEX works better from inside the cloud network
+
+This is often the better production choice.
+
+Option 3 — inside OSPC
+
+You can run it from an OSPC VM only if that VM can also:
+
+access FLEX APIs
+upload images to FLEX
+SSH to the FLEX test VM
+
+So yes, it can run in OSPC, but only if it has both-side access. The tool is not “an OSPC-only tool.” It is a bridge tool between both environments.
+
+Short answer
+Where should you run it?
+
+Run it on one control machine that can reach both OSPC and FLEX.
+
+Usually that is:
+
+your laptop, or
+a jump/admin VM
+
+not “inside the source VM being migrated.”
+
+How to use it
+1. Put the files on the machine where you will run it
+
+You need:
+
+ospc2flex_image_migrator.py
+README_ospc2flex_image_migrator.md
+.env.example
+2. Install prerequisites
+
+Check these:
+
+python3 --version
+openstack --version
+qemu-img --version
+ssh -V
+scp -V
+
+If qemu-img is missing on Ubuntu:
+
+sudo apt-get update
+sudo apt-get install -y qemu-utils
+
+If openstack CLI is missing:
+
+python3 -m pip install python-openstackclient
+3. Create your env file
+cp .env.example .env
+
+Edit .env and set at minimum:
+
+OSPC_OPENRC="$HOME/ospc-openrc.sh"
+FLEX_OPENRC="$HOME/flex-openrc.sh"
+SOURCE_SERVER_NAME="web-01"
+
+FLEX_FLAVOR="gp.7.1.2"
+FLEX_NETWORK_ID="YOUR_FLEX_NETWORK_ID"
+FLEX_KEY_NAME="YOUR_FLEX_KEYPAIR_NAME"
+FLEX_SECURITY_GROUP="default"
+
+SSH_KEY_PATH="$HOME/.ssh/id_rsa"
+SSH_USER="ubuntu"
+SSH_PORT="22"
+FLEX_NET_IFACE="ens3"
+SYSTEMD_SERVICES="nginx,myapp.service"
+4. Load the env file
+set -a
+source ./.env
+set +a
+How to test safely
+
+Do it in 3 phases.
+
+Phase 1 — dry run
+
+This checks the command flow without changing anything:
+
+python3 ospc2flex_image_migrator.py \
+  --ospc-openrc "$OSPC_OPENRC" \
+  --flex-openrc "$FLEX_OPENRC" \
+  --server-name "$SOURCE_SERVER_NAME" \
+  --boot-test-vm \
+  --flex-flavor "$FLEX_FLAVOR" \
+  --flex-network-id "$FLEX_NETWORK_ID" \
+  --flex-key-name "$FLEX_KEY_NAME" \
+  --repair-guest \
+  --ssh-key-path "$SSH_KEY_PATH" \
+  --fix-fstab \
+  --dry-run
+What you confirm here
+your openrc files exist
+the CLI is installed
+the command structure is correct
+required flags are present
+Phase 2 — create the FLEX image only
+
+This builds and imports the FLEX-ready image, but does not boot a VM yet:
+
+python3 ospc2flex_image_migrator.py \
+  --ospc-openrc "$OSPC_OPENRC" \
+  --flex-openrc "$FLEX_OPENRC" \
+  --server-name "$SOURCE_SERVER_NAME"
+What happens
+snapshot is created in OSPC
+image is exported
+image is converted
+converted image is imported into FLEX
+How to verify
+
+List images in FLEX:
+
+source "$FLEX_OPENRC"
+openstack image list
+
+Inspect the new image:
+
+openstack image show "${SOURCE_SERVER_NAME}-snap-<timestamp>-flex"
+
+Or if you used a custom name:
+
+openstack image show YOUR_FLEX_IMAGE_NAME
+Phase 3 — create and test the FLEX VM
+
+Now boot a FLEX test VM from the image:
+
+python3 ospc2flex_image_migrator.py \
+  --ospc-openrc "$OSPC_OPENRC" \
+  --flex-openrc "$FLEX_OPENRC" \
+  --server-name "$SOURCE_SERVER_NAME" \
+  --boot-test-vm \
+  --flex-flavor "$FLEX_FLAVOR" \
+  --flex-network-id "$FLEX_NETWORK_ID" \
+  --flex-key-name "$FLEX_KEY_NAME"
+What happens
+FLEX image is created/imported
+FLEX VM is created from that image
+tool waits for VM to become ACTIVE
+How to verify the VM exists
+source "$FLEX_OPENRC"
+openstack server list
+openstack server show "${SOURCE_SERVER_NAME}-lift-test"
+How to test SSH into the FLEX VM
+If the VM has a floating IP
+
+If you already know the floating IP:
+
+ssh -i "$SSH_KEY_PATH" "$SSH_USER@<FLOATING_IP>"
+If you want the tool to attach a floating IP
+
+Use:
+
+python3 ospc2flex_image_migrator.py \
+  --ospc-openrc "$OSPC_OPENRC" \
+  --flex-openrc "$FLEX_OPENRC" \
+  --server-name "$SOURCE_SERVER_NAME" \
+  --boot-test-vm \
+  --flex-flavor "$FLEX_FLAVOR" \
+  --flex-network-id "$FLEX_NETWORK_ID" \
+  --flex-key-name "$FLEX_KEY_NAME" \
+  --floating-ip "YOUR_FLOATING_IP"
+
+Then SSH:
+
+ssh -i "$SSH_KEY_PATH" "$SSH_USER@YOUR_FLOATING_IP"
+How to test the guest repair
+
+Once you can SSH to the FLEX test VM, run full repair:
+
+python3 ospc2flex_image_migrator.py \
+  --ospc-openrc "$OSPC_OPENRC" \
+  --flex-openrc "$FLEX_OPENRC" \
+  --server-name "$SOURCE_SERVER_NAME" \
+  --boot-test-vm \
+  --flex-flavor "$FLEX_FLAVOR" \
+  --flex-network-id "$FLEX_NETWORK_ID" \
+  --flex-key-name "$FLEX_KEY_NAME" \
+  --repair-guest \
+  --ssh-key-path "$SSH_KEY_PATH" \
+  --ssh-user "$SSH_USER" \
+  --ssh-port "$SSH_PORT" \
+  --fix-fstab \
+  --fix-netplan \
+  --flex-net-iface "$FLEX_NET_IFACE" \
+  --systemd-services "$SYSTEMD_SERVICES"
+What it does inside the FLEX VM
+rebuilds initramfs/grub where possible
+cleans cloud-init
+can rewrite root fstab
+can write a simple netplan
+installs qemu-guest-agent
+restarts named services
+
+This repair logic comes directly from the compatibility changes you listed.
+
+How to validate the created FLEX VM
+
+After the tool runs, test in this order.
+
+1. VM state
+source "$FLEX_OPENRC"
+openstack server show "${SOURCE_SERVER_NAME}-lift-test"
+openstack console log show "${SOURCE_SERVER_NAME}-lift-test"
+2. SSH works
+ssh -i "$SSH_KEY_PATH" "$SSH_USER@<vm-ip>"
+3. OS/network works
+
+Inside the VM:
+
+hostnamectl
+ip a
+ip r
+lsblk -f
+cat /etc/fstab
+systemctl --failed
+4. App services work
+
+Inside the VM:
+
+sudo systemctl status nginx
+sudo systemctl status myapp.service
+ss -tulpn
+5. Local app responds
+
+Inside the VM:
+
+curl -I http://127.0.0.1
+curl -k https://127.0.0.1 || true
+6. External test from your laptop or jump host
+curl -I http://<floating-ip>
+curl -k https://<floating-ip>
+Best practical workflow
+For first test
+
+Run it from:
+
+your laptop if you have API + SSH access and enough disk
+otherwise from a jump/admin VM
+Then do this sequence
+dry run
+image build/import only
+boot FLEX test VM
+SSH into it
+run repair
+validate OS
+validate app
+decide whether the image-lift is usable
+My recommendation
+
+For real-world usage, the best place to run it is usually:
+
+Preferred
+
+A jump host / admin VM that has:
+
+OSPC API access
+FLEX API access
+enough storage for exported images
+SSH path to the FLEX test VM
+Acceptable
+
+Your laptop, if it has all of the above.
+
+One-line summary
+
+Run the tool on one control machine that can access both OSPC and FLEX, usually your laptop or a jump/admin VM; first do a --dry-run, then build/import the FLEX image, then boot a FLEX test VM, then SSH/repair it, and finally validate the VM and app before trusting the migrated image.

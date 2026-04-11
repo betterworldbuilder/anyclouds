@@ -1,0 +1,884 @@
+#!/usr/bin/env python3
+"""
+ospc2flex_image_migrator.py
+OSPC → FLEX end-to-end image migration tool
+Always runs fresh — no smart-resume skip logic.
+"""
+import argparse
+import json
+import os
+import shlex
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def shell_quote(s: str) -> str:
+    return shlex.quote(str(s))
+
+
+def run(cmd, *, dry_run: bool = False, capture: bool = True, check: bool = True) -> str:
+    if isinstance(cmd, str):
+        cmd_str = cmd
+    else:
+        cmd_str = " ".join(str(c) for c in cmd)
+    log(f"[RUN] {cmd_str}")
+    if dry_run:
+        return ""
+    result = subprocess.run(
+        cmd_str, shell=True, capture_output=capture,
+        text=True, errors="replace"
+    )
+    if capture:
+        out = (result.stdout or "").strip()
+        if result.returncode != 0 and check:
+            err = (result.stderr or "").strip()
+            raise RuntimeError(f"Command failed ({result.returncode}): {cmd_str}\nSTDOUT: {out}\nSTDERR: {err}")
+        return out
+    else:
+        if result.returncode != 0 and check:
+            raise RuntimeError(f"Command failed ({result.returncode}): {cmd_str}")
+        return ""
+
+
+def openstack_cmd(openrc_path: str, cmd: str) -> str:
+    return f"bash -lc {shell_quote(f'source {openrc_path} && {cmd}')}"
+
+
+def ssh_base_cmd(key: str, user: str, host: str, port: int = 22) -> str:
+    return (
+        f"ssh -i {shell_quote(key)}"
+        f" -o BatchMode=yes"
+        f" -o StrictHostKeyChecking=accept-new"
+        f" -o ConnectTimeout=10"
+        f" -o ServerAliveInterval=30"
+        f" -o ServerAliveCountMax=10"
+        f" -p {port}"
+        f" {user}@{host}"
+    )
+
+
+def scp_base_cmd(key: str, port: int = 22) -> str:
+    return (
+        f"scp -i {shell_quote(key)}"
+        f" -o BatchMode=yes"
+        f" -o StrictHostKeyChecking=accept-new"
+        f" -o ConnectTimeout=10"
+        f" -P {port}"
+    )
+
+
+def wait_for_ssh(*, key: str, user: str, host: str, port: int = 22,
+                 retries: int = 30, wait: int = 10, dry_run: bool = False) -> None:
+    for attempt in range(1, retries + 1):
+        log(f"[INFO] SSH connectivity check {attempt}/{retries} → {user}@{host}:{port}")
+        if dry_run:
+            log(f"[OK] SSH reachable (dry-run): {host}:{port}")
+            return
+        try:
+            run(f"{ssh_base_cmd(key, user, host, port)} echo ok", check=False)
+            log(f"[OK] SSH reachable: {host}:{port}")
+            return
+        except Exception:
+            pass
+        result = subprocess.run(
+            f"{ssh_base_cmd(key, user, host, port)} echo ok",
+            shell=True, capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            log(f"[OK] SSH reachable: {host}:{port}")
+            return
+        if attempt < retries:
+            log(f"  Not ready yet, waiting {wait}s...")
+            time.sleep(wait)
+    raise RuntimeError(f"SSH {user}@{host}:{port} not reachable after {retries} attempts")
+
+
+def wait_for_image_status(*, openrc: str, image_ref: str,
+                          poll_seconds: int = 5, timeout_seconds: int = 1800,
+                          dry_run: bool = False) -> dict:
+    if dry_run:
+        return {"id": image_ref, "status": "active"}
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        out = run(openstack_cmd(openrc, f"openstack image show {shell_quote(image_ref)} -f json"),
+                  dry_run=dry_run, check=False)
+        try:
+            payload = json.loads(out)
+            status = payload.get("status", "unknown")
+            log(f"[INFO] image={image_ref} status={status}")
+            if status == "active":
+                return payload
+            if status in ("killed", "deleted", "error"):
+                raise RuntimeError(f"Image {image_ref} entered terminal state: {status}")
+        except (json.JSONDecodeError, TypeError):
+            pass
+        time.sleep(poll_seconds)
+    raise RuntimeError(f"Timed out waiting for image {image_ref} to become active")
+
+
+def wait_for_server_status(*, openrc: str, server_ref: str, desired_status: str = "ACTIVE",
+                           poll_seconds: int = 5, timeout_seconds: int = 600,
+                           dry_run: bool = False) -> dict:
+    if dry_run:
+        return {"id": server_ref, "status": desired_status, "addresses": ""}
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        out = run(openstack_cmd(openrc, f"openstack server show {shell_quote(server_ref)} -f json"),
+                  dry_run=dry_run, check=False)
+        try:
+            payload = json.loads(out)
+            status = payload.get("status", "unknown")
+            log(f"[INFO] server={server_ref} status={status}")
+            if status == desired_status:
+                return payload
+            if status in ("ERROR", "DELETED"):
+                raise RuntimeError(f"Server {server_ref} in terminal state: {status}")
+        except (json.JSONDecodeError, TypeError):
+            pass
+        time.sleep(poll_seconds)
+    raise RuntimeError(f"Timed out waiting for server {server_ref} → {desired_status}")
+
+
+def parse_addresses_for_floating(addresses_str: str) -> list:
+    """Try to extract IPs from openstack server show addresses field."""
+    import re
+    return re.findall(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', str(addresses_str))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Remote bash script builder
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_remote_export_script(
+    *,
+    snap_name: str,
+    snap_id: str,
+    flex_image_name: str,
+    ospc_openrc_path: str,
+    flex_openrc_path: str,
+    origin_image_dir: str,
+    target_format: str = "qcow2",
+    container_format: str = "bare",
+    visibility: str = "private",
+    retries: int = 4,
+    retry_wait_seconds: int = 15,
+    keep_export: bool = False,
+    use_swift_import: bool = False,
+) -> str:
+    """Generate the bash script that runs on the origin VM."""
+
+    script = f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# ─── Logging helpers ────────────────────────────────────────────────────────
+log() {{ echo "$@"; }}
+stage_start() {{ local n=$1 t=$2 d=$3
+  echo ""
+  echo ""
+  echo "┌──────────────────────────────────────────────────────┐"
+  echo "│ STAGE $n ── $t"
+  echo "│ $d"
+  echo "└──────────────────────────────────────────────────────┘"
+}}
+stage_done() {{ local n=$1; echo "✅ STAGE $n RESULT: SUCCESS"; echo ""; }}
+stage_fail() {{ local n=$1 msg=$2; echo "❌ STAGE $n RESULT: FAILED ── $msg"; echo ""; exit 1; }}
+
+echo ""
+echo "╔══════════════════════════════════════════════════╗"
+echo "║        OSPC → FLEX Datacenter Backbone Pipeline ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo ""
+
+export_retries={retries}
+export_retry_wait={retry_wait_seconds}
+workdir={shell_quote(origin_image_dir)}
+mkdir -p "$workdir"
+img_path="$workdir/{snap_name}.img"
+converted_path="$workdir/{snap_name}.{target_format}"
+
+# ── STAGE 1 ─────────────────────────────────────────────────────────────────
+stage_start 1 'Validate Dependencies' 'Checking openstack CLI and qemu-img'
+if ! command -v openstack >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/openstack" ]; then
+  log '  Installing OpenStack CLI...'
+  sudo apt-get update >/dev/null 2>&1 || true
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3-openstackclient >/dev/null 2>&1 || \\
+    python3 -m pip install --break-system-packages --user python-openstackclient >/dev/null 2>&1 || true
+  log '  [OK] openstack CLI installed'
+else
+  log '  [OK] openstack CLI present'
+fi
+if ! command -v qemu-img >/dev/null 2>&1; then
+  log '  Installing qemu-utils...'
+  sudo apt-get update >/dev/null 2>&1 || true
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y qemu-utils >/dev/null 2>&1
+  log '  [OK] qemu-img installed'
+else
+  log '  [OK] qemu-img present'
+fi
+stage_done 1
+
+# ── STAGE 3: Download OSPC Snapshot ──────────────────────────────────────────
+stage_start 3 'Download OSPC Snapshot' 'Streaming disk image from OSPC Glance'
+log '  Sourcing OSPC credentials...'
+source {shell_quote(ospc_openrc_path)}
+log '  Acquiring OSPC Keystone token...'
+OS_TOKEN=$(openstack token issue -f value -c id 2>/dev/null || true)
+if [ -z "$OS_TOKEN" ]; then
+  stage_fail 3 'No OSPC token — check OSPC credentials'
+fi
+OS_IMAGE_URL=$(openstack catalog show image -f json 2>/dev/null | python3 -c "
+import sys,json
+data=json.load(sys.stdin)
+eps=[e for e in data.get('endpoints',[]) if e.get('interface')=='public']
+print(eps[0]['url'].rstrip('/') if eps else '')
+" 2>/dev/null || true)
+if [ -z "$OS_IMAGE_URL" ]; then
+  log '  [WARN] Catalog lookup failed — using DFW3 Glance default'
+  OS_IMAGE_URL='https://glance.api.dfw3.rackspacecloud.com'
+fi
+IMG_DOWNLOAD_URL="$OS_IMAGE_URL/v2/images/{snap_id}/file"
+log "  Target: $IMG_DOWNLOAD_URL"
+success=0
+for attempt in $(seq 1 $export_retries); do
+  log "  Attempt $attempt/$export_retries — large file, please wait..."
+  HTTP_STATUS=$(curl -s -C - -L --retry 3 --retry-delay 10 --retry-max-time 180 \\
+    -H "X-Auth-Token: $OS_TOKEN" \\
+    -o "$img_path" \\
+    --write-out '%{{http_code}}' \\
+    "$IMG_DOWNLOAD_URL" 2>/dev/null || echo '000')
+  size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
+  log "  HTTP $HTTP_STATUS | $size bytes received"
+  if [ "$size" -gt 1048576 ]; then
+    log "  [OK] Download complete: $size bytes"
+    success=1; break
+  else
+    log "  [WARN] Incomplete (size=$size) — refreshing token and retrying..."
+    OS_TOKEN=$(openstack token issue -f value -c id 2>/dev/null || true)
+    rm -f "$img_path"
+  fi
+  [ $attempt -lt $export_retries ] && {{ log "  Waiting ${{export_retry_wait}}s..."; sleep $export_retry_wait; }}
+done
+[ $success -eq 0 ] && stage_fail 3 'Download failed after all attempts'
+stage_done 3
+
+# ── STAGE 4: Convert Image Format ────────────────────────────────────────────
+stage_start 4 'Convert Image Format' 'qemu-img convert → {target_format}'
+qemu-img convert -p -O {target_format} "$img_path" "$converted_path"
+SIZE=$(ls -lh "$converted_path" | awk '{{print $5}}')
+log "  [OK] Output: $converted_path ($SIZE)"
+stage_done 4
+
+# ── STAGE 4.5: Offline Guest Repair ──────────────────────────────────────────
+stage_start '4.5' 'Offline Guest Repair' 'Fixing fstab + netplan inside qcow2 before FLEX upload'
+NBD_DEV=/dev/nbd0
+MNT=/tmp/ospc2flex_mnt_$$
+repair_ok=0
+if ! command -v qemu-nbd >/dev/null 2>&1; then
+  log '  [INFO] qemu-nbd not found — installing qemu-utils...'
+  sudo apt-get install -y qemu-utils >/dev/null 2>&1 && log '  [OK] qemu-utils installed' || log '  [WARN] Install failed'
+fi
+if command -v qemu-nbd >/dev/null 2>&1; then
+  # Disconnect any stale nbd connection first
+  sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
+  sleep 1
+  sudo modprobe nbd max_part=8 2>/dev/null || true
+  sleep 1
+  if sudo qemu-nbd --connect="$NBD_DEV" "$converted_path" 2>/tmp/nbd_err.txt; then
+    sleep 3
+    ROOT_PART=$(sudo fdisk -l "$NBD_DEV" 2>/dev/null | awk '/Linux filesystem/{{print $1; exit}}')
+    [ -z "$ROOT_PART" ] && ROOT_PART="${{NBD_DEV}}p1"
+    log "  Root partition: $ROOT_PART"
+    sudo mkdir -p "$MNT"
+    # Run fsck to repair dirty journal from live snapshot
+    log '  Running fsck to repair dirty journal...'
+    sudo fsck -y "$ROOT_PART" >/tmp/fsck_out.txt 2>&1 || true
+    log "  fsck: $(tail -2 /tmp/fsck_out.txt 2>/dev/null | tr '\\n' ' ')"
+    # Try normal mount, then norecovery fallback
+    if sudo mount "$ROOT_PART" "$MNT" 2>/dev/null; then
+      log '  [OK] Mounted normally'
+    elif sudo mount -o norecovery,errors=remount-ro "$ROOT_PART" "$MNT" 2>/dev/null; then
+      log '  [INFO] Mounted with norecovery flag'
+    else
+      log '  [WARN] Mount failed (tried normal + norecovery) — skipping offline repair'
+      sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
+      sudo rmmod nbd 2>/dev/null || true
+    fi
+    if sudo mountpoint -q "$MNT" 2>/dev/null; then
+      # Fix fstab
+      if [ -f "$MNT/etc/fstab" ]; then
+        sudo cp "$MNT/etc/fstab" "$MNT/etc/fstab.ospc2flex.bak"
+        sudo sed -i '/^[[:space:]]*#/b; /^[[:space:]]*$/b; /[[:space:]]\\/[[:space:]]/b; /[[:space:]]swap[[:space:]]/b; s/^/# [ospc2flex] /' "$MNT/etc/fstab"
+        log '  [OK] fstab non-root mounts commented out'
+        sudo grep -v '^#' "$MNT/etc/fstab" | grep -v '^[[:space:]]*$' || log '  (no active mounts other than root/swap)'
+      fi
+      # Fix netplan
+      if [ -d "$MNT/etc/netplan" ]; then
+        sudo tee "$MNT/etc/netplan/99-ospc2flex.yaml" >/dev/null <<'NETPLAN_EOF'
+network:
+  version: 2
+  ethernets:
+    ens3:
+      dhcp4: true
+      dhcp6: false
+NETPLAN_EOF
+        log '  [OK] Netplan DHCP config written'
+      fi
+      sudo umount "$MNT" && repair_ok=1 || log '  [WARN] umount failed'
+    fi
+    sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
+    sudo rmmod nbd 2>/dev/null || true
+    sudo rm -rf "$MNT"
+  else
+    log "  [WARN] qemu-nbd connect failed: $(cat /tmp/nbd_err.txt 2>/dev/null | head -3)"
+    sudo rmmod nbd 2>/dev/null || true
+  fi
+else
+  log '  [WARN] qemu-nbd not available — skipping offline repair'
+fi
+[ $repair_ok -eq 1 ] && log '  [OK] Offline guest repair completed' || log '  [WARN] Offline repair skipped — VM may need manual fstab fix after boot'
+stage_done '4.5'
+
+# ── STAGE 5: Upload to FLEX Glance ───────────────────────────────────────────
+stage_start 5 'Upload to FLEX Glance' 'Auth → Create image record → Stream qcow2'
+log '  Sourcing FLEX credentials...'
+source {shell_quote(flex_openrc_path)}
+log "  Auth URL : ${{OS_AUTH_URL}}"
+log "  User     : ${{OS_USERNAME}}"
+log "  Project  : ${{OS_PROJECT_ID:-${{OS_TENANT_ID:-unknown}}}}"
+
+FLEX_TOKEN=""
+FLEX_CATALOG=""
+
+# Try Rackspace v2 API Key auth first
+log '  Attempting Rackspace v2 API Key auth first...'
+FLEX_RESP=$(curl -s -X POST 'https://identity.api.rackspacecloud.com/v2.0/tokens' \\
+  -H 'Content-Type: application/json' \\
+  -d "{{\\"auth\\":{{\\"RAX-KSKEY:apiKeyCredentials\\":{{\\"username\\":\\"$OS_USERNAME\\",\\"apiKey\\":\\"$OS_PASSWORD\\"}}}}}}" 2>/dev/null || true)
+FLEX_TOKEN=$(echo "$FLEX_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access',{{}}).get('token',{{}}).get('id',''))" 2>/dev/null || true)
+
+if [ -n "$FLEX_TOKEN" ]; then
+  log '  [OK] FLEX auth via Rackspace v2 API Key succeeded'
+  FLEX_CATALOG=$(echo "$FLEX_RESP" | python3 -c "
+import sys,json,os
+d=json.load(sys.stdin)
+cat=d.get('access',{{}}).get('serviceCatalog',[])
+img=[s for s in cat if s.get('type')=='image']
+eps=img[0].get('endpoints',[]) if img else []
+region=os.environ.get('OS_REGION_NAME','DFW').upper()
+# DFW3 maps to DFW in catalog
+region_aliases={{'DFW3':'DFW'}}
+region=region_aliases.get(region,region)
+avail=[e.get('region','?') for e in eps]
+print('Available Glance regions: '+str(avail), file=sys.stderr)
+match=[e.get('publicURL','').rstrip('/') for e in eps if e.get('region','').upper()==region and e.get('publicURL')]
+pub=[e.get('publicURL','').rstrip('/') for e in eps if e.get('publicURL')]
+u=(match[0] if match else (pub[0] if pub else ''))
+print(u[:-3] if u.endswith('/v2') else u)
+" 2>/tmp/flex_catalog_debug.txt || true)
+  log "  Region selected: ${{OS_REGION_NAME:-DFW}} | $(cat /tmp/flex_catalog_debug.txt 2>/dev/null || true)"
+else
+  log '  [WARN] v2 API Key failed — trying Keystone v3 password auth...'
+  HTTP_AUTH=$(curl -s -w '%{{http_code}}' -o /tmp/flex_token_body.json \\
+    -X POST "${{OS_AUTH_URL}}/auth/tokens" \\
+    -H 'Content-Type: application/json' \\
+    -d "{{
+      \\"auth\\": {{
+        \\"identity\\": {{
+          \\"methods\\": [\\"password\\"],
+          \\"password\\": {{
+            \\"user\\": {{
+              \\"name\\": \\"$OS_USERNAME\\",
+              \\"domain\\": {{\\"name\\": \\"${{OS_USER_DOMAIN_NAME:-Default}}\\"}},
+              \\"password\\": \\"$OS_PASSWORD\\"
+            }}
+          }}
+        }},
+        \\"scope\\": {{\\"project\\": {{\\"id\\": \\"${{OS_PROJECT_ID}}\\"}}}}
+      }}
+    }}" 2>/dev/null || echo '000')
+  if [ "$HTTP_AUTH" = "201" ]; then
+    FLEX_TOKEN=$(grep -i '^x-subject-token:' /tmp/flex_token_body.json 2>/dev/null | awk '{{print $2}}' | tr -d '\\r' || true)
+    if [ -z "$FLEX_TOKEN" ]; then
+      FLEX_TOKEN=$(curl -si -X POST "${{OS_AUTH_URL}}/auth/tokens" \\
+        -H 'Content-Type: application/json' \\
+        -d "{{\"auth\":{{\"identity\":{{\"methods\":[\"password\"],\"password\":{{\"user\":{{\"name\":\"$OS_USERNAME\",\"domain\":{{\"name\":\"${{OS_USER_DOMAIN_NAME:-Default}}\"}},\"password\":\"$OS_PASSWORD\"}}}}}},\"scope\":{{\"project\":{{\"id\":\"${{OS_PROJECT_ID}}\"}} }}}}}}" 2>/dev/null \\
+        | grep -i 'x-subject-token' | awk '{{print $2}}' | tr -d '\\r')
+    fi
+    FLEX_CATALOG=$(cat /tmp/flex_token_body.json | python3 -c "
+import sys,json,os
+d=json.load(sys.stdin)
+cat=d.get('token',{{}}).get('catalog',[])
+img=[s for s in cat if s.get('type')=='image']
+eps=img[0].get('endpoints',[]) if img else []
+region=os.environ.get('OS_REGION_NAME','DFW').upper()
+region_aliases={{'DFW3':'DFW'}}; region=region_aliases.get(region,region)
+match=[e.get('url','').rstrip('/') for e in eps if e.get('region','').upper()==region and e.get('interface')=='public' and e.get('url')]
+pub=[e.get('url','').rstrip('/') for e in eps if e.get('interface')=='public' and e.get('url')]
+u=(match[0] if match else (pub[0] if pub else ''))
+print(u[:-3] if u.endswith('/v2') else u)
+" 2>/dev/null || true)
+    log '  [OK] FLEX auth via Keystone v3 succeeded'
+  else
+    log '  [WARN] Keystone v3 also failed'
+    cat /tmp/flex_token_body.json 2>/dev/null | head -c 300 || true
+  fi
+fi
+
+if [ -z "$FLEX_TOKEN" ]; then
+  stage_fail 5 'All FLEX auth methods failed'
+fi
+[ -z "${{FLEX_CATALOG:-}}" ] && {{ log '  [WARN] Using DFW Glance default'; FLEX_CATALOG='https://dfw.images.api.rackspacecloud.com'; }}
+FLEX_UPLOAD_URL="$FLEX_CATALOG/v2/images"
+log "  Glance: $FLEX_UPLOAD_URL"
+
+# Check if image record already exists (clean up orphaned records)
+EXISTING_IMG=$(curl -s "$FLEX_UPLOAD_URL?name={flex_image_name}" -H "X-Auth-Token: $FLEX_TOKEN" 2>/dev/null)
+EXISTING_IMG_ID=$(echo "$EXISTING_IMG" | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('id','') if imgs else '')" 2>/dev/null || true)
+EXISTING_IMG_STATUS=$(echo "$EXISTING_IMG" | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('status','') if imgs else '')" 2>/dev/null || true)
+if [ -n "$EXISTING_IMG_ID" ] && [ "$EXISTING_IMG_STATUS" = 'active' ]; then
+  log "  [SKIP] FLEX image '{flex_image_name}' already active (ID: $EXISTING_IMG_ID) — skipping upload"
+  stage_done 5
+elif [ -n "$EXISTING_IMG_ID" ]; then
+  log "  [CLEANUP] Deleting orphaned FLEX image record $EXISTING_IMG_ID (status=$EXISTING_IMG_STATUS)..."
+  curl -s -X DELETE "$FLEX_UPLOAD_URL/$EXISTING_IMG_ID" -H "X-Auth-Token: $FLEX_TOKEN" 2>/dev/null || true
+  log '  [OK] Orphaned record deleted'
+fi
+
+log '  Creating image record...'
+CREATE_RESP=$(curl -s -X POST "$FLEX_UPLOAD_URL" \\
+  -H "X-Auth-Token: $FLEX_TOKEN" \\
+  -H 'Content-Type: application/json' \\
+  -d '{{"name":"{flex_image_name}","disk_format":"{target_format}","container_format":"{container_format}","visibility":"{visibility}"}}' 2>/dev/null)
+FLEX_IMG_ID=$(echo "$CREATE_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+if [ -z "$FLEX_IMG_ID" ]; then
+  echo "$CREATE_RESP"
+  stage_fail 5 'Failed to create image record in FLEX Glance'
+fi
+log "  Image record created: $FLEX_IMG_ID"
+
+FILE_SIZE=$(stat -c%s "$converted_path" 2>/dev/null || echo 0)
+log "  Uploading $FILE_SIZE bytes via chunked streaming PUT (HTTP/1.1, no Content-Length)..."
+UPLOAD_OK=0
+for upload_attempt in 1 2 3; do
+  log "  Upload attempt $upload_attempt/3..."
+  # Omit Content-Length and use Transfer-Encoding: chunked so Cloudflare/proxies
+  # cannot pre-reject the request based on payload size (413 OverLimit).
+  UPLOAD_STATUS=$(curl -s --http1.1 -X PUT "$FLEX_UPLOAD_URL/$FLEX_IMG_ID/file" \\
+    -H "X-Auth-Token: $FLEX_TOKEN" \\
+    -H 'Content-Type: application/octet-stream' \\
+    -H 'Transfer-Encoding: chunked' \\
+    --data-binary @"$converted_path" \\
+    --write-out '%{{http_code}}' -o /tmp/flex_upload_resp.txt 2>/dev/null || echo '000')
+  log "  Upload HTTP: $UPLOAD_STATUS"
+  if [ "$UPLOAD_STATUS" = '204' ] || [ "$UPLOAD_STATUS" = '200' ]; then
+    log "  [OK] FLEX Image ID: $FLEX_IMG_ID"
+    UPLOAD_OK=1; stage_done 5; break
+  elif [ "$UPLOAD_STATUS" = '413' ]; then
+    RETRY_BODY=$(cat /tmp/flex_upload_resp.txt 2>/dev/null || true)
+    log "  [413 OverLimit] $RETRY_BODY"
+    RETRY_AFTER=$(echo "$RETRY_BODY" | python3 -c "
+import sys,json,datetime
+try:
+  d=json.load(sys.stdin)
+  ra=d.get('overLimit',{{}}).get('retryAfter','')
+  if ra:
+    t=datetime.datetime.strptime(ra,'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
+    wait=max(0,int((t-datetime.datetime.now(datetime.timezone.utc)).total_seconds())+5)
+    print(wait)
+  else: print(90)
+except: print(90)
+" 2>/dev/null || echo 90)
+    # If quota resets more than 5 minutes from now it is a daily account quota
+    # exhaustion — sleeping 22+ hours is not practical. Fail fast with guidance.
+    if [ "$RETRY_AFTER" -gt 300 ]; then
+      RETRY_HUMAN=$(echo "$RETRY_AFTER" | python3 -c "
+import sys
+s=int(sys.stdin.read().strip())
+print(f'{{s//3600}}h {{(s%3600)//60}}m')
+" 2>/dev/null || echo "${{RETRY_AFTER}}s")
+      log "  [QUOTA EXHAUSTED] FLEX account upload quota is exhausted."
+      log "  Retry window: ${{RETRY_HUMAN}} from now (retryAfter=$RETRY_AFTER s)."
+      log "  Options: (1) wait for quota reset, (2) contact Rackspace to raise the limit,"
+      log "           (3) re-run the migration after the retryAfter time."
+      stage_fail 5 "FLEX daily upload quota exhausted — retry in ${{RETRY_HUMAN}} (retryAfter=${{RETRY_AFTER}}s)"
+    elif [ $upload_attempt -lt 3 ]; then
+      log "  [WARN] 413 OverLimit — sleeping ${{RETRY_AFTER}}s then retrying..."
+      sleep "$RETRY_AFTER"
+    else
+      log '  [FAIL] 413 OverLimit on final curl attempt — will try openstack CLI fallback.'
+    fi
+  elif [ "$UPLOAD_STATUS" = '000' ]; then
+    log '  [WARN] Curl connection error — retrying in 20s...'
+    [ $upload_attempt -lt 3 ] && sleep 20 || true
+  else
+    log "  Upload error body: $(cat /tmp/flex_upload_resp.txt 2>/dev/null | head -c 300)"
+    stage_fail 5 "Upload failed with HTTP $UPLOAD_STATUS"
+  fi
+done
+
+# ── Fallback: OpenStack CLI upload (bypasses Cloudflare size limits) ──
+if [ "$UPLOAD_OK" = '0' ]; then
+  log '  [FALLBACK] curl attempts failed — trying openstack image set --file...'
+  source /tmp/ospc2flex_flex.sh
+  OS_CLIENT_CONFIG_FILE=/dev/null openstack \\
+    --os-auth-url "${{OS_AUTH_URL}}" \\
+    --os-username "${{OS_USERNAME}}" \\
+    --os-password "${{OS_PASSWORD}}" \\
+    --os-project-id "${{OS_PROJECT_ID:-${{OS_TENANT_ID:-}}}}" \\
+    --os-region-name "${{OS_REGION_NAME:-DFW}}" \\
+    image set --file "$converted_path" "$FLEX_IMG_ID" 2>/tmp/osc_upload_err.txt && UPLOAD_OK=1 || true
+  if [ "$UPLOAD_OK" = '1' ]; then
+    log '  [OK] Fallback openstack CLI upload succeeded'
+    stage_done 5
+  else
+    log "  [ERR] openstack CLI fallback failed: $(cat /tmp/osc_upload_err.txt 2>/dev/null | head -c 500)"
+    stage_fail 5 'Upload failed — curl (chunked) and openstack CLI both failed'
+  fi
+fi
+"""
+
+    if not keep_export:
+        script += f"""
+# ── STAGE 6: Clean Workspace ─────────────────────────────────────────────────
+stage_start 6 'Clean Workspace' 'Removing raw + converted disk images from Origin VM'
+rm -f "$img_path" "$converted_path" || true
+stage_done 6
+"""
+
+    return script
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Guest repair (runs on FLEX VM after boot)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def repair_guest(
+    *,
+    key: str,
+    user: str,
+    host: str,
+    port: int = 22,
+    fix_fstab: bool = True,
+    fix_netplan: bool = True,
+    new_hostname: str = "",
+    services: list = None,
+    dry_run: bool = False,
+) -> None:
+    ssh = f"{ssh_base_cmd(key, user, host, port)}"
+
+    def remote(cmd: str) -> str:
+        return run(f"{ssh} {shell_quote(cmd)}", dry_run=dry_run, check=False)
+
+    log("[INFO] === Online Guest Repair ===")
+
+    if new_hostname:
+        remote(f"sudo hostnamectl set-hostname {shell_quote(new_hostname)}")
+        log(f"[OK] Hostname set to {new_hostname}")
+
+    if fix_fstab:
+        log("[INFO] STEP 1 — Fix /etc/fstab (comment out non-root mounts):")
+        remote("sudo cp /etc/fstab /etc/fstab.ospc2flex.bak 2>/dev/null || true")
+        remote(r"sudo sed -i '/^[[:space:]]*#/b; /^[[:space:]]*$/b; /[[:space:]]\//b; /[[:space:]]swap[[:space:]]/b; s/^/# [ospc2flex] /' /etc/fstab")
+        fstab = remote("sudo cat /etc/fstab 2>/dev/null || true")
+        log(f"[OK] fstab after fix:\n{fstab}")
+
+    if fix_netplan:
+        log("[INFO] STEP 2 — Fix netplan (write clean DHCP config):")
+        netplan_yaml = "network:\\n  version: 2\\n  ethernets:\\n    ens3:\\n      dhcp4: true\\n      dhcp6: false"
+        remote(f"sudo mkdir -p /etc/netplan && printf '{netplan_yaml}' | sudo tee /etc/netplan/99-ospc2flex.yaml >/dev/null")
+        log("[OK] Netplan DHCP config written")
+
+    # Disable cloud-init
+    remote("sudo cloud-init clean 2>/dev/null || true")
+    remote("sudo touch /etc/cloud/cloud-init.disabled 2>/dev/null || true")
+    log("[OK] cloud-init disabled")
+
+    # Install qemu-guest-agent
+    remote("sudo apt-get update -qq >/dev/null 2>&1 && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y qemu-guest-agent >/dev/null 2>&1 || true")
+    remote("sudo systemctl enable --now qemu-guest-agent 2>/dev/null || true")
+    log("[OK] qemu-guest-agent installed")
+
+    # Restart services
+    if services:
+        for svc in services:
+            result = remote(f"sudo systemctl restart {shell_quote(svc)} 2>&1 || true")
+            log(f"[OK] Restarted {svc}")
+
+    log("[INFO] === Online Guest Repair Complete ===")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Argument parser
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description="OSPC → FLEX image migration tool")
+    p.add_argument("--ospc-openrc", required=True)
+    p.add_argument("--flex-openrc", required=True)
+    p.add_argument("--server-name", required=True)
+    p.add_argument("--snapshot-name", help="Auto-generated if omitted")
+    p.add_argument("--workdir", default="./image_migrator_work")
+    p.add_argument("--target-format", default="qcow2", choices=["qcow2", "raw"])
+    p.add_argument("--source-format")
+    p.add_argument("--flex-image-name")
+    p.add_argument("--visibility", default="private",
+                   choices=["public", "private", "shared", "community"])
+    p.add_argument("--container-format", default="bare")
+    p.add_argument("--poll-seconds", type=int, default=5)
+    p.add_argument("--timeout-seconds", type=int, default=1800)
+    p.add_argument("--keep-export", action="store_true")
+    p.add_argument("--cleanup-snapshot", action="store_true")
+    p.add_argument("--export-retries", type=int, default=4)
+    p.add_argument("--export-retry-wait", type=int, default=15)
+    p.add_argument("--remote-export", action="store_true")
+    p.add_argument("--origin-image-dir", default="$HOME/image")
+    # SSH
+    p.add_argument("--ssh-key-path")
+    p.add_argument("--ssh-user", default="ubuntu")
+    p.add_argument("--ssh-port", type=int, default=22)
+    p.add_argument("--source-server-ip")
+    p.add_argument("--jump-host")
+    # Boot test VM
+    p.add_argument("--boot-test-vm", action="store_true")
+    p.add_argument("--test-server-name")
+    p.add_argument("--flex-flavor")
+    p.add_argument("--flex-network-id")
+    p.add_argument("--flex-key-name")
+    p.add_argument("--flex-security-group", default="default")
+    p.add_argument("--floating-ip")
+    p.add_argument("--auto-floating-ip", action="store_true")
+    p.add_argument("--flex-external-network", default="PUBLICNET")
+    p.add_argument("--test-server-ip")
+    # Guest repair
+    p.add_argument("--repair-guest", action="store_true")
+    p.add_argument("--new-hostname")
+    p.add_argument("--fix-fstab", action="store_true")
+    p.add_argument("--fix-netplan", action="store_true")
+    p.add_argument("--flex-net-iface")
+    p.add_argument("--systemd-services", default="")
+    p.add_argument("--skip-cloud-init-clean", action="store_true")
+    p.add_argument("--skip-qemu-guest-agent", action="store_true")
+    p.add_argument("--use-swift-import", action="store_true",
+                   help="Upload via Cloud Files (Swift) → Glance import task instead of direct PUT. "
+                        "Use when the FLEX Glance daily upload quota is exhausted (413 OverLimit).")
+    p.add_argument("--dry-run", action="store_true")
+    return p
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+
+def main() -> None:
+    args = build_parser().parse_args()
+
+    workdir = Path(args.workdir)
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d%0H%M%S")
+    snapshot_name = args.snapshot_name or f"{args.server_name}-snap-{timestamp}"
+    flex_image_name = args.flex_image_name or f"{snapshot_name}-flex"
+    test_server_name = args.test_server_name or f"{args.server_name}-lift-test"
+    ospc_openrc = str(Path(args.ospc_openrc).resolve())
+    flex_openrc = str(Path(args.flex_openrc).resolve())
+    metadata_file = workdir / f"{snapshot_name}.metadata.json"
+
+    log("=" * 60)
+    log("OSPC -> FLEX image migrator")
+    log("=" * 60)
+    log(f"[INFO] server-name    : {args.server_name}")
+    log(f"[INFO] snapshot-name  : {snapshot_name}")
+    log(f"[INFO] flex-image     : {flex_image_name}")
+    log(f"[INFO] boot-test-vm   : {args.boot_test_vm}")
+    log(f"[INFO] repair-guest   : {args.repair_guest}")
+    log(f"[INFO] remote-export  : {args.remote_export}")
+    log(f"[INFO] swift-import   : {args.use_swift_import}")
+    log(f"[INFO] workdir        : {workdir}")
+    log("")
+
+    # ── Stage 2: Create OSPC Snapshot (always fresh) ──────────────────────
+    log(f"[INFO] Creating OSPC snapshot '{snapshot_name}'...")
+    run(
+        openstack_cmd(
+            ospc_openrc,
+            f"openstack server image create --name {shell_quote(snapshot_name)} {shell_quote(args.server_name)}"
+        ),
+        dry_run=args.dry_run,
+    )
+
+    image_payload = wait_for_image_status(
+        openrc=ospc_openrc,
+        image_ref=snapshot_name,
+        poll_seconds=args.poll_seconds,
+        timeout_seconds=args.timeout_seconds,
+        dry_run=args.dry_run,
+    )
+    if not args.dry_run:
+        metadata_file.write_text(json.dumps(image_payload, indent=2), encoding="utf-8")
+        log(f"[INFO] OSPC snapshot metadata written to {metadata_file}")
+    image_id = image_payload.get("id", snapshot_name)
+
+    if args.remote_export:
+        source_ssh_host = args.source_server_ip
+        if not source_ssh_host and not args.dry_run:
+            source_payload = wait_for_server_status(
+                openrc=ospc_openrc,
+                server_ref=args.server_name,
+                desired_status="ACTIVE",
+                poll_seconds=args.poll_seconds,
+                timeout_seconds=args.timeout_seconds,
+                dry_run=args.dry_run,
+            )
+            ips = parse_addresses_for_floating(source_payload.get("addresses", ""))
+            if ips:
+                source_ssh_host = ips[0]
+                log(f"[INFO] Discovered source VM IP: {source_ssh_host}")
+
+        if not source_ssh_host:
+            raise RuntimeError("Cannot determine source VM IP for --remote-export")
+        if not args.ssh_key_path:
+            raise RuntimeError("--ssh-key-path required for --remote-export")
+
+        log(f"[INFO] Connecting to Origin VM {source_ssh_host} for Datacenter Backbone Pipeline...")
+
+        wait_for_ssh(
+            key=args.ssh_key_path,
+            user=args.ssh_user,
+            host=source_ssh_host,
+            port=args.ssh_port,
+            dry_run=args.dry_run,
+        )
+
+        # SCP openrc files
+        ospc_remote = "/tmp/ospc2flex_ospc.sh"
+        flex_remote = "/tmp/ospc2flex_flex.sh"
+        scp = scp_base_cmd(args.ssh_key_path, args.ssh_port)
+        run(f"{scp} {shell_quote(ospc_openrc)} {args.ssh_user}@{source_ssh_host}:{ospc_remote}", dry_run=args.dry_run)
+        run(f"{scp} {shell_quote(flex_openrc)} {args.ssh_user}@{source_ssh_host}:{flex_remote}", dry_run=args.dry_run)
+
+        # Generate and SCP the remote export script
+        script_content = build_remote_export_script(
+            snap_name=snapshot_name,
+            snap_id=image_id,
+            flex_image_name=flex_image_name,
+            ospc_openrc_path=ospc_remote,
+            flex_openrc_path=flex_remote,
+            origin_image_dir=args.origin_image_dir,
+            target_format=args.target_format,
+            container_format=args.container_format,
+            visibility=args.visibility,
+            retries=args.export_retries,
+            retry_wait_seconds=args.export_retry_wait,
+            keep_export=args.keep_export,
+            use_swift_import=args.use_swift_import,
+        )
+
+        local_script = workdir / "remote_export.sh"
+        local_script.write_text(script_content, encoding="utf-8")
+
+        ts = int(time.time())
+        remote_script = f"/tmp/remote_export_{ts}.sh"
+        run(f"{scp} {shell_quote(str(local_script))} {args.ssh_user}@{source_ssh_host}:{remote_script}", dry_run=args.dry_run)
+
+        ssh_cmd = f"{ssh_base_cmd(args.ssh_key_path, args.ssh_user, source_ssh_host, args.ssh_port)} bash {remote_script}"
+        run(ssh_cmd, capture=False, dry_run=args.dry_run)
+
+    # ── Boot test VM ────────────────────────────────────────────────────────
+    if args.boot_test_vm:
+        log(f"[INFO] Booting test VM '{test_server_name}' on FLEX from image '{flex_image_name}'...")
+        if not args.flex_flavor or not args.flex_network_id:
+            raise RuntimeError("--flex-flavor and --flex-network-id required for --boot-test-vm")
+
+        boot_cmd = (
+            f"openstack server create"
+            f" --name {shell_quote(test_server_name)}"
+            f" --image {shell_quote(flex_image_name)}"
+            f" --flavor {shell_quote(args.flex_flavor)}"
+            f" --network {shell_quote(args.flex_network_id)}"
+        )
+        if args.flex_key_name:
+            boot_cmd += f" --key-name {shell_quote(args.flex_key_name)}"
+        if args.flex_security_group:
+            boot_cmd += f" --security-group {shell_quote(args.flex_security_group)}"
+        boot_cmd += " -f json"
+
+        boot_resp = run(openstack_cmd(flex_openrc, boot_cmd), dry_run=args.dry_run)
+        try:
+            server_id = json.loads(boot_resp).get("id", test_server_name)
+        except Exception:
+            server_id = test_server_name
+        log(f"[INFO] Test VM created: {server_id}")
+
+        server_payload = wait_for_server_status(
+            openrc=flex_openrc,
+            server_ref=server_id,
+            desired_status="ACTIVE",
+            timeout_seconds=600,
+            dry_run=args.dry_run,
+        )
+
+        test_ip = args.test_server_ip
+
+        if args.auto_floating_ip and not test_ip:
+            log("[INFO] Allocating floating IP...")
+            fip_resp = run(openstack_cmd(
+                flex_openrc,
+                f"openstack floating ip create {shell_quote(args.flex_external_network)} -f json"
+            ), dry_run=args.dry_run)
+            try:
+                fip = json.loads(fip_resp).get("floating_ip_address", "")
+                if fip:
+                    run(openstack_cmd(
+                        flex_openrc,
+                        f"openstack server add floating ip {shell_quote(server_id)} {shell_quote(fip)}"
+                    ), dry_run=args.dry_run)
+                    test_ip = fip
+                    log(f"[OK] Floating IP: {test_ip}")
+            except Exception as e:
+                log(f"[WARN] Floating IP allocation failed: {e}")
+
+        if not test_ip:
+            ips = parse_addresses_for_floating(server_payload.get("addresses", ""))
+            if ips:
+                test_ip = ips[0]
+
+        if args.repair_guest and test_ip and args.ssh_key_path:
+            wait_for_ssh(
+                key=args.ssh_key_path,
+                user=args.ssh_user,
+                host=test_ip,
+                port=args.ssh_port,
+                retries=30,
+                wait=20,
+                dry_run=args.dry_run,
+            )
+            services = [s.strip() for s in args.systemd_services.split(",") if s.strip()]
+            repair_guest(
+                key=args.ssh_key_path,
+                user=args.ssh_user,
+                host=test_ip,
+                port=args.ssh_port,
+                fix_fstab=args.fix_fstab,
+                fix_netplan=args.fix_netplan,
+                new_hostname=args.new_hostname or "",
+                services=services,
+                dry_run=args.dry_run,
+            )
+
+    log("[INFO] Migration complete!")
+
+
+if __name__ == "__main__":
+    main()
