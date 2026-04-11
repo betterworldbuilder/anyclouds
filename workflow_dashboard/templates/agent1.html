@@ -1297,7 +1297,7 @@ run_cmd() {
 # mysql_src: runs locally, connects to DBaaS via LB — NO SSH to DBaaS
 mysql_src() { mysql -h "\$LB_PUBLIC_IP" -P "\$LB_PORT" -u "\$DBAAS_USER" -p"\$DBAAS_PASS" "\$@"; }
 # mysql_dst: runs on Flex DB via SSH
-mysql_dst() { ssh -i "\$SSH_KEY" "\$SSH_USER@\$FLEX_IP" "mysql -u root -p\\"\$FLEX_ROOT_PASS\\" \$*"; }
+mysql_dst() { ssh -i "\$SSH_KEY" "\$SSH_USER@\$FLEX_IP" "mysql -h 127.0.0.1 -u root -p\\"\$FLEX_ROOT_PASS\\" \$*"; }
 `;
 
                     // ── HA: OSPC is SSH-accessible VM ─────────────────────────
@@ -1457,10 +1457,10 @@ done
 echo ""; echo "── PHASE 4: Restore on Flex DB ──────────────────────────────────"
 for DB in $DATABASES; do
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
-    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"CREATE DATABASE IF NOT EXISTS \\\`$DB\\\`;\\"'" \\
+    'mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"CREATE DATABASE IF NOT EXISTS \\\`$DB\\\`;\\"'" \\
     "Create DB $DB on Flex"
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
-    'zcat $DUMP_DIR/\\"$DB\\".sql.gz | mysql -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\"'" \\
+    'zcat $DUMP_DIR/\\"$DB\\".sql.gz | mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\"'" \\
     "Restore $DB on Flex"
 done
 `;
@@ -1478,7 +1478,7 @@ for DB in $DATABASES; do
       WHERE TABLE_SCHEMA='$DB' ORDER BY TABLE_ROWS DESC;\\"" \\
     "Row counts — OSPC DBaaS $DB (via LB)"
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
-    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
+    'mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
     \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
       WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
     "Row counts — Flex DB $DB"
@@ -1492,7 +1492,7 @@ echo "[ACTION] ⚠  Schedule a brief maintenance window to prevent split-brain w
 echo "[ACTION] Update application config: DB_HOST → $FLEX_IP"
 echo "[ACTION] Restart application services — all traffic now to Flex DB"
 run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
-  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SELECT NOW(), @@hostname;\\"'" \\
+  'mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SELECT NOW(), @@hostname;\\"'" \\
   "Confirm Flex DB is accepting queries"
 echo ""
 echo "[FREEZE] To cut write access to OSPC DBaaS, choose one option:"
