@@ -91,155 +91,252 @@ A persistent backlog table for managing multiple customer migration engagements 
 
 ### Stage 1 — Discovery & Assessment
 
-Connects to the live OSPC environment and maps all infrastructure into structured reports.
+```
+ openrc credentials
+       │
+       ▼
+ ┌─────────────┐    run_discovery.sh    ┌──────────────────┐
+ │ OSPC Scanner│ ──────────────────────►│  servers.csv     │
+ │  (live env) │                        │  network.csv     │
+ └─────────────┘                        └──────────────────┘
+       │                                        │
+       │  mirror scan                           │ side-by-side
+       ▼                                        ▼
+ ┌─────────────┐                        ┌──────────────────┐
+ │ FLEX Scanner│ ──────────────────────►│  FLEX inventory  │
+ │ (target env)│   flavor auto-detect   │  flavor mapping  │
+ └─────────────┘                        └──────────────────┘
+```
 
-**OSPC Scanner**
-- Authenticates against OSPC Identity endpoints via `openrc` credential injection
-- Generates and executes `run_discovery.sh` — scans Compute nodes, Cinder volumes, Security Groups, Load Balancers, Floating IPs, DNS records
-- Exports results to `servers.csv` and `network.csv`
-- Live SSE terminal streaming of discovery progress
+| Panel | What it does | Output |
+|-------|-------------|--------|
+| **OSPC Scanner** | Authenticates via `openrc`, runs `run_discovery.sh` — scans Compute, Cinder, Security Groups, LBs, Floating IPs, DNS | `servers.csv`, `network.csv` |
+| **FLEX Scanner** | Mirrors the same scan against the FLEX target environment | FLEX inventory for side-by-side comparison, flavor candidates |
+| **Topology Import** | Parses existing OpenStack Bash/YAML scripts and reverse-engineers them into the visual canvas | Supports `openstack server create`, `network create`, `router` |
+| **References Panel** | OSPC flavor catalog vs FLEX catalog with pricing — nearest-equivalent recommendation | Side-by-side flavor mapping table |
 
-**FLEX Scanner**
-- Mirrors the same scan against the target FLEX environment
-- Produces a FLEX inventory for side-by-side comparison
-- Auto-detects flavor and network mapping candidates
-
-**Topology Import**
-- Parses existing OpenStack deployment scripts (YAML/Bash heredocs) and reverse-engineers them into the visual topology canvas
-- Supports `openstack server create`, `openstack network create`, `openstack router` command extraction
-
-**References Panel**
-- OSPC flavor catalog (CPU/RAM/disk specs)
-- FLEX flavor catalog with pricing
-- Side-by-side flavor mapping with nearest-equivalent recommendation
+All scanners stream live output to an SSE terminal panel in the browser.
 
 ---
 
 ### Stage 2 — Migration Pipeline
 
+Three paths depending on workload type:
+
+```
+ OSPC Workload
+      │
+      ├──► Option 1: Direct Shift & Lift  ──► VM snapshot → qemu-img → FLEX
+      │
+      └──► Option 2: REHOST
+                │
+                ├── Phase 1: Infra Cloning (Topology Designer)
+                ├── Phase 2: Apps Servers & DB Replication
+                └── Phase 3: Kubernetes Migration
+```
+
+---
+
 #### Option 1: Direct Shift & Lift (Image Migration)
 
-GUI wrapper for the `ospc2flex_image_migrator.py` engine — moves running VMs as raw disk images.
+GUI wrapper for `ospc2flex_image_migrator.py` — migrates running VMs as raw disk images without downtime.
 
-- **Live snapshot** — snapshots OSPC instances without halting production
-- **Secure download** — pulls raw images over SSH tunnel from OSPC
-- **QEMU conversion** — reformats raw → FLEX-compatible format via `qemu-img`
-- **SSH key injection** — supports `.pem` keypair override per instance
-- **Storage bridge validation** — calculates local disk space requirements before download
-- **Kubernetes artifact support** — applies Helm charts and raw YAML configs post-lift
-- **Live streaming terminal** — SSE output panel shows conversion progress in real time
+```
+ OSPC VM (live)
+      │
+      │  live snapshot (no halt)
+      ▼
+ raw image
+      │
+      │  scp over SSH tunnel
+      ▼
+ local disk
+      │
+      │  qemu-img convert
+      ▼
+ FLEX-compatible image
+      │
+      │  upload + boot
+      ▼
+ FLEX VM ✓
+```
+
+| Feature | Detail |
+|---------|--------|
+| Live snapshot | Snapshots OSPC instances without halting production |
+| Secure download | Pulls raw images over SSH tunnel |
+| QEMU conversion | `qemu-img` reformats raw → FLEX-compatible |
+| SSH key injection | `.pem` keypair override per instance |
+| Storage validation | Calculates local disk space needed before download |
+| K8s artifact support | Applies Helm charts and raw YAML configs post-lift |
+| Live terminal | SSE streaming panel shows conversion progress in real time |
 
 ---
 
 #### Option 2 Phase 1: REHOST Infra Cloning (Topology Designer)
 
-An interactive canvas for designing the FLEX target infrastructure before any migration runs.
+Interactive canvas for designing the full FLEX target infrastructure before any migration runs.
 
-- **Visual drag-and-drop topology builder** — nodes for VMs, networks, subnets, routers, load balancers, security groups, volumes
-- **Live OpenStack import** — pulls current OSPC topology directly from the API into the canvas
-- **Topology validation engine** — 25+ checks: orphan nodes, missing router uplinks, duplicate IPs, invalid CIDR overlaps, unreachable subnets
-- **Topology → Bash script** — generates a full ordered OpenStack deployment script from the canvas, phase-aware
-- **Script → Topology reverse parser** — paste an existing deployment script and reconstruct the canvas automatically
-- **Keypair verification** — validates all SSH keypairs referenced in the topology exist in the target FLEX project
-- **IP auto-propagation** — OSPC and FLEX IPs entered in any panel are persisted to `localStorage` and injected into all other panels automatically
-- **Execution plan table** — ordered list of every resource creation step with OpenStack CLI command preview
+| Capability | Detail |
+|-----------|--------|
+| **Visual canvas** | Drag-and-drop nodes — VMs, networks, subnets, routers, LBs, security groups, volumes |
+| **Live OSPC import** | Pulls current topology from OpenStack API directly into the canvas |
+| **Validation engine** | 25+ checks — orphan nodes, missing router uplinks, duplicate IPs, CIDR overlaps |
+| **Topology → Script** | Generates a full ordered OpenStack Bash deployment script from the canvas |
+| **Script → Topology** | Paste an existing deployment script — canvas reconstructs automatically |
+| **Keypair verification** | Validates all SSH keypairs exist in the FLEX project before deploy |
+| **IP auto-propagation** | IPs entered in any panel persist to `localStorage` and inject into all other panels |
+| **Execution plan** | Ordered table of every resource creation step with CLI command preview |
 
 ---
 
 #### Option 2 Phase 2: Apps Servers & DB Replication
 
-Script generator + parallel execution engine for migrating application servers and databases.
+Script generator and parallel execution engine for migrating application servers and databases.
 
-**Node Discovery Panel**
-- Detects OSPC and FLEX node pairs from the topology canvas via `data-role` stamping
-- Supports node roles: `server`, `db-primary`, `db-replica`
-- Auto-populates IPs into script generators; falls back silently to mock data
+**► Node pairing & mock data**
 
-**Mock Pairs Preview Table**
-- Pre-built example migration pairs (3 servers + 1 Single DB + 2 HA DB nodes)
-- "Use Mockup Data" checkbox — injects mock IPs into both script generators and parallel executor for dry-run testing
+| Component | Detail |
+|-----------|--------|
+| Node Discovery | Auto-detects OSPC↔FLEX pairs via `data-role` — roles: `server`, `db-primary`, `db-replica` |
+| Mock Pairs Table | Pre-built pairs (3 servers + 1 Single DB + 2 HA DB) for dry-run testing without real nodes |
+| Use Mockup Data | Checkbox — injects mock IPs into both script generators and the parallel executor |
 
-**Server Script Generator**
-- **Quick Install mode** — generates an apt/dnf package installation script for matched FLEX servers
-- **Full Rehost Clone mode** — generates a 13-layer server cloning script:
-  1. Server Identity (hostname, timezone)
-  2. SSH & Access (sshd\_config, authorized\_keys, sudoers)
-  3. Users & Permissions (UID/GID-preserved user recreation, `/home/` sync)
-  4. Disk / Mounts (lsblk/df/fstab audit — read-only)
-  5. Packages & Repos (apt/rpm package list mirror)
-  6. Kernel / Sysctl (sysctl.conf, security/limits.d)
-  7. Network (ip addr/route/netplan export — manual apply)
-  8. Runtime Env (Python, Node.js, Docker, PM2)
-  9. App Code & Config (rsync `/opt/app`, `/srv`, `/var/www`; IP substitution in config files)
-  10. Service Units & Cron (systemd units, cron jobs)
-  11. Data (PostgreSQL/MySQL dump & restore — opt-in)
-  12. TLS & Certs (Let's Encrypt transfer, CA trust store refresh)
-  13. External Deps (`.env`/YAML external URL audit)
-- **Dry Run / Live / Maintenance / Cutover** execution mode selector
-- **`run_cmd()` wrapper** — every command prints `[DRY]` in dry run or `[RUN]/[OK]/[ERR]` in live mode
+---
 
-**DB Script Generator — Single DB**
-- Scenario: single OSPC source → single Flex DB VM
-- 7-phase pipeline: Pre-flight → Discover → Dump → Transfer → Restore → Validate → Cutover
-- `mysqldump --single-transaction --master-data=2` per database → gzip → scp → restore
-- Row-count validation per table (OSPC vs FLEX) before cutover
-- Dry Run support throughout
+**► Server Script Generator**
 
-**DB Script Generator — HA DB + Replica (Reengineered)**
-- New self-contained approach — no ongoing cross-cloud replication dependency:
-  - **Phase 5**: Expose source — verify Flex primary can reach OSPC HA VIP:3306 (TCP + auth); verify all 3 nodes engine/version/GTID
-  - **Phase 6**: Verify engines — MySQL/MariaDB version + GTID mode parity across OSPC, Flex primary, Flex replica
-  - **Phase 7**: Seed Flex primary — `mysqldump --single-transaction` from OSPC HA VIP → restore on Flex primary → row-count validate. **OSPC role ends here.**
-  - **Phase 8**: Bootstrap Flex-internal HA — create `REPLICATION SLAVE` user on Flex primary; dump Flex primary → restore on Flex replica (self-contained seed)
-  - **Phase 9**: Start Flex-internal replication — `CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP; START SLAVE` on Flex replica; monitor `Seconds_Behind_Master → 0`
-  - **Phase 10**: Cutover — set OSPC `read_only=ON`; repoint app `DB_HOST → Flex primary`; Flex replica provides HA; 48h stability window; OSPC decommissioned
-- Result: `OSPC Primary → (dump/restore) → Flex Primary → (internal replication) → Flex Replica`
+Two modes selectable before generation:
 
-**Parallel Execution Engine**
-- `⚡ Execute in Parallel` button — runs the generated rehost script against all VM pairs simultaneously
-- Per-VM streaming terminal panel — one SSE terminal block per node, live output
-- Overview panel — migration manifest and global status
-- Stop button — cancels all in-flight executions
+| Mode | What it generates |
+|------|------------------|
+| 📦 Quick Install | `apt`/`dnf` package installation script for matched FLEX servers |
+| 🖥️ Full Rehost Clone | 13-layer deep-clone script (see table below) |
 
-**Panel Exclusivity**
-- Generating a DB script hides the server output panel and vice versa — prevents confusing overlap
+**Full Rehost Clone — 13 Layers**
+
+| # | Layer | What it copies |
+|---|-------|---------------|
+| 1 | Server Identity | Hostname, timezone |
+| 2 | SSH & Access | `sshd_config`, `authorized_keys`, `sudoers.d` |
+| 3 | Users & Permissions | System users (UID/GID preserved), `/home/` sync |
+| 4 | Disk / Mounts | `lsblk`/`df`/`fstab` audit — read-only, no changes |
+| 5 | Packages & Repos | `apt`/`rpm` package list mirror |
+| 6 | Kernel / Sysctl | `sysctl.conf`, `security/limits.d` |
+| 7 | Network | `ip addr`/`route`/`netplan` export — manual apply |
+| 8 | Runtime Env | Python, Node.js, Docker, PM2 |
+| 9 | App Code & Config | `rsync` `/opt/app` `/srv` `/var/www`; IP substitution in config files |
+| 10 | Service Units & Cron | `systemd` units, cron jobs |
+| 11 | Data | PostgreSQL/MySQL dump & restore — opt-in only |
+| 12 | TLS & Certs | Let's Encrypt transfer, CA trust store refresh |
+| 13 | External Deps | `.env`/YAML external URL audit |
+
+**Execution modes:** `🔍 Dry Run` · `🔒 Maint Mode` · `✂️ Cutover Mode` · `🟢 Live`
+
+---
+
+**► DB Script Generator — Single DB**
+
+```
+ OSPC DB
+    │  mysqldump --single-transaction --master-data=2
+    ▼
+ dump.sql.gz
+    │  scp
+    ▼
+ FLEX DB
+    │  zcat | mysql
+    ▼
+ row-count validate → cutover app config ✓
+```
+
+| Phase | Action |
+|-------|--------|
+| 0 Pre-flight | SSH + MySQL reachability, disk space |
+| 1 Discover | `SHOW DATABASES` on OSPC |
+| 2 Dump | `mysqldump` per DB → gzip |
+| 3 Transfer | `scp` to FLEX `/tmp` |
+| 4 Restore | `zcat *.sql.gz \| mysql` |
+| 5 Validate | Row count per table — OSPC vs FLEX |
+| 6 Cutover | Update app `DB_HOST` → FLEX, restart services |
+| 7 Cleanup | Remove temp dumps from both sides |
+
+---
+
+**► DB Script Generator — HA DB + Replica**
+
+Self-contained approach — OSPC seeds Flex primary, then Flex builds its own internal HA pair. No ongoing cross-cloud replication.
+
+```
+ OSPC Primary (HA VIP)
+        │
+        │  Phase 7: mysqldump → restore  (OSPC role ends here)
+        ▼
+ Flex Primary
+        │
+        │  Phase 8: internal dump → restore
+        ▼
+ Flex Replica
+        │
+        │  Phase 9: CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP
+        │           START SLAVE → lag monitor → 0
+        ▼
+ Flex internal HA pair ✓  (OSPC decommissioned)
+```
+
+| Phase | OSPC Role | FLEX Role | Action |
+|-------|-----------|-----------|--------|
+| 5 Expose source | HA VIP reachable | No DB yet | TCP:3306 + auth check on all 3 nodes |
+| 6 Verify engines | Version checked | Pri + Rep verified | MySQL version + GTID mode parity |
+| 7 Seed Flex primary | **Role ends here** | Receives full clone | `mysqldump` from OSPC → restore + row-count validate |
+| 8 Bootstrap internal HA | Not involved | Pri seeds Rep | `REPLICATION SLAVE` user on Flex Pri; dump Pri → restore Rep |
+| 9 Start Flex replication | Not involved | Rep follows Pri | `CHANGE MASTER TO FLEX_PRI_IP; START SLAVE`; lag → 0 |
+| 10 Cutover | `read_only=ON` → decommission | Pri = new app endpoint | Repoint `DB_HOST`; 48h stability window |
+
+---
+
+**► Parallel Execution Engine**
+
+| Control | Function |
+|---------|----------|
+| ⚡ Execute in Parallel | Runs the rehost script against all VM pairs simultaneously |
+| Per-VM terminal | One live SSE streaming panel per node |
+| Overview panel | Migration manifest + global status |
+| ⏹ Stop | Cancels all in-flight executions |
+
+> Generating a DB script automatically hides the server output panel and vice versa.
 
 ---
 
 #### Option 2 Phase 3: Kubernetes Replication Manual / Auto
 
-Full K8s migration lifecycle planner with two modes.
+**Method 1 — Full Manual Mode** — step-by-step runbook with live command execution per stage
 
-**Method 1 — Full Manual Mode**
+| Stage | Phase | Action |
+|-------|-------|--------|
+| 1 | Extract | K8s manifests, Helm values, PV specs from OSPC cluster |
+| 2 | Collect | OSPC kubeconfig + cluster state snapshot |
+| 3 | Prepare | FLEX network — subnets, security groups |
+| 4 | Bootstrap | Genestack / OpenCenter on FLEX |
+| 5 | Deploy | Kubernetes on FLEX via Genestack |
+| 6 | Apply | Manifests, Helm charts, ConfigMaps |
+| 7 | Migrate | Persistent volumes — Cinder → FLEX block storage |
+| 8 | Validate | Pods, services, ingress, DNS health checks |
+| 9 | Cutover | DNS switch + traffic redirect to FLEX |
+| 10 | Decommission | OSPC cluster teardown |
 
-Step-by-step runbook with live command execution per stage:
+Lifecycle cards filter the action table by phase group. Each stage has an expandable terminal log panel and file collection tracker. A progress bar tracks overall completion.
 
-| Stage | Description |
-|-------|-------------|
-| 1 | Extract K8s manifests, Helm values, PV specs from OSPC cluster |
-| 2 | Collect OSPC kubeconfig + cluster state |
-| 3 | Prepare FLEX network (subnets, security groups) |
-| 4 | Bootstrap Genestack / OpenCenter on FLEX |
-| 5 | Deploy Kubernetes on FLEX via Genestack |
-| 6 | Apply manifests, Helm charts, ConfigMaps |
-| 7 | Migrate persistent volumes (Cinder → FLEX block storage) |
-| 8 | Validate pods, services, ingress, DNS |
-| 9 | DNS cutover + traffic switch |
-| 10 | Decommission OSPC cluster |
+---
 
-- **Lifecycle cards** — clickable cards filter the action table to show only relevant stage rows
-- **Per-stage log panels** — expandable terminal output per step
-- **File collection tracker** — marks artifact files as collected/pending
-- **Progress bar** — tracks overall K8s migration completion
+**Method 2 — Automated Deployment (Genestack)**
 
-**Method 2 — Automated Deployment**
-
-Genestack / OpenCenter automated deployment table:
-
-- Multi-column command table: step number, what it does, OpenStack/Genestack CLI command (editable textarea), target host, status
-- Each row has a **Run** button — executes the command via SSE streaming and marks status
-- IP injection — Genestack host and jump host IPs auto-fill into all command templates
-- Covers: Genestack bootstrap, Kubernetes cluster creation, namespace setup, Helm chart deployment, PV migration, health checks
+| Feature | Detail |
+|---------|--------|
+| Command table | Step · description · editable CLI command · target host · status |
+| Run button | Each row executes via SSE streaming and auto-marks status |
+| IP injection | Genestack host + jump host IPs auto-fill all command templates |
+| Coverage | Genestack bootstrap → K8s cluster → namespaces → Helm → PV migration → health checks |
 
 ---
 
