@@ -312,12 +312,22 @@ Each imported node shows:
 
 **IP persistence** — OSPC and FLEX IPs are saved to `localStorage` keyed by node name (`node_ospc_ip_<name>`, `node_flex_ip_<name>`) and survive hard refresh. The script generators and parallel executor always read live values from the rendered node cards, not from a static config.
 
-**DB IP resolution** — when a DB script is generated, IPs are pulled from node cards in this priority order:
+**DB IP resolution** — when a DB script is generated, IPs are pulled in this priority order:
 
 ```
-1. card with data-role="db-primary"  →  ospc_custom_ip[] / flex_custom_ip[]
-2. card with data-role="db-replica"  →  ospc_custom_ip[] / flex_custom_ip[]
-3. fallback → source_ip / target_ip form fields
+Single DB (DBaaS via Cloud LB):
+  LB Public IP:  dbaas_lb_ip field (manual override)
+                 → card data-role="db-primary" ospc_custom_ip[]
+                 → mock data fallback
+  Flex DB IP:    card data-role="db-primary" flex_custom_ip[]
+                 → mock data fallback
+
+HA DB + Replica:
+  OSPC HA VIP:   card data-role="db-primary" ospc_custom_ip[]
+  OSPC Replica:  card data-role="db-replica" ospc_custom_ip[]
+  Flex Primary:  card data-role="db-primary" flex_custom_ip[]
+  Flex Replica:  card data-role="db-replica" flex_custom_ip[]
+  Fallback on all: mock data (mock checkbox auto-activates)
 ```
 
 ---
@@ -353,31 +363,45 @@ Two modes selectable before generation:
 
 ---
 
-**► DB Script Generator — Single DB**
+**► DB Script Generator — Single DB (OSPC DBaaS via Cloud Load Balancer)**
+
+OSPC managed DBaaS instances have **no SSH access**. The only public path is via a Rackspace **Cloud Load Balancer** created in the same region, with MySQL (port 3306) and "Accessible on the Public Internet" selected. All dump commands run **locally** on the jumphost — never SSH to the DBaaS host.
 
 ```
- OSPC DB
-    │  mysqldump --single-transaction --master-data=2
-    ▼
- dump.sql.gz
-    │  scp
-    ▼
- FLEX DB
-    │  zcat | mysql
-    ▼
- row-count validate → cutover app config ✓
+ OSPC DBaaS (xxx.rackspaceclouddb.com — private network only, no SSH)
+        │
+        └─► Cloud Load Balancer (public VIP :3306)
+                 │
+                 │  Phase 0: nc -zv LB_IP 3306  +  mysql -h LB_IP auth   [local]
+                 │  Phase 1: mysql -h LB_IP SHOW DATABASES                [local]
+                 │  Phase 2: mysqldump -h LB_IP → local /tmp/*.sql.gz     [local, no SSH to DBaaS]
+                 │
+                 │  Phase 3: scp local dumps → Flex DB VM                 [local → SSH]
+                 │  Phase 4: zcat | mysql restore                         [SSH → Flex]
+                 │  Phase 5: row-count validate (LB vs Flex)              [local + SSH]
+                 │
+                 │  Phase 6: repoint app DB_HOST → Flex IP                [app config]
+                 └─► Phase 7: rm local + Flex dumps · DELETE Cloud LB     [local + SSH + Cloud CP]
 ```
 
-| Phase | Action |
-|-------|--------|
-| 0 Pre-flight | SSH + MySQL reachability, disk space |
-| 1 Discover | `SHOW DATABASES` on OSPC |
-| 2 Dump | `mysqldump` per DB → gzip |
-| 3 Transfer | `scp` to FLEX `/tmp` |
-| 4 Restore | `zcat *.sql.gz \| mysql` |
-| 5 Validate | Row count per table — OSPC vs FLEX |
-| 6 Cutover | Update app `DB_HOST` → FLEX, restart services |
-| 7 Cleanup | Remove temp dumps from both sides |
+**Setup — before running the script:**
+1. Cloud Control Panel → Networking → Load Balancers → **Add External Node** → paste DBaaS hostname, port 3306
+2. Select **"Accessible on the Public Internet"** + **MySQL** protocol
+3. Note the LB public VIP — enter it in the **LB Public IP** field in the UI
+4. Export credentials: `export DBAAS_PASS=yourpassword && export FLEX_ROOT_PASS=yourpassword`
+
+| Phase | Runs on | Action |
+|-------|---------|--------|
+| 0 Pre-flight | Local | `nc -zv LB_IP 3306` + `mysql -h LB_IP` auth + SSH → Flex |
+| 1 Discover | Local | `mysql -h LB_IP SHOW DATABASES` — no SSH to DBaaS |
+| 2 Dump | **Local** | `mysqldump -h LB_IP --single-transaction` per DB → local gzip |
+| 3 Transfer | Local → SSH | `scp` local dumps → Flex DB VM |
+| 4 Restore | SSH → Flex | `zcat *.sql.gz \| mysql` per DB |
+| 5 Validate | Local + SSH | Row counts: `mysql -h LB_IP` vs `ssh Flex mysql` per table |
+| 6 Cutover | App config | Repoint `DB_HOST → FLEX_IP` · delete Cloud LB to freeze DBaaS writes |
+| 7 Cleanup | Local + SSH | `rm` local + Flex dumps · **manual**: delete Cloud LB from Cloud CP |
+
+> **Note:** `--master-data` and `--flush-logs` are omitted — managed DBaaS does not grant the `SUPER` privilege these options require. `--single-transaction` provides consistent read-only snapshot for InnoDB tables.
 
 ---
 
@@ -417,7 +441,7 @@ Self-contained approach — OSPC seeds Flex primary, then Flex builds its own in
 
 | Control | Function |
 |---------|----------|
-| ⚡ Execute in Parallel | Runs the rehost script against all VM pairs simultaneously |
+| ⚡ Execute Server Migration | Runs the rehost script against all VM pairs simultaneously |
 | Per-VM terminal | One live SSE streaming panel per node |
 | Overview panel | Migration manifest + global status |
 | ⏹ Stop | Cancels all in-flight executions |
