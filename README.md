@@ -251,13 +251,74 @@ Interactive canvas for designing the full FLEX target infrastructure before any 
 
 Script generator and parallel execution engine for migrating application servers and databases.
 
-**► Node pairing & mock data**
+**► Node & DB Pairing — How it works**
 
-| Component | Detail |
-|-----------|--------|
-| Node Discovery | Auto-detects OSPC↔FLEX pairs via `data-role` — roles: `server`, `db-primary`, `db-replica` |
-| Mock Pairs Table | Pre-built pairs (3 servers + 1 Single DB + 2 HA DB) for dry-run testing without real nodes |
-| Use Mockup Data | Checkbox — injects mock IPs into both script generators and the parallel executor |
+Pairs are built automatically from the OSPC discovery scan and topology import. No manual IP entry required.
+
+```
+ Stage 1 OSPC Discovery scan
+         │
+         │  topology.json  (nodes: name, group, IP, OS, packages, runtimes)
+         ▼
+ "📥 Import Discovered Topology" button
+         │
+         │  parse topology.json
+         │  assign data-role per node:
+         │    group contains db/mysql/postgres/mariadb  → db-primary
+         │    group contains replica/slave/standby      → db-replica
+         │    everything else                           → server
+         ▼
+ Node cards rendered side by side
+ ┌─────────────────────────┐   ┌──────────────────────────┐
+ │  OSPC source card       │   │  FLEX target card         │
+ │  name, IP, OS, packages │   │  name, FLEX IP (editable) │
+ │  data-role="db-primary" │   │  data-role="db-primary"   │
+ │  data-verified="false"  │   │  data-verified="false"    │
+ └─────────────────────────┘   └──────────────────────────┘
+         │                               │
+         │  SSH connectivity test        │  SSH connectivity test
+         │  packages verified on FLEX    │  border turns green on pass
+         ▼                               ▼
+ data-verified="true"           data-verified="true"
+         │
+         │  script generators read IPs directly from node cards
+         │  parallel executor reads verified pairs into _rehostPairList
+         ▼
+ Scripts generated with real IPs ✓
+```
+
+**Node role assignment logic**
+
+| Node group keyword | Assigned `data-role` | Used by |
+|-------------------|---------------------|---------|
+| `db`, `mysql`, `postgres`, `mariadb`, `data` | `db-primary` | DB script generator — primary IP |
+| `replica`, `slave`, `standby` + any DB keyword | `db-replica` | DB script generator — replica IP |
+| All other nodes | `server` | Server script generator + parallel executor |
+
+**Per-node card details**
+
+Each imported node shows:
+
+| Field | Source |
+|-------|--------|
+| Name | From `topology.json` node name |
+| OSPC IP | Auto-populated from discovery scan; persisted to `localStorage` |
+| OS | Detected OS from OSPC scan (e.g. Ubuntu 22.04, Rocky 9) |
+| Packages | Key packages found on OSPC node (nginx, mysql-server, python3…) |
+| Runtimes | Runtime environments detected (Python, Node.js, Docker, PM2) |
+| FLEX IP | Editable field — operator enters the target FLEX VM IP |
+| Verification | SSH + package check against FLEX IP; border turns 🟢 green on pass, 🔴 red on fail |
+| Force Override | Checkbox to mark a node verified manually (skips SSH check) |
+
+**IP persistence** — OSPC and FLEX IPs are saved to `localStorage` keyed by node name (`node_ospc_ip_<name>`, `node_flex_ip_<name>`) and survive hard refresh. The script generators and parallel executor always read live values from the rendered node cards, not from a static config.
+
+**DB IP resolution** — when a DB script is generated, IPs are pulled from node cards in this priority order:
+
+```
+1. card with data-role="db-primary"  →  ospc_custom_ip[] / flex_custom_ip[]
+2. card with data-role="db-replica"  →  ospc_custom_ip[] / flex_custom_ip[]
+3. fallback → source_ip / target_ip form fields
+```
 
 ---
 
