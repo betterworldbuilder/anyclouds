@@ -1496,26 +1496,26 @@ for DB in $DATABASES; do
 
   echo "│ [OSPC DBaaS] Tables in $DB:"
   TABLES_OSPC=$(mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" -p"$DBAAS_PASS" \
-    -N -B -e "SHOW TABLES IN \`$DB\`;" 2>/dev/null)
+    -N -B -e "SHOW TABLES FROM $DB;" 2>/dev/null)
   echo "$TABLES_OSPC" | sed 's/^/│   /'
 
   FIRST_TABLE=$(echo "$TABLES_OSPC" | head -1)
   if [ -n "$FIRST_TABLE" ]; then
     echo "│ [OSPC DBaaS] Content of first table: $FIRST_TABLE"
     mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" -p"$DBAAS_PASS" \
-      "$DB" -e "SELECT * FROM \`$FIRST_TABLE\` LIMIT 10;" 2>/dev/null | sed 's/^/│   /'
+      "$DB" -e "SELECT * FROM $FIRST_TABLE LIMIT 10;" 2>/dev/null | sed 's/^/│   /'
   fi
 
   echo "│ [Flex DB] Tables in $DB:"
   TABLES_FLEX=$(ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
-    "mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\"SHOW TABLES IN \\\`$DB\\\`;\\"" 2>/dev/null)
+    "mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\"SHOW TABLES FROM $DB;\\"" 2>/dev/null)
   echo "$TABLES_FLEX" | sed 's/^/│   /'
 
   FIRST_TABLE_FLEX=$(echo "$TABLES_FLEX" | head -1)
   if [ -n "$FIRST_TABLE_FLEX" ]; then
     echo "│ [Flex DB] Content of first table: $FIRST_TABLE_FLEX"
     ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" \
-      "mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\" -e \\"SELECT * FROM \\\`$FIRST_TABLE_FLEX\\\` LIMIT 10;\\"" 2>/dev/null | sed 's/^/│   /'
+      "mysql -h 127.0.0.1 -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\" -e \\"SELECT * FROM $FIRST_TABLE_FLEX LIMIT 10;\\"" 2>/dev/null | sed 's/^/│   /'
   fi
 
   echo "└───────────────────────────────────────────────────────────────"
