@@ -5,3 +5,7 @@ python-octaviaclient
 pandas
 openpyxl
 xlrd
+
+# ── System packages (install via apt, not pip) ────────────────────────────────
+# sudo apt-get install -y mysql-client     # required on jumphost for DBaaS migration
+#                                          # (mysqldump + mysql CLI to reach OSPC DBaaS via Cloud LB)
