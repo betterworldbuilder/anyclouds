@@ -1332,6 +1332,25 @@ fi
                     // ── DBaaS single: all source ops run locally via LB ────────
                     const DISCOVER_DBAAS = `
 # ══════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 0a — Ensure mysql client is installed (jumphost + Flex DB)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 0a: Ensure mysql client available ──────────────────────"
+if ! command -v mysql &>/dev/null; then
+  echo "[INFO] mysql not found locally — installing mysql-client on jumphost..."
+  sudo apt-get install -y mysql-client 2>&1 | tail -3
+  command -v mysql &>/dev/null && echo "[OK]   mysql client installed on jumphost" || { echo "[ERR]  mysql client install failed — install manually: sudo apt-get install -y mysql-client"; exit 1; }
+else
+  echo "[OK]   mysql client already present on jumphost ($(mysql --version | head -1))"
+fi
+if ! ssh -i "$SSH_KEY" -o ConnectTimeout=8 "$SSH_USER@$FLEX_IP" 'command -v mysql' &>/dev/null; then
+  echo "[INFO] mysql not found on Flex DB — installing mysql-client..."
+  ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" 'sudo apt-get install -y mysql-client 2>&1 | tail -3'
+  ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_IP" 'command -v mysql' &>/dev/null && echo "[OK]   mysql client installed on Flex DB" || echo "[WARN] mysql install on Flex DB may have failed — continuing"
+else
+  echo "[OK]   mysql client already present on Flex DB"
+fi
+
 # PHASE 0 — Pre-flight: LB TCP + DBaaS auth + Flex SSH
 # (OSPC DBaaS has no SSH — all source checks are via mysql client locally)
 # ══════════════════════════════════════════════════════════════════════
