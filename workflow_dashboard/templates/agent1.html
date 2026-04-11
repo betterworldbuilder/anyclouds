@@ -829,6 +829,18 @@
                         </div>
                     </label>
                     <span style="color:#475569; font-size:0.71rem; flex:1; min-width:160px;">Password embedded in script at generation · leave blank to use <code style="color:#a78bfa;">export DBAAS_PASS=...</code></span>
+                    <span style="color:#94a3b8; font-weight:700; white-space:nowrap; padding-left:10px; border-left:1px solid rgba(124,58,237,0.25);">🖥 Flex DB root</span>
+                    <label style="color:#94a3b8; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+                        Password
+                        <div style="display:flex; align-items:center; gap:0;">
+                            <input type="password" id="flex_root_pass" placeholder="Flex root password"
+                                style="width:140px; padding:4px 8px; font-size:0.78rem; background:rgba(0,0,0,0.3); border:1px solid rgba(124,58,237,0.35); border-radius:5px 0 0 5px; color:#e2e8f0; font-family:'Fira Code',monospace;">
+                            <button type="button" title="Show / hide password"
+                                onclick="(function(btn){const i=btn.previousElementSibling;i.type=i.type==='password'?'text':'password';btn.textContent=i.type==='password'?'👁':'🙈';})(this)"
+                                style="padding:4px 7px; background:rgba(124,58,237,0.2); border:1px solid rgba(124,58,237,0.35); border-left:none; border-radius:0 5px 5px 0; color:#c4b5fd; cursor:pointer; font-size:0.78rem;">👁</button>
+                        </div>
+                    </label>
+                    <span style="color:#475569; font-size:0.71rem;">Flex root pass · leave blank to use <code style="color:#a78bfa;">export FLEX_ROOT_PASS=...</code></span>
                 </div>
 
                 <!-- ── DB Steps tables (full width, toggle by scenario) ───── -->
@@ -1155,8 +1167,9 @@
                     const custName = fv('project_customer_name') || 'customer';
                     // DBaaS-specific inputs (single scenario only)
                     const dbaasUser   = fv('dbaas_user') || 'admin';
-                    const dbaasPass   = fv('dbaas_pass');  // masked password field — embedded in script if set
-                    const dbaasLbOver = fv('dbaas_lb_ip'); // manual LB IP override
+                    const dbaasPass     = fv('dbaas_pass');      // masked password field — embedded in script if set
+                    const flexRootPass  = fv('flex_root_pass'); // Flex DB root password — embedded if set
+                    const dbaasLbOver   = fv('dbaas_lb_ip');   // manual LB IP override
 
                     const useMock = document.getElementById('use-mock-data').checked;
                     const mockScenario = isHA ? 'ha' : 'single';
@@ -1219,7 +1232,7 @@ LOG_FILE="/tmp/db_mig_$(date +%Y%m%d_%H%M%S).log"
 SSH_USER="${sshUser}"
 SSH_KEY="${sshKey}"
 OSPC_ROOT_PASS="\${OSPC_ROOT_PASS:-CHANGE_ME}"
-FLEX_ROOT_PASS="\${FLEX_ROOT_PASS:-CHANGE_ME}"
+FLEX_ROOT_PASS="${flexRootPass ? flexRootPass : `\${FLEX_ROOT_PASS:-CHANGE_ME}`}"${flexRootPass ? '  # embedded from UI' : '  # export FLEX_ROOT_PASS=yourpassword'}
 REPL_USER="replicator"
 REPL_PASS="\${REPL_PASS:-CHANGE_ME}"
 
@@ -1255,9 +1268,9 @@ mysql_dst() { ssh -i "$SSH_KEY" "$SSH_USER@${flexPri}"  "mysql -u root -p\\"$FLE
 #  PREREQUISITES:
 #    1. Cloud LB created in same region as OSPC DBaaS, pointing to the
 #       DBaaS hostname on port 3306, with "Accessible on Public Internet".
-#    2. Export FLEX DB root password before running:
-#         export FLEX_ROOT_PASS=yourpassword
-#${dbaasPass ? '    DBaaS password embedded in script — no DBAAS_PASS export needed.' : '    If DBaaS password not embedded: export DBAAS_PASS=yourpassword'}
+#    2. Export any non-embedded passwords before running:
+#${flexRootPass ? '#       FLEX_ROOT_PASS embedded in script.' : '         export FLEX_ROOT_PASS=yourpassword'}
+#${dbaasPass   ? '#       DBAAS_PASS embedded in script.'      : '         export DBAAS_PASS=yourpassword'}
 # ══════════════════════════════════════════════════════════════════════
 set -uo pipefail
 export DRY_RUN="${DRY}"
@@ -1275,7 +1288,7 @@ DBAAS_PASS="${dbaasPass ? dbaasPass : `\${DBAAS_PASS:-CHANGE_ME}`}"${dbaasPass ?
 SSH_USER="${sshUser}"
 SSH_KEY="${sshKey}"
 FLEX_IP="${flexPri}"                         # Flex DB VM — SSH-accessible
-FLEX_ROOT_PASS="\${FLEX_ROOT_PASS:-CHANGE_ME}" # export FLEX_ROOT_PASS=yourpassword
+FLEX_ROOT_PASS="${flexRootPass ? flexRootPass : `\${FLEX_ROOT_PASS:-CHANGE_ME}`}"${flexRootPass ? '  # embedded from UI' : '  # export FLEX_ROOT_PASS=yourpassword'}
 
 exec > >(tee -a "\$LOG_FILE") 2>&1
 echo "[START] OSPC DBaaS → Flex DB migration — \$(date)"
