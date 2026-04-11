@@ -488,7 +488,7 @@
 
 <div class="panel">
             <h2 class="section-title" style="justify-content: space-between;">
-                <div class="section-title-wrapper">Stage 2: Data Migration for Nodes that pass Stage 1 successfully</div>
+                <div class="section-title-wrapper">Stage 2: OSPC Servers and DBaaS ready for Duplication on FLEX</div>
                 <div style="font-size: 0.95rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 6px;">
                     <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                     <span id="stage2-title-wrapper">Nodes ready for data migration = 0</span>
@@ -544,8 +544,10 @@
             <div style="margin-bottom:28px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
                     <h2 class="section-title" style="margin:0;"><div class="section-title-wrapper">🔗 OSPC → FLEX Node Pairs</div></h2>
-                    <div style="display:flex; gap:10px; align-items:center;">
+                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                         <span id="pair-table-count" style="font-size:0.82rem; color:var(--text-muted);"></span>
+                        <button type="button" onclick="showAddPairModal()" class="secondary"
+                            style="padding:6px 16px; font-size:0.85rem; border-color:#6366f1; color:#818cf8; font-weight:700;">➕ Add Server or DBaaS</button>
                         <button type="button" onclick="buildNodePairTable()" class="secondary" style="padding:6px 16px; font-size:0.85rem;">↻ Refresh Pairs</button>
                         <button type="button" onclick="toggleAllPairs(true)" class="secondary" style="padding:6px 12px; font-size:0.82rem;">✅ All</button>
                         <button type="button" onclick="toggleAllPairs(false)" class="secondary" style="padding:6px 12px; font-size:0.82rem;">☐ None</button>
@@ -574,7 +576,8 @@
                         </thead>
                         <tbody id="node-pair-tbody">
                             <tr><td colspan="10" style="padding:32px; text-align:center; color:var(--text-muted); font-style:italic;">
-                                Run OSPC Discovery and FLEX Discovery first, then click ↻ Refresh Pairs
+                                Click <strong style="color:#818cf8;">➕ Add Server or DBaaS</strong> to add any OSPC/FLEX pair directly —
+                                or run OSPC + FLEX Discovery first, then click ↻ Refresh Pairs to auto-populate from scan results.
                             </td></tr>
                         </tbody>
                     </table>
@@ -671,6 +674,77 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- ── Add Server or DBaaS Modal ──────────────────────────── -->
+            <div id="add-pair-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:9999; align-items:center; justify-content:center;">
+                <div style="background:#0f1726; border:1px solid rgba(99,102,241,0.5); border-radius:14px; padding:28px 32px; width:480px; max-width:90vw; box-shadow:0 24px 64px rgba(0,0,0,0.7); position:relative;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                        <h3 style="color:#e2e8f0; font-size:1rem; margin:0;">➕ Add OSPC → FLEX Pair</h3>
+                        <button type="button" onclick="closeAddPairModal()" style="background:none;border:none;color:#64748b;font-size:1.2rem;cursor:pointer;padding:2px 6px;" title="Close">✕</button>
+                    </div>
+
+                    <!-- Type toggle -->
+                    <div style="margin-bottom:18px;">
+                        <label style="color:#94a3b8; font-size:0.78rem; display:block; margin-bottom:7px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase;">Migration Type</label>
+                        <div style="display:flex; gap:0; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+                            <button type="button" id="modal-type-server" onclick="setModalType('server')"
+                                style="flex:1; padding:9px 0; font-size:0.85rem; font-weight:700; background:rgba(16,185,129,0.2); border:none; color:#6ee7b7; cursor:pointer; border-right:1px solid rgba(255,255,255,0.08);">
+                                🖥️ Server
+                            </button>
+                            <button type="button" id="modal-type-dbaas" onclick="setModalType('dbaas')"
+                                style="flex:1; padding:9px 0; font-size:0.85rem; font-weight:700; background:rgba(255,255,255,0.04); border:none; color:#64748b; cursor:pointer;">
+                                🗄 DBaaS
+                            </button>
+                        </div>
+                        <p id="modal-type-hint" style="margin:7px 0 0; font-size:0.73rem; color:#475569; line-height:1.4;">
+                            Server: runs full rehost clone or quick install script on the target FLEX VM.
+                        </p>
+                    </div>
+
+                    <!-- Name -->
+                    <div style="margin-bottom:14px;">
+                        <label style="color:#94a3b8; font-size:0.78rem; font-weight:600; display:block; margin-bottom:5px;">Name</label>
+                        <input type="text" id="modal-pair-name" placeholder="e.g. web-server-01 or prod-db-main"
+                            style="width:100%; box-sizing:border-box; padding:9px 12px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.15); border-radius:7px; color:#e2e8f0; font-size:0.88rem;">
+                    </div>
+
+                    <!-- OSPC IP -->
+                    <div style="margin-bottom:14px;">
+                        <label id="modal-ospc-label" style="color:#f9a8d4; font-size:0.78rem; font-weight:600; display:block; margin-bottom:5px;">OSPC Public IP</label>
+                        <input type="text" id="modal-ospc-ip" placeholder="e.g. 104.x.x.x"
+                            style="width:100%; box-sizing:border-box; padding:9px 12px; background:rgba(249,168,212,0.07); border:1px solid rgba(249,168,212,0.3); border-radius:7px; color:#e2e8f0; font-family:'Fira Code',monospace; font-size:0.88rem;">
+                    </div>
+
+                    <!-- FLEX IP -->
+                    <div style="margin-bottom:18px;">
+                        <label style="color:#6ee7b7; font-size:0.78rem; font-weight:600; display:block; margin-bottom:5px;">FLEX Public IP</label>
+                        <input type="text" id="modal-flex-ip" placeholder="e.g. 192.168.x.x or FLEX VM IP"
+                            style="width:100%; box-sizing:border-box; padding:9px 12px; background:rgba(110,231,183,0.07); border:1px solid rgba(110,231,183,0.3); border-radius:7px; color:#e2e8f0; font-family:'Fira Code',monospace; font-size:0.88rem;">
+                    </div>
+
+                    <!-- DBaaS extra info -->
+                    <div id="modal-dbaas-extra" style="display:none; margin-bottom:18px; padding:10px 14px; background:rgba(124,58,237,0.08); border:1px solid rgba(124,58,237,0.25); border-radius:8px; font-size:0.77rem; color:#c4b5fd; line-height:1.5;">
+                        <strong>DBaaS note:</strong> OSPC IP = Cloud Load Balancer public VIP (port 3306). No SSH to the DB host — all dump commands run locally on this machine via <code style="color:#a78bfa;">mysqldump -h LB_IP</code>.<br>
+                        Set <code style="color:#a78bfa;">export DBAAS_PASS=yourpassword</code> before running the generated script.
+                        <div style="margin-top:10px;">
+                            <label style="color:#94a3b8; font-weight:600; display:block; margin-bottom:4px;">DBaaS Admin User</label>
+                            <input type="text" id="modal-dbaas-user" value="admin"
+                                style="width:100%; box-sizing:border-box; padding:6px 10px; background:rgba(0,0,0,0.3); border:1px solid rgba(124,58,237,0.35); border-radius:5px; color:#e2e8f0; font-size:0.82rem;">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px; justify-content:flex-end;">
+                        <button type="button" onclick="closeAddPairModal()"
+                            style="padding:9px 22px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#94a3b8; cursor:pointer; font-size:0.88rem;">
+                            Cancel
+                        </button>
+                        <button type="button" onclick="confirmAddPair()"
+                            style="padding:9px 24px; background:linear-gradient(135deg,#6366f1,#4f46e5); border:none; border-radius:8px; color:#fff; cursor:pointer; font-size:0.88rem; font-weight:700;">
+                            ➕ Add Pair
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- ── Script Mode Selector ── -->
@@ -2807,6 +2881,189 @@ echo "       Log           : $LOG_FILE"
         else if (chk === all.length) { hdr.checked = true;  hdr.indeterminate = false; }
         else                    { hdr.checked = false; hdr.indeterminate = true; }
     });
+
+    // ── Add Server or DBaaS modal ────────────────────────────────────────────
+    let _addPairType = 'server';
+
+    window.showAddPairModal = function() {
+        _addPairType = 'server';
+        setModalType('server');
+        document.getElementById('modal-pair-name').value  = '';
+        document.getElementById('modal-ospc-ip').value    = '';
+        document.getElementById('modal-flex-ip').value    = '';
+        document.getElementById('modal-dbaas-user').value = 'admin';
+        const m = document.getElementById('add-pair-modal');
+        m.style.display = 'flex';
+        setTimeout(() => document.getElementById('modal-pair-name').focus(), 60);
+    };
+
+    window.closeAddPairModal = function() {
+        document.getElementById('add-pair-modal').style.display = 'none';
+    };
+
+    // Close on backdrop click
+    document.getElementById('add-pair-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeAddPairModal();
+    });
+
+    window.setModalType = function(type) {
+        _addPairType = type;
+        const sBtn     = document.getElementById('modal-type-server');
+        const dBtn     = document.getElementById('modal-type-dbaas');
+        const hint     = document.getElementById('modal-type-hint');
+        const oLabel   = document.getElementById('modal-ospc-label');
+        const extra    = document.getElementById('modal-dbaas-extra');
+        if (type === 'server') {
+            sBtn.style.background = 'rgba(16,185,129,0.2)';  sBtn.style.color = '#6ee7b7';
+            dBtn.style.background = 'rgba(255,255,255,0.04)'; dBtn.style.color = '#64748b';
+            hint.textContent = 'Server: runs full rehost clone or quick install script on the target FLEX VM.';
+            oLabel.textContent = 'OSPC Public IP';
+            extra.style.display = 'none';
+        } else {
+            dBtn.style.background = 'rgba(124,58,237,0.22)'; dBtn.style.color = '#c4b5fd';
+            sBtn.style.background = 'rgba(255,255,255,0.04)'; sBtn.style.color = '#64748b';
+            hint.textContent = 'DBaaS: accessed via Cloud Load Balancer VIP :3306 — no SSH to the DB host.';
+            oLabel.textContent = 'OSPC Cloud LB Public IP (port 3306)';
+            extra.style.display = 'block';
+        }
+    };
+
+    window.confirmAddPair = function() {
+        const name   = document.getElementById('modal-pair-name').value.trim();
+        const ospcIp = document.getElementById('modal-ospc-ip').value.trim();
+        const flexIp = document.getElementById('modal-flex-ip').value.trim();
+        const dbUser = document.getElementById('modal-dbaas-user').value.trim() || 'admin';
+        if (!name || !ospcIp || !flexIp) {
+            alert('Name, OSPC IP, and FLEX IP are all required.');
+            return;
+        }
+        addMigrationPair(name, _addPairType, ospcIp, flexIp, dbUser);
+        closeAddPairModal();
+    };
+
+    // Enter key confirms modal
+    ['modal-pair-name','modal-ospc-ip','modal-flex-ip','modal-dbaas-user'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') confirmAddPair();
+        });
+    });
+
+    window.addMigrationPair = function(name, type, ospcIp, flexIp, dbaasUser) {
+        const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const tbody = document.getElementById('node-pair-tbody');
+        if (!tbody) return;
+
+        // Remove placeholder row if still present
+        const ph = tbody.querySelector('td[colspan="10"]');
+        if (ph) ph.closest('tr').remove();
+
+        const isDB = (type === 'dbaas');
+        const badge = isDB
+            ? `<span style="display:inline-block;background:rgba(124,58,237,0.2);color:#c4b5fd;border-radius:4px;padding:1px 7px;font-size:0.67rem;font-weight:700;margin-left:5px;">🗄 DBaaS</span>`
+            : `<span style="display:inline-block;background:rgba(16,185,129,0.15);color:#6ee7b7;border-radius:4px;padding:1px 7px;font-size:0.67rem;font-weight:700;margin-left:5px;">🖥️ SERVER</span>`;
+        const ospcSub = isDB
+            ? `<br><span style="color:#64748b;font-size:0.69rem;">Cloud LB VIP :3306</span>` : '';
+
+        const cbId  = `manual_cb_${normalized}_${Date.now()}`;
+        const rowBg = 'rgba(99,102,241,0.05)';
+
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-manual', 'true');
+        tr.setAttribute('data-manual-name', normalized);
+        tr.setAttribute('data-manual-type', type);
+        tr.style.cssText = `background:${rowBg}; border-bottom:1px solid rgba(255,255,255,0.06);`;
+        tr.innerHTML = `
+            <td style="padding:10px 14px; text-align:center;">
+                <input type="checkbox" id="${cbId}"
+                       data-ospc-ip="${ospcIp}" data-flex-ip="${flexIp}"
+                       data-ospc-name="${name}" data-flex-name="${name}-flex"
+                       data-os="Linux" data-type="${type}" checked
+                       style="accent-color:#6366f1; width:16px; height:16px; cursor:pointer;">
+            </td>
+            <td style="padding:10px 14px; color:#f9a8d4; font-weight:600;">${name}${badge}</td>
+            <td style="padding:10px 14px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#e2e8f0;">${ospcIp}${ospcSub}</td>
+            <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">ubuntu@22</td>
+            <td style="padding:10px 8px; text-align:center; color:#6366f1; font-size:1.1rem;">→</td>
+            <td style="padding:10px 14px; color:#6ee7b7; font-weight:600;">${name}-flex</td>
+            <td style="padding:10px 14px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#e2e8f0;">${flexIp}</td>
+            <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">ubuntu@22</td>
+            <td style="padding:10px 14px; font-size:0.78rem; color:#94a3b8;">Linux</td>
+            <td style="padding:10px 14px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="color:#10b981; font-size:0.8rem;">✅ Ready</span>
+                    <button type="button" onclick="removeManualPair('${normalized}', this)"
+                        style="background:none;border:1px solid rgba(239,68,68,0.35);color:#f87171;cursor:pointer;font-size:0.7rem;padding:2px 7px;border-radius:4px;" title="Remove this pair">✕</button>
+                </div>
+            </td>`;
+
+        tbody.appendChild(tr);
+
+        // DBaaS: inject hidden node cards so DB script generator finds the IPs
+        if (isDB) {
+            injectDbNodeCards(normalized, ospcIp, flexIp, dbaasUser || 'admin');
+        }
+
+        updateManualPairCount();
+        // Scroll to show the new row
+        tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    function injectDbNodeCards(normalized, ospcIp, flexIp, dbaasUser) {
+        // Remove any stale cards with the same name first
+        document.querySelectorAll(`.custom-node-group[data-name="${normalized}"]`).forEach(el => el.remove());
+
+        // OSPC card — queried by ipFromCard(..., 'ospc_custom_ip[]') → not(.custom-node-group-s2)
+        const oCard = document.createElement('div');
+        oCard.className = 'node-group custom-node-group';
+        oCard.setAttribute('data-name', normalized);
+        oCard.setAttribute('data-role', 'db-primary');
+        oCard.innerHTML = `<input type="hidden" name="ospc_custom_ip[]" value="${ospcIp}">`;
+        document.getElementById('ospc-custom-fields').appendChild(oCard);
+
+        // FLEX card — queried by ipFromCard(..., 'flex_custom_ip[]') → .custom-node-group-s2
+        const fCard = document.createElement('div');
+        fCard.className = 'node-group custom-node-group custom-node-group-s2';
+        fCard.setAttribute('data-name', normalized);
+        fCard.setAttribute('data-role', 'db-primary');
+        fCard.innerHTML = `<input type="hidden" name="flex_custom_ip[]" value="${flexIp}">`;
+        document.getElementById('flex-custom-fields').appendChild(fCard);
+
+        // Auto-fill the dbaas_lb_ip field if not already set (first DBaaS pair wins)
+        const lbField   = document.getElementById('dbaas_lb_ip');
+        const userField = document.getElementById('dbaas_user');
+        if (lbField   && !lbField.value)   lbField.value   = ospcIp;
+        if (userField && dbaasUser)         userField.value = dbaasUser;
+    }
+
+    window.removeManualPair = function(normalized, btn) {
+        const tr   = btn.closest('tr');
+        const type = tr ? tr.getAttribute('data-manual-type') : null;
+        if (tr) tr.remove();
+        // Clean up hidden DB cards
+        if (type === 'dbaas') {
+            document.querySelectorAll(`.custom-node-group[data-name="${normalized}"]`).forEach(el => el.remove());
+        }
+        updateManualPairCount();
+        // Restore placeholder if tbody is now empty
+        const tbody = document.getElementById('node-pair-tbody');
+        if (tbody && !tbody.querySelector('tr')) {
+            tbody.innerHTML = `<tr><td colspan="10" style="padding:32px; text-align:center; color:var(--text-muted); font-style:italic;">
+                Click <strong style="color:#818cf8;">➕ Add Server or DBaaS</strong> to add any OSPC/FLEX pair directly —
+                or run OSPC + FLEX Discovery first, then click ↻ Refresh Pairs to auto-populate from scan results.
+            </td></tr>`;
+        }
+    };
+
+    function updateManualPairCount() {
+        const tbody   = document.getElementById('node-pair-tbody');
+        const countEl = document.getElementById('pair-table-count');
+        if (!tbody || !countEl) return;
+        const total   = tbody.querySelectorAll('input[type="checkbox"]').length;
+        const checked = tbody.querySelectorAll('input[type="checkbox"]:checked').length;
+        if (total > 0) countEl.textContent = `${checked} selected / ${total} total`;
+        else countEl.textContent = '';
+    }
 
     // ── Rehost mode description ──────────────────────────────────────────────
     const _RH_MODE_DESCS = {
