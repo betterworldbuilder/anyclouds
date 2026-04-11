@@ -21,18 +21,20 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html { overflow-y: auto; }
+
         body {
             font-family: 'Outfit', sans-serif;
             background-color: var(--bg-base);
             color: var(--text-main);
             background-image: radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15), transparent 25%),
                               radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15), transparent 25%);
-            background-attachment: fixed;
             display: flex; justify-content: center;
             padding: 40px 20px; line-height: 1.6;
+            overflow-y: auto;
         }
 
-        .container { max-width: 1200px; width: 100%; display: flex; flex-direction: column; gap: 30px; }
+        .container { max-width: 1560px; width: 100%; display: flex; flex-direction: column; gap: 30px; }
 
         header { text-align: center; margin-bottom: 20px; }
         header h1 {
@@ -70,7 +72,7 @@
 
         label { font-size: 0.9rem; font-weight: 500; color: var(--text-muted); }
 
-        select, input[type="text"], input[type="password"], input[type="number"], textarea {
+        select, input[type="text"], input[type="number"], textarea {
             background: var(--input-bg); border: 1px solid var(--border);
             border-radius: 10px; padding: 12px 16px; color: var(--text-main);
             font-family: 'Fira Code', monospace; font-size: 0.9rem;
@@ -126,14 +128,14 @@
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">OSPC Cloud Credentials</div></h2>
                     <div class="form-group"><label>Username</label><input type="text" id="ospc_cloud_user" placeholder="e.g. admin"></div>
-                    <div class="form-group"><label>API Key / Password</label><input type="password" id="ospc_cloud_key" placeholder="Enter API Key"></div>
+                    <div class="form-group"><label>API Key / Password</label><input type="text" id="ospc_cloud_key" autocomplete="off" placeholder="Enter API Key"></div>
                     <div class="form-group"><label>Account / Project ID</label><input type="text" id="ospc_cloud_account" placeholder="e.g. 123456789"></div>
                 </div>
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">FLEX Cloud Credentials (Keystone v3)</div></h2>
                     <div class="form-group"><label>Auth URL</label><input type="text" id="flex_auth_url" placeholder="e.g. https://keystone.flex.rackspacecloud.com/v3" value="https://keystone.api.dfw3.rackspacecloud.com/v3/"></div>
                     <div class="form-group"><label>Username</label><input type="text" id="flex_cloud_user" placeholder="e.g. dzng.8294" value="dzng.8294"></div>
-                    <div class="form-group"><label>Password</label><input type="password" id="flex_cloud_key" placeholder="Enter Password"></div>
+                    <div class="form-group"><label>Password</label><input type="text" id="flex_cloud_key" autocomplete="off" placeholder="Enter Password"></div>
                     <div class="form-group"><label>Project ID</label><input type="text" id="flex_cloud_account" placeholder="e.g. 20ffb2987a3b..." value="49a2c18a567c402ef560bb0f11821b61"></div>
                     <div class="form-group"><label>Domain</label><input type="text" id="flex_cloud_domain" placeholder="e.g. default" value="rackspace_cloud_domain"></div>
                     <div style="margin-top: 8px;">
@@ -162,7 +164,7 @@
 
                     <div class="form-group"><label>Database Name</label><input type="text" id="ospc_db_name" value="pocdb" required></div>
                     <div class="form-group"><label>Database Admin User</label><input type="text" id="ospc_db_admin" value="postgres" required></div>
-                    <div class="form-group"><label>Database Password</label><input type="password" id="ospc_db_pass" placeholder="(Optional) DB Password"></div>
+                    <div class="form-group"><label>Database Password</label><input type="text" id="ospc_db_pass" autocomplete="off" placeholder="(Optional) DB Password"></div>
                 </div>
                 <div>
                     <h2 class="section-title"><div class="section-title-wrapper">FLEX Server & DB Credentials</div></h2>
@@ -188,7 +190,7 @@
 
                     <div class="form-group"><label>Database Name</label><input type="text" id="flex_db_name" value="pocdb" required></div>
                     <div class="form-group"><label>Database Admin User</label><input type="text" id="flex_db_admin" value="postgres" required></div>
-                    <div class="form-group"><label>Database Password</label><input type="password" id="flex_db_pass" placeholder="(Optional) DB Password"></div>
+                    <div class="form-group"><label>Database Password</label><input type="text" id="flex_db_pass" autocomplete="off" placeholder="(Optional) DB Password"></div>
                 </div>
             </div>
         </div>
@@ -239,12 +241,12 @@
 
             <!-- Resource Tabs -->
             <div id="res-tabs" style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap;">
-                <span class="res-tab active" data-restab="tab-servers" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🖥️ Servers</span>
-                <span class="res-tab" data-restab="tab-stacks" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📦 Stacks</span>
-                <span class="res-tab" data-restab="tab-networking" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🌐 Networking</span>
-                <span class="res-tab" data-restab="tab-storage" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">💾 Storage</span>
-                <span class="res-tab" data-restab="tab-databases" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🗄️ Databases</span>
-                <span class="res-tab" data-restab="tab-backups" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📋 Backups</span>
+                <button type="button" class="res-tab active" data-restab="tab-servers"   onclick="switchResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid #ec4899; transition: all 0.2s; color: #fbcfe8;">🖥️ Servers</button>
+                <button type="button" class="res-tab"        data-restab="tab-stacks"    onclick="switchResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📦 Stacks</button>
+                <button type="button" class="res-tab"        data-restab="tab-networking" onclick="switchResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🌐 Networking</button>
+                <button type="button" class="res-tab"        data-restab="tab-storage"   onclick="switchResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">💾 Storage</button>
+                <button type="button" class="res-tab"        data-restab="tab-databases" onclick="switchResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🗄️ Databases</button>
+                <button type="button" class="res-tab"        data-restab="tab-backups"   onclick="switchResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📋 Backups</button>
             </div>
 
             <!-- TAB: Servers (existing) -->
@@ -380,12 +382,12 @@
                 <!-- FLEX Resource Tabs -->
                 <div id="flex-results-container" style="display: none;">
                     <div id="flex-res-tabs" style="display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap;">
-                        <span class="flex-res-tab active" data-flextab="flex-tab-servers" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🖥️ Servers</span>
-                        <span class="flex-res-tab" data-flextab="flex-tab-stacks" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📦 Stacks</span>
-                        <span class="flex-res-tab" data-flextab="flex-tab-networking" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🌐 Networking</span>
-                        <span class="flex-res-tab" data-flextab="flex-tab-storage" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">💾 Storage</span>
-                        <span class="flex-res-tab" data-flextab="flex-tab-databases" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🗄️ Databases</span>
-                        <span class="flex-res-tab" data-flextab="flex-tab-backups" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📋 Backups</span>
+                        <button type="button" class="flex-res-tab active" data-flextab="flex-tab-servers"    onclick="switchFlexResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid #6ee7b7; transition: all 0.2s; color: #6ee7b7;">🖥️ Servers</button>
+                        <button type="button" class="flex-res-tab"        data-flextab="flex-tab-stacks"     onclick="switchFlexResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📦 Stacks</button>
+                        <button type="button" class="flex-res-tab"        data-flextab="flex-tab-networking" onclick="switchFlexResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🌐 Networking</button>
+                        <button type="button" class="flex-res-tab"        data-flextab="flex-tab-storage"    onclick="switchFlexResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">💾 Storage</button>
+                        <button type="button" class="flex-res-tab"        data-flextab="flex-tab-databases"  onclick="switchFlexResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">🗄️ Databases</button>
+                        <button type="button" class="flex-res-tab"        data-flextab="flex-tab-backups"    onclick="switchFlexResTab(this)" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.2s; color: var(--text-muted);">📋 Backups</button>
                     </div>
 
                     <!-- FLEX TAB: Servers -->
@@ -532,81 +534,998 @@
                 </div>
             </div>
 
-            <div class="form-grid" style="margin-bottom: 30px;">
-                <div>
-                    <h2 class="section-title"><div class="section-title-wrapper">OSPC Source Nodes</div></h2>
-                    <div id="ospc-fields"></div>
-                    <div id="ospc-custom-fields"></div>
+            <!-- Hidden card containers (used by Quick Install generator) -->
+            <div id="ospc-fields" style="display:none"></div>
+            <div id="ospc-custom-fields" style="display:none"></div>
+            <div id="flex-fields" style="display:none"></div>
+            <div id="flex-custom-fields" style="display:none"></div>
+
+            <!-- ── Node Pair Table ── -->
+            <div style="margin-bottom:28px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                    <h2 class="section-title" style="margin:0;"><div class="section-title-wrapper">🔗 OSPC → FLEX Node Pairs</div></h2>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <span id="pair-table-count" style="font-size:0.82rem; color:var(--text-muted);"></span>
+                        <button type="button" onclick="buildNodePairTable()" class="secondary" style="padding:6px 16px; font-size:0.85rem;">↻ Refresh Pairs</button>
+                        <button type="button" onclick="toggleAllPairs(true)" class="secondary" style="padding:6px 12px; font-size:0.82rem;">✅ All</button>
+                        <button type="button" onclick="toggleAllPairs(false)" class="secondary" style="padding:6px 12px; font-size:0.82rem;">☐ None</button>
+                    </div>
                 </div>
-                <div>
-                    <h2 class="section-title">
-                        <div class="section-title-wrapper">FLEX Target Nodes</div>
-                        <button type="button" class="secondary" onclick="addCustomNode()" style="padding: 6px 14px; font-size: 0.9rem;">+ Add Custom Node</button>
-                    </h2>
-                    <div id="flex-fields"></div>
-                    <div id="flex-custom-fields"></div>
+                <div style="overflow-x:auto; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
+                    <table id="node-pair-table" style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+                        <thead>
+                            <tr style="background:rgba(99,102,241,0.12); border-bottom:1px solid rgba(255,255,255,0.1);">
+                                <th style="padding:10px 14px; text-align:center; color:var(--text-muted); width:40px;">
+                                    <input type="checkbox" id="pair-select-all"
+                                        title="Select / deselect all rows"
+                                        style="width:16px; height:16px; cursor:pointer; accent-color:#818cf8;"
+                                        onchange="toggleAllPairs(this.checked)">
+                                </th>
+                                <th style="padding:10px 14px; text-align:left; color:#f9a8d4;">OSPC Server</th>
+                                <th style="padding:10px 14px; text-align:left; color:#f9a8d4;">OSPC IP</th>
+                                <th style="padding:10px 14px; text-align:left; color:#f9a8d4;">SSH</th>
+                                <th style="padding:10px 8px; text-align:center; color:var(--text-muted);">→</th>
+                                <th style="padding:10px 14px; text-align:left; color:#6ee7b7;">FLEX Server</th>
+                                <th style="padding:10px 14px; text-align:left; color:#6ee7b7;">FLEX IP</th>
+                                <th style="padding:10px 14px; text-align:left; color:#6ee7b7;">SSH</th>
+                                <th style="padding:10px 14px; text-align:left; color:var(--text-muted);">OS</th>
+                                <th style="padding:10px 14px; text-align:center; color:var(--text-muted);">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="node-pair-tbody">
+                            <tr><td colspan="10" style="padding:32px; text-align:center; color:var(--text-muted); font-style:italic;">
+                                Run OSPC Discovery and FLEX Discovery first, then click ↻ Refresh Pairs
+                            </td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
+
+            <!-- ── Mock Pairs Preview Table ── -->
+            <div style="margin-top:18px; border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:hidden; font-size:0.82rem;">
+                <!-- Table header bar -->
+                <div style="background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.08); padding:9px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <span style="font-weight:700; color:#94a3b8; letter-spacing:0.06em; font-size:0.75rem; text-transform:uppercase;">📋 Example Migration Pairs — Servers · Single DB · HA DB</span>
+                    <label id="mock-data-label" style="display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; padding:4px 12px; border-radius:6px; border:1px solid rgba(251,191,36,0.7); background:rgba(251,191,36,0.18); transition:background .15s;">
+                        <input type="checkbox" id="use-mock-data" checked style="accent-color:#fbbf24; width:14px; height:14px; cursor:pointer;" onchange="mockDataToggled(this)">
+                        <span style="font-size:0.75rem; font-weight:700; color:#fbbf24;">Use Mockup Data</span>
+                    </label>
+                </div>
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:rgba(0,0,0,0.3);">
+                            <th style="padding:8px 12px; text-align:left; color:#64748b; font-weight:600; white-space:nowrap;">Type</th>
+                            <th style="padding:8px 12px; text-align:left; color:#f9a8d4;">OSPC Node</th>
+                            <th style="padding:8px 12px; text-align:left; color:#f9a8d4;">OSPC IP</th>
+                            <th style="padding:8px 12px; text-align:center; color:#475569;">→</th>
+                            <th style="padding:8px 12px; text-align:left; color:#6ee7b7;">FLEX Node</th>
+                            <th style="padding:8px 12px; text-align:left; color:#6ee7b7;">FLEX IP</th>
+                            <th style="padding:8px 12px; text-align:left; color:#94a3b8;">Role / Script</th>
+                            <th style="padding:8px 12px; text-align:center; color:#94a3b8;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Server rows -->
+                        <tr style="border-top:1px solid rgba(255,255,255,0.05); background:rgba(16,185,129,0.03);">
+                            <td style="padding:8px 12px;"><span style="background:rgba(16,185,129,0.15);color:#6ee7b7;border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:700;">SERVER</span></td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">web-app-01</td>
+                            <td style="padding:8px 12px; color:#f9a8d4; font-family:monospace;">10.10.1.11</td>
+                            <td style="padding:8px 12px; text-align:center; color:#475569;">→</td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">flex-web-01</td>
+                            <td style="padding:8px 12px; color:#6ee7b7; font-family:monospace;">192.168.10.11</td>
+                            <td style="padding:8px 12px; color:#94a3b8;">Quick Install / Rehost Clone</td>
+                            <td style="padding:8px 12px; text-align:center;"><span style="color:#fbbf24; font-size:0.72rem;">⏳ pending</span></td>
+                        </tr>
+                        <tr style="border-top:1px solid rgba(255,255,255,0.05); background:rgba(16,185,129,0.03);">
+                            <td style="padding:8px 12px;"><span style="background:rgba(16,185,129,0.15);color:#6ee7b7;border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:700;">SERVER</span></td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">api-backend-02</td>
+                            <td style="padding:8px 12px; color:#f9a8d4; font-family:monospace;">10.10.1.12</td>
+                            <td style="padding:8px 12px; text-align:center; color:#475569;">→</td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">flex-api-02</td>
+                            <td style="padding:8px 12px; color:#6ee7b7; font-family:monospace;">192.168.10.12</td>
+                            <td style="padding:8px 12px; color:#94a3b8;">Quick Install / Rehost Clone</td>
+                            <td style="padding:8px 12px; text-align:center;"><span style="color:#fbbf24; font-size:0.72rem;">⏳ pending</span></td>
+                        </tr>
+                        <tr style="border-top:1px solid rgba(255,255,255,0.05); background:rgba(16,185,129,0.03);">
+                            <td style="padding:8px 12px;"><span style="background:rgba(16,185,129,0.15);color:#6ee7b7;border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:700;">SERVER</span></td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">cache-redis-03</td>
+                            <td style="padding:8px 12px; color:#f9a8d4; font-family:monospace;">10.10.1.13</td>
+                            <td style="padding:8px 12px; text-align:center; color:#475569;">→</td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">flex-cache-03</td>
+                            <td style="padding:8px 12px; color:#6ee7b7; font-family:monospace;">192.168.10.13</td>
+                            <td style="padding:8px 12px; color:#94a3b8;">Quick Install / Rehost Clone</td>
+                            <td style="padding:8px 12px; text-align:center;"><span style="color:#fbbf24; font-size:0.72rem;">⏳ pending</span></td>
+                        </tr>
+                        <!-- Single DB row -->
+                        <tr style="border-top:2px solid rgba(124,58,237,0.25); background:rgba(124,58,237,0.06);">
+                            <td style="padding:8px 12px;"><span style="background:rgba(124,58,237,0.2);color:#c4b5fd;border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:700;">DB · SINGLE</span></td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">mysql-primary-01</td>
+                            <td style="padding:8px 12px; color:#f9a8d4; font-family:monospace;">10.10.2.20</td>
+                            <td style="padding:8px 12px; text-align:center; color:#475569;">→</td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">flex-db-01</td>
+                            <td style="padding:8px 12px; color:#6ee7b7; font-family:monospace;">192.168.20.20</td>
+                            <td style="padding:8px 12px; color:#c4b5fd;">DB Script — Single<br><span style="color:#64748b;font-size:0.7rem;">dump → restore → cutover</span></td>
+                            <td style="padding:8px 12px; text-align:center;"><span style="color:#fbbf24; font-size:0.72rem;">⏳ pending</span></td>
+                        </tr>
+                        <!-- HA DB rows -->
+                        <tr style="border-top:2px solid rgba(251,146,60,0.25); background:rgba(251,146,60,0.05);">
+                            <td style="padding:8px 12px;"><span style="background:rgba(251,146,60,0.2);color:#fcd34d;border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:700;">HA DB · PRIMARY</span></td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">ha-mysql-pri-01<br><span style="color:#64748b;font-size:0.7rem;">HA VIP: 10.10.2.30</span></td>
+                            <td style="padding:8px 12px; color:#f9a8d4; font-family:monospace;">10.10.2.31</td>
+                            <td style="padding:8px 12px; text-align:center; color:#475569;">→</td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">flex-ha-db-01<br><span style="color:#64748b;font-size:0.7rem;">becomes new primary</span></td>
+                            <td style="padding:8px 12px; color:#6ee7b7; font-family:monospace;">192.168.20.31</td>
+                            <td style="padding:8px 12px; color:#fcd34d;">DB Script — HA<br><span style="color:#64748b;font-size:0.7rem;">expose → seed → replicate → promote</span></td>
+                            <td style="padding:8px 12px; text-align:center;"><span style="color:#fbbf24; font-size:0.72rem;">⏳ pending</span></td>
+                        </tr>
+                        <tr style="border-top:1px solid rgba(251,146,60,0.15); background:rgba(251,146,60,0.03);">
+                            <td style="padding:8px 12px;"><span style="background:rgba(251,146,60,0.1);color:#94a3b8;border-radius:4px;padding:2px 8px;font-size:0.72rem;font-weight:700;">HA DB · REPLICA</span></td>
+                            <td style="padding:8px 12px; color:#f1f5f9; font-family:monospace;">ha-mysql-rep-01<br><span style="color:#64748b;font-size:0.7rem;">OSPC replica (ref only)</span></td>
+                            <td style="padding:8px 12px; color:#f9a8d4; font-family:monospace;">10.10.2.32</td>
+                            <td style="padding:8px 12px; text-align:center; color:#475569;">↗</td>
+                            <td style="padding:8px 12px; color:#6ee7b7; font-family:monospace;">192.168.20.32</td>
+                            <td style="padding:8px 12px; color:#94a3b8; font-family:monospace;">—</td>
+                            <td style="padding:8px 12px; color:#64748b; font-size:0.75rem;">Flex primary (192.168.20.31) seeded from OSPC. Flex internal replica (192.168.20.32) follows Flex primary — OSPC disconnected after seed</td>
+                            <td style="padding:8px 12px; text-align:center;"><span style="color:#fbbf24; font-size:0.72rem;">flex-repl</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             <!-- ── Script Mode Selector ── -->
-            <div style="padding: 18px 0 0 0; border-top: 1px solid var(--border); margin-top: 10px;">
-                <div style="display:flex; justify-content:center; gap:0; margin-bottom:16px;">
-                    <button type="button" id="mode-quick-btn"
-                        onclick="setScriptMode('quick')"
-                        style="padding:10px 28px; font-size:0.92rem; border-radius:8px 0 0 8px; background:rgba(16,185,129,0.85); border:1px solid #10b981; color:#fff; cursor:pointer; font-weight:600;">
-                        📦 Quick Install
-                    </button>
-                    <button type="button" id="mode-rehost-btn"
-                        onclick="setScriptMode('rehost')"
-                        style="padding:10px 28px; font-size:0.92rem; border-radius:0 8px 8px 0; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15); color:#94a3b8; cursor:pointer; font-weight:600;">
-                        🖥️ Full Rehost Clone
-                    </button>
+            <div style="padding: 18px 0 0 0; border-top: 1px solid var(--border); margin-top: 18px;">
+
+                <!-- ── Two-column card layout ─────────────────────────────── -->
+                <div style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center; margin-bottom:16px;">
+
+                    <!-- LEFT: Servers column -->
+                    <div style="flex:1; min-width:270px; max-width:420px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                        <!-- Generate button (top) -->
+                        <button type="button" id="generate-install-btn" style="width:100%;background:linear-gradient(135deg,#10b981,#059669);font-size:1rem;padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                            Generate Installation for Servers
+                        </button>
+                        <!-- Mode toggle below -->
+                        <div style="display:flex; gap:0;">
+                            <button type="button" id="mode-quick-btn" onclick="setScriptMode('quick')"
+                                style="padding:8px 22px; font-size:0.88rem; border-radius:8px 0 0 8px; background:rgba(16,185,129,0.85); border:1px solid #10b981; color:#fff; cursor:pointer; font-weight:600;">
+                                📦 Quick Install
+                            </button>
+                            <button type="button" id="mode-rehost-btn" onclick="setScriptMode('rehost')"
+                                style="padding:8px 22px; font-size:0.88rem; border-radius:0 8px 8px 0; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.15); color:#94a3b8; cursor:pointer; font-weight:600;">
+                                🖥️ Full Rehost Clone
+                            </button>
+                        </div>
+                        <!-- Description under toggle -->
+                        <p id="mode-quick-desc" style="color:var(--text-muted); margin:0; font-size:0.82rem; text-align:center;">
+                            Installs required packages on matched FLEX servers via apt/dnf.
+                        </p>
+                        <p id="mode-rehost-desc" style="display:none; color:var(--text-muted); margin:0; font-size:0.82rem; text-align:center;">
+                            Full 13-layer server clone: audit OSPC source → copy to FLEX target in safe order → validate.
+                        </p>
+                    </div>
+
+                    <!-- RIGHT: DB column -->
+                    <div style="flex:1; min-width:270px; max-width:420px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                        <!-- Generate button (top) -->
+                        <button type="button" id="generate-db-btn" onclick="generateDbScript()"
+                            style="width:100%;background:linear-gradient(135deg,#7c3aed,#6d28d9);font-size:1rem;padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:8px;color:#fff;cursor:pointer;font-weight:700;">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3v2c0 1.657-3.582 3-8 3S4 11.657 4 9V7z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 9v4c0 1.657 3.582 3 8 3s8-1.343 8-3V9"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 13v4c0 1.657 3.582 3 8 3s8-1.343 8-3v-4"/></svg>
+                            <span id="generate-db-btn-label">Generate DB Script — Single</span>
+                        </button>
+                        <!-- Scenario toggle below -->
+                        <div style="display:flex;gap:0;background:rgba(0,0,0,0.4);border:1px solid rgba(124,58,237,0.35);border-radius:8px;overflow:hidden;font-size:0.82rem;font-weight:700;">
+                            <label id="db-sc-single-lbl" title="Single OSPC DB → single Flex DB VM"
+                                style="display:flex;align-items:center;gap:6px;padding:8px 18px;cursor:pointer;background:rgba(124,58,237,0.25);color:#c4b5fd;border-right:1px solid rgba(124,58,237,0.25);transition:background .15s;">
+                                <input type="radio" name="db_scenario" id="db_sc_single" value="single" checked style="display:none;" onchange="dbScenarioChanged()">
+                                🗄 Single DB
+                            </label>
+                            <label id="db-sc-ha-lbl" title="Flex VM as external replica of OSPC primary → promote at cutover"
+                                style="display:flex;align-items:center;gap:6px;padding:8px 18px;cursor:pointer;color:#64748b;transition:background .15s;">
+                                <input type="radio" name="db_scenario" id="db_sc_ha" value="ha" style="display:none;" onchange="dbScenarioChanged()">
+                                🔄 HA DB + Replica
+                            </label>
+                        </div>
+                        <!-- Hint under toggle -->
+                        <div id="db-scenario-hint" style="font-size:0.75rem;color:#8b7cc8;text-align:center;max-width:340px;line-height:1.4;"></div>
+                    </div>
+
+                </div><!-- end two-column -->
+
+                <!-- ── DB Steps tables (full width, toggle by scenario) ───── -->
+                <!-- Single DB steps -->
+                <div id="db-steps-single" style="margin-top:14px; border:1px solid rgba(124,58,237,0.25); border-radius:10px; overflow:hidden; font-size:0.78rem;">
+                    <div style="background:rgba(124,58,237,0.12); border-bottom:1px solid rgba(124,58,237,0.2); padding:7px 14px; font-weight:700; color:#c4b5fd; font-size:0.73rem; letter-spacing:0.06em; text-transform:uppercase;">
+                        🗄 Single DB — Migration Steps
+                    </div>
+                    <div style="overflow-x:auto; overflow-y:auto; max-height:300px;">
+                    <table style="width:100%; border-collapse:collapse; min-width:500px;">
+                        <thead style="position:sticky; top:0; z-index:2;">
+                            <tr style="background:rgba(15,17,26,0.97);">
+                                <th style="padding:6px 10px; text-align:center; color:#64748b; width:36px;">#</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Phase</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8;">Action</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">0</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Pre-flight</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">SSH + MySQL reachability, disk space check</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Both endpoints confirmed live</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Discover</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">SHOW DATABASES</code> on OSPC source</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">DB list ready for loop</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Dump</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">mysqldump --single-transaction --master-data=2</code> per DB → gzip</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Compressed dumps in /tmp</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Transfer</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">scp</code> dumps from OSPC → FLEX</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Dumps arrive on FLEX /tmp</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Restore</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">zcat *.sql.gz | mysql</code> — CREATE DATABASE + import per DB</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX DB populated</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Validate</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Row count comparison OSPC vs FLEX per table</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Counts match — data integrity confirmed</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Cut over</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Update app <code style="color:#a78bfa;">DB_HOST</code> → FLEX IP, restart services</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writes to FLEX DB</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">7</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Cleanup</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Remove temp dumps from OSPC + FLEX <code style="color:#a78bfa;">/tmp</code></td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Migration complete</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
                 </div>
 
-                <!-- Quick Install description -->
-                <p id="mode-quick-desc" style="color:var(--text-muted); margin-bottom:14px; font-size:0.9rem; text-align:center;">
-                    Installs required packages on matched FLEX servers via apt/dnf.
-                </p>
+                <!-- HA DB + Replica steps -->
+                <div id="db-steps-ha" style="display:none; margin-top:14px; border:1px solid rgba(251,146,60,0.25); border-radius:10px; overflow:hidden; font-size:0.78rem;">
+                    <div style="background:rgba(251,146,60,0.1); border-bottom:1px solid rgba(251,146,60,0.2); padding:7px 14px; font-weight:700; color:#fcd34d; font-size:0.73rem; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
+                        🔄 HA DB + Replica — Migration Stages
+                        <span style="font-size:0.68rem; font-weight:500; color:#94a3b8; text-transform:none; letter-spacing:0;">OSPC → seeds → Flex Primary → Flex creates own internal replica (OSPC disconnected after seed)</span>
+                    </div>
+                    <div style="overflow-x:auto; overflow-y:auto; max-height:340px;">
+                    <table style="width:100%; border-collapse:collapse; min-width:760px;">
+                        <thead style="position:sticky; top:0; z-index:2;">
+                            <tr style="background:rgba(15,17,26,0.97);">
+                                <th style="padding:6px 10px; text-align:center; color:#64748b; width:32px;">#</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Stage</th>
+                                <th style="padding:6px 10px; text-align:left; color:#f9a8d4; white-space:nowrap;">OSPC Role</th>
+                                <th style="padding:6px 10px; text-align:left; color:#6ee7b7; white-space:nowrap;">FLEX Role</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8;">Action</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Expose source</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">HA VIP = seed source (port 3306)</td>
+                                <td style="padding:6px 10px; color:#64748b; font-size:0.75rem; font-style:italic;">No DB role yet</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Verify Flex primary can reach OSPC HA VIP:3306 — TCP + root auth check on all 3 nodes</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex primary can connect to OSPC seed source</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Verify engines</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Source version + GTID checked</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex Pri + Flex Rep both verified</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Check MySQL/MariaDB version + GTID mode on OSPC, Flex primary, Flex replica — must match major version</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">All 3 nodes version-compatible</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Seed Flex primary</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Provides dump — role ends here</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex primary receives full clone</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">mysqldump --single-transaction --master-data=2</code> from OSPC HA VIP → restore on Flex primary → row-count validate</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;"><strong style="color:#fb923c;">OSPC disconnected</strong> — Flex primary is now self-contained clone</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Bootstrap internal HA</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex primary seeds Flex replica</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Create <code style="color:#fcd34d;">REPLICATION SLAVE</code> user on Flex primary for Flex replica; dump Flex primary → restore on Flex replica</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex replica seeded and ready to follow Flex primary</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Start Flex replication</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex replica follows Flex primary</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP; START SLAVE</code> on Flex replica — monitor <code style="color:#fcd34d;">Seconds_Behind_Master → 0</code></td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex has its own internal HA pair (no OSPC dependency)</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Cut over</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Set read_only=ON → decommission</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex primary = new app DB endpoint</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Set OSPC read_only=ON; repoint app <code style="color:#fcd34d;">DB_HOST → Flex primary</code>; Flex replica provides HA; 48h stability before OSPC retirement</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex HA pair fully independent — OSPC decommissioned</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </div>
 
-                <!-- Full Rehost options panel -->
+                <!-- Full Rehost options panel (full width, below both columns) -->
                 <div id="mode-rehost-panel" style="display:none; background:rgba(0,0,0,0.25); border:1px solid rgba(99,102,241,0.3); border-radius:10px; padding:16px; margin-bottom:16px;">
                     <p style="color:#a5b4fc; font-weight:600; margin-bottom:12px; font-size:0.92rem;">🖥️ Full Rehost Clone — 13-Layer Options</p>
                     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 24px; margin-bottom:14px; font-size:0.85rem;">
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_identity" checked> 1. Server Identity</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_ssh" checked> 2. SSH &amp; Access</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_users" checked> 3. Users &amp; Permissions</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_disk"> 4. Disk / Mounts <span style="color:#f59e0b;font-size:0.75rem;">⚠ opt-in</span></label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_packages" checked> 5. Packages &amp; Repos</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_kernel" checked> 6. Kernel / Sysctl</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_network"> 7. Network <span style="color:#94a3b8;font-size:0.75rem;">(export only)</span></label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_runtime" checked> 8. Runtime Env</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_appcode" checked> 9. App Code &amp; Config</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_services" checked> 10. Service Units &amp; Cron</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_data"> 11. Data <span style="color:#f59e0b;font-size:0.75rem;">⚠ opt-in</span></label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_tls" checked> 12. TLS &amp; Certs</label>
-                        <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" id="rl_external"> 13. External Deps <span style="color:#94a3b8;font-size:0.75rem;">(audit only)</span></label>
+                        <label title="Copies hostname &amp; timezone from OSPC to FLEX" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_identity" checked> 1. Server Identity</label>
+                        <label title="Copies sshd_config, authorized_keys &amp; sudoers.d to FLEX" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_ssh" checked> 2. SSH &amp; Access</label>
+                        <label title="Recreates system users (UID/GID preserved) &amp; syncs /home/" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_users" checked> 3. Users &amp; Permissions</label>
+                        <label title="AUDIT ONLY — exports lsblk/df/fstab for manual review. No changes made." style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_disk"> 4. Disk / Mounts <span style="color:#f59e0b;font-size:0.75rem;">⚠ audit only</span></label>
+                        <label title="Installs the same apt/rpm packages from OSPC onto FLEX" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_packages" checked> 5. Packages &amp; Repos</label>
+                        <label title="Copies sysctl.conf and security/limits.d settings to FLEX" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_kernel" checked> 6. Kernel / Sysctl</label>
+                        <label title="EXPORT ONLY — saves ip addr/route/netplan. IPs differ on FLEX; apply manually." style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_network"> 7. Network <span style="color:#94a3b8;font-size:0.75rem;">(export only)</span></label>
+                        <label title="Ensures Python, Node.js, Docker, PM2 are present on FLEX to match OSPC" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_runtime" checked> 8. Runtime Env</label>
+                        <label title="Rsyncs /opt/app /srv /var/www and replaces OSPC IPs in config files" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_appcode" checked> 9. App Code &amp; Config</label>
+                        <label title="Transfers systemd unit files, enables same services, copies cron jobs" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_services" checked> 10. Service Units &amp; Cron</label>
+                        <label title="Dumps &amp; restores PostgreSQL/MySQL databases. Opt-in: skipped by default." style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_data"> 11. Data <span style="color:#f59e0b;font-size:0.75rem;">⚠ opt-in</span></label>
+                        <label title="Copies Let's Encrypt certs from OSPC and refreshes CA trust store on FLEX" style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_tls" checked> 12. TLS &amp; Certs</label>
+                        <label title="Scans .env/yml files for external URLs (DB, Redis, APIs). Audit only." style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="rl_external"> 13. External Deps <span style="color:#94a3b8;font-size:0.75rem;">(audit only)</span></label>
                     </div>
-                    <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; border-top:1px solid rgba(255,255,255,0.07); padding-top:12px;">
-                        <label style="display:flex;align-items:center;gap:6px; font-size:0.85rem; color:#fbbf24;">
-                            <input type="checkbox" id="rehost_dry_run" checked> 🔍 DRY RUN (safe — prints commands, no changes applied)
-                        </label>
-                        <div style="flex:1; min-width:260px;">
-                            <label style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:4px;">App paths to clone (space-separated)</label>
-                            <input type="text" id="rehost_app_paths" value="/opt/app /srv /var/www /var/lib/app"
-                                   style="width:100%; font-family:'Fira Code',monospace; font-size:0.82rem;">
+                    <!-- Rehost Execution Controls -->
+                    <div style="border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:16px; margin-top:14px; background:rgba(0,0,0,0.25);">
+                        <div id="rh_mode_title" style="font-size:0.8rem; font-weight:700; color:#a5b4fc; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:12px;">⚡ Rehost Execution Mode <span id="rh_active_badge" style="font-size:0.75rem;font-weight:800;letter-spacing:0.08em;padding:3px 10px;border-radius:20px;margin-left:10px;background:rgba(251,191,36,0.08);color:#fbbf24;border:1px solid rgba(251,191,36,0.4);">🔍 DRY RUN</span></div>
+                        <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:14px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem;">
+                                <input type="radio" name="rh_exec_mode" id="rh_dry_run" checked
+                                    style="accent-color:#fbbf24;" onchange="rhModeChanged()">
+                                <span style="color:#fbbf24;">🔍 Dry Run</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem;">
+                                <input type="radio" name="rh_exec_mode" id="rh_maint"
+                                    style="accent-color:#f97316;" onchange="rhModeChanged()">
+                                <span style="color:#f97316;">🔒 Maint Mode</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem;">
+                                <input type="radio" name="rh_exec_mode" id="rh_cutover"
+                                    style="accent-color:#a78bfa;" onchange="rhModeChanged()">
+                                <span style="color:#a78bfa;">✂️ Cutover Mode</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9rem;">
+                                <input type="radio" name="rh_exec_mode" id="rh_live"
+                                    style="accent-color:#10b981;" onchange="rhModeChanged()">
+                                <span style="color:#10b981;">🟢 Live Mode</span>
+                            </label>
                         </div>
+                        <div id="rh_mode_desc" style="font-size:0.82rem; color:var(--text-muted); background:rgba(255,255,255,0.04); border-radius:6px; padding:10px; border:1px solid rgba(255,255,255,0.06);">
+                            🔍 <strong style="color:#fbbf24;">Dry Run:</strong> Prints every command with <code>[DRY]</code> prefix — zero changes made. Always run this first to verify your IPs and layers.
+                        </div>
+                    </div>
+                    <div style="flex:1; min-width:260px; margin-top:12px;">
+                        <label style="font-size:0.8rem; color:var(--text-muted); display:block; margin-bottom:4px;">App paths to clone (space-separated)</label>
+                        <input type="text" id="rehost_app_paths" value="/opt/app /srv /var/www /var/lib/app"
+                               style="width:100%; font-family:'Fira Code',monospace; font-size:0.82rem;">
                     </div>
                 </div>
 
-                <div style="text-align:center;">
-                    <p id="mode-rehost-desc" style="display:none; color:var(--text-muted); margin-bottom:14px; font-size:0.9rem;">
-                        Full 13-layer server clone: audit OSPC source → copy to FLEX target in safe order → validate.
-                    </p>
-                    <button type="button" id="generate-install-btn" style="background: linear-gradient(135deg, #10b981, #059669); font-size: 1rem; padding: 14px 32px;">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                        Generate Installation Script
-                    </button>
+
+                <script>
+                // ── Mock data IPs (mirrors the table rows) ──────────────────
+                const MOCK_DB = {
+                    single: { ospcPri: '10.10.2.20',  flexPri: '192.168.20.20', ospcRep: '',            flexRep: '' },
+                    ha:     { ospcPri: '10.10.2.30',  flexPri: '192.168.20.31', ospcRep: '10.10.2.32',  flexRep: '192.168.20.32' }
+                    //       ↑ OSPC HA VIP (seed src)  ↑ Flex primary           ↑ OSPC replica (ref)    ↑ Flex internal replica
+                };
+
+                function mockDataToggled(chk) {
+                    const lbl = document.getElementById('mock-data-label');
+                    lbl.style.background = chk.checked ? 'rgba(251,191,36,0.18)' : 'rgba(251,191,36,0.06)';
+                    lbl.style.borderColor = chk.checked ? 'rgba(251,191,36,0.7)' : 'rgba(251,191,36,0.3)';
+                }
+
+                // Scenario selector UI
+                const DB_SC_HINTS = {
+                    single: 'Dump OSPC source → restore to single Flex DB VM → validate row counts → cut over app config.',
+                    ha:     'Clone OSPC HA VIP → Flex primary (dump/restore). Flex primary then seeds its own Flex replica (internal HA pair). OSPC disconnected after seed validates — no ongoing cross-cloud replication.'
+                };
+                function dbScenarioChanged() {
+                    const isHA = document.getElementById('db_sc_ha').checked;
+                    const sLbl = document.getElementById('db-sc-single-lbl');
+                    const hLbl = document.getElementById('db-sc-ha-lbl');
+                    sLbl.style.background = isHA ? 'transparent' : 'rgba(124,58,237,0.25)';
+                    sLbl.style.color      = isHA ? '#64748b'     : '#c4b5fd';
+                    hLbl.style.background = isHA ? 'rgba(124,58,237,0.25)' : 'transparent';
+                    hLbl.style.color      = isHA ? '#c4b5fd'     : '#64748b';
+                    document.getElementById('db-scenario-hint').textContent = isHA ? DB_SC_HINTS.ha : DB_SC_HINTS.single;
+                    document.getElementById('generate-db-btn-label').textContent =
+                        isHA ? 'Generate DB Script — HA + Replica' : 'Generate DB Script — Single';
+                    document.getElementById('db-steps-single').style.display = isHA ? 'none' : 'block';
+                    document.getElementById('db-steps-ha').style.display     = isHA ? 'block' : 'none';
+                }
+                document.addEventListener('DOMContentLoaded', () => dbScenarioChanged());
+                </script>
+
+                <!-- ── DB Script output panel ─────────────────────────────── -->
+                <div id="output-container-db" style="display:none; margin-top:20px; border:1px solid rgba(124,58,237,0.4); border-radius:10px; overflow:hidden;">
+                    <div style="background:rgba(76,29,149,0.35);border-bottom:1px solid rgba(124,58,237,0.3);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <span style="font-weight:700;color:#c4b5fd;font-size:0.88rem;">🗄 Generated DB Dump &amp; Restore Script</span>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+
+                            <!-- DB Dry/Live toggle -->
+                            <div style="display:flex;align-items:center;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:7px;overflow:hidden;font-size:0.78rem;font-weight:700;">
+                                <label id="db-dry-label" title="Print every command — no data moved"
+                                    style="display:flex;align-items:center;gap:4px;padding:5px 11px;cursor:pointer;background:rgba(251,191,36,0.18);color:#fbbf24;border-right:1px solid rgba(255,255,255,0.08);">
+                                    <input type="radio" name="db_exec_mode" id="db_dry_run" value="dry" checked style="display:none;" onchange="dbModeChanged()">
+                                    🔍 Dry Run
+                                </label>
+                                <label id="db-live-label" title="Execute dump + restore for real"
+                                    style="display:flex;align-items:center;gap:4px;padding:5px 11px;cursor:pointer;color:#64748b;">
+                                    <input type="radio" name="db_exec_mode" id="db_live_run" value="live" style="display:none;" onchange="dbModeChanged()">
+                                    ⚡ Live
+                                </label>
+                            </div>
+                            <span id="db-mode-badge" style="font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);">🔍 DRY — no data moved</span>
+
+                            <button id="copy-btn-db" onclick="copyDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">📋 Copy</button>
+                            <button id="download-btn-db" onclick="downloadDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">⬇ Download .sh</button>
+                            <button id="execute-btn-db" onclick="executeDbScript()" class="secondary"
+                                style="padding:6px 14px;font-size:0.82rem;border-color:#7c3aed;color:#c4b5fd;font-weight:700;">🚀 Execute DB Migration</button>
+                            <button id="stop-btn-db" onclick="stopDbScript()" class="secondary"
+                                style="padding:6px 14px;font-size:0.82rem;border-color:#ef4444;color:#ef4444;display:none;">🛑 Stop</button>
+                        </div>
+                    </div>
+                    <pre style="margin:0;max-height:420px;overflow-y:auto;background:#0d0618;"><code id="script-output-db" style="font-family:'Fira Code',monospace;font-size:11.5px;color:#ddd8fe;"></code></pre>
                 </div>
+
+                <!-- DB execution terminal — appears below the script panel on Execute -->
+                <div id="db-terminal-box" style="display:none; margin-top:10px; border:1px solid rgba(124,58,237,0.4); border-radius:10px; overflow:hidden;">
+                    <div style="background:#1a0a2e; border-bottom:2px solid rgba(124,58,237,0.35); padding:10px 16px; display:flex; align-items:center; justify-content:space-between;">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span style="background:#ff5f56;width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+                            <span style="background:#ffbd2e;width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+                            <span style="background:#27c93f;width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+                            <span style="font-family:monospace; font-size:12px; font-weight:700; color:#a78bfa; margin-left:8px;">
+                                🖥 DB Migration Terminal
+                                <span id="db-spinner" style="color:#7c3aed; display:none; margin-left:6px;">&#9679; Running…</span>
+                            </span>
+                        </div>
+                        <button onclick="document.getElementById('db-log-output').textContent=''" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:13px;" title="Clear terminal">🗑️</button>
+                    </div>
+                    <pre id="db-log-output" style="margin:0; padding:14px 18px; height:320px; overflow-y:auto; background:#0b0618; font-family:'Courier New',monospace; font-size:12px; color:#a78bfa; white-space:pre-wrap; line-height:1.6;"></pre>
+                </div>
+
+                <script>
+                // ── DB mode toggle ────────────────────────────────────────────
+                function dbModeChanged() {
+                    const isDry  = document.getElementById('db_dry_run').checked;
+                    const dL = document.getElementById('db-dry-label');
+                    const lL = document.getElementById('db-live-label');
+                    const b  = document.getElementById('db-mode-badge');
+                    if (isDry) {
+                        dL.style.background='rgba(251,191,36,0.18)'; dL.style.color='#fbbf24';
+                        lL.style.background='transparent'; lL.style.color='#64748b';
+                        b.style.background='rgba(251,191,36,0.12)'; b.style.color='#fbbf24';
+                        b.style.borderColor='rgba(251,191,36,0.35)'; b.textContent='🔍 DRY — no data moved';
+                    } else {
+                        lL.style.background='rgba(124,58,237,0.22)'; lL.style.color='#c4b5fd';
+                        dL.style.background='transparent'; dL.style.color='#64748b';
+                        b.style.background='rgba(124,58,237,0.15)'; b.style.color='#c4b5fd';
+                        b.style.borderColor='rgba(124,58,237,0.4)'; b.textContent='⚡ LIVE — data will be moved';
+                    }
+                }
+
+                // ── DB script generator — two scenarios ───────────────────────
+                function generateDbScript() {
+                    const fv = id => (document.getElementById(id)||{value:''}).value.trim();
+                    const isHA    = document.getElementById('db_sc_ha').checked;
+                    const isDry   = document.getElementById('db_dry_run').checked;
+                    const DRY     = isDry ? '1' : '0';
+                    const sshUser = fv('ssh_user')  || 'ubuntu';
+                    const sshKey  = fv('ssh_key_path') || '~/.ssh/id_rsa';
+                    const custName = fv('project_customer_name') || 'customer';
+
+                    const useMock = document.getElementById('use-mock-data').checked;
+                    const mockScenario = isHA ? 'ha' : 'single';
+
+                    let ospcPri, flexPri, ospcRep, flexRep;
+
+                    if (useMock) {
+                        // Use IPs from the mock pairs table
+                        ospcPri = MOCK_DB[mockScenario].ospcPri;
+                        flexPri = MOCK_DB[mockScenario].flexPri;
+                        ospcRep = MOCK_DB[mockScenario].ospcRep || '<OSPC_DB_REPLICA_IP>';
+                        flexRep = MOCK_DB[mockScenario].flexRep || '<FLEX_DB_REPLICA_IP>';
+                    } else {
+                        // Auto-populate IPs from verified DB node cards (data-role="db-primary" / "db-replica")
+                        function ipFromCard(role, inputName) {
+                            const card = document.querySelector(`.custom-node-group-s2[data-role="${role}"]`);
+                            if (!card) return null;
+                            const inp = card.querySelector(`input[name="${inputName}"]`);
+                            return inp ? inp.value.trim() : null;
+                        }
+
+                        ospcPri = ipFromCard('db-primary', 'ospc_custom_ip[]') || fv('source_ip') || '<OSPC_DB_PRIMARY_IP>';
+                        flexPri = ipFromCard('db-primary', 'flex_custom_ip[]') || fv('target_ip') || '<FLEX_DB_PRIMARY_IP>';
+                        ospcRep = ipFromCard('db-replica', 'ospc_custom_ip[]') || fv('source_ip_ha') || '<OSPC_DB_REPLICA_IP>';
+                        flexRep = ipFromCard('db-replica', 'flex_custom_ip[]') || fv('target_ip_ha') || '<FLEX_DB_REPLICA_IP>';
+
+                        // Auto-fallback to mock if IPs are still placeholders
+                        const missingIps = [ospcPri, flexPri].filter(ip => ip.startsWith('<'));
+                        if (missingIps.length) {
+                            // Silently use mock data — no real nodes discovered yet
+                            ospcPri = MOCK_DB[mockScenario].ospcPri;
+                            flexPri = MOCK_DB[mockScenario].flexPri;
+                            ospcRep = MOCK_DB[mockScenario].ospcRep || '<OSPC_DB_REPLICA_IP>';
+                            flexRep = MOCK_DB[mockScenario].flexRep || '<FLEX_DB_REPLICA_IP>';
+                            // Activate the mock checkbox visually
+                            const mockChk = document.getElementById('use-mock-data');
+                            if (mockChk && !mockChk.checked) { mockChk.checked = true; mockDataToggled(mockChk); }
+                        }
+                    }
+
+                    const HEADER = `#!/usr/bin/env bash
+# ══════════════════════════════════════════════════════════════════════
+#  DB MIGRATION  —  OSPC → FLEX  [${isHA ? 'HA + REPLICA' : 'SINGLE DB'}]
+#  Customer : ${custName}
+#  Generated: ${new Date().toISOString()}
+#  Mode     : ${isDry ? 'DRY RUN — no data moved' : 'LIVE — changes will be applied'}
+# ══════════════════════════════════════════════════════════════════════
+set -uo pipefail
+export DRY_RUN="${DRY}"
+
+DUMP_DIR="/tmp/ospc_db_dumps"
+LOG_FILE="/tmp/db_mig_$(date +%Y%m%d_%H%M%S).log"
+SSH_USER="${sshUser}"
+SSH_KEY="${sshKey}"
+OSPC_ROOT_PASS="\${OSPC_ROOT_PASS:-CHANGE_ME}"
+FLEX_ROOT_PASS="\${FLEX_ROOT_PASS:-CHANGE_ME}"
+REPL_USER="replicator"
+REPL_PASS="\${REPL_PASS:-CHANGE_ME}"
+
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "[START] DB migration (${isHA ? 'HA' : 'Single'}) — $(date)"
+
+run_cmd() {
+  local CMD="$1" LABEL="\${2:-cmd}"
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "[DRY]  $LABEL"; echo "       $CMD"; return 0
+  fi
+  echo "[RUN]  $LABEL"
+  eval "$CMD" && echo "[OK]   $LABEL" || { echo "[ERR]  $LABEL (exit $?)"; return 1; }
+}
+
+mysql_src() { ssh -i "$SSH_KEY" "$SSH_USER@$DUMP_SRC" "mysql -u root -p\\"$OSPC_ROOT_PASS\\" $*"; }
+mysql_dst() { ssh -i "$SSH_KEY" "$SSH_USER@${flexPri}"  "mysql -u root -p\\"$FLEX_ROOT_PASS\\" $*"; }
+`;
+
+                    const DISCOVER = `
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 0 — Pre-flight: SSH + MySQL reachability
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 0: Pre-flight ──────────────────────────────────────────"
+run_cmd "ssh -i $SSH_KEY -o ConnectTimeout=8 $SSH_USER@$DUMP_SRC 'echo ok'" "SSH → OSPC dump source"
+run_cmd "ssh -i $SSH_KEY -o ConnectTimeout=8 $SSH_USER@${flexPri} 'echo ok'" "SSH → FLEX primary"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'systemctl is-active mysql mariadb 2>/dev/null | grep -q active'" "MySQL running on dump source"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} 'systemctl is-active mysql mariadb 2>/dev/null | grep -q active'" "MySQL running on FLEX primary"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'df -h /tmp'" "Disk space on dump source"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} 'df -h /tmp'" "Disk space on FLEX"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 1 — Discover databases
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 1: Discover databases ──────────────────────────────────"
+if [ "$DRY_RUN" = "1" ]; then
+  DATABASES="app_db reporting_db sessions_db"
+  echo "[DRY]  Mock DB list: $DATABASES"
+else
+  DATABASES=$(ssh -i "$SSH_KEY" "$SSH_USER@$DUMP_SRC" \\
+    "mysql -u root -p\\"$OSPC_ROOT_PASS\\" -N -B -e \\
+    \\"SHOW DATABASES WHERE \\\`Database\\\` NOT IN \\
+      ('information_schema','performance_schema','mysql','sys');\\"")
+  echo "[INFO] Found: $DATABASES"
+fi
+`;
+
+                    const DUMP = `
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 2 — Dump from source
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 2: Dump databases ──────────────────────────────────────"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'mkdir -p $DUMP_DIR'" "Create dump dir"
+for DB in $DATABASES; do
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC \\
+    'mysqldump -u root -p\\"$OSPC_ROOT_PASS\\" \\
+      --single-transaction --routines --triggers --events \\
+      --master-data=2 --flush-logs \\
+      \\"$DB\\" | gzip > $DUMP_DIR/\\"$DB\\".sql.gz'" \\
+    "Dump $DB"
+done
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'du -sh $DUMP_DIR/*'" "Dump sizes"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 3 — Transfer to FLEX primary
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 3: Transfer dumps → FLEX primary ───────────────────────"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} 'mkdir -p $DUMP_DIR'" "Create dump dir on FLEX"
+for DB in $DATABASES; do
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC \\
+    'scp -i $SSH_KEY -o StrictHostKeyChecking=accept-new \\
+      $DUMP_DIR/\\"$DB\\".sql.gz $SSH_USER@${flexPri}:$DUMP_DIR/'" \\
+    "SCP $DB → FLEX"
+done
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 4 — Restore on FLEX primary
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 4: Restore on FLEX primary ─────────────────────────────"
+for DB in $DATABASES; do
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} \\
+    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"CREATE DATABASE IF NOT EXISTS \\\`$DB\\\`;\\"'" \\
+    "Create DB $DB"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} \\
+    'zcat $DUMP_DIR/\\"$DB\\".sql.gz | mysql -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\"'" \\
+    "Restore $DB"
+done
+`;
+
+                    const VALIDATE_SINGLE = `
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 5 — Validate row counts (OSPC vs FLEX)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 5: Validate ────────────────────────────────────────────"
+for DB in $DATABASES; do
+  echo "[CHECK] $DB"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC \\
+    'mysql -u root -p\\"$OSPC_ROOT_PASS\\" -N -B -e \\
+    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
+      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
+    "Row counts — OSPC $DB"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} \\
+    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
+    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
+      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
+    "Row counts — FLEX $DB"
+done
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 6 — Cut over: update app DB_HOST to FLEX primary
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 6: Cut over ────────────────────────────────────────────"
+echo "[ACTION] Update your application config DB_HOST → ${flexPri}"
+echo "[ACTION] Restart application services to connect to FLEX DB"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SELECT NOW(), @@hostname;\\"'" \\
+  "Confirm FLEX DB is accepting queries"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 7 — Cleanup
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 7: Cleanup temp dumps ──────────────────────────────────"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'rm -rf $DUMP_DIR'" "Remove dumps from source"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} 'rm -rf $DUMP_DIR'" "Remove dumps from FLEX"
+
+echo ""; echo "[DONE] Single DB migration complete — $(date)"
+echo "       Log: $LOG_FILE"
+`;
+
+                    const HA_EXTRA = `
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# HA REPLICATION METHOD: Clone OSPC primary → Flex primary, then
+# Flex builds its OWN internal primary→replica pair (self-contained).
+# OSPC is seeding source only — NO ongoing OSPC→Flex replication.
+#
+# Flow: OSPC Primary ─(dump/restore)─► Flex Primary
+#                                             └─(internal repl)─► Flex Replica
+# Stages: Expose → Verify → Seed → Bootstrap internal → Replicate internal → Cutover
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FLEX_PRI_IP="${flexPri}"    # Flex primary DB (seeded clone of OSPC primary)
+FLEX_REP_IP="${flexRep}"    # Flex internal replica (new VM, Flex-side HA pair)
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 5 — STAGE 1: Expose source / verify Flex can reach OSPC HA VIP
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 5: Expose source — verify Flex primary can reach OSPC HA VIP ──"
+echo "[INFO] OSPC HA VIP (seed source only): $OSPC_HA_VIP  (port 3306)"
+echo "[INFO] Flex primary target            : $FLEX_PRI_IP"
+echo "[INFO] Flex internal replica target   : $FLEX_REP_IP"
+# Verify TCP 3306 reachable from Flex primary to OSPC HA VIP
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP \\
+  'nc -zv $OSPC_HA_VIP 3306 2>&1 | head -2'" \\
+  "TCP 3306 reachable: Flex primary → OSPC HA VIP"
+# Verify MySQL root access on OSPC source
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$OSPC_HA_VIP \\
+  'mysql -u root -p\\"$OSPC_ROOT_PASS\\" -e \\"SELECT 1 AS ospc_reachable;\\"'" \\
+  "MySQL root auth on OSPC HA VIP"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 6 — STAGE 2: Verify engine + version on OSPC, Flex Pri, Flex Rep
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 6: Verify engines — OSPC source + both Flex nodes ──────"
+for NODE_LABEL in "OSPC:$OSPC_HA_VIP:$OSPC_ROOT_PASS" "FLEX-PRI:$FLEX_PRI_IP:$FLEX_ROOT_PASS" "FLEX-REP:$FLEX_REP_IP:$FLEX_ROOT_PASS"; do
+  LABEL=\$(echo "$NODE_LABEL" | cut -d: -f1)
+  IP=\$(echo "$NODE_LABEL" | cut -d: -f2)
+  PASS=\$(echo "$NODE_LABEL" | cut -d: -f3)
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@\$IP \\
+    'mysql -u root -p\\"\$PASS\\" -e \\"SELECT VERSION(), @@version_comment, @@gtid_mode;\\"'" \\
+    "\$LABEL — engine/version/GTID"
+done
+echo "[CHECK] Flex primary and Flex replica must match OSPC major version"
+echo "[CHECK] GTID mode must be consistent across all three nodes"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 7 — STAGE 3: Seed Flex primary from OSPC dump (already done in
+#            DUMP section above) — validate row counts
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 7: Validate seed — row counts OSPC vs Flex primary ─────"
+for DB in $DATABASES; do
+  echo "[CHECK] $DB"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$OSPC_HA_VIP \\
+    'mysql -u root -p\\"$OSPC_ROOT_PASS\\" -N -B -e \\
+    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
+      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
+    "Row counts — OSPC source $DB"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP \\
+    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
+    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
+      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
+    "Row counts — Flex primary $DB (seeded clone)"
+done
+echo "[INFO] OSPC seed role is complete after this step — no further OSPC connection needed"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 8 — STAGE 4: Bootstrap Flex-internal replication
+#            Flex primary → Flex replica (self-contained HA pair)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 8: Bootstrap Flex-internal HA — create repl user on Flex primary ──"
+# Create replication user on Flex primary, allowing Flex replica to connect
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\
+  \\"CREATE USER IF NOT EXISTS \\\\\\"\$REPL_USER\\\\\\"@\\\\\\"$FLEX_REP_IP\\\\\\" IDENTIFIED BY \\\\\\"\$REPL_PASS\\\\\\"; \\
+    GRANT REPLICATION SLAVE ON *.* TO \\\\\\"\$REPL_USER\\\\\\"@\\\\\\"$FLEX_REP_IP\\\\\\"; \\
+    FLUSH PRIVILEGES;\\"'" \\
+  "Flex primary: create replication user → Flex replica"
+
+# Capture current GTID / binlog position on Flex primary (post-restore)
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SHOW MASTER STATUS\\\\G; SHOW VARIABLES LIKE \\'gtid_executed\\';\\"'" \\
+  "Flex primary binlog + GTID position (anchor for Flex replica)"
+
+# Seed Flex replica from Flex primary using a fresh dump (lightweight — delta only)
+echo "[INFO] Seeding Flex replica from Flex primary dump …"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP \\
+  'mysqldump -u root -p\\"$FLEX_ROOT_PASS\\" --all-databases --single-transaction \\
+   --master-data=2 --gtid-mode=on 2>/dev/null | gzip > /tmp/flex_internal_seed.sql.gz'" \\
+  "Dump Flex primary → /tmp/flex_internal_seed.sql.gz"
+run_cmd "scp -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP:/tmp/flex_internal_seed.sql.gz \\
+  $SSH_USER@$FLEX_REP_IP:/tmp/flex_internal_seed.sql.gz" \\
+  "Transfer seed dump → Flex replica"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_REP_IP \\
+  'zcat /tmp/flex_internal_seed.sql.gz | mysql -u root -p\\"$FLEX_ROOT_PASS\\" 2>&1 | tail -5'" \\
+  "Restore seed dump on Flex replica"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 9 — STAGE 5: Start Flex-internal replication
+#            Flex replica follows Flex primary (OSPC not involved)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 9: Start Flex-internal replication — Flex replica → Flex primary ──"
+echo "[INFO] Flex replica will follow Flex primary ($FLEX_PRI_IP) — OSPC is now disconnected"
+
+# Reset any stale state on Flex replica
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_REP_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"STOP SLAVE; RESET SLAVE ALL;\\"'" \\
+  "Reset any stale replication state on Flex replica"
+
+# Point Flex replica at Flex primary using GTID auto-position
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_REP_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\
+  \\"CHANGE MASTER TO \\
+      MASTER_HOST=\\\\\\"$FLEX_PRI_IP\\\\\\", \\
+      MASTER_PORT=3306, \\
+      MASTER_USER=\\\\\\"'\$REPL_USER'\\\\\\", \\
+      MASTER_PASSWORD=\\\\\\"'\$REPL_PASS'\\\\\\", \\
+      MASTER_AUTO_POSITION=1; \\
+    START SLAVE;\\"'" \\
+  "Flex replica: CHANGE MASTER TO Flex primary; START SLAVE"
+
+# Verify Flex replica threads are running
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_REP_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SHOW SLAVE STATUS\\\\G\\"'" \\
+  "Flex replica slave status (IO_Running + SQL_Running must = Yes)"
+
+# Monitor Flex-internal replication lag → 0
+echo ""; echo "[WAIT] Monitoring Flex-internal lag — waiting for Seconds_Behind_Master → 0"
+if [ "$DRY_RUN" != "1" ]; then
+  for i in $(seq 1 12); do
+    LAG=$(ssh -i "$SSH_KEY" "$SSH_USER@$FLEX_REP_IP" \\
+      "mysql -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
+      \\"SHOW SLAVE STATUS\\\\G\\" 2>/dev/null | grep Seconds_Behind_Master | awk '{print \$2}'")
+    echo "[$(date +%H:%M:%S)] Flex replica lag = \${LAG:-unknown}s"
+    [ "\$LAG" = "0" ] && break
+    sleep 30
+  done
+fi
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 10 — STAGE 6: Cutover — repoint app to Flex primary
+#             Flex replica provides internal HA; OSPC is decommissioned
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 10: Cutover ────────────────────────────────────────────"
+echo "[ACTION] ⚠  Confirm Flex-internal Seconds_Behind_Master = 0 before proceeding"
+echo "[ACTION] ⚠  Schedule a maintenance window — brief write pause on app side"
+
+# Freeze writes on OSPC (last chance — app still pointing there)
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$OSPC_HA_VIP \\
+  'mysql -u root -p\\"$OSPC_ROOT_PASS\\" -e \\"SET GLOBAL read_only=ON;\\"'" \\
+  "OSPC: set read_only=ON (drain in-flight writes)"
+
+# Verify Flex primary is writable and ready
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SELECT NOW(), @@hostname, @@read_only;\\"'" \\
+  "Flex primary — confirm read_only=OFF and accepting writes"
+
+# Confirm Flex replica is in sync
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_REP_IP \\
+  'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SHOW SLAVE STATUS\\\\G\\"' | \\
+  grep -E 'Seconds_Behind_Master|Running'" \\
+  "Flex replica final sync check"
+
+echo "[ACTION] Repoint application DB_HOST → $FLEX_PRI_IP  (Flex HA primary)"
+echo "[ACTION] Restart application services — all writes now go to Flex primary"
+echo "[ACTION] Flex replica ($FLEX_REP_IP) provides automatic HA within Flex"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 11 — Cleanup + 48h stability window before OSPC retirement
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 11: Cleanup ────────────────────────────────────────────"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$OSPC_HA_VIP 'rm -rf $DUMP_DIR /tmp/flex_internal_seed.sql.gz'" "Remove dumps from OSPC"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_PRI_IP 'rm -rf $DUMP_DIR /tmp/flex_internal_seed.sql.gz'" "Remove dumps from Flex primary"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_REP_IP 'rm -f /tmp/flex_internal_seed.sql.gz'" "Remove seed dump from Flex replica"
+echo "[NOTE] OSPC ($OSPC_HA_VIP) is now fully disconnected — no ongoing replication to Flex"
+echo "       Decommission OSPC after 48–72h stability window on Flex."
+echo "[NOTE] Flex HA topology: $FLEX_PRI_IP (primary) ←— $FLEX_REP_IP (replica)"
+
+echo ""; echo "[DONE] HA DB migration complete — $(date)"
+echo "       Flex primary  : $FLEX_PRI_IP"
+echo "       Flex replica  : $FLEX_REP_IP"
+echo "       Log           : $LOG_FILE"
+`;
+
+                    // Assemble final script based on scenario
+                    let script;
+                    if (isHA) {
+                        script = HEADER
+                          + `\n# ─────────────────────────────────────────────────────────────────────\n`
+                          + `# Scenario : HA — Clone OSPC → Flex primary, then Flex builds own HA pair\n`
+                          + `# Method   : Expose → Verify → Seed → Bootstrap internal → Replicate internal → Cutover\n`
+                          + `# Dump src : OSPC HA VIP (seed only — disconnected after restore validates)\n`
+                          + `# ─────────────────────────────────────────────────────────────────────\n`
+                          + `OSPC_HA_VIP="${ospcPri}"  # OSPC HA writer endpoint (seed source, port 3306)\n`
+                          + `DUMP_SRC="$OSPC_HA_VIP"   # dump from OSPC primary with --single-transaction\n`
+                          + DISCOVER + DUMP + HA_EXTRA;
+                    } else {
+                        script = HEADER
+                          + `\n# Scenario: Single DB — dump directly from OSPC source\n`
+                          + `DUMP_SRC="${ospcPri}"\n`
+                          + DISCOVER + DUMP + VALIDATE_SINGLE;
+                    }
+
+                    // Hide server panel, show DB panel exclusively
+                    const s1 = document.getElementById('output-container-stage1');
+                    if (s1) s1.style.display = 'none';
+                    const execLogs = document.getElementById('execution-logs-container-stage1');
+                    if (execLogs) execLogs.style.display = 'none';
+
+                    const el = document.getElementById('script-output-db');
+                    el.textContent = script;
+                    el.setAttribute('data-raw', script);
+                    // Reset terminal so it's ready for next execution
+                    const termBox = document.getElementById('db-terminal-box');
+                    const dbLog   = document.getElementById('db-log-output');
+                    if (termBox) termBox.style.display = 'none';
+                    if (dbLog)   dbLog.textContent = '';
+                    document.getElementById('output-container-db').style.display = 'block';
+                    document.getElementById('output-container-db').scrollIntoView({behavior:'smooth'});
+                }
+
+                function copyDbScript() {
+                    const raw = document.getElementById('script-output-db').getAttribute('data-raw') || '';
+                    navigator.clipboard.writeText(raw);
+                    const btn = document.getElementById('copy-btn-db');
+                    const orig = btn.textContent; btn.textContent = '✓ Copied!';
+                    setTimeout(() => btn.textContent = orig, 1400);
+                }
+
+                function downloadDbScript() {
+                    const raw = document.getElementById('script-output-db').getAttribute('data-raw') || '';
+                    const cust = (document.getElementById('project_customer_name')||{value:'customer'}).value.replace(/[^a-z0-9_-]/gi,'_');
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(new Blob([raw], {type:'text/plain'}));
+                    a.download = `${cust}_db_migration.sh`;
+                    a.click();
+                }
+
+                window.executeDbScript = async function() {
+                    const codeEl  = document.getElementById('script-output-db');
+                    const raw     = (codeEl ? codeEl.getAttribute('data-raw') : '') || '';
+                    const execBtn = document.getElementById('execute-btn-db');
+                    const stopBtn = document.getElementById('stop-btn-db');
+                    const spinner = document.getElementById('db-spinner');
+                    const termBox = document.getElementById('db-terminal-box');
+                    const log     = document.getElementById('db-log-output');
+
+                    if (!raw.trim()) { alert('Generate the DB script first'); return; }
+                    if (!termBox || !log) { alert('UI elements missing — reload the page'); return; }
+
+                    if (execBtn) execBtn.style.display = 'none';
+                    if (stopBtn) stopBtn.style.display = 'inline-block';
+                    if (spinner) spinner.style.display = 'inline';
+                    termBox.style.display = 'block';
+                    log.textContent = '';
+                    termBox.scrollIntoView({behavior:'smooth'});
+
+                    const dryEl = document.getElementById('db_dry_run');
+                    const isDry = dryEl ? dryEl.checked : true;
+                    log.textContent += `[${new Date().toLocaleTimeString()}] ▶ Starting DB migration — ${isDry ? 'DRY RUN' : 'LIVE'}\n`;
+
+                    try {
+                        const resp = await fetch('/api/agent1/run/migration', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'text/plain'},
+                            body: raw
+                        });
+                        if (!resp.ok) throw new Error(`Server error ${resp.status}: ${resp.statusText}`);
+                        const reader = resp.body.getReader();
+                        const dec    = new TextDecoder();
+                        while (true) {
+                            const {value, done} = await reader.read();
+                            if (done) break;
+                            log.textContent += dec.decode(value, {stream: true});
+                            log.scrollTop = log.scrollHeight;
+                        }
+                        log.textContent += `\n[${new Date().toLocaleTimeString()}] ✓ DB migration complete`;
+                    } catch(e) {
+                        log.textContent += `\n[ERROR] ${e.message}`;
+                    } finally {
+                        if (execBtn) execBtn.style.display = 'inline-block';
+                        if (stopBtn) stopBtn.style.display = 'none';
+                        if (spinner) spinner.style.display = 'none';
+                    }
+                };
+
+                window.stopDbScript = function() {
+                    fetch('/api/agent1/stop/migration', {method:'POST'}).catch(()=>{});
+                    const execBtn = document.getElementById('execute-btn-db');
+                    const stopBtn = document.getElementById('stop-btn-db');
+                    const spinner = document.getElementById('db-spinner');
+                    const log     = document.getElementById('db-log-output');
+                    if (execBtn) execBtn.style.display = 'inline-block';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    if (spinner) spinner.style.display = 'none';
+                    if (log) log.textContent += '\n[STOPPED by operator]';
+                };
+                </script>
             </div>
 
             <!-- Generated script output -->
@@ -614,19 +1533,55 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h2 class="section-title"><div class="section-title-wrapper">Generated Bash Script</div></h2>
                     <div style="display: flex; gap: 10px;">
-                        <button class="secondary" id="copy-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;">Copy</button>
-                        <button class="secondary" id="download-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;">Download .sh</button>
-                        <button type="button" class="secondary" id="execute-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem; border-color: var(--primary); color: var(--primary);">🚀 Execute Script</button>
-                        <button type="button" class="secondary" id="stop-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem; border-color: #ef4444; color: #ef4444; display: none;">🛑 Stop Script</button>
+
+                        <button class="secondary" id="copy-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;" title="Copy script to clipboard">📋 Copy</button>
+                        <button class="secondary" id="download-btn-stage1" style="padding: 8px 16px; font-size: 0.9rem;" title="Download as .sh file">⬇ Download .sh</button>
+                        <button type="button" class="secondary" id="run-parallel-btn-stage1" onclick="runRehostParallel()" style="padding: 8px 16px; font-size: 0.9rem; border-color: #f59e0b; color: #f59e0b; font-weight:700;">⚡ Execute in Parallel</button>
+                        <button type="button" class="secondary" id="stop-btn-stage1" onclick="fetch('/api/agent1/stop/migration',{method:'POST'}).catch(()=>{})" style="padding: 8px 16px; font-size: 0.9rem; border-color: #ef4444; color: #ef4444; display: none;">🛑 Stop All</button>
                     </div>
                 </div>
                 <pre><code id="script-output-stage1"></code></pre>
             </div>
 
-            <!-- Execution logs -->
-            <div id="execution-logs-container-stage1" style="display: none; margin-top: 10px;">
-                <h2 class="section-title">Execution Logs <span id="exec-spinner-stage1" style="font-size: 0.8rem; margin-left: 10px; color: var(--primary); display: none;">Tracking via API...</span></h2>
-                <pre><code id="live-logs-stage1" style="color: #a5d6ff;">Terminal starting...</code></pre>
+            <!-- Execution logs — multi-terminal parallel output -->
+            <div id="execution-logs-container-stage1" style="display:none; margin-top:10px; border:1px solid #334155; border-radius:10px; overflow:hidden;">
+                <!-- Terminal header bar -->
+                <div style="background:#1e293b; border-bottom:2px solid #334155; padding:10px 20px; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; gap:8px;">
+                        <span style="background:#ff5f56; width:12px; height:12px; border-radius:50%; display:inline-block;"></span>
+                        <span style="background:#ffbd2e; width:12px; height:12px; border-radius:50%; display:inline-block;"></span>
+                        <span style="background:#27c93f; width:12px; height:12px; border-radius:50%; display:inline-block;"></span>
+                    </div>
+                    <span style="flex:1; text-align:center; color:#94a3b8; font-family:monospace; font-size:12px; font-weight:bold; letter-spacing:1px;">
+                        ⚡ Rehost Execution Terminal
+                        <span id="exec-spinner-stage1" style="font-size:0.75rem; color:#3b82f6; display:none; margin-left:8px;">&#9679; Running...</span>
+                    </span>
+                    <button onclick="document.querySelectorAll('.rh1-terminal-panel').forEach(p=>p.innerHTML='')" style="background:transparent; border:none; cursor:pointer; font-size:14px; color:#64748b;" title="Clear all panels">🗑️</button>
+                </div>
+                <!-- Overview / status panel -->
+                <div id="rh1-panels-container" style="max-height:700px; overflow-y:auto; background:#0d1117; padding:10px; display:flex; flex-direction:column; gap:10px; box-sizing:border-box;">
+                    <div id="rh1-panel-overview" class="rh1-terminal-panel" style="min-height:50px; max-height:120px; overflow-y:auto; padding:10px 14px; background:#0b0f19; font-family:'Courier New',monospace; font-size:12px; color:#a5d6ff; word-wrap:break-word; white-space:pre-wrap; display:flex; flex-direction:column; gap:2px; border-radius:6px; border:1px solid #1e293b;">
+                        <div style="color:#475569; font-style:italic;">Generate script then click ⚡ Execute in Parallel to start parallel execution.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report XLS — Rehost -->
+            <div id="report-container-stage1" style="display:none; margin-top:10px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:18px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                    <span style="color:#4ade80; font-weight:700; font-size:0.95rem;">📊 Rehost Migration Report</span>
+                    <div style="display:flex; gap:8px;">
+                        <button id="dl-report-btn-stage1" style="display:none; background:#10b981; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:0.85rem; font-weight:600;">⬇ Download .csv</button>
+                        <button onclick="generateMigrationReport('stage1')" style="background:transparent; border:1px solid #4ade80; color:#4ade80; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:0.85rem;">🔄 Regenerate</button>
+                    </div>
+                </div>
+                <div id="report-timestamp-stage1" style="color:#64748b; font-size:0.8rem; margin-bottom:10px;"></div>
+                <div style="overflow-x:auto;">
+                    <table id="report-table-stage1" style="width:100%; border-collapse:collapse; font-size:0.82rem; font-family:'Fira Code',monospace;">
+                        <thead id="report-thead-stage1" style="background:rgba(0,0,0,0.4);"></thead>
+                        <tbody id="report-tbody-stage1"></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Results table -->
@@ -649,94 +1604,118 @@
                 </div>
             </div>
 
-            <div class="form-grid" id="global-exec-controls" style="margin-bottom: 30px; padding-top: 30px; border-top: 1px solid var(--border); transition: all 1s ease;">
-
-                <div>
-                    <h2 class="section-title"><div class="section-title-wrapper">Global Execution Controls</div></h2>
-                    
-                    <div style="margin-bottom: 20px;">
-                    </div>
-                    
-                    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin-bottom: 15px;">
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="exec_mode" id="radio_dry_run" checked> Dry Run</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="exec_mode" id="radio_maint"> Maint Mode</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="exec_mode" id="radio_svc"> Cutover Mode</label>
-                        <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="exec_mode" id="radio_live"> Live Mode</label>
-                    </div>
-
-                    <details open style="margin-bottom: 20px; background: rgba(0,0,0,0.25); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
-                        <summary style="cursor: pointer; font-weight: 500; color: #a5b4fc; outline: none; margin-bottom: 4px;">📖 How to use these execution controls?</summary>
-                        <div style="font-size: 0.85rem; color: var(--text-muted); padding-top: 10px; line-height: 1.6; border-top: 1px dashed rgba(255,255,255,0.1);">
-                            <p><strong style="color: var(--text-main);">Dry Run:</strong> Builds the final bash script explicitly in mock mode. It aggressively asserts all SSH connections and pre-checks exist, but <b>will not</b> actually stream your production files over `rsync` or do heavy `pg_dump` databases extracts. Always generate your first run with this checked to test your IPs!</p>
-                            <p style="margin-top: 8px;"><strong style="color: var(--text-main);">Maint Mode (DB Locks):</strong> Primarily used for resolving Database-tier delta diffs. Executes your specific <i>App Read-Only CMD</i> string directly on the Source OSPC nodes right before file-syncing begins. Use this to safely lock your Application so that no real web users make new database account creation writes that would otherwise get lost in the transition gap!</p>
-                            <p style="margin-top: 8px;"><strong style="color: var(--text-main);">Cutover Mode (Cold Transfer):</strong> Programs the script to dynamically utilize Linux `systemctl` bindings internally to gracefully <b>stop</b> the Backend API and web nodes on the OSPC platform so that log files and static assets are fully idle and safe to Rsync copy, and then automatically restarts those services on your new FLEX host targets!</p>
-                            <p style="margin-top: 8px;"><strong style="color: #10b981;">🟢 Live Mode (Zero Downtime):</strong> Instructs the script to execute a <b>Hot Transfer</b> where your OSPC source servers stay 100% online without any service interruption! It cleanly bypasses maintenance flags so `rsync` and `pg_dump` natively stream moving data safely. (Recommended for first-pass data bulk syncs).</p>
-                        </div>
-                    </details>
-
-                    <div id="maint-cmds-wrapper" style="display: none; animation: slideUp 0.3s forwards;">
-                        <div class="form-group" style="margin-bottom: 12px;"><label>App Read-Only CMD (Locks active users)</label><input type="text" id="maint_enable_cmd" value="true" placeholder="e.g. touch /tmp/maintenance.flag"></div>
-                        <div class="form-group"><label>App Read-Write CMD (Unlocks users post-sync)</label><input type="text" id="maint_disable_cmd" value="true" placeholder="e.g. rm /tmp/maintenance.flag"></div>
-                    </div>
-
-                    <div id="ab-strategy-container" style="display: none; animation: slideUp 0.3s forwards;">
-                        <h2 class="section-title" style="margin-top: 30px;"><div class="section-title-wrapper">A/B Migration Strategy</div></h2>
-                        <p style="font-size: 0.8rem; color: #94a3b8; margin-top: -10px; margin-bottom: 15px; line-height: 1.5;">Define how incoming live traffic should be balanced during the staging phase.</p>
-                        
-                        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                            <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="ab_mode" id="radio_ab_none" checked onchange="toggleABWrappers()"> No A/B Routing (Standard Cutover)</label>
-                            <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="ab_mode" id="radio_ab_native" onchange="toggleABWrappers()"> Option 1: Append to Existing OSPC Load Balancer (Recommended)</label>
-                            <label style="display:flex; align-items:center; gap:8px;"><input type="radio" name="ab_mode" id="radio_ab_haproxy" onchange="toggleABWrappers()"> Option 2: Inject inline HAProxy Proxy Server</label>
-                        </div>
-
-                        <div id="ab-opt1-wrapper" style="display: none; animation: slideUp 0.3s forwards; padding-left: 20px; border-left: 2px solid #10b981; margin-bottom: 20px;">
-                            <div class="form-group" style="margin-bottom: 12px;"><label>OSPC Load Balancer Admin IP</label><input type="text" id="ab_lb_ip" placeholder="e.g. 10.50.1.100"></div>
-                            <div class="form-group"><label>Initial FLEX Traffic Weight (%)</label><input type="number" id="ab_flex_weight" value="10" min="1" max="100"></div>
-                        </div>
-
-                        <div id="ab-opt2-wrapper" style="display: none; animation: slideUp 0.3s forwards; padding-left: 20px; border-left: 2px solid #ef4444; margin-bottom: 20px;">
-                            <p style="font-size: 0.8rem; color: #ef4444; margin-top: -5px; margin-bottom: 15px;">Warning: This modifies source infrastructure by installing <code>haproxy</code>.</p>
-                            <div class="form-group" style="margin-bottom: 12px;"><label>Target OSPC Proxy Host IP</label><input type="text" id="ab_haproxy_ip" placeholder="e.g. 10.50.1.10"></div>
-                            <div class="form-group"><label>HAProxy Binding Port</label><input type="number" id="ab_haproxy_port" value="80"></div>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h2 class="section-title"><div class="section-title-wrapper">Advanced SSH Routing</div></h2>
-                    <p style="font-size: 0.8rem; color: #94a3b8; font-style: italic; margin-top: -10px; margin-bottom: 20px; line-height: 1.5;">If your Cloud nodes are locked inside a Private VPC without public IPs, providing a Jump Host (e.g. <code style="background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 4px;">user@10.0.0.5</code>) automatically constructs secure nested <code>ssh -J</code> proxy tunnels. Optional Rsync bandwidth limits (KB/s) can be set for peak-hour transfers.</p>
-                    <div class="form-group"><label>OSPC Jump Host (Optional)</label><input type="text" id="ospc_jump_host" placeholder="e.g. juser@10.0.0.5"></div>
-                    <div class="form-group"><label>FLEX Jump Host (Optional)</label><input type="text" id="flex_jump_host" placeholder="e.g. bastion@10.60.0.5"></div>
-                    <div class="form-group"><label>Rsync Bandwidth Limit (KB/s, 0=unlimited)</label><input type="number" id="rsync_bwlimit" value="0"></div>
-                </div>
-            </div>
-            
-            <div class="btn-wrapper">
-                <button type="button" id="generate-btn">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                    Generate DATA Migration Script
-                </button>
-            </div>
         </div>
     </form>
 
     <div class="panel output-panel" id="output-container">
-        <h2 class="section-title" style="justify-content: space-between;">
+        <h2 class="section-title" style="justify-content: space-between; flex-wrap: wrap; gap: 10px;">
             <div class="section-title-wrapper">Stage 2: Generated Bash Script</div>
-            <div style="display: flex; gap: 10px;">
-                <button class="secondary" id="copy-btn" style="padding: 8px 16px; font-size: 0.9rem;">Copy</button>
-                <button class="secondary" id="download-btn" style="padding: 8px 16px; font-size: 0.9rem;">Download .sh</button>
-                <button type="button" class="secondary" id="execute-btn" style="padding: 8px 16px; font-size: 0.9rem; border-color: var(--primary); color: var(--primary);">🚀 Execute Script</button>
-                <button type="button" class="secondary" id="stop-btn" style="padding: 8px 16px; font-size: 0.9rem; border-color: #ef4444; color: #ef4444; display: none;">🛑 Stop Script</button>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+
+                <!-- ── Dry Run / Live toggle ───────────────────────────── -->
+                <div id="s2-exec-mode-toggle" style="display:flex;align-items:center;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.1);border-radius:8px;overflow:hidden;font-size:0.8rem;font-weight:700;letter-spacing:0.04em;">
+                    <label id="s2-dry-label" title="Prints every command with [DRY] prefix — zero changes made. Always run first."
+                        style="display:flex;align-items:center;gap:5px;padding:6px 13px;cursor:pointer;transition:background .15s;background:rgba(251,191,36,0.18);color:#fbbf24;border-right:1px solid rgba(255,255,255,0.08);">
+                        <input type="radio" name="s2_exec_mode" id="s2_dry_run" value="dry" checked
+                            style="display:none;" onchange="s2ModeChanged()">
+                        🔍 Dry Run
+                    </label>
+                    <label id="s2-live-label" title="Live mode — commands execute for real against FLEX. All changes applied."
+                        style="display:flex;align-items:center;gap:5px;padding:6px 13px;cursor:pointer;transition:background .15s;color:#64748b;">
+                        <input type="radio" name="s2_exec_mode" id="s2_live_run" value="live"
+                            style="display:none;" onchange="s2ModeChanged()">
+                        ⚡ Live
+                    </label>
+                </div>
+                <!-- mode hint badge -->
+                <span id="s2-mode-badge" style="font-size:0.72rem;font-weight:700;padding:4px 10px;border-radius:12px;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);white-space:nowrap;">🔍 DRY RUN — no changes</span>
+
+                <button class="secondary" id="copy-btn" style="padding: 8px 16px; font-size: 0.9rem;" title="Copy script to clipboard">📋 Copy</button>
+                <button class="secondary" id="download-btn" style="padding: 8px 16px; font-size: 0.9rem;" title="Download as .sh file">⬇ Download .sh</button>
+                <button type="button" class="secondary" id="execute-btn" style="padding: 8px 16px; font-size: 0.9rem; border-color: var(--primary); color: var(--primary);">⚡ Execute Copy in Parallel</button>
+                <button type="button" class="secondary" id="stop-btn" style="padding: 8px 16px; font-size: 0.9rem; border-color: #ef4444; color: #ef4444; display: none;">🛑 Stop All</button>
             </div>
         </h2>
         <pre><code id="script-output"></code></pre>
     </div>
+
+    <script>
+    // ── Stage 2 Dry Run / Live mode toggle ───────────────────────────────────
+    function s2ModeChanged() {
+        const isDry = document.getElementById('s2_dry_run').checked;
+        const dryLbl  = document.getElementById('s2-dry-label');
+        const liveLbl = document.getElementById('s2-live-label');
+        const badge   = document.getElementById('s2-mode-badge');
+
+        if (isDry) {
+            dryLbl.style.background  = 'rgba(251,191,36,0.18)';
+            dryLbl.style.color       = '#fbbf24';
+            liveLbl.style.background = 'transparent';
+            liveLbl.style.color      = '#64748b';
+            badge.style.background   = 'rgba(251,191,36,0.12)';
+            badge.style.color        = '#fbbf24';
+            badge.style.borderColor  = 'rgba(251,191,36,0.35)';
+            badge.textContent        = '🔍 DRY RUN — no changes';
+        } else {
+            liveLbl.style.background = 'rgba(16,185,129,0.18)';
+            liveLbl.style.color      = '#10b981';
+            dryLbl.style.background  = 'transparent';
+            dryLbl.style.color       = '#64748b';
+            badge.style.background   = 'rgba(16,185,129,0.12)';
+            badge.style.color        = '#10b981';
+            badge.style.borderColor  = 'rgba(16,185,129,0.4)';
+            badge.textContent        = '⚡ LIVE — changes will be applied';
+        }
+        // keep existing rh_dry_run radio in sync so execute-btn handler still works
+        const rhDry  = document.getElementById('rh_dry_run');
+        const rhLive = document.getElementById('rh_live');
+        if (rhDry && rhLive) {
+            if (isDry) { rhDry.checked = true; } else { rhLive.checked = true; }
+            if (typeof rhModeChanged === 'function') rhModeChanged();
+        }
+    }
+    // init on load
+    document.addEventListener('DOMContentLoaded', () => s2ModeChanged());
+    </script>
     
-    <div class="panel output-panel" id="execution-logs-container" style="display: none; margin-top: 30px; border-color: var(--primary);">
-        <h2 class="section-title">Stage 2: Execution Logs <span id="exec-spinner" style="font-size: 0.8rem; margin-left: 10px; color: var(--primary);">Tracking via API...</span></h2>
-        <pre><code id="live-logs" style="color: #a5d6ff;">Terminal starting...</code></pre>
+    <div class="panel output-panel" id="execution-logs-container" style="display: none; margin-top: 30px; border-color: var(--primary); padding:0; overflow:hidden;">
+        <!-- Terminal header -->
+        <div style="background:#1e293b; border-bottom:2px solid #334155; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <div style="display:flex; gap:8px;">
+                <span style="background:#ff5f56; width:12px; height:12px; border-radius:50%; display:inline-block;"></span>
+                <span style="background:#ffbd2e; width:12px; height:12px; border-radius:50%; display:inline-block;"></span>
+                <span style="background:#27c93f; width:12px; height:12px; border-radius:50%; display:inline-block;"></span>
+            </div>
+            <span style="flex:1; text-align:center; color:#94a3b8; font-family:monospace; font-size:12px; font-weight:bold; letter-spacing:1px;">⚡ Parallel Rehost Terminal <span id="exec-spinner" style="font-size:0.75rem; color:#3b82f6; display:none;">&#9679; Running...</span></span>
+            <button onclick="document.querySelectorAll('.rh-terminal-panel').forEach(p=>p.innerHTML='')" style="background:transparent; border:none; cursor:pointer; font-size:14px; color:#64748b;" title="Clear all panels">🗑️</button>
+        </div>
+        <!-- Stacked terminals column: overview + one block per node -->
+        <div id="rh-panels-container" style="max-height:680px; overflow-y:auto; background:#0d1117; flex:1; padding:10px; display:flex; flex-direction:column; gap:10px; box-sizing:border-box;">
+            <!-- Overview / manifest panel (always at top) -->
+            <div id="rh-panel-overview" class="rh-terminal-panel" style="min-height:60px; max-height:150px; overflow-y:auto; overflow-x:hidden; padding:12px 16px; background:#0b0f19; font-family:'Courier New',monospace; font-size:12px; color:#a5d6ff; word-wrap:break-word; word-break:break-all; white-space:pre-wrap; display:flex; flex-direction:column; gap:3px; box-sizing:border-box; border-radius:6px; border:1px solid #1e293b;">
+                <div style="color:#475569; font-style:italic;">Select nodes then click "🚀 Execute Script" to start parallel migrations.</div>
+            </div>
+        </div>
     </div>
     
+    <!-- Report XLS — Batch Engine -->
+    <div class="panel output-panel" id="report-container-stage2" style="display:none; margin-top:20px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.3);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <span style="color:#4ade80; font-weight:700; font-size:0.95rem;">📊 Migration Report</span>
+            <div style="display:flex; gap:8px;">
+                <button id="dl-report-btn-stage2" style="display:none; background:#10b981; color:#fff; border:none; border-radius:6px; padding:6px 16px; cursor:pointer; font-size:0.85rem; font-weight:600;">⬇ Download .csv</button>
+                <button onclick="generateMigrationReport('stage2')" style="background:transparent; border:1px solid #4ade80; color:#4ade80; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:0.85rem;">🔄 Regenerate</button>
+            </div>
+        </div>
+        <div id="report-timestamp-stage2" style="color:#64748b; font-size:0.8rem; margin-bottom:10px;"></div>
+        <div style="overflow-x:auto;">
+            <table id="report-table-stage2" style="width:100%; border-collapse:collapse; font-size:0.82rem; font-family:'Fira Code',monospace;">
+                <thead id="report-thead-stage2" style="background:rgba(0,0,0,0.4);"></thead>
+                <tbody id="report-tbody-stage2"></tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="panel output-panel" id="results-table-container" style="display: none; margin-top: 30px; border-color: var(--secondary);">
         <h2 class="section-title">
             <div class="section-title-wrapper">Stage 2: Live Migration Results</div>
@@ -1242,8 +2221,19 @@
                 let sService = normalized;
                 let groupLower = (node.group || '').toLowerCase();
                 if(groupLower.includes("nginx") || groupLower.includes("reverse-proxy")) { sPath = "/etc/nginx"; sService = "nginx"; }
-                if(groupLower.includes("db") || groupLower.includes("mysql") || groupLower.includes("postgres")) { sPath = "/var/lib"; }
+                if(groupLower.includes("db") || groupLower.includes("mysql") || groupLower.includes("postgres") || groupLower.includes("mariadb")) { sPath = "/var/lib/mysql"; sService = "mysql"; }
                 if(groupLower.includes("redis") || groupLower.includes("cache")) { sPath = "/var/lib/redis"; sService = "redis-server"; }
+
+                // ── DB role detection ────────────────────────────────────────
+                const isDbNode = groupLower.includes("db") || groupLower.includes("mysql") ||
+                                 groupLower.includes("postgres") || groupLower.includes("mariadb") ||
+                                 groupLower.includes("database");
+                const isDbReplica = isDbNode && (
+                                 rawName.toLowerCase().includes("replica") ||
+                                 rawName.toLowerCase().includes("slave") ||
+                                 rawName.toLowerCase().includes("-rep") ||
+                                 rawName.toLowerCase().includes("secondary"));
+                const dbRole = !isDbNode ? 'server' : isDbReplica ? 'db-replica' : 'db-primary';
                 
                 let defaultUser = 'root';
                 let osLower = (node.os || '').toLowerCase();
@@ -1324,7 +2314,7 @@
                     </div>`;
 
                 let fHtml = `
-                    <div class="node-group custom-node-group custom-node-group-s2" style="border: 2px solid #ef4444; transition: border-color 0.3s;" data-name="${normalized}" data-verified="false">
+                    <div class="node-group custom-node-group custom-node-group-s2" style="border: 2px solid #ef4444; transition: border-color 0.3s;" data-name="${normalized}" data-verified="false" data-role="${dbRole}">
                         <h3>${rawName} Target</h3>
                         <div class="form-group" style="margin-bottom: 15px; margin-top: -5px;">
                             <label style="color: #a5b4fc; font-size: 0.8rem;">Required Run-time Environment for Data Sync</label>
@@ -1523,6 +2513,162 @@
         if (val) showToast(`🔑 Keypair "${val}" applied to all FLEX nodes`);
     };
 
+    // ── Node Pair Table ──────────────────────────────────────────────────────
+    function resolveUser(osStr) {
+        const s = (osStr||'').toLowerCase();
+        if (s.includes('rocky'))  return 'rocky';
+        if (s.includes('alma'))   return 'almalinux';
+        if (s.includes('debian')) return 'debian';
+        if (s.includes('centos')) return 'centos';
+        if (s.includes('rhel') || s.includes('amazon')) return 'ec2-user';
+        return 'ubuntu';
+    }
+
+    window.buildNodePairTable = function() {
+        const tbody = document.getElementById('node-pair-tbody');
+        const countEl = document.getElementById('pair-table-count');
+        if (!tbody) return;
+
+        // Read OSPC discovery table
+        const ospcMap = {};
+        document.querySelectorAll('#stage1-results-body tr').forEach(tr => {
+            const tds = tr.querySelectorAll('td');
+            if (tds.length < 2) return;
+            const name = tds[0].textContent.trim();
+            const ip   = tds[1].textContent.trim();
+            const os   = tds[2] ? tds[2].textContent.trim() : '';
+            if (name && ip && ip !== '—') {
+                const key = name.toLowerCase().replace(/[\s_-]/g, '');
+                if (!ospcMap[key]) ospcMap[key] = { name, ip, os };
+            }
+        });
+
+        // Read FLEX discovery table
+        const flexMap = {};
+        document.querySelectorAll('#flex-res-servers-body tr').forEach(tr => {
+            const tds = tr.querySelectorAll('td');
+            if (tds.length < 2) return;
+            const name = tds[0].textContent.trim();
+            const ip   = tds[1].textContent.trim();
+            if (name) {
+                const key = name.toLowerCase().replace(/[\s_-]/g, '');
+                if (!flexMap[key]) flexMap[key] = { name, ip: (ip === 'N/A' ? '' : ip) };
+            }
+        });
+
+        const rows = [];
+        const seen = new Set();
+
+        Object.values(ospcMap).forEach(ospc => {
+            const key  = ospc.name.toLowerCase().replace(/[\s_-]/g, '');
+            const flex = flexMap[key];
+            const flexName = flex ? flex.name : '—';
+            const flexIp   = flex ? flex.ip   : '';
+            const dedup    = flexIp || ospc.name;
+            if (seen.has(dedup)) return;
+            seen.add(dedup);
+            const sshUser = resolveUser(ospc.os);
+            const hasMatch = !!(flex && flexIp);
+            rows.push({ ospc, flexName, flexIp, sshUser, hasMatch });
+        });
+
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="padding:32px; text-align:center; color:var(--text-muted); font-style:italic;">
+                No discovery data found — run OSPC Discovery and FLEX Discovery first.
+            </td></tr>`;
+            if (countEl) countEl.textContent = '';
+            return;
+        }
+
+        const matched = rows.filter(r => r.hasMatch).length;
+        if (countEl) countEl.textContent = `${matched} matched / ${rows.length} total`;
+
+        tbody.innerHTML = rows.map((r, i) => {
+            const rowBg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+            const statusHtml = r.hasMatch
+                ? `<span style="color:#10b981; font-size:0.8rem;">✅ Ready</span>`
+                : `<span style="color:#f87171; font-size:0.8rem;">⚠ No FLEX IP</span>`;
+            const checkDisabled = !r.hasMatch ? 'disabled' : '';
+            return `<tr style="background:${rowBg}; border-bottom:1px solid rgba(255,255,255,0.04); transition:background 0.15s;"
+                         onmouseover="this.style.background='rgba(99,102,241,0.07)'"
+                         onmouseout="this.style.background='${rowBg}'">
+                <td style="padding:10px 14px; text-align:center;">
+                    <input type="checkbox" id="pair_cb_${i}" data-ospc-ip="${r.ospc.ip}" data-flex-ip="${r.flexIp}"
+                           data-ospc-name="${r.ospc.name}" data-flex-name="${r.flexName}" data-os="${r.ospc.os}"
+                           ${r.hasMatch ? 'checked' : ''} ${checkDisabled}
+                           style="accent-color:#6366f1; width:16px; height:16px; cursor:pointer;">
+                </td>
+                <td style="padding:10px 14px; color:#f9a8d4; font-weight:600;">${r.ospc.name}</td>
+                <td style="padding:10px 14px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#e2e8f0;">${r.ospc.ip}</td>
+                <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">${r.sshUser}@22</td>
+                <td style="padding:10px 8px; text-align:center; color:#6366f1; font-size:1.1rem;">→</td>
+                <td style="padding:10px 14px; color:#6ee7b7; font-weight:600;">${r.flexName}</td>
+                <td style="padding:10px 14px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#e2e8f0;">${r.flexIp || '<span style="color:#64748b;">N/A</span>'}</td>
+                <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">${r.flexIp ? r.sshUser+'@22' : '—'}</td>
+                <td style="padding:10px 14px; font-size:0.78rem; color:#94a3b8;">${r.ospc.os || 'Linux'}</td>
+                <td style="padding:10px 14px; text-align:center;">${statusHtml}</td>
+            </tr>`;
+        }).join('');
+    };
+
+    window.toggleAllPairs = function(checked) {
+        document.querySelectorAll('#node-pair-tbody input[type="checkbox"]:not(:disabled)')
+            .forEach(cb => { cb.checked = checked; });
+        // sync header checkbox
+        const hdr = document.getElementById('pair-select-all');
+        if (hdr) { hdr.checked = checked; hdr.indeterminate = false; }
+    };
+
+    // Keep header checkbox in sync when individual rows are toggled
+    document.addEventListener('change', function(e) {
+        if (!e.target.matches('#node-pair-tbody input[type="checkbox"]')) return;
+        const all  = [...document.querySelectorAll('#node-pair-tbody input[type="checkbox"]:not(:disabled)')];
+        const chk  = all.filter(cb => cb.checked).length;
+        const hdr  = document.getElementById('pair-select-all');
+        if (!hdr) return;
+        if (chk === 0)          { hdr.checked = false; hdr.indeterminate = false; }
+        else if (chk === all.length) { hdr.checked = true;  hdr.indeterminate = false; }
+        else                    { hdr.checked = false; hdr.indeterminate = true; }
+    });
+
+    // ── Rehost mode description ──────────────────────────────────────────────
+    const _RH_MODE_DESCS = {
+        rh_dry_run : '🔍 <strong style="color:#fbbf24;">Dry Run:</strong> Prints every command with <code>[DRY]</code> prefix — zero changes made. Always run first to verify IPs and layers.',
+        rh_maint   : '🔒 <strong style="color:#f97316;">Maint Mode:</strong> Stops application services on OSPC source before syncing, ensuring a consistent final state copy.',
+        rh_cutover : '✂️ <strong style="color:#a78bfa;">Cutover Mode:</strong> Full stop of OSPC services → rsync → restart on FLEX. Use for final cutover with a short maintenance window.',
+        rh_live    : '🟢 <strong style="color:#10b981;">Live Mode (Zero Downtime):</strong> Source stays 100%% online. rsync runs live. All Phase 2 commands execute on FLEX — <strong>changes will be applied!</strong>',
+    };
+    window.rhModeChanged = function() {
+        const desc  = document.getElementById('rh_mode_desc');
+        const badge = document.getElementById('rh_active_badge');
+        const panel = document.getElementById('rh_mode_title') ?
+                      document.getElementById('rh_mode_title').closest('div[style*="border:1px"]') : null;
+        const modes = {
+            rh_dry_run : { color:'#fbbf24', bg:'rgba(251,191,36,0.08)',  border:'rgba(251,191,36,0.4)',  badge:'🔍 DRY RUN'  },
+            rh_maint   : { color:'#f97316', bg:'rgba(249,115,22,0.08)',  border:'rgba(249,115,22,0.4)',  badge:'🔒 MAINT'     },
+            rh_cutover : { color:'#a78bfa', bg:'rgba(167,139,250,0.08)', border:'rgba(167,139,250,0.4)', badge:'✂️ CUTOVER'  },
+            rh_live    : { color:'#10b981', bg:'rgba(16,185,129,0.1)',   border:'rgba(16,185,129,0.6)',  badge:'⚡ LIVE MODE' },
+        };
+        ['rh_dry_run','rh_maint','rh_cutover','rh_live'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el || !el.checked) return;
+            const m = modes[id];
+            if (desc) desc.innerHTML = _RH_MODE_DESCS[id] || '';
+            if (badge) {
+                badge.textContent    = m.badge;
+                badge.style.background = m.bg;
+                badge.style.color      = m.color;
+                badge.style.border     = `1px solid ${m.border}`;
+            }
+            if (panel) {
+                panel.style.borderColor = m.border;
+                panel.style.background  = m.bg;
+                panel.style.boxShadow   = `0 0 12px ${m.border}`;
+            }
+        });
+    };
+    rhModeChanged(); // apply on load
+
     // ── Script mode toggle ──
     window._scriptMode = 'quick';
     window.setScriptMode = function(mode) {
@@ -1673,6 +2819,11 @@
 
             const codeEl = document.getElementById('script-output-stage1');
             const panel  = document.getElementById('output-container-stage1');
+            // Hide DB panel when server script generates
+            const dbPanel = document.getElementById('output-container-db');
+            const dbTerm  = document.getElementById('db-terminal-box');
+            if (dbPanel) dbPanel.style.display = 'none';
+            if (dbTerm)  dbTerm.style.display  = 'none';
             if (codeEl) { codeEl.innerHTML = syntaxHighlight(script); codeEl.setAttribute('data-raw', script); }
             if (panel)  { panel.style.display = 'block'; setTimeout(() => panel.scrollIntoView({behavior:'smooth'}), 100); }
 
@@ -1976,10 +3127,11 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
     });
 
     document.getElementById('download-btn').addEventListener('click', () => {
+        const raw = document.getElementById('script-output').getAttribute('data-raw') || '';
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([document.getElementById('script-output').getAttribute('data-raw')], { type: 'text/x-sh' }));
+        a.href = URL.createObjectURL(new Blob([raw], { type: 'text/x-sh' }));
         a.download = 'migrate_ospc_flex_production.sh';
-        a.click();
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
     });
 
     function showToast(msg) {
@@ -2096,82 +3248,293 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         window.URL.revokeObjectURL(url);
     });
 
+    // ── Rehost Stacked Panel helpers ───────────────────────────────────────
+    function rhSafeId(name) { return 'rh_' + String(name).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+    // No-op: all panels always visible
+    function switchRehostTab(nodeName) {}
+    function createRehostTab(nodeName) {}
+
+    // Per-node reader map for individual Stop support (batch engine)
+    window._rhReaderMap = {};
+
+    function createRehostPanel(nodeName, ipHint) {
+        const safeId = rhSafeId(nodeName);
+        if (document.getElementById('rh-panel-' + safeId)) return document.getElementById('rh-panel-' + safeId);
+
+        const container = document.getElementById('rh-panels-container');
+
+        // Outer block
+        const block = document.createElement('div');
+        block.id = 'rh-block-' + safeId;
+        block.style.cssText = 'border-radius:8px;overflow:hidden;border:1px solid #334155;flex-shrink:0;transition:border-color 0.3s;';
+
+        // Header with per-panel controls
+        const header = document.createElement('div');
+        header.style.cssText = 'background:#1e293b;padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #334155;flex-wrap:wrap;';
+        const ipSpan = ipHint ? `<span style="color:#64748b;font-family:monospace;font-size:10px;">${ipHint}</span>` : '';
+        const btnStyle = 'background:transparent;border:1px solid #334155;border-radius:4px;cursor:pointer;font-size:10px;padding:2px 7px;color:#64748b;transition:all 0.2s;';
+        header.innerHTML = `
+            <span id="rh-status-icon-${safeId}" style="font-size:14px;">⏳</span>
+            <span style="color:#f1f5f9;font-family:monospace;font-size:12px;font-weight:600;">${nodeName}</span>
+            ${ipSpan}
+            <span style="flex:1"></span>
+            <button title="Copy output as .txt" onclick="(function(){const p=document.getElementById('rh-panel-${safeId}');const t=Array.from(p.querySelectorAll('div')).map(d=>d.textContent).join('\\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));a.download='${nodeName.replace(/[^a-zA-Z0-9]/g,'_')}_log.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);})()" style="${btnStyle}">📄 Export</button>
+            <button title="Stop this VM's job" onclick="(function(){const r=window._rhReaderMap&&window._rhReaderMap['${safeId}'];if(r){try{r.cancel();}catch(e){}}document.getElementById('rh-status-icon-${safeId}').textContent='⏹️';document.getElementById('rh-block-${safeId}').style.borderColor='#475569';})()" style="${btnStyle};color:#f87171;border-color:#7f1d1d;">⏹ Stop</button>
+            <button title="Clear panel" onclick="document.getElementById('rh-panel-${safeId}').innerHTML=''" style="${btnStyle}">🗑 Clear</button>
+            <button title="Toggle" onclick="(function(p){p.style.display=p.style.display==='none'?'flex':'none';})(document.getElementById('rh-panel-${safeId}'))" style="${btnStyle}">▲▼</button>
+        `;
+
+        // Terminal body
+        const panel = document.createElement('div');
+        panel.id = 'rh-panel-' + safeId;
+        panel.className = 'rh-terminal-panel';
+        panel.style.cssText = 'height:220px;overflow-y:auto;overflow-x:hidden;padding:12px 16px;background:#0b0f19;font-family:"Courier New",monospace;font-size:12px;color:#a5d6ff;word-wrap:break-word;word-break:break-all;white-space:pre-wrap;display:flex;flex-direction:column;gap:3px;box-sizing:border-box;';
+
+        block.appendChild(header);
+        block.appendChild(panel);
+        container.appendChild(block);
+        return panel;
+    }
+
+    function setRehostTabStatus(nodeName, status) {
+        const safeId = rhSafeId(nodeName);
+        const icon  = document.getElementById('rh-status-icon-' + safeId);
+        const block = document.getElementById('rh-block-' + safeId);
+        const icons  = { running: '⏳', success: '✅', error: '❌', stopped: '⏹️' };
+        const bcolors = { success: '#22c55e', error: '#ef4444', running: '#3b82f6', stopped: '#475569' };
+        if (icon)  icon.textContent = icons[status] || '⏳';
+        if (block && bcolors[status]) block.style.borderColor = bcolors[status];
+    }
+
     document.getElementById('execute-btn').addEventListener('click', async () => {
-        let scriptContent = document.getElementById('script-output').getAttribute('data-raw');
-        // CRLF FIX FOR STAGE 2
-        scriptContent = scriptContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const term = document.getElementById('execution-logs-container');
-        const rtc = document.getElementById('results-table-container');
-        const logsEle = document.getElementById('live-logs');
-        document.getElementById('exec-spinner').style.display = 'inline';
-        term.style.display = 'block';
-        term.scrollIntoView({ behavior: 'smooth' });
-        logsEle.textContent = "Connecting to API Backend...\n";
-        
-        try {
-            const resp = await fetch('/api/agent1/run/migration', { method: 'POST', body: scriptContent });
-            const data = await resp.json();
-            
-            if (data.status === "started") {
-                document.getElementById('execute-btn').style.display = 'none';
-                document.getElementById('stop-btn').style.display = 'inline-block';
-                term.style.display = 'block';
-                rtc.style.display = 'block';
-                document.getElementById('results-table-body').innerHTML = '';
-                logsEle.textContent += "Process started! Streaming logs...\n";
-                let pollInterval = setInterval(async () => {
-                    try {
-                        let logReq = await fetch('/migration_log.txt?t=' + new Date().getTime());
-                        if(logReq.ok) {
-                            let text = await logReq.text();
-                            logsEle.textContent = text;
-                            logsEle.parentElement.scrollTop = logsEle.parentElement.scrollHeight;
-                            
-                            if(text.includes("Migration completed: PASS_COUNT=") || text.includes("Migration API Server Error") || text.includes("forcefully stopped")) {
-                                clearInterval(pollInterval);
-                                document.getElementById('exec-spinner').style.display = 'none';
-                                document.getElementById('execute-btn').style.display = 'inline-block';
-                                document.getElementById('stop-btn').style.display = 'none';
-                                showToast(text.includes("forcefully stopped") ? "Execution Stopped!" : "Execution Completed!");
-                            }
-                        }
-                        
-                        try {
-                            let csvReq = await fetch('/api/agent1/results/csv?t=' + new Date().getTime());
-                            if(csvReq.ok) {
-                                let csvText = await csvReq.text();
-                                parseCSVToTable(csvText);
-                            }
-                        } catch(e) {}
-                    } catch(err) { }
-                }, 1000);
-            }
-        } catch(err) {
-            logsEle.textContent += "Error: Cannot connect to Python Backend. Did you start launch.sh?\n";
-            document.getElementById('exec-spinner').style.display = 'none';
-            document.getElementById('execute-btn').style.display = 'inline-block';
-            document.getElementById('stop-btn').style.display = 'none';
+        const allS2Groups = Array.from(document.querySelectorAll('.custom-node-group-s2'));
+        const okS2Groups = allS2Groups.filter(g => g.getAttribute('data-verified') === 'true');
+
+        const term    = document.getElementById('execution-logs-container');
+        const spinner = document.getElementById('exec-spinner');
+        const execBtn = document.getElementById('execute-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const overviewPanel = document.getElementById('rh-panel-overview');
+
+        // ── Reset: clear overview, remove old node blocks from last run ──────
+        document.querySelectorAll('[id^="rh-block-"]').forEach(b => b.remove());
+        overviewPanel.innerHTML = '';
+
+        // Fallback: no verified nodes → run pre-generated script as single terminal
+        if (okS2Groups.length === 0) {
+            const rawEl = document.getElementById('script-output-stage1') || document.getElementById('script-output');
+            const scriptContent = (rawEl ? rawEl.getAttribute('data-raw') : '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+            if (!scriptContent) { alert('No script generated and no verified nodes. Generate the script first.'); return; }
+            rhLog(overviewPanel, '⚠ No verified nodes — running full pre-generated script in single terminal.', '#f59e0b');
+            spinner.style.display = 'inline';
+            execBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            term.style.display = 'block';
+            term.scrollIntoView({ behavior: 'smooth' });
+            window._allMigrationReaders = [];
+            window._migrationReader = null;
+            try {
+                const resp = await fetch('/api/agent1/run/migration', { method:'POST', headers:{'Content-Type':'text/plain'}, body: scriptContent });
+                const reader = resp.body.getReader();
+                window._migrationReader = reader;
+                window._allMigrationReaders.push(reader);
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const txt = decoder.decode(value, { stream: true });
+                    txt.split('\n').forEach(l => { if(l.trim()) rhLog(overviewPanel, l); });
+                }
+                showToast('✅ Execution complete');
+            } catch(e) { rhLog(overviewPanel, '[ERROR] ' + e.message, '#ef4444'); }
+            spinner.style.display = 'none';
+            execBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            return;
         }
+
+        // ── Build common script parts (shared across all nodes) ───────────────
+        // Helper: read input inside scope element
+        const fv = (sel, scope) => { const el = scope ? scope.querySelector(sel) : document.querySelector(sel); return el ? el.value : ''; };
+        const fq = (sel, scope) => `"${fv(sel, scope)}"`;
+
+        // Mode flags
+        const isDry   = document.getElementById('rh_dry_run')?.checked;
+        const isMaint = document.getElementById('rh_maint')?.checked;
+        const isCutover = document.getElementById('rh_cutover')?.checked;
+        const dry_run    = isDry ? '1' : '0';
+        const maint_mode = isMaint ? '1' : '0';
+        const do_services = (isMaint || isCutover) ? '1' : '0';
+        const m_enable  = document.getElementById('maint_enable_cmd')?.value || 'true';
+        const m_disable = document.getElementById('maint_disable_cmd')?.value || 'true';
+        const oj_host   = document.getElementById('ospc_jump_host')?.value || '';
+        const fj_host   = document.getElementById('flex_jump_host')?.value || '';
+        const bwlim     = document.getElementById('rsync_bwlimit')?.value || '0';
+        const safeNameS2 = (document.getElementById('project_customer_name')?.value || 'Customer').replace(/[^a-zA-Z0-9_-]/g, '_');
+
+        let commonBashEnv = `#!/usr/bin/env bash\nset -eu\nIFS=$'\\n\\t'\n\nSCRIPT_NAME=$(basename "$0")\nRUN_TS=$(date -u +"%Y%m%dT%H%M%SZ")\nLOG_DIR="\${LOG_DIR:-./logs}"\nmkdir -p "$LOG_DIR"\n\nexport DRY_RUN="\${DRY_RUN:-${dry_run}}"\nexport MAINTENANCE_MODE="\${MAINTENANCE_MODE:-${maint_mode}}"\nexport STOP_START_SERVICES="\${STOP_START_SERVICES:-${do_services}}"\nexport STRICT_HOST_KEY_CHECKING="\${STRICT_HOST_KEY_CHECKING:-accept-new}"\nexport SSH_CONNECT_TIMEOUT="\${SSH_CONNECT_TIMEOUT:-10}"\nexport RSYNC_BW_LIMIT_KBPS="\${RSYNC_BW_LIMIT_KBPS:-${bwlim}}"\nexport ENABLE_APP_READONLY_CMD="\${ENABLE_APP_READONLY_CMD:-${m_enable}}"\nexport DISABLE_APP_READONLY_CMD="\${DISABLE_APP_READONLY_CMD:-${m_disable}}"\nexport OSPC_JUMP_HOST="\${OSPC_JUMP_HOST:-${oj_host}}"\nexport FLEX_JUMP_HOST="\${FLEX_JUMP_HOST:-${fj_host}}"\n`;
+
+        // Cloud credentials
+        const osc_u = document.getElementById('ospc_cloud_user')?.value || '';
+        const osc_k = document.getElementById('ospc_cloud_key')?.value || '';
+        const osc_a = document.getElementById('ospc_cloud_account')?.value || '';
+        const flx_u = document.getElementById('flex_cloud_user')?.value || '';
+        const flx_k = document.getElementById('flex_cloud_key')?.value || '';
+        const flx_a = document.getElementById('flex_cloud_account')?.value || '';
+        if (osc_u||osc_k||osc_a) commonBashEnv += `\nexport OS_USERNAME_OSPC="${osc_u}"\nexport OS_PASSWORD_OSPC="${osc_k}"\nexport OS_PROJECT_ID_OSPC="${osc_a}"\n`;
+        if (flx_u||flx_k||flx_a) commonBashEnv += `\nexport OS_USERNAME_FLEX="${flx_u}"\nexport OS_PASSWORD_FLEX="${flx_k}"\nexport OS_PROJECT_ID_FLEX="${flx_a}"\n`;
+
+        // SSH + DB credentials
+        const oUser  = document.getElementById('ospc_ssh_user')?.value || 'ubuntu';
+        const fUser  = document.getElementById('flex_ssh_user')?.value || 'ubuntu';
+        const oDbName  = document.getElementById('ospc_db_name')?.value || '';
+        const oDbAdmin = document.getElementById('ospc_db_admin')?.value || '';
+        const oDbPass  = document.getElementById('ospc_db_pass')?.value || '';
+        const fDbName  = document.getElementById('flex_db_name')?.value || '';
+        const fDbAdmin = document.getElementById('flex_db_admin')?.value || '';
+        const fDbPass  = document.getElementById('flex_db_pass')?.value || '';
+        let oRawKey    = document.getElementById('ospc_ssh_key')?.value || '';
+        let fRawKey    = document.getElementById('flex_ssh_key')?.value || '';
+
+        let oKeyPath = oRawKey.includes('BEGIN') ? '/tmp/ospc_mig_key.pem' : (oRawKey || 'OSPC_KEY_FILE');
+        let fKeyPath = fRawKey.includes('BEGIN') ? '/tmp/flex_mig_key.pem' : (fRawKey || 'FLEX_KEY_FILE');
+        let keyConfig = `\n# ---------- Identities ----------\n`;
+        if (oRawKey.includes('BEGIN')) keyConfig += `echo "${oRawKey.replace(/\n/g,'\\n')}" > ${oKeyPath}\nchmod 600 ${oKeyPath}\n`;
+        if (fRawKey.includes('BEGIN')) keyConfig += `echo "${fRawKey.replace(/\n/g,'\\n')}" > ${fKeyPath}\nchmod 600 ${fKeyPath}\n`;
+
+        const identities = `\nexport OSPC_SSH_USER="${oUser}"\nexport OSPC_KEY_PATH="${oKeyPath}"\nexport OSPC_DB_NAME="${oDbName}"\nexport OSPC_DB_ADMIN="${oDbAdmin}"\nexport OSPC_DB_PASS="${oDbPass}"\nexport FLEX_SSH_USER="${fUser}"\nexport FLEX_KEY_PATH="${fKeyPath}"\nexport FLEX_DB_NAME="${fDbName}"\nexport FLEX_DB_ADMIN="${fDbAdmin}"\nexport FLEX_DB_PASS="${fDbPass}"\nexport PROJECT_CUSTOMER_NAME="${safeNameS2}"\n`;
+
+        // Fetch migration template ONCE
+        let templateContent = '';
+        try {
+            const tr = await fetch('/migration_template.sh?bypass=' + Date.now(), { cache: 'no-store' });
+            if (tr.ok) templateContent = await tr.text();
+        } catch(e) { templateContent = '\n# Error: Could not fetch migration_template.sh\n'; }
+
+        // Show terminal, update UI
+        term.style.display = 'block';
+        spinner.style.display = 'inline';
+        execBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        term.scrollIntoView({ behavior: 'smooth' });
+        window._allMigrationReaders = [];
+        window._migrationReader = null;
+
+        // Overview manifest
+        rhLog(overviewPanel, `🚀 Launching ${okS2Groups.length} node migration${okS2Groups.length>1?'s':''} in parallel...`, '#60a5fa');
+        okS2Groups.forEach((g, i) => {
+            const n = g.getAttribute('data-name') || `node-${i+1}`;
+            const ip = g.querySelector('input[name="flex_custom_ip[]"]')?.value || '?';
+            rhLog(overviewPanel, `  [${i+1}] ${n} → ${ip}`, '#94a3b8');
+        });
+
+        // ── Parallel dispatch: one per node ───────────────────────────────────
+        const nodePromises = okS2Groups.map(async (g, i) => {
+            const n       = g.getAttribute('data-name') || `node-${i+1}`;
+            const flexIP  = g.querySelector('input[name="flex_custom_ip[]"]')?.value || '';
+            const flexPort = g.querySelector('input[name="flex_custom_port[]"]')?.value || '22';
+            const flexUser = g.querySelector('input[name="flex_custom_user[]"]')?.value || '';
+            const flexCred = g.querySelector('input[name="flex_custom_cred[]"]')?.value || '';
+            const flexPath = g.querySelector('input[name="flex_custom_data_path[]"]')?.value || '';
+            const flexSvc  = g.querySelector('input[name="flex_custom_service[]"]')?.value || '';
+            const flexPkg  = g.querySelector('input[name="flex_custom_packages[]"]')?.value || '';
+            const flexRT   = g.querySelector('input[name="flex_custom_runtimes[]"]')?.value || '';
+            const flexOS   = g.querySelector('input[name="flex_custom_os[]"]')?.value || '';
+            const flexEnv  = g.querySelector('input[name="flex_custom_env[]"]')?.value || '';
+
+            // OSPC corresponding block
+            const ospcBlock = document.querySelector(`#ospc-custom-fields .custom-node-group[data-name="${n}"]`);
+            const ospcIP   = ospcBlock?.querySelector('input[name="ospc_custom_ip[]"]')?.value || '';
+            const ospcPort = ospcBlock?.querySelector('input[name="ospc_custom_port[]"]')?.value || '22';
+            const ospcUser = ospcBlock?.querySelector('input[name="ospc_custom_user[]"]')?.value || '';
+            const ospcCred = ospcBlock?.querySelector('input[name="ospc_custom_cred[]"]')?.value || '';
+            const ospcPath = ospcBlock?.querySelector('input[name="ospc_custom_data_path[]"]')?.value || '';
+            const ospcSvc  = ospcBlock?.querySelector('input[name="ospc_custom_service[]"]')?.value || '';
+
+            const nodeArrays = `\n# --- Custom OSPC Components (Node: ${n}) ---\nCUSTOM_NODE_NAMES=("${n}")\nOSPC_CUSTOM_IPS=("${ospcIP}")\nOSPC_CUSTOM_PORTS=("${ospcPort}")\nOSPC_CUSTOM_USERS=("${ospcUser}")\nOSPC_CUSTOM_CREDS=("${ospcCred}")\nOSPC_CUSTOM_DATA_PATHS=("${ospcPath}")\nOSPC_CUSTOM_SERVICES=("${ospcSvc}")\n\n# --- Custom FLEX Components (Node: ${n}) ---\nFLEX_CUSTOM_IPS=("${flexIP}")\nFLEX_CUSTOM_PORTS=("${flexPort}")\nFLEX_CUSTOM_USERS=("${flexUser}")\nFLEX_CUSTOM_CREDS=("${flexCred}")\nFLEX_CUSTOM_DATA_PATHS=("${flexPath}")\nFLEX_CUSTOM_SERVICES=("${flexSvc}")\nFLEX_CUSTOM_PACKAGES=("${flexPkg}")\nFLEX_CUSTOM_RUNTIMES=("${flexRT}")\nFLEX_CUSTOM_OS=("${flexOS}")\nFLEX_CUSTOM_ENV=("${flexEnv}")\n`;
+
+            const nodeScript = (commonBashEnv + keyConfig + identities + nodeArrays + '\n' + templateContent).replace(/\r\n/g,'\n');
+
+            // Create dedicated stacked block + panel
+            createRehostTab(n); // no-op in stacked layout
+            const panel = createRehostPanel(n, flexIP || ospcIP || '');
+
+            rhLog(panel, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, '#334155');
+            rhLog(panel, `🚀 Node: ${n}  |  FLEX IP: ${flexIP||'?'}  |  OSPC IP: ${ospcIP||'?'}`, '#60a5fa');
+            rhLog(panel, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, '#334155');
+
+            try {
+                setRehostTabStatus(n, 'running');
+                const resp = await fetch('/api/agent1/run/migration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: nodeScript
+                });
+                if (!resp.ok) throw new Error(`API error ${resp.status}`);
+
+                const reader = resp.body.getReader();
+                window._allMigrationReaders.push(reader);
+                window._migrationReader = reader;
+                window._rhReaderMap[rhSafeId(n)] = reader;  // register for individual Stop
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const txt = decoder.decode(value, { stream: true });
+                    txt.split('\n').forEach(l => { if (l.trim()) rhLog(panel, l); });
+                }
+
+                setRehostTabStatus(n, 'success');
+                rhLog(panel, `✔ Node migration complete: ${n}`, '#4ade80');
+                rhLog(overviewPanel, `✅ [${i+1}/${okS2Groups.length}] Done: ${n}`, '#4ade80');
+
+            } catch(e) {
+                setRehostTabStatus(n, 'error');
+                rhLog(panel, `[ERROR] ${e.message}`, '#ef4444');
+                rhLog(overviewPanel, `❌ [${i+1}/${okS2Groups.length}] Error: ${n} — ${e.message}`, '#ef4444');
+            }
+        });
+
+        await Promise.all(nodePromises);
+
+        spinner.style.display = 'none';
+        execBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        rhLog(overviewPanel, '=== ✅ All Node Migrations Complete ===', '#22c55e');
+        showToast('✅ All parallel migrations complete');
+        // Auto-generate report after all jobs finish
+        setTimeout(() => generateMigrationReport('stage2'), 500);
     });
 
     document.getElementById('stop-btn').addEventListener('click', async () => {
-        try {
-            await fetch('/api/agent1/stop/migration', { method: 'POST' });
-        } catch(err) { }
+        // Cancel all parallel readers
+        if (window._allMigrationReaders) {
+            for (const r of window._allMigrationReaders) { try { r.cancel(); } catch(e) {} }
+            window._allMigrationReaders = [];
+        }
+        if (window._migrationReader) { try { window._migrationReader.cancel(); } catch(e) {} window._migrationReader = null; }
+        // Tell backend to kill child processes
+        try { await fetch('/api/agent1/stop/migration', { method: 'POST' }); } catch(e) {}
+        // Mark all running node blocks as stopped
+        document.querySelectorAll('[id^="rh-status-icon-"]').forEach(icon => {
+            if (icon.textContent === '⏳') {
+                icon.textContent = '⏹️';
+                const block = document.getElementById('rh-block-' + icon.id.replace('rh-status-icon-', ''));
+                if (block) block.style.borderColor = '#475569';
+            }
+        });
+        const overviewPanel = document.getElementById('rh-panel-overview');
+        rhLog(overviewPanel, '[⏹ STOPPED by operator]', '#f59e0b');
+        document.getElementById('exec-spinner').style.display = 'none';
+        document.getElementById('execute-btn').style.display = 'inline-block';
+        document.getElementById('stop-btn').style.display = 'none';
+        showToast('🛑 Migration stopped');
     });
 
-    // Flash the Execution Controls panel aggressively upon loading to draw their eyes
-    window.addEventListener('load', () => {
-        let el = document.getElementById('global-exec-controls');
-        el.style.backgroundColor = 'rgba(99, 102, 241, 0.4)';
-        el.style.boxShadow = '0 0 30px rgba(99, 102, 241, 0.8)';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        setTimeout(() => {
-            el.style.backgroundColor = 'transparent';
-            el.style.boxShadow = 'none';
-        }, 1500);
-    });
+    // (global-exec-controls panel removed)
+
     async function verifyNodeDependencies(normalized, btn) {
         let originalText = btn.innerHTML;
         btn.innerHTML = `<svg style="animation: spin 1s linear infinite;" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Probing SSH...`;
@@ -2327,107 +3690,378 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
 
     document.getElementById('download-btn-stage1').addEventListener('click', () => {
         const text = document.getElementById('script-output-stage1').getAttribute('data-raw') || '';
-        const blob = new Blob([text], { type: 'text/plain' });
+        const blob = new Blob([text], { type: 'text/x-sh' });
         const a = document.createElement('a');
         a.href = window.URL.createObjectURL(blob);
-        a.download = 'stage1_install.sh';
-        a.click();
+        a.download = 'rehost_clone_script.sh';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
     });
 
-    document.getElementById('execute-btn-stage1').addEventListener('click', async () => {
-        let scriptContent = document.getElementById('script-output-stage1').getAttribute('data-raw');
-        if (!scriptContent) { showToast('⚠️ Generate the script first'); return; }
-        scriptContent = scriptContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
+    async function runRehostScript() {
+        const script = (document.getElementById('script-output-stage1').getAttribute('data-raw') || '').replace(/\r\n/g,'\n');
+        if (!script.trim()) { alert('Generate the script first'); return; }
         const term    = document.getElementById('execution-logs-container-stage1');
-        const rtc     = document.getElementById('results-table-container-stage1');
-        const logsEle = document.getElementById('live-logs-stage1');
-        const spinner = document.getElementById('exec-spinner-stage1');
-        const execBtn = document.getElementById('execute-btn-stage1');
         const stopBtn = document.getElementById('stop-btn-stage1');
+        const spinner = document.getElementById('exec-spinner-stage1');
+        const overview = document.getElementById('rh1-panel-overview');
+        const container = document.getElementById('rh1-panels-container');
 
-        spinner.style.display = 'inline';
-        execBtn.style.display = 'none';
+        // Clear old per-VM panels from last run
+        container.querySelectorAll('[id^="rh1-block-"]').forEach(b => b.remove());
+        overview.innerHTML = '';
+
         stopBtn.style.display = 'inline-block';
+        spinner.style.display = 'inline';
         term.style.display = 'block';
-        rtc.style.display = 'none';
-        logsEle.textContent = 'Connecting...\n';
+
+        const modeLabels = { rh_dry_run:'🔍 DRY RUN', rh_maint:'🔒 MAINT', rh_cutover:'✂️ CUTOVER', rh_live:'⚡ LIVE' };
+        const activeMode = ['rh_dry_run','rh_maint','rh_cutover','rh_live'].find(id => { const el = document.getElementById(id); return el && el.checked; }) || 'rh_live';
+        rh1Log(overview, `▶ Sequential execution — ${modeLabels[activeMode]||activeMode} — all VMs in one stream`, '#60a5fa');
+        term.scrollIntoView({ behavior: 'smooth' });
+        try {
+            const resp = await fetch('/api/agent1/run/migration', { method:'POST', headers:{'Content-Type':'text/plain'}, body: script });
+            const reader = resp.body.getReader();
+            const dec = new TextDecoder();
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                dec.decode(value, { stream: true }).split('\n').forEach(line => {
+                    if (!line.trim()) return;
+                    const isOk   = line.includes('[OK]') || line.includes('[DONE]');
+                    const isErr  = line.includes('[ERROR]') || line.includes('[FATAL]');
+                    const isWarn = line.includes('[WARN]') || line.includes('[DRY]');
+                    const color  = isErr ? '#f87171' : isOk ? '#4ade80' : isWarn ? '#fbbf24' : '#a5d6ff';
+                    rh1Log(overview, line, color);
+                });
+            }
+            rh1Log(overview, '✅ Sequential execution complete', '#4ade80');
+            if (typeof showToast === 'function') showToast('✅ Rehost script complete');
+        } catch(e) { rh1Log(overview, '❌ ' + e.message, '#f87171'); }
+        execBtn.disabled = false;
+        stopBtn.style.display = 'none';
+        spinner.style.display = 'none';
+    }
+
+    // ── Parallel Rehost Execution — one terminal panel per VM ─────────────────
+    function rh1SafeId(name) { return 'rh1_' + name.replace(/[^a-zA-Z0-9]/g,'_'); }
+
+    function rh1Log(panel, msg, color) {
+        if (!panel) return;
+        const el = document.createElement('div');
+        const ts = new Date().toLocaleTimeString();
+        el.innerHTML = `<span style="color:#475569">[${ts}]</span> <span style="color:${color||'#a5d6ff'}">${msg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
+        panel.appendChild(el);
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function rh1SetStatus(name, status) {
+        const safeId = rh1SafeId(name);
+        const icon  = document.getElementById('rh1-status-icon-' + safeId);
+        const block = document.getElementById('rh1-block-' + safeId);
+        const icons  = { running:'⏳', success:'✅', error:'❌', stopped:'⏹️' };
+        const colors = { running:'#3b82f6', success:'#22c55e', error:'#ef4444', stopped:'#475569' };
+        if (icon)  icon.textContent = icons[status] || '⏳';
+        if (block) block.style.borderColor = colors[status] || '#334155';
+    }
+
+    function rh1GetOrCreatePanel(vmName, ospcIp, flexIp) {
+        const safeId = rh1SafeId(vmName);
+        const existing = document.getElementById('rh1-panel-' + safeId);
+        if (existing) return existing;
+        const container = document.getElementById('rh1-panels-container');
+        if (!container) return null;
+
+        const block = document.createElement('div');
+        block.id = 'rh1-block-' + safeId;
+        block.style.cssText = 'border-radius:8px; overflow:hidden; border:2px solid #334155; transition:border-color 0.3s;';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'background:#1e293b; padding:6px 12px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #334155; user-select:none; flex-wrap:wrap;';
+        const ipTag  = ospcIp ? `<span style="background:#0f172a;border:1px solid #334155;border-radius:4px;padding:1px 7px;color:#fbbf24;font-family:monospace;font-size:10px;">OSPC ${ospcIp}</span>` : '';
+        const fxTag  = flexIp ? `<span style="background:#0f172a;border:1px solid #334155;border-radius:4px;padding:1px 7px;color:#34d399;font-family:monospace;font-size:10px;">FLEX ${flexIp}</span>` : '';
+        const pb = 'background:transparent;border:1px solid #334155;border-radius:4px;cursor:pointer;font-size:10px;padding:2px 7px;color:#64748b;';
+        const safeName = vmName.replace(/[^a-zA-Z0-9]/g,'_');
+        header.innerHTML =
+            `<span id="rh1-status-icon-${safeId}" style="font-size:15px;">⏳</span>`
+          + `<span style="color:#a5b4fc;font-family:monospace;font-size:13px;font-weight:700;">&#9889; ${vmName}</span>`
+          + ipTag + fxTag
+          + `<span style="flex:1"></span>`
+          + `<span class="rh1-timer" id="rh1-timer-${safeId}" data-start="${Date.now()}" style="color:#10b981;font-family:monospace;font-size:12px;font-weight:bold;background:rgba(0,0,0,0.3);border:1px solid rgba(16,185,129,0.3);padding:2px 8px;border-radius:6px;">00:00</span>`
+          + `<button title="Export log as .txt" onclick="(function(){const p=document.getElementById('rh1-panel-${safeId}');const t=Array.from(p.querySelectorAll('div')).map(d=>d.textContent).join('\\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));a.download='${safeName}_log.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);})()" style="${pb}">📄 Export</button>`
+          + `<button title="Stop this VM job" onclick="(function(){const r=window._rh1ReaderMap&&window._rh1ReaderMap['${safeId}'];if(r){try{r.cancel();}catch(e){}}const ic=document.getElementById('rh1-status-icon-${safeId}');if(ic)ic.textContent='⏹️';const bl=document.getElementById('rh1-block-${safeId}');if(bl)bl.style.borderColor='#475569';})()" style="${pb};color:#f87171;border-color:#7f1d1d;">⏹ Stop</button>`
+          + `<button title="Clear panel" onclick="document.getElementById('rh1-panel-${safeId}').innerHTML=''" style="${pb}">🗑 Clear</button>`
+          + `<button title="Toggle" onclick="(function(p){p.style.display=p.style.display==='none'?'flex':'none';})(document.getElementById('rh1-panel-${safeId}'))" style="${pb}">▲▼</button>`;
+        // No full-header onclick — buttons handle their own clicks
+
+        const panel = document.createElement('div');
+        panel.id = 'rh1-panel-' + safeId;
+        panel.className = 'rh1-terminal-panel';
+        panel.style.cssText = 'height:240px;overflow-y:auto;overflow-x:hidden;padding:10px 14px;background:#0b0f19;font-family:"Courier New",monospace;font-size:11.5px;color:#a5d6ff;word-wrap:break-word;white-space:pre-wrap;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;';
+
+        block.appendChild(header);
+        block.appendChild(panel);
+        container.appendChild(block);
+        return panel;
+    }
+
+    async function runRehostParallel() {
+        // ── Mock data injection ──────────────────────────────────────────
+        const useMock = document.getElementById('use-mock-data') && document.getElementById('use-mock-data').checked;
+        if (useMock && (!window._rehostPairList || window._rehostPairList.length === 0)) {
+            const MOCK_SERVERS = [
+                { name: 'web-app-01',      ospcIp: '10.10.1.11', flexIp: '192.168.10.11' },
+                { name: 'api-backend-02',  ospcIp: '10.10.1.12', flexIp: '192.168.10.12' },
+                { name: 'cache-redis-03',  ospcIp: '10.10.1.13', flexIp: '192.168.10.13' },
+            ];
+            window._rehostPairList = MOCK_SERVERS;
+            // Generate a dry-run stub script per mock VM
+            window._rehostNodeScripts = window._rehostNodeScripts || {};
+            MOCK_SERVERS.forEach(p => {
+                window._rehostNodeScripts[p.name] =
+`#!/usr/bin/env bash
+# ── MOCK DRY RUN — ${p.name} ──────────────────────────────────────
+# OSPC: ${p.ospcIp}  →  FLEX: ${p.flexIp}
+set -uo pipefail
+export DRY_RUN=1
+run_cmd() { echo "[DRY]  \$2"; echo "       \$1"; }
+
+echo "[MOCK] Starting rehost simulation for ${p.name}"
+run_cmd "ssh ubuntu@${p.ospcIp} 'hostname'" "SSH → OSPC ${p.ospcIp}"
+run_cmd "ssh ubuntu@${p.flexIp} 'hostname'" "SSH → FLEX ${p.flexIp}"
+run_cmd "rsync -avz --dry-run ubuntu@${p.ospcIp}:/opt/app/ ubuntu@${p.flexIp}:/opt/app/" "Sync app code"
+run_cmd "ssh ubuntu@${p.flexIp} 'systemctl restart app'" "Restart service on FLEX"
+echo "[MOCK] Done — ${p.name} simulation complete"`;
+            });
+        }
+        // ────────────────────────────────────────────────────────────────
+
+        const pairList = window._rehostPairList || [];
+        if (pairList.length === 0) {
+            alert('Generate the rehost script first — no VMs found.\nTip: check ✅ "Use Mockup Data" in the table header to run with sample servers.');
+            return;
+        }
+        const term      = document.getElementById('execution-logs-container-stage1');
+        const spinner   = document.getElementById('exec-spinner-stage1');
+        const parBtn    = document.getElementById('run-parallel-btn-stage1');
+        const stopBtn   = document.getElementById('stop-btn-stage1');
+        const overview  = document.getElementById('rh1-panel-overview');
+        const container = document.getElementById('rh1-panels-container');
+
+        // Reset old panels
+        container.querySelectorAll('[id^="rh1-block-"]').forEach(b => b.remove());
+        overview.innerHTML = '';
+
+        term.style.display  = 'block';
+        spinner.style.display = 'inline';
+        parBtn.disabled = true;
+        stopBtn.style.display = 'inline-block';
         term.scrollIntoView({ behavior: 'smooth' });
 
-        try {
-            // API streams text/plain — do NOT parse as JSON
-            const resp = await fetch('/api/agent1/run/migration', {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: scriptContent
+        rh1Log(overview, `🚀 Launching ${pairList.length} VM rehost${pairList.length !== 1 ? 's' : ''} in parallel...`, '#60a5fa');
+
+        // Start live timers
+        const timerInterval = setInterval(() => {
+            document.querySelectorAll('.rh1-timer').forEach(t => {
+                const elapsed = Math.floor((Date.now() - Number(t.dataset.start)) / 1000);
+                t.textContent = `${String(Math.floor(elapsed/60)).padStart(2,'0')}:${String(elapsed%60).padStart(2,'0')}`;
             });
+        }, 1000);
 
-            if (!resp.ok) { throw new Error(`API error ${resp.status}: ${await resp.text()}`); }
+        window._rh1Readers = [];
+        window._rh1ReaderMap = {};  // keyed by safeId for individual Stop
 
-            const reader = resp.body.getReader();
-            const decoder = new TextDecoder();
-            let done = false;
-            while (!done) {
-                const { value, done: d } = await reader.read();
-                done = d;
-                if (value) {
-                    logsEle.textContent += decoder.decode(value, { stream: !done });
-                    logsEle.parentElement.scrollTop = logsEle.parentElement.scrollHeight;
+        const jobs = pairList.map(pair => (async () => {
+            const safeId = rh1SafeId(pair.name);
+            const panel = rh1GetOrCreatePanel(pair.name, pair.ospcIp, pair.flexIp);
+            rh1SetStatus(pair.name, 'running');
+            rh1Log(panel, `▶ Starting rehost: OSPC ${pair.ospcIp} → FLEX ${pair.flexIp}`, '#60a5fa');
 
-                    // Poll CSV results while streaming
-                    try {
-                        let csvReq = await fetch('/api/agent1/results/csv?t=' + Date.now());
-                        if (csvReq.ok) parseCSVToTableStage1(await csvReq.text());
-                    } catch(e) {}
-                }
-            }
+            // Use pre-built standalone script (set during generateRehostScript)
+            // Falls back to on-demand regex extraction if not available
+            const script = (window._rehostNodeScripts && window._rehostNodeScripts[pair.name])
+                ? window._rehostNodeScripts[pair.name]
+                : (typeof window.generateRehostNodeScript === 'function')
+                    ? window.generateRehostNodeScript(pair)
+                    : `echo "ERROR: No script available for ${pair.name} — regenerate first"`;
 
-            // Done
-            spinner.style.display = 'none';
-            execBtn.style.display = 'inline-block';
-            stopBtn.style.display = 'none';
-            rtc.style.display = 'block';
-
-            // Propagate dep results to Stage 2 node cards
-            globalStateTableS1.forEach(n => {
-                const s2Node = document.querySelector(`.custom-node-group-s2[data-name="${n.comp}"]`);
-                if (!s2Node) return;
-                if (n.depStatus === 'PASS') {
-                    s2Node.setAttribute('data-verified', 'true');
-                    s2Node.style.borderColor = '#10b981';
-                    ['os','runtimes','packages','env'].forEach(t => {
-                        const chk = document.getElementById(`chk_${n.comp}_${t}`);
-                        const stat = document.getElementById(`stat_${n.comp}_${t}`);
-                        if (chk) chk.checked = true;
-                        if (stat) { stat.textContent = '# installed'; stat.style.color = '#10b981'; }
+            try {
+                const resp   = await fetch('/api/agent1/run/migration', { method:'POST', headers:{'Content-Type':'text/plain'}, body: script });
+                const reader = resp.body.getReader();
+                window._rh1Readers.push(reader);
+                window._rh1ReaderMap[safeId] = reader;  // register for individual Stop
+                const dec = new TextDecoder();
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const txt = dec.decode(value, { stream: true });
+                    txt.split('\n').forEach(line => {
+                        if (!line.trim()) return;
+                        const isOk    = line.includes('[OK]') || line.includes('[DONE]') || line.includes('SUCCESS');
+                        const isErr   = line.includes('[ERROR]') || line.includes('[FATAL]') || line.includes('FAILED');
+                        const isWarn  = line.includes('[WARN]') || line.includes('[DRY]');
+                        const isStage = line.includes('STAGE') && (line.includes('══') || line.includes('──'));
+                        const color   = isErr ? '#f87171' : isOk ? '#4ade80' : isWarn ? '#fbbf24' : isStage ? '#c084fc' : '#a5d6ff';
+                        rh1Log(panel, line, color);
                     });
-                } else if (n.depStatus) {
-                    s2Node.setAttribute('data-verified', 'false');
-                    s2Node.style.borderColor = '#ef4444';
                 }
+                rh1SetStatus(pair.name, 'success');
+                rh1Log(panel, `✅ ${pair.name} complete`, '#4ade80');
+                rh1Log(overview, `✅ ${pair.name} done`, '#4ade80');
+            } catch(e) {
+                rh1SetStatus(pair.name, 'error');
+                rh1Log(panel, `❌ Error: ${e.message}`, '#f87171');
+                rh1Log(overview, `❌ ${pair.name} failed: ${e.message}`, '#f87171');
+            }
+        })());
+
+        await Promise.allSettled(jobs);
+        clearInterval(timerInterval);
+        spinner.style.display = 'none';
+        parBtn.disabled = false;
+        stopBtn.style.display = 'none';
+        rh1Log(overview, `🏁 All ${pairList.length} VM rehost jobs finished`, '#60a5fa');
+        if (typeof showToast === 'function') showToast(`✅ Parallel rehost complete — ${pairList.length} VMs`);
+        // Auto-generate report after all rehost jobs finish
+        setTimeout(() => generateMigrationReport('stage1'), 500);
+    }
+
+
+
+
+    // ── MIGRATION REPORT GENERATOR ───────────────────────────────────────────
+    // Shared by both Stage 2 Batch Engine (stage2) and Rehost Parallel (stage1)
+    // Reads terminal panel text, parses layer results, builds CSV + table.
+    window._migReportData = { stage1: [], stage2: [] };
+
+    function generateMigrationReport(scope) {
+        const panelClass   = scope === 'stage1' ? 'rh1-terminal-panel' : 'rh-terminal-panel';
+        const overviewId   = scope === 'stage1' ? 'rh1-panel-overview'  : 'rh-panel-overview';
+        const containerId  = scope === 'stage1' ? 'report-container-stage1' : 'report-container-stage2';
+        const theadId      = scope === 'stage1' ? 'report-thead-stage1'     : 'report-thead-stage2';
+        const tbodyId      = scope === 'stage1' ? 'report-tbody-stage1'     : 'report-tbody-stage2';
+        const tsId         = scope === 'stage1' ? 'report-timestamp-stage1' : 'report-timestamp-stage2';
+        const dlBtnId      = scope === 'stage1' ? 'dl-report-btn-stage1'    : 'dl-report-btn-stage2';
+
+        const LAYERS = [
+            'STAGE 0','STAGE 1','STAGE 2','STAGE 3','STAGE 4','STAGE 5',
+            'IDENTITY','SSH','USERS','DISK','PACKAGES','KERNEL',
+            'NETWORK','RUNTIME','APP CODE','SERVICES','DATA','TLS','EXTERNAL'
+        ];
+
+        const rows = [];
+        const panels = document.querySelectorAll('.' + panelClass);
+        const ts = new Date();
+        const tsStr = ts.toISOString().replace('T',' ').substring(0,19);
+
+        panels.forEach(panel => {
+            if (panel.id === overviewId) return; // skip overview panel
+            // Derive server name from block header
+            const block = panel.closest('[id^="rh-block-"],[id^="rh1-block-"]');
+            const nameEl = block ? block.querySelector('span[style*="font-weight:600"],span[style*="font-weight:700"]') : null;
+            const serverName = nameEl ? nameEl.textContent.replace('⚡ ','').trim() : panel.id;
+
+            const lines = Array.from(panel.querySelectorAll('div')).map(d => d.textContent);
+            const fullText = lines.join('\n');
+
+            // Extract IPs from header tags
+            const ospcTag = block ? block.querySelector('span[style*="fbbf24"]') : null;
+            const flexTag = block ? block.querySelector('span[style*="34d399"]') : null;
+            const ospcIp = ospcTag ? ospcTag.textContent.replace('OSPC ','').trim() : '—';
+            const flexIp = flexTag ? flexTag.textContent.replace('FLEX ','').trim() : '—';
+
+            // Determine overall status
+            const hasError  = /\[ERROR\]|\[FATAL\]|FAILED/.test(fullText);
+            const hasDone   = /\[DONE\]|\[PARALLEL-DONE\]|complete/.test(fullText);
+            const hasDry    = /\[DRY\]/.test(fullText);
+            const overallStatus = hasError ? 'FAILED' : hasDone ? (hasDry ? 'DRY_RUN' : 'SUCCESS') : 'INCOMPLETE';
+
+            // Detect layer pass/fail by scanning for STAGE markers + errors
+            const layerResults = {};
+            let currentStage = null;
+            let stageHasError = false;
+            lines.forEach(line => {
+                const stageMatch = line.match(/STAGE\s+(\d+)/i) || line.match(/(IDENTITY|SSH|USERS|DISK|PACKAGES|KERNEL|NETWORK|RUNTIME|APP CODE|SERVICES|DATA|TLS|EXTERNAL)/i);
+                if (stageMatch) {
+                    if (currentStage) layerResults[currentStage] = stageHasError ? 'FAIL' : 'PASS';
+                    currentStage = stageMatch[1] || stageMatch[0];
+                    stageHasError = false;
+                }
+                if (currentStage && /\[ERROR\]|\[FATAL\]|FAILED/.test(line)) stageHasError = true;
             });
-            if (window.updateStage2Count) window.updateStage2Count();
-            showToast('✅ Execution complete');
+            if (currentStage) layerResults[currentStage] = stageHasError ? 'FAIL' : 'PASS';
 
-        } catch(err) {
-            logsEle.textContent += '\n[ERROR] ' + err.message;
-            spinner.style.display = 'none';
-            execBtn.style.display = 'inline-block';
-            stopBtn.style.display = 'none';
+            rows.push({ serverName, ospcIp, flexIp, overallStatus, layerResults, ts: tsStr });
+        });
+
+        if (rows.length === 0) {
+            showToast('No terminal output found — run migrations first');
+            return;
         }
-    });
 
-    document.getElementById('stop-btn-stage1').addEventListener('click', async () => {
-        try {
-            await fetch('/api/agent1/stop/migration', { method: 'POST' });
-            showToast("Stopping script...");
-        } catch(err) {
-            showToast("Failed to stop script");
-        }
-    });
+        window._migReportData[scope] = rows;
 
-    // --- PHASE 6: CONFIGURATION PERSISTENCE (runs immediately — DOM already built) ---
+        // ── Build table ────────────────────────────────────────────────────────
+        const detectedLayers = [...new Set(rows.flatMap(r => Object.keys(r.layerResults)))];
+        const colStyle = 'padding:8px 10px; border:1px solid #1e293b; text-align:center; font-size:0.78rem;';
+        const hStyle   = 'padding:8px 10px; border:1px solid #1e293b; color:#94a3b8; white-space:nowrap;';
+
+        document.getElementById(theadId).innerHTML = `<tr>
+            <th style="${hStyle}">Server</th>
+            <th style="${hStyle}">OSPC IP</th>
+            <th style="${hStyle}">FLEX IP</th>
+            ${detectedLayers.map(l => `<th style="${hStyle}">${l}</th>`).join('')}
+            <th style="${hStyle}">Overall</th>
+            <th style="${hStyle}">Generated</th>
+        </tr>`;
+
+        const statusColor = s => s==='PASS'||s==='SUCCESS' ? '#4ade80' : s==='FAIL'||s==='FAILED' ? '#f87171' : s==='DRY_RUN' ? '#fbbf24' : '#94a3b8';
+        const badge = (s) => `<span style="background:${statusColor(s)}22;color:${statusColor(s)};border-radius:4px;padding:2px 6px;font-size:0.75rem;font-weight:600;">${s||'—'}</span>`;
+
+        document.getElementById(tbodyId).innerHTML = rows.map(r => `<tr style="border-bottom:1px solid #1e293b;">
+            <td style="${colStyle} color:#e2e8f0; text-align:left;">${r.serverName}</td>
+            <td style="${colStyle} color:#fbbf24; font-family:monospace;">${r.ospcIp}</td>
+            <td style="${colStyle} color:#34d399; font-family:monospace;">${r.flexIp}</td>
+            ${detectedLayers.map(l => `<td style="${colStyle}">${badge(r.layerResults[l] || '—')}</td>`).join('')}
+            <td style="${colStyle}">${badge(r.overallStatus)}</td>
+            <td style="${colStyle} color:#64748b; font-size:0.72rem;">${r.ts}</td>
+        </tr>`).join('');
+
+        document.getElementById(tsId).textContent = `Generated: ${tsStr}  |  ${rows.length} server(s)`;
+        document.getElementById(containerId).style.display = 'block';
+
+        // ── Build CSV ──────────────────────────────────────────────────────────
+        const csvHeader = ['Server','OSPC IP','FLEX IP', ...detectedLayers, 'Overall','Generated'].join(',');
+        const csvRows   = rows.map(r =>
+            [`"${r.serverName}"`, `"${r.ospcIp}"`, `"${r.flexIp}"`,
+             ...detectedLayers.map(l => r.layerResults[l] || 'N/A'),
+             r.overallStatus, `"${r.ts}"`].join(',')
+        );
+        const csvContent = [csvHeader, ...csvRows].join('\n');
+        const fname = `rehost-result_${ts.toISOString().replace(/[:.]/g,'-').substring(0,19)}.csv`;
+
+        const dlBtn = document.getElementById(dlBtnId);
+        dlBtn.style.display = 'inline-block';
+        dlBtn.onclick = () => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }));
+            a.download = fname;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            // Also persist to localStorage for Stage 3 import
+            try { localStorage.setItem('osflex_rehost_report_csv', csvContent); localStorage.setItem('osflex_rehost_report_ts', tsStr); } catch(e) {}
+            showToast('📊 Report downloaded — available in Stage 3');
+        };
+
+        // Auto-persist to localStorage so Stage 3 can import without user clicking DL
+        try { localStorage.setItem('osflex_rehost_report_csv', csvContent); localStorage.setItem('osflex_rehost_report_ts', tsStr); } catch(e) {}
+        showToast('📊 Report generated — ' + rows.length + ' server(s)');
+        document.getElementById(containerId).scrollIntoView({ behavior: 'smooth' });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // --- CONFIGURATION PERSISTENCE ---
     (function initCredPersistence() {
+        const CRED_KEY = 'osflex_creds_v2';
+
         const persistIds = [
             // Cloud API credentials
             'ospc_cloud_user', 'ospc_cloud_key', 'ospc_cloud_account',
@@ -2435,31 +4069,84 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
             // SSH + DB credentials
             'ospc_ssh_user', 'ospc_ssh_key', 'ospc_db_name', 'ospc_db_admin', 'ospc_db_pass',
             'flex_ssh_user', 'flex_keypair_name', 'flex_keypair_global', 'flex_ssh_key', 'flex_db_name', 'flex_db_admin', 'flex_db_pass',
-            // Project / region config
-            'project_customer_name', 'ospc_discovery_region', 'flex_deploy_region', 'architecture_mode'
+            // Project / region / migration config
+            'project_customer_name', 'ospc_discovery_region', 'flex_deploy_region', 'architecture_mode',
+            'rehost_app_paths',
         ];
 
+        function loadAll() {
+            try {
+                const store = JSON.parse(localStorage.getItem(CRED_KEY) || '{}');
+                // Migrate old op_conf_* keys if new store is empty
+                if (Object.keys(store).length === 0) {
+                    persistIds.forEach(id => {
+                        const old = localStorage.getItem('op_conf_' + id);
+                        if (old !== null) store[id] = old;
+                    });
+                    if (Object.keys(store).length > 0) localStorage.setItem(CRED_KEY, JSON.stringify(store));
+                }
+                return store;
+            } catch(e) { return {}; }
+        }
+        function saveAll(store) {
+            try { localStorage.setItem(CRED_KEY, JSON.stringify(store)); } catch(e) {}
+        }
+
         function doInit() {
+            const store = loadAll();
+
+            function saveSnapshot() {
+                const s = loadAll();
+                persistIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && el.value) s[id] = el.value;
+                });
+                saveAll(s);
+            }
+
             persistIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (!el) return;
-                // Restore saved value
-                const saved = localStorage.getItem('op_conf_' + id);
-                if (saved !== null) el.value = saved;
-                // Save on every change
-                const evts = el.tagName === 'SELECT' ? ['change'] : ['input', 'change'];
-                evts.forEach(evt => el.addEventListener(evt, e => {
-                    localStorage.setItem('op_conf_' + id, e.target.value);
-                }));
+
+                // Restore: localStorage wins over hardcoded HTML default
+                if (store[id] !== undefined && store[id] !== null && store[id] !== '') {
+                    el.value = store[id];
+                } else if (el.value) {
+                    store[id] = el.value;
+                }
+
+                // Save on input, change AND blur (blur catches password managers)
+                ['input', 'change', 'blur'].forEach(evt => el.addEventListener(evt, saveSnapshot));
             });
 
-            // On load: propagate restored global keypair to all node fields
+            saveAll(store);
+
+            // Save everything on page unload (catches any missed changes)
+            window.addEventListener('beforeunload', saveSnapshot);
+
+            // Poll every 3s to catch programmatic changes (e.g. OpenRC import, autofill)
+            setInterval(saveSnapshot, 3000);
+
+            // Restore rehost execution mode radio
+            const savedMode = store['rh_exec_mode'];
+            if (savedMode) {
+                const radio = document.getElementById(savedMode);
+                if (radio) { radio.checked = true; if (typeof rhModeChanged === 'function') rhModeChanged(); }
+            }
+            ['rh_dry_run','rh_maint','rh_cutover','rh_live'].forEach(id => {
+                const r = document.getElementById(id);
+                if (r) r.addEventListener('change', () => {
+                    const s = loadAll(); s['rh_exec_mode'] = id; saveAll(s);
+                });
+            });
+
+            // Propagate restored global keypair
             const globalKP = document.getElementById('flex_keypair_global');
             if (globalKP && globalKP.value) {
-                setTimeout(() => window.applyGlobalKeypair(globalKP.value), 600);
+                setTimeout(() => window.applyGlobalKeypair && window.applyGlobalKeypair(globalKP.value), 600);
             }
 
-            // Re-trigger architecture dropdown so topology DOM updates
+            // Re-trigger architecture dropdown
             setTimeout(() => {
                 const modeEl = document.getElementById('architecture_mode');
                 if (!modeEl) return;
@@ -2469,16 +4156,24 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
                     modeEl.dispatchEvent(new Event('change'));
                 }
             }, 500);
+
+            // Show a subtle saved indicator on the credentials panel
+            const badge = document.createElement('span');
+            badge.textContent = '💾 Credentials auto-saved';
+            badge.style.cssText = 'font-size:0.7rem; color:#10b981; margin-left:12px; opacity:0; transition:opacity 0.4s;';
+            const credTitle = document.querySelector('h2.section-title');
+            if (credTitle) { credTitle.appendChild(badge); setTimeout(() => badge.style.opacity = '1', 100); setTimeout(() => badge.style.opacity = '0', 3000); }
         }
 
-        // Script is at bottom of body — DOM is already ready
+        // Run at 800ms — after generateDOM (500ms) — so our values win
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', doInit);
+            document.addEventListener('DOMContentLoaded', () => setTimeout(doInit, 800));
         } else {
-            doInit();
+            setTimeout(doInit, 800);
         }
     })();
 
+    // ══════ CREDENTIAL PERSISTENCE → handled by /static/cred-cache.js ══════
 
     // ══════ NEW STAGE TABLE POPULATION (1.2, 1.3, 1.4) ══════
     function autoPlaybook(n) {
@@ -2535,25 +4230,33 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
     }
 
     // ══════ RESOURCE TAB SWITCHING ══════
-    document.querySelectorAll('.res-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.res-tab').forEach(t => {
-                t.classList.remove('active');
-                t.style.color = 'var(--text-muted)';
-                t.style.borderBottomColor = 'transparent';
-            });
-            tab.classList.add('active');
-            tab.style.color = '#fbcfe8';
-            tab.style.borderBottomColor = '#ec4899';
-            document.querySelectorAll('.res-tab-content').forEach(c => c.style.display = 'none');
-            document.getElementById(tab.dataset.restab).style.display = 'block';
+    window.switchResTab = function(btn) {
+        document.querySelectorAll('.res-tab').forEach(t => {
+            t.classList.remove('active');
+            t.style.color = 'var(--text-muted)';
+            t.style.borderBottomColor = 'transparent';
         });
-    });
-    // Set active style on first tab
-    (function() {
-        const first = document.querySelector('.res-tab.active');
-        if (first) { first.style.color = '#fbcfe8'; first.style.borderBottomColor = '#ec4899'; }
-    })();
+        btn.classList.add('active');
+        btn.style.color = '#fbcfe8';
+        btn.style.borderBottomColor = '#ec4899';
+        document.querySelectorAll('.res-tab-content').forEach(c => c.style.display = 'none');
+        const target = document.getElementById(btn.dataset.restab);
+        if (target) target.style.display = 'block';
+    };
+
+    window.switchFlexResTab = function(btn) {
+        document.querySelectorAll('.flex-res-tab').forEach(t => {
+            t.classList.remove('active');
+            t.style.color = 'var(--text-muted)';
+            t.style.borderBottomColor = 'transparent';
+        });
+        btn.classList.add('active');
+        btn.style.color = '#6ee7b7';
+        btn.style.borderBottomColor = '#6ee7b7';
+        document.querySelectorAll('.flex-res-tab-content').forEach(c => c.style.display = 'none');
+        const target = document.getElementById(btn.dataset.flextab);
+        if (target) target.style.display = 'block';
+    };
 
     // ══════ POPULATE ALL RESOURCE TABS FROM TOPOLOGY ══════
     function populateResourceTabs(topData) {
@@ -2739,7 +4442,7 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
     });
 
     // ═══════ FLEX DISCOVERY ═══════
-    let flexDiscoveryData = null;
+    var flexDiscoveryData = null;
 
     async function startFlexDiscovery() {
         const authUrl = document.getElementById('flex_auth_url')?.value?.trim();
@@ -2954,6 +4657,19 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         
         showToast(`🔗 Matching complete: ${matchCount}/${ospcServers.length} OSPC servers matched on FLEX`);
 
+        // ── Persist match table to localStorage (survives hard refresh) ──
+        const matchData = [];
+        matchBody.querySelectorAll('tr[data-ospc-name]').forEach(row => {
+            matchData.push({
+                ospcName : row.dataset.ospcName || '',
+                ospcIp   : row.dataset.ospcIp   || '',
+                flexName : row.dataset.flexName  || '',
+                flexIp   : row.dataset.flexIp    || '',
+            });
+        });
+        localStorage.setItem('match_table_data', JSON.stringify(matchData));
+        if (typeof buildNodePairTable === 'function') buildNodePairTable();
+
         // ── Automatically propagate FLEX IPs into Stage 2 node cards ──
         let autoPropCount = 0;
         document.querySelectorAll('#ospc-flex-match-body tr[data-ospc-name]').forEach(row => {
@@ -3070,5 +4786,7 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
 
 </script>
 <script src="/static/rehost_generator.js"></script>
+<script src="/static/cred-cache.js"></script>
 </body>
+
 </html>

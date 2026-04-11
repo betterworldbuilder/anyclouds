@@ -2473,9 +2473,22 @@ def agent1_ui():
     return render_template("agent1.html")
 
 
+@app.get("/rehost_manual/")
+def rehost_manual_ui():
+    return render_template("rehost_manual.html")
+
+
 @app.get("/image_migrator/")
 def image_migrator_ui():
-    return render_template("image_migrator.html")
+    # Preload map files (filename + content) so labels and tables render without any JS fetch
+    preloaded: dict = {}
+    for pattern, key in [('*_overview.csv', 'overviewmap'), ('*_flavormap.csv', 'flavormap'), ('*_blockmap.csv', 'blockmap')]:
+        files = _find_map_files(pattern)
+        if files:
+            entry = _cache_map_file(key, files[0])
+            if entry:
+                preloaded[key] = entry   # {'filename': '...', 'content': '...'}
+    return render_template("image_migrator.html", preloaded_maps=preloaded)
 
 
 @app.get("/dashboard/")
@@ -4548,58 +4561,84 @@ from flask import stream_with_context
 import sys
 import subprocess
 
-ACTIVE_MIGRATOR_PROCESS = None
+ACTIVE_MIGRATOR_PROCESSES = set()
+
+# ── Server-side map file cache (avoid disk read on every page refresh) ────────
+# Structure: { 'key': {'path': str, 'mtime': float, 'filename': str, 'content': str} }
+_MAP_CACHE: dict = {}
+
+def _cache_map_file(key: str, path: str) -> dict:
+    """Return cached content if mtime unchanged, else re-read and cache."""
+    import os
+    try:
+        mtime = os.path.getmtime(path)
+        cached = _MAP_CACHE.get(key)
+        if cached and cached['mtime'] == mtime:
+            return {'filename': cached['filename'], 'content': cached['content']}
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+        _MAP_CACHE[key] = {'path': path, 'mtime': mtime, 'filename': os.path.basename(path), 'content': content}
+        return {'filename': os.path.basename(path), 'content': content}
+    except Exception:
+        return {}
+
+def _find_map_files(pattern: str) -> list:
+    """Glob BASE_DIR + UPLOAD_DIR for a CSV pattern, sorted newest-first."""
+    import glob, os
+    hits = (
+        glob.glob(str(BASE_DIR   / pattern)) +
+        glob.glob(str(UPLOAD_DIR / pattern))
+    )
+    return sorted(set(hits), key=os.path.getmtime, reverse=True)
+
+def _preload_maps():
+    """Preload all map CSVs into cache at startup (BASE_DIR + uploads/)."""
+    for pattern, key in [('*_overview.csv', 'overviewmap'), ('*_flavormap.csv', 'flavormap'), ('*_blockmap.csv', 'blockmap')]:
+        files = _find_map_files(pattern)
+        if files:
+            _cache_map_file(key, files[0])
+            print(f'[MAP CACHE] Preloaded {key}: {os.path.basename(files[0])}')
+
+_preload_maps()
 
 @app.get("/api/image_migrator/latest-maps")
 def get_latest_maps():
-    import glob, os
     try:
-        overview_files = glob.glob(str(BASE_DIR / "*_overview.csv"))
-        block_files    = glob.glob(str(BASE_DIR / "*_blockmap.csv"))
-        flavor_files   = glob.glob(str(BASE_DIR / "*_flavormap.csv"))
-
-        overview_files.sort(key=os.path.getmtime, reverse=True)
-        block_files.sort(key=os.path.getmtime, reverse=True)
-        flavor_files.sort(key=os.path.getmtime, reverse=True)
-
         res = {}
-        if overview_files:
-            with open(overview_files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                res['overviewmap'] = {'filename': os.path.basename(overview_files[0]), 'content': f.read()}
-        if block_files:
-            with open(block_files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                res['blockmap'] = {'filename': os.path.basename(block_files[0]), 'content': f.read()}
-        if flavor_files:
-            with open(flavor_files[0], 'r', encoding='utf-8', errors='ignore') as f:
-                res['flavormap'] = {'filename': os.path.basename(flavor_files[0]), 'content': f.read()}
-
+        for pattern, key in [('*_overview.csv', 'overviewmap'), ('*_flavormap.csv', 'flavormap'), ('*_blockmap.csv', 'blockmap')]:
+            files = _find_map_files(pattern)
+            if files:
+                entry = _cache_map_file(key, files[0])
+                if entry:
+                    res[key] = entry
         return jsonify(res)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.post("/api/image_migrator/stop")
 def stop_image_migrator():
-    global ACTIVE_MIGRATOR_PROCESS
-    if ACTIVE_MIGRATOR_PROCESS:
-        try:
-            import os, signal
-            pgid = os.getpgid(ACTIVE_MIGRATOR_PROCESS.pid)
-            os.killpg(pgid, signal.SIGTERM)
-        except Exception:
-            pass
-        try:
-            ACTIVE_MIGRATOR_PROCESS.kill()
-        except Exception:
-            pass
-        ACTIVE_MIGRATOR_PROCESS = None
-        return jsonify({"status": "stopped", "message": "Migration process and all child processes killed."})
+    global ACTIVE_MIGRATOR_PROCESSES
+    if ACTIVE_MIGRATOR_PROCESSES:
+        for p in list(ACTIVE_MIGRATOR_PROCESSES):
+            try:
+                import os, signal
+                pgid = os.getpgid(p.pid)
+                os.killpg(pgid, signal.SIGTERM)
+            except Exception:
+                pass
+            try:
+                p.kill()
+            except Exception:
+                pass
+        ACTIVE_MIGRATOR_PROCESSES.clear()
+        return jsonify({"status": "stopped", "message": "All migration processes and child processes killed."})
     return jsonify({"status": "idle", "message": "No active migration process found."})
 @app.post("/api/image_migrator/run")
 def run_image_migrator():
     req = request.get_json(force=True, silent=True) or {}
-    script_path = "/home/dzoan/OSPC2FLEX/ospc2Flex-Image-migtool/ospc2flex_image_migrator.py"
-    
-    cmd = [sys.executable, script_path]
+    script_path = "/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2Flex-Image-migtool/ospc2flex_image_migrator.py"
+
+    cmd = ["python3", script_path]
     
     # Core
     ospc_path = req.get('ospc_openrc')
@@ -4607,49 +4646,108 @@ def run_image_migrator():
     
     # Auto-synthesize OSPC if raw creds provided
     if req.get('ospc_username') and req.get('ospc_apikey') and not ospc_path:
-        import tempfile
+        import tempfile, shlex, re as _re
         fd, ospc_path = tempfile.mkstemp(suffix=".sh", prefix="ospc_auto_")
+        ospc_region   = str(req.get('ospc_region', 'IAD')).strip() or 'IAD'
+        ospc_auth_url = str(req.get('ospc_auth_url', '')).strip()
+        ospc_auth_type = str(req.get('ospc_auth_type', 'v2')).strip().lower()
         with os.fdopen(fd, 'w') as f:
-            f.write("export OS_AUTH_URL=https://keystone.api.dfw3.rackspacecloud.com/v3/\n")
-            f.write("export OS_IDENTITY_API_VERSION=3\n")
-            f.write("export OS_AUTH_TYPE=password\n")
-            f.write("export OS_REGION_NAME=DFW3\n")
-            f.write("export OS_INTERFACE=public\n")
-            f.write("export OS_USER_DOMAIN_NAME=rackspace_cloud_domain\n")
-            f.write("export OS_PROJECT_DOMAIN_NAME=rackspace_cloud_domain\n")
+            f.write("#!/usr/bin/env bash\n")
+            f.write(f"export OS_REGION_NAME={shlex.quote(ospc_region)}\n")
+            f.write("export OS_NO_CACHE=1\n")
             f.write(f"export OS_USERNAME={shlex.quote(str(req.get('ospc_username')))}\n")
             f.write(f"export OS_PASSWORD={shlex.quote(str(req.get('ospc_apikey')))}\n")
-            if req.get('ospc_account_id'): 
-                f.write(f"export OS_PROJECT_ID={shlex.quote(str(req.get('ospc_account_id')))}\n")
-                f.write(f"export OS_PROJECT_NAME={shlex.quote(str(req.get('ospc_account_id')))}\n")
-            
+            f.write(f"export OS_API_KEY={shlex.quote(str(req.get('ospc_apikey')))}\n")
+            if ospc_auth_type == 'v3':
+                # --- Keystone v3 ---
+                url = ospc_auth_url or 'https://identity.api.rackspacecloud.com/v3/'
+                f.write(f"export OS_AUTH_URL={shlex.quote(url)}\n")
+                f.write("export OS_IDENTITY_API_VERSION=3\n")
+                f.write("export OS_AUTH_TYPE=password\n")
+                acct = str(req.get('ospc_account_id', '')).strip()
+                if acct:
+                    f.write(f"export OS_PROJECT_ID={shlex.quote(acct)}\n")
+                domain = str(req.get('ospc_domain', 'rackspace_cloud_domain')).strip() or 'rackspace_cloud_domain'
+                f.write(f"export OS_USER_DOMAIN_NAME={shlex.quote(domain)}\n")
+                f.write(f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(domain)}\n")
+            else:
+                # --- Rackspace Classic v2 via RAX-KSKEY pre-auth ---
+                url = ospc_auth_url or 'https://identity.api.rackspacecloud.com/v2.0/'
+                f.write(f"export OS_AUTH_URL={shlex.quote(url)}\n")
+                f.write("export OS_IDENTITY_API_VERSION=2\n")
+                try:
+                    import requests as _rq
+                    _resp = _rq.post(
+                        url.rstrip('/') + '/tokens',
+                        json={"auth": {"RAX-KSKEY:apiKeyCredentials": {
+                            "username": req.get('ospc_username'),
+                            "apiKey":   req.get('ospc_apikey'),
+                        }}},
+                        timeout=15
+                    )
+                    _data = _resp.json()
+                    _token = _data['access']['token']['id']
+                    _tenant = _data['access']['token'].get('tenant', {}).get('id', '')
+                    f.write(f"export OS_TOKEN={shlex.quote(_token)}\n")
+                    f.write("export OS_AUTH_TYPE=token\n")
+                    if _tenant:
+                        f.write(f"export OS_TENANT_ID={shlex.quote(_tenant)}\n")
+                        f.write(f"export OS_PROJECT_ID={shlex.quote(_tenant)}\n")
+                except Exception:
+                    # Fallback: write raw creds (may fail, but better than nothing)
+                    f.write(f"export OS_PASSWORD={shlex.quote(str(req.get('ospc_apikey')))}\n")
+                    f.write("export OS_AUTH_TYPE=v2password\n")
+                    acct = str(req.get('ospc_account_id', '')).strip()
+                    if acct:
+                        f.write(f"export OS_TENANT_ID={shlex.quote(acct)}\n")
+
+
     # Auto-synthesize FLEX if raw creds provided
-    if req.get('flex_username') and req.get('flex_password') and not flex_path:
+    _flex_app_id     = str(req.get('flex_app_cred_id',     '') or '').strip()
+    _flex_app_secret = str(req.get('flex_app_cred_secret', '') or '').strip()
+    _flex_username   = str(req.get('flex_username', '') or '').strip()
+    _flex_password   = str(req.get('flex_password', '') or '').strip()
+    _has_appcred     = bool(_flex_app_id and _flex_app_secret)
+    _has_userpwd     = bool(_flex_username and _flex_password)
+    
+    if (_has_appcred or _has_userpwd) and not flex_path:
         import tempfile
         fd, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_auto_")
-        flex_region = str(req.get('flex_region', 'DFW')).upper().strip() or 'DFW'
-        with os.fdopen(fd, 'w') as f:
-            f.write(f"export OS_AUTH_URL={shlex.quote(str(req.get('flex_auth_url', 'https://keystone.api.dfw3.rackspacecloud.com/v3/')))}\n")
-            f.write("export OS_IDENTITY_API_VERSION=3\n")
-            f.write(f"export OS_USERNAME={shlex.quote(str(req.get('flex_username')))}\n")
-            f.write(f"export OS_PASSWORD={shlex.quote(str(req.get('flex_password')))}\n")
-            f.write(f"export OS_REGION_NAME={shlex.quote(flex_region)}\n")
-            if req.get('flex_project_id'): f.write(f"export OS_PROJECT_ID={shlex.quote(str(req.get('flex_project_id')))}\n")
-            if req.get('flex_domain'):
-                f.write(f"export OS_USER_DOMAIN_NAME={shlex.quote(str(req.get('flex_domain')))}\n")
-                f.write(f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(str(req.get('flex_domain')))}\n")
+        flex_region   = str(req.get('flex_region',   'DFW3') or 'DFW3').strip()
+        flex_domain   = str(req.get('flex_domain',   'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
+        flex_auth_url = str(req.get('flex_auth_url', 'https://keystone.api.dfw3.rackspacecloud.com/v3/') or 'https://keystone.api.dfw3.rackspacecloud.com/v3/').strip()
+        
+        with os.fdopen(fd, 'w', newline='\n') as f:
+            f.write('#!/usr/bin/env bash\n')
+            f.write(f'export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n')
+            f.write('export OS_IDENTITY_API_VERSION=3\n')
+            f.write('export OS_INTERFACE=public\n')
+            f.write(f'export OS_REGION_NAME={shlex.quote(flex_region)}\n')
+            
+            if _has_appcred:
+                f.write('export OS_AUTH_TYPE=v3applicationcredential\n')
+                f.write(f'export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(_flex_app_id)}\n')
+                f.write(f'export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(_flex_app_secret)}\n')
+            else:
+                f.write('export OS_AUTH_TYPE=password\n')
+                f.write(f'export OS_USERNAME={shlex.quote(_flex_username)}\n')
+                f.write(f'export OS_PASSWORD={shlex.quote(_flex_password)}\n')
+                f.write(f'export OS_API_KEY={shlex.quote(_flex_password)}\n')
+                f.write(f'export OS_USER_DOMAIN_NAME={shlex.quote(flex_domain)}\n')
+                f.write(f'export OS_PROJECT_DOMAIN_NAME={shlex.quote(flex_domain)}\n')
+                
+                if req.get('flex_project_id'):
+                    f.write(f'export OS_PROJECT_ID={shlex.quote(str(req.get("flex_project_id")))}\n')
+                    f.write(f'export OS_PROJECT_NAME={shlex.quote(str(req.get("flex_project_id")))}\n')
 
-    if ospc_path: cmd.extend(["--ospc-openrc", ospc_path])
-    if flex_path: cmd.extend(["--flex-openrc", flex_path])
+    if not ospc_path:
+        return jsonify({"status": "error", "message": "OSPC credentials missing: fill in OSPC Username + API Key in the credentials panel"}), 400
+    if not flex_path:
+        return jsonify({"status": "error", "message": "FLEX credentials missing: fill in FLEX Username + Password in the credentials panel"}), 400
+    cmd.extend(["--ospc-openrc", ospc_path])
+    cmd.extend(["--flex-openrc", flex_path])
     if req.get('server_name'): cmd.extend(["--server-name", req.get('server_name')])
-    if req.get('source_server_ip'): cmd.extend(["--source-server-ip", req.get('source_server_ip')])
     if req.get('snapshot_name'): cmd.extend(["--snapshot-name", req.get('snapshot_name')])
-    
-    # Map the UI's 'workdir' block to the remote execution directory to prevent local WSL parsing crashes
-    if req.get('workdir'): cmd.extend(["--origin-image-dir", req.get('workdir')])
-    # Provide a safe, isolated local orchestrator node workspace
-    cmd.extend(["--workdir", "/home/dzoan/OSPC2FLEX_LOCAL_WORKSPACE"])
-
     if req.get('target_format'): cmd.extend(["--target-format", req.get('target_format')])
     if req.get('source_format'): cmd.extend(["--source-format", req.get('source_format')])
     if req.get('flex_image_name'): cmd.extend(["--flex-image-name", req.get('flex_image_name')])
@@ -4658,26 +4756,34 @@ def run_image_migrator():
     if req.get('keep_export'): cmd.append("--keep-export")
     if req.get('cleanup_snapshot'): cmd.append("--cleanup-snapshot")
     if req.get('dry_run'): cmd.append("--dry-run")
-    
-    # HARDCODED: Always use the high-speed Datacenter Backbone proxy-bounce via Origin VM SSH
+
+    # Always use remote export (Datacenter Backbone Pipeline)
     cmd.append("--remote-export")
-    if req.get('use_swift_import'): cmd.append("--use-swift-import")
-    
-    # Dynamically inject External Processing Host settings if provided, else rely on origin inference
-    process_ip = req.get('process_host_ip')
-    if process_ip and process_ip.strip():
-        cmd.extend(["--source-server-ip", process_ip.strip()])
-    
-    # Inherit SSH configs. If external host is defined, use its creds over the globals if populated
+
+    # SSH credentials for the processing host (jumphost) — always ubuntu, never per-VM OS user
     ssh_key = req.get('process_ssh_key') or req.get('ssh_key_path')
+    ssh_usr = req.get('process_ssh_user') or 'ubuntu'
     if ssh_key: cmd.extend(["--ssh-key-path", ssh_key])
-    
-    ssh_usr = req.get('process_ssh_user') or req.get('ssh_user')
     if ssh_usr: cmd.extend(["--ssh-user", ssh_usr])
-    
-    if req.get('ssh_port') and req.get('ssh_port') != 22: cmd.extend(["--ssh-port", str(req.get('ssh_port'))])
-    if req.get('jump_host'): cmd.extend(["--jump-host", req.get('jump_host')])
-    
+    if req.get('ssh_port') and req.get('ssh_port') != 22:
+        cmd.extend(["--ssh-port", str(req.get('ssh_port'))])
+
+    # Jumphost (required — Mode 1 removed)
+    process_ip = (req.get('process_host_ip') or '').strip()
+    if not process_ip:
+        return jsonify({"error": "process_host_ip (jumphost IP) is required. Select Mode 2 or Mode 3 and provide a jumphost."}), 400
+    cmd.extend(["--source-server-ip", process_ip])
+    cmd.extend(["--origin-image-dir", req.get('workdir') or '/home/ubuntu/image'])
+    cmd.extend(["--workdir", "/tmp/ospc2flex_local_orch"])
+    # origin_vm_user = per-VM OS user (rocky, almalinux, etc.) used to SSH into origin VM in Mode 3
+    origin_user = req.get('origin_vm_user') or req.get('ssh_user') or ssh_usr
+    cmd.extend(["--origin-vm-user", origin_user])
+
+    # Production Mode: pass the per-VM origin IP separately so migrator knows to SSH-pipe from it
+    origin_vm_ip_override = (req.get('source_server_ip') or req.get('origin_vm_ip') or '').strip()
+    if origin_vm_ip_override and origin_vm_ip_override != process_ip:
+        cmd.extend(["--origin-vm-ip", origin_vm_ip_override])
+
     # Boot test
     if req.get('boot_test_vm'):
         cmd.append("--boot-test-vm")
@@ -4691,10 +4797,12 @@ def run_image_migrator():
         if req.get('auto_floating_ip'): cmd.append("--auto-floating-ip")
         if req.get('flex_external_network'): cmd.extend(["--flex-external-network", req.get('flex_external_network')])
 
-        
     # Repair
     if req.get('repair_guest'):
         cmd.append("--repair-guest")
+        if req.get('ssh_key_path'): cmd.extend(["--ssh-key-path", req.get('ssh_key_path')])
+        if req.get('ssh_port') and req.get('ssh_port') != 22: cmd.extend(["--ssh-port", str(req.get('ssh_port'))])
+        if req.get('jump_host'): cmd.extend(["--jump-host", req.get('jump_host')])
         if req.get('new_hostname'): cmd.extend(["--new-hostname", req.get('new_hostname')])
         if req.get('fix_fstab'): cmd.append("--fix-fstab")
         if req.get('fix_netplan'): cmd.append("--fix-netplan")
@@ -4703,23 +4811,23 @@ def run_image_migrator():
         if req.get('skip_cloud_init_clean'): cmd.append("--skip-cloud-init-clean")
         if req.get('skip_qemu_guest_agent'): cmd.append("--skip-qemu-guest-agent")
         if req.get('clean_hosts_file'): cmd.append("--clean-hosts-file")
-        if req.get('app_endpoint_map_file'): cmd.extend(["--app-endpoint-map-file", req.get('app_endpoint_map_file')])
         if req.get('systemd_services'): cmd.extend(["--systemd-services", req.get('systemd_services')])
 
     safe_cmd_str = " ".join(shlex.quote(str(c)) for c in cmd)
     cwd_dir = os.path.dirname(script_path)
     
     def generate():
-        global ACTIVE_MIGRATOR_PROCESS
+        global ACTIVE_MIGRATOR_PROCESSES
         yield f"data: --- EXECUTING ---\n\n"
         yield f"data: {safe_cmd_str}\n\n"
         yield f"data: \n\n"
+        process = None
         try:
             process = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 cwd=cwd_dir, text=True, bufsize=1, start_new_session=True
             )
-            ACTIVE_MIGRATOR_PROCESS = process
+            ACTIVE_MIGRATOR_PROCESSES.add(process)
             for line in iter(process.stdout.readline, ''):
                 if not line: break
                 yield f"data: {line.rstrip()}\n\n"
@@ -4729,7 +4837,8 @@ def run_image_migrator():
         except Exception as e:
             yield f"data: [SUBPROCESS LAUNCH ERROR: {str(e)}]\n\n"
         finally:
-            ACTIVE_MIGRATOR_PROCESS = None
+            if process in ACTIVE_MIGRATOR_PROCESSES:
+                ACTIVE_MIGRATOR_PROCESSES.remove(process)
             yield "data: [DONE]\n\n"
             
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
@@ -5250,29 +5359,53 @@ def agent1_run_deep_scan():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
+_migration_process = None  # module-level handle so stop endpoint can kill it
+
 @app.post("/api/agent1/run/migration")
 def agent1_run_migration():
+    global _migration_process
     script_data = request.data.decode('utf-8')
     with open('/tmp/run_migration_live.sh', 'w') as f: f.write(script_data)
     os.system('chmod +x /tmp/run_migration_live.sh')
-    
+
     def generate():
-        process = subprocess.Popen(
+        global _migration_process
+        _migration_process = subprocess.Popen(
             ['bash', '/tmp/run_migration_live.sh'],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+            preexec_fn=os.setsid  # run in its own process group so we can kill all children
         )
         with open('migration_log.txt', 'w') as f_log:
-            for line in iter(process.stdout.readline, ''):
+            for line in iter(_migration_process.stdout.readline, ''):
                 if not line: break
                 f_log.write(line)
                 f_log.flush()
                 yield line
+        _migration_process = None
     return Response(stream_with_context(generate()), mimetype='text/plain')
 
 @app.post("/api/agent1/stop/migration")
 def agent1_stop_migration():
-    os.system("pkill -f 'run_migration_live.sh'")
-    return jsonify({"status":"stopped"})
+    global _migration_process
+    import signal
+    if _migration_process is not None:
+        try:
+            # Kill the entire process group (bash + all ssh/scp/rsync children)
+            os.killpg(os.getpgid(_migration_process.pid), signal.SIGKILL)
+        except Exception:
+            pass
+        try:
+            _migration_process.kill()
+        except Exception:
+            pass
+        _migration_process = None
+    # Fallback pkill in case process ref was lost
+    os.system("pkill -9 -f 'run_migration_live.sh' 2>/dev/null || true")
+    os.system("pkill -9 -f 'ssh -i /home' 2>/dev/null || true")
+    os.system("pkill -9 -f 'scp -O' 2>/dev/null || true")
+    return jsonify({"status": "stopped"})
+
 
 @app.post("/api/agent1/run/dependency_check")
 def agent1_run_deps():
@@ -5367,6 +5500,8 @@ def run_uat_tests():
     flex_user = data.get('flex_user', '')
     flex_pass = data.get('flex_pass', '')
     flex_domain = data.get('flex_domain', 'default')
+    flex_app_id = data.get('flex_app_id', '')
+    flex_app_secret = data.get('flex_app_secret', '')
     
     app_url = data.get('uat_app_url', '')
     app_ip = data.get('uat_app_ip', '')
@@ -5374,14 +5509,26 @@ def run_uat_tests():
     ssh_user = data.get('uat_ssh_user', 'ubuntu')
     ssh_key = data.get('uat_ssh_key', '')
 
+    has_appcred = bool(flex_app_id and flex_app_secret)
+    
     openrc_content = f"""
 export OS_AUTH_URL="{flex_auth}"
+export OS_IDENTITY_API_VERSION=3
+export OS_INTERFACE=public
+"""
+    if has_appcred:
+        openrc_content += f"""export OS_AUTH_TYPE=v3applicationcredential
+export OS_APPLICATION_CREDENTIAL_ID="{flex_app_id}"
+export OS_APPLICATION_CREDENTIAL_SECRET="{flex_app_secret}"
+"""
+    else:
+        openrc_content += f"""export OS_AUTH_TYPE=password
 export OS_PROJECT_ID="{flex_proj}"
 export OS_PROJECT_NAME="{flex_proj}"
 export OS_USER_DOMAIN_NAME="{flex_domain}"
 export OS_USERNAME="{flex_user}"
 export OS_PASSWORD="{flex_pass}"
-export OS_IDENTITY_API_VERSION=3
+export OS_API_KEY="{flex_pass}"
 """
     with open('/tmp/flex_uat_openrc.sh', 'w') as f:
         f.write(openrc_content)
@@ -5916,4 +6063,4 @@ def download_report_file(filename):
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))
-    app.run(host=host, port=port, debug=False)
+    app.run(host=host, port=port, debug=False, threaded=True)

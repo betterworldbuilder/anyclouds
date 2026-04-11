@@ -10,94 +10,16 @@
   <header>
     <h1>Data Migration Full auto mode ( pre AI co pilot )</h1>
     <p>OSPC2Flex Data Migration Dashboard: Orchestrates final payload file syncing, database replication, and safe A/B traffic split cutovers.</p>
-    <ul style="max-width: 900px; margin: 10px auto; text-align: left; background: rgba(0, 0, 0, 0.2); color: #fff; padding: 15px 35px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); line-height: 1.6;">
-      <li><strong>Step 6 (Data Migration)</strong>: Generate the sync, cutover, and rollback scripts required to migrate databases and application files.</li>
-      <li><strong>Step 7 (Execution)</strong>: Select a generated migration script and click the button to execute it securely from the dashboard.</li>
-      <li style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.2);"><strong>Manual Process (Step 9)</strong>: Use the manual runbook below for edge cases not covered by automated scripts, such as Kubernetes/Magnum container workloads, highly customised persistent volumes, custom clustered database topologies, or any legacy component requiring specific per-tier write freezes and data verification steps before cutover.</li>
-    </ul>
   </header>
 
   <main>
 
 
-    <section class="card">
-      <h2>File Manager & Uploads</h2>
-      <p class="hint">For typical data migrations, Step 6 will automatically inherit the Discovery and Mapping artifacts generated during Step 1.<br>
-      However, you can completely bypass Step 1 and supply a standalone CSV list of source and target IPs directly by uploading a <code>custom_data_targets.csv</code> file! <a href="/api/download/custom_data_targets.csv" style="color: #66b3ff; text-decoration: underline; font-weight: bold;">(Download Demo Template)</a><br>
-      Upload your custom overrides or artifact files here to instantly populate the active deployment dropdowns. <em>(Files are stored securely in the local <code>uploads/</code> directory).</em></p>
-      <div class="row">
-        <input type="file" id="uploadFile" />
-        <button id="uploadBtn">Upload</button>
-        <button id="refreshFilesBtn">Refresh Files</button>
-      </div>
-      <ul id="fileList" class="file-list"></ul>
-    </section>
 
 
 
 
 
-    <section class="card">
-      <h2>Step 6) Generate Data Migration Artifacts <span id="statusMigrateGen" class="status-chip idle">Idle</span></h2>
-      <div class="hint">
-        <p>This step is the <strong>planning and scripting engine</strong>. When you select your inputs (either the OpenStack mappings from Stage 1 or a custom CSV) and choose a Migration Strategy, the backend python script (<code>generate_data_migration_script.py</code>) analyzes the source servers and target clones to build a customized migration runbook.</p>
-        <p>It generates three distinct, reusable Bash scripts:</p>
-        <ul style="margin-top:5px; margin-bottom:10px; padding-left:20px;">
-          <li><strong>*_sync.sh (The Background Copy)</strong>: Securely copies files (<code>rsync</code>) or copies databases (<code>mysqldump</code>) from the live OSPC source to the FLEX target while the application is still running. This step is 100% non-disruptive and can be run multiple times to keep the target "warmed up."</li>
-          <li><strong>*_cutover.sh (The Final Switch)</strong>: The critical script that executes the strategy you chose (Direct, Local A/B, or External A/B). It stops the source services to freeze data writes, performs one final lightning-fast delta sync to the target, and updates local proxies or OpenStack Load Balancers to permanently route live user traffic to the new FLEX instance.</li>
-          <li><strong>*_rollback.sh (The Safety Net)</strong>: Automatically generated safety script that immediately reverses the cutover commands (e.g. removes the FLEX instance from the load balancer and restarts the legacy OSPC services) if the migration fails validation.</li>
-        </ul>
-      </div>
-      <div class="grid">
-        <p class="hint" style="grid-column: span 3; margin-bottom: 0;"><label class="hint-check"><input id="migUseCustomCsv" type="checkbox" /> Bypass step 6 migration artifacts generation and use a standalone Custom Server IP CSV</label></p>
-        
-        <div id="migStandardInputGroup" style="display: contents;">
-          <label>Overview CSV (Source Inventory)
-            <select id="migInventory"></select>
-          </label>
-          <label>Flavor Map CSV (Target Mappings)
-            <select id="migFlavorMap"></select>
-          </label>
-        </div>
-        
-        <div id="migCustomInputGroup" style="display: none; grid-column: span 2;">
-          <label>Custom Data Migration CSV (Must contain <code>source_ip</code> and <code>target_ip</code> columns)
-            <select id="migCustomList"></select>
-          </label>
-        </div>
-
-        <label>Migration Strategy
-          <select id="migStrategy">
-            <option value="fip_swap">Floating IP Swap (Lowest Downtime / Hot Swap)</option>
-            <option value="dns_swap">DNS CNAME / A-Record Swap (Low Downtime)</option>
-            <option value="ab_reuse_lb">A/B Parallel: Reuse OpenStack LB & HA DB (Medium Downtime)</option>
-            <option value="ab_haproxy">A/B Parallel: Install Local HAProxy (Medium-High Downtime)</option>
-            <option value="direct">Direct Cutover (Highest Downtime / Stop Services)</option>
-          </select>
-        </label>
-      </div>
-      <button id="runMigrateGenBtn">Generate Data Migration Scripts</button>
-    </section>
-
-    <section class="card">
-      <h2>Step 7) Execute Data Migration <span id="statusExecuteBash" class="status-chip idle">Idle</span></h2>
-      <div class="hint">
-        <p>This step is the <strong>execution engine</strong>. Instead of forcing you to SSH into jump boxes to run the scripts manually, the dashboard acts as a secure control plane.</p>
-        <ul style="margin-top:5px; margin-bottom:10px; padding-left:20px;">
-          <li>You use the dropdown to select one of the three scripts generated in Step 6 (usually starting with the <code>_sync.sh</code> script).</li>
-          <li>When you click <strong>Execute Migration Script</strong>, the dashboard's backend securely spawns a bash sub-process.</li>
-          <li>The script executes the remote payload delivery (e.g., streaming <code>rsync</code> over SSH between the source and target IPs).</li>
-          <li>All standard output and errors are captured live and streamed directly into the <strong>Execution Output</strong> window at the bottom of the dashboard, giving you complete visibility into the progress of the packet transfers and database dumps.</li>
-        </ul>
-      </div>
-      <div class="grid">
-        <label>Migration Script (*.sh)
-          <select id="exeBashScript"></select>
-        </label>
-      </div>
-      <button id="runExecuteBashBtn">Execute Migration Script</button>
-      <button id="stopExecuteBashBtn" style="display:none; background:linear-gradient(135deg,#c0392b,#922b21); margin-left:10px;" title="Stop the running migration script">⏹ Stop Execution</button>
-    </section>
 
     <section id="deployNextStepsCard" class="card" style="display:none;">
       <h2>Next Step</h2>
@@ -115,573 +37,1109 @@
       </div>
     </section>
 
-    <!-- Step 8.5: Kubernetes Data Migration Runbook -->
-    <section class="card" id="k8sMigrationCard">
-      <h2>Step 8.5) Kubernetes (K8s) Migration <span class="status-chip idle">Manual &amp; Automated</span></h2>
-      <div class="hint">
-        <p>Because Kubernetes manages its own state and storage dependencies, we do not migrate them using standard VM-level <code>rsync</code> scripts. Choose the Automated Pipeline or one of the manual fallback strategies below:</p>
-        <div style="margin-top: 15px; background: rgba(0,0,0,0.1); padding: 15px; border-radius: 6px; border-left: 3px solid #7ecfff;">
-          <h4 style="margin: 0 0 10px 0; color: #7ecfff;">How it works</h4>
-          <ol style="margin: 0 0 10px 0; padding-left: 20px; font-size: 13px;">
-            <li>You select the Deployment Type dropdown (Helm, Kustomize, or Raw YAML).</li>
-            <li>You <strong>upload</strong> your Stage 1 Export Configuration (e.g. <code>k8s-inventory-main.yaml</code> or ZIP).</li>
-            <li>You provide the path to your target FLEX Kubeconfig file.</li>
-            <li>You click the big purple <strong>Execute Kubernetes Redeployment</strong> button.</li>
-          </ol>
-          <p style="margin: 0 0 10px 0; font-size: 13px;">The Python backend engine (<code>app.py</code>) will automatically take those exact parameters, inject the Kubeconfig context into an isolated environment, and execute the correct deployment binary for you:</p>
-          <ul style="margin: 0 0 10px 0; padding-left: 20px; font-size: 13px;">
-            <li>For <strong>Helm</strong>, it runs: <code>helm upgrade --install &lt;release&gt; . -f &lt;values-path&gt;</code></li>
-            <li>For <strong>Kustomize</strong>, it runs: <code>kubectl apply -k &lt;kustomize-path&gt;</code></li>
-            <li>For <strong>Raw YAML</strong>, it runs: <code>kubectl apply -f &lt;yaml-path&gt;</code></li>
-          </ul>
-          <p style="margin: 0; font-size: 13px;">The execution logs are then streamed straight back into the dashboard! This makes rebuilding the K8s configurations a true 1-click operation without your operators ever having to touch a terminal.</p>
-        </div>
-      </div>
 
-      <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; margin-bottom:20px; border-left:4px solid #8e44ad;">
-        <h3 style="margin-top:0; color:#fff;">⚡ Automated Pipeline: Stage 1 Artifact Deployment</h3>
-        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Automatically deploy the Kubernetes configurations (YAML/Helm/Kustomize) exported during Stage 1 directly onto the new FLEX cluster.</p>
-        <ol style="font-size:13px; color:#eee; padding-left:20px; line-height:1.6; margin-bottom:15px;">
-          <li>Ensure the newly provisioned FLEX Kubernetes Cluster is online.</li>
-          <li>Ensure any Cinder storage volumes have been successfully snapshot and re-attached in FLEX.</li>
-          <li>Select the deployment type (Helm, Kustomize, or Raw YAML) and provide the file paths below.</li>
-        </ol>
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <label style="font-size:12px; color:#aaa;">Deployment Type
-            <select id="k8sDeployType" style="width:100%; padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; margin-top:2px;">
-              <option value="yaml">Raw YAML Manifest (e.g. k8s-inventory-main.yaml)</option>
-              <option value="kustomize">Kustomize Directory (.zip or .tar.gz)</option>
-              <option value="helm">Helm Values (values.yaml)</option>
-            </select>
-          </label>
-          <label style="font-size:12px; color:#aaa; margin-top:5px;">Stage 1 Configuration File (YAML, Zip, or Tar)
-            <input type="file" id="k8sArtifactFile" style="width:100%; padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; font-family:monospace; font-size:12px; margin-top:2px;">
-          </label>
-          <input type="text" id="k8sFlexConfig" placeholder="Path to target FLEX kubeconfig (e.g. /home/user/.kube/config-flex)" style="padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; font-family:monospace; font-size:12px; margin-top:5px;">
-          <input type="text" id="k8sHelmRelease" placeholder="Helm Release Name / Chart (Required for Helm only)" style="padding:8px; border-radius:4px; border:1px solid #4b6fa0; background:#111; color:#5eead4; font-family:monospace; font-size:12px; display:none;">
-          <button id="btnRunK8sDeploy" style="background:#8e44ad; border:none; color:white; padding:10px 15px; font-weight:bold; cursor:pointer; border-radius:4px; margin-top:5px;">Execute Kubernetes Redeployment</button>
-        </div>
-      </div>
-      
-      <script>
-        document.getElementById('k8sDeployType').addEventListener('change', (e) => {
-            const helmInput = document.getElementById('k8sHelmRelease');
-            helmInput.style.display = (e.target.value === 'helm') ? 'block' : 'none';
-        });
-
-        document.getElementById('btnRunK8sDeploy').addEventListener('click', () => {
-            const deployType = document.getElementById('k8sDeployType').value;
-            const fileInput = document.getElementById('k8sArtifactFile');
-            const flexConfig = document.getElementById('k8sFlexConfig').value.trim();
-            const helmRelease = document.getElementById('k8sHelmRelease').value.trim();
-
-            if (fileInput.files.length === 0 || !flexConfig) {
-                alert("Please upload the Stage 1 configuration file and provide the FLEX Kubeconfig path.");
-                return;
-            }
-            if (deployType === 'helm' && !helmRelease) {
-                alert("Helm requires a Release Name / Chart Name.");
-                return;
-            }
-
-            const btn = document.getElementById('btnRunK8sDeploy');
-            btn.textContent = "⏳ Uploading & Executing Pipeline...";
-            btn.disabled = true;
-
-            const formData = new FormData();
-            formData.append('deployType', deployType);
-            formData.append('artifactFile', fileInput.files[0]);
-            formData.append('flexConfig', flexConfig);
-            formData.append('helmRelease', helmRelease);
-
-            fetch('/api/run/k8s-deploy', {
-                method: 'POST',
-                body: formData // No explicit JSON headers needed for FormData
-            })
-            .then(res => res.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.textContent = "Execute Kubernetes Redeployment";
-                if (data.status === 'success') {
-                    alert("K8s Pipeline Executed Successfully!\n\n" + data.message);
-                } else {
-                    alert("Pipeline Error:\n" + data.error);
-                }
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.textContent = "Execute Kubernetes Redeployment";
-                alert("Network error calling Pipeline API.");
-            });
-        });
-      </script>
-
-      <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; margin-bottom:20px; border-left:4px solid #f39c12;">
-        <h3 style="margin-top:0; color:#fff;">Manual Strategy A: Cinder Volume Snapshot &amp; Configuration Rebuild</h3>
-        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Best for clusters with giant Persistent Volumes (Databases, Message Queues) when you don't want to use Velero.</p>
-        <ol style="font-size:13px; color:#eee; padding-left:20px; line-height:1.6; margin-bottom:0;">
-          <li>Back in <strong>Stage 1 (Discovery)</strong>, export all configurations based on the source tooling (e.g. Helm values, Kustomize folder, or cleaned raw YAML).</li>
-          <li>Scale down the StatefulSets in OSPC to freeze data pipelines: <code>kubectl scale statefulset &lt;name&gt; --replicas=0</code>.</li>
-          <li>Snapshot the underlying Cinder Volumes in the OSPC OpenStack project.</li>
-          <li>Create new Cinder Volumes from those snapshots in the FLEX project, ensuring they match capacity.</li>
-          <li>Deploy the new FLEX Kubernetes Cluster.</li>
-          <li>Update your <code>PersistentVolume</code> manifests in FLEX to bind directly to the newly cloned FLEX Volume IDs.</li>
-          <li>During <strong>Stage 3</strong>, switch your terminal context to the new FLEX cluster's API and apply your exported configurations:</li>
-          <ul style="list-style-type:circle; margin-top:5px; margin-bottom:10px;">
-            <li><strong>Helm:</strong> <code>helm upgrade --install &lt;release&gt; &lt;chart&gt; -n &lt;namespace&gt; -f values.yaml</code></li>
-            <li><strong>Kustomize:</strong> <code>kubectl apply -k &lt;directory&gt;</code></li>
-            <li><strong>Raw YAML / Live Export:</strong> <code>kubectl apply -f k8s-inventory-main.yaml</code> (ensure you removed old runtime uids/ips).</li>
-          </ul>
-          <li>Update Ingress Route53/DNS.</li>
-        </ol>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; border-left:4px solid #2ecc71;">
-        <h3 style="margin-top:0; color:#fff;">Manual Strategy B: Backup &amp; Restore via Velero (Cloud-Native Sync)</h3>
-        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">The recommended Kubernetes-native manual approach that perfectly preserves all Custom Resources, Secrets, and Namespaces.</p>
-        <ol style="font-size:13px; color:#eee; padding-left:20px; line-height:1.6; margin-bottom:0;">
-          <li>Provision an empty target Kubernetes cluster running on your FLEX OpenStack VMs.</li>
-          <li>Install Velero on the legacy OSPC Cluster, configured to backup workloads to an S3/Swift Object Storage bucket.</li>
-          <li>Run a full cluster backup: <code>velero backup create k8s-migration --include-namespaces &lt;your-apps&gt;</code>.</li>
-          <li>Install Velero on the new FLEX Cluster, pointing to the exact same shared bucket.</li>
-          <li>Run the restore command onto FLEX: <code>velero restore create --from-backup k8s-migration</code>.</li>
-          <li>Validate the restored pods, test workload communication over the new FLEX overlay network, and cutover DNS.</li>
-        </ol>
-      </div>
-    </section>
-
-    <!-- Step 9: Manual Data Migration Runbook -->
-    <section class="card" id="manualRunbookCard">
-      <h2>Step 9) Manual Data Migration Runbook <span class="status-chip idle">Reference</span></h2>
-      <p class="hint">A/B OSPC → FLEX manual runbook for operators. Covers Frontend · Backend · API · Shared Files · MySQL · PostgreSQL · Kubernetes/Magnum · Write-Freeze · Cutover · Health Check · Rollback.</p>
-
-      <!-- Variable config -->
-      <details open style="margin:10px 0;background:#0d1a3a;border:1px solid #8ea2cc44;border-radius:8px;padding:10px 14px;">
-        <summary style="cursor:pointer;font-weight:700;color:#7ecfff;font-size:13px;">⚙️ Configure Placeholder Variables (fill in your IPs)</summary>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:10px;">
-          <label style="font-size:12px;">OSPC_FRONT IP<input id="rb_ospc_front" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">OSPC_BACK IP<input id="rb_ospc_back" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">OSPC_API IP<input id="rb_ospc_api" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">OSPC_DB IP<input id="rb_ospc_db" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">FLEX_FRONT IP<input id="rb_flex_front" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">FLEX_BACK IP<input id="rb_flex_back" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">FLEX_API IP<input id="rb_flex_api" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">FLEX_DB IP<input id="rb_flex_db" class="rb-var" placeholder="user@IP" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">SSH Key path<input id="rb_ssh_key" class="rb-var" placeholder="~/.ssh/ospc2flex" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">OSPC K8s API<input id="rb_k8s_ospc" class="rb-var" placeholder="https://OSPC_K8S_API" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-          <label style="font-size:12px;">FLEX K8s API<input id="rb_k8s_flex" class="rb-var" placeholder="https://FLEX_K8S_API" style="display:block;width:100%;margin-top:3px;padding:5px;background:#1a2e5a;border:1px solid #4b6fa0;border-radius:4px;color:#fff;font-family:monospace;font-size:12px;"></label>
-        </div>
-        <button onclick="applyRbVars()" type="button" style="margin-top:10px;padding:6px 14px;background:#4b5f91;border:none;border-radius:5px;color:#fff;font-weight:700;cursor:pointer;">Apply Variables</button>
-      </details>
-
-      <!-- Section tabs -->
-      <div id="rbTabs" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;">
-        <button class="rb-tab active" data-rb="rb1">1 Frontend</button>
-        <button class="rb-tab" data-rb="rb2">2 Backend</button>
-        <button class="rb-tab" data-rb="rb3">3 API</button>
-        <button class="rb-tab" data-rb="rb4">4 Shared Files</button>
-        <button class="rb-tab" data-rb="rb5">5 MySQL</button>
-        <button class="rb-tab" data-rb="rb6">6 PostgreSQL</button>
-        <button class="rb-tab" data-rb="rb7">☸ K8s / Magnum</button>
-        <button class="rb-tab" data-rb="rb8">7 Write-Freeze</button>
-        <button class="rb-tab" data-rb="rb9">8 Cutover</button>
-        <button class="rb-tab" data-rb="rb10">9 Health Check</button>
-        <button class="rb-tab" data-rb="rb11">10 Rollback</button>
-        <button class="rb-tab" data-rb="rb12">11 Best Practices</button>
-      </div>
-
-      <!-- Runbook tables -->
-      <div id="rbContent" style="overflow-x:auto;font-size:12px;">
-
-        <!-- 1 Frontend -->
-        <div class="rb-panel active" id="rb1">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">1) Frontend Runbook — Nginx / Static Web</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>Initial sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Sync deployed web files</td></tr>
-            <tr><td>Nginx config backup</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_FRONT 'sudo tar czf /tmp/frontend-nginx.tgz /etc/nginx' &amp;&amp; scp -i $SSH_KEY $OSPC_FRONT:/tmp/frontend-nginx.tgz /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/frontend-nginx.tgz $FLEX_FRONT:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move config for review</td></tr>
-            <tr><td>Restore config on Flex</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'sudo tar xzf /tmp/frontend-nginx.tgz -C / &amp;&amp; sudo nginx -t &amp;&amp; sudo systemctl reload nginx'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Validate and reload</td></tr>
-            <tr><td>Delta sync (pre-cutover)</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_FRONT:/var/www/html/ $FLEX_FRONT:/var/www/html/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Re-run before cutover</td></tr>
-            <tr><td>Smoke test</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm HTTP response</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 2 Backend -->
-        <div class="rb-panel" id="rb2">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">2) Backend Runbook — App Service</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>App code sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete --exclude 'venv/' --exclude 'node_modules/' --exclude 'logs/' --exclude 'tmp/' -e "ssh -i $SSH_KEY" $OSPC_BACK:/opt/myapp/ $FLEX_BACK:/opt/myapp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move app tree, skip rebuildable dirs</td></tr>
-            <tr><td>Service file export</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_BACK 'sudo tar czf /tmp/backend-systemd.tgz /etc/systemd/system' &amp;&amp; scp -i $SSH_KEY $OSPC_BACK:/tmp/backend-systemd.tgz /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/backend-systemd.tgz $FLEX_BACK:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Carry service definitions</td></tr>
-            <tr><td>Restore service files</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo tar xzf /tmp/backend-systemd.tgz -C / &amp;&amp; sudo systemctl daemon-reload'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Load service units</td></tr>
-            <tr><td>Reinstall deps</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'cd /opt/myapp &amp;&amp; [ -f requirements.txt ] &amp;&amp; python3 -m pip install -r requirements.txt; [ -f package.json ] &amp;&amp; npm ci'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Rebuild dependencies on Flex</td></tr>
-            <tr><td>Start service</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl restart myapp &amp;&amp; sudo systemctl status myapp --no-pager'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Verify service comes up</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 3 API -->
-        <div class="rb-panel" id="rb3">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">3) API Runbook</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>API code sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete --exclude '.git/' --exclude 'venv/' --exclude 'node_modules/' -e "ssh -i $SSH_KEY" $OSPC_API:/srv/api/ $FLEX_API:/srv/api/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Sync API code</td></tr>
-            <tr><td>Env/config export</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_API 'sudo tar czf /tmp/api-config.tgz /etc/myapi /srv/api/.env' &amp;&amp; scp -i $SSH_KEY $OSPC_API:/tmp/api-config.tgz /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/api-config.tgz $FLEX_API:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move env/config carefully</td></tr>
-            <tr><td>Restore config</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'sudo tar xzf /tmp/api-config.tgz -C /'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Restore config</td></tr>
-            <tr><td>Dependency rebuild</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'cd /srv/api &amp;&amp; [ -f requirements.txt ] &amp;&amp; python3 -m pip install -r requirements.txt; [ -f package.json ] &amp;&amp; npm ci'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Rebuild API dependencies</td></tr>
-            <tr><td>API health test</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'curl -fsS http://127.0.0.1:8000/health || curl -fsS http://127.0.0.1:5000/health'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm API responds</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 4 Shared Files -->
-        <div class="rb-panel" id="rb4">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">4) Shared Files / Uploads</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>Initial file sync</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --progress -e "ssh -i $SSH_KEY" $OSPC_BACK:/srv/uploads/ $FLEX_BACK:/srv/uploads/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Initial bulk transfer</td></tr>
-            <tr><td>Large archive option</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_BACK 'sudo tar czf /tmp/uploads.tgz /srv/uploads' &amp;&amp; scp -i $SSH_KEY $OSPC_BACK:/tmp/uploads.tgz $FLEX_BACK:/tmp/ &amp;&amp; ssh -i $SSH_KEY $FLEX_BACK 'sudo tar xzf /tmp/uploads.tgz -C /'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Use for many tiny files</td></tr>
-            <tr><td>Delta sync (pre-cutover)</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_BACK:/srv/uploads/ $FLEX_BACK:/srv/uploads/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final incremental sync</td></tr>
-            <tr><td>Verify size/count</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_BACK 'du -sh /srv/uploads &amp;&amp; find /srv/uploads | wc -l' &amp;&amp; ssh -i $SSH_KEY $FLEX_BACK 'du -sh /srv/uploads &amp;&amp; find /srv/uploads | wc -l'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Compare counts both sides</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 5 MySQL -->
-        <div class="rb-panel" id="rb5">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">5) MySQL / MariaDB Runbook</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>Logical dump</td><td>Admin box → OSPC DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'mysqldump -u root -p --single-transaction --routines --triggers --events --databases appdb > /tmp/appdb.sql'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Consistent InnoDB export</td></tr>
-            <tr><td>Transfer dump</td><td>Admin box</td><td><code class="rb-cmd">scp -i $SSH_KEY $OSPC_DB:/tmp/appdb.sql /tmp/appdb.sql &amp;&amp; scp -i $SSH_KEY /tmp/appdb.sql $FLEX_DB:/tmp/appdb.sql</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move dump</td></tr>
-            <tr><td>Create DB on Flex</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS appdb;"'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Prepare target</td></tr>
-            <tr><td>Restore dump</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -p appdb < /tmp/appdb.sql'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Import DB</td></tr>
-            <tr><td>App validation</td><td>Admin box → Flex API</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'mysql -h $FLEX_DB_IP -u appuser -p appdb -e "SHOW TABLES;"'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm app→DB connectivity</td></tr>
-            <tr><td>Final freeze dump</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'mysqldump -u root -p --single-transaction --routines --triggers --events appdb > /tmp/appdb-final.sql' &amp;&amp; scp -i $SSH_KEY $OSPC_DB:/tmp/appdb-final.sql /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/appdb-final.sql $FLEX_DB:/tmp/ &amp;&amp; ssh -i $SSH_KEY $FLEX_DB 'mysql -u root -p appdb < /tmp/appdb-final.sql'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final delta after write freeze</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 6 PostgreSQL -->
-        <div class="rb-panel" id="rb6">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">6) PostgreSQL Runbook</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>Archive dump</td><td>Admin box → OSPC DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'pg_dump -U postgres -Fc appdb > /tmp/appdb.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Portable custom-format dump</td></tr>
-            <tr><td>Transfer dump</td><td>Admin box</td><td><code class="rb-cmd">scp -i $SSH_KEY $OSPC_DB:/tmp/appdb.dump /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/appdb.dump $FLEX_DB:/tmp/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Move archive</td></tr>
-            <tr><td>Create target DB</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'createdb -U postgres appdb'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Prepare target</td></tr>
-            <tr><td>Restore archive</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'pg_restore -U postgres -d appdb /tmp/appdb.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Restore DB</td></tr>
-            <tr><td>Parallel restore (faster)</td><td>Admin box → Flex DB</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_DB 'pg_restore -U postgres -j 4 -d appdb /tmp/appdb.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>4 parallel jobs for speed</td></tr>
-            <tr><td>App validation</td><td>Admin box → Flex API</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'psql -h $FLEX_DB_IP -U appuser -d appdb -c "\dt"'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm connectivity + tables</td></tr>
-            <tr><td>Final freeze dump</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $OSPC_DB 'pg_dump -U postgres -Fc appdb > /tmp/appdb-final.dump' &amp;&amp; scp -i $SSH_KEY $OSPC_DB:/tmp/appdb-final.dump /tmp/ &amp;&amp; scp -i $SSH_KEY /tmp/appdb-final.dump $FLEX_DB:/tmp/ &amp;&amp; ssh -i $SSH_KEY $FLEX_DB 'dropdb -U postgres appdb &amp;&amp; createdb -U postgres appdb &amp;&amp; pg_restore -U postgres -d appdb /tmp/appdb-final.dump'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final delta after write freeze</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- K8s / Magnum -->
-        <div class="rb-panel" id="rb7">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">☸ Kubernetes / OpenStack Magnum Migration</h3>
-          <p style="color:#d4ddf5;margin-bottom:10px;font-size:12px;">OSPC does not offer Magnum. Migrate containerised workloads by exporting manifests and PVC data from the source cluster and re-deploying on a new Flex Magnum cluster.</p>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Purpose</th></tr></thead><tbody>
-            <tr><td>Export all manifests</td><td>Admin box (kubectl → OSPC cluster)</td><td><code class="rb-cmd">kubectl --kubeconfig=ospc-kubeconfig get all,configmap,secret,ingress,pvc -A -o yaml > ospc-cluster-export.yaml</code><button class="cp-btn" title="Copy">⎘</button></td><td>Capture all workload definitions</td></tr>
-            <tr><td>Create Flex Magnum cluster</td><td>Admin box (openstack CLI)</td><td><code class="rb-cmd">openstack coe cluster create flex-k8s --cluster-template k8s-v1.29 --node-count 3 --master-count 1 --keypair ospc2flex</code><button class="cp-btn" title="Copy">⎘</button></td><td>Provision target K8s cluster on Flex</td></tr>
-            <tr><td>Get Flex kubeconfig</td><td>Admin box</td><td><code class="rb-cmd">openstack coe cluster config flex-k8s --dir ~/.kube/ --force &amp;&amp; export KUBECONFIG=~/.kube/config</code><button class="cp-btn" title="Copy">⎘</button></td><td>Configure kubectl for Flex cluster</td></tr>
-            <tr><td>Migrate PVC data (Velero)</td><td>Admin box</td><td><code class="rb-cmd">velero backup create ospc-backup --kubeconfig=ospc-kubeconfig --include-namespaces=prod &amp;&amp; velero restore create --from-backup ospc-backup --kubeconfig=flex-kubeconfig</code><button class="cp-btn" title="Copy">⎘</button></td><td>Backup &amp; restore PVCs via Velero</td></tr>
-            <tr><td>Manual PVC rsync fallback</td><td>Admin box</td><td><code class="rb-cmd">kubectl --kubeconfig=ospc-kubeconfig exec -n prod deploy/myapp -- tar czf - /data | kubectl --kubeconfig=flex-kubeconfig exec -i -n prod deploy/myapp -- tar xzf - -C /data</code><button class="cp-btn" title="Copy">⎘</button></td><td>Direct pod-to-pod data transfer</td></tr>
-            <tr><td>Apply manifests on Flex</td><td>Admin box (kubectl → Flex)</td><td><code class="rb-cmd">kubectl --kubeconfig=flex-kubeconfig apply -f ospc-cluster-export.yaml</code><button class="cp-btn" title="Copy">⎘</button></td><td>Deploy workloads on Flex cluster</td></tr>
-            <tr><td>Verify pods healthy</td><td>Admin box (kubectl → Flex)</td><td><code class="rb-cmd">kubectl --kubeconfig=flex-kubeconfig get pods -A &amp;&amp; kubectl --kubeconfig=flex-kubeconfig get pvc -A</code><button class="cp-btn" title="Copy">⎘</button></td><td>Confirm all pods running, PVCs bound</td></tr>
-            <tr><td>Update ingress / DNS</td><td>DNS / LB control plane</td><td><code class="rb-cmd"># Point your DNS / Flex Octavia LB to the new Flex Magnum cluster ingress IP<br>openstack floating ip list | grep &lt;flex-ingress-ip&gt;</code><button class="cp-btn" title="Copy">⎘</button></td><td>Route traffic to Flex cluster</td></tr>
-          </tbody></table>
-          <p style="color:#a8d8ff;margin-top:10px;font-size:12px;">⚠️ <strong>Prerequisites:</strong> kubectl, Helm, Velero (optional), openstack CLI with Magnum plugin. Update image registry references if your OSPC cluster used a private registry.</p>
-        </div>
-
-        <!-- 7 Write-Freeze -->
-        <div class="rb-panel" id="rb8">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">7) Write-Freeze Sequence</h3>
-          <table class="rb-table"><thead><tr><th>Step</th><th>Where</th><th>Command</th><th>Goal</th></tr></thead><tbody>
-            <tr><td>Stop backend</td><td>OSPC backend</td><td><code class="rb-cmd">sudo systemctl stop myapp</code><button class="cp-btn" title="Copy">⎘</button></td><td>Freeze writes</td></tr>
-            <tr><td>Stop API</td><td>OSPC API</td><td><code class="rb-cmd">sudo systemctl stop myapi</code><button class="cp-btn" title="Copy">⎘</button></td><td>Freeze writes</td></tr>
-            <tr><td>Maintenance page</td><td>OSPC frontend</td><td><code class="rb-cmd">sudo ln -sf /var/www/html/maintenance.html /var/www/html/index.html</code><button class="cp-btn" title="Copy">⎘</button></td><td>Prevent user writes during sync</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 8 Cutover -->
-        <div class="rb-panel" id="rb9">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">8) Cutover Sequence</h3>
-          <table class="rb-table"><thead><tr><th>#</th><th>Where</th><th>Action</th><th>Goal</th></tr></thead><tbody>
-            <tr><td>1</td><td>OSPC app/API</td><td>Stop writes on OSPC app/API</td><td>Freeze state</td></tr>
-            <tr><td>2</td><td>Admin box</td><td><code class="rb-cmd">rsync -avz --delete -e "ssh -i $SSH_KEY" $OSPC_BACK:/srv/uploads/ $FLEX_BACK:/srv/uploads/</code><button class="cp-btn" title="Copy">⎘</button></td><td>Final file sync</td></tr>
-            <tr><td>3</td><td>Admin box</td><td>Final MySQL / PostgreSQL dump + restore (see tabs 5 & 6)</td><td>Last DB changes</td></tr>
-            <tr><td>4</td><td>Flex app/API</td><td>Update Flex app env vars / DB endpoints to point to Flex DB</td><td>Repoint Flex app</td></tr>
-            <tr><td>5</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl restart myapp' &amp;&amp; ssh -i $SSH_KEY $FLEX_API 'sudo systemctl restart myapi'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Bring Flex live</td></tr>
-            <tr><td>6</td><td>Admin box → Flex</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1' &amp;&amp; ssh -i $SSH_KEY $FLEX_API 'curl -fsS http://127.0.0.1:8000/health'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Health before exposure</td></tr>
-            <tr><td>7</td><td>DNS / LB control plane</td><td>Switch LB / DNS / public entrypoint to Flex IPs</td><td>Send users to Flex</td></tr>
-            <tr><td>8</td><td>Flex servers + monitoring</td><td>Monitor logs and transactions</td><td>Validate success</td></tr>
-            <tr><td>9</td><td>—</td><td>Keep OSPC intact for rollback window</td><td>Safe fallback</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 9 Health Check -->
-        <div class="rb-panel" id="rb10">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">9) Flex Restart / Health Check</h3>
-          <table class="rb-table"><thead><tr><th>Phase</th><th>Where</th><th>Command</th><th>Goal</th></tr></thead><tbody>
-            <tr><td>Reload frontend</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'sudo nginx -t &amp;&amp; sudo systemctl reload nginx'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Frontend ready</td></tr>
-            <tr><td>Restart backend</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_BACK 'sudo systemctl restart myapp &amp;&amp; sudo systemctl status myapp --no-pager'</code><button class="cp-btn" title="Copy">⎘</button></td><td>Backend ready</td></tr>
-            <tr><td>Restart API</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'sudo systemctl restart myapi &amp;&amp; sudo systemctl status myapi --no-pager'</code><button class="cp-btn" title="Copy">⎘</button></td><td>API ready</td></tr>
-            <tr><td>Frontend health</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_FRONT 'curl -I http://127.0.0.1'</code><button class="cp-btn" title="Copy">⎘</button></td><td>HTTP health</td></tr>
-            <tr><td>API health</td><td>Admin box</td><td><code class="rb-cmd">ssh -i $SSH_KEY $FLEX_API 'curl -fsS http://127.0.0.1:8000/health || curl -fsS http://127.0.0.1:5000/health'</code><button class="cp-btn" title="Copy">⎘</button></td><td>API health</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 10 Rollback -->
-        <div class="rb-panel" id="rb11">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">10) Rollback Table</h3>
-          <table class="rb-table"><thead><tr><th>Failure Point</th><th>Where</th><th>Rollback Action</th></tr></thead><tbody>
-            <tr><td>Flex frontend broken</td><td>DNS / LB control plane</td><td>Point DNS/LB back to OSPC frontend</td></tr>
-            <tr><td>Flex backend/API broken</td><td>OSPC/Flex servers</td><td>Stop Flex services, re-enable OSPC services</td></tr>
-            <tr><td>Flex DB fails before cutover</td><td>DB / app side</td><td>Keep OSPC DB primary, fix and retry</td></tr>
-            <tr><td>Post-cutover functional issue</td><td>DNS/LB + app ops</td><td>Repoint traffic to OSPC, keep Flex offline</td></tr>
-          </tbody></table>
-        </div>
-
-        <!-- 11 Best Practices -->
-        <div class="rb-panel" id="rb12">
-          <h3 style="color:#7ecfff;margin-bottom:8px;">11) Best Practices — What to Sync / What to Exclude</h3>
-          <table class="rb-table"><thead><tr><th>Tier</th><th>Sync</th><th>Exclude</th><th>Note</th></tr></thead><tbody>
-            <tr><td>Frontend</td><td>/var/www/html, selected /etc/nginx</td><td>cache, logs</td><td>Review nginx conf before overwrite</td></tr>
-            <tr><td>Backend</td><td>/opt/myapp, selected /etc/systemd/system</td><td>venv, node_modules, logs, tmp</td><td>Reinstall deps on Flex</td></tr>
-            <tr><td>API</td><td>/srv/api, selected /etc/…, .env after review</td><td>build cache, logs</td><td>Rotate secrets on Flex</td></tr>
-            <tr><td>Shared files</td><td>/srv/uploads, /data/media</td><td>temp processing folders</td><td>Use rsync + verify counts</td></tr>
-            <tr><td>MySQL / PgSQL</td><td>Logical dump only</td><td>Raw DB files</td><td>Never copy raw data dir</td></tr>
-            <tr><td>K8s</td><td>Manifests (YAML) + PVC data via Velero</td><td>Local images, node-specific resources</td><td>Update image registry refs</td></tr>
-          </tbody></table>
-          <h3 style="color:#e06c6c;margin:14px 0 8px;">❌ What NOT to Migrate</h3>
-          <table class="rb-table"><thead><tr><th>Do NOT blindly migrate</th><th>Why</th></tr></thead><tbody>
-            <tr><td>OS image from OSPC</td><td>Carries old environment assumptions — not the supported pattern</td></tr>
-            <tr><td>Old package binaries</td><td>Often breaks on target — reinstall on Flex instead</td></tr>
-            <tr><td>Cache / temp dirs</td><td>Useless — recreated automatically</td></tr>
-            <tr><td>Logs</td><td>Archive separately, not migrated as live workload data</td></tr>
-            <tr><td>Secrets without review</td><td>Risk of broken auth or leakage — rotate and re-inject on Flex</td></tr>
-          </tbody></table>
-        </div>
-
-      </div><!-- /rbContent -->
-
-      <!-- Download button -->
-      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
-        <button onclick="downloadRunbook()" type="button" style="padding:9px 18px;background:linear-gradient(135deg,#1565c0,#0d47a1);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;">⬇️ Download Runbook (HTML)</button>
-        <span style="color:#aaa;font-size:12px;align-self:center;">Opens a self-contained HTML file you can save, print, or share with your team.</span>
-      </div>
-    </section>
-
+    <!-- ══════════════════════════════════════════════════════════════
+         K8s MIGRATION LIFECYCLE PLANNER  v2 — CMD + EXEC + FILES
+    ═══════════════════════════════════════════════════════════════ -->
     <style>
-      .rb-tab { background:#1a2e5a; border:1px solid #4b6fa0; color:#d4ddf5; border-radius:5px; padding:5px 10px; cursor:pointer; font-size:12px; font-weight:600; }
-      .rb-tab.active { background:#4b5f91; border-color:#8ea2cc; color:#fff; }
-      .rb-panel { display:none; }
-      .rb-panel.active { display:block; }
-      .rb-table { width:100%; border-collapse:collapse; margin-top:4px; }
-      .rb-table th { background:#1a3a5c; color:#7ecfff; padding:7px 8px; text-align:left; font-size:12px; border-bottom:1px solid #8ea2cc44; }
-      .rb-table td { padding:6px 8px; border-bottom:1px solid #ffffff12; color:#d4ddf5; vertical-align:top; font-size:12px; }
-      .rb-table tr:hover td { background:#ffffff08; }
-      .rb-table code.rb-cmd { font-family:monospace; font-size:11px; color:#a8ffc8; background:#0d1a3a; padding:3px 6px; border-radius:3px; word-break:break-all; }
-      code.rb-cmd[contenteditable="true"] { outline:none; border-bottom:1px dashed #7ecfff; transition: background 0.2s; }
-      code.rb-cmd[contenteditable="true"]:focus { background:#1a2e5a; }
-      .cp-btn { background:none; border:none; color:#7ecfff; cursor:pointer; font-size:13px; margin-left:6px; vertical-align:middle; }
-      .cp-btn:hover { color:#fff; }
-      .run-btn { color:#ffbc2c; font-size:14px; margin-left:2px; }
-      .run-btn:hover { color:#fff; }
+    .k2-page{font-family:'Outfit','Segoe UI',sans-serif;}
+    .phase-legend{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+    .phase-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:0.71rem;font-weight:700;border:1px solid rgba(255,255,255,0.13);}
+    .k2-progress-wrap{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+    .k2-progress-bar{flex:1;background:rgba(0,0,0,0.35);border-radius:8px;height:8px;overflow:hidden;}
+    .k2-progress-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,#3b82f6,#22c55e,#a855f7);transition:width .4s;}
+    .k2-progress-lbl{font-size:0.79rem;color:#8ba3cc;white-space:nowrap;font-weight:600;}
+    /* IP panel */
+    .ip2-panel{background:rgba(10,18,52,0.92);border:1px solid rgba(100,140,255,0.18);border-radius:11px;overflow:hidden;margin-bottom:16px;}
+    .ip2-toggle{display:flex;align-items:center;gap:9px;padding:11px 17px;cursor:pointer;background:rgba(6,12,40,0.6);user-select:none;}
+    .ip2-toggle:hover{background:rgba(79,126,248,0.09);}
+    .ip2-toggle span{font-weight:700;font-size:0.86rem;color:#aac3f8;}
+    .ip2-body{padding:14px 17px;display:none;background:rgba(8,15,45,0.5);}
+    .ip2-body.open{display:block;}
+    .ip2-sec{font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#4f7ef8;margin:8px 0 6px;border-bottom:1px solid rgba(79,126,248,0.18);padding-bottom:3px;}
+    .ip2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:9px;margin-bottom:4px;}
+    .ip2-grp label{font-size:0.67rem;color:#8ba3cc;display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;}
+    .ip2-grp input{width:100%;padding:5px 8px;background:rgba(3,8,35,0.65);border:1px solid rgba(100,140,255,0.2);border-radius:5px;color:#e8edf8;font-family:'Courier New',monospace;font-size:0.75rem;outline:none;}
+    .ip2-grp input:focus{border-color:#4f7ef8;}
+    .ip2-apply{background:linear-gradient(135deg,#1d4ed8,#4f7ef8);color:#fff;border:none;padding:6px 18px;border-radius:6px;font-weight:700;font-size:0.82rem;cursor:pointer;margin-top:10px;}
+    /* Table */
+    .k2-wrap{overflow-x:auto;border-radius:11px;border:1px solid rgba(100,140,255,0.14);margin-bottom:18px;}
+    .k2-tbl{width:100%;border-collapse:collapse;min-width:1100px;font-size:0.78rem;}
+    .k2-tbl th{padding:9px 10px;text-align:left;font-weight:700;color:#7a9acc;background:rgba(6,14,48,0.9);border-bottom:2px solid rgba(79,126,248,0.2);font-size:0.69rem;text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;}
+    .k2-tbl td{padding:8px 10px;border-bottom:1px solid rgba(79,126,248,0.06);vertical-align:top;}
+    .k2-tbl tr.k2-data:hover td{background:rgba(79,126,248,0.05);}
+    /* Phase group header */
+    .k2-phase-row td{padding:5px 10px;font-size:0.67rem;font-weight:800;text-transform:uppercase;letter-spacing:0.09em;border-bottom:1px solid rgba(79,126,248,0.1);}
+    /* Log row */
+    .k2-log-row{display:none;}
+    .k2-log-row.open{display:table-row;}
+    .k2-log-row td{padding:0;border-bottom:1px solid rgba(79,126,248,0.1);}
+    .k2-log-inner{background:#03081e;font-family:'Courier New',monospace;font-size:11px;color:#93c5fd;padding:10px 14px;max-height:160px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;border-top:1px solid rgba(79,126,248,0.15);}
+    /* Cells */
+    .k2-stripe{width:4px;padding:0!important;}
+    .k2-num{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;border-radius:50%;font-weight:800;font-size:0.69rem;flex-shrink:0;}
+    .k2-step{font-weight:700;color:#c8d9ff;min-width:130px;}
+    .k2-srv{font-family:'Courier New',monospace;font-size:0.68rem;color:#93c5fd;min-width:120px;line-height:1.55;}
+    .k2-ip{color:#fcd34d;font-size:0.66rem;}
+    .k2-owner{font-size:0.69rem;color:#fda4af;white-space:nowrap;}
+    /* CMD cell */
+    .k2-cmd-cell{min-width:230px;max-width:310px;}
+    .k2-cmd-ta{width:100%;background:rgba(3,8,35,0.7);border:1px solid rgba(100,140,255,0.18);border-radius:5px;color:#a5f3fc;font-family:'Courier New',monospace;font-size:0.68rem;padding:5px 7px;resize:vertical;min-height:52px;outline:none;line-height:1.5;}
+    .k2-cmd-ta:focus{border-color:#4f7ef8;box-shadow:0 0 0 2px rgba(79,126,248,0.18);}
+    .k2-exec-btn{background:linear-gradient(135deg,#6d28d9,#7c3aed);color:#fff;border:none;padding:4px 11px;border-radius:5px;font-size:0.71rem;font-weight:700;cursor:pointer;margin-top:5px;display:flex;align-items:center;gap:5px;transition:all .15s;}
+    .k2-exec-btn:hover{background:linear-gradient(135deg,#7c3aed,#8b5cf6);box-shadow:0 2px 8px rgba(109,40,217,0.4);}
+    .k2-exec-btn:disabled{opacity:0.5;cursor:not-allowed;}
+    /* Output files */
+    .k2-files-cell{min-width:160px;}
+    .k2-file-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(34,197,94,0.09);border:1px solid rgba(34,197,94,0.25);color:#86efac;border-radius:4px;padding:2px 7px;font-size:0.66rem;font-family:'Courier New',monospace;margin:2px 2px 2px 0;cursor:pointer;transition:all .13s;white-space:nowrap;}
+    .k2-file-chip:hover{background:rgba(34,197,94,0.2);border-color:#22c55e;}
+    .k2-file-chip.collected{background:rgba(34,197,94,0.18);border-color:#22c55e;color:#4ade80;}
+    .k2-file-chip.pending{background:rgba(148,163,184,0.07);border-color:rgba(148,163,184,0.25);color:#94a3b8;}
+    .k2-export-btn{background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);color:#86efac;padding:3px 9px;border-radius:5px;font-size:0.69rem;font-weight:700;cursor:pointer;margin-top:5px;transition:all .13s;display:flex;align-items:center;gap:4px;}
+    .k2-export-btn:hover{background:rgba(34,197,94,0.25);border-color:#22c55e;}
+    /* Status */
+    .k2-status{padding:3px 10px;border-radius:11px;border:1px solid;font-size:0.68rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;}
+    .k2-todo{background:rgba(148,163,184,0.09);border-color:rgba(148,163,184,0.3);color:#94a3b8;}
+    .k2-wip{background:rgba(245,158,11,0.14);border-color:#f59e0b;color:#fbbf24;}
+    .k2-done{background:rgba(34,197,94,0.14);border-color:#22c55e;color:#4ade80;}
+    /* Flow cards */
+    .flow2-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px;}
+    .flow2-card{background:rgba(8,16,48,0.92);border:1px solid rgba(100,140,255,0.14);border-radius:10px;padding:13px 14px;position:relative;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;}
+    .flow2-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.4);}
+    .flow2-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;}
+    .flow2-card.active{border-color:currentColor;box-shadow:0 0 0 2px rgba(255,255,255,0.15), 0 6px 24px rgba(0,0,0,0.5);transform:translateY(-2px);}
+    .flow2-label{font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:#8ba3cc;margin-bottom:5px;}
+    .flow2-from{font-size:0.71rem;color:#93c5fd;font-family:'Courier New',monospace;line-height:1.4;}
+    .flow2-arr{color:#4f7ef8;font-size:1rem;margin:3px 0;}
+    .flow2-to{font-size:0.71rem;font-family:'Courier New',monospace;line-height:1.4;}
+    .flow2-what{margin-top:6px;font-size:0.74rem;color:#e8edf8;font-weight:600;line-height:1.4;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;}
+    /* Card output files section */
+    .flow2-outputs{margin-top:8px;display:flex;flex-direction:column;gap:3px;}
+    .flow2-out-file{display:flex;align-items:center;gap:5px;font-size:0.64rem;font-family:'Courier New',monospace;padding:2px 0;color:#64748b;transition:color .2s;}
+    .flow2-out-file.collected{color:#4ade80;}
+    .flow2-out-file .out-dot{width:6px;height:6px;border-radius:50%;background:#334155;flex-shrink:0;transition:background .2s;}
+    .flow2-out-file.collected .out-dot{background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.6);}
+    /* Progress ring per card */
+    .flow2-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+    .flow2-stage-prog{font-size:0.62rem;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#8ba3cc;}
+    .flow2-stage-prog.all-done{background:rgba(34,197,94,0.15);border-color:#22c55e;color:#4ade80;}
     </style>
 
-    <script>
-      // Tab switching
-      document.getElementById('rbTabs').addEventListener('click', e => {
-        const btn = e.target.closest('.rb-tab');
-        if (!btn) return;
-        document.querySelectorAll('.rb-tab').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.rb-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.rb).classList.add('active');
-      });
+    <section class="card k2-page" id="k8sLifecyclePlanner">
 
-      // Copy command
-      document.getElementById('rbContent').addEventListener('click', e => {
-        const btn = e.target.closest('.cp-btn');
-        if (!btn) return;
-        const code = btn.previousElementSibling;
-        navigator.clipboard.writeText(code.innerText).then(() => {
-          btn.textContent = '✓'; setTimeout(() => btn.textContent = '⎘', 1500);
-        });
-      });
-
-      // Apply variables
-      function getRbVars() {
-        return {
-          '$SSH_KEY':    document.getElementById('rb_ssh_key').value    || '~/.ssh/ospc2flex',
-          '$OSPC_FRONT': document.getElementById('rb_ospc_front').value || 'ubuntu@OSPC_FRONTEND_IP',
-          '$OSPC_BACK':  document.getElementById('rb_ospc_back').value  || 'ubuntu@OSPC_BACKEND_IP',
-          '$OSPC_API':   document.getElementById('rb_ospc_api').value   || 'ubuntu@OSPC_API_IP',
-          '$OSPC_DB':    document.getElementById('rb_ospc_db').value    || 'ubuntu@OSPC_DB_IP',
-          '$FLEX_FRONT': document.getElementById('rb_flex_front').value || 'ubuntu@FLEX_FRONTEND_IP',
-          '$FLEX_BACK':  document.getElementById('rb_flex_back').value  || 'ubuntu@FLEX_BACKEND_IP',
-          '$FLEX_API':   document.getElementById('rb_flex_api').value   || 'ubuntu@FLEX_API_IP',
-          '$FLEX_DB':    document.getElementById('rb_flex_db').value    || 'ubuntu@FLEX_DB_IP',
-        };
-      }
-      function applyRbVars() {
-        const vars = getRbVars();
-        document.querySelectorAll('code.rb-cmd').forEach(el => {
-          let text = el.getAttribute('data-orig') || el.innerText;
-          el.setAttribute('data-orig', text);
-          Object.entries(vars).forEach(([k, v]) => { text = text.replaceAll(k, v); });
-          el.innerText = text;
-        });
-      }
-
-      // Download runbook as HTML
-      function downloadRunbook() {
-        const vars = getRbVars();
-        const html = document.getElementById('manualRunbookCard').outerHTML;
-        let processed = html;
-        Object.entries(vars).forEach(([k, v]) => { processed = processed.replaceAll(k, v); });
-        const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OSPC→FLEX Manual Migration Runbook</title>
-<style>body{font-family:Segoe UI,sans-serif;background:#1a2744;color:#d4ddf5;padding:20px;}
-table{width:100%;border-collapse:collapse;margin:8px 0;}
-th{background:#1a3a5c;color:#7ecfff;padding:7px 8px;text-align:left;border-bottom:1px solid #8ea2cc44;}
-td{padding:6px 8px;border-bottom:1px solid #ffffff12;vertical-align:top;font-size:12px;}
-code{font-family:monospace;font-size:11px;color:#a8ffc8;background:#0d1a3a;padding:3px 6px;border-radius:3px;word-break:break-all;display:block;margin:4px 0;}
-h1{color:#7ecfff;}h2,h3{color:#a8d8ff;}
-.rb-panel{display:block!important;margin-bottom:30px;}
-button,.rb-tab,.rb-var,.cp-btn{display:none;}
-details{open:true;}
-</style></head><body><h1>OSPC → FLEX Manual Data Migration Runbook</h1>${processed}</body></html>`;
-        const blob = new Blob([full], {type:'text/html'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'ospc_flex_migration_runbook.html';
-        a.click(); URL.revokeObjectURL(a.href);
-      }
-
-      // Initialize Runbook enhancements
-      document.addEventListener('DOMContentLoaded', () => {
-        // 1. Make commands editable and append Run button
-        document.querySelectorAll('code.rb-cmd').forEach(el => {
-            el.setAttribute('contenteditable', 'true');
-            el.setAttribute('spellcheck', 'false');
-            el.title = 'Click to edit command before running';
-            
-            const runBtn = document.createElement('button');
-            runBtn.className = 'cp-btn run-btn';
-            runBtn.title = 'Run Command';
-            runBtn.textContent = '🚀';
-            
-            el.insertAdjacentElement('afterend', runBtn);
-        });
-
-        // 2. Auto-Prefill IPs
-        fetch('/api/data/runbook-ips')
-          .then(res => res.json())
-          .then(data => {
-              let updated = false;
-              if (data.OSPC_FRONT) { document.getElementById('rb_ospc_front').value = data.OSPC_FRONT; updated = true; }
-              if (data.OSPC_BACK) { document.getElementById('rb_ospc_back').value = data.OSPC_BACK; updated = true; }
-              if (data.OSPC_API) { document.getElementById('rb_ospc_api').value = data.OSPC_API; updated = true; }
-              if (data.OSPC_DB) { document.getElementById('rb_ospc_db').value = data.OSPC_DB; updated = true; }
-              if (updated) applyRbVars();
-          })
-          .catch(err => console.error("Prefill failed", err));
-      });
-
-      // 3. Run command handler
-      document.getElementById('rbContent').addEventListener('click', e => {
-        const runBtn = e.target.closest('.run-btn');
-        if (!runBtn) return;
-        
-        const code = runBtn.parentElement.querySelector('code.rb-cmd');
-        if (!code) return;
-        const cmd = code.innerText.trim();
-        
-        if (!confirm("Execute this manual command on the target server?\n\n$ " + cmd)) return;
-        
-        runBtn.textContent = '⏳';
-        runBtn.disabled = true;
-        
-        // Ensure execution log section is visible and scrolled to
-        const logBox = document.getElementById('logBox');
-        if (logBox) logBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
-        fetch('/api/run/execute-manual-cmd', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: cmd })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                runBtn.textContent = '✅';
-                if (logBox) {
-                    if (logBox.textContent === 'Ready.') logBox.textContent = '';
-                    logBox.textContent += "\n--- MANUAL EXECUTION ---\n$ " + cmd + "\n" + data.output + "\n";
-                    logBox.scrollTop = logBox.scrollHeight;
-                }
-            } else {
-                runBtn.textContent = '❌';
-                alert("Execution failed:\n" + data.error);
-                if (logBox) {
-                    logBox.textContent += "\n--- EXECUTION FAILED ---\n$ " + cmd + "\n" + data.error + "\n";
-                    logBox.scrollTop = logBox.scrollHeight;
-                }
-            }
-            setTimeout(() => {
-                runBtn.textContent = '🚀';
-                runBtn.disabled = false;
-            }, 4000);
-        })
-        .catch(err => {
-            alert("API error executing command.");
-            runBtn.textContent = '🚀';
-            runBtn.disabled = false;
-        });
-      });
-    </script>
-
-
-      <div class="row log-tools">
-        <button id="logFilterAll" class="active" type="button">All</button>
-        <button id="logFilterInfo" type="button">Info</button>
-        <button id="logFilterWarn" type="button">Warn</button>
-        <button id="logFilterError" type="button">Error</button>
-        <button id="copyLogBtn" type="button">Copy Log</button>
-        <button id="clearLogBtn" type="button">Clear</button>
+      <!-- Header row -->
+      <!-- Method 1 label -->
+      <div style="margin-bottom:14px;padding:14px 22px;background:rgba(249,115,22,.09);border:2px solid rgba(249,115,22,.35);border-radius:10px;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:1.15rem;font-weight:800;color:#fb923c;text-transform:uppercase;letter-spacing:.1em;">✍ Method 1 — Full Manual Mode</span>
+        <span style="font-size:0.88rem;color:#94a3b8;font-weight:500;">Step-by-step runbook — you control every command</span>
       </div>
-      <pre id="logBox">Ready.</pre>
+
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+        <div>
+          <h2 style="margin:0 0 3px;font-size:1.05rem;color:#c8d9ff;">☸️ OSPC K8 → Flex — Migration Lifecycle</h2>
+          <p style="margin:0;color:#8ba3cc;font-size:0.78rem;">Fill IPs → edit commands → click ▶ to execute each stage → collect outputs → export files.</p>
+        </div>
+        <button class="ip2-apply" style="padding:6px 14px;font-size:0.78rem;" onclick="toggleIpPanel()">⚙️ Server IPs</button>
+      </div>
+
+      <!-- Flow summary cards — TOP, live-updating -->
+      <div class="flow2-grid" id="flowSummaryGrid"></div>
+
+      <!-- Phase legend -->
+      <div class="phase-legend">
+        <span class="phase-pill" style="background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4);color:#93c5fd;">🟦 Collect from OSPC</span>
+        <span class="phase-pill" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#fcd34d;">🟨 Back up data</span>
+        <span class="phase-pill" style="background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.4);color:#86efac;">🟩 Build Flex</span>
+        <span class="phase-pill" style="background:rgba(168,85,247,.14);border-color:rgba(168,85,247,.4);color:#c4b5fd;">🟪 Replay &amp; restore</span>
+        <span class="phase-pill" style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.4);color:#fca5a5;">🟥 Validate &amp; cut over</span>
+        <span class="phase-pill" style="background:rgba(148,163,184,.09);border-color:rgba(148,163,184,.3);color:#cbd5e1;">⬜ Stabilize &amp; retire</span>
+      </div>
+
+      <!-- Progress -->
+      <div class="k2-progress-wrap">
+        <div class="k2-progress-bar"><div class="k2-progress-fill" id="k2ProgressFill" style="width:0%"></div></div>
+        <span class="k2-progress-lbl" id="k2ProgressLbl">0 / 13 done</span>
+      </div>
+
+      <!-- IP Config -->
+      <div class="ip2-panel">
+        <div class="ip2-toggle" onclick="toggleIpPanel()">
+          <span id="ip2Arrow" style="color:#8ba3cc;font-size:11px;">▶</span>
+          <span>⚙ Configure Server IPs — applied to all CMD fields &amp; source/target columns</span>
+          <span style="margin-left:auto;font-size:0.72rem;color:#8ba3cc;">Click to expand</span>
+        </div>
+        <div class="ip2-body" id="ip2Body">
+          <div class="ip2-sec">Source — OSPC side</div>
+          <div class="ip2-grid">
+            <div class="ip2-grp"><label>Linux admin / jump host</label><input id="ip_jump" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>OSPC K8 API VIP</label><input id="ip_ospc_api" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>OSPC app server</label><input id="ip_ospc_app" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>OSPC DB server</label><input id="ip_ospc_db" placeholder="10.x.x.x"></div>
+          </div>
+          <div class="ip2-sec">Target — Flex side</div>
+          <div class="ip2-grid">
+            <div class="ip2-grp"><label>Flex Genestack host</label><input id="ip_flex_gs" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>Flex master 1</label><input id="ip_flex_m1" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>Flex master 2</label><input id="ip_flex_m2" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>Flex master 3</label><input id="ip_flex_m3" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>Flex worker 1</label><input id="ip_flex_w1" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>Flex worker 2</label><input id="ip_flex_w2" placeholder="10.x.x.x"></div>
+            <div class="ip2-grp"><label>Flex ingress / LB VIP</label><input id="ip_flex_lb" placeholder="10.x.x.x or FQDN"></div>
+          </div>
+          <button class="ip2-apply" onclick="applyIPs()">✅ Apply IPs to all rows</button>
+        </div>
+      </div>
+
+      <!-- Main table -->
+      <div class="k2-wrap">
+        <table class="k2-tbl">
+          <thead><tr>
+            <th style="width:4px;padding:0;"></th>
+            <th>#</th>
+            <th>Stage</th>
+            <th>Source server / IP</th>
+            <th>Target server / IP</th>
+            <th>Command (editable) &nbsp;▶</th>
+            <th>Output files</th>
+            <th>Owner</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody id="k2TBody"></tbody>
+        </table>
+      </div>
+
     </section>
 
-    <section class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <h2>Step 10) Migration CRM Closeout</h2>
-          <p class="hint" style="margin-bottom:0;">Once all validation checks pass (or fail), mark the final status in the global Customer Migration Tracker.</p>
+    <script>
+    // ── Phase metadata ──────────────────────────────────────────────────────
+    const PM = {
+      blue:  {c:'#3b82f6',bg:'rgba(59,130,246,.17)', lbl:'Collect from OSPC'},
+      yellow:{c:'#f59e0b',bg:'rgba(245,158,11,.15)', lbl:'Back up stateful data'},
+      green: {c:'#22c55e',bg:'rgba(34,197,94,.14)',  lbl:'Build Flex / Genestack'},
+      purple:{c:'#a855f7',bg:'rgba(168,85,247,.16)', lbl:'Replay apps & restore'},
+      red:   {c:'#ef4444',bg:'rgba(239,68,68,.14)',  lbl:'Validate & cut over'},
+      gray:  {c:'#94a3b8',bg:'rgba(148,163,184,.11)','lbl':'Stabilize & retire'},
+    };
+
+    // ── Server IP map ───────────────────────────────────────────────────────
+    const IPS = {
+      jump:'&lt;jump-host-ip&gt;', ospc_api:'&lt;ospc-api-vip&gt;',
+      ospc_app:'&lt;ospc-app-ip&gt;', ospc_db:'&lt;ospc-db-ip&gt;',
+      flex_gs:'&lt;flex-genestack-ip&gt;', flex_m1:'&lt;flex-master-1&gt;',
+      flex_m2:'&lt;flex-master-2&gt;', flex_m3:'&lt;flex-master-3&gt;',
+      flex_w1:'&lt;flex-worker-1&gt;', flex_w2:'&lt;flex-worker-2&gt;',
+      flex_lb:'&lt;flex-lb-vip&gt;',
+    };
+    function raw(k){ const v=IPS[k]||'&lt;'+k+'&gt;'; const t=document.createElement('textarea'); t.innerHTML=v; return t.value; }
+    function ip(k){return IPS[k]||'&lt;'+k+'&gt;';}
+
+    // ── Stage data ──────────────────────────────────────────────────────────
+    function buildStages(){return[
+      {phase:'blue',n:1,step:'Scan the OSPC cluster',
+       src:()=>`Linux admin/jump host → OSPC K8 API\n<span class="k2-ip">(${ip('jump')} → ${ip('ospc_api')})</span>`,
+       tgt:()=>'N/A',
+       cmd:()=>`kubectl get nodes -o wide > nodes.txt\nkubectl get namespaces > namespaces.txt\nhelm list -A > helm-releases.txt\nkubectl get storageclass > storageclasses.txt\nkubectl api-resources > crds.txt`,
+       files:['nodes.txt','namespaces.txt','helm-releases.txt','storageclasses.txt','crds.txt'],
+       owner:'Platform / K8 admin'},
+
+      {phase:'blue',n:2,step:'Export the OSPC config',
+       src:()=>`Linux admin/jump host ← OSPC K8\n<span class="k2-ip">(${ip('jump')})</span>`,
+       tgt:()=>`Local bundle on admin host\n<span class="k2-ip">(${ip('jump')})</span>`,
+       cmd:()=>`mkdir -p ospc-k8-bundle/{02-yaml,03-helm}\nkubectl get all -A -o yaml > ospc-k8-bundle/02-yaml/all.yaml\nkubectl get configmap,secret,pvc -A -o yaml >> ospc-k8-bundle/02-yaml/all.yaml\nhelm list -A -q | while read r; do\n  helm get values "$r" > ospc-k8-bundle/03-helm/${r}-values.yaml\n  helm get manifest "$r" > ospc-k8-bundle/03-helm/${r}-manifest.yaml\ndone`,
+       files:['ospc-k8-bundle/02-yaml/all.yaml','ospc-k8-bundle/03-helm/*-values.yaml','ospc-k8-bundle/03-helm/*-manifest.yaml'],
+       owner:'Platform / K8 admin'},
+
+      {phase:'yellow',n:3,step:'Back up the app data',
+       src:()=>`OSPC app + DB servers\n<span class="k2-ip">(${ip('ospc_app')}, ${ip('ospc_db')})</span>`,
+       tgt:()=>`Backup repo / admin host\n<span class="k2-ip">(${ip('jump')})</span>`,
+       cmd:()=>`# PostgreSQL\npg_dump -h ${ip('ospc_db')} -U postgres -Fc mydb > mydb.dump\n# MySQL\nmysqldump -h ${ip('ospc_db')} -u root -p --all-databases > alldb.sql\n# App files\nrsync -avz --progress ${ip('ospc_app')}:/var/app/data/ ./app-backup/\n# PV backup\nkubectl get pvc -A -o yaml > pvc-list.yaml`,
+       files:['mydb.dump','alldb.sql','app-backup/','pvc-list.yaml'],
+       owner:'App owner + DBA'},
+
+      {phase:'green',n:4,step:'Build the Flex foundation',
+       src:()=>'N/A',
+       tgt:()=>`Flex: networks, VMs, SGs, DNS\n<span class="k2-ip">(${ip('flex_m1')}, ${ip('flex_w1')}, …)</span>`,
+       cmd:()=>`openstack server create --flavor m1.large --image ubuntu-22.04 \\\n  --network flex-internal --key-name flex-key ${ip('flex_m1')}\nopenstack server create --flavor m1.large --image ubuntu-22.04 \\\n  --network flex-internal --key-name flex-key ${ip('flex_w1')}\nopenstack network create flex-k8-net\nopenstack subnet create --network flex-k8-net \\\n  --subnet-range 10.0.100.0/24 flex-k8-subnet`,
+       files:['flex-vm-list.txt','flex-network-plan.txt','flex-dns-fqdn-plan.txt'],
+       owner:'Cloud / Infra team'},
+
+      {phase:'green',n:5,step:'Bootstrap Genestack / OpenCenter',
+       src:()=>'N/A',
+       tgt:()=>`Flex Genestack host\n<span class="k2-ip">(${ip('flex_gs')})</span>`,
+       cmd:()=>`ssh ${ip('flex_gs')} 'git clone https://github.com/rackerlabs/genestack /opt/genestack'\nssh ${ip('flex_gs')} 'cd /opt/genestack && bash bootstrap.sh'\nssh ${ip('flex_gs')} 'genestack --version'`,
+       files:['genestack-bootstrap.log'],
+       owner:'Cloud / Infra team'},
+
+      {phase:'green',n:6,step:'Define the new Flex cluster',
+       src:()=>`OSPC K8 bundle + topology notes\n<span class="k2-ip">(${ip('jump')})</span>`,
+       tgt:()=>`Flex deployment host\n<span class="k2-ip">(${ip('flex_gs')})</span>`,
+       cmd:()=>`scp -r ospc-k8-bundle/ ${ip('flex_gs')}:/opt/\nssh ${ip('flex_gs')} \\\n  'cp /opt/ospc-k8-bundle/inventory.yaml /etc/genestack/inventory/hosts.yaml'\n# Edit masters/workers/versions:\nssh ${ip('flex_gs')} 'nano /etc/genestack/inventory/hosts.yaml'`,
+       files:['/etc/genestack/inventory/hosts.yaml','group_vars/k8s_cluster/k8s-cluster.yml'],
+       owner:'Platform / K8 admin'},
+
+      {phase:'green',n:7,step:'Deploy Kubernetes on Flex',
+       src:()=>`Flex deployment host\n<span class="k2-ip">(${ip('flex_gs')})</span>`,
+       tgt:()=>`Flex masters + workers\n<span class="k2-ip">(${ip('flex_m1')}, ${ip('flex_m2')}, ${ip('flex_m3')}, ${ip('flex_w1')}…)</span>`,
+       cmd:()=>`ssh ${ip('flex_gs')} \\\n  'cd /opt/genestack && ansible-playbook \\\n   -i /etc/genestack/inventory/hosts.yaml \\\n   cluster.yml --become -v 2>&1 | tee k8s-deploy.log'`,
+       files:['k8s-deploy.log','~/.kube/config-flex'],
+       owner:'Platform / K8 admin'},
+
+      {phase:'green',n:8,step:'Install cluster plumbing',
+       src:()=>`Flex deployment host\n<span class="k2-ip">(${ip('flex_gs')})</span>`,
+       tgt:()=>`Flex K8 cluster\n<span class="k2-ip">(${ip('flex_m1')})</span>`,
+       cmd:()=>`# CNI (Calico)\nhelm install calico tigera/tigera-operator -n calico-system --create-namespace\n# Ingress + LB\nhelm install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx --create-namespace\n# Monitoring\nhelm install kube-prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace\n# Verify\nkubectl get pods -A`,
+       files:['cni-config.yaml','ingress-config.yaml','storage-config.yaml'],
+       owner:'Platform / K8 admin'},
+
+      {phase:'purple',n:9,step:'Redeploy your apps',
+       src:()=>`OSPC K8 bundle (admin / Genestack host)\n<span class="k2-ip">(${ip('jump')} or ${ip('flex_gs')})</span>`,
+       tgt:()=>`Flex K8 cluster\n<span class="k2-ip">(${ip('flex_m1')})</span>`,
+       cmd:()=>`# Apply exported YAML (clean UIDs/IPs first)\nkubectl apply -f ospc-k8-bundle/02-yaml/all.yaml --dry-run=client\nkubectl apply -f ospc-k8-bundle/02-yaml/all.yaml\n# Helm releases\nhelm upgrade --install myapp ./chart \\\n  -f ospc-k8-bundle/03-helm/myapp-values.yaml \\\n  -n production --create-namespace\nkubectl get pods -A`,
+       files:['kubectl-apply.log','helm-deploy.log'],
+       owner:'App owner + Platform team'},
+
+      {phase:'purple',n:10,step:'Restore data',
+       src:()=>`OSPC backup bundle / DB dump\n<span class="k2-ip">(${ip('jump')})</span>`,
+       tgt:()=>`Flex DB / app / PV targets\n<span class="k2-ip">(${ip('flex_w1')}…)</span>`,
+       cmd:()=>`# PostgreSQL restore\npg_restore -h ${ip('flex_w1')} -U postgres -d mydb mydb.dump\n# MySQL restore\nmysql -h ${ip('flex_w1')} -u root -p < alldb.sql\n# App files\nrsync -avz ./app-backup/ ${ip('flex_w1')}:/var/app/data/\n# Verify\nkubectl exec -n production deploy/myapp -- wget -qO- localhost/health`,
+       files:['restore-pg.log','restore-mysql.log','rsync-restore.log'],
+       owner:'DBA + App owner'},
+
+      {phase:'red',n:11,step:'Test',
+       src:()=>`Flex app endpoints / DB / K8\n<span class="k2-ip">(${ip('flex_lb')})</span>`,
+       tgt:()=>'Flex production-like endpoints',
+       cmd:()=>`curl -I http://${ip('flex_lb')}/health\nkubectl get pods -A | grep -v Running\nkubectl logs -n production deploy/myapp --tail=50\n# API smoke test\ncurl -s http://${ip('flex_lb')}/api/v1/status | python3 -m json.tool`,
+       files:['smoke-test-results.txt','validation-report.txt'],
+       owner:'QA + App owner + Platform'},
+
+      {phase:'red',n:12,step:'Cut over traffic',
+       src:()=>`OSPC DNS / LB / ingress\n<span class="k2-ip">(${ip('ospc_api')})</span>`,
+       tgt:()=>`Flex DNS / LB / ingress\n<span class="k2-ip">(${ip('flex_lb')})</span>`,
+       cmd:()=>`# Update DNS A record to Flex LB VIP\nopenstack recordset set --records ${ip('flex_lb')} myzone myapp.example.com.\n# Or update ingress:\nkubectl patch svc ingress-nginx-controller \\\n  -n ingress-nginx -p '{"spec":{"externalIPs":["${ip('flex_lb')}"]}}'\necho "Cutover complete — $(date)" >> cutover.log`,
+       files:['cutover.log','cutover-change-record.txt'],
+       owner:'Infra + App owner'},
+
+      {phase:'gray',n:13,step:'Rollback window — retire OSPC',
+       src:()=>`OSPC still alive during monitoring\n<span class="k2-ip">(${ip('ospc_api')})</span>`,
+       tgt:()=>`Flex serving production\n<span class="k2-ip">(${ip('flex_lb')})</span>`,
+       cmd:()=>`# Monitor Flex for 24-48h, then retire OSPC:\nopenstack server stop ${ip('ospc_app')} ${ip('ospc_db')}\n# Create final snapshots before deletion:\nopenstack volume snapshot create --volume ospc-vol-01 ospc-final-snap\n# Decommission:\nopenstack server delete ${ip('ospc_app')} ${ip('ospc_db')}\necho "OSPC retired — $(date)" >> retirement.log`,
+       files:['retirement.log','ospc-final-snapshot-list.txt','closure-report.txt'],
+       owner:'Ops / Platform / App owner'},
+    ];}
+
+    // ── State ───────────────────────────────────────────────────────────────
+    const ST_CYCLE=['todo','wip','done'];
+    const ST_LBL={todo:'⬜ To Do',wip:'🔄 In Progress',done:'✅ Done'};
+    const kStatus={};
+    const kCollected={};  // n → Set of collected filenames
+
+    // ── Render ──────────────────────────────────────────────────────────────
+    function renderK8Table(){
+      const STAGES = buildStages();
+      const tbody = document.getElementById('k2TBody');
+      tbody.innerHTML='';
+      let lastPhase=null;
+      STAGES.forEach(row=>{
+        const pm = PM[row.phase];
+        if(row.phase!==lastPhase){
+          const hr=document.createElement('tr');
+          hr.className='k2-phase-row';
+          hr.style.background=pm.bg;
+          hr.innerHTML=`<td colspan="9" style="color:${pm.c};border-left:3px solid ${pm.c};">${pm.lbl.toUpperCase()}</td>`;
+          tbody.appendChild(hr);
+          lastPhase=row.phase;
+        }
+        const st=kStatus[row.n]||'todo';
+        const coll=kCollected[row.n]||new Set();
+
+        // File chips HTML
+        const chipsHtml=row.files.map(f=>{
+          const isColl=coll.has(f);
+          return `<span class="k2-file-chip ${isColl?'collected':'pending'}" title="${f}" onclick="markCollected(${row.n},'${f}',this)">
+            ${isColl?'✓ ':''}<code style="font-size:0.63rem;">${f.length>22?f.slice(0,20)+'…':f}</code>
+          </span>`;
+        }).join('');
+
+        // Data row
+        const tr=document.createElement('tr');
+        tr.className='k2-data';
+        tr.dataset.n=row.n;
+        tr.innerHTML=`
+          <td class="k2-stripe" style="background:${pm.c};"></td>
+          <td><span class="k2-num" style="background:${pm.bg};color:${pm.c};border:1px solid ${pm.c};">${row.n}</span></td>
+          <td class="k2-step">${row.step}</td>
+          <td class="k2-srv">${row.src().replace(/\n/g,'<br>')}</td>
+          <td class="k2-srv">${row.tgt().replace(/\n/g,'<br>')}</td>
+          <td class="k2-cmd-cell">
+            <textarea class="k2-cmd-ta" id="cmd-${row.n}" spellcheck="false"></textarea>
+            <button class="k2-exec-btn" id="exec-btn-${row.n}" onclick="execStage(${row.n})">
+              ▶ Run
+            </button>
+          </td>
+          <td class="k2-files-cell">
+            <div id="chips-${row.n}">${chipsHtml}</div>
+            <button class="k2-export-btn" id="exp-btn-${row.n}" onclick="exportFiles(${row.n})" title="Export collected files list">
+              ⬇ Export
+            </button>
+          </td>
+          <td class="k2-owner">${row.owner}</td>
+          <td><button class="k2-status k2-${st}" id="st-btn-${row.n}" onclick="cycleStatus(${row.n},this)">${ST_LBL[st]}</button></td>`;
+        tbody.appendChild(tr);
+        // Set textarea value safely (avoids HTML-injection of <ip-placeholders>)
+        document.getElementById(`cmd-${row.n}`).value = row.cmd().replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+
+        // Log row (hidden by default)
+        const lr=document.createElement('tr');
+        lr.className='k2-log-row';
+        lr.id=`log-row-${row.n}`;
+        lr.innerHTML=`<td colspan="9"><div class="k2-log-inner" id="log-${row.n}"></div></td>`;
+        tbody.appendChild(lr);
+      });
+      updateProgress();
+    }
+
+    // ── Exec ────────────────────────────────────────────────────────────────
+    async function execStage(n){
+      const ta=document.getElementById(`cmd-${n}`);
+      const btn=document.getElementById(`exec-btn-${n}`);
+      const logDiv=document.getElementById(`log-${n}`);
+      const logRow=document.getElementById(`log-row-${n}`);
+      const cmd=ta.value.trim();
+      if(!cmd)return;
+
+      btn.disabled=true; btn.textContent='⏳ Running…';
+      logRow.classList.add('open');
+      logDiv.textContent='';
+
+      // Mark stage as WIP
+      if((kStatus[n]||'todo')==='todo'){
+        kStatus[n]='wip';
+        const sb=document.getElementById(`st-btn-${n}`);
+        if(sb){sb.className='k2-status k2-wip';sb.textContent=ST_LBL['wip'];}
+        saveK8Status();updateProgress();
+      }
+
+      const script=`#!/usr/bin/env bash\nset -uo pipefail\n${cmd}\n`;
+      try{
+        const resp=await fetch('/api/agent1/run/migration',{
+          method:'POST',headers:{'Content-Type':'text/plain'},body:script});
+        const reader=resp.body.getReader();
+        const dec=new TextDecoder();
+        while(true){
+          const {value,done}=await reader.read();
+          if(done)break;
+          logDiv.textContent+=dec.decode(value,{stream:true});
+          logDiv.scrollTop=logDiv.scrollHeight;
+        }
+        btn.disabled=false; btn.textContent='▶ Run';
+        // Auto-mark all files as collected on success
+        const STAGES=buildStages();
+        const stageData=STAGES.find(s=>s.n===n);
+        if(stageData){
+          if(!kCollected[n])kCollected[n]=new Set();
+          stageData.files.forEach(f=>kCollected[n].add(f));
+          refreshChips(n,stageData.files);
+        }
+        // Auto-advance to done
+        kStatus[n]='done';
+        const sb=document.getElementById(`st-btn-${n}`);
+        if(sb){sb.className='k2-status k2-done';sb.textContent=ST_LBL['done'];}
+        saveK8Status(); updateProgress(); updateFlowCards();
+        saveCollected();
+      }catch(e){
+        logDiv.textContent+= `\n[ERROR] ${e.message}`;
+        btn.disabled=false; btn.textContent='▶ Run';
+      }
+    }
+
+    function refreshChips(n, files){
+      const coll=kCollected[n]||new Set();
+      const container=document.getElementById(`chips-${n}`);
+      if(!container)return;
+      container.innerHTML=files.map(f=>{
+        const isColl=coll.has(f);
+        return `<span class="k2-file-chip ${isColl?'collected':'pending'}" title="${f}" onclick="markCollected(${n},'${f}',this)">
+          ${isColl?'✓ ':''}<code style="font-size:0.63rem;">${f.length>22?f.slice(0,20)+'…':f}</code>
+        </span>`;
+      }).join('');
+    }
+
+    function markCollected(n, fname, chip){
+      if(!kCollected[n])kCollected[n]=new Set();
+      if(kCollected[n].has(fname)){kCollected[n].delete(fname);chip.classList.remove('collected');chip.classList.add('pending');chip.innerHTML=`<code style="font-size:0.63rem;">${fname.length>22?fname.slice(0,20)+'…':fname}</code>`;}
+      else{kCollected[n].add(fname);chip.classList.remove('pending');chip.classList.add('collected');chip.innerHTML=`✓ <code style="font-size:0.63rem;">${fname.length>22?fname.slice(0,20)+'…':fname}</code>`;}
+      saveCollected(); updateFlowCards();
+    }
+
+    function exportFiles(n){
+      const STAGES=buildStages();
+      const row=STAGES.find(s=>s.n===n);
+      if(!row)return;
+      const coll=kCollected[n]||new Set();
+      const lines=[
+        `# K8s Migration Stage ${n}: ${row.step}`,
+        `# Generated: ${new Date().toISOString()}`,
+        `# Status: ${kStatus[n]||'todo'}`,
+        '',
+        '## Expected output files:',
+        ...row.files.map(f=>`  [${coll.has(f)?'✓':'○'}] ${f}`),
+        '',
+        '## Command used:',
+        document.getElementById(`cmd-${n}`).value,
+        '',
+        '## Execution log:',
+        document.getElementById(`log-${n}`).textContent||'(not executed yet)',
+      ];
+      const blob=new Blob([lines.join('\n')],{type:'text/plain'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=`k8s-stage-${n}-${row.step.replace(/\s+/g,'-').toLowerCase()}.txt`;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    }
+
+    // ── Status ──────────────────────────────────────────────────────────────
+    function cycleStatus(n,btn){
+      const cur=kStatus[n]||'todo';
+      const next=ST_CYCLE[(ST_CYCLE.indexOf(cur)+1)%3];
+      kStatus[n]=next;
+      btn.className=`k2-status k2-${next}`;
+      btn.textContent=ST_LBL[next];
+      saveK8Status(); updateProgress(); updateFlowCards();
+    }
+    function updateProgress(){
+      const done=Object.values(kStatus).filter(v=>v==='done').length;
+      const pct=Math.round(done/13*100);
+      document.getElementById('k2ProgressFill').style.width=pct+'%';
+      document.getElementById('k2ProgressLbl').textContent=`${done} / 13 done`;
+    }
+
+    // ── IP Config ───────────────────────────────────────────────────────────
+    function toggleIpPanel(){
+      const b=document.getElementById('ip2Body');
+      const arr=document.getElementById('ip2Arrow');
+      const open=b.classList.toggle('open');
+      arr.textContent=open?'▼':'▶';
+    }
+    function applyIPs(){
+      const map={jump:'ip_jump',ospc_api:'ip_ospc_api',ospc_app:'ip_ospc_app',ospc_db:'ip_ospc_db',
+        flex_gs:'ip_flex_gs',flex_m1:'ip_flex_m1',flex_m2:'ip_flex_m2',flex_m3:'ip_flex_m3',
+        flex_w1:'ip_flex_w1',flex_w2:'ip_flex_w2',flex_lb:'ip_flex_lb'};
+      let changed=false;
+      for(const [k,id] of Object.entries(map)){
+        const v=document.getElementById(id).value.trim();
+        if(v){IPS[k]=v;changed=true;}
+      }
+      if(changed){renderFlowCards();renderK8Table();}
+      try{const saved={};for(const[k,id]of Object.entries(map)){const v=document.getElementById(id).value.trim();if(v)saved[k]=v;}localStorage.setItem('k8_ips2',JSON.stringify(saved));}catch(e){}
+    }
+    function loadSavedIPs(){
+      try{
+        const map={jump:'ip_jump',ospc_api:'ip_ospc_api',ospc_app:'ip_ospc_app',ospc_db:'ip_ospc_db',
+          flex_gs:'ip_flex_gs',flex_m1:'ip_flex_m1',flex_m2:'ip_flex_m2',flex_m3:'ip_flex_m3',
+          flex_w1:'ip_flex_w1',flex_w2:'ip_flex_w2',flex_lb:'ip_flex_lb'};
+        const saved=JSON.parse(localStorage.getItem('k8_ips2')||'{}');
+        for(const[k,id]of Object.entries(map)){if(saved[k]){document.getElementById(id).value=saved[k];IPS[k]=saved[k];}}
+      }catch(e){}
+    }
+
+    // ── Persist ─────────────────────────────────────────────────────────────
+    function saveK8Status(){try{localStorage.setItem('k8_status2',JSON.stringify(kStatus));}catch(e){}}
+    function saveCollected(){
+      try{const s={};for(const[k,v]of Object.entries(kCollected))s[k]=[...v];localStorage.setItem('k8_collected',JSON.stringify(s));}catch(e){}
+    }
+    function loadPersistedState(){
+      try{Object.assign(kStatus,JSON.parse(localStorage.getItem('k8_status2')||'{}'));}catch(e){}
+      try{const s=JSON.parse(localStorage.getItem('k8_collected')||'{}');for(const[k,v]of Object.entries(s))kCollected[k]=new Set(v);}catch(e){}
+    }
+
+    // ── Flow card groups ────────────────────────────────────────────────────
+    const FLOW_GROUPS = [
+      { stages:[1,2], color:'#3b82f6',
+        label:'Stages 1–2', what:'Collect from OSPC',
+        from:'OSPC K8 API', arr:'↓', to:'Admin / jump host',
+        desc:'Cluster config, YAML, Helm values' },
+      { stages:[3], color:'#f59e0b',
+        label:'Stage 3', what:'Back up stateful data',
+        from:'OSPC apps / DB / PVs', arr:'↓', to:'Backup bundle / staging',
+        desc:'DB dumps, file archives, PV backup set' },
+      { stages:[4,5,6,7,8], color:'#22c55e',
+        label:'Stages 4–8', what:'Build Flex / Genestack',
+        from:'Genestack host', arr:'↓', to:'Flex VMs → K8 cluster',
+        desc:'New Kubernetes cluster built & plumbed' },
+      { stages:[9,10], color:'#a855f7',
+        label:'Stages 9–10', what:'Replay apps & restore',
+        from:'Admin bundle + backups', arr:'↓', to:'Flex cluster + DB / storage',
+        desc:'Apps + data replayed onto Flex' },
+      { stages:[11,12,13], color:'#ef4444',
+        label:'Stages 11–13', what:'Validate & cut over',
+        from:'OSPC traffic endpoint', arr:'↓', to:'Flex DNS / LB / ingress',
+        desc:'Production cutover → monitor → retire OSPC' },
+    ];
+
+    function renderFlowCards() {
+      const STAGES = buildStages();
+      const grid = document.getElementById('flowSummaryGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      FLOW_GROUPS.forEach(grp => {
+        // Gather all output files for this group's stages
+        const allFiles = [];
+        grp.stages.forEach(n => {
+          const s = STAGES.find(x => x.n === n);
+          if (s) s.files.forEach(f => allFiles.push({n, f}));
+        });
+        const doneCount = grp.stages.filter(n => (kStatus[n]||'todo') === 'done').length;
+        const allDone = doneCount === grp.stages.length;
+
+        const filesHtml = allFiles.map(({n, f}) => {
+          const coll = kCollected[n] && kCollected[n].has(f);
+          const short = f.length > 28 ? f.slice(0,26)+'…' : f;
+          return `<div class="flow2-out-file ${coll?'collected':''}" id="fc-file-${n}-${f.replace(/[^a-z0-9]/gi,'_')}">
+            <span class="out-dot"></span><span title="${f}">${short}</span>
+          </div>`;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.className = 'flow2-card';
+        card.style.borderLeftColor = grp.color;
+        card._grpStages = grp.stages;
+        card._grpLabel  = grp.label;
+        card.onclick = function() {
+          const isActive = this.classList.contains('active');
+          // Deactivate all cards
+          document.querySelectorAll('.flow2-card').forEach(c => c.classList.remove('active'));
+          if (isActive) {
+            // Toggle off — show all rows
+            filterK8Table(null);
+          } else {
+            this.classList.add('active');
+            filterK8Table(this._grpStages);
+          }
+        };
+        card.innerHTML = `
+          <div class="flow2-card-header">
+            <div class="flow2-label" style="color:${grp.color};">${grp.label}</div>
+            <span class="flow2-stage-prog ${allDone?'all-done':''}">${doneCount}/${grp.stages.length} done</span>
+          </div>
+          <div class="flow2-from" style="color:${grp.color}cc;">${grp.from}</div>
+          <div class="flow2-arr">↓</div>
+          <div class="flow2-to" style="color:${grp.color}99;">${grp.to}</div>
+          <div class="flow2-what">${grp.desc}</div>
+          <div class="flow2-outputs" id="fc-outputs-${grp.stages[0]}">${filesHtml}</div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    function updateFlowCards() {
+      // Lightweight update — just refresh dot states without full re-render
+      const STAGES = buildStages();
+      FLOW_GROUPS.forEach(grp => {
+        const doneCount = grp.stages.filter(n => (kStatus[n]||'todo') === 'done').length;
+        const allDone = doneCount === grp.stages.length;
+        // Update progress badge
+        const prog = document.querySelector(`#fc-outputs-${grp.stages[0]}`)?.closest('.flow2-card')?.querySelector('.flow2-stage-prog');
+        if (prog) {
+          prog.textContent = `${doneCount}/${grp.stages.length} done`;
+          prog.className = `flow2-stage-prog ${allDone?'all-done':''}`;
+        }
+        // Update file dots
+        grp.stages.forEach(n => {
+          const s = STAGES.find(x => x.n === n);
+          if (!s) return;
+          s.files.forEach(f => {
+            const id = `fc-file-${n}-${f.replace(/[^a-z0-9]/gi,'_')}`;
+            const el = document.getElementById(id);
+            if (el) {
+              const coll = kCollected[n] && kCollected[n].has(f);
+              el.className = `flow2-out-file ${coll?'collected':''}`;
+            }
+          });
+        });
+      });
+    }
+
+    // ── Card filter: show only rows belonging to clicked card's stages ───────
+    function filterK8Table(stages) {
+      const tbody = document.getElementById('k2TBody');
+      const allRows = Array.from(tbody.querySelectorAll('tr'));
+      if (!stages) {
+        // Show everything
+        allRows.forEach(r => r.style.display = '');
+        return;
+      }
+      const stageSet = new Set(stages.map(String));
+      let lastPhaseHeaderVisible = null;
+
+      allRows.forEach(r => {
+        if (r.classList.contains('k2-phase-row')) {
+          // Phase header — show/hide based on whether any following data rows match
+          lastPhaseHeaderVisible = r;
+          r.style.display = 'none'; // tentatively hide; reveal when first matching data row found
+        } else if (r.classList.contains('k2-data')) {
+          const n = r.dataset.n;
+          const show = stageSet.has(n);
+          r.style.display = show ? '' : 'none';
+          if (show && lastPhaseHeaderVisible) {
+            lastPhaseHeaderVisible.style.display = '';
+            lastPhaseHeaderVisible = null; // only reveal once per section
+          }
+        } else if (r.classList.contains('k2-log-row')) {
+          // Keep log row visibility in sync with its data row
+          const id = r.id.replace('log-row-', '');
+          r.style.display = stageSet.has(id) ? '' : 'none';
+        }
+      });
+
+      // Scroll to first visible data row
+      const firstVisible = tbody.querySelector('tr.k2-data[style=""]') ||
+                           Array.from(tbody.querySelectorAll('tr.k2-data')).find(r => r.style.display !== 'none');
+      if (firstVisible) setTimeout(() => firstVisible.scrollIntoView({behavior:'smooth', block:'center'}), 80);
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    loadPersistedState();
+    loadSavedIPs();
+    renderFlowCards();
+    renderK8Table();
+    </script>
+
+    <!-- Step 8.5: Kubernetes Data Migration Runbook -->
+    <!-- Kubernetes (K8s) Migration Automated options -->
+    <section class="card" id="k8sMigrationCard">
+      <h2 style="margin-bottom:16px;">☸️ Kubernetes (K8s) Migration
+        <span class="status-chip idle" style="margin-left:8px;font-size:0.72rem;">Automated options</span>
+      </h2>
+
+      <style>
+      /* Option tabs */
+      .k8opt-tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+      .k8opt-tab{padding:8px 18px;border-radius:8px;border:1px solid rgba(100,140,255,0.25);background:transparent;
+        color:#8ba3cc;font-size:0.82rem;font-weight:600;cursor:pointer;transition:all .18s;font-family:inherit;}
+      .k8opt-tab:hover{background:rgba(79,126,248,.1);color:#c8d9ff;border-color:rgba(79,126,248,.4);}
+      .k8opt-tab.active{background:rgba(79,126,248,.2);border-color:#4f7ef8;color:#c8d9ff;box-shadow:0 0 0 2px rgba(79,126,248,.2);}
+      .k8opt-tab.gs-tab.active{background:rgba(34,197,94,.15);border-color:#22c55e;color:#86efac;box-shadow:0 0 0 2px rgba(34,197,94,.15);}
+      .k8opt-panel{display:none;}.k8opt-panel.active{display:block;}
+
+      /* Genestack step table */
+      .gs-tbl{width:100%;border-collapse:collapse;font-size:0.84rem;table-layout:fixed;}
+      .gs-tbl th{padding:11px 14px;text-align:left;font-weight:700;color:#7a9acc;background:rgba(6,14,48,0.88);
+        border-bottom:2px solid rgba(34,197,94,.25);font-size:0.69rem;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+      .gs-tbl td{padding:11px 14px;border-bottom:1px solid rgba(34,197,94,.08);vertical-align:top;}
+      .gs-tbl tr:hover td{background:rgba(34,197,94,.04);}
+      .gs-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+        background:rgba(34,197,94,.18);border:1px solid #22c55e;color:#4ade80;font-weight:800;font-size:0.78rem;flex-shrink:0;}
+      .gs-what{font-weight:600;color:#c8d9ff;min-width:200px;font-size:0.88rem;line-height:1.5;}
+      .gs-cmd-wrap{position:relative;}
+      .gs-cmd-ta{width:100%;background:rgba(3,10,30,.75);border:1px solid rgba(34,197,94,.2);border-radius:6px;
+        color:#a5f3fc;font-family:'Courier New',monospace;font-size:0.78rem;padding:10px 12px;resize:vertical;
+        min-height:100px;outline:none;line-height:1.6;}
+      .gs-cmd-ta:focus{border-color:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.18);}
+      .gs-btn-row{display:flex;gap:5px;margin-top:5px;}
+      .gs-run-btn{background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;border:none;padding:4px 12px;
+        border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer;transition:all .15s;}
+      .gs-run-btn:hover{box-shadow:0 2px 8px rgba(34,197,94,.4);}
+      .gs-run-btn:disabled{opacity:.45;cursor:not-allowed;}
+      .gs-copy-btn{background:rgba(79,126,248,.15);border:1px solid rgba(79,126,248,.4);color:#aac3f8;
+        padding:4px 10px;border-radius:5px;font-size:0.7rem;font-weight:600;cursor:pointer;transition:all .13s;}
+      .gs-copy-btn:hover{background:rgba(79,126,248,.3);}
+      .gs-file{font-size:0.68rem;color:#86efac;font-family:'Courier New',monospace;line-height:1.6;}
+      .gs-phase-row td{padding:5px 11px;font-size:0.67rem;font-weight:800;text-transform:uppercase;
+        letter-spacing:.09em;background:rgba(34,197,94,.08);border-bottom:1px solid rgba(34,197,94,.15);color:#4ade80;}
+      /* Log */
+      .gs-log-row{display:none;}.gs-log-row.open{display:table-row;}
+      .gs-log-row td{padding:0;border-bottom:1px solid rgba(34,197,94,.1);}
+      .gs-log-inner{background:#030e08;font-family:'Courier New',monospace;font-size:11px;color:#86efac;
+        padding:10px 14px;max-height:150px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;
+        border-top:1px solid rgba(34,197,94,.12);}
+      /* Phase legend strip */
+      .gs-phases{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+      .gs-phase-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:16px;
+        font-size:0.7rem;font-weight:700;cursor:pointer;transition:all .15s;border:1px solid;}
+      .gs-phase-pill:hover{filter:brightness(1.15);}
+      /* note box */
+      .gs-note{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;
+        padding:12px 16px;margin-bottom:16px;font-size:0.78rem;color:#fcd34d;line-height:1.6;}
+      .gs-note strong{color:#fbbf24;}
+      /* mapping table */
+      .gs-map-tbl{width:100%;border-collapse:collapse;font-size:0.76rem;margin-bottom:20px;}
+      .gs-map-tbl th{padding:8px 11px;text-align:left;color:#8ba3cc;font-weight:700;font-size:0.68rem;
+        text-transform:uppercase;background:rgba(6,14,48,.8);border-bottom:2px solid rgba(79,126,248,.2);}
+      .gs-map-tbl td{padding:7px 11px;border-bottom:1px solid rgba(79,126,248,.06);vertical-align:top;}
+      .gs-map-tbl td:first-child{color:#fcd34d;font-family:'Courier New',monospace;font-size:0.7rem;}
+      .gs-map-tbl td:nth-child(2){color:#86efac;font-family:'Courier New',monospace;font-size:0.7rem;}
+      .gs-map-tbl td:nth-child(3){color:#8ba3cc;font-size:0.72rem;}
+      </style>
+
+      <!-- Method 2 label -->
+      <div style="margin-bottom:14px;padding:14px 22px;background:rgba(34,197,94,.09);border:2px solid rgba(34,197,94,.35);border-radius:10px;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:1.15rem;font-weight:800;color:#86efac;text-transform:uppercase;letter-spacing:.1em;">⚙ Method 2 — Automated Deployment</span>
+        <span style="font-size:0.88rem;color:#94a3b8;font-weight:500;">Choose your automation platform:</span>
+      </div>
+
+      <!-- Option tabs -->
+      <div class="k8opt-tabs">
+        <button class="k8opt-tab gs-tab active" onclick="k8optSwitch('genestack',this)">🟩 Genestack / Kubespray</button>
+        <button class="k8opt-tab" onclick="k8optSwitch('opencenter',this)">🔵 OpenCenter</button>
+      </div>
+
+      <!-- ─── GENESTACK PANEL ───────────────────────────────────── -->
+      <div class="k8opt-panel active" id="k8opt-genestack">
+
+        <div class="gs-note">
+          <strong>⚠ Key rule:</strong> Genestack builds the cluster from <code>inventory.yaml</code> + <code>group_vars</code>.
+          Your exported OSPC YAML &amp; Helm values are applied <em>after</em> the cluster exists to redeploy workloads — do not try to feed Genestack a Kubernetes YAML file to build the cluster.
         </div>
-        <div style="display:flex; gap:10px;">
-          <button id="btnMarkSuccess" style="background:#28a745; border:none; color:white; padding:10px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">✅ Mark as Successful</button>
-          <button id="btnMarkRollback" style="background:#ffbc2c; border:none; color:#000; padding:10px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">↩️ Mark as Rolled Back</button>
+
+        <!-- Phase legend -->
+        <div class="gs-phases">
+          <span class="gs-phase-pill" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#93c5fd;">📥 Map OSPC data</span>
+          <span class="gs-phase-pill" style="background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.4);color:#86efac;">🚀 Bootstrap &amp; deploy</span>
+          <span class="gs-phase-pill" style="background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.4);color:#c4b5fd;">🔌 Kube-OVN &amp; storage</span>
+          <span class="gs-phase-pill" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#fcd34d;">✅ Verify &amp; kubeconfig</span>
+        </div>
+
+        <!-- OSPC data → Genestack input mapping -->
+        <h3 style="font-size:0.88rem;font-weight:700;color:#aac3f8;margin:0 0 10px;">1) Map collected OSPC data → Genestack inputs</h3>
+        <div style="overflow-x:auto;border-radius:9px;border:1px solid rgba(100,140,255,.13);margin-bottom:20px;">
+          <table class="gs-map-tbl">
+            <thead><tr><th>Collected from OSPC</th><th>Genestack target file on Flex</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>Master/worker count, hostnames, IPs, roles</td><td>/etc/genestack/inventory/inventory.yaml</td><td>Target cluster definition Genestack/Kubespray uses</td></tr>
+              <tr><td>Kubernetes version target</td><td>/etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml</td><td><code>kube_version</code> set here per Rackspace docs</td></tr>
+              <tr><td>Global host settings</td><td>/etc/genestack/inventory/group_vars/all/all.yml</td><td>host-setup.yml reads values from group_vars</td></tr>
+              <tr><td>Network plan</td><td>/etc/genestack/helm-configs/kube-ovn/kube-ovn-helm-overrides.yaml</td><td>Genestack requires Kube-OVN</td></tr>
+              <tr><td>Storage plan</td><td>Persistent storage config (your choice)</td><td>Genestack requires persistent storage</td></tr>
+              <tr><td>App YAML / Helm values</td><td>Keep separate — apply after cluster is built</td><td>Redeploy workloads, not the cluster itself</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Genestack step table -->
+        <h3 style="font-size:0.88rem;font-weight:700;color:#aac3f8;margin:0 0 10px;">2) Deployment steps on Flex Genestack host</h3>
+        <div style="overflow-x:auto;border-radius:9px;border:1px solid rgba(34,197,94,.14);">
+          <table class="gs-tbl" id="gsTbl">
+            <thead><tr>
+              <th>#</th><th>What you do</th><th>Command / file (editable &nbsp;▶)</th><th>Key file(s)</th>
+            </tr></thead>
+            <tbody id="gsTBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Global log -->
+        <div style="margin-top:16px;background:rgba(3,10,20,.9);border:1px solid rgba(34,197,94,.15);border-radius:9px;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(34,197,94,.12);">
+            <span style="font-size:0.78rem;font-weight:700;color:#86efac;">🖥 Execution Log</span>
+            <button onclick="document.getElementById('gsLog').textContent=''" style="margin-left:auto;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:3px 9px;border-radius:5px;font-size:0.69rem;cursor:pointer;">Clear</button>
+          </div>
+          <pre id="gsLog" style="margin:0;padding:10px 14px;font-family:'Courier New',monospace;font-size:11px;color:#86efac;height:170px;overflow-y:auto;white-space:pre-wrap;background:transparent;line-height:1.5;">Ready — click ▶ Run on any step above.</pre>
         </div>
       </div>
+
+      <!-- ─── OPENCENTER PANEL ──────────────────────────────────── -->
+      <div class="k8opt-panel" id="k8opt-opencenter">
+
+        <div class="gs-note" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.3);color:#93c5fd;">
+          <strong>OpenCenter</strong> — Rackspace CLI-driven platform for bootstrapping Kubernetes clusters with GitOps.
+          Install the <code>opencenter</code> CLI, spin up a Kind cluster, and let FluxCD reconcile all platform services automatically. ~10 min config + 30–50 min deployment.
+        </div>
+
+        <!-- Phase legend -->
+        <div class="gs-phases">
+          <span class="gs-phase-pill" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#93c5fd;">📦 Install CLI</span>
+          <span class="gs-phase-pill" style="background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.4);color:#86efac;">☸️ Init &amp; Provision</span>
+          <span class="gs-phase-pill" style="background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.4);color:#c4b5fd;">🔁 Bootstrap GitOps</span>
+          <span class="gs-phase-pill" style="background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#fcd34d;">✅ Verify</span>
+        </div>
+
+        <h3 style="font-size:0.88rem;font-weight:700;color:#93c5fd;margin:0 0 10px;">OpenCenter quickstart — install CLI → cluster → GitOps → verify</h3>
+        <div style="overflow-x:auto;border-radius:9px;border:1px solid rgba(59,130,246,.2);">
+          <table class="gs-tbl" id="ocTbl">
+            <thead><tr>
+              <th>#</th><th>Step</th><th>Command / action (editable &nbsp;▶)</th><th>Output / notes</th>
+            </tr></thead>
+            <tbody id="ocTBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Global log -->
+        <div style="margin-top:16px;background:rgba(3,10,20,.9);border:1px solid rgba(59,130,246,.15);border-radius:9px;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(59,130,246,.12);">
+            <span style="font-size:0.78rem;font-weight:700;color:#93c5fd;">🖥 OpenCenter Execution Log</span>
+            <button onclick="document.getElementById('ocLog').textContent=''" style="margin-left:auto;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:3px 9px;border-radius:5px;font-size:0.69rem;cursor:pointer;">Clear</button>
+          </div>
+          <pre id="ocLog" style="margin:0;padding:10px 14px;font-family:'Courier New',monospace;font-size:11px;color:#93c5fd;height:150px;overflow-y:auto;white-space:pre-wrap;background:transparent;line-height:1.5;">Ready — click ▶ Run on any step above.</pre>
+        </div>
+      </div>
+
       <script>
-        document.addEventListener('DOMContentLoaded', () => {
-           function setCRMStatus(statusStr) {
-               fetch('/api/tracker/update_status', {
-                   method: 'POST',
-                   headers: {'Content-Type': 'application/json'},
-                   body: JSON.stringify({ status: statusStr })
-               }).then(res => res.json())
-               .then(data => {
-                   if (data.ok) {
-                       alert('Migration CRM Tracker updated to: ' + statusStr);
-                       window.location.href = '/tracker'; // Go back to global tracker
-                   } else {
-                       alert('Error updating CRM: ' + data.error);
-                   }
-               }).catch(e => alert('Failed to contact backend API.'));
-           }
-           document.getElementById('btnMarkSuccess').addEventListener('click', () => { if(confirm('Mark this customer migration as SUCCESSFUL and close the project?')) setCRMStatus('Success'); });
-           document.getElementById('btnMarkRollback').addEventListener('click', () => { if(confirm('Mark this customer migration as ROLLED BACK?')) setCRMStatus('Rolled Back'); });
+      // ── Option tab switching ───────────────────────────────────────────────
+      function k8optSwitch(id, btn) {
+        document.querySelectorAll('.k8opt-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.k8opt-tab').forEach(b => b.classList.remove('active'));
+        document.getElementById('k8opt-'+id).classList.add('active');
+        btn.classList.add('active');
+      }
+
+      // ── Genestack steps data ───────────────────────────────────────────────
+      const GS_STEPS = [
+        // Phase: Map OSPC data
+        {phase:'map',   n:1,  what:'Prepare Flex deployment host',
+         cmd:'# Use a separate control node (NOT a cluster node)\nssh-keygen -t ed25519 -C "genestack-deploy" -f ~/.ssh/genestack\n# Distribute key to all Flex nodes:\nfor ip in MASTER1 MASTER2 MASTER3 WORKER1; do ssh-copy-id -i ~/.ssh/genestack.pub ubuntu@$ip; done',
+         files:'SSH key pair, host connectivity confirmed'},
+        {phase:'map',   n:2,  what:'Clone Genestack',
+         cmd:'git clone --recurse-submodules -j4 \\\n  https://github.com/rackerlabs/genestack /opt/genestack',
+         files:'/opt/genestack/'},
+        {phase:'map',   n:3,  what:'Bootstrap Genestack',
+         cmd:'sudo -E /opt/genestack/bootstrap.sh',
+         files:'Genestack runtime, venv, Ansible'},
+        // Phase: Build inventory
+        {phase:'inv',   n:4,  what:'Build inventory directory tree',
+         cmd:'mkdir -p /etc/genestack/inventory/group_vars/{all,k8s_cluster}\n# Copy the example inventory as your starting point:\ncp /opt/genestack/ansible/inventory/inventory.yaml.example \\\n   /etc/genestack/inventory/inventory.yaml',
+         files:'/etc/genestack/inventory/'},
+        {phase:'inv',   n:5,  what:'Fill inventory.yaml with Flex masters/workers',
+         cmd:'# Edit to match your Flex VMs from OSPC scan output:\ncat > /etc/genestack/inventory/inventory.yaml << \'EOF\'\nall:\n  hosts:\n    flex-master-1:\n      ansible_host: FLEX_MASTER_1_IP\n    flex-master-2:\n      ansible_host: FLEX_MASTER_2_IP\n    flex-worker-1:\n      ansible_host: FLEX_WORKER_1_IP\n  children:\n    kube_control_plane:\n      hosts: {flex-master-1:, flex-master-2:}\n    kube_node:\n      hosts: {flex-worker-1:}\nEOF',
+         files:'/etc/genestack/inventory/inventory.yaml'},
+        {phase:'inv',   n:6,  what:'Set cluster vars (K8s version, settings)',
+         cmd:'# Set kube_version (from your OSPC scan):\ncat >> /etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml << EOF\nkube_version: v1.29.3\ncontainer_manager: containerd\nEOF\n# Set global host settings:\ncat >> /etc/genestack/inventory/group_vars/all/all.yml << EOF\nansible_user: ubuntu\nansible_become: true\nEOF',
+         files:'/etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml\n/etc/genestack/inventory/group_vars/all/all.yml'},
+        // Phase: Deploy
+        {phase:'deploy',n:7,  what:'Run host preparation',
+         cmd:'source /opt/genestack/scripts/genestack.rc\ncd /opt/genestack/ansible/playbooks\nansible-playbook host-setup.yml \\\n  -i /etc/genestack/inventory/inventory.yaml',
+         files:'Host prep log'},
+        {phase:'deploy',n:8,  what:'Deploy Kubernetes with Kubespray',
+         cmd:'cd /opt/genestack/submodules/kubespray\nansible-playbook cluster.yml --become \\\n  -i /etc/genestack/inventory/inventory.yaml \\\n  2>&1 | tee /var/log/kubespray-deploy.log',
+         files:'/var/log/kubespray-deploy.log\nFresh K8s cluster on Flex'},
+        // Phase: Kube-OVN
+        {phase:'ovn',   n:9,  what:'Configure Kube-OVN overrides',
+         cmd:'# Edit the Kube-OVN helm override file:\nvi /etc/genestack/helm-configs/kube-ovn/kube-ovn-helm-overrides.yaml\n# Key values to set: tunnel_type, pod_cidr, service_cidr',
+         files:'/etc/genestack/helm-configs/kube-ovn/kube-ovn-helm-overrides.yaml'},
+        {phase:'ovn',   n:10, what:'Label OVN master nodes',
+         cmd:'kubectl label node -l node-role.kubernetes.io/control-plane \\\n  kube-ovn/role=master\nkubectl get nodes --show-labels | grep kube-ovn',
+         files:'Node labels applied'},
+        {phase:'ovn',   n:11, what:'Install Kube-OVN',
+         cmd:'/opt/genestack/bin/install-kube-ovn.sh\nkubectl get pods -n kube-system | grep ovn',
+         files:'Kube-OVN CNI running'},
+        // Phase: Verify
+        {phase:'verify',n:12, what:'Pull kubeconfig and verify cluster',
+         cmd:'mkdir -p ~/.kube\nrsync -e "ssh -F ${HOME}/.ssh/openstack-keypair.config" \\\n  --rsync-path="sudo rsync" \\\n  -avz ubuntu@FIRST_CONTROLLER_IP:/root/.kube/config "${HOME}/.kube/config"\nsed -i \'s@server.*@server: https://FIRST_CONTROLLER_IP:6443@g\' "${HOME}/.kube/config"\nkubectl get nodes\nkubectl get pods -A',
+         files:'~/.kube/config (Flex cluster kubeconfig)'},
+      ];
+
+      const GS_PHASE_META = {
+        map:   {label:'📥 Map OSPC data → Genestack inputs', c:'#3b82f6'},
+        inv:   {label:'📋 Build inventory & group_vars',      c:'#22c55e'},
+        deploy:{label:'🚀 Bootstrap & deploy Kubernetes',     c:'#a855f7'},
+        ovn:   {label:'🔌 Install Kube-OVN (required)',       c:'#f59e0b'},
+        verify:{label:'✅ Verify & pull kubeconfig',          c:'#ef4444'},
+      };
+
+      function renderGsTable() {
+        const tbody = document.getElementById('gsTBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        let lastPhase = null;
+        GS_STEPS.forEach(row => {
+          const pm = GS_PHASE_META[row.phase];
+          if (row.phase !== lastPhase) {
+            const hr = document.createElement('tr');
+            hr.className = 'gs-phase-row';
+            hr.innerHTML = `<td colspan="4" style="color:${pm.c};">${pm.label}</td>`;
+            tbody.appendChild(hr);
+            lastPhase = row.phase;
+          }
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><span class="gs-num">${row.n}</span></td>
+            <td class="gs-what">${row.what}</td>
+            <td style="min-width:320px;max-width:420px;">
+              <div class="gs-cmd-wrap">
+                <textarea class="gs-cmd-ta" id="gs-cmd-${row.n}" spellcheck="false"></textarea>
+                <div class="gs-btn-row">
+                  <button class="gs-run-btn" id="gs-run-${row.n}" onclick="gsRun(${row.n})">▶ Run</button>
+                  <button class="gs-copy-btn" onclick="gsCopy(${row.n})">📋 Copy</button>
+                </div>
+              </div>
+            </td>
+            <td class="gs-file">${row.files.replace(/\n/g,'<br>')}</td>`;
+          tbody.appendChild(tr);
+          // Set textarea value safely
+          document.getElementById('gs-cmd-'+row.n) && (document.getElementById('gs-cmd-'+row.n).value = row.cmd);
+          // Log row
+          const lr = document.createElement('tr');
+          lr.className = 'gs-log-row';
+          lr.id = 'gs-log-row-'+row.n;
+          lr.innerHTML = `<td colspan="4"><div class="gs-log-inner" id="gs-log-inner-${row.n}"></div></td>`;
+          tbody.appendChild(lr);
         });
+      }
+
+      async function gsRun(n) {
+        const ta = document.getElementById('gs-cmd-'+n);
+        const btn = document.getElementById('gs-run-'+n);
+        const globalLog = document.getElementById('gsLog');
+        const logRow = document.getElementById('gs-log-row-'+n);
+        const logInner = document.getElementById('gs-log-inner-'+n);
+        if (!ta) return;
+        const cmd = ta.value.trim();
+        if (!cmd) return;
+        btn.disabled = true; btn.textContent = '⏳';
+        logRow.classList.add('open'); logInner.textContent = '';
+        const script = '#!/usr/bin/env bash\nset -uo pipefail\n' + cmd + '\n';
+        const ts = new Date().toLocaleTimeString();
+        const step = GS_STEPS.find(s => s.n === n);
+        globalLog.textContent += `\n[${ts}] ▶ Step ${n}: ${step ? step.what : ''}\n`;
+        try {
+          const resp = await fetch('/api/agent1/run/migration', {
+            method:'POST', headers:{'Content-Type':'text/plain'}, body: script});
+          const reader = resp.body.getReader();
+          const dec = new TextDecoder();
+          while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            const chunk = dec.decode(value, {stream:true});
+            logInner.textContent += chunk;
+            logInner.scrollTop = logInner.scrollHeight;
+            globalLog.textContent += chunk;
+            globalLog.scrollTop = globalLog.scrollHeight;
+          }
+          btn.disabled = false; btn.textContent = '▶ Run';
+          globalLog.textContent += `\n[${new Date().toLocaleTimeString()}] ✓ Step ${n} complete\n`;
+        } catch(e) {
+          logInner.textContent += '\n[ERROR] ' + e.message;
+          globalLog.textContent += '\n[ERROR] ' + e.message;
+          btn.disabled = false; btn.textContent = '▶ Run';
+        }
+      }
+
+      function gsCopy(n) {
+        const ta = document.getElementById('gs-cmd-'+n);
+        if (!ta) return;
+        navigator.clipboard.writeText(ta.value);
+        const btn = document.querySelector(`#gs-run-${n}`)?.nextElementSibling;
+        if (btn) { const orig = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(()=>btn.textContent=orig, 1200); }
+      }
+
+      // ── OpenCenter steps data (from official quickstart) ──────────────────
+      const OC_STEPS = [
+        // Phase: Install CLI
+        {phase:'install', n:1, what:'Download CLI binary (Linux amd64)',
+         cmd:'# Linux amd64 — swap suffix for your platform\ncurl -Lo opencenter https://github.com/rackerlabs/openCenter-cli/releases/download/v1.0.0/opencenter-linux-amd64\nchmod +x opencenter\nsudo mv opencenter /usr/local/bin/',
+         files:'opencenter binary in /usr/local/bin/'},
+        {phase:'install', n:2, what:'Verify CLI installation',
+         cmd:'opencenter version\n# Expected: opencenter version 1.0.0',
+         files:'CLI ready'},
+        // Phase: Kind cluster
+        {phase:'cluster', n:3, what:'Initialize a Kind cluster',
+         cmd:'# Create cluster configuration\nopencenter cluster init my-first-cluster --type kind\n\n# Review the generated configuration\nopencenter cluster edit my-first-cluster',
+         files:'Cluster config generated'},
+        {phase:'cluster', n:4, what:'Provision the cluster',
+         cmd:'# Generate and apply infrastructure\nopencenter cluster setup my-first-cluster\n\n# Check cluster status (takes 30–50 min)\nopencenter cluster status my-first-cluster',
+         files:'Cluster provisioned'},
+        // Phase: GitOps
+        {phase:'gitops', n:5, what:'Bootstrap GitOps (FluxCD)',
+         cmd:'# Install FluxCD and start reconciliation\nopencenter cluster bootstrap my-first-cluster',
+         files:'FluxCD reconciliation started'},
+        // Phase: Verify
+        {phase:'verify', n:6, what:'Check platform services',
+         cmd:'kubectl get pods -A\n# Verify: flux-system pods Running\n# Platform services deploying: cert-manager, kyverno, etc.',
+         files:'All pods Running'},
+        {phase:'verify', n:7, what:'Access Headlamp UI',
+         cmd:'kubectl port-forward -n headlamp svc/headlamp 8080:80\n# Open: http://localhost:8080',
+         files:'Headlamp UI accessible at :8080'},
+      ];
+
+      const OC_PHASE_META = {
+        install: {label:'📦 Step 1 — Install the CLI',              c:'#3b82f6'},
+        cluster: {label:'☸️ Steps 2–3 — Init & Provision cluster',  c:'#22c55e'},
+        gitops:  {label:'🔁 Step 4 — Bootstrap GitOps',             c:'#a855f7'},
+        verify:  {label:'✅ Step 5 — Verify the cluster',           c:'#f59e0b'},
+      };
+
+      function renderOcTable() {
+        const tbody = document.getElementById('ocTBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        let lastPhase = null;
+        OC_STEPS.forEach(row => {
+          if (row.phase !== lastPhase) {
+            lastPhase = row.phase;
+            const pm = OC_PHASE_META[row.phase] || {label:row.phase, c:'#6b7280'};
+            const ph = document.createElement('tr');
+            ph.innerHTML = `<td colspan="4" style="padding:8px 12px;background:rgba(0,0,0,.35);
+              border-left:3px solid ${pm.c};color:${pm.c};font-size:0.72rem;font-weight:700;
+              letter-spacing:.06em;text-transform:uppercase;">${pm.label}</td>`;
+            tbody.appendChild(ph);
+          }
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><span class="gs-num">${row.n}</span></td>
+            <td class="gs-what">${row.what}</td>
+            <td style="min-width:320px;max-width:420px;">
+              <div class="gs-cmd-wrap">
+                <textarea class="gs-cmd-ta" id="oc-cmd-${row.n}" spellcheck="false"></textarea>
+                <div class="gs-btn-row">
+                  <button class="gs-run-btn" id="oc-run-${row.n}" onclick="ocRun(${row.n})">▶ Run</button>
+                  <button class="gs-copy-btn" onclick="ocCopy(${row.n})">📋 Copy</button>
+                </div>
+              </div>
+            </td>
+            <td class="gs-file">${row.files.replace(/\n/g,'<br>')}</td>`;
+          tbody.appendChild(tr);
+          document.getElementById('oc-cmd-'+row.n) && (document.getElementById('oc-cmd-'+row.n).value = row.cmd);
+          const lr = document.createElement('tr');
+          lr.className = 'gs-log-row'; lr.id = 'oc-log-row-'+row.n;
+          lr.innerHTML = `<td colspan="4"><div class="gs-log-inner" id="oc-log-inner-${row.n}"></div></td>`;
+          tbody.appendChild(lr);
+        });
+      }
+
+      async function ocRun(n) {
+        const ta = document.getElementById('oc-cmd-'+n);
+        const btn = document.getElementById('oc-run-'+n);
+        const globalLog = document.getElementById('ocLog');
+        const logRow = document.getElementById('oc-log-row-'+n);
+        const logInner = document.getElementById('oc-log-inner-'+n);
+        if (!ta) return;
+        const cmd = ta.value.trim(); if (!cmd) return;
+        btn.disabled = true; btn.textContent = '⏳';
+        logRow.classList.add('open'); logInner.textContent = '';
+        const script = '#!/usr/bin/env bash\nset -uo pipefail\n' + cmd + '\n';
+        const ts = new Date().toLocaleTimeString();
+        const step = OC_STEPS.find(s => s.n === n);
+        globalLog.textContent += `\n[${ts}] ▶ Step ${n}: ${step ? step.what : ''}\n`;
+        try {
+          const resp = await fetch('/api/agent1/run/migration', {
+            method:'POST', headers:{'Content-Type':'text/plain'}, body: script});
+          const reader = resp.body.getReader(); const dec = new TextDecoder();
+          while (true) {
+            const {value, done} = await reader.read(); if (done) break;
+            const chunk = dec.decode(value, {stream:true});
+            logInner.textContent += chunk; logInner.scrollTop = logInner.scrollHeight;
+            globalLog.textContent += chunk; globalLog.scrollTop = globalLog.scrollHeight;
+          }
+          btn.disabled = false; btn.textContent = '▶ Run';
+          globalLog.textContent += `\n[${new Date().toLocaleTimeString()}] ✓ Step ${n} complete\n`;
+        } catch(e) {
+          logInner.textContent += '\n[ERROR] '+e.message;
+          globalLog.textContent += '\n[ERROR] '+e.message;
+          btn.disabled = false; btn.textContent = '▶ Run';
+        }
+      }
+
+      function ocCopy(n) {
+        const ta = document.getElementById('oc-cmd-'+n); if (!ta) return;
+        navigator.clipboard.writeText(ta.value);
+        const btn = document.getElementById('oc-run-'+n)?.nextElementSibling;
+        if (btn) { const orig = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(()=>btn.textContent=orig, 1200); }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        renderGsTable();
+        renderOcTable();
+      });
       </script>
     </section>
 
-    <section class="card">
-      <a href="/readme" target="_blank" rel="noopener noreferrer">Open README (Plain Text)</a>
-    </section>
   </main>
 
   <script src="/static/app.js?v=8"></script>

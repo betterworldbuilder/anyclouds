@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OSPC to FLEX Migration Operations</title>
+  <title>OSPC to FLEX Migration Dashboard</title>
   <style>
     :root {
       --bg: #233a6b; --card: #0f1e3e88; --text: #ffffff;
@@ -41,19 +41,6 @@
     }
     @keyframes corner-glow {
       0%, 100% { opacity: 0.6; } 50% { opacity: 1; }
-    }
-    @keyframes open-blink {
-      0%   { color: #ff00ff; text-shadow: 0 0 8px #ff00ff, 0 0 20px #ff00ff, 0 0 50px #ff00ff, 0 0 80px #ff00ff; }
-      25%  { color: #ffffff; text-shadow: 0 0 4px #fff, 0 0 10px #fff; }
-      50%  { color: #00f3ff; text-shadow: 0 0 8px #00f3ff, 0 0 20px #00f3ff, 0 0 50px #00f3ff, 0 0 80px #00f3ff; }
-      75%  { color: #ffffff; text-shadow: 0 0 4px #fff, 0 0 10px #fff; }
-      100% { color: #ff00ff; text-shadow: 0 0 8px #ff00ff, 0 0 20px #ff00ff, 0 0 50px #ff00ff, 0 0 80px #ff00ff; }
-    }
-    header h1 .open-sign {
-      font-style: italic;
-      animation: open-blink 1.4s ease-in-out infinite;
-      font-size: 0.85em;
-      letter-spacing: 4px;
     }
     header {
       background: linear-gradient(180deg, #000d1a 0%, #021628 50%, #061e3a 100%);
@@ -196,7 +183,7 @@
     iframe { width: 100%; height: 100%; border: none; background: transparent; }
 
     /* Info panels */
-    .info-panel { height: auto; overflow-y: visible; padding: 20px 24px; }
+    .info-panel { height: 100%; overflow-y: auto; padding: 20px 24px; }
     .info-panel h2 { font-size: 17px; color: #7ecfff; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
     .info-panel h3 { font-size: 13px; color: #a8d8ff; margin: 14px 0 6px; }
     .info-panel ul { padding-left: 20px; line-height: 1.75; color: var(--muted); }
@@ -213,7 +200,7 @@
 
 <header>
   <div class="header-inner">
-    <h1><span class="shield">🛡</span> OSPC <span class="accent">to</span> FLEX Migration Operations &ndash; <span class="open-sign">Open 24/24</span></h1>
+    <h1><span class="shield">🛡</span> OSPC <span class="accent">TO</span> FLEX MIGRATION FULL CYCLE MISSION CONTROL – <span style="font-style:italic;">OPEN 24/24</span></h1>
   </div>
   <div class="header-ticker-wrap">
     <span class="header-ticker">
@@ -262,8 +249,9 @@
 <div class="sub-bar" id="subBar2">
   <button class="sub-btn active" data-sub="s2image">🚀 Option 1: Direct Shift and Lift of VM OSPC 2 FLEX</button>
   <button class="sub-btn" data-sub="s2rehost_p1">🛠 Option 2: REHOST / Phase 1: OSPC 2FLEX infra cloning</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Option 2: REHOST / Phase 2 - Option 1: Apps Migration Manual semi Auto</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_2">📊 Option 2: REHOST / Phase 2 - Option 2: Data Migration Full auto mode</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Phase 2 : Apps Servers and DB Replication</button>
+  <button class="sub-btn" data-sub="s2rehost_manual">📋 Apps Server Replication Full Manual</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ Phase 3 : Kubernetes Replication Manuel / Auto mode</button>
 </div>
 
 <!-- ── Panels ─────────────────────────────────────────── -->
@@ -579,17 +567,420 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     <iframe id="s2rehost_p1-pane" src="/designer/" title="REHOST Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_manual-pane" src="/rehost_manual/" title="REHOST Full Manual Runbook" style="display:none; width:100%; height:100%; border:none;"></iframe>
   </div>
 
   <!-- STAGE 4 · Validation & UAT -->
   <div class="panel" id="panel-s4">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
-      
-      <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(165,180,252,.2); padding:20px; border-radius:8px;">
-        <h2 style="font-size: 19px; color: #7ecfff; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">🛡️ Stage 4 – Automated Migration Validation Engine</h2>
-        <p style="color:var(--muted); margin:10px 0;">Validation is split into Internal UAT (migration team) and Customer UAT. Supply your target IP addresses below to allow the Automated Engine to perform live Ping, Curl, SSH, and OpenStack API verification sweeps across the entire FLEX environment.</p>
 
-        <form id="uat-runner-form" novalidate onsubmit="return false;">
+      <style>
+        /* ── UAT Simple Page ─────────────────────────── */
+        .uat-page { display:flex; flex-direction:column; gap:18px; max-width:1100px; }
+        .uat-section { background:rgba(6,14,48,.7); border:1px solid rgba(79,126,248,.18); border-radius:12px; overflow:hidden; }
+        .uat-sec-hdr { display:flex; align-items:center; gap:10px; padding:11px 18px;
+          background:rgba(0,0,0,.35); border-bottom:1px solid rgba(79,126,248,.15); }
+        .uat-sec-hdr span { font-size:0.82rem; font-weight:700; color:#aac3f8; text-transform:uppercase; letter-spacing:.07em; }
+        .uat-sec-body { padding:16px 18px; }
+        /* editable cells */
+        .uat-ed { background:rgba(255,255,255,.04); border:1px solid rgba(79,126,248,.15); border-radius:5px;
+          padding:5px 9px; color:#e2e8f0; font-size:0.82rem; min-width:60px; outline:none;
+          transition:border-color .15s; }
+        .uat-ed:focus { border-color:rgba(99,160,255,.55); background:rgba(255,255,255,.07); }
+        .uat-ed[data-ph]:empty::before { content:attr(data-ph); color:#4a5a7a; pointer-events:none; }
+        /* tables */
+        .uat-tbl { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        .uat-tbl th { padding:7px 12px; text-align:left; color:#7a9acc; font-size:0.69rem; font-weight:700;
+          text-transform:uppercase; background:rgba(0,0,0,.3); border-bottom:2px solid rgba(79,126,248,.18); white-space:nowrap; }
+        .uat-tbl td { padding:6px 12px; border-bottom:1px solid rgba(79,126,248,.07); vertical-align:middle; }
+        .uat-tbl tr:last-child td { border-bottom:none; }
+        .uat-tbl tr:hover td { background:rgba(255,255,255,.02); }
+        /* select */
+        .uat-sel { background:rgba(6,14,48,.9); border:1px solid rgba(79,126,248,.25); border-radius:5px;
+          color:#e2e8f0; font-size:0.78rem; padding:4px 8px; cursor:pointer; }
+        .uat-sel:focus { outline:none; border-color:#60a5fa; }
+        /* status badge */
+        .uat-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.7rem; font-weight:700; }
+        /* checklist */
+        .uat-check-row { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:10px;
+          padding:8px 4px; border-bottom:1px solid rgba(79,126,248,.07); }
+        .uat-check-row:last-child { border-bottom:none; }
+        .uat-chk { width:18px; height:18px; accent-color:#22c55e; cursor:pointer; }
+        .uat-check-label { font-size:0.82rem; color:#c8d9ff; }
+        .uat-check-note { font-size:0.75rem; }
+        /* decision row */
+        .uat-decision-row { display:flex; gap:12px; flex-wrap:wrap; align-items:stretch; margin-top:4px; }
+        .uat-dec-card { flex:1; min-width:160px; border-radius:10px; border:2px solid; padding:14px 16px;
+          cursor:pointer; transition:all .15s; user-select:none; }
+        .uat-dec-card:hover { filter:brightness(1.12); }
+        .uat-dec-card.selected { filter:brightness(1.2); box-shadow:0 0 0 3px rgba(255,255,255,.15); }
+        /* export btn */
+        .uat-export-btn { background:rgba(37,99,235,.18); border:1px solid rgba(59,130,246,.4); color:#93c5fd;
+          border-radius:7px; padding:6px 16px; font-size:0.77rem; font-weight:700; cursor:pointer;
+          transition:background .15s; margin-left:auto; }
+        .uat-export-btn:hover { background:rgba(37,99,235,.3); }
+        /* issue add btn */
+        .uat-add-btn { background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.35); color:#a5b4fc;
+          border-radius:6px; padding:5px 13px; font-size:0.75rem; font-weight:700; cursor:pointer; }
+        .uat-add-btn:hover { background:rgba(99,102,241,.25); }
+        /* severity badges */
+        .sev-critical { background:rgba(239,68,68,.2); border:1px solid rgba(239,68,68,.4); color:#fca5a5; }
+        .sev-high     { background:rgba(249,115,22,.2); border:1px solid rgba(249,115,22,.4); color:#fdba74; }
+        .sev-medium   { background:rgba(234,179,8,.2);  border:1px solid rgba(234,179,8,.4);  color:#fde047; }
+        .sev-low      { background:rgba(34,197,94,.2);  border:1px solid rgba(34,197,94,.4);  color:#86efac; }
+      </style>
+
+      <div class="uat-page" id="uatPage">
+
+        <!-- PAGE HEADER -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2 style="margin:0 0 3px;font-size:1.1rem;color:#c8d9ff;">🛡️ UAT Sign-off — OSPC → FLEX</h2>
+            <p style="margin:0;color:#6b8aad;font-size:0.76rem;">Purpose: Validate the migrated system on FLEX before cutover &nbsp;·&nbsp; All fields are editable</p>
+          </div>
+          <button class="uat-export-btn" onclick="uatExport()">⬇ Export UAT report</button>
+        </div>
+
+        <!-- ── BLOCK 1: UAT SUMMARY ─────────────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>1 · UAT Summary</span>
+          </div>
+          <div class="uat-sec-body" style="display:flex;flex-direction:column;gap:14px;">
+
+            <!-- Customer info row -->
+            <div>
+              <p style="margin:0 0 8px;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Customer info</p>
+              <table class="uat-tbl">
+                <thead><tr><th>Customer Name</th><th>Industry</th><th>Contact (name / email / phone)</th></tr></thead>
+                <tbody><tr>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="customer name" id="uat_cust_name"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="industry" id="uat_cust_industry"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="name / email / phone" id="uat_cust_contact" style="min-width:220px;"></span></td>
+                </tr></tbody>
+              </table>
+            </div>
+
+            <!-- Business context -->
+            <div>
+              <p style="margin:0 0 8px;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Business context</p>
+              <table class="uat-tbl">
+                <thead><tr><th>Business System / App</th><th>Role / What it does</th><th>Dependencies</th><th>Input source</th><th>Outputs to</th></tr></thead>
+                <tbody><tr>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="app / system name" id="uat_biz_system"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="what this system does" id="uat_biz_role"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="DB / API / LDAP / DNS" id="uat_biz_deps"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="users / API / upstream app" id="uat_biz_input"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="billing / CRM / reports" id="uat_biz_output"></span></td>
+                </tr></tbody>
+              </table>
+            </div>
+
+            <!-- Status table -->
+            <div>
+              <p style="margin:0 0 8px;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Migration / UAT status</p>
+              <table class="uat-tbl" style="max-width:580px;">
+                <tbody>
+                  <tr><td style="color:#8ba3cc;width:200px;">Source Environment</td><td><span class="uat-badge" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.4);color:#fb923c;">OSPC</span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Target Environment</td><td><span class="uat-badge" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#86efac;">FLEX</span></td></tr>
+                  <tr><td style="color:#8ba3cc;">UAT Status</td><td>
+                    <select class="uat-sel" id="uat_status" onchange="uatSave()">
+                      <option>Not Started</option><option>In Progress</option>
+                      <option>Passed</option><option>Failed</option><option>Blocked</option>
+                    </select>
+                  </td></tr>
+                  <tr><td style="color:#8ba3cc;">UAT Owner</td><td><span class="uat-ed" contenteditable="true" data-ph="owner name" id="uat_owner"></span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Planned UAT Date</td><td><span class="uat-ed" contenteditable="true" data-ph="YYYY-MM-DD" id="uat_date"></span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Cutover Readiness</td><td>
+                    <select class="uat-sel" id="uat_readiness" onchange="uatSave()">
+                      <option>Not Ready</option><option>At Risk</option><option>Ready</option>
+                    </select>
+                  </td></tr>
+                  <tr><td style="color:#8ba3cc;">Overall Progress</td><td><span class="uat-ed" contenteditable="true" data-ph="0%" id="uat_progress"></span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Critical Issues</td><td><span class="uat-ed" contenteditable="true" data-ph="0" id="uat_critical_count"></span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── BLOCK 2: TEST CHECKLIST ──────────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>2 · Test Checklist</span>
+            <span style="font-size:0.7rem;color:#4a5a7a;font-weight:400;text-transform:none;letter-spacing:0;">Scope: core flows, data, integrations, access, outputs</span>
+          </div>
+          <div class="uat-sec-body">
+            <div id="uatChecklist">
+              <!-- rows injected by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BLOCK 3: ISSUES ──────────────────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>3 · Issues</span>
+            <button class="uat-add-btn" onclick="uatAddIssue()" style="margin-left:auto;">＋ Add issue</button>
+          </div>
+          <div class="uat-sec-body" style="padding:0;">
+            <table class="uat-tbl" id="uatIssueTable">
+              <thead><tr><th>#</th><th>Issue description</th><th>Severity</th><th>Owner</th><th>Status</th><th style="width:32px;"></th></tr></thead>
+              <tbody id="uatIssueTbody">
+                <!-- rows injected by JS -->
+              </tbody>
+            </table>
+            <div id="uatNoIssues" style="text-align:center;padding:18px;color:#4a5a7a;font-size:0.78rem;">No issues logged — click ＋ Add issue to log one</div>
+          </div>
+        </div>
+
+        <!-- ── BLOCK 4: GO / NO-GO DECISION ────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>4 · Go / No-Go Decision</span>
+          </div>
+          <div class="uat-sec-body" style="display:flex;flex-direction:column;gap:16px;">
+
+            <div class="uat-decision-row" id="uatDecisionCards">
+              <div class="uat-dec-card" id="dec-go" data-dec="Go"
+                style="background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.35);"
+                onclick="uatPickDecision('Go')">
+                <div style="font-size:1.4rem;">✅</div>
+                <div style="font-weight:700;color:#86efac;margin-top:6px;">Go</div>
+                <div style="font-size:0.73rem;color:#6b8aad;margin-top:4px;">All tests passed — ready for cutover</div>
+              </div>
+              <div class="uat-dec-card" id="dec-nogo" data-dec="No-Go"
+                style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);"
+                onclick="uatPickDecision('No-Go')">
+                <div style="font-size:1.4rem;">🚫</div>
+                <div style="font-weight:700;color:#fca5a5;margin-top:6px;">No-Go</div>
+                <div style="font-size:0.73rem;color:#6b8aad;margin-top:4px;">Critical issues remain — do not cut over</div>
+              </div>
+              <div class="uat-dec-card" id="dec-conditional" data-dec="Conditional Go"
+                style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);"
+                onclick="uatPickDecision('Conditional Go')">
+                <div style="font-size:1.4rem;">⚠️</div>
+                <div style="font-weight:700;color:#fde047;margin-top:6px;">Conditional Go</div>
+                <div style="font-size:0.73rem;color:#6b8aad;margin-top:4px;">Minor issues — proceed with mitigation plan</div>
+              </div>
+            </div>
+
+            <!-- Sign-off row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding-top:4px;">
+              <div>
+                <p style="margin:0 0 5px;font-size:0.71rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Sign-off name</p>
+                <span class="uat-ed" contenteditable="true" data-ph="full name" id="uat_signoff_name" style="display:block;"></span>
+              </div>
+              <div>
+                <p style="margin:0 0 5px;font-size:0.71rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Sign-off date</p>
+                <span class="uat-ed" contenteditable="true" data-ph="YYYY-MM-DD" id="uat_signoff_date" style="display:block;"></span>
+              </div>
+              <div>
+                <p style="margin:0 0 5px;font-size:0.71rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Notes</p>
+                <span class="uat-ed" contenteditable="true" data-ph="any final notes..." id="uat_signoff_notes" style="display:block;"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /uat-page -->
+
+      <script>
+      // ── UAT page data ────────────────────────────────────────────────────
+      const UAT_CHECKS = [
+        {id:'ck_login',   label:'Login works',                        note:'All user roles can authenticate on FLEX'},
+        {id:'ck_flows',   label:'Main business flows work',           note:'Core transactions / workflows complete end-to-end'},
+        {id:'ck_data',    label:'Data looks correct',                 note:'Records, counts, and spot-checks match OSPC'},
+        {id:'ck_api',     label:'APIs / integrations work',           note:'All external API calls and webhooks respond correctly'},
+        {id:'ck_reports', label:'Reports / emails / outputs work',    note:'Scheduled jobs, email notifications, report exports run'},
+        {id:'ck_perms',   label:'Permissions / roles work',           note:'Users have correct access — no over- or under-privilege'},
+      ];
+
+      const UAT_EDITABLE_IDS = [
+        'uat_cust_name','uat_cust_industry','uat_cust_contact',
+        'uat_biz_system','uat_biz_role','uat_biz_deps','uat_biz_input','uat_biz_output',
+        'uat_owner','uat_date','uat_progress','uat_critical_count',
+        'uat_signoff_name','uat_signoff_date','uat_signoff_notes',
+      ];
+
+      let uatIssues = [];
+      let uatDecision = '';
+
+      function uatSave() {
+        const data = {};
+        UAT_EDITABLE_IDS.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) data[id] = el.innerText;
+        });
+        ['uat_status','uat_readiness'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) data[id] = el.value;
+        });
+        UAT_CHECKS.forEach(c => {
+          const el = document.getElementById(c.id);
+          if (el) data[c.id] = el.checked;
+        });
+        data._issues = uatIssues;
+        data._decision = uatDecision;
+        localStorage.setItem('uatData', JSON.stringify(data));
+      }
+
+      function uatLoad() {
+        const raw = localStorage.getItem('uatData');
+        if (!raw) return;
+        try {
+          const data = JSON.parse(raw);
+          UAT_EDITABLE_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && data[id] !== undefined) el.innerText = data[id];
+          });
+          ['uat_status','uat_readiness'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && data[id]) el.value = data[id];
+          });
+          UAT_CHECKS.forEach(c => {
+            const el = document.getElementById(c.id);
+            if (el && data[c.id] !== undefined) el.checked = data[c.id];
+          });
+          if (data._issues) { uatIssues = data._issues; renderIssues(); }
+          if (data._decision) uatPickDecision(data._decision, true);
+        } catch(e) {}
+      }
+
+      function buildChecklist() {
+        const el = document.getElementById('uatChecklist');
+        el.innerHTML = '';
+        UAT_CHECKS.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'uat-check-row';
+          row.innerHTML = `
+            <input type="checkbox" class="uat-chk" id="${c.id}" onchange="uatSave()">
+            <label for="${c.id}" class="uat-check-label">${c.label}</label>
+            <span class="uat-ed uat-check-note" contenteditable="true"
+              data-ph="${c.note}" id="${c.id}_note"></span>`;
+          el.appendChild(row);
+        });
+      }
+
+      function uatAddIssue() {
+        const n = uatIssues.length + 1;
+        uatIssues.push({n, desc:'', sev:'Medium', owner:'', status:'Open'});
+        renderIssues();
+      }
+
+      function renderIssues() {
+        const tbody = document.getElementById('uatIssueTbody');
+        const noEl  = document.getElementById('uatNoIssues');
+        tbody.innerHTML = '';
+        if (uatIssues.length === 0) { noEl.style.display='block'; return; }
+        noEl.style.display = 'none';
+        uatIssues.forEach((iss, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="color:#6b8aad;font-size:0.73rem;">${iss.n}</td>
+            <td><span class="uat-ed" contenteditable="true" data-ph="describe the issue"
+              oninput="uatIssues[${i}].desc=this.innerText;uatSave()"
+              style="min-width:220px;display:block;">${iss.desc}</span></td>
+            <td>
+              <select class="uat-sel" onchange="uatIssues[${i}].sev=this.value;uatSave()">
+                ${['Critical','High','Medium','Low'].map(s =>
+                  `<option${iss.sev===s?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td><span class="uat-ed" contenteditable="true" data-ph="owner"
+              oninput="uatIssues[${i}].owner=this.innerText;uatSave()"
+              style="display:block;">${iss.owner}</span></td>
+            <td>
+              <select class="uat-sel" onchange="uatIssues[${i}].status=this.value;uatSave()">
+                ${['Open','In Progress','Resolved','Closed'].map(s =>
+                  `<option${iss.status===s?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td style="text-align:center;">
+              <button onclick="uatIssues.splice(${i},1);uatIssues.forEach((x,j)=>x.n=j+1);renderIssues();uatSave();"
+                style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.85rem;" title="Remove">✕</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function uatPickDecision(dec, skipSave) {
+        uatDecision = dec;
+        document.querySelectorAll('.uat-dec-card').forEach(c => c.classList.remove('selected'));
+        const map = {'Go':'dec-go','No-Go':'dec-nogo','Conditional Go':'dec-conditional'};
+        const el = document.getElementById(map[dec]);
+        if (el) el.classList.add('selected');
+        if (!skipSave) uatSave();
+      }
+
+      function uatExport() {
+        const lines = ['UAT REPORT — OSPC → FLEX', '='.repeat(50), ''];
+        const g = id => (document.getElementById(id)||{}).innerText || '';
+        const gs = id => (document.getElementById(id)||{}).value || '';
+        lines.push('CUSTOMER');
+        lines.push('  Name: ' + g('uat_cust_name'));
+        lines.push('  Industry: ' + g('uat_cust_industry'));
+        lines.push('  Contact: ' + g('uat_cust_contact'));
+        lines.push('');
+        lines.push('BUSINESS CONTEXT');
+        lines.push('  System: ' + g('uat_biz_system'));
+        lines.push('  Role: ' + g('uat_biz_role'));
+        lines.push('  Deps: ' + g('uat_biz_deps'));
+        lines.push('  Input: ' + g('uat_biz_input'));
+        lines.push('  Output: ' + g('uat_biz_output'));
+        lines.push('');
+        lines.push('STATUS');
+        lines.push('  UAT Status: ' + gs('uat_status'));
+        lines.push('  Owner: ' + g('uat_owner'));
+        lines.push('  Date: ' + g('uat_date'));
+        lines.push('  Readiness: ' + gs('uat_readiness'));
+        lines.push('  Progress: ' + g('uat_progress'));
+        lines.push('  Critical issues: ' + g('uat_critical_count'));
+        lines.push('');
+        lines.push('TEST CHECKLIST');
+        UAT_CHECKS.forEach(c => {
+          const chk = (document.getElementById(c.id)||{}).checked;
+          lines.push('  [' + (chk ? 'X' : ' ') + '] ' + c.label);
+        });
+        lines.push('');
+        lines.push('ISSUES (' + uatIssues.length + ')');
+        uatIssues.forEach(iss => {
+          lines.push(`  #${iss.n} [${iss.sev}] ${iss.desc} — Owner: ${iss.owner} — ${iss.status}`);
+        });
+        lines.push('');
+        lines.push('DECISION: ' + (uatDecision || 'Pending'));
+        lines.push('Sign-off: ' + g('uat_signoff_name') + '  Date: ' + g('uat_signoff_date'));
+        lines.push('Notes: ' + g('uat_signoff_notes'));
+        const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'UAT-report.txt';
+        a.click();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        buildChecklist();
+        renderIssues();
+        uatLoad();
+        // auto-save on every contenteditable change inside uat page
+        document.getElementById('uatPage').addEventListener('input', () => uatSave());
+      });
+      </script>
+
+      <!-- keep stub so old JS refs don't throw -->
+      <div id="uat-terminal-box" style="display:none;"></div>
+      <div id="uat-log-output" style="display:none;"></div>
+      <span id="uat-status-indicator" style="display:none;"></span>
+      <div id="rbac-terminal-box" style="display:none;"></div>
+      <div id="rbac-log-output" style="display:none;"></div>
+      <span id="rbac-status-indicator" style="display:none;"></span>
+      <div id="s3-report-panel" style="display:none;"></div>
+      <div id="uat-app-blocks" style="display:none;"></div>
+
+
+        <!-- old automated engine removed -->
+        <form id="uat-runner-form" novalidate onsubmit="return false;" style="display:none;">
             <!-- 1. CLOUD CREDENTIALS -->
             <div style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:32px; background:rgba(0,0,0,0.2); border-radius:4px; padding:20px; border-left:4px solid #f39c12;">
                 <!-- OSPC -->
@@ -628,6 +1019,26 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
                             <input id="uat_flex_os_user_domain_id" type="text" value="default" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
                         </label>
                     </div>
+                </div>
+            </div>
+
+            <!-- 1A-IMPORT. REHOST MIGRATION RESULTS (auto-imported from Stage 2 report) -->
+            <div id="s3-report-panel" style="display:none; margin-bottom:20px; padding:15px; background:rgba(16,185,129,0.06); border-left:4px solid #10b981; border-radius:4px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <h3 style="margin:0; color:#4ade80; font-size:14px;">📊 Rehost Migration Results</h3>
+                        <p style="font-size:11px; color:#aaa; margin-top:4px;">Imported from Stage 2 parallel execution report · <span id="s3-report-ts" style="color:#64748b;"></span></p>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="s3LoadReport()" style="background:transparent; border:1px solid #4ade80; color:#4ade80; border-radius:5px; padding:5px 12px; cursor:pointer; font-size:12px;">🔄 Reload</button>
+                        <button onclick="s3DownloadReport()" id="s3-dl-btn" style="display:none; background:#10b981; color:#fff; border:none; border-radius:5px; padding:5px 12px; cursor:pointer; font-size:12px;">⬇ Download .csv</button>
+                    </div>
+                </div>
+                <div style="overflow-x:auto; max-height:280px; overflow-y:auto;">
+                    <table id="s3-report-table" style="width:100%; border-collapse:collapse; font-size:12px; font-family:monospace;">
+                        <thead id="s3-report-thead" style="background:rgba(0,0,0,0.5); position:sticky; top:0;"></thead>
+                        <tbody id="s3-report-tbody"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -754,14 +1165,27 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
             <!-- 2. SPECIFIC TARGETS -->
             <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #7ecfff; border-radius:4px;">
-                <h3 style="margin-top:0; color:#7ecfff; font-size:14px;">2. Explicit End-to-End Application Targets</h3>
-                <p style="font-size:11px; color:#aaa; margin-bottom:10px;">Enter the exact IP addresses the migrated VMs leased in the FLEX cloud to run deep connectivity validations.</p>
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:15px; margin-top:10px;">
-                    <div><label style="font-size:11px; color:#aaa; display:block;">Web Application URL</label><input type="text" id="uat_app_url" placeholder="e.g. www.mypayroll.com" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
-                    <div><label style="font-size:11px; color:#aaa; display:block;">App/LoadBalancer IP (Ping Test)</label><input type="text" id="uat_app_ip" placeholder="e.g. 10.250.0.15" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
-                    <div><label style="font-size:11px; color:#aaa; display:block;">Database Node IP (SSH SQL Test)</label><input type="text" id="uat_db_ip" placeholder="e.g. 10.250.0.8" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
-                    <div><label style="font-size:11px; color:#aaa; display:block;">SSH Username</label><input type="text" id="uat_ssh_user" value="ubuntu" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
-                    <div style="grid-column: span 2;"><label style="font-size:11px; color:#aaa; display:block;">SSH Private Key (.pem Path)</label><input type="text" id="uat_ssh_key" placeholder="/home/dzoan/keys/target.pem" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <h3 style="margin:0; color:#7ecfff; font-size:14px;">2. Explicit End-to-End Application Targets</h3>
+                        <p style="font-size:11px; color:#aaa; margin-top:4px;">Enter the exact IP addresses the migrated VMs leased in the FLEX cloud to run deep connectivity validations.</p>
+                    </div>
+                    <button type="button" onclick="addAppBlock()" style="background:rgba(99,102,241,0.15); border:1px solid #6366f1; color:#a5b4fc; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap;">＋ Add Application</button>
+                </div>
+                <!-- App blocks container — first block is the original -->
+                <div id="uat-app-blocks">
+                    <div class="uat-app-block" style="background:rgba(255,255,255,0.03); border:1px solid #2d4a6b; border-radius:6px; padding:12px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; color:#7ecfff; font-weight:600;">Application 1</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            <div><label style="font-size:11px; color:#aaa; display:block;">Web Application URL</label><input type="text" id="uat_app_url" placeholder="e.g. www.mypayroll.com" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div><label style="font-size:11px; color:#aaa; display:block;">App/LoadBalancer IP (Ping Test)</label><input type="text" id="uat_app_ip" placeholder="e.g. 10.250.0.15" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div><label style="font-size:11px; color:#aaa; display:block;">Database Node IP (SSH SQL Test)</label><input type="text" id="uat_db_ip" placeholder="e.g. 10.250.0.8" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div><label style="font-size:11px; color:#aaa; display:block;">SSH Username</label><input type="text" id="uat_ssh_user" value="ubuntu" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div style="grid-column: span 2;"><label style="font-size:11px; color:#aaa; display:block;">SSH Private Key (.pem Path)</label><input type="text" id="uat_ssh_key" placeholder="/home/dzoan/keys/target.pem" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -778,7 +1202,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         </div>
       </div>
 
-      <div style="opacity:0.75; padding-top:10px;">
+      <div style="display:none;">
         <h3>🔬 Internal UAT Tasks Reference</h3>
       <h3>🔬 Internal UAT Tasks</h3>
       <ul>
@@ -836,10 +1260,7 @@ ssh user@&lt;app_ip&gt; 'systemctl is-active &lt;service_name&gt;'</pre>
 kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
-      <h3>📦 Deliverable</h3>
-      <ul><li>Internal team and customer sign off UAT confirming migration successful.</li></ul>
     </div>
-  </div>
   </div>
 
   <!-- STAGE 5 · Cutover -->
@@ -1180,7 +1601,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
-  const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2'];
+  const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual'];
 
   function activateSub(paneIds, activeId) {
     paneIds.forEach(id => {
@@ -1739,6 +2160,91 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       btn.addEventListener('click', () => { setTimeout(loadFLEXCredentials_UAT, 300); });
   });
   setTimeout(loadFLEXCredentials_UAT, 500);
+
+  // ── Stage 3: Auto-import rehost report from localStorage ─────────────────
+  window.s3LoadReport = function() {
+      const csv  = localStorage.getItem('osflex_rehost_report_csv') || '';
+      const ts   = localStorage.getItem('osflex_rehost_report_ts')  || '';
+      const panel = document.getElementById('s3-report-panel');
+      if (!csv) { panel.style.display = 'none'; return; }
+
+      const lines = csv.trim().split('\n');
+      if (lines.length < 2) return;
+      const headers = lines[0].split(',');
+      const rows    = lines.slice(1).map(l => {
+          // CSV-safe split: handle quoted fields
+          const cells = []; let cur = '', inQ = false;
+          for (const ch of l) {
+              if (ch === '"') { inQ = !inQ; }
+              else if (ch === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+              else cur += ch;
+          }
+          cells.push(cur.trim());
+          return cells;
+      });
+
+      const thStyle = 'padding:6px 10px; color:#94a3b8; font-size:11px; border:1px solid #1e293b; white-space:nowrap;';
+      const tdStyle = 'padding:5px 10px; font-size:11px; border:1px solid #1e293b; text-align:center;';
+      const sc = s => s==='SUCCESS'||s==='PASS'?'#4ade80':s==='FAILED'||s==='FAIL'?'#f87171':s==='DRY_RUN'?'#fbbf24':'#94a3b8';
+      const badge = s => `<span style="background:${sc(s)}22;color:${sc(s)};border-radius:3px;padding:1px 5px;font-size:10px;">${s}</span>`;
+
+      document.getElementById('s3-report-thead').innerHTML = `<tr>${headers.map(h=>`<th style="${thStyle}">${h}</th>`).join('')}</tr>`;
+      document.getElementById('s3-report-tbody').innerHTML = rows.map(r => `<tr>${r.map((cell,i) => {
+          const v = cell.replace(/^"|"$/g,'');
+          const styled = /^(SUCCESS|PASS|FAIL|FAILED|DRY_RUN|INCOMPLETE|N\/A)$/.test(v) ? badge(v) : v;
+          const extra = i===1?'color:#fbbf24;':i===2?'color:#34d399;':i===0?'color:#e2e8f0;text-align:left;':'';
+          return `<td style="${tdStyle}${extra}">${styled}</td>`;
+      }).join('')}</tr>`).join('');
+
+      document.getElementById('s3-report-ts').textContent = ts ? `Last run: ${ts}` : '';
+      document.getElementById('s3-dl-btn').style.display = 'inline-block';
+      panel.style.display = 'block';
+  };
+
+  window.s3DownloadReport = function() {
+      const csv = localStorage.getItem('osflex_rehost_report_csv') || '';
+      if (!csv) return;
+      const ts  = new Date().toISOString().replace(/[:.]/g,'-').substring(0,19);
+      const a   = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+      a.download = `rehost-result_${ts}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  // Auto-load on page open
+  setTimeout(window.s3LoadReport, 300);
+
+  // ── Add Application block (Section 2) ────────────────────────────────────
+  window.addAppBlock = function() {
+      const container = document.getElementById('uat-app-blocks');
+      const idx = container.querySelectorAll('.uat-app-block').length + 1;
+      const is = 'width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;';
+      const block = document.createElement('div');
+      block.className = 'uat-app-block';
+      block.style.cssText = 'background:rgba(255,255,255,0.03); border:1px solid #2d4a6b; border-radius:6px; padding:12px; margin-bottom:8px;';
+      block.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:11px; color:#7ecfff; font-weight:600;">Application ${idx}</span>
+              <button type="button" onclick="this.closest('.uat-app-block').remove(); renumberAppBlocks();" style="background:transparent; border:1px solid #7f1d1d; color:#f87171; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:11px;">✕ Remove</button>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+              <div><label style="font-size:11px; color:#aaa; display:block;">Web Application URL</label><input type="text" name="uat_app_url_extra" placeholder="e.g. www.app${idx}.com" style="${is}"></div>
+              <div><label style="font-size:11px; color:#aaa; display:block;">App/LoadBalancer IP (Ping Test)</label><input type="text" name="uat_app_ip_extra" placeholder="e.g. 10.250.0.${idx * 10}" style="${is}"></div>
+              <div><label style="font-size:11px; color:#aaa; display:block;">Database Node IP (SSH SQL Test)</label><input type="text" name="uat_db_ip_extra" placeholder="e.g. 10.250.0.${idx * 10 + 1}" style="${is}"></div>
+              <div><label style="font-size:11px; color:#aaa; display:block;">SSH Username</label><input type="text" name="uat_ssh_user_extra" value="ubuntu" style="${is}"></div>
+              <div style="grid-column: span 2;"><label style="font-size:11px; color:#aaa; display:block;">SSH Private Key (.pem Path)</label><input type="text" name="uat_ssh_key_extra" placeholder="/home/dzoan/keys/target.pem" style="${is}"></div>
+          </div>`;
+      container.appendChild(block);
+  };
+
+  window.renumberAppBlocks = function() {
+      document.querySelectorAll('#uat-app-blocks .uat-app-block').forEach((b, i) => {
+          const label = b.querySelector('span[style*="7ecfff"]');
+          if (label) label.textContent = `Application ${i + 1}`;
+      });
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   window.executeUATTests = function() {
       const btn = document.getElementById('btnRunUAT');   

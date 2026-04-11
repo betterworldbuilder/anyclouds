@@ -10,7 +10,11 @@ window.generateRehostScript = function() {
         const fUser     = (document.getElementById('flex_ssh_user')||{value:'ubuntu'}).value||'ubuntu';
         const oUser     = (document.getElementById('ospc_ssh_user')||{value:'ubuntu'}).value||fUser;
         const sshKey    = '/home/dzoan/.ssh/id_rsa';
-        const isDryRun  = (document.getElementById('rehost_dry_run')||{checked:true}).checked;
+        // Read actual radio button state — IDs: rh_dry_run, rh_maint, rh_cutover, rh_live
+        const rhLive    = !!(document.getElementById('rh_live')    && document.getElementById('rh_live').checked);
+        const rhCutover = !!(document.getElementById('rh_cutover') && document.getElementById('rh_cutover').checked);
+        const rhMaint   = !!(document.getElementById('rh_maint')   && document.getElementById('rh_maint').checked);
+        const isDryRun  = !(rhLive || rhCutover || rhMaint);
         const appPaths  = ((document.getElementById('rehost_app_paths')||{value:'/opt/app /srv /var/www /var/lib/app'}).value||'/opt/app').trim();
 
         const L = {
@@ -58,58 +62,142 @@ window.generateRehostScript = function() {
         s += `# set -e intentionally omitted — each node function handles its own errors\n`;
         s += `set -uo pipefail\n\n`;
         s += `# ================================================================\n`;
-        s += `# OSPC -> FLEX  Full Server Rehost Clone Script\n`;
-        s += `# Customer  : ${custName}\n`;
-        s += `# Generated : $(date)\n`;
-        s += `# Layers    : ${activeL}\n`;
+        s += `# OSPC → FLEX  Server Rehost Clone Script\n`;
+        s += `# ────────────────────────────────────────────────────────────────\n`;
+        s += `# PARENT PHASE : PHASE 1 — SERVER DATA REPLICATION\n`;
+        s += `# ────────────────────────────────────────────────────────────────\n`;
+        s += `# Customer     : ${custName}\n`;
+        s += `# Generated    : $(date)\n`;
+        s += `# Mode         : ${rhLive ? '⚡ LIVE MODE (changes WILL apply)' : rhCutover ? '🔀 CUTOVER MODE' : rhMaint ? '🔧 MAINT MODE' : '🔍 DRY RUN (no changes applied)'}\n`;
+        s += `# Layers       : ${activeL}\n`;
+        s += `# ────────────────────────────────────────────────────────────────\n`;
+        s += `# Stage map (Phase 1 sub-stages):\n`;
+        s += `#   STAGE 0  Pre-flight checks         (SSH, rsync, disk, lock)\n`;
+        s += `#   STAGE 1  Audit OSPC source          (configs, packages, users)\n`;
+        s += `#   STAGE 2  Clone to FLEX              (L1-L13 in safe order)\n`;
+        s += `#   STAGE 3  Validation                 (hostname, disk, ports, services)\n`;
+        s += `#   STAGE 4  Smoke tests                (9A Infra + 9B App)\n`;
+        s += `#   STAGE 5  Cleanup                    (remove staging files)\n`;
         s += `# ================================================================\n\n`;
         s += `DRY_RUN=${isDryRun ? '1' : '0'}\n`;
         s += `DEFAULT_SRC_USER="${oUser}"\n`;
         s += `DEFAULT_DST_USER="${fUser}"\n`;
         s += `SSH_KEY="${sshKey}"\n`;
         s += `SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"\n`;
-        s += `RSYNC_OPTS="-aHAX --numeric-ids --info=progress2"\n`;
+        s += `SSH_OPTS_A="-A -i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"\n`;
+        s += `RSYNC_OPTS="-aHAX --numeric-ids --stats --info=progress2"\n`;
         s += `APP_PATHS="${appPaths}"\n`;
         s += `AUDIT_DIR="./migration-csv/${safeName}-audit"\n`;
         s += `mkdir -p "$AUDIT_DIR"\n\n`;
 
-        s += `# DRY_RUN wrapper: prints command instead of running it\n`;
-        s += `run() {\n  if [ "$DRY_RUN" = "1" ]; then\n    echo "  [DRY] $*"\n  else\n    eval "$@"\n  fi\n}\n\n`;
+        s += `trap 'pkill -P $$ 2>/dev/null' EXIT HUP INT TERM\n\n`;
 
-        // Helper functions use local SRC_IP, DST_IP, SRC_USER, DST_USER set per node function
+        s += `# DRY_RUN wrapper\n`;
+        s += `run() {\n`;
+        s += `  if [ "$DRY_RUN" = "1" ]; then\n`;
+        s += `    if [ $# -eq 1 ]; then echo "  [DRY] $1"; else echo "  [DRY] $*"; fi\n`;
+        s += `  else\n`;
+        s += `    if [ $# -eq 1 ]; then eval "$1"; else "$@"; fi\n`;
+        s += `  fi\n`;
+        s += `}\n\n`;
+
+        // Control helpers
         s += `src_cmd() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "$@" 2>/dev/null; }\n`;
         s += `dst_cmd() { ssh $SSH_OPTS "$DST_USER@$DST_IP" "$@" 2>/dev/null; }\n`;
-        s += `src_pull() { scp -q $SSH_OPTS "$SRC_USER@$SRC_IP:$1" "$2" 2>/dev/null || true; }\n`;
-        s += `dst_push() { scp -q $SSH_OPTS "$1" "$DST_USER@$DST_IP:$2" 2>/dev/null || true; }\n\n`;
+        // Direct transfer: copy the local SSH key to OSPC first, then run scp/rsync there
+        // (more reliable than agent forwarding which needs key pre-loaded in ssh-agent)
+        s += `MIG_KEY_REMOTE="/tmp/.mig_flex_key"\n`;
+        s += `deploy_key_to_ospc() {\n`;
+        s += `  scp -O -q $SSH_OPTS "$SSH_KEY" "$SRC_USER@$SRC_IP:$MIG_KEY_REMOTE" 2>/dev/null && \\\n`;
+        s += `  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "chmod 600 $MIG_KEY_REMOTE" 2>/dev/null || \\\n`;
+        s += `  echo "  [WARN] Could not deploy SSH key to OSPC -- direct transfers may fail"\n`;
+        s += `}\n`;
+        s += `remove_key_from_ospc() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rm -f $MIG_KEY_REMOTE" 2>/dev/null || true; }\n`;
+        // Direct scp: OSPC scp to FLEX using the deployed key
+        s += `ospc_to_flex() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "scp -O -q -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no -o BatchMode=yes '$1' '$DST_USER@$DST_IP:$2' 2>/dev/null || true"; }\n`;
+        // Direct rsync: run on OSPC using the deployed key -- datacenter speed
+        s += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no -o BatchMode=yes' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
 
-        const cards = document.querySelectorAll('.custom-node-group-s2');
-        if (cards.length === 0) {
-            s += `echo "WARNING: No nodes loaded — import topology first."\n`;
+        // ── Prefer checkbox table; fall back to raw discovery tables ──────────
+        // If the node-pair table has been built, honour checkbox selection.
+        // Otherwise fall back to reading the discovery tables directly.
+        const checkedRows = [...document.querySelectorAll(
+            '#node-pair-tbody input[type="checkbox"]:checked')];
+
+        let pairList = [];
+        if (checkedRows.length > 0) {
+            checkedRows.forEach(cb => {
+                pairList.push({
+                    name   : cb.dataset.ospcName || 'node',
+                    ospcIp : cb.dataset.ospcIp   || '',
+                    flexIp : cb.dataset.flexIp   || '',
+                    osStr  : cb.dataset.os        || '',
+                });
+            });
         } else {
+            // Fallback: read both discovery tables
+            const ospcMap = {};
+            document.querySelectorAll('#stage1-results-body tr').forEach(tr => {
+                const tds = tr.querySelectorAll('td');
+                if (tds.length < 2) return;
+                const name = tds[0].textContent.trim();
+                const ip   = tds[1].textContent.trim();
+                const os   = tds[2] ? tds[2].textContent.trim() : '';
+                if (name && ip && ip !== '—') {
+                    const key = name.toLowerCase().replace(/[\s_-]/g, '');
+                    if (!ospcMap[key]) ospcMap[key] = { name, ip, os };
+                }
+            });
+            const flexMap = {};
+            document.querySelectorAll('#flex-res-servers-body tr').forEach(tr => {
+                const tds = tr.querySelectorAll('td');
+                if (tds.length < 2) return;
+                const name = tds[0].textContent.trim();
+                const ip   = tds[1].textContent.trim();
+                if (name && ip && ip !== 'N/A' && ip !== '—') {
+                    const key = name.toLowerCase().replace(/[\s_-]/g, '');
+                    if (!flexMap[key]) flexMap[key] = { name, ip };
+                }
+            });
+            Object.values(ospcMap).forEach(ospc => {
+                const key  = ospc.name.toLowerCase().replace(/[\s_-]/g, '');
+                const flex = flexMap[key];
+                if (flex && flex.ip) pairList.push({ name: ospc.name, ospcIp: ospc.ip, flexIp: flex.ip, osStr: ospc.os });
+            });
+        }
+
+        const ospcCount = pairList.length;
+        const flexCount = pairList.filter(p => p.flexIp).length;
+
+        if (pairList.length === 0) {
+            s += `echo "WARNING: No node pairs selected — build the pair table and check nodes first."\n`;
+        } else {
+            s += `echo "# Source: ${ospcCount} selected node pairs"\n\n`;
             const seen = new Set();
-            const funcCalls = [];  // collect function calls to emit at end
+            const funcCalls = [];
+            // Per-node script bodies for parallel execution (keyed by node name)
+            window._rehostNodeScripts = {};
+            // Capture common header length BEFORE any function definitions
+            const _commonHeaderLen = s.length;
 
-            cards.forEach(card => {
-                const name    = card.getAttribute('data-name') || 'node';
-                const flexIp  = (card.querySelector('input[name="flex_custom_ip[]"]')||{value:''}).value.trim();
-                const ospcIp  = (card.querySelector('input[name="ospc_custom_ip[]"]')||{value:''}).value.trim();
-                const osStr   = (card.querySelector('input[name="flex_custom_os[]"]')||{value:''}).value.trim();
+            pairList.forEach(pair => {
+                const { name, ospcIp, flexIp, osStr } = pair;
 
-                if (!flexIp || flexIp === 'N/A' || flexIp === '0.0.0.0') { s += `echo "[SKIP] ${name} -- no FLEX IP"\n`; return; }
-                if (seen.has(flexIp)) { s += `echo "[SKIP] ${name} -- FLEX ${flexIp} already done"\n`; return; }
-                seen.add(flexIp);
-
-                const nodeUser = resolveOsUser(osStr);
+                const nodeUser = resolveOsUser(osStr);   // for FLEX target
+                const srcUser  = resolveOsUser(osStr);   // same OS family on OSPC source
                 const pkgMgr  = resolvePkgMgr(osStr);
                 const funcName = `node_${name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+                // ── track start position for standalone script slice ──────────
+                const _fnStart = s.length;
 
                 // ── emit the function definition ─────────────────────────────
                 s += `\n# ────────────────────────────────────────────────────────────\n`;
                 s += `${funcName}() {\n`;
                 s += `  local SRC_IP="${ospcIp}"\n`;
                 s += `  local DST_IP="${flexIp}"\n`;
-                s += `  local SRC_USER="${oUser}"\n`;
-                s += `  local DST_USER="${nodeUser}"   # OS: ${osStr || 'unknown'}\n`;
+                s += `  local SRC_USER="${srcUser}"   # OSPC SSH user (OS: ${osStr || 'unknown'})\n`;
+                s += `  local DST_USER="${nodeUser}"   # FLEX SSH user (OS: ${osStr || 'unknown'})\n`;
                 s += `  local NODE_AUDIT="$AUDIT_DIR/${name}"\n`;
                 s += `  mkdir -p "$NODE_AUDIT"\n\n`;
 
@@ -120,16 +208,40 @@ window.generateRehostScript = function() {
                 s += `  echo "#  FLEX : ${flexIp}  [user: ${nodeUser}]  OS: ${osStr || 'unknown'}"\n`;
                 s += `  echo "##############################################################"\n\n`;
 
-                // PREFLIGHT — return 1 exits the function cleanly
-                s += `  # PREFLIGHT SSH checks\n`;
+                // ── STAGE 0 — PRE-FLIGHT ──────────────────────────────────
+                s += `  ${sec('STAGE 0 -- PRE-FLIGHT CHECKS').replace(/\n/g, '\n  ')}\n`;
                 if (ospcIp) {
+                    s += `  echo "[P0] SSH connectivity check..."\n`;
                     s += `  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to OSPC $SRC_IP as $SRC_USER -- skipping ${name}"; return 1; }\n`;
                 }
-                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to FLEX $DST_IP as $DST_USER -- skipping ${name}"; return 1; }\n\n`;
-
-                // PHASE 1 — AUDIT
+                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null || { echo "[ERROR] Cannot SSH to FLEX $DST_IP as $DST_USER -- skipping ${name}"; return 1; }\n`;
                 if (ospcIp) {
-                    s += `  ${sec('PHASE 1 -- AUDIT OSPC SOURCE').replace(/\n/g, '\n  ')}\n`;
+                    s += `  echo "[P0] Checking rsync availability..."\n`;
+                    s += `  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on OSPC -- install with: sudo apt-get install -y rsync"; }\n`;
+                    s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on FLEX -- install with: sudo apt-get install -y rsync"; }\n`;
+                    s += `  echo "[P0] Disk space check (OSPC used vs FLEX free)..."\n`;
+                    s += `  OSPC_USED=$(ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "df / --output=used | tail -1" 2>/dev/null || echo 0)\n`;
+                    s += `  FLEX_FREE=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df / --output=avail | tail -1" 2>/dev/null || echo 999999999)\n`;
+                    s += `  if [ "$OSPC_USED" -gt "$FLEX_FREE" ] 2>/dev/null; then\n`;
+                    s += `    echo "[WARN] OSPC used (${ospcIp}): $((OSPC_USED/1024))MB > FLEX free (${flexIp}): $((FLEX_FREE/1024))MB -- proceed with caution"\n`;
+                    s += `  else\n`;
+                    s += `    echo "[P0] Disk OK  OSPC used=$((OSPC_USED/1024))MB  FLEX avail=$((FLEX_FREE/1024))MB"\n`;
+                    s += `  fi\n`;
+                }
+                s += `  echo "[P0] Checking for stale migration lock..."\n`;
+                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "if [ -f /tmp/.ospc-migration-lock ]; then echo '[WARN] Stale lock found -- auto-removing (leftover from previous run)'; rm -f /tmp/.ospc-migration-lock; fi" 2>/dev/null || true\n`;
+                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "touch /tmp/.ospc-migration-lock" 2>/dev/null || true\n`;
+                s += `  echo "[P0] All pre-flight checks passed"\n\n`;
+                // Deploy SSH key to OSPC so direct OSPC→FLEX transfers work
+                if (ospcIp) {
+                    s += `  echo "[P0] Deploying transfer key to OSPC for direct server-to-server transfers..."\n`;
+                    s += `  deploy_key_to_ospc\n`;
+                    s += `  echo "[P0] Key deployed -- direct OSPC->FLEX transfers ready"\n\n`;
+                }
+
+                // STAGE 1 — AUDIT
+                if (ospcIp) {
+                    s += `  ${sec('STAGE 1 -- AUDIT OSPC SOURCE').replace(/\n/g, '\n  ')}\n`;
                     s += `  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" bash <<'ENDSSH'\n`;
                     s += `    mkdir -p ~/server-clone-audit\n`;
                     s += `    hostnamectl > ~/server-clone-audit/hostnamectl.txt 2>/dev/null || true\n`;
@@ -163,40 +275,52 @@ window.generateRehostScript = function() {
                     s += `  scp -q $SSH_OPTS "$SRC_USER@$SRC_IP:~/server-clone-audit.tgz" "$NODE_AUDIT/audit.tgz" && echo "  [AUDIT] Saved $NODE_AUDIT/audit.tgz" || true\n\n`;
                 }
 
-                // PHASE 2 — CLONE
-                s += `  ${sec('PHASE 2 -- CLONE TO FLEX (safe order)').replace(/\n/g, '\n  ')}\n`;
+                // STAGE 2 — CLONE
+                s += `  ${sec('STAGE 2 -- CLONE TO FLEX (safe order)').replace(/\n/g, '\n  ')}\n`;
 
                 if (L.identity && ospcIp) {
                     s += `  echo "[L1] Server Identity"\n`;
                     s += `  SRC_HOST=$(src_cmd "hostname -f 2>/dev/null || hostname")\n`;
                     s += `  SRC_TZ=$(src_cmd "cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || echo UTC")\n`;
-                    s += `  run dst_cmd "sudo hostnamectl set-hostname '$SRC_HOST'"\n`;
-                    s += `  run dst_cmd "sudo timedatectl set-timezone '$SRC_TZ'"\n\n`;
+                    s += `  echo "  [L1] Detected hostname: $SRC_HOST  timezone: $SRC_TZ"\n`;
+                    s += `  run dst_cmd "sudo hostnamectl set-hostname '\${SRC_HOST:-$(hostname)}'"\n`;
+                    s += `  run dst_cmd "sudo timedatectl set-timezone '\${SRC_TZ:-UTC}'"\n`;
+                    s += `  echo "  [L1] FLEX hostname set to: $SRC_HOST"\n\n`;
                 }
 
                 if (L.ssh && ospcIp) {
                     s += `  echo "[L2] SSH & Access"\n`;
-                    s += `  src_pull "/etc/ssh/sshd_config" "/tmp/${name}_sshd_config"\n`;
-                    s += `  run dst_push "/tmp/${name}_sshd_config" "/tmp/sshd_config"\n`;
+                    s += `  ospc_to_flex "/etc/ssh/sshd_config" "/tmp/sshd_config"\n`;
                     s += `  run dst_cmd "sudo cp /tmp/sshd_config /etc/ssh/sshd_config && sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true"\n`;
-                    s += `  src_pull "~/.ssh/authorized_keys" "/tmp/${name}_authkeys" && run dst_push "/tmp/${name}_authkeys" "~/.ssh/authorized_keys" && run dst_cmd "chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"\n`;
-                    s += `  src_cmd "sudo tar -czf /tmp/sudoers_d.tgz /etc/sudoers.d/ 2>/dev/null || true" && src_pull "/tmp/sudoers_d.tgz" "/tmp/${name}_sudoers_d.tgz"\n`;
-                    s += `  run dst_push "/tmp/${name}_sudoers_d.tgz" "/tmp/sudoers_d.tgz" && run dst_cmd "sudo tar -xzf /tmp/sudoers_d.tgz -C / 2>/dev/null || true"\n\n`;
+                    s += `  echo "  [L2] sshd_config applied on FLEX"\n`;
+                    s += `  ospc_to_flex "~/.ssh/authorized_keys" "~/.ssh/authorized_keys"\n`;
+                    s += `  run dst_cmd "chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"\n`;
+                    s += `  echo "  [L2] authorized_keys synced to FLEX"\n`;
+                    s += `  src_cmd "sudo tar -czf /tmp/sudoers_d.tgz /etc/sudoers.d/ 2>/dev/null || true"\n`;
+                    s += `  ospc_to_flex "/tmp/sudoers_d.tgz" "/tmp/sudoers_d.tgz"\n`;
+                    s += `  run dst_cmd "sudo tar -xzf /tmp/sudoers_d.tgz -C / 2>/dev/null || true"\n`;
+                    s += `  echo "  [L2] sudoers.d synced to FLEX"\n\n`;
                 }
 
                 if (L.users && ospcIp) {
                     s += `  echo "[L3] Users & Groups (UID/GID preserved)"\n`;
+                    s += `  USER_COUNT=$(src_cmd "getent passwd | awk -F: '\\$3>=1000 && \\$3<65000{print}' | wc -l" || echo 0)\n`;
+                    s += `  echo "  [L3] Found $USER_COUNT non-system users -- syncing..."\n`;
                     s += `  src_cmd "getent passwd | awk -F: '\\$3>=1000 && \\$3<65000{print}'" | while IFS=: read user pw uid gid gecos home shell; do\n`;
+                    s += `    echo "    -> user: $user uid:$uid gid:$gid"\n`;
                     s += `    run dst_cmd "sudo groupadd -g $gid $user 2>/dev/null || true && sudo useradd -u $uid -g $gid -m -s '$shell' -c '$gecos' '$user' 2>/dev/null || true"\n`;
                     s += `  done\n`;
-                    s += `  run "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh $SSH_OPTS' $SRC_USER@$SRC_IP:/home/ /tmp/${name}_homes/"\n`;
-                    s += `  run "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh $SSH_OPTS' /tmp/${name}_homes/ $DST_USER@$DST_IP:/home/"\n\n`;
+                    s += `  echo "  [L3] Direct rsync OSPC:/home/ -> FLEX:/home/ (server-to-server)"\n`;
+                    s += `  rsync_direct "/home/" "/home/"\n`;
+                    s += `  echo "  [L3] Home directories synced OK"\n\n`;
                 }
 
                 if (L.disk && ospcIp) {
                     s += `  echo "[L4] Disk/Mounts -- AUDIT ONLY"\n`;
                     s += `  src_cmd "lsblk -f; df -Th; cat /etc/fstab" > "$NODE_AUDIT/L4_disk.txt" 2>/dev/null || true\n`;
-                    s += `  echo "  Disk layout saved to $NODE_AUDIT/L4_disk.txt -- apply fstab entries MANUALLY"\n\n`;
+                    s += `  DISK_LINES=$(wc -l < "$NODE_AUDIT/L4_disk.txt" 2>/dev/null || echo 0)\n`;
+                    s += `  echo "  [L4] Disk layout captured ($DISK_LINES lines) -> $NODE_AUDIT/L4_disk.txt"\n`;
+                    s += `  echo "  [L4] Apply fstab entries MANUALLY (IPs and device names may differ)"\n\n`;
                 }
 
                 if (L.packages) {
@@ -204,31 +328,42 @@ window.generateRehostScript = function() {
                     if (pkgMgr === 'apt') {
                         s += `  run dst_cmd "sudo sed -i '/rax\\.mirror\\.rackspace\\.com/d;/mirror\\.rackspace\\.com\\/opensuse/d' /etc/apt/sources.list 2>/dev/null || true"\n`;
                         s += `  run dst_cmd "sudo find /etc/apt/sources.list.d/ \\( -name 'holland*' -o -name '*rackspace*' \\) -delete 2>/dev/null || true"\n`;
+                        s += `  echo "  [L5] Rackspace repos cleaned from FLEX apt sources"\n`;
                         if (ospcIp) {
                             s += `  APT_LIST=$(src_cmd "apt-mark showmanual 2>/dev/null" | tr '\\n' ' ' || true)\n`;
-                            s += `  [ -n "$APT_LIST" ] && run dst_cmd "sudo apt-get update -qq 2>/dev/null || true && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $APT_LIST" || true\n\n`;
+                            s += `  APT_COUNT=$(echo "$APT_LIST" | wc -w)\n`;
+                            s += `  echo "  [L5] Detected $APT_COUNT manually installed packages on OSPC"\n`;
+                            s += `  [ -n "$APT_LIST" ] && run dst_cmd "sudo apt-get update -qq 2>/dev/null || true && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $APT_LIST" || true\n`;
+                            s += `  echo "  [L5] Package install complete"\n\n`;
                         }
                     } else {
                         // dnf/rpm path
                         if (ospcIp) {
                             s += `  RPM_LIST=$(src_cmd "rpm -qa --queryformat '%{NAME}\\n' 2>/dev/null" | tr '\\n' ' ' || true)\n`;
-                            s += `  [ -n "$RPM_LIST" ] && run dst_cmd "sudo dnf install -y $RPM_LIST 2>/dev/null || true" || true\n\n`;
+                            s += `  RPM_COUNT=$(echo "$RPM_LIST" | wc -w)\n`;
+                            s += `  echo "  [L5] Detected $RPM_COUNT RPM packages on OSPC"\n`;
+                            s += `  [ -n "$RPM_LIST" ] && run dst_cmd "sudo dnf install -y $RPM_LIST 2>/dev/null || true" || true\n`;
+                            s += `  echo "  [L5] Package install complete"\n\n`;
                         }
                     }
                 }
 
                 if (L.kernel && ospcIp) {
                     s += `  echo "[L6] Kernel / Sysctl / Limits"\n`;
-                    s += `  src_cmd "sudo cat /etc/sysctl.conf; grep -r . /etc/sysctl.d/ 2>/dev/null" > "/tmp/${name}_sysctl.conf" || true\n`;
-                    s += `  src_cmd "grep -r . /etc/security/limits.conf /etc/security/limits.d/ 2>/dev/null" > "/tmp/${name}_limits.conf" || true\n`;
-                    s += `  run dst_push "/tmp/${name}_sysctl.conf" "/tmp/sysctl_clone.conf" && run dst_cmd "sudo cp /tmp/sysctl_clone.conf /etc/sysctl.d/99-ospc-clone.conf && sudo sysctl --system 2>/dev/null || true"\n`;
-                    s += `  [ -s "/tmp/${name}_limits.conf" ] && run dst_push "/tmp/${name}_limits.conf" "/tmp/limits_clone.conf" && run dst_cmd "sudo cp /tmp/limits_clone.conf /etc/security/limits.d/99-ospc-clone.conf" || true\n\n`;
+                    s += `  src_cmd "sudo cat /etc/sysctl.conf; grep -r . /etc/sysctl.d/ 2>/dev/null" | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/sysctl_clone.conf" || true\n`;
+                    s += `  run dst_cmd "sudo cp /tmp/sysctl_clone.conf /etc/sysctl.d/99-ospc-clone.conf && sudo sysctl --system 2>/dev/null || true"\n`;
+                    s += `  echo "  [L6] sysctl settings applied on FLEX"\n`;
+                    s += `  src_cmd "grep -r . /etc/security/limits.conf /etc/security/limits.d/ 2>/dev/null" | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/limits_clone.conf" || true\n`;
+                    s += `  run dst_cmd "sudo cp /tmp/limits_clone.conf /etc/security/limits.d/99-ospc-clone.conf 2>/dev/null || true"\n`;
+                    s += `  echo "  [L6] kernel/limits sync complete"\n\n`;
                 }
 
                 if (L.network && ospcIp) {
                     s += `  echo "[L7] Network -- EXPORT ONLY (IPs differ on FLEX)"\n`;
                     s += `  src_cmd "ip addr; ip route; cat /etc/netplan/*.yaml 2>/dev/null || true" > "$NODE_AUDIT/L7_network.txt" 2>/dev/null || true\n`;
-                    s += `  echo "  Network config saved to $NODE_AUDIT/L7_network.txt -- update IPs MANUALLY"\n\n`;
+                    s += `  NET_LINES=$(wc -l < "$NODE_AUDIT/L7_network.txt" 2>/dev/null || echo 0)\n`;
+                    s += `  echo "  [L7] Network config exported ($NET_LINES lines) -> $NODE_AUDIT/L7_network.txt"\n`;
+                    s += `  echo "  [L7] NOTE: Update IP addresses manually before applying netplan on FLEX"\n\n`;
                 }
 
                 if (L.runtime && ospcIp) {
@@ -237,6 +372,7 @@ window.generateRehostScript = function() {
                     s += `  NODE_V=$(src_cmd "node --version 2>/dev/null" | tr -d 'v' || true)\n`;
                     s += `  HAS_DOCKER=$(src_cmd "which docker 2>/dev/null" || true)\n`;
                     s += `  HAS_PM2=$(src_cmd "which pm2 2>/dev/null" || true)\n`;
+                    s += `  echo "  [L8] Detected: python=$PYTHON_V node=$NODE_V docker=$([ -n \"$HAS_DOCKER\" ] && echo yes || echo no) pm2=$([ -n \"$HAS_PM2\" ] && echo yes || echo no)"\n`;
                     if (pkgMgr === 'apt') {
                         s += `  [ -n "$PYTHON_V" ] && run dst_cmd "which python3 || sudo apt-get install -y python3 python3-pip python3-venv" || true\n`;
                         s += `  [ -n "$NODE_V" ] && run dst_cmd "which node || (curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs)" || true\n`;
@@ -245,64 +381,107 @@ window.generateRehostScript = function() {
                         s += `  [ -n "$NODE_V" ] && run dst_cmd "which node || sudo dnf install -y nodejs" || true\n`;
                     }
                     s += `  [ -n "$HAS_DOCKER" ] && run dst_cmd "which docker || (curl -fsSL https://get.docker.com | sudo sh)" || true\n`;
-                    s += `  [ -n "$HAS_PM2" ] && run dst_cmd "which pm2 || sudo npm install -g pm2" || true\n\n`;
+                    s += `  [ -n "$HAS_PM2" ] && run dst_cmd "which pm2 || sudo npm install -g pm2" || true\n`;
+                    s += `  echo "  [L8] Runtime environment sync complete"\n\n`;
                 }
 
                 if (L.appcode && ospcIp) {
                     s += `  echo "[L9] App Code & Config"\n`;
                     s += `  for SRC_PATH in ${appPaths}; do\n`;
                     s += `    src_cmd "[ -d $SRC_PATH ] && echo exists" 2>/dev/null | grep -q exists || continue\n`;
-                    s += `    echo "  Syncing $SRC_PATH"\n`;
-                    s += `    LOCAL_TMP="/tmp/${name}_app$(echo $SRC_PATH | tr '/' '_')"\n`;
-                    s += `    run "mkdir -p $LOCAL_TMP"\n`;
-                    s += `    run "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh $SSH_OPTS' $SRC_USER@$SRC_IP:$SRC_PATH/ $LOCAL_TMP/"\n`;
-                    s += `    run "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh $SSH_OPTS' $LOCAL_TMP/ $DST_USER@$DST_IP:$SRC_PATH/"\n`;
+                    s += `    echo "  [L9] Direct rsync OSPC:$SRC_PATH -> FLEX:$SRC_PATH (server-to-server)"\n`;
+                    s += `    rsync_direct "$SRC_PATH/" "$SRC_PATH/"\n`;
+                    s += `    echo "  [L9] Synced: $SRC_PATH"\n`;
                     s += `  done\n`;
                     s += `  src_cmd "find ${appPaths} -name '.env' -o -name '*.yml' -o -name '*.yaml' -o -name '*.ini' 2>/dev/null | head -30" > "$NODE_AUDIT/L9_configs.txt" 2>/dev/null || true\n`;
-                    s += `  echo "  Config file list saved to $NODE_AUDIT/L9_configs.txt"\n\n`;
+                    s += `  echo "  Config file list saved to $NODE_AUDIT/L9_configs.txt"\n`;
+                    s += `  echo "[L9.5] Config IP fixup -- replacing OSPC IP ${ospcIp} with FLEX IP ${flexIp}"\n`;
+                    s += `  FIXUP_DIRS="${appPaths} /etc/nginx /etc/apache2 /etc/haproxy"\n`;
+                    s += `  run dst_cmd "for DIR in $FIXUP_DIRS; do [ -d \\$DIR ] && sudo grep -rl '${ospcIp}' \\$DIR 2>/dev/null | xargs -r sudo sed -i 's|${ospcIp}|${flexIp}|g'; done || true"\n`;
+                    s += `  echo "  [L9.5] Also checking for hardcoded hostnames..."\n`;
+                    s += `  SRC_HOST_IP=$(src_cmd "hostname -f 2>/dev/null || hostname")\n`;
+                    s += `  DST_HOST_IP=$(dst_cmd "hostname -f 2>/dev/null || hostname")\n`;
+                    s += `  [ -n "$SRC_HOST_IP" ] && run dst_cmd "for DIR in $FIXUP_DIRS; do [ -d \\$DIR ] && sudo grep -rl '$SRC_HOST_IP' \\$DIR 2>/dev/null | xargs -r sudo sed -i 's|'\\$SRC_HOST_IP'|'\\$DST_HOST_IP'|g'; done || true" || true\n\n`;
                 }
 
                 if (L.services && ospcIp) {
                     s += `  echo "[L10] Systemd Units & Cron"\n`;
-                    s += `  src_cmd "sudo tar -czf /tmp/systemd_units.tgz /etc/systemd/system/ 2>/dev/null || true" && src_pull "/tmp/systemd_units.tgz" "/tmp/${name}_systemd.tgz"\n`;
-                    s += `  run dst_push "/tmp/${name}_systemd.tgz" "/tmp/systemd_units.tgz" && run dst_cmd "sudo tar -xzf /tmp/systemd_units.tgz -C / 2>/dev/null || true && sudo systemctl daemon-reload"\n`;
+                    s += `  src_cmd "sudo tar -czf /tmp/systemd_units.tgz /etc/systemd/system/ 2>/dev/null || true"\n`;
+                    s += `  ospc_to_flex "/tmp/systemd_units.tgz" "/tmp/systemd_units.tgz"\n`;
+                    s += `  run dst_cmd "sudo tar -xzf /tmp/systemd_units.tgz -C / 2>/dev/null || true && sudo systemctl daemon-reload"\n`;
+                    s += `  echo "  [L10] systemd units transferred and daemon reloaded"\n`;
                     s += `  ENABLED=$(src_cmd "systemctl list-unit-files --state=enabled --type=service --no-legend 2>/dev/null | awk '{print \\$1}'" || true)\n`;
-                    s += `  for svc in $ENABLED; do run dst_cmd "sudo systemctl enable '$svc' 2>/dev/null || true"; done\n`;
-                    s += `  src_cmd "sudo tar -czf /tmp/cron_backup.tgz /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly 2>/dev/null || true" && src_pull "/tmp/cron_backup.tgz" "/tmp/${name}_cron.tgz"\n`;
-                    s += `  run dst_push "/tmp/${name}_cron.tgz" "/tmp/cron_backup.tgz" && run dst_cmd "sudo tar -xzf /tmp/cron_backup.tgz -C / 2>/dev/null || true"\n\n`;
+                    s += `  ENABLED_COUNT=$(echo "$ENABLED" | grep -c . || echo 0)\n`;
+                    s += `  echo "  [L10] Enabling $ENABLED_COUNT services on FLEX..."\n`;
+                    s += `  for svc in $ENABLED; do\n`;
+                    s += `    echo "    -> enabling: $svc"\n`;
+                    s += `    run dst_cmd "sudo systemctl enable '$svc' 2>/dev/null || true"\n`;
+                    s += `  done\n`;
+                    s += `  src_cmd "sudo tar -czf /tmp/cron_backup.tgz /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly 2>/dev/null || true"\n`;
+                    s += `  ospc_to_flex "/tmp/cron_backup.tgz" "/tmp/cron_backup.tgz"\n`;
+                    s += `  run dst_cmd "sudo tar -xzf /tmp/cron_backup.tgz -C / 2>/dev/null || true"\n`;
+                    s += `  echo "  [L10] Cron jobs synced to FLEX"\n\n`;
                 }
 
                 if (L.data && ospcIp) {
                     s += `  echo "[L11] Data"\n`;
                     s += `  for DATA_PATH in /var/lib/app /srv/data; do\n`;
                     s += `    src_cmd "[ -d $DATA_PATH ] && echo exists" 2>/dev/null | grep -q exists || continue\n`;
-                    s += `    run "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh $SSH_OPTS' $SRC_USER@$SRC_IP:$DATA_PATH/ $DST_USER@$DST_IP:$DATA_PATH/"\n`;
+                    s += `    echo "  [L11] Direct rsync OSPC:$DATA_PATH -> FLEX:$DATA_PATH"\n`;
+                    s += `    rsync_direct "$DATA_PATH/" "$DATA_PATH/"\n`;
                     s += `  done\n`;
-                    s += `  echo "  DB DUMP -- run manually on OSPC source:"\n`;
-                    s += `  echo "    pg_dump -U postgres DBNAME | gzip > /tmp/db.sql.gz"\n`;
-                    s += `  echo "    mysqldump -u root -p DBNAME | gzip > /tmp/db.sql.gz"\n\n`;
+                    s += `  echo "[L11] Checking for PostgreSQL..."\n`;
+                    s += `  HAS_PG=$(src_cmd "which pg_dump" 2>/dev/null || true)\n`;
+                    s += `  if [ -n "$HAS_PG" ]; then\n`;
+                    s += `    echo "  [L11] PostgreSQL detected -- dumping & transferring direct OSPC->FLEX"\n`;
+                    s += `    PG_DBS=$(src_cmd "sudo -u postgres psql -t -c \\"SELECT datname FROM pg_database WHERE datistemplate=false AND datname<>'postgres';\\" 2>/dev/null" | tr -d ' ' | grep -v '^$' || true)\n`;
+                    s += `    for DB in $PG_DBS; do\n`;
+                    s += `      echo "  [L11] Dumping PG: $DB"\n`;
+                    s += `      src_cmd "sudo -u postgres pg_dump -Fc $DB > /tmp/pg_${name}_$DB.dump 2>/dev/null"\n`;
+                    s += `      ospc_to_flex "/tmp/pg_${name}_$DB.dump" "/tmp/pg_$DB.dump"\n`;
+                    s += `      run dst_cmd "sudo -u postgres createdb $DB 2>/dev/null || true && sudo -u postgres pg_restore -d $DB /tmp/pg_$DB.dump 2>/dev/null && echo '[L11] PG restore OK: '$DB || echo '[L11] PG restore WARNING: '$DB"\n`;
+                    s += `    done\n`;
+                    s += `  fi\n`;
+                    s += `  HAS_MYSQL=$(src_cmd "which mysqldump" 2>/dev/null || true)\n`;
+                    s += `  if [ -n "$HAS_MYSQL" ]; then\n`;
+                    s += `    echo "  [L11] MySQL/MariaDB detected -- dumping & transferring direct OSPC->FLEX"\n`;
+                    s += `    MY_DBS=$(src_cmd "mysql -uroot -e 'SHOW DATABASES;' 2>/dev/null | grep -Ev 'Database|information_schema|performance_schema|mysql|sys'" || true)\n`;
+                    s += `    for DB in $MY_DBS; do\n`;
+                    s += `      echo "  [L11] Dumping MySQL: $DB"\n`;
+                    s += `      src_cmd "mysqldump -uroot $DB | gzip > /tmp/mysql_${name}_$DB.sql.gz 2>/dev/null"\n`;
+                    s += `      ospc_to_flex "/tmp/mysql_${name}_$DB.sql.gz" "/tmp/mysql_$DB.sql.gz"\n`;
+                    s += `      run dst_cmd "mysql -uroot -e 'CREATE DATABASE IF NOT EXISTS $DB;' 2>/dev/null && zcat /tmp/mysql_$DB.sql.gz | mysql -uroot $DB 2>/dev/null && echo '[L11] MySQL restore OK: '$DB || echo '[L11] MySQL restore WARNING: '$DB"\n`;
+                    s += `    done\n`;
+                    s += `  fi\n\n`;
                 }
 
                 if (L.tls && ospcIp) {
                     s += `  echo "[L12] TLS & Certs"\n`;
-                    s += `  src_cmd "[ -d /etc/letsencrypt ] && echo exists" 2>/dev/null | grep -q exists && {\n`;
+                    s += `  TLS_EXISTS=$(src_cmd "[ -d /etc/letsencrypt ] && echo exists" 2>/dev/null || true)\n`;
+                    s += `  if echo "$TLS_EXISTS" | grep -q exists; then\n`;
+                    s += `    echo "  [L12] Let's Encrypt detected on OSPC -- copying certs direct to FLEX"\n`;
                     s += `    src_cmd "sudo tar -czf /tmp/letsencrypt.tgz /etc/letsencrypt/ 2>/dev/null || true"\n`;
-                    s += `    src_pull "/tmp/letsencrypt.tgz" "/tmp/${name}_letsencrypt.tgz"\n`;
-                    s += `    run dst_push "/tmp/${name}_letsencrypt.tgz" "/tmp/letsencrypt.tgz"\n`;
+                    s += `    ospc_to_flex "/tmp/letsencrypt.tgz" "/tmp/letsencrypt.tgz"\n`;
                     s += `    run dst_cmd "sudo tar -xzf /tmp/letsencrypt.tgz -C / 2>/dev/null || true"\n`;
-                    s += `  } || true\n`;
-                    s += `  run dst_cmd "sudo update-ca-certificates 2>/dev/null || sudo update-ca-trust 2>/dev/null || true"\n\n`;
+                    s += `    echo "  [L12] TLS certs transferred to FLEX"\n`;
+                    s += `  else\n`;
+                    s += `    echo "  [L12] No Let's Encrypt certs on OSPC -- skipping"\n`;
+                    s += `  fi\n`;
+                    s += `  run dst_cmd "sudo update-ca-certificates 2>/dev/null || sudo update-ca-trust 2>/dev/null || true"\n`;
+                    s += `  echo "  [L12] CA trust store updated on FLEX"\n\n`;
                 }
 
                 if (L.external && ospcIp) {
                     s += `  echo "[L13] External Dependencies (audit only)"\n`;
                     s += `  src_cmd "grep -rE '(DB_HOST|DATABASE_URL|PG_HOST|REDIS_URL|API_URL)' ${appPaths} 2>/dev/null | head -30" > "$NODE_AUDIT/L13_external.txt" 2>/dev/null || true\n`;
                     s += `  src_cmd "ss -ltnp 2>/dev/null" >> "$NODE_AUDIT/L13_external.txt" || true\n`;
-                    s += `  echo "  External config saved to $NODE_AUDIT/L13_external.txt"\n\n`;
+                    s += `  EXT_LINES=$(wc -l < "$NODE_AUDIT/L13_external.txt" 2>/dev/null || echo 0)\n`;
+                    s += `  echo "  [L13] External dependency audit: $EXT_LINES entries found -> $NODE_AUDIT/L13_external.txt"\n`;
+                    s += `  echo "  [L13] Review external endpoints and update configs manually on FLEX"\n\n`;
                 }
 
-                // PHASE 3 — VALIDATION
-                s += `  ${sec('PHASE 3 -- VALIDATION').replace(/\n/g, '\n  ')}\n`;
+                // STAGE 3 — VALIDATION
+                s += `  ${sec('STAGE 3 -- VALIDATION').replace(/\n/g, '\n  ')}\n`;
                 s += `  echo "[VALIDATE] Post-clone checks on FLEX $DST_IP (user: $DST_USER)"\n`;
                 s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" bash <<'ENDSSH' | tee "$NODE_AUDIT/validation.txt" || true\n`;
                 s += `    echo '--- Hostname ---' && hostnamectl 2>/dev/null | head -5 || true\n`;
@@ -310,14 +489,135 @@ window.generateRehostScript = function() {
                 s += `    echo '--- Listening ports ---' && ss -ltnp\n`;
                 s += `    echo '--- Running services ---' && systemctl list-units --type=service --state=running --no-pager 2>/dev/null | head -15 || true\n`;
                 s += `    echo '--- sshd config test ---' && sudo sshd -t 2>/dev/null && echo 'sshd OK' || echo 'sshd config WARNING'\n`;
-                s += `ENDSSH\n`;
+                s += `ENDSSH\n\n`;
+
+                // STAGE 4 — FULL SMOKE TEST (9A Infra + 9B App)
+                s += `  ${sec('STAGE 4 -- SMOKE TESTS (9A INFRA + 9B APP)').replace(/\n/g, '\n  ')}\n`;
+                s += `  SMOKE_REPORT="$NODE_AUDIT/smoke_test.txt"\n`;
+                s += `  SMOKE_PASS=0; SMOKE_FAIL=0; SMOKE_SKIP=0\n`;
+                s += `  smoke_ok()  { echo "  ✅ [PASS] $1" | tee -a "$SMOKE_REPORT"; SMOKE_PASS=$((SMOKE_PASS+1)); }\n`;
+                s += `  smoke_fail(){ echo "  ❌ [FAIL] $1" | tee -a "$SMOKE_REPORT"; SMOKE_FAIL=$((SMOKE_FAIL+1)); }\n`;
+                s += `  smoke_skip(){ echo "  ⏭  [SKIP] $1" | tee -a "$SMOKE_REPORT"; SMOKE_SKIP=$((SMOKE_SKIP+1)); }\n`;
+                s += `  echo "# Smoke test report -- $(date)" > "$SMOKE_REPORT"\n\n`;
+
+                // 9A — INFRA
+                s += `  echo ""\n`;
+                s += `  echo "── 9A INFRA ────────────────────────────────────"\n`;
+
+                // SSH
+                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "echo OK" 2>/dev/null && smoke_ok "SSH access -- $DST_IP" || smoke_fail "SSH access -- $DST_IP"\n`;
+
+                // IP and route
+                s += `  IP_OUT=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ip addr show | grep -c 'inet '" 2>/dev/null || echo 0)\n`;
+                s += `  [ "$IP_OUT" -gt 0 ] 2>/dev/null && smoke_ok "IP address present ($IP_OUT interfaces)" || smoke_fail "No IP address found"\n`;
+                s += `  RT_OUT=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ip route | grep -c default" 2>/dev/null || echo 0)\n`;
+                s += `  [ "$RT_OUT" -gt 0 ] 2>/dev/null && smoke_ok "Default route present" || smoke_fail "No default route"\n`;
+
+                // DNS
+                s += `  DNS_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "resolvectl status 2>/dev/null | grep -c 'DNS Server' || dig +short google.com 2>/dev/null | grep -c '[0-9]'" 2>/dev/null || echo 0)\n`;
+                s += `  [ "$DNS_OK" -gt 0 ] 2>/dev/null && smoke_ok "DNS resolution working" || smoke_fail "DNS not resolving"\n`;
+
+                // Disk mounts
+                s += `  MOUNTS=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df -Th | grep -cE '^/dev'" 2>/dev/null || echo 0)\n`;
+                s += `  [ "$MOUNTS" -gt 0 ] 2>/dev/null && smoke_ok "Disk mounts present ($MOUNTS devices)" || smoke_fail "No disk mounts"\n`;
+
+                // Listening ports
+                s += `  PORTS=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "ss -ltnp | grep -c LISTEN" 2>/dev/null || echo 0)\n`;
+                s += `  [ "$PORTS" -gt 0 ] 2>/dev/null && smoke_ok "Listening ports present ($PORTS)" || smoke_fail "No listening ports"\n`;
+                s += `  echo "  Ports in use:" && ssh $SSH_OPTS "$DST_USER@$DST_IP" "ss -ltnp | grep LISTEN" 2>/dev/null | sed 's/^/    /' | tee -a "$SMOKE_REPORT" || true\n`;
+
+                // Service state
+                s += `  FAILED=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "systemctl --failed --no-pager 2>/dev/null | grep -c 'failed'" 2>/dev/null || echo 0)\n`;
+                s += '  FAILED=$(echo "$FAILED" | tr -d "[:space:]")\n'; // strip whitespace
+                s += '  [ "$FAILED" = "0" ] && smoke_ok "No failed systemd units" || smoke_fail "$FAILED failed systemd units -- check: systemctl --failed"\n';
+                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "systemctl --failed --no-pager 2>/dev/null" | grep -v "^$" | sed 's/^/    /' | tee -a "$SMOKE_REPORT" || true\n\n`;
+
+                // 9B — APP (port-check first, then HTTP)
+                s += `  echo "── 9B APP ──────────────────────────────────────"\n`;
+                s += `  PORT80=$(nc -z -w5 $DST_IP 80 2>/dev/null && echo open || echo closed)\n`;
+                s += `  PORT443=$(nc -z -w5 $DST_IP 443 2>/dev/null && echo open || echo closed)\n`;
+
+                // HTTP checks only if port 80 is open
+                s += `  if [ "$PORT80" = "open" ]; then\n`;
+                s += `    echo "  [PORT] port 80 open"\n`;
+                s += `    HTTP_CODE=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80" 2>/dev/null || echo "000")\n`;
+                s += `    case "$HTTP_CODE" in\n`;
+                s += `      2*|3*) smoke_ok  "Homepage  :80  HTTP $HTTP_CODE" ;;\n`;
+                s += `      *)     smoke_fail "Homepage  :80  HTTP $HTTP_CODE" ;;\n`;
+                s += `    esac\n`;
+                s += `    HEALTH=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80/health" 2>/dev/null || echo "000")\n`;
+                s += `    case "$HEALTH" in\n`;
+                s += `      2*) smoke_ok   "Health endpoint  :80/health  HTTP $HEALTH" ;;\n`;
+                s += `      *)  smoke_skip "Health endpoint  :80/health  HTTP $HEALTH (route not found)" ;;\n`;
+                s += `    esac\n`;
+                s += `    API=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 "http://$DST_IP:80/api/" 2>/dev/null || echo "000")\n`;
+                s += `    case "$API" in\n`;
+                s += `      2*|3*) smoke_ok  "API endpoint  :80/api/  HTTP $API" ;;\n`;
+                s += `      *)     smoke_skip "API endpoint  :80/api/  HTTP $API (route not found)" ;;\n`;
+                s += `    esac\n`;
+                s += `  else\n`;
+                s += `    smoke_skip "HTTP checks skipped -- port 80 closed on $DST_IP"\n`;
+                s += `  fi\n`;
+
+                // DB connectivity
+                s += `  HAS_PSQL=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "which psql" 2>/dev/null || true)\n`;
+                s += `  if [ -n "$HAS_PSQL" ]; then\n`;
+                s += `    DB_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "sudo -u postgres psql -c '\\\\l' 2>/dev/null | grep -c '|'" 2>/dev/null || echo 0)\n`;
+                s += `    [ "$DB_OK" -gt 0 ] 2>/dev/null && smoke_ok "DB connectivity (PostgreSQL) -- $DB_OK databases found" || smoke_fail "DB connectivity (PostgreSQL) -- cannot list databases"\n`;
+                s += `  else\n`;
+                s += `    HAS_MYSQL=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "which mysql" 2>/dev/null || true)\n`;
+                s += `    if [ -n "$HAS_MYSQL" ]; then\n`;
+                s += `      DB_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "mysql -uroot -e 'SHOW DATABASES;' 2>/dev/null | grep -c Database" 2>/dev/null || echo 0)\n`;
+                s += `      [ "$DB_OK" -gt 0 ] 2>/dev/null && smoke_ok "DB connectivity (MySQL)" || smoke_fail "DB connectivity (MySQL)"\n`;
+                s += `    else\n`;
+                s += `      smoke_skip "DB connectivity (no psql or mysql found)"\n`;
+                s += `    fi\n`;
+                s += `  fi\n`;
+
+                // Background jobs
+                s += `  CRON_OK=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "crontab -l 2>/dev/null | grep -vc '^#'" 2>/dev/null || echo 0)\n`;
+                s += `  [ "$CRON_OK" -gt 0 ] && smoke_ok "Background jobs -- $CRON_OK cron entries present" || smoke_skip "Background jobs -- no crontab entries (manual check needed)"\n`;
+
+                // TLS
+                s += `  TLS_CODE=$(curl -sSo /dev/null -w "%{http_code}" --max-time 10 -k "https://$DST_IP" 2>/dev/null || echo "000")\n`;
+                s += `  case "$TLS_CODE" in\n`;
+                s += `    2*|3*) smoke_ok  "TLS / HTTPS  HTTP $TLS_CODE" ;;\n`;
+                s += `    000)   smoke_skip "TLS / HTTPS  (port 443 not open)" ;;\n`;
+                s += `    *)     smoke_fail "TLS / HTTPS  HTTP $TLS_CODE" ;;\n`;
+                s += `  esac\n\n`;
+
+                // Summary
+                s += `  echo ""\n`;
+                s += `  echo "════════════════════════════════════════════════"\n`;
+                s += `  echo "  SMOKE TEST SUMMARY: ✅ $SMOKE_PASS passed  ❌ $SMOKE_FAIL failed  ⏭  $SMOKE_SKIP skipped"\n`;
+                s += `  echo "  Full report: $SMOKE_REPORT"\n`;
+                s += `  echo "════════════════════════════════════════════════"\n`;
+                s += `  [ "$SMOKE_FAIL" -gt 0 ] && echo "  ⚠  $SMOKE_FAIL check(s) failed -- review before cutover" || echo "  ✅  All checks passed -- safe to proceed to cutover"\n\n`;
+
+
+                // STAGE 5 — CLEANUP
+                s += `  ${sec('STAGE 5 -- CLEANUP').replace(/\n/g, '\n  ')}\n`;
+                s += `  echo "[CLEANUP] Removing /tmp staging files for ${name}..."\n`;
+                s += `  run "rm -rf /tmp/${name}_* 2>/dev/null || true"\n`;
+                s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "rm -f /tmp/.ospc-migration-lock /tmp/sshd_config /tmp/sudoers_d.tgz /tmp/systemd_units.tgz /tmp/cron_backup.tgz /tmp/sysctl_clone.conf /tmp/limits_clone.conf /tmp/pg_*.dump /tmp/mysql_*.sql.gz 2>/dev/null || true" || true\n`;
+                if (ospcIp) {
+                    s += `  remove_key_from_ospc  # remove transferred SSH key from OSPC\n`;
+                }
+                s += `  echo "  [CLEANUP] Done"\n\n`;
+
                 s += `  echo "[DONE] ${name} complete. Reports: $NODE_AUDIT/"\n`;
                 s += `}\n`;  // close function
+
+                // ── Store complete standalone script for parallel execution ────
+                // commonHeader + this function definition + invocation call
+                const _fnBody = s.slice(_fnStart);
+                window._rehostNodeScripts[name] = s.slice(0, _commonHeaderLen) + _fnBody
+                    + `\n# ── Parallel invocation ──\n${funcName}\necho ""\necho "[PARALLEL-DONE] ${name} execution complete"\n`;
 
                 funcCalls.push(funcName);
             });
 
-            // Emit the sequential function calls
+            // Emit the sequential function calls (full combined script)
             s += `\n# ================================================================\n`;
             s += `# MAIN — process nodes one at a time\n`;
             s += `# ================================================================\n`;
@@ -326,14 +626,142 @@ window.generateRehostScript = function() {
 
         s += `\necho ""\necho "================================================================"\necho "ALL NODES PROCESSED"\necho "Audit + validation reports: ./migration-csv/${safeName}-audit/"\necho "================================================================"\n`;
 
+        // ── Export per-VM data for parallel execution ─────────────────────────
+        window._rehostPairList = pairList;
+        // Capture settings snapshot so generateRehostNodeScript() can rebuild any single-VM script
+        window._rehostSettings = { isDryRun, oUser, fUser, sshKey: '/home/dzoan/.ssh/id_rsa',
+            safeName, appPaths, L,
+            resolveOsUser: resolveOsUser.toString(),
+            resolvePkgMgr: resolvePkgMgr.toString(),
+        };
+
         const codeEl = document.getElementById('script-output-stage1');
         const panel  = document.getElementById('output-container-stage1');
         if (codeEl) { codeEl.innerHTML = (typeof syntaxHighlight === 'function' ? syntaxHighlight(s) : s); codeEl.setAttribute('data-raw', s); }
         if (panel)  { panel.style.display = 'block'; setTimeout(() => panel.scrollIntoView({behavior:'smooth'}), 100); }
-        if (typeof showToast === 'function') showToast(isDryRun ? '🔍 Rehost script generated (DRY RUN)' : '🖥️ Full Rehost script generated');
+        if (typeof showToast === 'function') showToast(
+            isDryRun
+                ? '🔍 Rehost script generated — DRY RUN (no changes will apply)'
+                : `⚡ Rehost script generated — ${pairList.length} VM(s) ready · click ⚡ Run Parallel to start`
+        );
+
+        // Update parallel button state
+        const parBtn = document.getElementById('run-parallel-btn-stage1');
+        if (parBtn) {
+            parBtn.disabled  = pairList.length === 0;
+            parBtn.textContent = `⚡ Run ${pairList.length} VM${pairList.length !== 1 ? 's' : ''} in Parallel`;
+        }
 
     } catch(err) {
         console.error('[ReHost] Generator error:', err);
         if (typeof showToast === 'function') showToast('❌ ' + err.message);
     }
+
+    // ── Shared env header builder (called at generate time) ───────────────────
+    function buildCommonHeader() {
+        const custName  = (document.getElementById('project_customer_name')||{value:'UnknownCustomer'}).value||'UnknownCustomer';
+        const safeName  = custName.replace(/[^a-zA-Z0-9_-]/g,'_');
+        const fUser     = (document.getElementById('flex_ssh_user')||{value:'ubuntu'}).value||'ubuntu';
+        const oUser     = (document.getElementById('ospc_ssh_user')||{value:'ubuntu'}).value||fUser;
+        const sshKey    = '/home/dzoan/.ssh/id_rsa';
+        const appPaths  = ((document.getElementById('rehost_app_paths')||{value:'/opt/app'}).value||'/opt/app').trim();
+        const rhLive    = !!(document.getElementById('rh_live')    && document.getElementById('rh_live').checked);
+        const rhCutover = !!(document.getElementById('rh_cutover') && document.getElementById('rh_cutover').checked);
+        const rhMaint   = !!(document.getElementById('rh_maint')   && document.getElementById('rh_maint').checked);
+        const isDryRun  = !(rhLive || rhCutover || rhMaint);
+        let h = `#!/usr/bin/env bash\nset -uo pipefail\n`;
+        h += `DRY_RUN=${isDryRun ? '1' : '0'}\n`;
+        h += `DEFAULT_SRC_USER="${oUser}"\nDEFAULT_DST_USER="${fUser}"\n`;
+        h += `SSH_KEY="${sshKey}"\n`;
+        h += `SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"\n`;
+        h += `SSH_OPTS_A="-A -i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"\n`;
+        h += `RSYNC_OPTS="-aHAX --numeric-ids --stats --info=progress2"\n`;
+        h += `APP_PATHS="${appPaths}"\n`;
+        h += `AUDIT_DIR="./migration-csv/${safeName}-audit"\n`;
+        h += `mkdir -p "$AUDIT_DIR"\n\n`;
+        h += `run() {\n  if [ "$DRY_RUN" = "1" ]; then\n    echo "  [DRY] $*";\n  else\n    "$@";\n  fi\n}\n`;
+        h += `MIG_KEY_REMOTE="/tmp/.mig_flex_key"\n`;
+        h += `deploy_key_to_ospc() { scp -O -q $SSH_OPTS "$SSH_KEY" "$SRC_USER@$SRC_IP:$MIG_KEY_REMOTE" 2>/dev/null && ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "chmod 600 $MIG_KEY_REMOTE" 2>/dev/null || echo "  [WARN] Could not deploy SSH key"; }\n`;
+        h += `remove_key_from_ospc() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rm -f $MIG_KEY_REMOTE" 2>/dev/null || true; }\n`;
+        h += `ospc_to_flex() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "scp -O -q -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no '$1' '$DST_USER@$DST_IP:$2' 2>/dev/null || true"; }\n`;
+        h += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
+        return h;
+    }
 };
+
+/**
+ * generateRehostNodeScript(pair)
+ * Build a self-contained bash script for a SINGLE node pair.
+ * Uses settings captured by generateRehostScript() → window._rehostSettings.
+ * Called by runRehostParallel() in agent1.html to run each VM independently.
+ */
+window.generateRehostNodeScript = function(pair) {
+    const cfg = window._rehostSettings || {};
+    const { isDryRun = true, oUser = 'ubuntu', fUser = 'ubuntu',
+            sshKey = '~/.ssh/id_rsa', safeName = 'migration', appPaths = '/opt/app', L = {} } = cfg;
+
+    const { name, ospcIp, flexIp, osStr = '' } = pair;
+    const o = osStr.toLowerCase();
+
+    function resolveOsUser(s) {
+        const lo = (s||'').toLowerCase();
+        if (lo.includes('rocky'))  return 'rocky';
+        if (lo.includes('alma'))   return 'almalinux';
+        if (lo.includes('debian')) return 'debian';
+        if (lo.includes('fedora')) return 'fedora';
+        if (lo.includes('centos')) return 'centos';
+        if (lo.includes('rhel') || lo.includes('red hat')) return 'ec2-user';
+        if (lo.includes('amazon')) return 'ec2-user';
+        if (lo.includes('ubuntu')) return 'ubuntu';
+        return fUser;
+    }
+    function resolvePkgMgr(s) {
+        const lo = (s||'').toLowerCase();
+        if (lo.includes('rocky')||lo.includes('alma')||lo.includes('centos')||lo.includes('rhel')||lo.includes('fedora')) return 'dnf';
+        return 'apt';
+    }
+
+    const nodeUser = resolveOsUser(osStr);
+    const srcUser  = resolveOsUser(osStr);
+    const pkgMgr   = resolvePkgMgr(osStr);
+    const funcName = `node_${name.replace(/[^a-zA-Z0-9]/g,'_')}`;
+
+    // Rebuild common header inline
+    let s = `#!/usr/bin/env bash\nset -uo pipefail\n`;
+    s += `# Parallel rehost: ${name} | OSPC ${ospcIp} → FLEX ${flexIp}\n`;
+    s += `DRY_RUN=${isDryRun ? '1' : '0'}\n`;
+    s += `DEFAULT_SRC_USER="${oUser}"\nDEFAULT_DST_USER="${fUser}"\n`;
+    s += `SSH_KEY="${sshKey}"\n`;
+    s += `SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes"\n`;
+    s += `RSYNC_OPTS="-aHAX --numeric-ids --stats --info=progress2"\n`;
+    s += `APP_PATHS="${appPaths}"\n`;
+    s += `AUDIT_DIR="./migration-csv/${safeName}-audit"\n`;
+    s += `mkdir -p "$AUDIT_DIR"\n\n`;
+    s += `run() {\n  if [ "$DRY_RUN" = "1" ]; then echo "  [DRY] $*"; else "$@"; fi\n}\n`;
+    s += `MIG_KEY_REMOTE="/tmp/.mig_flex_key"\n`;
+    s += `deploy_key_to_ospc() { scp -O -q $SSH_OPTS "$SSH_KEY" "$SRC_USER@$SRC_IP:$MIG_KEY_REMOTE" 2>/dev/null && ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "chmod 600 $MIG_KEY_REMOTE" 2>/dev/null || echo "  [WARN] Could not deploy SSH key"; }\n`;
+    s += `remove_key_from_ospc() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rm -f $MIG_KEY_REMOTE" 2>/dev/null || true; }\n`;
+    s += `ospc_to_flex() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "scp -O -q -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no '$1' '$DST_USER@$DST_IP:$2' 2>/dev/null || true"; }\n`;
+    s += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
+
+    // Node function — extract from full generated script via regex
+    const fullScript = (document.getElementById('script-output-stage1')||{getAttribute:()=>''}).getAttribute('data-raw') || '';
+    const fnRegex = new RegExp(`(${funcName}\\(\\)[\\s\\S]*?^\\})`, 'm');
+    const fnMatch = fullScript.match(fnRegex);
+    if (fnMatch) {
+        s += fnMatch[1] + '\n\n';
+    } else {
+        // Minimal inline fallback if regex fails
+        s += `${funcName}() {\n`;
+        s += `  local SRC_IP="${ospcIp}"\n  local DST_IP="${flexIp}"\n`;
+        s += `  local SRC_USER="${srcUser}"\n  local DST_USER="${nodeUser}"\n`;
+        s += `  local NODE_AUDIT="$AUDIT_DIR/${name}"\n  mkdir -p "$NODE_AUDIT"\n`;
+        s += `  echo "  [INFO] Minimal fallback — regenerate script for full layers"\n`;
+        s += `}\n\n`;
+    }
+
+    s += `# Run\n${funcName}\n`;
+    s += `echo ""\necho "[DONE] ${name} parallel execution complete"\n`;
+    return s;
+};
+
