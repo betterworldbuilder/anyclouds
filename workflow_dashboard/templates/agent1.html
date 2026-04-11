@@ -733,19 +733,35 @@
 
                 </div><!-- end two-column -->
 
+                <!-- ── DBaaS config strip (single mode only) ──────────────── -->
+                <div id="dbaas-config-strip" style="margin-top:10px; padding:8px 14px; background:rgba(124,58,237,0.08); border:1px solid rgba(124,58,237,0.22); border-radius:8px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:0.8rem;">
+                    <span style="color:#c4b5fd; font-weight:700; white-space:nowrap;">🗄 DBaaS via Cloud LB</span>
+                    <label style="color:#94a3b8; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+                        LB Public IP
+                        <input type="text" id="dbaas_lb_ip" placeholder="auto from node card" style="width:145px; padding:4px 8px; font-size:0.78rem; background:rgba(0,0,0,0.3); border:1px solid rgba(124,58,237,0.35); border-radius:5px; color:#e2e8f0;">
+                    </label>
+                    <label style="color:#94a3b8; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+                        DBaaS Admin User
+                        <input type="text" id="dbaas_user" value="admin" style="width:95px; padding:4px 8px; font-size:0.78rem; background:rgba(0,0,0,0.3); border:1px solid rgba(124,58,237,0.35); border-radius:5px; color:#e2e8f0;">
+                    </label>
+                    <span style="color:#475569; font-size:0.71rem; flex:1; min-width:180px;">LB VIP overrides node card IP · set <code style="color:#a78bfa;">DBAAS_PASS</code> + <code style="color:#a78bfa;">FLEX_ROOT_PASS</code> as env vars before running</span>
+                </div>
+
                 <!-- ── DB Steps tables (full width, toggle by scenario) ───── -->
                 <!-- Single DB steps -->
                 <div id="db-steps-single" style="margin-top:14px; border:1px solid rgba(124,58,237,0.25); border-radius:10px; overflow:hidden; font-size:0.78rem;">
-                    <div style="background:rgba(124,58,237,0.12); border-bottom:1px solid rgba(124,58,237,0.2); padding:7px 14px; font-weight:700; color:#c4b5fd; font-size:0.73rem; letter-spacing:0.06em; text-transform:uppercase;">
-                        🗄 Single DB — Migration Steps
+                    <div style="background:rgba(124,58,237,0.12); border-bottom:1px solid rgba(124,58,237,0.2); padding:7px 14px; font-weight:700; color:#c4b5fd; font-size:0.73rem; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
+                        🗄 Single DBaaS → Flex DB — Migration Phases
+                        <span style="font-size:0.67rem; font-weight:500; color:#94a3b8; text-transform:none; letter-spacing:0;">OSPC DBaaS (managed — no SSH) · accessed via Cloud Load Balancer public VIP · dumps run locally on jumphost</span>
                     </div>
                     <div style="overflow-x:auto; overflow-y:auto; max-height:300px;">
-                    <table style="width:100%; border-collapse:collapse; min-width:500px;">
+                    <table style="width:100%; border-collapse:collapse; min-width:560px;">
                         <thead style="position:sticky; top:0; z-index:2;">
                             <tr style="background:rgba(15,17,26,0.97);">
-                                <th style="padding:6px 10px; text-align:center; color:#64748b; width:36px;">#</th>
+                                <th style="padding:6px 10px; text-align:center; color:#64748b; width:32px;">#</th>
                                 <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Phase</th>
                                 <th style="padding:6px 10px; text-align:left; color:#94a3b8;">Action</th>
+                                <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Where it runs</th>
                                 <th style="padding:6px 10px; text-align:left; color:#94a3b8; white-space:nowrap;">Result</th>
                             </tr>
                         </thead>
@@ -753,49 +769,57 @@
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">0</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Pre-flight</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">SSH + MySQL reachability, disk space check</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Both endpoints confirmed live</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">nc -zv LB_IP 3306</code> + <code style="color:#a78bfa;">mysql -h LB_IP</code> auth test + SSH → Flex</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (jumphost)</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">LB reachable, DBaaS auth ok, Flex SSH ok</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Discover</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">SHOW DATABASES</code> on OSPC source</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">mysql -h LB_IP SHOW DATABASES</code> — no SSH to DBaaS</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">DB list ready for loop</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Dump</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">mysqldump --single-transaction --master-data=2</code> per DB → gzip</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Compressed dumps in /tmp</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">mysqldump -h LB_IP --single-transaction</code> per DB → local gzip</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (no SSH to DBaaS)</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Compressed dumps in local /tmp</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Transfer</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">scp</code> dumps from OSPC → FLEX</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Dumps arrive on FLEX /tmp</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">scp</code> dumps from local jumphost → Flex DB VM</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local → Flex SSH</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Dumps arrive on Flex /tmp</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Restore</td>
                                 <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">zcat *.sql.gz | mysql</code> — CREATE DATABASE + import per DB</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX DB populated</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">SSH → Flex DB</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex DB populated</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Validate</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Row count comparison OSPC vs FLEX per table</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Row counts: <code style="color:#a78bfa;">mysql -h LB_IP</code> vs <code style="color:#a78bfa;">ssh Flex mysql</code> per table</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local + Flex SSH</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">Counts match — data integrity confirmed</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Cut over</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Update app <code style="color:#a78bfa;">DB_HOST</code> → FLEX IP, restart services</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writes to FLEX DB</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Repoint app <code style="color:#a78bfa;">DB_HOST → FLEX_IP</code> · delete OSPC Cloud LB to freeze DBaaS writes</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">App config + Cloud Control Panel</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writes to Flex DB · OSPC DBaaS isolated</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">7</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Cleanup</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Remove temp dumps from OSPC + FLEX <code style="color:#a78bfa;">/tmp</code></td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Remove local + Flex /tmp dumps · delete Cloud LB (manual)</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local + Flex SSH + Cloud CP</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">Migration complete</td>
                             </tr>
                         </tbody>
@@ -959,9 +983,10 @@
                     hLbl.style.color      = isHA ? '#c4b5fd'     : '#64748b';
                     document.getElementById('db-scenario-hint').textContent = isHA ? DB_SC_HINTS.ha : DB_SC_HINTS.single;
                     document.getElementById('generate-db-btn-label').textContent =
-                        isHA ? 'Generate DB Script — HA + Replica' : 'Generate DB Script — Single';
-                    document.getElementById('db-steps-single').style.display = isHA ? 'none' : 'block';
-                    document.getElementById('db-steps-ha').style.display     = isHA ? 'block' : 'none';
+                        isHA ? 'Generate DB Script — HA + Replica' : 'Generate DB Script — DBaaS via LB';
+                    document.getElementById('db-steps-single').style.display    = isHA ? 'none'  : 'block';
+                    document.getElementById('db-steps-ha').style.display        = isHA ? 'block' : 'none';
+                    document.getElementById('dbaas-config-strip').style.display = isHA ? 'none'  : 'flex';
                 }
                 document.addEventListener('DOMContentLoaded', () => dbScenarioChanged());
                 </script>
@@ -1044,6 +1069,9 @@
                     const sshUser = fv('ssh_user')  || 'ubuntu';
                     const sshKey  = fv('ssh_key_path') || '~/.ssh/id_rsa';
                     const custName = fv('project_customer_name') || 'customer';
+                    // DBaaS-specific inputs (single scenario only)
+                    const dbaasUser   = fv('dbaas_user') || 'admin';
+                    const dbaasLbOver = fv('dbaas_lb_ip'); // manual LB IP override
 
                     const useMock = document.getElementById('use-mock-data').checked;
                     const mockScenario = isHA ? 'ha' : 'single';
@@ -1058,8 +1086,14 @@
                         flexRep = MOCK_DB[mockScenario].flexRep || '<FLEX_DB_REPLICA_IP>';
                     } else {
                         // Auto-populate IPs from verified DB node cards (data-role="db-primary" / "db-replica")
+                        // OSPC cards: .custom-node-group WITHOUT .custom-node-group-s2
+                        // FLEX cards: .custom-node-group-s2
                         function ipFromCard(role, inputName) {
-                            const card = document.querySelector(`.custom-node-group-s2[data-role="${role}"]`);
+                            const isFlex = inputName.startsWith('flex_');
+                            const sel = isFlex
+                                ? `.custom-node-group-s2[data-role="${role}"]`
+                                : `.custom-node-group:not(.custom-node-group-s2)[data-role="${role}"]`;
+                            const card = document.querySelector(sel);
                             if (!card) return null;
                             const inp = card.querySelector(`input[name="${inputName}"]`);
                             return inp ? inp.value.trim() : null;
@@ -1084,9 +1118,10 @@
                         }
                     }
 
-                    const HEADER = `#!/usr/bin/env bash
+                    // ── HA scenario header (SSH-accessible OSPC VM) ───────────
+                    const HEADER_HA = `#!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════════
-#  DB MIGRATION  —  OSPC → FLEX  [${isHA ? 'HA + REPLICA' : 'SINGLE DB'}]
+#  DB MIGRATION  —  OSPC → FLEX  [HA + REPLICA]
 #  Customer : ${custName}
 #  Generated: ${new Date().toISOString()}
 #  Mode     : ${isDry ? 'DRY RUN — no data moved' : 'LIVE — changes will be applied'}
@@ -1104,7 +1139,7 @@ REPL_USER="replicator"
 REPL_PASS="\${REPL_PASS:-CHANGE_ME}"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
-echo "[START] DB migration (${isHA ? 'HA' : 'Single'}) — $(date)"
+echo "[START] DB migration (HA) — $(date)"
 
 run_cmd() {
   local CMD="$1" LABEL="\${2:-cmd}"
@@ -1119,7 +1154,66 @@ mysql_src() { ssh -i "$SSH_KEY" "$SSH_USER@$DUMP_SRC" "mysql -u root -p\\"$OSPC_
 mysql_dst() { ssh -i "$SSH_KEY" "$SSH_USER@${flexPri}"  "mysql -u root -p\\"$FLEX_ROOT_PASS\\" $*"; }
 `;
 
-                    const DISCOVER = `
+                    // ── Single DBaaS scenario header (no SSH to managed DBaaS) ─
+                    const lbPublicIp = dbaasLbOver || ospcPri; // manual override takes priority
+                    const HEADER_DBAAS = `#!/usr/bin/env bash
+# ══════════════════════════════════════════════════════════════════════
+#  DB MIGRATION  —  OSPC DBaaS → FLEX DB  [SINGLE — via Cloud Load Balancer]
+#  Customer : ${custName}
+#  Generated: ${new Date().toISOString()}
+#  Mode     : ${isDry ? 'DRY RUN — no data moved' : 'LIVE — changes will be applied'}
+#
+#  OSPC DBaaS is a MANAGED database — no SSH access to the DB host.
+#  Connectivity is via OSPC Cloud Load Balancer public VIP (port 3306).
+#  All mysqldump/mysql commands run LOCALLY on this jumphost machine.
+#
+#  PREREQUISITES:
+#    1. Cloud LB created in same region as OSPC DBaaS, pointing to the
+#       DBaaS hostname on port 3306, with "Accessible on Public Internet".
+#    2. Export passwords before running:
+#         export DBAAS_PASS=yourpassword
+#         export FLEX_ROOT_PASS=yourpassword
+# ══════════════════════════════════════════════════════════════════════
+set -uo pipefail
+export DRY_RUN="${DRY}"
+
+DUMP_DIR="/tmp/ospc_db_dumps"
+LOG_FILE="/tmp/db_mig_\$(date +%Y%m%d_%H%M%S).log"
+
+# ── OSPC DBaaS access (via Cloud Load Balancer) ───────────────────────
+LB_PUBLIC_IP="${lbPublicIp}"              # Cloud LB VIP — only public path to DBaaS
+LB_PORT="3306"                            # LB → DBaaS MySQL port
+DBAAS_USER="\${DBAAS_USER:-${dbaasUser}}" # DBaaS admin user (override: export DBAAS_USER=...)
+DBAAS_PASS="\${DBAAS_PASS:-CHANGE_ME}"   # export DBAAS_PASS=yourpassword
+
+# ── FLEX DB target (SSH-accessible VM) ───────────────────────────────
+SSH_USER="${sshUser}"
+SSH_KEY="${sshKey}"
+FLEX_IP="${flexPri}"                         # Flex DB VM — SSH-accessible
+FLEX_ROOT_PASS="\${FLEX_ROOT_PASS:-CHANGE_ME}" # export FLEX_ROOT_PASS=yourpassword
+
+exec > >(tee -a "\$LOG_FILE") 2>&1
+echo "[START] OSPC DBaaS → Flex DB migration — \$(date)"
+echo "        Source : OSPC DBaaS via Cloud LB \$LB_PUBLIC_IP:\$LB_PORT  (user: \$DBAAS_USER)"
+echo "        Target : Flex DB \$FLEX_IP  (SSH: \$SSH_USER)"
+
+run_cmd() {
+  local CMD="\$1" LABEL="\${2:-cmd}"
+  if [ "\$DRY_RUN" = "1" ]; then
+    echo "[DRY]  \$LABEL"; echo "       \$CMD"; return 0
+  fi
+  echo "[RUN]  \$LABEL"
+  eval "\$CMD" && echo "[OK]   \$LABEL" || { echo "[ERR]  \$LABEL (exit \$?)"; return 1; }
+}
+
+# mysql_src: runs locally, connects to DBaaS via LB — NO SSH to DBaaS
+mysql_src() { mysql -h "\$LB_PUBLIC_IP" -P "\$LB_PORT" -u "\$DBAAS_USER" -p"\$DBAAS_PASS" "\$@"; }
+# mysql_dst: runs on Flex DB via SSH
+mysql_dst() { ssh -i "\$SSH_KEY" "\$SSH_USER@\$FLEX_IP" "mysql -u root -p\\"\$FLEX_ROOT_PASS\\" \$*"; }
+`;
+
+                    // ── HA: OSPC is SSH-accessible VM ─────────────────────────
+                    const DISCOVER_HA = `
 # ══════════════════════════════════════════════════════════════════════
 # PHASE 0 — Pre-flight: SSH + MySQL reachability
 # ══════════════════════════════════════════════════════════════════════
@@ -1147,12 +1241,45 @@ else
 fi
 `;
 
-                    const DUMP = `
+                    // ── DBaaS single: all source ops run locally via LB ────────
+                    const DISCOVER_DBAAS = `
 # ══════════════════════════════════════════════════════════════════════
-# PHASE 2 — Dump from source
+# PHASE 0 — Pre-flight: LB TCP + DBaaS auth + Flex SSH
+# (OSPC DBaaS has no SSH — all source checks are via mysql client locally)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 0: Pre-flight ──────────────────────────────────────────"
+echo "[INFO] Source: OSPC DBaaS via Cloud LB $LB_PUBLIC_IP:$LB_PORT"
+echo "[INFO] Target: Flex DB $FLEX_IP (SSH: $SSH_USER)"
+run_cmd "nc -zv $LB_PUBLIC_IP $LB_PORT 2>&1 | head -2" "TCP $LB_PUBLIC_IP:$LB_PORT reachable"
+run_cmd "mysql -h '$LB_PUBLIC_IP' -P '$LB_PORT' -u '$DBAAS_USER' -p\\"$DBAAS_PASS\\" -e \\"SELECT 1 AS dbaas_ok;\\"" \\
+  "DBaaS auth via Cloud LB"
+run_cmd "ssh -i $SSH_KEY -o ConnectTimeout=8 $SSH_USER@$FLEX_IP 'echo ok'" "SSH → Flex DB"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'systemctl is-active mysql mariadb 2>/dev/null | grep -q active'" \\
+  "MySQL running on Flex DB"
+run_cmd "df -h /tmp" "Local disk space for dumps (jumphost)"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'df -h /tmp'" "Disk space on Flex DB"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 1 — Discover databases via Cloud LB (runs locally — no SSH)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 1: Discover databases ──────────────────────────────────"
+if [ "$DRY_RUN" = "1" ]; then
+  DATABASES="app_db reporting_db sessions_db"
+  echo "[DRY]  Mock DB list: $DATABASES"
+else
+  DATABASES=$(mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" -p"$DBAAS_PASS" -N -B -e \\
+    "SHOW DATABASES WHERE \\\`Database\\\` NOT IN ('information_schema','performance_schema','mysql','sys');")
+  echo "[INFO] Databases found: $DATABASES"
+fi
+`;
+
+                    // ── HA: dump via SSH to OSPC VM ───────────────────────────
+                    const DUMP_HA = `
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 2 — Dump from OSPC source (via SSH)
 # ══════════════════════════════════════════════════════════════════════
 echo ""; echo "── PHASE 2: Dump databases ──────────────────────────────────────"
-run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'mkdir -p $DUMP_DIR'" "Create dump dir"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'mkdir -p $DUMP_DIR'" "Create dump dir on OSPC"
 for DB in $DATABASES; do
   run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC \\
     'mysqldump -u root -p\\"$OSPC_ROOT_PASS\\" \\
@@ -1161,7 +1288,7 @@ for DB in $DATABASES; do
       \\"$DB\\" | gzip > $DUMP_DIR/\\"$DB\\".sql.gz'" \\
     "Dump $DB"
 done
-run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'du -sh $DUMP_DIR/*'" "Dump sizes"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'du -sh $DUMP_DIR/*'" "Dump sizes on OSPC"
 
 # ══════════════════════════════════════════════════════════════════════
 # PHASE 3 — Transfer to FLEX primary
@@ -1189,44 +1316,96 @@ for DB in $DATABASES; do
 done
 `;
 
-                    const VALIDATE_SINGLE = `
+                    // ── DBaaS single: dump locally via LB, scp to Flex ────────
+                    const DUMP_DBAAS = `
 # ══════════════════════════════════════════════════════════════════════
-# PHASE 5 — Validate row counts (OSPC vs FLEX)
+# PHASE 2 — Dump from OSPC DBaaS via Cloud LB (runs locally — no SSH to DBaaS)
+#   Note: --master-data and --flush-logs are NOT used.
+#   Managed DBaaS typically lacks the SUPER privilege these require.
 # ══════════════════════════════════════════════════════════════════════
-echo ""; echo "── PHASE 5: Validate ────────────────────────────────────────────"
+echo ""; echo "── PHASE 2: Dump DBaaS → local /tmp ────────────────────────────"
+mkdir -p "$DUMP_DIR"
 for DB in $DATABASES; do
-  echo "[CHECK] $DB"
-  run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC \\
-    'mysql -u root -p\\"$OSPC_ROOT_PASS\\" -N -B -e \\
-    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
-      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
-    "Row counts — OSPC $DB"
-  run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} \\
-    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
-    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
-      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
-    "Row counts — FLEX $DB"
+  run_cmd "mysqldump -h '$LB_PUBLIC_IP' -P '$LB_PORT' -u '$DBAAS_USER' -p\\"$DBAAS_PASS\\" \\
+    --single-transaction --routines --triggers --events \\
+    \\"$DB\\" | gzip > $DUMP_DIR/\\"$DB\\".sql.gz" \\
+    "Dump $DB → local (via LB)"
+done
+run_cmd "du -sh $DUMP_DIR/*" "Dump sizes (local)"
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 3 — Transfer dumps from local jumphost → Flex DB
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 3: Transfer dumps → Flex DB ────────────────────────────"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'mkdir -p $DUMP_DIR'" "Create dump dir on Flex"
+for DB in $DATABASES; do
+  run_cmd "scp -i $SSH_KEY -o StrictHostKeyChecking=accept-new \\
+    $DUMP_DIR/\\"$DB\\".sql.gz $SSH_USER@$FLEX_IP:$DUMP_DIR/" \\
+    "SCP $DB → Flex"
 done
 
 # ══════════════════════════════════════════════════════════════════════
-# PHASE 6 — Cut over: update app DB_HOST to FLEX primary
+# PHASE 4 — Restore on Flex DB
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 4: Restore on Flex DB ──────────────────────────────────"
+for DB in $DATABASES; do
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
+    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"CREATE DATABASE IF NOT EXISTS \\\`$DB\\\`;\\"'" \\
+    "Create DB $DB on Flex"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
+    'zcat $DUMP_DIR/\\"$DB\\".sql.gz | mysql -u root -p\\"$FLEX_ROOT_PASS\\" \\"$DB\\"'" \\
+    "Restore $DB on Flex"
+done
+`;
+
+                    // ── DBaaS single: validate + cutover + cleanup ────────────
+                    const VALIDATE_DBAAS = `
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 5 — Validate row counts: DBaaS (via LB, local) vs Flex DB (SSH)
+# ══════════════════════════════════════════════════════════════════════
+echo ""; echo "── PHASE 5: Validate row counts ─────────────────────────────────"
+for DB in $DATABASES; do
+  echo "[CHECK] $DB"
+  run_cmd "mysql -h '$LB_PUBLIC_IP' -P '$LB_PORT' -u '$DBAAS_USER' -p\\"$DBAAS_PASS\\" -N -B -e \\
+    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
+      WHERE TABLE_SCHEMA='$DB' ORDER BY TABLE_ROWS DESC;\\"" \\
+    "Row counts — OSPC DBaaS $DB (via LB)"
+  run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
+    'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -N -B -e \\
+    \\"SELECT TABLE_NAME,TABLE_ROWS FROM information_schema.TABLES \\
+      WHERE TABLE_SCHEMA=\\\\\\"$DB\\\\\\" ORDER BY TABLE_ROWS DESC;\\"'" \\
+    "Row counts — Flex DB $DB"
+done
+
+# ══════════════════════════════════════════════════════════════════════
+# PHASE 6 — Cut over: repoint app to Flex DB
 # ══════════════════════════════════════════════════════════════════════
 echo ""; echo "── PHASE 6: Cut over ────────────────────────────────────────────"
-echo "[ACTION] Update your application config DB_HOST → ${flexPri}"
-echo "[ACTION] Restart application services to connect to FLEX DB"
-run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} \\
+echo "[ACTION] ⚠  Schedule a brief maintenance window to prevent split-brain writes"
+echo "[ACTION] Update application config: DB_HOST → $FLEX_IP"
+echo "[ACTION] Restart application services — all traffic now to Flex DB"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP \\
   'mysql -u root -p\\"$FLEX_ROOT_PASS\\" -e \\"SELECT NOW(), @@hostname;\\"'" \\
-  "Confirm FLEX DB is accepting queries"
+  "Confirm Flex DB is accepting queries"
+echo ""
+echo "[FREEZE] To cut write access to OSPC DBaaS, choose one option:"
+echo "  Option A (recommended): Delete the Cloud Load Balancer from the Cloud Control Panel"
+echo "                          — this removes all public internet access to OSPC DBaaS"
+echo "  Option B (if SUPER privilege available):"
+echo "    mysql -h $LB_PUBLIC_IP -P $LB_PORT -u $DBAAS_USER -p\\\$DBAAS_PASS -e 'SET GLOBAL read_only=ON;'"
 
 # ══════════════════════════════════════════════════════════════════════
 # PHASE 7 — Cleanup
 # ══════════════════════════════════════════════════════════════════════
-echo ""; echo "── PHASE 7: Cleanup temp dumps ──────────────────────────────────"
-run_cmd "ssh -i $SSH_KEY $SSH_USER@$DUMP_SRC 'rm -rf $DUMP_DIR'" "Remove dumps from source"
-run_cmd "ssh -i $SSH_KEY $SSH_USER@${flexPri} 'rm -rf $DUMP_DIR'" "Remove dumps from FLEX"
+echo ""; echo "── PHASE 7: Cleanup ─────────────────────────────────────────────"
+run_cmd "rm -rf $DUMP_DIR" "Remove local dumps (jumphost)"
+run_cmd "ssh -i $SSH_KEY $SSH_USER@$FLEX_IP 'rm -rf $DUMP_DIR'" "Remove dumps from Flex DB"
+echo "[MANUAL] Delete the OSPC Cloud Load Balancer via Cloud Control Panel:"
+echo "         Networking → Load Balancers → [your LB] → Delete"
 
-echo ""; echo "[DONE] Single DB migration complete — $(date)"
-echo "       Log: $LOG_FILE"
+echo ""; echo "[DONE] OSPC DBaaS → Flex DB migration complete — $(date)"
+echo "       Flex DB : $FLEX_IP"
+echo "       Log     : $LOG_FILE"
 `;
 
                     const HA_EXTRA = `
@@ -1415,20 +1594,18 @@ echo "       Log           : $LOG_FILE"
                     // Assemble final script based on scenario
                     let script;
                     if (isHA) {
-                        script = HEADER
+                        script = HEADER_HA
                           + `\n# ─────────────────────────────────────────────────────────────────────\n`
                           + `# Scenario : HA — Clone OSPC → Flex primary, then Flex builds own HA pair\n`
                           + `# Method   : Expose → Verify → Seed → Bootstrap internal → Replicate internal → Cutover\n`
-                          + `# Dump src : OSPC HA VIP (seed only — disconnected after restore validates)\n`
+                          + `# Dump src : OSPC HA VIP (SSH-accessible VM, seed only — disconnected after seed validates)\n`
                           + `# ─────────────────────────────────────────────────────────────────────\n`
                           + `OSPC_HA_VIP="${ospcPri}"  # OSPC HA writer endpoint (seed source, port 3306)\n`
                           + `DUMP_SRC="$OSPC_HA_VIP"   # dump from OSPC primary with --single-transaction\n`
-                          + DISCOVER + DUMP + HA_EXTRA;
+                          + DISCOVER_HA + DUMP_HA + HA_EXTRA;
                     } else {
-                        script = HEADER
-                          + `\n# Scenario: Single DB — dump directly from OSPC source\n`
-                          + `DUMP_SRC="${ospcPri}"\n`
-                          + DISCOVER + DUMP + VALIDATE_SINGLE;
+                        // Single: OSPC DBaaS (managed — no SSH) accessed via Cloud Load Balancer
+                        script = HEADER_DBAAS + DISCOVER_DBAAS + DUMP_DBAAS + VALIDATE_DBAAS;
                     }
 
                     // Hide server panel, show DB panel exclusively
