@@ -13,7 +13,9 @@
 
 <p>
   <img src="https://img.shields.io/badge/Lifecycle_Stages-6-22c55e?style=flat-square" alt="Stages">
-  <img src="https://img.shields.io/badge/Migration_Strategies-5-f59e0b?style=flat-square" alt="Strategies">
+  <img src="https://img.shields.io/badge/Migration_Strategies-6-f59e0b?style=flat-square" alt="Strategies">
+  <img src="https://img.shields.io/badge/DB_Scenarios-4-22d3ee?style=flat-square" alt="DB Scenarios">
+  <img src="https://img.shields.io/badge/Verification_Checks-14%2B-a855f7?style=flat-square" alt="Verification Checks">
   <img src="https://img.shields.io/badge/Live_Streaming-SSE-a855f7?style=flat-square" alt="SSE">
   <img src="https://img.shields.io/badge/No_DB-CSV_%2B_localStorage-3b82f6?style=flat-square" alt="No DB">
   <img src="https://img.shields.io/badge/Genestack-K8s_Integration-0ea5e9?style=flat-square" alt="Genestack">
@@ -39,6 +41,12 @@
     - [Option 1: Direct Shift & Lift (Image Migration)](#option-1-direct-shift--lift-image-migration)
     - [Option 2 Phase 1: REHOST Infra Cloning (Topology Designer)](#option-2-phase-1-rehost-infra-cloning-topology-designer)
     - [Option 2 Phase 2: Apps Servers & DB Replication](#option-2-phase-2-apps-servers--db-replication)
+      - [DB VM — Single Database](#ospc2flex--db-vm-ssh-accessible-ospc-db-server)
+      - [Single DBaaS — V2 Streaming](#ospc2flex--single-dbaas-v2-streaming--no-ssh-to-dbaas)
+      - [DBaaS + Replica — V2 GTID](#ospc2flex--dbaas--replica-v2-gtid-streaming-replication)
+      - [HA DBaaS — FLEX HA pair](#ospc2flex--ha-dbaas-ospc-ha-vip--flex-ha-pair)
+      - [Comprehensive Verification Phase](#comprehensive-verification-phase-all-four-scenarios)
+      - [HTML Comparison Report](#html-comparison-report-1)
     - [Option 2 Phase 3: Kubernetes Replication Manual / Auto](#option-2-phase-3-kubernetes-replication-manual--auto)
   - [Stage 3 — Validation & UAT](#stage-3--validation--uat)
   - [Stage 4 — Cutover & Handover](#stage-4--cutover--handover)
@@ -363,77 +371,239 @@ Two modes selectable before generation:
 
 ---
 
-**► DB Script Generator — Single DB (OSPC DBaaS via Cloud Load Balancer)**
-
-OSPC managed DBaaS instances have **no SSH access**. The only public path is via a Rackspace **Cloud Load Balancer** created in the same region, with MySQL (port 3306) and "Accessible on the Public Internet" selected. All dump commands run **locally** on the jumphost — never SSH to the DBaaS host.
-
-```
- OSPC DBaaS (xxx.rackspaceclouddb.com — private network only, no SSH)
-        │
-        └─► Cloud Load Balancer (public VIP :3306)
-                 │
-                 │  Phase 0: nc -zv LB_IP 3306  +  mysql -h LB_IP auth   [local]
-                 │  Phase 1: mysql -h LB_IP SHOW DATABASES                [local]
-                 │  Phase 2: mysqldump -h LB_IP → local /tmp/*.sql.gz     [local, no SSH to DBaaS]
-                 │
-                 │  Phase 3: scp local dumps → Flex DB VM                 [local → SSH]
-                 │  Phase 4: zcat | mysql restore                         [SSH → Flex]
-                 │  Phase 5: row-count validate (LB vs Flex)              [local + SSH]
-                 │
-                 │  Phase 6: repoint app DB_HOST → Flex IP                [app config]
-                 └─► Phase 7: rm local + Flex dumps · DELETE Cloud LB     [local + SSH + Cloud CP]
-```
-
-**Setup — before running the script:**
-1. Cloud Control Panel → Networking → Load Balancers → **Add External Node** → paste DBaaS hostname, port 3306
-2. Select **"Accessible on the Public Internet"** + **MySQL** protocol
-3. Note the LB public VIP — enter it in the **LB Public IP** field in the UI
-4. Export credentials: `export DBAAS_PASS=yourpassword && export FLEX_ROOT_PASS=yourpassword`
-
-| Phase | Runs on | Action |
-|-------|---------|--------|
-| 0 Pre-flight | Local | `nc -zv LB_IP 3306` + `mysql -h LB_IP` auth + SSH → Flex |
-| 1 Discover | Local | `mysql -h LB_IP SHOW DATABASES` — no SSH to DBaaS |
-| 2 Dump | **Local** | `mysqldump -h LB_IP --single-transaction` per DB → local gzip |
-| 3 Transfer | Local → SSH | `scp` local dumps → Flex DB VM |
-| 4 Restore | SSH → Flex | `zcat *.sql.gz \| mysql` per DB |
-| 5 Validate | Local + SSH | Row counts: `mysql -h LB_IP` vs `ssh Flex mysql` per table |
-| 6 Cutover | App config | Repoint `DB_HOST → FLEX_IP` · delete Cloud LB to freeze DBaaS writes |
-| 7 Cleanup | Local + SSH | `rm` local + Flex dumps · **manual**: delete Cloud LB from Cloud CP |
-
-> **Note:** `--master-data` and `--flush-logs` are omitted — managed DBaaS does not grant the `SUPER` privilege these options require. `--single-transaction` provides consistent read-only snapshot for InnoDB tables.
-
----
-
-**► DB Script Generator — HA DB + Replica**
-
-Self-contained approach — OSPC seeds Flex primary, then Flex builds its own internal HA pair. No ongoing cross-cloud replication.
+________________________________________
+►  OSPC2FLEX — DB VM
+Single SSH-accessible OSPC DB server → FLEX DB VM. Classic dump-transfer-restore with no cloud LB required.
 
 ```
- OSPC Primary (HA VIP)
+ OSPC DB VM
         │
-        │  Phase 7: mysqldump → restore  (OSPC role ends here)
+        │  mysqldump --single-transaction --routines --triggers --events
+        │  per DB → gzip  →  /tmp/ospc_db_dumps/<db>.sql.gz
         ▼
- Flex Primary
+ /tmp/ospc_db_dumps/  (on OSPC VM)
         │
-        │  Phase 8: internal dump → restore
+        │  scp -i SSH_KEY
         ▼
- Flex Replica
+ FLEX DB VM  /tmp/ospc_db_dumps/
         │
-        │  Phase 9: CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP
-        │           START SLAVE → lag monitor → 0
+        │  CREATE DATABASE <db>
+        │  zcat <db>.sql.gz | sudo mysql <db>
         ▼
- Flex internal HA pair ✓  (OSPC decommissioned)
+ row-count validate → cutover app config ✓
+        │
+        └─► PHASE FINAL: comprehensive verification → HTML report
+```
+
+| Phase | Action |
+|-------|--------|
+| 0 Pre-flight | SSH to OSPC + FLEX reachability · disk space check |
+| 1 Discover | `SHOW DATABASES` on OSPC · detect MySQL version |
+| 2 Dump | `mysqldump` per DB → gzip on OSPC `/tmp` |
+| 3 Transfer | `scp` dumps OSPC → FLEX `/tmp` |
+| 4 Restore | `CREATE DATABASE` · `zcat *.sql.gz \| sudo mysql` per DB |
+| 5 Validate | Row counts per table — OSPC vs FLEX |
+| 6 Cutover | Update app `DB_HOST → FLEX_IP` · `SET GLOBAL read_only=ON` on OSPC |
+| 7 Cleanup | `rm` temp dumps from OSPC + FLEX |
+| Final | Full 14-check schema + data verification → HTML report |
+
+________________________________________
+►  OSPC2FLEX — Single DBaaS
+OSPC DBaaS has no SSH access — only path is a Rackspace Cloud Load Balancer (port 3306, public internet). V2 streams `mysqldump` directly through a pipe to FLEX — zero local disk, no SCP step.
+
+> **Setup:** Cloud CP → Networking → Load Balancers → Add External Node → DBaaS hostname:3306 → note VIP · `export DBAAS_PASS=... FLEX_ROOT_PASS=...`
+
+```
+ OSPC DBaaS  (no SSH — private network only)
+        │
+        └─► Cloud Load Balancer  (public VIP :3306)
+                │
+                │  nc -zv LB_IP 3306  +  mysql -h LB_IP  (auth check)
+                ▼
+             [preflight OK]
+                │
+                │  mysqldump -h LB_IP --single-transaction
+                │    --no-tablespaces --set-gtid-purged=OFF
+                │    --routines --triggers --events <db>
+                │  | ssh FLEX_IP "mysql -u root <db>"
+                │  (streaming pipe — zero local disk, no scp)
+                ▼
+             FLEX Primary
+                │
+                │  SELECT COUNT(*) per table  (LB vs FLEX)
+                │  first N sample rows side-by-side
+                ▼
+             row-count validated ✓
+                │
+                └─► PHASE FINAL: comprehensive verification → HTML report
 ```
 
 | Phase | OSPC Role | FLEX Role | Action |
 |-------|-----------|-----------|--------|
-| 5 Expose source | HA VIP reachable | No DB yet | TCP:3306 + auth check on all 3 nodes |
-| 6 Verify engines | Version checked | Pri + Rep verified | MySQL version + GTID mode parity |
-| 7 Seed Flex primary | **Role ends here** | Receives full clone | `mysqldump` from OSPC → restore + row-count validate |
-| 8 Bootstrap internal HA | Not involved | Pri seeds Rep | `REPLICATION SLAVE` user on Flex Pri; dump Pri → restore Rep |
-| 9 Start Flex replication | Not involved | Rep follows Pri | `CHANGE MASTER TO FLEX_PRI_IP; START SLAVE`; lag → 0 |
-| 10 Cutover | `read_only=ON` → decommission | Pri = new app endpoint | Repoint `DB_HOST`; 48h stability window |
+| 0 Pre-flight | LB reachable | SSH-checked | `nc -zv LB:3306` · `mysql -h LB` auth · `df -h` `free -h` |
+| 1 Discover | Source only | — | `SHOW DATABASES` via LB — no SSH to DBaaS ever |
+| 2 Prepare FLEX | — | Receives setup | Install MySQL if absent · enable service · verify `root` access |
+| 3 Stream | **Role ends after seed** | Receives full clone | `mysqldump` pipe · DROP + recreate each DB before import |
+| 4 Validate | — | FLEX Primary | Row counts + first N sample rows OSPC vs FLEX |
+| Final | — | FLEX Primary | Full 14-check verification · HTML report |
+
+> `--master-data` and `--flush-logs` omitted — managed DBaaS does not grant `SUPER`. `--single-transaction` gives a consistent InnoDB snapshot without write locks.
+
+________________________________________
+►  OSPC2FLEX — DBaaS + Replica
+Extends Single DBaaS — after FLEX primary is seeded via streaming pipe, the script provisions N FLEX replicas with GTID binary-log replication. OSPC is source only during the initial seed; no ongoing cross-cloud replication.
+
+```
+ OSPC DBaaS  (Cloud LB :3306)
+        │
+        │  mysqldump | ssh pipe → FLEX Primary  (streaming, no temp file)
+        ▼
+ FLEX Primary  (server-id=101 · GTID ON · log_bin · bind-address=0.0.0.0)
+        │
+        │  CREATE USER replicator IDENTIFIED WITH mysql_native_password
+        │  GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.*
+        │
+        │  mysqldump --all-databases --master-data=2
+        │            --set-gtid-purged=ON | gzip → /tmp/flex_seed.sql.gz
+        ▼
+ /tmp/flex_seed.sql.gz
+        │
+        │  cat seed.sql.gz | ssh REPLICA | gunzip | mysql  (per replica)
+        ▼
+ FLEX Replica(s)  (server-id=201+ · read_only=ON · relay_log)
+        │
+        │  STOP SLAVE; RESET SLAVE ALL; RESET MASTER  ← clears GTID history
+        │  DROP DATABASE <db>  ← remove stale tables before import
+        │  CHANGE MASTER TO MASTER_HOST=FLEX_IP
+        │                   MASTER_AUTO_POSITION=1
+        │                   GET_MASTER_PUBLIC_KEY=1
+        │  START SLAVE
+        ▼
+ GTID replication running ✓
+        │
+        └─► PHASE FINAL: OSPC vs FLEX Primary + each Replica
+                         HTML report — one column per node
+```
+
+| Phase | OSPC Role | FLEX Role | Action |
+|-------|-----------|-----------|--------|
+| 1 Pre-flight | LB reachable | All nodes SSH-checked | `nc`, `mysql` auth, `df -h`, `free -h` per node |
+| 2 Prepare primary | — | FLEX Primary | Install MySQL · `server-id=101` · `log_bin` · GTID · `bind=0.0.0.0` · restart |
+| 2 Prepare replicas | — | Each FLEX Replica | Install MySQL · `server-id=201+` · `read_only=ON` · GTID · restart |
+| 3 Stream → Primary | **Role ends after seed** | Receives full clone | `mysqldump` LB pipe · DROP + recreate each DB |
+| 4 Validate primary | — | FLEX Primary | Row counts + sample rows OSPC vs FLEX |
+| 5 Seed dump | — | FLEX Primary | `--all-databases --master-data=2 --set-gtid-purged=ON` → gzip |
+| 6 Seed replicas | — | Each FLEX Replica | `RESET MASTER` · DROP user DBs · stream seed · import |
+| 7 Start replication | — | Each FLEX Replica | `CHANGE MASTER TO ... MASTER_AUTO_POSITION=1; START SLAVE` |
+| 8 Postcheck | — | All nodes | `@@read_only` · `SHOW SLAVE STATUS` IO/SQL/Lag per replica |
+| Final | — | Primary + Replicas | Full verification per node · HTML report |
+
+________________________________________
+►  OSPC2FLEX — HA DBaaS
+OSPC seeds FLEX primary, then FLEX builds its own internal HA pair. No ongoing cross-cloud replication — OSPC is the source only during the initial seed.
+
+```
+ OSPC Primary  (HA VIP — SSH accessible)
+        │
+        │  mysqldump --single-transaction --routines --triggers --events
+        │  | gzip → OSPC /tmp  →  scp → FLEX Primary /tmp
+        ▼
+ FLEX Primary  (OSPC role ends here)
+        │
+        │  CREATE DATABASE <db>;  zcat | sudo mysql  (per DB)
+        │  row-count validate
+        │
+        │  CREATE USER replicator  GRANT REPLICATION SLAVE
+        │  sudo mysqldump --all-databases --single-transaction
+        │                 --master-data=2
+        │                 | gzip → /tmp/flex_ha_seed.sql.gz
+        ▼
+ /tmp/flex_ha_seed.sql.gz
+        │
+        │  scp → each FLEX Standby /tmp/
+        ▼
+ FLEX Standby(s)
+        │
+        │  zcat flex_ha_seed.sql.gz | sudo mysql
+        │  STOP SLAVE; RESET SLAVE ALL
+        │  CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP
+        │                   MASTER_AUTO_POSITION=1
+        │  START SLAVE
+        ▼
+ FLEX internal HA pair ✓  (OSPC decommissioned after 48 h)
+        │
+        └─► PHASE FINAL: OSPC vs FLEX Primary + each Standby
+                         HTML report — one column per node
+```
+
+| Phase | OSPC Role | FLEX Role | Action |
+|-------|-----------|-----------|--------|
+| 1 Pre-flight | SSH + `mysql` auth check | All nodes SSH-checked | MySQL version + GTID parity · `df -h` |
+| 2 Expose source | HA VIP reachable | No DB yet | TCP:3306 + auth check on all nodes |
+| 3 Seed primary | **Source — role ends here** | Receives full clone | `mysqldump` OSPC → SCP → `zcat \| mysql` + row-count validate |
+| 4 Replication user | Not involved | FLEX Primary | `CREATE USER replicator` · `GRANT REPLICATION SLAVE` |
+| 5 Seed standbys | Not involved | Pri → Standbys | Dump FLEX Primary → SCP to each standby → `zcat \| mysql` |
+| 6 Start replication | Not involved | Each Standby | `CHANGE MASTER TO FLEX_PRI_IP; START SLAVE` |
+| 7 HA control layer | Not involved | FLEX Primary | keepalived / ProxySQL / MaxScale VIP setup |
+| Cutover | `super_read_only=ON` → decommission | Pri = new app endpoint | Repoint `DB_HOST` · 48 h stability window |
+| Final | — | Primary + Standbys | Full verification per node · HTML report |
+
+---
+
+**► Comprehensive Verification Phase (all four scenarios)**
+
+Every generated script ends with the same exhaustive comparison run against each target node (FLEX Primary + every replica/standby). Results accumulate across all phases into one TSV then render as a single HTML pivot table.
+
+```
+ _run_db_cmp_phase "FLEX PRIMARY"
+ _run_db_cmp_phase "REPLICA 10.x.x.x"    ← repeated per replica/standby
+
+ All phases → /tmp/db_mig_v2/cmp_<ts>.tsv
+            → /tmp/db_mig_v2/db_report_<ts>.html
+```
+
+| # | Check | Method |
+|---|-------|--------|
+| 1 | Database list | `SHOW DATABASES` diff — system DBs excluded |
+| 2 | User list | `mysql.user` — skipped with `[INFO]` when DBaaS returns `RESTRICTED` |
+| 3 | Tables | `SHOW TABLES` per DB — sorted diff |
+| 4 | TABLE STATUS | Engine + charset — `utf8` normalized to `utf8mb3` (MySQL 8.0 rename) |
+| 5 | Columns | `information_schema.COLUMNS` — name, type, nullable, default, key, extra |
+| 6 | Indexes | `information_schema.STATISTICS` — all definitions |
+| 7 | Views | `information_schema.VIEWS` — definition text |
+| 8 | Triggers | `information_schema.TRIGGERS` — event, timing, table |
+| 9 | Routines | `information_schema.ROUTINES` — procedures + functions |
+| 10 | Events | `information_schema.EVENTS` — name + status |
+| 11 | Row counts | `SELECT COUNT(*)` per table |
+| 12 | DDL | `SHOW CREATE TABLE` — `AUTO_INCREMENT` stripped before diff |
+| 13 | Data ≤ 5 000 rows | Full table `md5sum` hash (`SELECT * ORDER BY 1 \| md5sum`) |
+| 14 | Data > 5 000 rows | `CHECKSUM TABLE` — MySQL native CRC32 |
+
+---
+
+**► HTML Comparison Report**
+
+After all phases complete, an embedded Python 3 script generates a self-contained dark-themed HTML report and prints `[REPORT] /tmp/db_mig_v2/db_report_<ts>.html` to the stream.
+
+```
+ All phase results → /tmp/db_mig_v2/cmp_<ts>.tsv
+    │  python3 (inline heredoc in migration script)
+    ▼
+ /tmp/db_mig_v2/db_report_<ts>.html
+    │  GET /api/agent1/db-report
+    ▼
+ Browser — dark-themed pivot table  (checks × phases)
+```
+
+| Feature | Detail |
+|---------|--------|
+| **Summary cards** | One card per phase — PASS / FAIL counts · green border = all pass · red = failures |
+| **Pivot table** | Rows = every check · columns = FLEX Primary + each replica — color-coded cells |
+| **Section grouping** | Checks grouped: Global → per-DB schema → per-table data |
+| **Cell detail** | PASS shows row count or checksum mode · FAIL shows diff context |
+| **Export CSV** | One-click full comparison matrix download |
+| **View Report button** | Green banner in migration terminal links directly to report after script completes |
+| **Endpoints** | `GET /api/agent1/db-report` (latest) · `GET /api/agent1/db-report/<filename>` |
 
 ---
 

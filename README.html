@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSPC2FLEX — README</title>
+<style>
+
+/* github-markdown-css — light theme */
+.markdown-body{-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;margin:0;color:#1f2328;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:16px;line-height:1.5;word-wrap:break-word}
+.markdown-body a{color:#0969da;text-decoration:none}
+.markdown-body a:hover{text-decoration:underline}
+.markdown-body strong{font-weight:600}
+.markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6{font-weight:600;line-height:1.25;margin-top:24px;margin-bottom:16px}
+.markdown-body h1{font-size:2em;border-bottom:1px solid #d8dee4;padding-bottom:.3em}
+.markdown-body h2{font-size:1.5em;border-bottom:1px solid #d8dee4;padding-bottom:.3em}
+.markdown-body h3{font-size:1.25em}
+.markdown-body h4{font-size:1em}
+.markdown-body p{margin-top:0;margin-bottom:16px}
+.markdown-body blockquote{margin:0;padding:0 1em;color:#636c76;border-left:.25em solid #d8dee4}
+.markdown-body blockquote>:first-child{margin-top:0}
+.markdown-body blockquote>:last-child{margin-bottom:0}
+.markdown-body ul,.markdown-body ol{margin-top:0;margin-bottom:16px;padding-left:2em}
+.markdown-body li{margin-top:.25em}
+.markdown-body li+li{margin-top:.25em}
+.markdown-body code{padding:.2em .4em;margin:0;font-size:85%;white-space:break-spaces;background-color:#818b981f;border-radius:6px;font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+.markdown-body pre{margin-top:0;margin-bottom:16px;overflow:auto;font-size:85%;line-height:1.45;color:#1f2328;background-color:#f6f8fa;border-radius:6px;padding:16px}
+.markdown-body pre code{display:inline;overflow:visible;line-height:inherit;word-wrap:normal;background:transparent;padding:0;margin:0;font-size:100%;border:0}
+.markdown-body table{border-spacing:0;border-collapse:collapse;display:block;width:max-content;max-width:100%;overflow:auto;margin-top:0;margin-bottom:16px}
+.markdown-body table th,.markdown-body table td{padding:6px 13px;border:1px solid #d8dee4}
+.markdown-body table th{font-weight:600;background-color:#f6f8fa}
+.markdown-body table tr{background-color:#ffffff;border-top:1px solid #d8dee4}
+.markdown-body table tr:nth-child(2n){background-color:#f6f8fa}
+.markdown-body hr{height:.25em;padding:0;margin:24px 0;background-color:#d8dee4;border:0}
+.markdown-body img{max-width:100%;box-sizing:content-box}
+.markdown-body .highlight pre,.markdown-body pre{background-color:#f6f8fa}
+
+
+/* ── Layout ── */
+:root{--sidebar-w:260px;--bg:#ffffff;--sidebar-bg:#f6f8fa;--border:#d8dee4;--text:#1f2328;--nav-active:#0969da}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+
+/* ── Sidebar ── */
+#sidebar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;overflow-y:auto;background:var(--sidebar-bg);border-right:1px solid var(--border);padding:20px 0;z-index:100}
+#sidebar h2{font-size:11px;font-weight:600;color:#636c76;text-transform:uppercase;letter-spacing:.08em;padding:0 16px 8px;margin:0 0 4px;border-bottom:1px solid var(--border)}
+#sidebar a{display:block;padding:4px 16px;font-size:13px;color:var(--text);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:2px solid transparent;line-height:1.5}
+#sidebar a.nav-l3{padding-left:28px;font-size:12px;color:#636c76}
+#sidebar a:hover{color:var(--nav-active);background:#f0f6ff}
+#sidebar a.active{color:var(--nav-active);border-left-color:var(--nav-active);font-weight:600;background:#dbeafe40}
+
+/* ── Content ── */
+#content{margin-left:var(--sidebar-w);padding:40px 48px 80px;max-width:980px}
+.table-wrap{overflow-x:auto;margin-bottom:16px}
+
+/* ── h3 scenario titles ── */
+.markdown-body h3{color:#0969da}
+
+/* ── hr + h3 spacing ── */
+.markdown-body hr + h3{margin-top:20px}
+
+@media(max-width:768px){
+  #sidebar{display:none}
+  #content{margin-left:0;padding:20px 16px}
+}
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <h2>Contents</h2>
+  <a href="#table-of-contents" class="nav-l2" data-id="table-of-contents">Table of Contents</a>
+<a href="#why-this-tool-exists" class="nav-l2" data-id="why-this-tool-exists">Why This Tool Exists</a>
+<a href="#architecture" class="nav-l2" data-id="architecture">Architecture</a>
+<a href="#full-stage-breakdown" class="nav-l2" data-id="full-stage-breakdown">Full Stage Breakdown</a>
+<a href="#stage-0-customer-migration-tracker" class="nav-l3" data-id="stage-0-customer-migration-tracker">Stage 0 — Customer Migration Tracker</a>
+<a href="#stage-1-discovery-assessment" class="nav-l3" data-id="stage-1-discovery-assessment">Stage 1 — Discovery &amp; Assessment</a>
+<a href="#stage-2-migration-pipeline" class="nav-l3" data-id="stage-2-migration-pipeline">Stage 2 — Migration Pipeline</a>
+<a href="#node--amp--db-pairing---how-it-works" class="nav-l3" data-id="node--amp--db-pairing---how-it-works">► Node &amp; DB Pairing — How it works</a>
+<a href="#server-script-generator" class="nav-l3" data-id="server-script-generator">► Server Script Generator</a>
+<a href="#comprehensive-verification-phase--all-four-scenarios" class="nav-l3" data-id="comprehensive-verification-phase--all-four-scenarios">► Comprehensive Verification Phase (all four scenarios)</a>
+<a href="#html-comparison-report" class="nav-l3" data-id="html-comparison-report">► HTML Comparison Report</a>
+<a href="#parallel-execution-engine" class="nav-l3" data-id="parallel-execution-engine">► Parallel Execution Engine</a>
+<a href="#stage-3-validation-uat" class="nav-l3" data-id="stage-3-validation-uat">Stage 3 — Validation &amp; UAT</a>
+<a href="#stage-4-cutover-handover" class="nav-l3" data-id="stage-4-cutover-handover">Stage 4 — Cutover &amp; Handover</a>
+<a href="#stage-5-post-migration" class="nav-l3" data-id="stage-5-post-migration">Stage 5 — Post-Migration</a>
+<a href="#script-generation-engine" class="nav-l2" data-id="script-generation-engine">Script Generation Engine</a>
+<a href="#prerequisites-installation" class="nav-l2" data-id="prerequisites-installation">Prerequisites &amp; Installation</a>
+<a href="#launch" class="nav-l2" data-id="launch">Launch</a>
+<a href="#security-persistence" class="nav-l2" data-id="security-persistence">Security &amp; Persistence</a>
+</nav>
+
+<div id="content">
+  <article class="markdown-body">
+    <div align="center">
+
+<h1>🚀 OSPC2FLEX Mission Control</h1>
+
+<p><strong>Full-cycle browser dashboard for migrating OpenStack Private Cloud (OSPC) workloads to Rackspace FLEX</strong></p>
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3.12-3776ab?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Flask-2.x-000000?style=for-the-badge&logo=flask&logoColor=white" alt="Flask">
+  <img src="https://img.shields.io/badge/OpenStack-OSPC→FLEX-ed1944?style=for-the-badge&logo=openstack&logoColor=white" alt="OpenStack">
+  <img src="https://img.shields.io/badge/Platform-WSL2%20%2F%20Linux-0078d4?style=for-the-badge&logo=linux&logoColor=white" alt="Platform">
+</p>
+
+<p>
+  <img src="https://img.shields.io/badge/Lifecycle_Stages-6-22c55e?style=flat-square" alt="Stages">
+  <img src="https://img.shields.io/badge/Migration_Strategies-6-f59e0b?style=flat-square" alt="Strategies">
+  <img src="https://img.shields.io/badge/DB_Scenarios-4-22d3ee?style=flat-square" alt="DB Scenarios">
+  <img src="https://img.shields.io/badge/Verification_Checks-14%2B-a855f7?style=flat-square" alt="Verification Checks">
+  <img src="https://img.shields.io/badge/Live_Streaming-SSE-a855f7?style=flat-square" alt="SSE">
+  <img src="https://img.shields.io/badge/No_DB-CSV_%2B_localStorage-3b82f6?style=flat-square" alt="No DB">
+  <img src="https://img.shields.io/badge/Genestack-K8s_Integration-0ea5e9?style=flat-square" alt="Genestack">
+</p>
+
+<br>
+
+> **One tab. Six stages. Zero spreadsheets.**
+> Discovery → Topology Design → Script Generation → Live Execution → UAT Sign-off → Cutover
+
+</div>
+
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#why-this-tool-exists">Why This Tool Exists</a></li>
+<li><a href="#architecture">Architecture</a></li>
+<li><a href="#full-stage-breakdown">Full Stage Breakdown</a></li>
+<li><a href="#stage-0--customer-migration-tracker">Stage 0 — Customer Migration Tracker</a></li>
+<li><a href="#stage-1--discovery--assessment">Stage 1 — Discovery &amp; Assessment</a></li>
+<li><a href="#stage-2--migration-pipeline">Stage 2 — Migration Pipeline</a><ul>
+<li><a href="#option-1-direct-shift--lift-image-migration">Option 1: Direct Shift &amp; Lift (Image Migration)</a></li>
+<li><a href="#option-2-phase-1-rehost-infra-cloning-topology-designer">Option 2 Phase 1: REHOST Infra Cloning (Topology Designer)</a></li>
+<li><a href="#option-2-phase-2-apps-servers--db-replication">Option 2 Phase 2: Apps Servers &amp; DB Replication</a></li>
+<li><a href="#ospc2flex--db-vm-ssh-accessible-ospc-db-server">DB VM — Single Database</a></li>
+<li><a href="#ospc2flex--single-dbaas-v2-streaming--no-ssh-to-dbaas">Single DBaaS — V2 Streaming</a></li>
+<li><a href="#ospc2flex--dbaas--replica-v2-gtid-streaming-replication">DBaaS + Replica — V2 GTID</a></li>
+<li><a href="#ospc2flex--ha-dbaas-ospc-ha-vip--flex-ha-pair">HA DBaaS — FLEX HA pair</a></li>
+<li><a href="#comprehensive-verification-phase-all-four-scenarios">Comprehensive Verification Phase</a></li>
+<li><a href="#html-comparison-report-1">HTML Comparison Report</a></li>
+<li><a href="#option-2-phase-3-kubernetes-replication-manual--auto">Option 2 Phase 3: Kubernetes Replication Manual / Auto</a></li>
+</ul>
+</li>
+<li><a href="#stage-3--validation--uat">Stage 3 — Validation &amp; UAT</a></li>
+<li><a href="#stage-4--cutover--handover">Stage 4 — Cutover &amp; Handover</a></li>
+<li><a href="#stage-5--post-migration">Stage 5 — Post-Migration</a></li>
+<li><a href="#script-generation-engine">Script Generation Engine</a></li>
+<li><a href="#prerequisites--installation">Prerequisites &amp; Installation</a></li>
+<li><a href="#launch">Launch</a></li>
+<li><a href="#security--persistence">Security &amp; Persistence</a></li>
+</ul>
+<hr />
+<h2 id="why-this-tool-exists">Why This Tool Exists</h2>
+<p>OSPC (Rackspace OpenStack Private Cloud) customers migrating to FLEX face a multi-week, multi-team gauntlet: discovery audits, topology redesign, VM image conversion, database replication, Kubernetes re-platforming, and final cutover — each with its own CLI toolchain, credentials, and risk surface.</p>
+<p><strong>OSPC2FLEX Mission Control</strong> collapses that entire lifecycle into a single browser tab. It wraps CLI tools, OpenStack API scanners, Bash script generators, and live SSE streaming terminals into a "Future Punk" dashboard UI — so operators coordinate a full migration without dropping to a terminal.</p>
+<hr />
+<h2 id="architecture">Architecture</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend</td>
+<td>Python 3.12, Flask</td>
+</tr>
+<tr>
+<td>Frontend</td>
+<td>Vanilla HTML/CSS/JavaScript — no framework</td>
+</tr>
+<tr>
+<td>Realtime output</td>
+<td>Server-Sent Events (SSE) via <code>ReadableStream</code></td>
+</tr>
+<tr>
+<td>Script execution</td>
+<td>Python <code>subprocess</code> threading + Bash</td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td>Browser <code>localStorage</code> + CSV files (no database required)</td>
+</tr>
+<tr>
+<td>Platform</td>
+<td>Ubuntu 22.04+ / WSL2 (Windows Subsystem for Linux)</td>
+</tr>
+<tr>
+<td>OpenStack integration</td>
+<td><code>python-openstackclient</code>, <code>python-octaviaclient</code></td>
+</tr>
+<tr>
+<td>VM image conversion</td>
+<td><code>qemu-img</code> (raw → qcow2 → FLEX-compatible)</td>
+</tr>
+</tbody>
+</table></div>
+<p>The Flask backend serves all pages as iframes within a single unified shell (<code>combined.html</code>), providing tab-based navigation across all migration stages without page reloads. Each page streams live execution output via SSE.</p>
+<hr />
+<h2 id="full-stage-breakdown">Full Stage Breakdown</h2>
+<h3 id="stage-0-customer-migration-tracker">Stage 0 — Customer Migration Tracker</h3>
+<p>A persistent backlog table for managing multiple customer migration engagements simultaneously.</p>
+<ul>
+<li><strong>CSV-backed tracker</strong> — reads/writes <code>migration_tracker_db.csv</code>, survives server restarts</li>
+<li><strong>Per-customer rows</strong> — customer name, environment size, migration status, notes, assigned engineer</li>
+<li><strong>Status chips</strong> — color-coded: <code>Pending</code>, <code>In Progress</code>, <code>UAT</code>, <code>Done</code>, <code>Failed</code></li>
+<li><strong>Inline editing</strong> — update status and notes directly in the table, auto-saves</li>
+<li><strong>Why Move to FLEX promo panel</strong> — business value overview tab for customer-facing presentations</li>
+</ul>
+<hr />
+<h3 id="stage-1-discovery-assessment">Stage 1 — Discovery &amp; Assessment</h3>
+<pre><code> openrc credentials
+       │
+       ▼
+ ┌─────────────┐    run_discovery.sh    ┌──────────────────┐
+ │ OSPC Scanner│ ──────────────────────►│  servers.csv     │
+ │  (live env) │                        │  network.csv     │
+ └─────────────┘                        └──────────────────┘
+       │                                        │
+       │  mirror scan                           │ side-by-side
+       ▼                                        ▼
+ ┌─────────────┐                        ┌──────────────────┐
+ │ FLEX Scanner│ ──────────────────────►│  FLEX inventory  │
+ │ (target env)│   flavor auto-detect   │  flavor mapping  │
+ └─────────────┘                        └──────────────────┘
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Panel</th>
+<th>What it does</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OSPC Scanner</strong></td>
+<td>Authenticates via <code>openrc</code>, runs <code>run_discovery.sh</code> — scans Compute, Cinder, Security Groups, LBs, Floating IPs, DNS</td>
+<td><code>servers.csv</code>, <code>network.csv</code></td>
+</tr>
+<tr>
+<td><strong>FLEX Scanner</strong></td>
+<td>Mirrors the same scan against the FLEX target environment</td>
+<td>FLEX inventory for side-by-side comparison, flavor candidates</td>
+</tr>
+<tr>
+<td><strong>Topology Import</strong></td>
+<td>Parses existing OpenStack Bash/YAML scripts and reverse-engineers them into the visual canvas</td>
+<td>Supports <code>openstack server create</code>, <code>network create</code>, <code>router</code></td>
+</tr>
+<tr>
+<td><strong>References Panel</strong></td>
+<td>OSPC flavor catalog vs FLEX catalog with pricing — nearest-equivalent recommendation</td>
+<td>Side-by-side flavor mapping table</td>
+</tr>
+</tbody>
+</table></div>
+<p>All scanners stream live output to an SSE terminal panel in the browser.</p>
+<hr />
+<h3 id="stage-2-migration-pipeline">Stage 2 — Migration Pipeline</h3>
+<p>Three paths depending on workload type:</p>
+<pre><code> OSPC Workload
+      │
+      ├──► Option 1: Direct Shift &amp; Lift  ──► VM snapshot → qemu-img → FLEX
+      │
+      └──► Option 2: REHOST
+                │
+                ├── Phase 1: Infra Cloning (Topology Designer)
+                ├── Phase 2: Apps Servers &amp; DB Replication
+                └── Phase 3: Kubernetes Migration
+</code></pre>
+<hr />
+<h4 id="option-1-direct-shift-lift-image-migration">Option 1: Direct Shift &amp; Lift (Image Migration)</h4>
+<p>GUI wrapper for <code>ospc2flex_image_migrator.py</code> — three migration modes via a dedicated <strong>Jump Host</strong>, with automatic offline boot repair before upload.</p>
+<p><strong>Migration Modes</strong></p>
+<pre><code> OSPC VM (live)
+      │
+      ├─ Mode A: PRODUCTION ──── SSH-pipe /dev/vda ──────────────────────────────────────┐
+      │          (no snapshot)    origin VM → jumphost (stream + convert in one step)     │
+      │                                                                                   │
+      ├─ Mode B: EXTERNAL OFFLOAD ── OSPC Glance snapshot ──► download to jumphost ──────┤
+      │          (snapshot-based)                                                         │
+      │                                                                                   │
+      └─ Mode C: DIRECT EXPORT ── qemu-img reads live disk directly on jumphost ─────────┘
+                 (no snapshot)                                                            │
+                                                                                         ▼
+                                                                              ┌──────────────────┐
+                                                                              │  Stage 4: Convert │
+                                                                              │  qemu-img → qcow2 │
+                                                                              └────────┬─────────┘
+                                                                                       │
+                                                                              ┌────────▼─────────┐
+                                                                              │ Stage 4.5: Offline│
+                                                                              │  Guest Repair     │
+                                                                              │  (custom_os /     │
+                                                                              │   generic mode)   │
+                                                                              └────────┬─────────┘
+                                                                                       │
+                                                                              ┌────────▼─────────┐
+                                                                              │ Stage 5: Upload   │
+                                                                              │ to FLEX Glance    │
+                                                                              └────────┬─────────┘
+                                                                                       │
+                                                                                  FLEX VM ✓
+</code></pre>
+<p><strong>Pipeline Stages</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Name</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Validate Dependencies</td>
+<td>Check <code>openstack</code> CLI + <code>qemu-img</code> on jumphost</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Create OSPC Snapshot</td>
+<td>Glance snapshot (skipped in Production / Direct Export modes)</td>
+</tr>
+<tr>
+<td>2.5</td>
+<td>Clean Workspace</td>
+<td>Remove leftover <code>.img</code> / <code>.qcow2</code> from previous runs</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Disk Acquisition</td>
+<td><strong>Production</strong>: SSH-pipe <code>/dev/vda</code> from origin VM · <strong>Offload</strong>: download from Glance · <strong>Direct</strong>: read live disk</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Convert Image</td>
+<td><code>qemu-img</code> auto-detect source format → convert to <code>qcow2</code> or <code>raw</code></td>
+</tr>
+<tr>
+<td>4.5</td>
+<td>Offline Guest Repair</td>
+<td>Mount image via <code>qemu-nbd</code>, run OS-profile repair (see below)</td>
+</tr>
+<tr>
+<td>4.6</td>
+<td>Repair Fallback</td>
+<td>If 4.5 fails — retry with standalone <code>ospc2flex_offline_repair.sh</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Upload to FLEX Glance</td>
+<td>Stream repaired image from jumphost → FLEX Glance</td>
+</tr>
+<tr>
+<td>5.5</td>
+<td>Clean Workspace</td>
+<td>Remove uploaded artifact from jumphost</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Offline Guest Repair — OS Profiles (Stage 4.5)</strong></p>
+<p>Repairs the image while it is offline so it boots cleanly on FLEX on first try. Two modes:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>How it works</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>custom_os</code> <em>(default)</em></td>
+<td>Connects image via <code>qemu-nbd</code>, runs <code>fsck</code>, auto-detects OS from <code>/etc/os-release</code>, applies per-OS profile</td>
+</tr>
+<tr>
+<td><code>generic</code></td>
+<td>Runs standalone <code>ospc2flex_offline_repair.sh</code> directly — no OS detection, no mount</td>
+</tr>
+</tbody>
+</table></div>
+<p>Per-OS repair profiles applied in <code>custom_os</code> mode:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>OS</th>
+<th>Repair actions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ubuntu 24.04</strong></td>
+<td>Delete <code>50-cloud-init.yaml</code>, write <code>99-ospc2flex.yaml</code> netplan (enp3s0), fix fstab UUID refs</td>
+</tr>
+<tr>
+<td><strong>Ubuntu 20/22</strong></td>
+<td>Write netplan config, fix fstab, clean cloud-init state, install <code>qemu-guest-agent</code> via chroot</td>
+</tr>
+<tr>
+<td><strong>Debian</strong></td>
+<td>Same as Ubuntu (apt safe from Ubuntu jumphost), netplan / interfaces fix</td>
+</tr>
+<tr>
+<td><strong>Rocky / AlmaLinux</strong></td>
+<td>Fix fstab, write NetworkManager config, enable legacy network via systemd symlink <em>(no chroot — RPM from Ubuntu jumphost unsafe)</em></td>
+</tr>
+<tr>
+<td><strong>CentOS / RHEL</strong></td>
+<td>Fix fstab, ifcfg network config, disable cloud-init lock</td>
+</tr>
+<tr>
+<td><strong>Fallback</strong></td>
+<td>Detect fails → default to Ubuntu 24.04 netplan profile + generic repair</td>
+</tr>
+</tbody>
+</table></div>
+<p>All profiles: backup original <code>fstab</code> → <code>fstab.ospc2flex.bak</code>, strip OSPC MAC bindings, set correct network interface name for FLEX.</p>
+<p><strong>Key Options</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--jump-host</code></td>
+<td>Dedicated jumphost IP — all processing runs here (required)</td>
+</tr>
+<tr>
+<td><code>--origin-vm-ip</code></td>
+<td>Source VM IP for Production Mode (SSH-pipe <code>/dev/vda</code>)</td>
+</tr>
+<tr>
+<td><code>--direct-export</code></td>
+<td>Image live disk directly on jumphost — no snapshot</td>
+</tr>
+<tr>
+<td><code>--offline-repair-method</code></td>
+<td><code>custom_os</code> (smart per-OS) or <code>generic</code> (standalone script)</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Print all commands, make no changes</td>
+</tr>
+<tr>
+<td><code>--stop-before-snapshot</code></td>
+<td>Cleanly stop VM before snapshot for consistency</td>
+</tr>
+<tr>
+<td><code>--boot-test-vm</code></td>
+<td>Launch a test VM on FLEX after upload to verify boot</td>
+</tr>
+<tr>
+<td><code>--repair-guest</code></td>
+<td>Re-run offline repair on an already-uploaded image</td>
+</tr>
+<tr>
+<td><code>--fix-fstab</code> / <code>--fix-netplan</code></td>
+<td>Targeted repair flags</td>
+</tr>
+<tr>
+<td><code>--ssh-key-path</code></td>
+<td><code>.pem</code> keypair for jumphost + origin VM access</td>
+</tr>
+<tr>
+<td><code>--target-format</code></td>
+<td><code>qcow2</code> <em>(default)</em> or <code>raw</code></td>
+</tr>
+<tr>
+<td>Live terminal</td>
+<td>SSE streaming panel — every stage logged in real time to browser</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h4 id="option-2-phase-1-rehost-infra-cloning-topology-designer">Option 2 Phase 1: REHOST Infra Cloning (Topology Designer)</h4>
+<p>Interactive canvas for designing the full FLEX target infrastructure before any migration runs.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Visual canvas</strong></td>
+<td>Drag-and-drop nodes — VMs, networks, subnets, routers, LBs, security groups, volumes</td>
+</tr>
+<tr>
+<td><strong>Live OSPC import</strong></td>
+<td>Pulls current topology from OpenStack API directly into the canvas</td>
+</tr>
+<tr>
+<td><strong>Validation engine</strong></td>
+<td>25+ checks — orphan nodes, missing router uplinks, duplicate IPs, CIDR overlaps</td>
+</tr>
+<tr>
+<td><strong>Topology → Script</strong></td>
+<td>Generates a full ordered OpenStack Bash deployment script from the canvas</td>
+</tr>
+<tr>
+<td><strong>Script → Topology</strong></td>
+<td>Paste an existing deployment script — canvas reconstructs automatically</td>
+</tr>
+<tr>
+<td><strong>Keypair verification</strong></td>
+<td>Validates all SSH keypairs exist in the FLEX project before deploy</td>
+</tr>
+<tr>
+<td><strong>IP auto-propagation</strong></td>
+<td>IPs entered in any panel persist to <code>localStorage</code> and inject into all other panels</td>
+</tr>
+<tr>
+<td><strong>Execution plan</strong></td>
+<td>Ordered table of every resource creation step with CLI command preview</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h4 id="option-2-phase-2-apps-servers-db-replication">Option 2 Phase 2: Apps Servers &amp; DB Replication</h4>
+<p>Script generator and parallel execution engine for migrating application servers and databases.</p>
+<h3 id="node--amp--db-pairing---how-it-works">► Node &amp; DB Pairing — How it works</h3>
+<p>Pairs are built automatically from the OSPC discovery scan and topology import. No manual IP entry required.</p>
+<pre><code> Stage 1 OSPC Discovery scan
+         │
+         │  topology.json  (nodes: name, group, IP, OS, packages, runtimes)
+         ▼
+ &quot;📥 Import Discovered Topology&quot; button
+         │
+         │  parse topology.json
+         │  assign data-role per node:
+         │    group contains db/mysql/postgres/mariadb  → db-primary
+         │    group contains replica/slave/standby      → db-replica
+         │    everything else                           → server
+         ▼
+ Node cards rendered side by side
+ ┌─────────────────────────┐   ┌──────────────────────────┐
+ │  OSPC source card       │   │  FLEX target card         │
+ │  name, IP, OS, packages │   │  name, FLEX IP (editable) │
+ │  data-role=&quot;db-primary&quot; │   │  data-role=&quot;db-primary&quot;   │
+ │  data-verified=&quot;false&quot;  │   │  data-verified=&quot;false&quot;    │
+ └─────────────────────────┘   └──────────────────────────┘
+         │                               │
+         │  SSH connectivity test        │  SSH connectivity test
+         │  packages verified on FLEX    │  border turns green on pass
+         ▼                               ▼
+ data-verified=&quot;true&quot;           data-verified=&quot;true&quot;
+         │
+         │  script generators read IPs directly from node cards
+         │  parallel executor reads verified pairs into _rehostPairList
+         ▼
+ Scripts generated with real IPs ✓
+</code></pre>
+<p><strong>Node role assignment logic</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Node group keyword</th>
+<th>Assigned <code>data-role</code></th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>db</code>, <code>mysql</code>, <code>postgres</code>, <code>mariadb</code>, <code>data</code></td>
+<td><code>db-primary</code></td>
+<td>DB script generator — primary IP</td>
+</tr>
+<tr>
+<td><code>replica</code>, <code>slave</code>, <code>standby</code> + any DB keyword</td>
+<td><code>db-replica</code></td>
+<td>DB script generator — replica IP</td>
+</tr>
+<tr>
+<td>All other nodes</td>
+<td><code>server</code></td>
+<td>Server script generator + parallel executor</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Per-node card details</strong></p>
+<p>Each imported node shows:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td>From <code>topology.json</code> node name</td>
+</tr>
+<tr>
+<td>OSPC IP</td>
+<td>Auto-populated from discovery scan; persisted to <code>localStorage</code></td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Detected OS from OSPC scan (e.g. Ubuntu 22.04, Rocky 9)</td>
+</tr>
+<tr>
+<td>Packages</td>
+<td>Key packages found on OSPC node (nginx, mysql-server, python3…)</td>
+</tr>
+<tr>
+<td>Runtimes</td>
+<td>Runtime environments detected (Python, Node.js, Docker, PM2)</td>
+</tr>
+<tr>
+<td>FLEX IP</td>
+<td>Editable field — operator enters the target FLEX VM IP</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td>SSH + package check against FLEX IP; border turns 🟢 green on pass, 🔴 red on fail</td>
+</tr>
+<tr>
+<td>Force Override</td>
+<td>Checkbox to mark a node verified manually (skips SSH check)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>IP persistence</strong> — OSPC and FLEX IPs are saved to <code>localStorage</code> keyed by node name (<code>node_ospc_ip_&lt;name&gt;</code>, <code>node_flex_ip_&lt;name&gt;</code>) and survive hard refresh. The script generators and parallel executor always read live values from the rendered node cards, not from a static config.</p>
+<p><strong>DB IP resolution</strong> — when a DB script is generated, IPs are pulled in this priority order:</p>
+<pre><code>Single DB (DBaaS via Cloud LB):
+  LB Public IP:  dbaas_lb_ip field (manual override)
+                 → card data-role=&quot;db-primary&quot; ospc_custom_ip[]
+                 → mock data fallback
+  Flex DB IP:    card data-role=&quot;db-primary&quot; flex_custom_ip[]
+                 → mock data fallback
+
+HA DB + Replica:
+  OSPC HA VIP:   card data-role=&quot;db-primary&quot; ospc_custom_ip[]
+  OSPC Replica:  card data-role=&quot;db-replica&quot; ospc_custom_ip[]
+  Flex Primary:  card data-role=&quot;db-primary&quot; flex_custom_ip[]
+  Flex Replica:  card data-role=&quot;db-replica&quot; flex_custom_ip[]
+  Fallback on all: mock data (mock checkbox auto-activates)
+</code></pre>
+<hr />
+<h3 id="server-script-generator">► Server Script Generator</h3>
+<p>Two modes selectable before generation:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What it generates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>📦 Quick Install</td>
+<td><code>apt</code>/<code>dnf</code> package installation script for matched FLEX servers</td>
+</tr>
+<tr>
+<td>🖥️ Full Rehost Clone</td>
+<td>13-layer deep-clone script (see table below)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Full Rehost Clone — 13 Layers</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Layer</th>
+<th>What it copies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Server Identity</td>
+<td>Hostname, timezone</td>
+</tr>
+<tr>
+<td>2</td>
+<td>SSH &amp; Access</td>
+<td><code>sshd_config</code>, <code>authorized_keys</code>, <code>sudoers.d</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Users &amp; Permissions</td>
+<td>System users (UID/GID preserved), <code>/home/</code> sync</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Disk / Mounts</td>
+<td><code>lsblk</code>/<code>df</code>/<code>fstab</code> audit — read-only, no changes</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Packages &amp; Repos</td>
+<td><code>apt</code>/<code>rpm</code> package list mirror</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Kernel / Sysctl</td>
+<td><code>sysctl.conf</code>, <code>security/limits.d</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Network</td>
+<td><code>ip addr</code>/<code>route</code>/<code>netplan</code> export — manual apply</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Runtime Env</td>
+<td>Python, Node.js, Docker, PM2</td>
+</tr>
+<tr>
+<td>9</td>
+<td>App Code &amp; Config</td>
+<td><code>rsync</code> <code>/opt/app</code> <code>/srv</code> <code>/var/www</code>; IP substitution in config files</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service Units &amp; Cron</td>
+<td><code>systemd</code> units, cron jobs</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Data</td>
+<td>PostgreSQL/MySQL dump &amp; restore — opt-in only</td>
+</tr>
+<tr>
+<td>12</td>
+<td>TLS &amp; Certs</td>
+<td>Let's Encrypt transfer, CA trust store refresh</td>
+</tr>
+<tr>
+<td>13</td>
+<td>External Deps</td>
+<td><code>.env</code>/YAML external URL audit</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Execution modes:</strong> <code>🔍 Dry Run</code> · <code>🔒 Maint Mode</code> · <code>✂️ Cutover Mode</code> · <code>🟢 Live</code></p>
+<hr />
+<hr />
+<p>►  OSPC2FLEX — DB VM<br />
+Single SSH-accessible OSPC DB server → FLEX DB VM. Classic dump-transfer-restore with no cloud LB required.</p>
+<pre><code> OSPC DB VM
+        │
+        │  mysqldump --single-transaction --routines --triggers --events
+        │  per DB → gzip  →  /tmp/ospc_db_dumps/&lt;db&gt;.sql.gz
+        ▼
+ /tmp/ospc_db_dumps/  (on OSPC VM)
+        │
+        │  scp -i SSH_KEY
+        ▼
+ FLEX DB VM  /tmp/ospc_db_dumps/
+        │
+        │  CREATE DATABASE &lt;db&gt;
+        │  zcat &lt;db&gt;.sql.gz | sudo mysql &lt;db&gt;
+        ▼
+ row-count validate → cutover app config ✓
+        │
+        └─► PHASE FINAL: comprehensive verification → HTML report
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0 Pre-flight</td>
+<td>SSH to OSPC + FLEX reachability · disk space check</td>
+</tr>
+<tr>
+<td>1 Discover</td>
+<td><code>SHOW DATABASES</code> on OSPC · detect MySQL version</td>
+</tr>
+<tr>
+<td>2 Dump</td>
+<td><code>mysqldump</code> per DB → gzip on OSPC <code>/tmp</code></td>
+</tr>
+<tr>
+<td>3 Transfer</td>
+<td><code>scp</code> dumps OSPC → FLEX <code>/tmp</code></td>
+</tr>
+<tr>
+<td>4 Restore</td>
+<td><code>CREATE DATABASE</code> · <code>zcat *.sql.gz \| sudo mysql</code> per DB</td>
+</tr>
+<tr>
+<td>5 Validate</td>
+<td>Row counts per table — OSPC vs FLEX</td>
+</tr>
+<tr>
+<td>6 Cutover</td>
+<td>Update app <code>DB_HOST → FLEX_IP</code> · <code>SET GLOBAL read_only=ON</code> on OSPC</td>
+</tr>
+<tr>
+<td>7 Cleanup</td>
+<td><code>rm</code> temp dumps from OSPC + FLEX</td>
+</tr>
+<tr>
+<td>Final</td>
+<td>Full 14-check schema + data verification → HTML report</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<p>►  OSPC2FLEX — Single DBaaS<br />
+OSPC DBaaS has no SSH access — only path is a Rackspace Cloud Load Balancer (port 3306, public internet). V2 streams <code>mysqldump</code> directly through a pipe to FLEX — zero local disk, no SCP step.</p>
+<blockquote>
+<p><strong>Setup:</strong> Cloud CP → Networking → Load Balancers → Add External Node → DBaaS hostname:3306 → note VIP · <code>export DBAAS_PASS=... FLEX_ROOT_PASS=...</code></p>
+</blockquote>
+<pre><code> OSPC DBaaS  (no SSH — private network only)
+        │
+        └─► Cloud Load Balancer  (public VIP :3306)
+                │
+                │  nc -zv LB_IP 3306  +  mysql -h LB_IP  (auth check)
+                ▼
+             [preflight OK]
+                │
+                │  mysqldump -h LB_IP --single-transaction
+                │    --no-tablespaces --set-gtid-purged=OFF
+                │    --routines --triggers --events &lt;db&gt;
+                │  | ssh FLEX_IP &quot;mysql -u root &lt;db&gt;&quot;
+                │  (streaming pipe — zero local disk, no scp)
+                ▼
+             FLEX Primary
+                │
+                │  SELECT COUNT(*) per table  (LB vs FLEX)
+                │  first N sample rows side-by-side
+                ▼
+             row-count validated ✓
+                │
+                └─► PHASE FINAL: comprehensive verification → HTML report
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>OSPC Role</th>
+<th>FLEX Role</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0 Pre-flight</td>
+<td>LB reachable</td>
+<td>SSH-checked</td>
+<td><code>nc -zv LB:3306</code> · <code>mysql -h LB</code> auth · <code>df -h</code> <code>free -h</code></td>
+</tr>
+<tr>
+<td>1 Discover</td>
+<td>Source only</td>
+<td>—</td>
+<td><code>SHOW DATABASES</code> via LB — no SSH to DBaaS ever</td>
+</tr>
+<tr>
+<td>2 Prepare FLEX</td>
+<td>—</td>
+<td>Receives setup</td>
+<td>Install MySQL if absent · enable service · verify <code>root</code> access</td>
+</tr>
+<tr>
+<td>3 Stream</td>
+<td><strong>Role ends after seed</strong></td>
+<td>Receives full clone</td>
+<td><code>mysqldump</code> pipe · DROP + recreate each DB before import</td>
+</tr>
+<tr>
+<td>4 Validate</td>
+<td>—</td>
+<td>FLEX Primary</td>
+<td>Row counts + first N sample rows OSPC vs FLEX</td>
+</tr>
+<tr>
+<td>Final</td>
+<td>—</td>
+<td>FLEX Primary</td>
+<td>Full 14-check verification · HTML report</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><code>--master-data</code> and <code>--flush-logs</code> omitted — managed DBaaS does not grant <code>SUPER</code>. <code>--single-transaction</code> gives a consistent InnoDB snapshot without write locks.</p>
+</blockquote>
+<hr />
+<p>►  OSPC2FLEX — DBaaS + Replica<br />
+Extends Single DBaaS — after FLEX primary is seeded via streaming pipe, the script provisions N FLEX replicas with GTID binary-log replication. OSPC is source only during the initial seed; no ongoing cross-cloud replication.</p>
+<pre><code> OSPC DBaaS  (Cloud LB :3306)
+        │
+        │  mysqldump | ssh pipe → FLEX Primary  (streaming, no temp file)
+        ▼
+ FLEX Primary  (server-id=101 · GTID ON · log_bin · bind-address=0.0.0.0)
+        │
+        │  CREATE USER replicator IDENTIFIED WITH mysql_native_password
+        │  GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.*
+        │
+        │  mysqldump --all-databases --master-data=2
+        │            --set-gtid-purged=ON | gzip → /tmp/flex_seed.sql.gz
+        ▼
+ /tmp/flex_seed.sql.gz
+        │
+        │  cat seed.sql.gz | ssh REPLICA | gunzip | mysql  (per replica)
+        ▼
+ FLEX Replica(s)  (server-id=201+ · read_only=ON · relay_log)
+        │
+        │  STOP SLAVE; RESET SLAVE ALL; RESET MASTER  ← clears GTID history
+        │  DROP DATABASE &lt;db&gt;  ← remove stale tables before import
+        │  CHANGE MASTER TO MASTER_HOST=FLEX_IP
+        │                   MASTER_AUTO_POSITION=1
+        │                   GET_MASTER_PUBLIC_KEY=1
+        │  START SLAVE
+        ▼
+ GTID replication running ✓
+        │
+        └─► PHASE FINAL: OSPC vs FLEX Primary + each Replica
+                         HTML report — one column per node
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>OSPC Role</th>
+<th>FLEX Role</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 Pre-flight</td>
+<td>LB reachable</td>
+<td>All nodes SSH-checked</td>
+<td><code>nc</code>, <code>mysql</code> auth, <code>df -h</code>, <code>free -h</code> per node</td>
+</tr>
+<tr>
+<td>2 Prepare primary</td>
+<td>—</td>
+<td>FLEX Primary</td>
+<td>Install MySQL · <code>server-id=101</code> · <code>log_bin</code> · GTID · <code>bind=0.0.0.0</code> · restart</td>
+</tr>
+<tr>
+<td>2 Prepare replicas</td>
+<td>—</td>
+<td>Each FLEX Replica</td>
+<td>Install MySQL · <code>server-id=201+</code> · <code>read_only=ON</code> · GTID · restart</td>
+</tr>
+<tr>
+<td>3 Stream → Primary</td>
+<td><strong>Role ends after seed</strong></td>
+<td>Receives full clone</td>
+<td><code>mysqldump</code> LB pipe · DROP + recreate each DB</td>
+</tr>
+<tr>
+<td>4 Validate primary</td>
+<td>—</td>
+<td>FLEX Primary</td>
+<td>Row counts + sample rows OSPC vs FLEX</td>
+</tr>
+<tr>
+<td>5 Seed dump</td>
+<td>—</td>
+<td>FLEX Primary</td>
+<td><code>--all-databases --master-data=2 --set-gtid-purged=ON</code> → gzip</td>
+</tr>
+<tr>
+<td>6 Seed replicas</td>
+<td>—</td>
+<td>Each FLEX Replica</td>
+<td><code>RESET MASTER</code> · DROP user DBs · stream seed · import</td>
+</tr>
+<tr>
+<td>7 Start replication</td>
+<td>—</td>
+<td>Each FLEX Replica</td>
+<td><code>CHANGE MASTER TO ... MASTER_AUTO_POSITION=1; START SLAVE</code></td>
+</tr>
+<tr>
+<td>8 Postcheck</td>
+<td>—</td>
+<td>All nodes</td>
+<td><code>@@read_only</code> · <code>SHOW SLAVE STATUS</code> IO/SQL/Lag per replica</td>
+</tr>
+<tr>
+<td>Final</td>
+<td>—</td>
+<td>Primary + Replicas</td>
+<td>Full verification per node · HTML report</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<p>►  OSPC2FLEX — HA DBaaS<br />
+OSPC seeds FLEX primary, then FLEX builds its own internal HA pair. No ongoing cross-cloud replication — OSPC is the source only during the initial seed.</p>
+<pre><code> OSPC Primary  (HA VIP — SSH accessible)
+        │
+        │  mysqldump --single-transaction --routines --triggers --events
+        │  | gzip → OSPC /tmp  →  scp → FLEX Primary /tmp
+        ▼
+ FLEX Primary  (OSPC role ends here)
+        │
+        │  CREATE DATABASE &lt;db&gt;;  zcat | sudo mysql  (per DB)
+        │  row-count validate
+        │
+        │  CREATE USER replicator  GRANT REPLICATION SLAVE
+        │  sudo mysqldump --all-databases --single-transaction
+        │                 --master-data=2
+        │                 | gzip → /tmp/flex_ha_seed.sql.gz
+        ▼
+ /tmp/flex_ha_seed.sql.gz
+        │
+        │  scp → each FLEX Standby /tmp/
+        ▼
+ FLEX Standby(s)
+        │
+        │  zcat flex_ha_seed.sql.gz | sudo mysql
+        │  STOP SLAVE; RESET SLAVE ALL
+        │  CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP
+        │                   MASTER_AUTO_POSITION=1
+        │  START SLAVE
+        ▼
+ FLEX internal HA pair ✓  (OSPC decommissioned after 48 h)
+        │
+        └─► PHASE FINAL: OSPC vs FLEX Primary + each Standby
+                         HTML report — one column per node
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>OSPC Role</th>
+<th>FLEX Role</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 Pre-flight</td>
+<td>SSH + <code>mysql</code> auth check</td>
+<td>All nodes SSH-checked</td>
+<td>MySQL version + GTID parity · <code>df -h</code></td>
+</tr>
+<tr>
+<td>2 Expose source</td>
+<td>HA VIP reachable</td>
+<td>No DB yet</td>
+<td>TCP:3306 + auth check on all nodes</td>
+</tr>
+<tr>
+<td>3 Seed primary</td>
+<td><strong>Source — role ends here</strong></td>
+<td>Receives full clone</td>
+<td><code>mysqldump</code> OSPC → SCP → <code>zcat \| mysql</code> + row-count validate</td>
+</tr>
+<tr>
+<td>4 Replication user</td>
+<td>Not involved</td>
+<td>FLEX Primary</td>
+<td><code>CREATE USER replicator</code> · <code>GRANT REPLICATION SLAVE</code></td>
+</tr>
+<tr>
+<td>5 Seed standbys</td>
+<td>Not involved</td>
+<td>Pri → Standbys</td>
+<td>Dump FLEX Primary → SCP to each standby → <code>zcat \| mysql</code></td>
+</tr>
+<tr>
+<td>6 Start replication</td>
+<td>Not involved</td>
+<td>Each Standby</td>
+<td><code>CHANGE MASTER TO FLEX_PRI_IP; START SLAVE</code></td>
+</tr>
+<tr>
+<td>7 HA control layer</td>
+<td>Not involved</td>
+<td>FLEX Primary</td>
+<td>keepalived / ProxySQL / MaxScale VIP setup</td>
+</tr>
+<tr>
+<td>Cutover</td>
+<td><code>super_read_only=ON</code> → decommission</td>
+<td>Pri = new app endpoint</td>
+<td>Repoint <code>DB_HOST</code> · 48 h stability window</td>
+</tr>
+<tr>
+<td>Final</td>
+<td>—</td>
+<td>Primary + Standbys</td>
+<td>Full verification per node · HTML report</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h3 id="comprehensive-verification-phase--all-four-scenarios">► Comprehensive Verification Phase (all four scenarios)</h3>
+<p>Every generated script ends with the same exhaustive comparison run against each target node (FLEX Primary + every replica/standby). Results accumulate across all phases into one TSV then render as a single HTML pivot table.</p>
+<pre><code> _run_db_cmp_phase &quot;FLEX PRIMARY&quot;
+ _run_db_cmp_phase &quot;REPLICA 10.x.x.x&quot;    ← repeated per replica/standby
+
+ All phases → /tmp/db_mig_v2/cmp_&lt;ts&gt;.tsv
+            → /tmp/db_mig_v2/db_report_&lt;ts&gt;.html
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Check</th>
+<th>Method</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Database list</td>
+<td><code>SHOW DATABASES</code> diff — system DBs excluded</td>
+</tr>
+<tr>
+<td>2</td>
+<td>User list</td>
+<td><code>mysql.user</code> — skipped with <code>[INFO]</code> when DBaaS returns <code>RESTRICTED</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Tables</td>
+<td><code>SHOW TABLES</code> per DB — sorted diff</td>
+</tr>
+<tr>
+<td>4</td>
+<td>TABLE STATUS</td>
+<td>Engine + charset — <code>utf8</code> normalized to <code>utf8mb3</code> (MySQL 8.0 rename)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Columns</td>
+<td><code>information_schema.COLUMNS</code> — name, type, nullable, default, key, extra</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Indexes</td>
+<td><code>information_schema.STATISTICS</code> — all definitions</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Views</td>
+<td><code>information_schema.VIEWS</code> — definition text</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Triggers</td>
+<td><code>information_schema.TRIGGERS</code> — event, timing, table</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Routines</td>
+<td><code>information_schema.ROUTINES</code> — procedures + functions</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Events</td>
+<td><code>information_schema.EVENTS</code> — name + status</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Row counts</td>
+<td><code>SELECT COUNT(*)</code> per table</td>
+</tr>
+<tr>
+<td>12</td>
+<td>DDL</td>
+<td><code>SHOW CREATE TABLE</code> — <code>AUTO_INCREMENT</code> stripped before diff</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Data ≤ 5 000 rows</td>
+<td>Full table <code>md5sum</code> hash (<code>SELECT * ORDER BY 1 \| md5sum</code>)</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Data &gt; 5 000 rows</td>
+<td><code>CHECKSUM TABLE</code> — MySQL native CRC32</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h3 id="html-comparison-report">► HTML Comparison Report</h3>
+<p>After all phases complete, an embedded Python 3 script generates a self-contained dark-themed HTML report and prints <code>[REPORT] /tmp/db_mig_v2/db_report_&lt;ts&gt;.html</code> to the stream.</p>
+<pre><code> All phase results → /tmp/db_mig_v2/cmp_&lt;ts&gt;.tsv
+    │  python3 (inline heredoc in migration script)
+    ▼
+ /tmp/db_mig_v2/db_report_&lt;ts&gt;.html
+    │  GET /api/agent1/db-report
+    ▼
+ Browser — dark-themed pivot table  (checks × phases)
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Summary cards</strong></td>
+<td>One card per phase — PASS / FAIL counts · green border = all pass · red = failures</td>
+</tr>
+<tr>
+<td><strong>Pivot table</strong></td>
+<td>Rows = every check · columns = FLEX Primary + each replica — color-coded cells</td>
+</tr>
+<tr>
+<td><strong>Section grouping</strong></td>
+<td>Checks grouped: Global → per-DB schema → per-table data</td>
+</tr>
+<tr>
+<td><strong>Cell detail</strong></td>
+<td>PASS shows row count or checksum mode · FAIL shows diff context</td>
+</tr>
+<tr>
+<td><strong>Export CSV</strong></td>
+<td>One-click full comparison matrix download</td>
+</tr>
+<tr>
+<td><strong>View Report button</strong></td>
+<td>Green banner in migration terminal links directly to report after script completes</td>
+</tr>
+<tr>
+<td><strong>Endpoints</strong></td>
+<td><code>GET /api/agent1/db-report</code> (latest) · <code>GET /api/agent1/db-report/&lt;filename&gt;</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h3 id="parallel-execution-engine">► Parallel Execution Engine</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>⚡ Execute Server Migration</td>
+<td>Runs the rehost script against all VM pairs simultaneously</td>
+</tr>
+<tr>
+<td>Per-VM terminal</td>
+<td>One live SSE streaming panel per node</td>
+</tr>
+<tr>
+<td>Overview panel</td>
+<td>Migration manifest + global status</td>
+</tr>
+<tr>
+<td>⏹ Stop</td>
+<td>Cancels all in-flight executions</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>Generating a DB script automatically hides the server output panel and vice versa.</p>
+</blockquote>
+<hr />
+<h4 id="option-2-phase-3-kubernetes-replication-manual-auto">Option 2 Phase 3: Kubernetes Replication Manual / Auto</h4>
+<p><strong>Method 1 — Full Manual Mode</strong> — step-by-step runbook with live command execution per stage</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Phase</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Extract</td>
+<td>K8s manifests, Helm values, PV specs from OSPC cluster</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Collect</td>
+<td>OSPC kubeconfig + cluster state snapshot</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Prepare</td>
+<td>FLEX network — subnets, security groups</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Bootstrap</td>
+<td>Genestack / OpenCenter on FLEX</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Deploy</td>
+<td>Kubernetes on FLEX via Genestack</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Apply</td>
+<td>Manifests, Helm charts, ConfigMaps</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Migrate</td>
+<td>Persistent volumes — Cinder → FLEX block storage</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Validate</td>
+<td>Pods, services, ingress, DNS health checks</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Cutover</td>
+<td>DNS switch + traffic redirect to FLEX</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Decommission</td>
+<td>OSPC cluster teardown</td>
+</tr>
+</tbody>
+</table></div>
+<p>Lifecycle cards filter the action table by phase group. Each stage has an expandable terminal log panel and file collection tracker. A progress bar tracks overall completion.</p>
+<hr />
+<p><strong>Method 2 — Automated Deployment: Genestack / Kubespray  ·or·  OpenCenter</strong></p>
+<p>Two deployment engines are available as selectable tabs. Both are fully driven from the browser via SSE-streaming Run buttons.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Engine tabs</td>
+<td>Switch between 🟩 Genestack / Kubespray and 🔵 OpenCenter in one click</td>
+</tr>
+<tr>
+<td>Command table</td>
+<td>Step · description · editable CLI command · target host · status</td>
+</tr>
+<tr>
+<td>Run button</td>
+<td>Each row executes via SSE streaming, auto-marks row status on completion</td>
+</tr>
+<tr>
+<td>IP injection</td>
+<td>Genestack host + jump host IPs auto-fill all command templates</td>
+</tr>
+<tr>
+<td>OSPC → Genestack mapping table</td>
+<td>Maps collected OSPC data (IPs, K8s version, roles) to exact Genestack config file paths</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<p><strong>🟩 Genestack / Kubespray</strong> — Ansible-driven cluster build on bare FLEX VMs</p>
+<pre><code> OSPC scan output (IPs, K8s version, node roles)
+        │
+        │  map to Genestack inventory + group_vars
+        ▼
+ /etc/genestack/inventory/inventory.yaml
+ /etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml
+        │
+        │  ansible-playbook host-setup.yml  (pre-flight)
+        │  ansible-playbook cluster.yml     (Kubespray — 30–60 min)
+        ▼
+ Kubernetes cluster on FLEX VMs
+        │
+        │  install-kube-ovn.sh  (Kube-OVN CNI)
+        │  apply Helm overrides + your OSPC workload manifests
+        ▼
+ Workloads running on FLEX ✓
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>SSH key distribution to all FLEX nodes</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Clone Genestack repo + run <code>bootstrap.sh</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Write <code>inventory.yaml</code> from OSPC scan (masters, workers, IPs)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Set <code>kube_version</code>, <code>container_manager</code> in <code>group_vars</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Run <code>host-setup.yml</code> pre-flight playbook</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Run <code>cluster.yml</code> via Kubespray (full K8s cluster)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Configure + install Kube-OVN CNI</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Apply OSPC workload manifests, Helm charts, PV configs</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>When to choose Genestack:</strong> Full control over every node, network plugin, and K8s version. Best for large production clusters where you need to match the exact OSPC configuration.</p>
+<hr />
+<p><strong>🔵 OpenCenter</strong> — CLI-driven GitOps bootstrap (FluxCD + Kind)</p>
+<pre><code> opencenter CLI
+        │
+        │  cluster init my-first-cluster --type kind   (~10 min config)
+        ▼
+ Kind cluster provisioned
+        │
+        │  opencenter cluster bootstrap                (~30–50 min)
+        ▼
+ FluxCD installed → reconciles all platform services automatically
+        │
+        │  cert-manager, kyverno, Headlamp UI, etc. — zero manual YAML
+        ▼
+ Cluster + platform services running ✓
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Command</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 Install CLI</td>
+<td><code>curl -Lo opencenter .../opencenter-linux-amd64</code></td>
+<td><code>opencenter</code> binary in <code>/usr/local/bin</code></td>
+</tr>
+<tr>
+<td>2 Verify</td>
+<td><code>opencenter version</code></td>
+<td><code>opencenter version 1.0.0</code></td>
+</tr>
+<tr>
+<td>3 Init cluster</td>
+<td><code>opencenter cluster init my-first-cluster --type kind</code></td>
+<td>Cluster config generated</td>
+</tr>
+<tr>
+<td>4 Provision</td>
+<td><code>opencenter cluster setup my-first-cluster</code></td>
+<td>Cluster provisioned (30–50 min)</td>
+</tr>
+<tr>
+<td>5 GitOps</td>
+<td><code>opencenter cluster bootstrap my-first-cluster</code></td>
+<td>FluxCD reconciliation started</td>
+</tr>
+<tr>
+<td>6 Verify</td>
+<td><code>kubectl get pods -A</code></td>
+<td>All platform pods Running</td>
+</tr>
+<tr>
+<td>7 UI</td>
+<td><code>kubectl port-forward -n headlamp svc/headlamp 8080:80</code></td>
+<td>Headlamp dashboard at <code>:8080</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Why OpenCenter over Genestack?</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Benefit</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Faster setup</strong></td>
+<td>~10 min config vs 30–60 min Ansible playbook tuning</td>
+</tr>
+<tr>
+<td><strong>No inventory files</strong></td>
+<td><code>cluster init</code> generates config — no manual <code>inventory.yaml</code> editing</td>
+</tr>
+<tr>
+<td><strong>GitOps by default</strong></td>
+<td>FluxCD reconciles platform services automatically — no <code>helm install</code> per chart</td>
+</tr>
+<tr>
+<td><strong>Self-healing</strong></td>
+<td>FluxCD continuously reconciles desired state — drift is corrected automatically</td>
+</tr>
+<tr>
+<td><strong>Platform services included</strong></td>
+<td><code>cert-manager</code>, <code>kyverno</code>, <code>Headlamp UI</code> bootstrapped automatically</td>
+</tr>
+<tr>
+<td><strong>Simpler upgrades</strong></td>
+<td>Update the Git repo → FluxCD propagates changes cluster-wide</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Smaller clusters, fast bring-up, teams already using GitOps workflows</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>Rule of thumb:</strong> Use <strong>Genestack</strong> when you need node-level control and exact OSPC parity. Use <strong>OpenCenter</strong> when you want a production-grade cluster running in under an hour with GitOps from day one.</p>
+</blockquote>
+<hr />
+<h3 id="stage-3-validation-uat">Stage 3 — Validation &amp; UAT</h3>
+<p>Automated testing harness for post-migration verification.</p>
+<ul>
+<li><strong>Cross-Cloud Identity Parity</strong> — authenticates simultaneously against OSPC and FLEX; diffs RBAC roles and permission boundaries</li>
+<li><strong>Global API Health</strong> — evaluates FLEX compute, network router, and storage quota limits</li>
+<li><strong>Endpoint Connectivity</strong> — SSH, ping, and curl checks against newly-migrated IPs and Load Balancer URLs</li>
+<li><strong>A/B Traffic Split</strong> — provisions HAProxy VM + DB replica for gradual traffic rollover</li>
+<li><strong>Verification Report Table</strong> — auto-generated findings table with severity (INFO / WARN / ERROR), scope, and remediation hints</li>
+<li><strong>CSV export</strong> — migration audit report downloadable as CSV</li>
+</ul>
+<hr />
+<h3 id="stage-4-cutover-handover">Stage 4 — Cutover &amp; Handover</h3>
+<p>Controlled production cutover workflow.</p>
+<ul>
+<li><strong>HAProxy provisioning</strong> — auto-generates HAProxy VM setup script for A/B traffic split</li>
+<li><strong>DB replica promotion</strong> — script to promote Flex DB replica to primary and repoint applications</li>
+<li><strong>Cutover checklist</strong> — step-by-step operator sign-off list before OSPC decommission</li>
+<li><strong>Handover documentation</strong> — generates customer-facing handover notes</li>
+</ul>
+<hr />
+<h3 id="stage-5-post-migration">Stage 5 — Post-Migration</h3>
+<p>Stability monitoring and sign-off.</p>
+<ul>
+<li><strong>Success / Failure marking</strong> — operators mark the migration outcome per customer</li>
+<li><strong>Status persistence</strong> — outcome written back to the customer tracker CSV</li>
+<li><strong>48–72h stability window guidance</strong> — OSPC kept in <code>read_only</code> as warm standby before final decommission</li>
+</ul>
+<hr />
+<h2 id="script-generation-engine">Script Generation Engine</h2>
+<p>All generated scripts share a common pattern:</p>
+<pre><code class="language-bash">run_cmd() {
+  if [ &quot;$DRY_RUN&quot; = &quot;1&quot; ]; then
+    echo &quot;[DRY]  $LABEL&quot;; echo &quot;       $CMD&quot;; return 0
+  fi
+  echo &quot;[RUN]  $LABEL&quot;
+  eval &quot;$CMD&quot; &amp;&amp; echo &quot;[OK]   $LABEL&quot; || { echo &quot;[ERR]  $LABEL (exit $?)&quot;; return 1; }
+}
+</code></pre>
+<ul>
+<li><strong><code>DRY_RUN=1</code></strong> — prints every command with <code>[DRY]</code> prefix, zero changes made</li>
+<li><strong><code>DRY_RUN=0</code></strong> — executes live, logs <code>[OK]</code> or <code>[ERR]</code> per step</li>
+<li><strong><code>exec &gt; &gt;(tee -a "$LOG_FILE") 2&gt;&amp;1</code></strong> — all output written to timestamped log file</li>
+<li>Scripts are displayed in a syntax-highlighted panel, copyable, and executable directly from the browser via the SSE terminal</li>
+</ul>
+<hr />
+<h2 id="prerequisites-installation">Prerequisites &amp; Installation</h2>
+<p>Runs on Ubuntu 22.04+ or WSL2.</p>
+<pre><code class="language-bash"># System dependencies
+sudo apt-get update -y
+sudo apt-get install -y python3 python3-pip python3-venv
+sudo apt-get install -y qemu-utils
+sudo apt-get install -y curl iputils-ping netcat-openbsd
+
+# Python packages
+pip3 install python-openstackclient python-octaviaclient flask
+</code></pre>
+<hr />
+<h2 id="launch">Launch</h2>
+<pre><code class="language-bash">chmod +x letsmove.sh
+./letsmove.sh
+</code></pre>
+<p>Navigate to <strong>http://localhost:5001</strong> (or the WSL network IP shown in terminal output).</p>
+<hr />
+<h2 id="security-persistence">Security &amp; Persistence</h2>
+<ul>
+<li><strong>No database</strong> — all state lives in browser <code>localStorage</code> and local CSV files</li>
+<li><strong>Credentials sandboxed locally</strong> — OpenRC tokens and SSH keys never leave the orchestration machine</li>
+<li><strong>IP auto-propagation</strong> — OSPC and FLEX IPs entered once are persisted to <code>localStorage</code> and injected across all panels automatically, surviving hard refresh</li>
+<li><strong>Dry Run by default</strong> — all script generators and execution engines default to <code>DRY_RUN=1</code>; operators must explicitly switch to Live mode</li>
+<li><strong><code>/tmp/</code> cleanup</strong> — all dump files and temp artifacts are removed in the Cleanup phase of every generated script</li>
+</ul>
+<hr />
+<div align="center">
+<sub>Built for Rackspace OSPC → FLEX migrations · Python 3.12 · Flask · SSE · WSL2</sub>
+</div>
+  </article>
+</div>
+
+<script>
+// Intersection observer for active nav highlight
+const navLinks = document.querySelectorAll('#sidebar a[data-id]');
+const headingEls = [];
+navLinks.forEach(a => {
+  const el = document.getElementById(a.dataset.id);
+  if (el) headingEls.push(el);
+});
+let activeId = null;
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) activeId = e.target.id;
+  });
+  navLinks.forEach(a => a.classList.toggle('active', a.dataset.id === activeId));
+}, {rootMargin:'-10% 0px -80% 0px', threshold:0});
+headingEls.forEach(el => obs.observe(el));
+</script>
+</body>
+</html>

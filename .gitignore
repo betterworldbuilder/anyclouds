@@ -1,5 +1,16 @@
 ospc2flecredential.txt
+*credential*.txt
+*credential*.json
 *.pem
+*.key
+*.p12
+*.pfx
+
+# Specific credential files found in project
+"openrclast(cred).sh"
+openrclast*.sh
+"openrcred (6).sh"
+openrcred*.sh
 
 # OpenRC credential files — all variants
 openrc*.sh

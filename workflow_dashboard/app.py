@@ -2566,6 +2566,14 @@ def readme():
     return Response(plain, mimetype="text/plain")
 
 
+@app.get("/readme.html")
+def readme_html():
+    html_path = BASE_DIR / "README.html"
+    if not html_path.exists():
+        return Response("README.html not found — run the export script first.\n", status=404, mimetype="text/plain")
+    return Response(html_path.read_text(encoding="utf-8"), mimetype="text/html; charset=utf-8")
+
+
 @app.get("/topology-notes")
 def topology_notes():
     notes_path = TOPOLOGY_UPLOAD_DIR / "TOPOLOGY_NOTES.md"
@@ -5405,6 +5413,86 @@ def agent1_stop_migration():
     os.system("pkill -9 -f 'ssh -i /home' 2>/dev/null || true")
     os.system("pkill -9 -f 'scp -O' 2>/dev/null || true")
     return jsonify({"status": "stopped"})
+
+
+@app.post("/api/agent1/generate/db-script")
+def agent1_generate_db_script():
+    try:
+        from workflow_dashboard.db_script_gen import generate
+    except ImportError:
+        from db_script_gen import generate
+    r = request.get_json(silent=True) or {}
+    try:
+        script = generate(
+            scenario    = r.get('scenario', 'single'),
+            dry         = r.get('dry', '1'),
+            cust        = r.get('cust', 'customer'),
+            ssh_user    = r.get('ssh_user', 'ubuntu'),
+            ssh_key     = r.get('ssh_key', '~/.ssh/id_rsa'),
+            lb_ip       = r.get('lb_ip', ''),
+            dbaas_user  = r.get('dbaas_user', 'admin'),
+            dbaas_pass  = r.get('dbaas_pass', ''),
+            flex_pri    = r.get('flex_pri', ''),
+            flex_rep_ips= r.get('flex_rep_ips', ''),
+            flex_root_pass = r.get('flex_root_pass', ''),
+            repl_user   = r.get('repl_user', 'replicator'),
+            repl_pass   = r.get('repl_pass', ''),
+            ospc_pri    = r.get('ospc_pri', ''),
+            ha_method   = r.get('ha_method', ''),
+            ha_vip      = r.get('ha_vip', ''),
+        )
+        return script, 200, {'Content-Type': 'text/plain; charset=utf-8'}
+    except Exception as e:
+        return str(e), 500, {'Content-Type': 'text/plain'}
+
+
+@app.get("/api/agent1/db-report")
+def agent1_db_report_latest():
+    """Serve the most-recently generated DB comparison HTML report."""
+    import glob as _glob
+    files = sorted(_glob.glob('/tmp/db_mig_v2/db_report_*.html'), reverse=True)
+    if not files:
+        return ('<html><body style="background:#0d1117;color:#8b949e;font-family:monospace;padding:40px">'
+                '<h2 style="color:#58a6ff">No report found yet</h2>'
+                '<p>Run a migration comparison first — the report will appear here.</p>'
+                '</body></html>'), 404, {'Content-Type': 'text/html; charset=utf-8'}
+    with open(files[0], encoding='utf-8') as f:
+        content = f.read()
+    return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+@app.get("/api/agent1/db-report/<path:fname>")
+def agent1_db_report_file(fname):
+    """Serve a specific DB comparison HTML report by filename."""
+    import re as _re
+    if not _re.match(r'^db_report_[\w\-]+\.html$', fname):
+        return 'Invalid filename', 400
+    fpath = '/tmp/db_mig_v2/' + fname
+    if not os.path.exists(fpath):
+        return 'Report not found', 404
+    with open(fpath, encoding='utf-8') as f:
+        content = f.read()
+    return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+@app.post("/api/agent1/run/db-compare")
+def agent1_run_db_compare():
+    script_data = request.data.decode('utf-8')
+    with open('/tmp/run_db_compare.sh', 'w') as f:
+        f.write(script_data)
+    os.system('chmod +x /tmp/run_db_compare.sh')
+    def generate():
+        proc = subprocess.Popen(
+            ['bash', '/tmp/run_db_compare.sh'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1
+        )
+        for line in iter(proc.stdout.readline, ''):
+            if not line:
+                break
+            yield line
+        proc.wait()
+    return Response(stream_with_context(generate()), mimetype='text/plain')
 
 
 @app.post("/api/agent1/run/dependency_check")
