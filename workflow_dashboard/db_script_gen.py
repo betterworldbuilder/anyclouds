@@ -369,7 +369,7 @@ trap 'rc=$?; echo "[FATAL] line $LINENO: $BASH_COMMAND (rc=$rc)" >&2; exit $rc' 
 
 DRY_RUN="%%DRY%%"
 LB_PUBLIC_IP="%%LB_IP%%"
-LB_PORT="3306"
+LB_PORT="%%LB_PORT%%"
 DBAAS_USER="%%DBAAS_USER%%"
 DBAAS_PASS="%%DBAAS_PASS%%"  %%DBAAS_PASS_HINT%%
 SSH_USER="%%SSH_USER%%"
@@ -392,6 +392,40 @@ DB_ENGINE_PKG="mysql"
 
 mkdir -p "$WORKDIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
+
+# ── Auto-detect DB port if not supplied ──────────────────────────────
+# Scans common DB ports and picks the first open one.
+# Order: 3306 (MySQL/MariaDB) · 3307 (alt-MySQL) · 5432 (PostgreSQL)
+#        1433 (MSSQL) · 27017 (MongoDB)
+detect_db_port() {
+  local _host="$1"
+  local _candidates="3306 3307 5432 1433 27017"
+  for _p in $_candidates; do
+    if timeout 3 bash -c ">/dev/tcp/$_host/$_p" 2>/dev/null; then
+      echo "$_p"
+      return 0
+    fi
+  done
+  # fallback: try nc if bash tcp redirection is blocked
+  for _p in $_candidates; do
+    if nc -z -w3 "$_host" "$_p" 2>/dev/null; then
+      echo "$_p"
+      return 0
+    fi
+  done
+  echo ""
+}
+
+if [ -z "$LB_PORT" ] || [ "$LB_PORT" = "auto" ]; then
+  echo "[INFO] LB_PORT=auto — scanning open DB ports on $LB_PUBLIC_IP …"
+  _detected="$(detect_db_port "$LB_PUBLIC_IP")"
+  if [ -z "$_detected" ]; then
+    echo "[FATAL] No open DB port found on $LB_PUBLIC_IP (tried 3306 3307 5432 1433 27017)" >&2
+    exit 1
+  fi
+  LB_PORT="$_detected"
+  echo "[INFO] Auto-detected DB port: $LB_PORT"
+fi
 
 log()  { echo; echo "════════════════════════════════════════════════════════════════════"; echo "$1"; echo "════════════════════════════════════════════════════════════════════"; }
 info() { echo "[INFO] $*"; }
@@ -979,7 +1013,8 @@ def generate(scenario, dry, cust, ssh_user, ssh_key,
     return _fill(tmpl,
         SCENARIO=scenario_label,
         CUST=cust, TS=ts, MODE=mode, DRY=dry,
-        LB_IP=lb_ip, DBAAS_USER=dbaas_user,
+        LB_IP=lb_ip, LB_PORT='auto',
+        DBAAS_USER=dbaas_user,
         DBAAS_PASS=dbaas_pass or '${DBAAS_PASS:-CHANGE_ME}',
         DBAAS_PASS_HINT=_hint(dbaas_pass, 'DBAAS_PASS'),
         SSH_USER=ssh_user, SSH_KEY=ssh_key,
