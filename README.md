@@ -987,5 +987,5 @@ Navigate to **http://localhost:5001** (or the WSL network IP shown in terminal o
 ---
 
 <div align="center">
-<sub>Built for Rackspace OSPC → FLEX migrations · Python 3.12 · Flask · SSE · WSL2</sub>
+<sub>Built for OpenStack Zen → OpenStack KVM migrations · Python 3.12 · Flask · SSE · WSL2</sub>
 </div>
