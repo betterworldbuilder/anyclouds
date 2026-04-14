@@ -4123,15 +4123,18 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         const typeColor = isDB ? '#7c3aed' : '#3b82f6';
         const typeBadge = isDB ? '🗄 DB' : '🖥 Server';
         const reportSection = isDB ? `
-            <div id="job-report-${jobId}" style="display:none; padding:9px 14px; background:linear-gradient(135deg,#0d2818,#0d1a2d); border-top:1px solid #238636; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:18px;">📊</span>
-                    <div>
-                        <div style="color:#3fb950; font-weight:700; font-size:13px;">Comparison Report Ready</div>
-                        <div id="job-report-path-${jobId}" style="color:#8b949e; font-size:10px; font-family:monospace; margin-top:1px;"></div>
+            <div id="job-report-${jobId}" style="display:none; border-top:1px solid #1e3a2e;">
+                <!-- header bar -->
+                <div style="padding:9px 16px; background:linear-gradient(135deg,#0d2818,#0d1a2d); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:16px;">📊</span>
+                        <span style="color:#3fb950; font-weight:700; font-size:13px;">Comparison Report</span>
+                        <span id="job-report-path-${jobId}" style="color:#4b5563; font-size:10px; font-family:monospace;"></span>
                     </div>
+                    <a id="job-report-link-${jobId}" href="#" target="_blank" style="padding:4px 12px; background:#238636; color:#fff; border-radius:5px; text-decoration:none; font-weight:600; font-size:11px; flex-shrink:0;">↗ Open full page</a>
                 </div>
-                <a id="job-report-link-${jobId}" href="#" target="_blank" style="padding:6px 14px; background:#238636; color:#fff; border-radius:6px; text-decoration:none; font-weight:700; font-size:12px;">📊 View Report</a>
+                <!-- inline rendered table injected here -->
+                <div id="job-report-inline-${jobId}" style="padding:0; background:#0d1117; overflow-x:auto;"></div>
             </div>` : '';
         return `
         <div id="job-card-${jobId}" data-job-label="${label.replace(/"/g,'&quot;')}" style="border-radius:8px; overflow:hidden; border:1px solid #334155; transition:border-color 0.3s;">
@@ -4158,6 +4161,79 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         el.textContent = msg;
         out.appendChild(el);
         out.scrollTop = out.scrollHeight;
+    }
+
+    async function _renderReportInline(jobId, url) {
+        const container = document.getElementById('job-report-inline-' + jobId);
+        if (!container) return;
+        container.innerHTML = '<div style="padding:20px;color:#4b5563;font-family:monospace;font-size:12px;">Loading report…</div>';
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const html = await resp.text();
+            const doc  = new DOMParser().parseFromString(html, 'text/html');
+
+            // ── Summary cards ──────────────────────────────────────────────
+            const cardsWrap = document.createElement('div');
+            cardsWrap.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px 0;';
+            doc.querySelectorAll('.card').forEach(c => {
+                const isPass = c.classList.contains('all-pass');
+                const isFail = c.classList.contains('has-fail');
+                const title  = c.querySelector('b')  ? c.querySelector('b').textContent  : '';
+                const pg     = c.querySelector('.pg') ? c.querySelector('.pg').textContent : '';
+                const fb     = c.querySelector('.fb') ? c.querySelector('.fb').textContent : '';
+                const bColor = isPass ? '#238636' : isFail ? '#da3633' : '#30363d';
+                const chip   = document.createElement('div');
+                chip.style.cssText = `background:#161b22;border:1px solid ${bColor};border-radius:8px;padding:10px 16px;min-width:160px;`;
+                chip.innerHTML = `<div style="color:#79c0ff;font-size:11px;font-weight:700;letter-spacing:.04em;margin-bottom:7px;">${title}</div>
+                    <div style="display:flex;gap:12px;align-items:baseline;">
+                      <span style="color:#3fb950;font-weight:700;font-size:18px;">${pg}</span>
+                      <span style="color:#f85149;font-weight:700;font-size:18px;">${fb}</span>
+                    </div>`;
+                cardsWrap.appendChild(chip);
+            });
+            container.appendChild(cardsWrap);
+
+            // ── Timestamp ──────────────────────────────────────────────────
+            const ts = doc.querySelector('.ts');
+            if (ts) {
+                const tsEl = document.createElement('div');
+                tsEl.style.cssText = 'padding:4px 16px 10px;color:#4b5563;font-size:10px;font-family:monospace;';
+                tsEl.textContent = ts.textContent;
+                container.appendChild(tsEl);
+            }
+
+            // ── Table ──────────────────────────────────────────────────────
+            const tbl = doc.querySelector('table');
+            if (tbl) {
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'overflow-x:auto;padding:0 0 14px;';
+
+                // Re-style the table to match the dark card
+                tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;min-width:500px;';
+                tbl.querySelectorAll('th').forEach(th => {
+                    th.style.cssText = 'background:#1c2128;color:#8b949e;text-align:left;padding:9px 14px;border:1px solid #30363d;white-space:nowrap;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;';
+                });
+                tbl.querySelectorAll('td').forEach(td => {
+                    td.style.fontSize = '12px';
+                    td.style.padding  = '7px 12px';
+                    td.style.border   = '1px solid #21262d';
+                    td.style.verticalAlign = 'top';
+                });
+                tbl.querySelectorAll('tr').forEach(tr => {
+                    tr.style.transition = 'background .12s';
+                    tr.onmouseenter = () => tr.querySelectorAll('td').forEach(td => td.style.background = '#161b22');
+                    tr.onmouseleave = () => tr.querySelectorAll('td').forEach(td => td.style.background = '');
+                });
+
+                wrap.appendChild(tbl);
+                container.appendChild(wrap);
+            } else {
+                container.innerHTML += '<div style="padding:12px 16px;color:#4b5563;font-size:12px;font-family:monospace;">No comparison table in report.</div>';
+            }
+        } catch(e) {
+            container.innerHTML = `<div style="padding:14px 16px;color:#f85149;font-family:monospace;font-size:12px;">Failed to load report: ${e.message}</div>`;
+        }
     }
 
     function setJobStatus(jobId, status) {
@@ -4262,10 +4338,12 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
                         const banner   = document.getElementById('job-report-'      + jobId);
                         const link     = document.getElementById('job-report-link-' + jobId);
                         const path     = document.getElementById('job-report-path-' + jobId);
-                        if (banner) banner.style.display = 'flex';
+                        if (banner) banner.style.display = 'block';
                         if (link)   link.href = '/api/agent1/db-report/' + encodeURIComponent(fname);
-                        if (path)   path.textContent = htmlPath;
+                        if (path)   path.textContent = fname;
                         _jobLog(jobId, line, '#3fb950');
+                        // Fetch and render inline
+                        _renderReportInline(jobId, '/api/agent1/db-report/' + encodeURIComponent(fname));
                     } else {
                         _jobLog(jobId, line);
                     }
