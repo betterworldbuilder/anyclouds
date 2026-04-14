@@ -325,7 +325,7 @@
 
 <!-- ── All 5 stage buttons on one row ───────────────── -->
 <div class="stage-bar" id="stageBar">
-  <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 WHY Move to FLEX<br><small>Business Value</small></button>
+  <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 Why move to FLEX<br><small>Tech stack comparison & Business value</small></button>
   <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customers Log<br><small>Migration Tracker</small></button>
   <button class="stage-btn" data-stage="s1">STAGE 1<br><small>Discovery</small></button>
   <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Migration</small></button>
@@ -381,6 +381,39 @@
           <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0;">
             FLEX supports innovation with community-driven updates, custom networking, and multiple storage options for secure, performant environments. It's positioned as the successor to OSPC, bridging dedicated and multi-tenant clouds for long-term agility.
           </p>
+        </div>
+      </div>
+
+      <!-- OpenStack Component Comparison Table — Professional dark theme -->
+      <div style="margin-top:48px;">
+        <h2 style="color:#e8edf8; font-size:26px; font-weight:700; letter-spacing:-.01em; margin-bottom:4px;">OpenStack Service Compatibility</h2>
+        <p style="color:#7889a8; font-size:13px; margin-bottom:20px; letter-spacing:.01em;">OSPC (2024.2 Dalmatian) versus Rackspace FLEX (2025.1 Epoxy+)</p>
+        <div style="border-radius:14px; overflow:hidden; background:rgba(10,16,36,0.72); border:1px solid rgba(120,150,220,0.18); box-shadow:0 4px 32px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,0.05) inset; backdrop-filter:blur(16px);">
+          <table style="width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed;">
+            <colgroup>
+              <col style="width:13%">
+              <col style="width:15%">
+              <col style="width:7%">
+              <col style="width:7%">
+              <col style="width:13%">
+              <col style="width:14%">
+              <col style="width:17%">
+              <col style="width:14%">
+            </colgroup>
+            <thead>
+              <tr style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(120,150,220,0.2);">
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Service</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Role</th>
+                <th style="padding:12px 16px; text-align:center; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">OSPC</th>
+                <th style="padding:12px 16px; text-align:center; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">FLEX</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">OSPC Ver.</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">FLEX Min Ver.</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">What it does</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Benefit</th>
+              </tr>
+            </thead>
+            <tbody id="compatTbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1951,6 +1984,51 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       });
   }
   loadTracker();
+
+  // ── OpenStack compat matrix ──
+  (function(){
+    const rows = [
+      ["OpenStack","Coordinated OpenStack release","Yes","Yes","2024.2 (Dalmatian)","2025.1 (Epoxy), partial 2025.2 (Flamingo)","Base cloud platform release coordinating core services","Establishes the supported control-plane baseline"],
+      ["Keystone","Identity & Access Control (IAM)","Yes","Yes","26.1.0 (2024.2 / Dalmatian)","29.0.0.dev1 (2025.1 / Epoxy)","Identity, auth, service catalog, API tokens","Central auth for all services"],
+      ["Magnum","Kubernetes Control API / Cluster Orchestrator","Yes (Heat-based)","Yes (CAPI-based)","18.0.0 (2024.2 / Dalmatian)","20.0.0 (2025.1 / Epoxy, 2025.2 / Flamingo)","Creates and manages Kubernetes clusters","Provides managed Kubernetes through OpenStack"],
+      ["Heat","Legacy Orchestration Engine","Yes","Present (legacy for Magnum)","25.0.0 (2024.2 / Dalmatian)","26.0.0 (2025.2 / Flamingo)","Builds infrastructure from templates/stacks","Legacy cluster provisioning path"],
+      ["Barbican","Secrets & Certificate Manager","Yes","Yes (required for Flex Magnum)","20.0.0 (2024.2 / Dalmatian)","21.0.0.dev1 (2025.1 / Epoxy)","Stores secrets and certificates securely","Improves security for cluster/API operations"],
+      ["Octavia","Load Balancer Service","Yes","Yes","12.0.0 (2024.2 / Dalmatian)","13.0.0 (2025.1 / Epoxy)","Provides load balancers","Supports K8s API and ingress/load balancing"],
+      ["Nova","Compute Engine","Yes","Yes","30.2.0 (2024.2 / Dalmatian)","31.0.0.dev1 (2025.1 / Epoxy)","Launches and manages VMs","Core compute layer for cluster nodes"],
+      ["Neutron","Network & Connectivity Engine","Yes","Yes","24.0.0 (2024.2 / Dalmatian)","25.0.0.dev1 (2025.1 / Epoxy)","Manages networks, ports, routers, security groups","Connects cluster nodes and exposes traffic"],
+      ["Glance","Image Repository","Yes","Yes","27.0.0 (2024.2 / Dalmatian)","28.0.0 (2025.1 / Epoxy)","Stores VM images","Provides node images for Kubernetes clusters"],
+      ["Cinder","Block Storage Provider","Yes","Yes","23.0.0 (2024.2 / Dalmatian)","23.0.0 (2024.2 / Dalmatian; Flex may run newer patches)","Provides persistent block storage","Supports stateful workloads"],
+      ["Placement","Resource Allocation / Scheduler Backend","Yes","Yes","9.0.0 (2024.2 / Dalmatian)","10.0.0 (2025.1 / Epoxy)","Tracks resource inventories and allocations","Improves placement and scheduling"],
+      ["RabbitMQ","Message Bus","Underlying infra","Underlying infra","3.12+","3.12+ (platform component)","Messaging backbone between OpenStack services","Reliable async communication"],
+      ["MariaDB / DB backend","Control Plane Database","Underlying infra","Underlying infra","10.11+","10.11+ (platform component)","Stores OpenStack service state/configuration","Persistent control-plane state"],
+      ["Management Kubernetes cluster","CAPI Management Plane","No (classic Heat model)","Yes (required for CAPI)","N/A","v1.30+ (aligned to 2025.1-era Flex K8s stack)","Hosts the CAPI controllers","Enables modern controller-based cluster lifecycle"],
+      ["CAPI controllers / CAPO","Reconciliation Engine","No","Yes","N/A","v1.30+ (CAPI stack)","Reconciles desired state into OpenStack resources","Kubernetes-native provisioning and lifecycle"],
+      ["Helm / Magnum CAPI Helm driver","Deployment Engine for CAPI","No","Yes","N/A","v3.15+ (Flex K8s/Helm layer)","Lets Magnum use Helm/CAPI-based deployment logic","Better integration with modern K8s tooling"],
+      ["cert-manager","Certificate Automation","No","Yes (K8s management layer)","N/A","v1.15+ (Flex K8s management layer)","Automates certificate issuance and rotation","Simplifies TLS lifecycle"],
+    ];
+    const tbody = document.getElementById('compatTbody');
+    if (!tbody) return;
+    const yesbadge = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(52,211,120,.14);color:#34d978;border:1px solid rgba(52,211,120,.32);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.02em;">✓ Yes</span>`;
+    const nobadge  = `<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,90,80,.12);color:#ff7068;border:1px solid rgba(255,90,80,.28);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.02em;">✕ No</span>`;
+    function fmtBadge(v){ return v==='Yes'?yesbadge:v==='No'?nobadge:`<span style="background:rgba(255,185,50,.12);color:#f5a623;border:1px solid rgba(255,185,50,.28);border-radius:5px;padding:3px 8px;font-size:10px;font-weight:500;line-height:1.4;display:inline-block;">${v}</span>`; }
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      const baseBg = i%2===0 ? 'transparent' : 'rgba(255,255,255,0.025)';
+      tr.style.cssText = `background:${baseBg};border-bottom:1px solid rgba(100,130,200,0.12);transition:background .15s;`;
+      tr.onmouseenter = () => tr.style.background = 'rgba(99,155,255,0.09)';
+      tr.onmouseleave = () => tr.style.background = baseBg;
+      tr.innerHTML = `
+        <td style="padding:13px 16px;color:#dce6f8;font-weight:600;font-size:13px;line-height:1.4;word-wrap:break-word;">${r[0]}</td>
+        <td style="padding:13px 16px;color:#8899bb;font-size:12px;line-height:1.4;word-wrap:break-word;">${r[1]}</td>
+        <td style="padding:13px 16px;text-align:center;">${fmtBadge(r[2])}</td>
+        <td style="padding:13px 16px;text-align:center;">${fmtBadge(r[3])}</td>
+        <td style="padding:13px 16px;color:#607090;font-size:11px;line-height:1.5;word-wrap:break-word;">${r[4]}</td>
+        <td style="padding:13px 16px;color:#607090;font-size:11px;line-height:1.5;word-wrap:break-word;">${r[5]}</td>
+        <td style="padding:13px 16px;color:#a8bbd8;font-size:12px;line-height:1.5;word-wrap:break-word;">${r[6]}</td>
+        <td style="padding:13px 16px;color:#34d978;font-size:12px;font-weight:500;line-height:1.5;word-wrap:break-word;">${r[7]}</td>`;
+      tbody.appendChild(tr);
+    });
+  })();
 
   // ── sync top scrollbar with table wrapper ──
   (function() {
