@@ -18,114 +18,206 @@
       flex-direction: column; overflow: hidden;
     }
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
-    @keyframes neon-flicker {
-      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
-        text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 40px #fff,
-          0 0 80px #00f3ff, 0 0 120px #00f3ff, 0 0 160px #00f3ff,
-          0 0 200px #00f3ff;
-        color: #fff;
+    /* ── Real neon tube: title text blinks cyan ── */
+    @keyframes neon-tube-title {
+      0%,17%,19%,100% {
+        color:#fff;
+        text-shadow:0 0 7px #fff,0 0 10px #fff,0 0 21px #fff,
+          0 0 42px #0ff,0 0 82px #0ff,0 0 92px #0ff,0 0 102px #0ff,0 0 151px #0ff;
       }
-      20%, 24%, 55% { text-shadow: none; color: #99ccdd; }
+      18%        { color:rgba(0,210,230,.25); text-shadow:none; }
+      45%,47%,49%,51% {
+        color:#fff;
+        text-shadow:0 0 7px #fff,0 0 10px #fff,0 0 21px #fff,
+          0 0 42px #0ff,0 0 82px #0ff,0 0 92px #0ff,0 0 102px #0ff,0 0 151px #0ff;
+      }
+      46%,50%    { color:rgba(0,210,230,.25); text-shadow:none; }
+      78%,80%    {
+        color:#fff;
+        text-shadow:0 0 7px #fff,0 0 10px #fff,0 0 21px #fff,
+          0 0 42px #0ff,0 0 82px #0ff,0 0 92px #0ff,0 0 102px #0ff,0 0 151px #0ff;
+      }
+      79%        { color:rgba(0,210,230,.15); text-shadow:none; }
     }
-    @keyframes neon-pulse {
-      0%, 100% { opacity: 1; text-shadow: 0 0 10px #ff00ff, 0 0 30px #ff00ff, 0 0 60px #ff00ff, 0 0 100px #ff00ff; }
-      50% { opacity: 0.85; text-shadow: 0 0 5px #ff66ff, 0 0 15px #ff66ff, 0 0 35px #ff66ff; }
+    /* ── accent "TO" — magenta tube blink ── */
+    @keyframes neon-tube-accent {
+      0%,29%,31%,60%,62%,100% {
+        color:#fff;
+        text-shadow:0 0 7px #fff,0 0 10px #fff,0 0 21px #fff,
+          0 0 42px #f0f,0 0 82px #f0f,0 0 92px #f0f,0 0 102px #f0f,0 0 151px #f0f;
+      }
+      30%,61%    { color:rgba(220,0,220,.2); text-shadow:none; }
+    }
+    /* ── pink inner frame blinks ── */
+    @keyframes neon-frame-blink {
+      0%,34%,36%,68%,70%,100% {
+        border-color:#ff2d78;
+        box-shadow:0 0 .2rem #fff,0 0 .4rem #fff,
+          0 0 2rem #ff2d78,0 0 0.8rem #ff2d78,0 0 2.8rem #ff2d78,0 0 5rem #ff2d78,
+          inset 0 0 1.5rem rgba(255,45,120,.15);
+      }
+      35%,69%    { border-color:rgba(255,45,120,.12); box-shadow:none; }
+    }
+    /* ── blue outer frame blinks — offset from pink ── */
+    @keyframes neon-frame-blue {
+      0%,20%,22%,55%,57%,100% {
+        border-color:#00f3ff;
+        box-shadow:0 0 .2rem #fff,0 0 .4rem #fff,
+          0 0 2rem #00f3ff,0 0 0.8rem #00f3ff,0 0 2.8rem #00f3ff,0 0 5rem #00f3ff,
+          inset 0 0 1.5rem rgba(0,243,255,.08);
+      }
+      21%,56%    { border-color:rgba(0,243,255,.1); box-shadow:none; }
     }
     @keyframes scanline {
-      0% { background-position: 0 0; }
+      0%   { background-position: 0 0; }
       100% { background-position: 0 200px; }
     }
     @keyframes ticker-scroll {
       0%   { transform: translateX(100%); }
       100% { transform: translateX(-100%); }
     }
-    @keyframes corner-glow {
-      0%, 100% { opacity: 0.6; } 50% { opacity: 1; }
+    @keyframes open-2424-neon {
+      0%,22%  {opacity:1;color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 20px #00d4ff,0 0 50px #00d4ff,0 0 100px #0088ff88;}
+      23%     {opacity:.06;text-shadow:none;}
+      24%,46% {opacity:1;color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 20px #ff2d9b,0 0 50px #ff2d9b,0 0 100px #ff006688;}
+      47%     {opacity:.06;text-shadow:none;}
+      48%     {opacity:.9;color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 20px #ff2d9b;}
+      49%     {opacity:.06;text-shadow:none;}
+      50%,72% {opacity:1;color:#00ff88;text-shadow:0 0 6px #00ff88,0 0 20px #00ff88,0 0 50px #00ff88,0 0 100px #00ff4488;}
+      73%     {opacity:.06;text-shadow:none;}
+      74%,96% {opacity:1;color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 20px #00d4ff,0 0 50px #00d4ff,0 0 100px #0088ff88;}
+      97%     {opacity:.06;text-shadow:none;}
+      98%     {opacity:.9;color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 14px #00d4ff;}
+      99%     {opacity:.06;text-shadow:none;}
+      100%    {opacity:1;color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 20px #00d4ff,0 0 50px #00d4ff,0 0 100px #0088ff88;}
     }
     header {
-      background: linear-gradient(180deg, #000d1a 0%, #021628 50%, #061e3a 100%);
-      padding: 18px 30px 14px;
+      background: #020408;
+      padding: 22px 30px 16px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      border-bottom: 3px solid #00f3ff;
-      box-shadow: 0 0 40px rgba(0,243,255,0.5), 0 0 80px rgba(0,243,255,0.2), inset 0 -2px 30px rgba(0,243,255,0.15);
+      border-bottom: 1px solid #111;
       position: relative;
       overflow: hidden;
-      min-height: 110px;
     }
-    /* CRT scanlines */
+    /* subtle brick/panel texture */
     header::before {
       content: '';
       position: absolute; inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0,243,255,0.03) 0px, rgba(0,243,255,0.03) 1px,
-        transparent 1px, transparent 5px
-      );
-      pointer-events: none;
-      animation: scanline 6s linear infinite;
-      z-index: 0;
+      background: repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0px,rgba(255,255,255,.012) 1px,transparent 1px,transparent 6px),
+                  repeating-linear-gradient(90deg,rgba(255,255,255,.008) 0px,rgba(255,255,255,.008) 1px,transparent 1px,transparent 40px);
+      pointer-events: none; z-index: 0;
     }
-    /* Corner neon decorators */
-    header::after {
-      content: '◈ ─────────────── ◈';
-      position: absolute;
-      bottom: 38px; left: 50%; transform: translateX(-50%);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 11px;
-      color: rgba(0,243,255,0.3);
-      letter-spacing: 6px;
-      pointer-events: none;
-      z-index: 0;
-    }
+    header::after { content: none; }
     .header-inner { position: relative; z-index: 1; text-align: center; }
+
+    /* ══ BLUE outer neon tube frame ══ */
+    .neon-sign-outer {
+      display: inline-block;
+      padding: 10px 16px;
+      border: 5px solid #00cfff;
+      border-radius: 28px;
+      background: rgba(0,8,20,.9);
+      
+      
+      /* strong tube glow both ways */
+      box-shadow:
+        0 0 5px #fff,
+        0 0 10px #00cfff,
+        0 0 25px #00cfff,
+        0 0 50px #00cfff,
+        0 0 100px rgba(0,207,255,.4),
+        inset 0 0 8px rgba(0,207,255,.15);
+    }
+
+    /* ══ PINK inner neon tube frame ══ */
+    .neon-sign {
+      display: inline-block;
+      padding: 14px 36px 12px;
+      border: 5px solid #ff2d78;
+      border-radius: 16px;
+      background: rgba(0,2,12,.7);
+      
+      box-shadow:
+        0 0 5px #fff,
+        0 0 10px #ff2d78,
+        0 0 25px #ff2d78,
+        0 0 50px #ff2d78,
+        0 0 90px rgba(255,45,120,.4),
+        inset 0 0 10px rgba(255,45,120,.12);
+    }
+    .neon-sign::before, .neon-sign::after { content: none; }
+
     header h1 {
       font-family: 'Orbitron', monospace;
-      font-size: clamp(28px, 4vw, 52px);
+      font-size: clamp(18px, 2.8vw, 42px);
       font-weight: 900;
-      letter-spacing: clamp(3px, 0.6vw, 10px);
+      letter-spacing: clamp(2px, 0.5vw, 8px);
       text-transform: uppercase;
-      color: #00f3ff;
-      animation: neon-flicker 6s infinite alternate;
-      line-height: 1.1;
-      margin: 0;
-      white-space: nowrap;
+      color: #fff;
+      text-shadow:
+        0 0 4px #fff,
+        0 0 8px #fff,
+        0 0 18px #0ff,
+        0 0 38px #0ff,
+        0 0 70px #0ff,
+        0 0 100px rgba(0,255,255,.5),
+        0 0 140px rgba(0,255,255,.3);
+      animation: neon-tube-title 5s linear infinite;
+      line-height: 1.2; margin: 0; white-space: nowrap;
     }
     header h1 .shield {
-      margin-right: 10px;
-      font-size: 1em;
-      filter: drop-shadow(0 0 12px #00f3ff) drop-shadow(0 0 24px #00f3ff);
+      margin-right: 8px; font-size: .85em;
+      filter: drop-shadow(0 0 8px #0ff) drop-shadow(0 0 22px #0ff);
     }
     header h1 .accent {
-      color: #ff00ff;
-      animation: neon-pulse 2s ease-in-out infinite;
+      color: #fff;
+      text-shadow:
+        0 0 4px #fff, 0 0 8px #fff, 0 0 18px #f0f,
+        0 0 38px #f0f, 0 0 70px #f0f,
+        0 0 100px rgba(255,0,255,.5);
+      animation: neon-tube-accent 4s linear infinite;
       font-style: italic;
     }
-    /* Scrolling ticker subtitle */
+    /* Scrolling ticker */
     .header-ticker-wrap {
       position: relative;
       z-index: 1;
       width: 100%;
       overflow: hidden;
-      margin-top: 8px;
-      border-top: 1px solid rgba(0,243,255,0.2);
-      border-bottom: 1px solid rgba(0,243,255,0.2);
-      padding: 4px 0;
+      margin-top: 10px;
+      border-top: 2px solid rgba(0,255,100,.25);
+      border-bottom: 2px solid rgba(0,255,100,.25);
+      padding: 8px 0;
+      background: rgba(0,255,80,.04);
+      box-shadow: 0 0 18px rgba(0,255,80,.12), inset 0 0 12px rgba(0,255,80,.06);
     }
     .header-ticker {
       display: inline-block;
       white-space: nowrap;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: clamp(10px, 1.1vw, 13px);
-      color: #7ecfff;
-      letter-spacing: 1px;
-      text-shadow: 0 0 8px rgba(0,243,255,0.7);
-      animation: ticker-scroll 40s linear infinite;
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(13px, 1.4vw, 18px);
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #00ff55;
+      text-shadow:
+        0 0 4px #00ff55,
+        0 0 12px #00ff55,
+        0 0 28px #00ff55,
+        0 0 55px rgba(0,255,80,.6);
+      animation: ticker-scroll 55s linear infinite;
+      animation-delay: -20s;
     }
-    .header-ticker .sep { color: #ff00ff; margin: 0 16px; opacity: 0.8; }
+    .header-ticker .sep {
+      color: #00ffaa;
+      text-shadow: 0 0 8px #00ffaa, 0 0 20px #00ffaa;
+      margin: 0 20px;
+      opacity: 1;
+    }
 
     /* Stage row */
     .stage-bar {
@@ -178,7 +270,7 @@
 
     /* Panel area */
     .panel-area { flex: 1; overflow: hidden; position: relative; }
-    .panel { display: none; width: 100%; height: 100%; overflow-y: auto; }
+    .panel { display: none; width: 100%; height: 100%; }
     .panel.active { display: block; }
     iframe { width: 100%; height: 100%; border: none; background: transparent; }
 
@@ -200,7 +292,11 @@
 
 <header>
   <div class="header-inner">
-    <h1><span class="shield">🛡</span> OSPC <span class="accent">TO</span> FLEX MIGRATION FULL CYCLE MISSION CONTROL – <span style="font-style:italic;">OPEN 24/24</span></h1>
+    <div class="neon-sign-outer">
+      <div class="neon-sign">
+        <h1><span class="shield">🛡</span> OSPC <span class="accent">TO</span> FLEX MIGRATION FULL CYCLE CONTROL TOWER – <span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
+      </div>
+    </div>
   </div>
   <div class="header-ticker-wrap">
     <span class="header-ticker">
@@ -215,6 +311,8 @@
       VM Shift and Lift
       <span class="sep">◈</span>
       System Data Transfer
+      <span class="sep">◈</span>
+      DB HA &amp; DBaaS Migration
       <span class="sep">◈</span>
       A/B Migration Strategy
       <span class="sep">◈</span>
@@ -249,9 +347,9 @@
 <div class="sub-bar" id="subBar2">
   <button class="sub-btn active" data-sub="s2image">🚀 Option 1: Direct Shift and Lift of VM OSPC 2 FLEX</button>
   <button class="sub-btn" data-sub="s2rehost_p1">🛠 Option 2: REHOST / Phase 1: OSPC 2FLEX infra cloning</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Phase 2 : Apps Servers and DB Replication</button>
-  <button class="sub-btn" data-sub="s2rehost_manual">📋 Apps Server Replication Full Manual</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ Phase 3 : Kubernetes Replication Manuel / Auto mode</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Apps Servers and DB Replication</button>
+  <button class="sub-btn" data-sub="s2rehost_manual">📋 REHOST option 3 Data migration full manual mode</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ Kubernetes migration options</button>
 </div>
 
 <!-- ── Panels ─────────────────────────────────────────── -->
@@ -332,7 +430,11 @@
         <input type="text" id="trackerSearch" placeholder="🔍 Search backlog by customer, status, readiness..." style="width:100%; max-width:400px; padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#fff; font-size:14px; outline:none;" />
       </div>
 
-      <div style="width:100%; overflow-x:auto; margin-top:20px; background:rgba(0,0,0,0.2); border-radius:8px; border: 2px solid #00f3ff; box-shadow: 0 0 15px rgba(0,243,255,0.4), inset 0 0 10px rgba(0,243,255,0.2);">
+      <!-- top scrollbar mirror -->
+      <div id="trackerTopScroll" style="width:100%;overflow-x:auto;overflow-y:hidden;margin-top:20px;height:14px;">
+        <div id="trackerTopScrollInner" style="height:1px;"></div>
+      </div>
+      <div id="trackerScrollWrap" style="width:100%; overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:8px; border: 2px solid #00f3ff; box-shadow: 0 0 15px rgba(0,243,255,0.4), inset 0 0 10px rgba(0,243,255,0.2);">
         <table style="width:100%; border-collapse:collapse; white-space:nowrap;" id="trackerTable">
         <thead>
           <tr>
@@ -1849,6 +1951,22 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       });
   }
   loadTracker();
+
+  // ── sync top scrollbar with table wrapper ──
+  (function() {
+    const top  = document.getElementById('trackerTopScroll');
+    const wrap = document.getElementById('trackerScrollWrap');
+    const inner = document.getElementById('trackerTopScrollInner');
+    function syncInnerWidth() {
+      inner.style.width = wrap.scrollWidth + 'px';
+    }
+    // sync widths after table renders
+    const obs = new MutationObserver(syncInnerWidth);
+    obs.observe(document.getElementById('trackerBody'), { childList: true, subtree: true });
+    syncInnerWidth();
+    top.addEventListener('scroll',  () => { wrap.scrollLeft = top.scrollLeft; });
+    wrap.addEventListener('scroll', () => { top.scrollLeft  = wrap.scrollLeft; });
+  })();
 
   let uploadMode = "append";
   window.markEdits = function() {

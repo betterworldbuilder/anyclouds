@@ -3,48 +3,79 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OSPC TO FLEX MIGRATION MISSION CONTROL</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>OSPC TO FLEX MIGRATION CONTROL TOWER</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ v }}" />
   <style>
-    @keyframes neon-blink {
-      0%,100%{opacity:1;} 48%{opacity:1;} 50%{opacity:0.15;} 52%{opacity:1;}
+    /* ── neon dot pulse ── */
+    @keyframes dot-pulse {
+      0%,100%{box-shadow:0 0 6px #00ff88,0 0 14px #00ff88;}
+      50%    {box-shadow:0 0 2px #00ff88,0 0 4px #00ff88;}
     }
+    /* ── neon pink flicker (OPEN) — erratic real-neon feel ── */
+    @keyframes pink-flicker {
+      0%          {opacity:1;   color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 18px #ff2d9b,0 0 40px #ff2d9b,0 0 80px #ff006688;}
+      4%          {opacity:0.08;text-shadow:none;}
+      5%          {opacity:1;   color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 18px #ff2d9b,0 0 40px #ff2d9b;}
+      30%         {opacity:1;   color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 18px #ff2d9b,0 0 40px #ff2d9b,0 0 80px #ff006688;}
+      31%         {opacity:0.05;text-shadow:none;}
+      32%         {opacity:0.9; color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 18px #ff2d9b;}
+      33%         {opacity:0.05;text-shadow:none;}
+      34%         {opacity:1;   color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 18px #ff2d9b,0 0 40px #ff2d9b,0 0 80px #ff006688;}
+      100%        {opacity:1;   color:#ff2d9b;text-shadow:0 0 6px #ff2d9b,0 0 18px #ff2d9b,0 0 40px #ff2d9b,0 0 80px #ff006688;}
+    }
+    /* ── neon blue flicker (24/24) — offset cycle ── */
+    @keyframes blue-flicker {
+      0%          {opacity:1;   color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 18px #00d4ff,0 0 40px #00d4ff,0 0 80px #0088ff88;}
+      15%         {opacity:0.07;text-shadow:none;}
+      16%         {opacity:1;   color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 18px #00d4ff,0 0 40px #00d4ff;}
+      60%         {opacity:1;   color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 18px #00d4ff,0 0 40px #00d4ff,0 0 80px #0088ff88;}
+      61%         {opacity:0.05;text-shadow:none;}
+      62%         {opacity:0.85;color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 14px #00d4ff;}
+      63%         {opacity:0.05;text-shadow:none;}
+      64%         {opacity:1;   color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 18px #00d4ff,0 0 40px #00d4ff,0 0 80px #0088ff88;}
+      100%        {opacity:1;   color:#00d4ff;text-shadow:0 0 6px #00d4ff,0 0 18px #00d4ff,0 0 40px #00d4ff,0 0 80px #0088ff88;}
+    }
+    /* ── subtitle cycles blue → orange → green ── */
     @keyframes neon-cycle {
-      0%  {color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff,0 0 40px #00d4ff;}
-      33% {color:#ff6a00;text-shadow:0 0 8px #ff6a00,0 0 20px #ff6a00,0 0 40px #ff6a00;}
-      66% {color:#00ff88;text-shadow:0 0 8px #00ff88,0 0 20px #00ff88,0 0 40px #00ff88;}
-      100%{color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff,0 0 40px #00d4ff;}
+      0%  {color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 22px #00d4ff,0 0 50px #00d4ff;}
+      30% {color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 22px #00d4ff,0 0 50px #00d4ff;}
+      40% {color:#ff6a00;text-shadow:0 0 8px #ff6a00,0 0 22px #ff6a00,0 0 50px #ff6a00;}
+      65% {color:#ff6a00;text-shadow:0 0 8px #ff6a00,0 0 22px #ff6a00,0 0 50px #ff6a00;}
+      75% {color:#00ff88;text-shadow:0 0 8px #00ff88,0 0 22px #00ff88,0 0 50px #00ff88;}
+      95% {color:#00ff88;text-shadow:0 0 8px #00ff88,0 0 22px #00ff88,0 0 50px #00ff88;}
+      100%{color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 22px #00d4ff,0 0 50px #00d4ff;}
     }
-    @keyframes pink-blink {
-      0%,45%,55%,100%{opacity:1;color:#ff2d9b;text-shadow:0 0 8px #ff2d9b,0 0 20px #ff2d9b,0 0 50px #ff2d9b;}
-      50%            {opacity:0.1;text-shadow:none;}
-    }
-    @keyframes blue-blink {
-      0%,45%,55%,100%{opacity:1;color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff,0 0 50px #00d4ff;}
-      50%            {opacity:0.1;text-shadow:none;}
-    }
-    .mc-header{background:#050810;border-bottom:1px solid rgba(0,212,255,.15);padding:18px 28px 14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
-    .mc-title{font-family:'Courier New',monospace;font-size:1.35rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#e2e8f0;}
-    .mc-open{font-family:'Courier New',monospace;font-size:0.78rem;font-weight:900;letter-spacing:.18em;animation:pink-blink 1.6s infinite, blue-blink 1.6s 0.8s infinite;margin-left:4px;}
-    .mc-open-pink{animation:pink-blink 1.8s infinite;}
-    .mc-open-blue{animation:blue-blink 1.8s 0.9s infinite;}
-    .mc-subtitle{font-family:'Courier New',monospace;font-size:0.82rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;animation:neon-cycle 3s linear infinite;}
-    .mc-dot{width:8px;height:8px;border-radius:50%;background:#00ff88;box-shadow:0 0 6px #00ff88,0 0 12px #00ff88;animation:neon-blink 2s infinite;flex-shrink:0;}
   </style>
 </head>
 <body>
-  <header style="padding:0;margin:0;">
-    <div class="mc-header">
-      <div class="mc-dot"></div>
-      <span class="mc-title">OSPC TO FLEX MIGRATION MISSION CONTROL</span>
-      <span style="display:inline-flex;align-items:center;gap:5px;font-family:'Courier New',monospace;font-size:0.75rem;font-weight:900;letter-spacing:.15em;">
-        <span class="mc-open-pink" style="color:#ff2d9b;text-shadow:0 0 8px #ff2d9b,0 0 20px #ff2d9b;">OPEN</span>
-        <span style="color:#475569;font-size:0.7rem;">|</span>
-        <span class="mc-open-blue" style="color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff;">24/24</span>
+  <!-- ── CONTROL TOWER HEADER ─────────────────────────────────────────── -->
+  <div id="mc-header" style="background:#04060f!important;border-bottom:2px solid rgba(0,212,255,.13);padding:14px 28px 10px;display:block!important;width:100%;box-sizing:border-box;">
+
+    <!-- Row 1: dot + main title + OPEN 24/24 -->
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:nowrap;white-space:nowrap;margin-bottom:6px;">
+      <!-- pulsing green dot -->
+      <div style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:#00ff88;box-shadow:0 0 8px #00ff88,0 0 18px #00ff88;animation:dot-pulse 1.4s ease-in-out infinite;"></div>
+
+      <!-- main title — white monospace -->
+      <span style="font-family:'Courier New',monospace;font-size:1.25rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#e2e8f0;white-space:nowrap;">OSPC TO FLEX MIGRATION CONTROL TOWER</span>
+
+      <!-- OPEN | 24/24 neon blinkers -->
+      <span style="display:inline-flex;align-items:center;gap:6px;flex-shrink:0;margin-left:4px;">
+        <span style="font-family:'Courier New',monospace;font-size:0.8rem;font-weight:900;letter-spacing:.2em;animation:pink-flicker 2.5s infinite;">OPEN</span>
+        <span style="color:#1e293b;font-size:0.85rem;">|</span>
+        <span style="font-family:'Courier New',monospace;font-size:0.8rem;font-weight:900;letter-spacing:.2em;animation:blue-flicker 3.1s 0.4s infinite;">24/24</span>
       </span>
-      <span style="margin-left:8px;" class="mc-subtitle">FLEX MIGRATION FULL CYCLE MISSION CONTROL</span>
     </div>
-  </header>
+
+    <!-- Row 2: cycling subtitle -->
+    <div style="padding-left:23px;">
+      <span style="font-family:'Courier New',monospace;font-size:0.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;animation:neon-cycle 4s ease-in-out infinite;display:inline-block;">FLEX MIGRATION FULL CYCLE CONTROL TOWER</span>
+    </div>
+
+  </div>
 
   <main>
 

@@ -46,6 +46,21 @@ if _pycache.exists():
     try: _shutil.rmtree(str(_pycache))
     except: pass
 print("[STARTUP] Template cache flushed — serving fresh templates from disk.")
+
+# ── Global no-cache headers on every HTML response ───────────────────────────
+@app.after_request
+def add_no_cache_headers(response):
+    if "text/html" in response.content_type:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+# ── Cache-bust version tag (timestamp at startup) ────────────────────────────
+import time as _time
+_CACHE_BUST = str(int(_time.time()))
+app.jinja_env.globals["v"] = _CACHE_BUST
+print(f"[STARTUP] Cache-bust token: v={_CACHE_BUST}")
 # ─────────────────────────────────────────────────────────────────────────────
 NODE_TYPES = {"network", "subnet", "router", "security_group", "instance", "volume", "load_balancer"}
 ALLOWED_EDGE_PAIRS = {
@@ -2457,11 +2472,44 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
 
 # CRM Tracker Global State
 ACTIVE_CUSTOMER_ID = None
-TRACKER_DB = BASE_DIR / "data" / "migration_tracker_db.csv"
+TRACKER_DB      = BASE_DIR / "data" / "migration_tracker_db.csv"
+BACKLOG_TEMPLATE = BASE_DIR / "data" / "backlog_template.xlsx"
 TRACKER_DB.parent.mkdir(exist_ok=True)
 
+def _xlsx_to_tracker_csv(xlsx_path: Path, csv_path: Path):
+    """Read backlog template xlsx and write all rows to tracker CSV."""
+    import openpyxl, datetime as _dt
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    ws = wb.active
+    headers = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+    headers = [str(h).strip() if h else f"col_{c}" for c, h in enumerate(headers, 1)]
+    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=headers)
+        writer.writeheader()
+        for r in range(2, ws.max_row + 1):
+            row = {}
+            has_data = False
+            for c, h in enumerate(headers, 1):
+                v = ws.cell(r, c).value
+                if isinstance(v, _dt.datetime):
+                    v = v.strftime("%Y-%m-%d")
+                row[h] = v if v is not None else ""
+                if v:
+                    has_data = True
+            if has_data:
+                writer.writerow(row)
+    print(f"[BACKLOG] Loaded template → {csv_path.name} ({ws.max_row - 1} rows)")
+
 def init_tracker_db():
-    if not TRACKER_DB.exists():
+    """Initialize tracker DB — load from template if DB is empty or missing."""
+    if not TRACKER_DB.exists() or TRACKER_DB.stat().st_size < 10:
+        if BACKLOG_TEMPLATE.exists():
+            try:
+                _xlsx_to_tracker_csv(BACKLOG_TEMPLATE, TRACKER_DB)
+                return
+            except Exception as e:
+                print(f"[BACKLOG] Template load failed: {e}")
+        # fallback: empty CSV with base columns
         with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -2486,7 +2534,15 @@ def run_ui():
 
 @app.get("/migrate/")
 def migrate_ui():
-    return render_template("migrate.html")
+    from flask import make_response, request, redirect
+    # Force cache-bust: if no matching v param, redirect to versioned URL
+    if request.args.get("v") != _CACHE_BUST:
+        return redirect(f"/migrate/?v={_CACHE_BUST}", code=302)
+    resp = make_response(render_template("migrate.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.get("/designer/")
