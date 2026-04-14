@@ -62,6 +62,37 @@ DEPLOY_JOBS: Dict[str, Dict[str, Any]] = {}
 DEPLOY_JOBS_LOCK = threading.Lock()
 MAX_DEPLOY_JOBS = 30
 
+# ── Parallel migration job tracker (server + DB) ──────────────────────────────
+import queue as _queue_mod
+MIGRATION_JOBS: Dict[str, Dict[str, Any]] = {}
+MIGRATION_JOBS_LOCK = threading.Lock()
+
+
+def _mig_job_create(job_id: str, label: str, job_type: str, script_path: str) -> None:
+    with MIGRATION_JOBS_LOCK:
+        MIGRATION_JOBS[job_id] = {
+            'id': job_id,
+            'label': label,
+            'type': job_type,           # 'server' | 'db'
+            'status': 'running',
+            'script_path': script_path,
+            'proc': None,
+            'queue': _queue_mod.SimpleQueue(),
+            'started_at': datetime.utcnow().isoformat(),
+            'finished_at': None,
+            'return_code': None,
+        }
+
+
+def _mig_job_finish(job_id: str, rc: int) -> None:
+    with MIGRATION_JOBS_LOCK:
+        if job_id in MIGRATION_JOBS:
+            j = MIGRATION_JOBS[job_id]
+            j['status'] = 'completed' if rc == 0 else ('stopped' if rc == -1 else 'failed')
+            j['return_code'] = rc
+            j['finished_at'] = datetime.utcnow().isoformat()
+            j['proc'] = None
+
 
 def list_workspace_files() -> List[str]:
     out: List[str] = []
@@ -5367,6 +5398,118 @@ def agent1_run_deep_scan():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
+# ── Parallel Job Endpoints ────────────────────────────────────────────────────
+
+@app.post("/api/agent1/jobs/launch")
+def agent1_jobs_launch():
+    """Launch a server or DB migration job. Returns job_id immediately."""
+    label      = request.headers.get('X-Job-Label', 'Migration')
+    job_type   = request.headers.get('X-Job-Type', 'server')   # 'server' | 'db'
+    script_data = request.data.decode('utf-8')
+    job_id     = uuid4().hex
+    script_path = f'/tmp/mig_job_{job_id}.sh'
+
+    with open(script_path, 'w') as f:
+        f.write(script_data)
+    os.chmod(script_path, 0o755)
+
+    _mig_job_create(job_id, label, job_type, script_path)
+
+    def run_job():
+        proc = subprocess.Popen(
+            ['bash', script_path],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+            preexec_fn=os.setsid,
+        )
+        q = None
+        with MIGRATION_JOBS_LOCK:
+            if job_id in MIGRATION_JOBS:
+                MIGRATION_JOBS[job_id]['proc'] = proc
+                q = MIGRATION_JOBS[job_id]['queue']
+        if q is None:
+            try: proc.kill()
+            except: pass
+            return
+        for line in iter(proc.stdout.readline, ''):
+            if line:
+                q.put(line)
+        rc = proc.wait()
+        _mig_job_finish(job_id, rc)
+        q.put(None)   # sentinel — unblocks stream endpoint
+
+    threading.Thread(target=run_job, daemon=True, name=f'mig-{job_id[:8]}').start()
+    return jsonify({'job_id': job_id, 'label': label, 'type': job_type})
+
+
+@app.get("/api/agent1/jobs/<job_id>/stream")
+def agent1_jobs_stream(job_id: str):
+    """Stream live stdout for a running migration job."""
+    import time as _time
+    for _ in range(50):   # wait up to 5 s for thread to register the job
+        with MIGRATION_JOBS_LOCK:
+            if job_id in MIGRATION_JOBS:
+                break
+        _time.sleep(0.1)
+    else:
+        return 'Job not found', 404
+
+    with MIGRATION_JOBS_LOCK:
+        q = MIGRATION_JOBS[job_id].get('queue')
+    if q is None:
+        return 'Job queue missing', 500
+
+    def generate():
+        while True:
+            item = q.get()      # blocks until next line arrives or sentinel
+            if item is None:
+                rc = MIGRATION_JOBS.get(job_id, {}).get('return_code', 0)
+                yield f'[JOB_DONE] exit={rc}\n'
+                break
+            yield item
+
+    return Response(stream_with_context(generate()), mimetype='text/plain')
+
+
+@app.post("/api/agent1/jobs/<job_id>/stop")
+def agent1_jobs_stop(job_id: str):
+    """Kill a specific migration job."""
+    import signal as _signal
+    with MIGRATION_JOBS_LOCK:
+        job = MIGRATION_JOBS.get(job_id)
+    if not job:
+        return jsonify({'status': 'not_found'}), 404
+    proc = job.get('proc')
+    if proc:
+        try:
+            os.killpg(os.getpgid(proc.pid), _signal.SIGKILL)
+        except Exception:
+            pass
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    q = job.get('queue')
+    if q:
+        try: q.put(None)    # unblock stream endpoint
+        except: pass
+    _mig_job_finish(job_id, -1)
+    return jsonify({'status': 'stopped', 'job_id': job_id})
+
+
+@app.get("/api/agent1/jobs")
+def agent1_jobs_list():
+    """List all migration jobs (running and recently finished)."""
+    with MIGRATION_JOBS_LOCK:
+        jobs = [
+            {k: v for k, v in j.items() if k not in ('proc', 'queue')}
+            for j in MIGRATION_JOBS.values()
+        ]
+    jobs.sort(key=lambda j: j.get('started_at', ''), reverse=True)
+    return jsonify(jobs)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 _migration_process = None  # module-level handle so stop endpoint can kill it
 
 @app.post("/api/agent1/run/migration")

@@ -1,0 +1,6 @@
+# Runtime dependencies
+ruamel.yaml>=0.17.21        # Preferred YAML backend (preserves comments/quotes)
+pyyaml>=6.0                 # Fallback YAML backend
+
+# Dev / test dependencies (install with: pip install -r requirements.txt -r requirements-dev.txt)
+# See requirements-dev.txt

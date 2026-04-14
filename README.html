@@ -82,6 +82,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
 <a href="#comprehensive-verification-phase--all-four-scenarios" class="nav-l3" data-id="comprehensive-verification-phase--all-four-scenarios">► Comprehensive Verification Phase (all four scenarios)</a>
 <a href="#html-comparison-report" class="nav-l3" data-id="html-comparison-report">► HTML Comparison Report</a>
 <a href="#parallel-execution-engine" class="nav-l3" data-id="parallel-execution-engine">► Parallel Execution Engine</a>
+<a href="#method-1--full-manual-mode" class="nav-l3" data-id="method-1--full-manual-mode">K8s Method 1 — Manual Runbook</a>
+<a href="#method-2--automated-deployment" class="nav-l3" data-id="method-2--automated-deployment">K8s Method 2 — Genestack / OpenCenter</a>
+<a href="#method-3--ospc-k8--flex-magnum" class="nav-l3" data-id="method-3--ospc-k8--flex-magnum">K8s Method 3 — Flex Magnum (8-stage)</a>
 <a href="#stage-3-validation-uat" class="nav-l3" data-id="stage-3-validation-uat">Stage 3 — Validation &amp; UAT</a>
 <a href="#stage-4-cutover-handover" class="nav-l3" data-id="stage-4-cutover-handover">Stage 4 — Cutover &amp; Handover</a>
 <a href="#stage-5-post-migration" class="nav-l3" data-id="stage-5-post-migration">Stage 5 — Post-Migration</a>
@@ -114,6 +117,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
   <img src="https://img.shields.io/badge/Live_Streaming-SSE-a855f7?style=flat-square" alt="SSE">
   <img src="https://img.shields.io/badge/No_DB-CSV_%2B_localStorage-3b82f6?style=flat-square" alt="No DB">
   <img src="https://img.shields.io/badge/Genestack-K8s_Integration-0ea5e9?style=flat-square" alt="Genestack">
+  <img src="https://img.shields.io/badge/K8s_Migration_Methods-3-fb923c?style=flat-square" alt="K8s Methods">
+  <img src="https://img.shields.io/badge/Magnum_Pipeline_Stages-8-ef4444?style=flat-square" alt="Magnum Stages">
 </p>
 
 <br>
@@ -141,7 +146,13 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,B
 <li><a href="#ospc2flex--ha-dbaas-ospc-ha-vip--flex-ha-pair">HA DBaaS — FLEX HA pair</a></li>
 <li><a href="#comprehensive-verification-phase-all-four-scenarios">Comprehensive Verification Phase</a></li>
 <li><a href="#html-comparison-report-1">HTML Comparison Report</a></li>
-<li><a href="#option-2-phase-3-kubernetes-replication-manual--auto">Option 2 Phase 3: Kubernetes Replication Manual / Auto</a></li>
+<li><a href="#option-2-phase-3-kubernetes-replication-manual--auto">Option 2 Phase 3: Kubernetes Replication Manual / Auto</a>
+<ul>
+<li><a href="#method-1--full-manual-mode">Method 1: Full Manual Runbook</a></li>
+<li><a href="#method-2--automated-deployment">Method 2: Automated — Genestack / Kubespray or OpenCenter</a></li>
+<li><a href="#method-3--ospc-k8--flex-magnum">Method 3: OSPC K8 → Flex Magnum (8-Stage SSH Migration)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#stage-3--validation--uat">Stage 3 — Validation &amp; UAT</a></li>
@@ -1336,7 +1347,9 @@ OSPC seeds FLEX primary, then FLEX builds its own internal HA pair. No ongoing c
 </table></div>
 <p>Lifecycle cards filter the action table by phase group. Each stage has an expandable terminal log panel and file collection tracker. A progress bar tracks overall completion.</p>
 <hr />
-<p><strong>Method 2 — Automated Deployment: Genestack / Kubespray  ·or·  OpenCenter</strong></p>
+<p id="method-1--full-manual-mode"><strong>Method 1 — Full Manual Mode</strong> — step-by-step runbook with live command execution per stage (see table above).</p>
+<hr />
+<p id="method-2--automated-deployment"><strong>Method 2 — Automated Deployment: Genestack / Kubespray  ·or·  OpenCenter</strong></p>
 <p>Two deployment engines are available as selectable tabs. Both are fully driven from the browser via SSE-streaming Run buttons.</p>
 <div class="table-wrap"><table>
 <thead>
@@ -1348,7 +1361,7 @@ OSPC seeds FLEX primary, then FLEX builds its own internal HA pair. No ongoing c
 <tbody>
 <tr>
 <td>Engine tabs</td>
-<td>Switch between 🟩 Genestack / Kubespray and 🔵 OpenCenter in one click</td>
+<td>Switch between 🟩 Genestack / Kubespray, 🔵 OpenCenter, and 🔴 OSPC K8 → Flex Magnum in one click</td>
 </tr>
 <tr>
 <td>Command table</td>
@@ -1359,8 +1372,8 @@ OSPC seeds FLEX primary, then FLEX builds its own internal HA pair. No ongoing c
 <td>Each row executes via SSE streaming, auto-marks row status on completion</td>
 </tr>
 <tr>
-<td>IP injection</td>
-<td>Genestack host + jump host IPs auto-fill all command templates</td>
+<td><strong>Live IP injection</strong></td>
+<td>Collected OSPC IPs (masters, workers, genestack host, jump host) auto-populate <strong>all</strong> Genestack and OpenCenter command templates when "Apply IPs to all rows" is clicked</td>
 </tr>
 <tr>
 <td>OSPC → Genestack mapping table</td>
@@ -1534,6 +1547,82 @@ OSPC seeds FLEX primary, then FLEX builds its own internal HA pair. No ongoing c
 <blockquote>
 <p><strong>Rule of thumb:</strong> Use <strong>Genestack</strong> when you need node-level control and exact OSPC parity. Use <strong>OpenCenter</strong> when you want a production-grade cluster running in under an hour with GitOps from day one.</p>
 </blockquote>
+<hr />
+<h4 id="method-3--ospc-k8--flex-magnum">Method 3 — OSPC K8 → Flex Magnum (8-Stage SSH Migration)</h4>
+<p>Production-grade toolkit for migrating existing Kubernetes workloads from an <strong>OSPC bare-metal cluster</strong> to a new <strong>Rackspace Flex Magnum</strong> (OpenStack-managed) cluster. Lives in <code>ospc2flex-k8-migration/ospc-to-flex-k8-migrator/</code>.</p>
+<blockquote><p><strong>Core rule:</strong> do not import the old OSPC control plane into Magnum. Magnum creates a brand-new cluster. This toolkit exports, transforms, and re-applies all workloads onto the new cluster.</p></blockquote>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Stage</th><th>Name</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Export (SSH remote master)</td><td>All <code>kubectl</code>/<code>helm</code> run ON the OSPC master via SSH; results copied back via <code>scp</code> → <code>output/&lt;ts&gt;/export/</code></td></tr>
+<tr><td>2</td><td>Create Flex Magnum cluster</td><td><code>openstack coe cluster create</code> — poll until <code>CREATE_COMPLETE</code>, download kubeconfig, verify nodes</td></tr>
+<tr><td>3</td><td>Transform manifests</td><td>storageClass remap · ingress class · service annotations · endpoint/FQDN substitution · node-selector strip · secret exclusion · metadata strip</td></tr>
+<tr><td>4</td><td>Restore workloads (phased)</td><td>Always dry-run first. Order: CRDs → NS → RBAC → ConfigMaps → Secrets → Storage → Services → Deployments → StatefulSets → DaemonSets → Ingresses → Policy → Helm</td></tr>
+<tr><td>5</td><td>Data restore (DB + PVC)</td><td><code>scripts/restore_db.sh</code> (MySQL/PostgreSQL — no hardcoded creds) · <code>pvc_restore_helper.pod.yaml</code> · rsync via port-forward for large datasets</td></tr>
+<tr><td>6</td><td>Validate + smoke tests</td><td>Python CLI structured checks → <code>validation-report.json</code> + <code>validation-summary.txt</code>. Non-zero exit on failure. Optional HTTP health checks.</td></tr>
+<tr><td>7</td><td>Cutover (DNS/LB switch)</td><td>Maintenance checklist · final DB delta sync (<code>delta_sync.sh</code>) · DNS/LB update · record <code>cutover-record.json</code> + timestamp</td></tr>
+<tr><td>8</td><td>Rollback plan</td><td>Tracks 6 migration states · generates <code>rollback-plan.json</code> with exact commands · <code>rollback_helper.sh</code> executes if triggered</td></tr>
+</tbody>
+</table></div>
+
+<p><strong>Stage 1 — SSH remote master mode (mandatory):</strong></p>
+<pre><code>export OSPC_MASTER_IP=10.1.2.3
+export SSH_USER=centos
+export SSH_KEY_PATH=~/.ssh/id_rsa
+
+python -m ospc_to_flex_k8.cli export \
+  --master-ip  $OSPC_MASTER_IP \
+  --ssh-user   $SSH_USER \
+  --ssh-key    $SSH_KEY_PATH \
+  --output-dir ./output
+</code></pre>
+
+<p><strong>Migration states tracked:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>State</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>rehearsal</code></td><td>Dry-run / test migration — no production impact</td></tr>
+<tr><td><code>pre-cutover</code></td><td>Flex cluster ready, OSPC still primary</td></tr>
+<tr><td><code>cutover-started</code></td><td>Traffic switch in progress</td></tr>
+<tr><td><code>cutover-complete</code></td><td>Flex is primary, OSPC kept as safety net</td></tr>
+<tr><td><code>rollback-triggered</code></td><td>Decision made to revert to OSPC</td></tr>
+<tr><td><code>rollback-complete</code></td><td>OSPC is primary again, Flex traffic drained</td></tr>
+</tbody>
+</table></div>
+
+<p><strong>Transform operations (Stage 3):</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>Transform</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>storageClassName</code></td><td>Remapped per <code>storage-map.yaml</code></td></tr>
+<tr><td>2</td><td>Ingress class</td><td>Annotation + <code>ingressClassName</code> remapped per <code>ingress-map.yaml</code></td></tr>
+<tr><td>3</td><td>Service annotations</td><td>LoadBalancer → Flex Octavia annotations</td></tr>
+<tr><td>4</td><td>Endpoint / FQDN</td><td>String substitution per <code>endpoint-map.yaml</code></td></tr>
+<tr><td>5</td><td>nodeSelector / affinity / tolerations</td><td>Node-specific fields stripped</td></tr>
+<tr><td>6</td><td>Namespace filter</td><td>Only <code>include_namespaces</code> from migration plan</td></tr>
+<tr><td>7</td><td>Secret exclusion</td><td>Source-cluster SA tokens and listed names excluded</td></tr>
+<tr><td>8</td><td>Metadata strip</td><td><code>uid</code>, <code>resourceVersion</code>, <code>generation</code>, <code>managedFields</code>, <code>status</code> removed</td></tr>
+<tr><td>9</td><td>RWX PVC flag</td><td><code>ReadWriteMany</code> flagged in <code>transform-report.json</code> for manual review</td></tr>
+</tbody>
+</table></div>
+
+<p><strong>Python CLI commands:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Command</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>export</code></td><td>SSH to OSPC master, run full cluster export, scp back</td></tr>
+<tr><td><code>plan</code></td><td>Display migration plan as JSON</td></tr>
+<tr><td><code>transform</code></td><td>Transform exported manifests for Flex compatibility</td></tr>
+<tr><td><code>create-target</code></td><td>Create Flex Magnum cluster via OpenStack API</td></tr>
+<tr><td><code>restore</code></td><td>Apply transformed manifests in correct phase order</td></tr>
+<tr><td><code>validate</code></td><td>Run structured validation checks, write JSON + text report</td></tr>
+<tr><td><code>smoke-test</code></td><td>Quick connectivity + pod health checks</td></tr>
+<tr><td><code>rollback-plan</code></td><td>Generate rollback plan for a given migration state</td></tr>
+</tbody>
+</table></div>
+
+<p><strong>Key limitations:</strong> Live PV block data is not automatically migrated · <code>ReadWriteMany</code> PVCs require NFS or Manila on Flex · Helm re-installs require original chart registry · API version deprecations are not auto-upgraded · This toolkit is non-destructive (never deletes source resources).</p>
 <hr />
 <h3 id="stage-3-validation-uat">Stage 3 — Validation &amp; UAT</h3>
 <p>Automated testing harness for post-migration verification.</p>

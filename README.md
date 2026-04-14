@@ -19,6 +19,8 @@
   <img src="https://img.shields.io/badge/Live_Streaming-SSE-a855f7?style=flat-square" alt="SSE">
   <img src="https://img.shields.io/badge/No_DB-CSV_%2B_localStorage-3b82f6?style=flat-square" alt="No DB">
   <img src="https://img.shields.io/badge/Genestack-K8s_Integration-0ea5e9?style=flat-square" alt="Genestack">
+  <img src="https://img.shields.io/badge/K8s_Migration_Methods-3-fb923c?style=flat-square" alt="K8s Methods">
+  <img src="https://img.shields.io/badge/Magnum_Pipeline_Stages-8-ef4444?style=flat-square" alt="Magnum Stages">
 </p>
 
 <br>
@@ -48,6 +50,9 @@
       - [Comprehensive Verification Phase](#comprehensive-verification-phase-all-four-scenarios)
       - [HTML Comparison Report](#html-comparison-report-1)
     - [Option 2 Phase 3: Kubernetes Replication Manual / Auto](#option-2-phase-3-kubernetes-replication-manual--auto)
+      - [Method 1: Full Manual Runbook](#method-1--full-manual-mode)
+      - [Method 2: Automated — Genestack / Kubespray or OpenCenter](#method-2--automated-deployment-genestack--kubespray--or--opencenter)
+      - [Method 3: OSPC K8 → Flex Magnum (8-Stage SSH Migration)](#method-3--ospc-k8--flex-magnum-8-stage-ssh-migration)
   - [Stage 3 — Validation & UAT](#stage-3--validation--uat)
   - [Stage 4 — Cutover & Handover](#stage-4--cutover--handover)
   - [Stage 5 — Post-Migration](#stage-5--post-migration)
@@ -647,11 +652,13 @@ Two deployment engines are available as selectable tabs. Both are fully driven f
 
 | Feature | Detail |
 |---------|--------|
-| Engine tabs | Switch between 🟩 Genestack / Kubespray and 🔵 OpenCenter in one click |
+| Engine tabs | Switch between 🟩 Genestack / Kubespray, 🔵 OpenCenter, and 🔴 OSPC K8 → Flex Magnum in one click |
 | Command table | Step · description · editable CLI command · target host · status |
 | Run button | Each row executes via SSE streaming, auto-marks row status on completion |
-| IP injection | Genestack host + jump host IPs auto-fill all command templates |
+| **Live IP injection** | Collected OSPC IPs (masters, workers, genestack host, jump host) auto-populate **all** Genestack and OpenCenter command templates the moment "Apply IPs to all rows" is clicked |
 | OSPC → Genestack mapping table | Maps collected OSPC data (IPs, K8s version, roles) to exact Genestack config file paths |
+
+> **IP injection flow:** Enter Flex master/worker/genestack IPs in the "Configure Server IPs" panel → click **Apply IPs to all rows** → `inventory.yaml`, SSH key distribution loops, kubeconfig rsync, and OpenCenter SSH commands all update instantly with real IPs.
 
 ---
 
@@ -676,16 +683,16 @@ Two deployment engines are available as selectable tabs. Both are fully driven f
  Workloads running on FLEX ✓
 ```
 
-| Step | What happens |
-|------|-------------|
-| 1 | SSH key distribution to all FLEX nodes |
-| 2 | Clone Genestack repo + run `bootstrap.sh` |
-| 3 | Write `inventory.yaml` from OSPC scan (masters, workers, IPs) |
-| 4 | Set `kube_version`, `container_manager` in `group_vars` |
-| 5 | Run `host-setup.yml` pre-flight playbook |
-| 6 | Run `cluster.yml` via Kubespray (full K8s cluster) |
-| 7 | Configure + install Kube-OVN CNI |
-| 8 | Apply OSPC workload manifests, Helm charts, PV configs |
+| Step | What happens | IP injection |
+|------|-------------|-------------|
+| 1 | SSH key distribution to all FLEX nodes | Loop uses `flex_m1/m2/m3`, `flex_w1/w2` from collected IPs |
+| 2 | Clone Genestack repo + run `bootstrap.sh` | — |
+| 3 | Write `inventory.yaml` from OSPC scan | All host IPs auto-populated; optional nodes (master-3, worker-2) included only when filled |
+| 4 | Set `kube_version`, `container_manager` in `group_vars` | — |
+| 5 | Run `host-setup.yml` pre-flight (on genestack host) | `ssh ubuntu@flex_gs` prefixed automatically |
+| 6 | Run `cluster.yml` via Kubespray on genestack host | `ssh ubuntu@flex_gs` prefixed |
+| 7 | Configure + install Kube-OVN CNI | Label loop uses `flex_m1/m2/m3` IPs |
+| 8 | Pull kubeconfig from master + verify | `rsync ubuntu@flex_m1:/root/.kube/config` + `sed` with `flex_m1` API address |
 
 **When to choose Genestack:** Full control over every node, network plugin, and K8s version. Best for large production clusters where you need to match the exact OSPC configuration.
 
@@ -732,6 +739,157 @@ Two deployment engines are available as selectable tabs. Both are fully driven f
 | **Best for** | Smaller clusters, fast bring-up, teams already using GitOps workflows |
 
 > **Rule of thumb:** Use **Genestack** when you need node-level control and exact OSPC parity. Use **OpenCenter** when you want a production-grade cluster running in under an hour with GitOps from day one.
+
+---
+
+#### Method 3 — OSPC K8 → Flex Magnum (8-Stage SSH Migration)
+
+Production-grade toolkit for migrating existing Kubernetes workloads from an **OSPC bare-metal cluster** to a new **Rackspace Flex Magnum** (OpenStack-managed) cluster. Lives in `ospc2flex-k8-migration/ospc-to-flex-k8-migrator/`.
+
+> **Core rule:** do not import the old OSPC control plane into Magnum. Magnum creates a brand-new cluster. This toolkit exports, transforms, and re-applies all workloads onto the new cluster.
+
+```
+ OSPC K8 cluster  (bare-metal, SSH-accessible master)
+        │
+        │  Stage 1: SSH remote master export
+        │  python -m ospc_to_flex_k8.cli export --master-ip … --ssh-key …
+        │  ─ runs kubectl/helm ON the OSPC master via SSH
+        │  ─ copies results back via scp → output/<ts>/export/
+        ▼
+ output/<ts>/export/
+ ├── kubeconfig-ospc
+ ├── manifests/  (cluster-scoped + per-namespace)
+ ├── helm/       (releases, values, manifests)
+ ├── images/images.txt
+ ├── summary.json
+ └── inventory.txt
+        │
+        │  Stage 2: Create Flex Magnum cluster
+        │  openstack coe cluster create --cluster-template …
+        ▼
+ Flex Magnum K8s cluster  (CREATE_COMPLETE)
+        │
+        │  Stage 3: Transform manifests
+        │  python -m ospc_to_flex_k8.cli transform …
+        │  ─ storageClass remap · ingress class · service annotations
+        │  ─ endpoint/FQDN substitution · node-selector strip
+        │  ─ secret exclusion · metadata strip
+        ▼
+ output/<ts>/transform/transformed-manifests/
+        │
+        │  Stage 4: Restore workloads (phased)
+        │  python -m ospc_to_flex_k8.cli restore --dry-run  (always first)
+        │  Phase order: CRDs → NS → RBAC → ConfigMaps → Secrets →
+        │               Storage → Services → Deployments → StatefulSets →
+        │               DaemonSets → Ingresses → Policy → Helm
+        ▼
+ Workloads running on Flex (no data yet)
+        │
+        │  Stage 5: Data restore
+        │  scripts/restore_db.sh  (MySQL / PostgreSQL — no hardcoded creds)
+        │  templates/pvc_restore_helper.pod.yaml  (PVC + rsync)
+        ▼
+ Data replicated to Flex
+        │
+        │  Stage 6: Validate + smoke tests
+        │  python -m ospc_to_flex_k8.cli validate …
+        │  → validation-report.json + validation-summary.txt
+        │  → optional HTTP health checks per URL
+        ▼
+ All checks PASS
+        │
+        │  Stage 7: Cutover
+        │  ─ Maintenance window checklist (manual sign-off)
+        │  ─ Final DB delta sync  (scripts/delta_sync.sh)
+        │  ─ DNS/LB switch to Flex ingress IPs
+        │  ─ Record cutover-record.json + timestamp
+        ▼
+ Flex is production ✓  (OSPC kept warm for 48 h)
+        │
+        │  Stage 8: Rollback plan
+        │  python -m ospc_to_flex_k8.cli rollback-plan --stage …
+        │  → rollback-plan.json with exact rollback commands
+        ▼
+ scripts/rollback_helper.sh  (if rollback triggered)
+```
+
+**Migration states tracked:**
+
+| State | Meaning |
+|-------|---------|
+| `rehearsal` | Dry-run / test migration — no production impact |
+| `pre-cutover` | Flex cluster ready, OSPC still primary |
+| `cutover-started` | Traffic switch in progress |
+| `cutover-complete` | Flex is primary, OSPC kept as safety net |
+| `rollback-triggered` | Decision made to revert to OSPC |
+| `rollback-complete` | OSPC is primary again, Flex traffic drained |
+
+**Stage 1 — SSH remote master mode (mandatory):**
+
+Stage 1 never runs kubectl locally. All commands execute on the OSPC master via SSH; results are copied back via `scp`.
+
+```bash
+export OSPC_MASTER_IP=10.1.2.3
+export SSH_USER=centos
+export SSH_KEY_PATH=~/.ssh/id_rsa
+
+python -m ospc_to_flex_k8.cli export \
+  --master-ip  $OSPC_MASTER_IP \
+  --ssh-user   $SSH_USER \
+  --ssh-key    $SSH_KEY_PATH \
+  --output-dir ./output
+```
+
+**Python CLI commands:**
+
+| Command | What it does |
+|---------|-------------|
+| `export` | SSH to OSPC master, run full cluster export, scp back |
+| `plan` | Display migration plan as JSON |
+| `transform` | Transform exported manifests for Flex compatibility |
+| `create-target` | Create Flex Magnum cluster via OpenStack API |
+| `restore` | Apply transformed manifests in correct phase order |
+| `validate` | Run structured validation checks, write JSON + text report |
+| `smoke-test` | Quick connectivity + pod health checks |
+| `rollback-plan` | Generate rollback plan for a given migration state |
+
+**Transform operations applied (Stage 3):**
+
+| # | Transform | Detail |
+|---|-----------|--------|
+| 1 | `storageClassName` | Remapped per `storage-map.yaml` (e.g. `ospc-standard` → `cinder-standard`) |
+| 2 | Ingress class | Annotation + `ingressClassName` remapped per `ingress-map.yaml` |
+| 3 | Service annotations | LoadBalancer → Flex Octavia annotations |
+| 4 | Endpoint / FQDN | String substitution per `endpoint-map.yaml` |
+| 5 | nodeSelector / affinity / tolerations | Node-specific fields stripped |
+| 6 | Namespace filter | Only `include_namespaces` from migration plan |
+| 7 | Secret exclusion | Source-cluster SA tokens and listed names excluded |
+| 8 | Metadata strip | `uid`, `resourceVersion`, `generation`, `managedFields`, `status` removed |
+| 9 | RWX PVC flag | `ReadWriteMany` flagged in `transform-report.json` for manual review |
+
+**Repo structure (`ospc2flex-k8-migration/ospc-to-flex-k8-migrator/`):**
+
+```
+├── src/ospc_to_flex_k8/     Python package (cli, exporter, transformer, validator …)
+├── scripts/                 Shell wrappers for each stage
+│   ├── export_ospc_k8.sh    Stage 1 SSH export (delegates to Python CLI)
+│   ├── restore_db.sh        Stage 5 MySQL/PostgreSQL restore (no hardcoded creds)
+│   ├── restore_pv.sh        Stage 5 PV block data restore
+│   ├── delta_sync.sh        Stage 7 final DB delta sync
+│   └── rollback_helper.sh   Stage 8 rollback executor
+├── configs/                 Example YAML maps (storage, ingress, endpoint)
+├── templates/               pvc_restore_helper.pod.yaml · restore-order.txt
+├── docs/                    architecture.md · runbook.md · rollback.md · assumptions.md
+├── tests/                   89 unit tests (transformer, validator, planner)
+└── env.example              All required env vars with defaults
+```
+
+**Key limitations:**
+- Live PV block data is **not** automatically migrated — use `restore_pv.sh`
+- `ReadWriteMany` PVCs require NFS or Manila on Flex (not Cinder)
+- Helm re-installs require the original chart registry to be reachable
+- API version deprecations (e.g. `extensions/v1beta1`) are not auto-upgraded — use `kubectl-convert`
+- This toolkit is **non-destructive** — it never deletes source resources
 
 ---
 

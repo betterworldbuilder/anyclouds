@@ -1,0 +1,21 @@
+# storage-map.example.yaml
+# Maps OSPC source StorageClass names to Rackspace Flex Magnum target names.
+# Pass this to the CLI via --plan (merge into migration-plan.yaml) or
+# reference it from your own transform script.
+
+old_to_new_storageclass:
+  ospc-standard:  cinder-standard
+  ospc-fast:      cinder-fast
+  local-path:     cinder-standard
+  nfs-client:     cinder-nfs
+  longhorn:       cinder-fast
+  rook-ceph:      cinder-fast
+
+# Fallback for any unmapped StorageClass
+default: cinder-standard
+
+# Storage warnings to be aware of:
+# - cinder-standard: Rackspace Flex general-purpose block storage
+# - cinder-fast:     Rackspace Flex SSD-backed block storage
+# - AccessModes: ReadWriteMany is NOT supported by Cinder — use NFS or object storage
+# - Existing PV data must be migrated separately (see Stage 5 / restore_pv.sh)

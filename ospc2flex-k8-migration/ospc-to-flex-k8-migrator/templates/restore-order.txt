@@ -1,0 +1,28 @@
+# restore-order.txt
+# The exact restore phase order enforced by restore.py.
+# This file is for reference and documentation.
+# The actual order is defined in src/ospc_to_flex_k8/planner.py:_PHASE_KINDS
+#
+# Do not change this file to reorder phases — edit planner.py instead.
+
+Phase 1:  crds          CustomResourceDefinitions (must exist before any CR objects)
+Phase 2:  namespaces    Namespace objects
+Phase 3:  rbac          ServiceAccounts, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings
+Phase 4:  configmaps    ConfigMaps
+Phase 5:  secrets       Secrets (applied after RBAC so service accounts exist)
+Phase 6:  storage       StorageClasses, PersistentVolumes, PersistentVolumeClaims
+Phase 7:  services      Services, Endpoints, EndpointSlices
+Phase 8:  deployments   Deployments, ReplicaSets
+Phase 9:  statefulsets  StatefulSets
+Phase 10: daemonsets    DaemonSets
+Phase 11: ingresses     Ingresses, IngressClasses, NetworkPolicies
+Phase 12: policy        PodDisruptionBudgets, HorizontalPodAutoscalers, ResourceQuotas
+Phase 13: helm          Helm re-installs (via helm upgrade --install)
+Phase 14: data          PV data restore (manual / script-assisted — see restore_pv.sh)
+Phase 15: validation    Post-restore validation checks (see validate command)
+
+# Notes:
+# - Phase 1 (CRDs): after apply, the restore waits 10s for API group registration.
+# - Phase 13 (Helm): installs from chart registry — ensure chart repos are added first.
+# - Phase 14 (data): not automated — run restore_pv.sh or restore_db.sh manually.
+# - Phase 15 (validation): run with: python -m ospc_to_flex_k8.cli validate

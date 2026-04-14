@@ -3,13 +3,47 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Data Migration Full auto mode</title>
+  <title>OSPC TO FLEX MIGRATION MISSION CONTROL</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    @keyframes neon-blink {
+      0%,100%{opacity:1;} 48%{opacity:1;} 50%{opacity:0.15;} 52%{opacity:1;}
+    }
+    @keyframes neon-cycle {
+      0%  {color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff,0 0 40px #00d4ff;}
+      33% {color:#ff6a00;text-shadow:0 0 8px #ff6a00,0 0 20px #ff6a00,0 0 40px #ff6a00;}
+      66% {color:#00ff88;text-shadow:0 0 8px #00ff88,0 0 20px #00ff88,0 0 40px #00ff88;}
+      100%{color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff,0 0 40px #00d4ff;}
+    }
+    @keyframes pink-blink {
+      0%,45%,55%,100%{opacity:1;color:#ff2d9b;text-shadow:0 0 8px #ff2d9b,0 0 20px #ff2d9b,0 0 50px #ff2d9b;}
+      50%            {opacity:0.1;text-shadow:none;}
+    }
+    @keyframes blue-blink {
+      0%,45%,55%,100%{opacity:1;color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff,0 0 50px #00d4ff;}
+      50%            {opacity:0.1;text-shadow:none;}
+    }
+    .mc-header{background:#050810;border-bottom:1px solid rgba(0,212,255,.15);padding:18px 28px 14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+    .mc-title{font-family:'Courier New',monospace;font-size:1.35rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#e2e8f0;}
+    .mc-open{font-family:'Courier New',monospace;font-size:0.78rem;font-weight:900;letter-spacing:.18em;animation:pink-blink 1.6s infinite, blue-blink 1.6s 0.8s infinite;margin-left:4px;}
+    .mc-open-pink{animation:pink-blink 1.8s infinite;}
+    .mc-open-blue{animation:blue-blink 1.8s 0.9s infinite;}
+    .mc-subtitle{font-family:'Courier New',monospace;font-size:0.82rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;animation:neon-cycle 3s linear infinite;}
+    .mc-dot{width:8px;height:8px;border-radius:50%;background:#00ff88;box-shadow:0 0 6px #00ff88,0 0 12px #00ff88;animation:neon-blink 2s infinite;flex-shrink:0;}
+  </style>
 </head>
 <body>
-  <header>
-    <h1>Data Migration Full auto mode ( pre AI co pilot )</h1>
-    <p>OSPC2Flex Data Migration Dashboard: Orchestrates final payload file syncing, database replication, and safe A/B traffic split cutovers.</p>
+  <header style="padding:0;margin:0;">
+    <div class="mc-header">
+      <div class="mc-dot"></div>
+      <span class="mc-title">OSPC TO FLEX MIGRATION MISSION CONTROL</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;font-family:'Courier New',monospace;font-size:0.75rem;font-weight:900;letter-spacing:.15em;">
+        <span class="mc-open-pink" style="color:#ff2d9b;text-shadow:0 0 8px #ff2d9b,0 0 20px #ff2d9b;">OPEN</span>
+        <span style="color:#475569;font-size:0.7rem;">|</span>
+        <span class="mc-open-blue" style="color:#00d4ff;text-shadow:0 0 8px #00d4ff,0 0 20px #00d4ff;">24/24</span>
+      </span>
+      <span style="margin-left:8px;" class="mc-subtitle">FLEX MIGRATION FULL CYCLE MISSION CONTROL</span>
+    </div>
   </header>
 
   <main>
@@ -529,7 +563,7 @@
         const v=document.getElementById(id).value.trim();
         if(v){IPS[k]=v;changed=true;}
       }
-      if(changed){renderFlowCards();renderK8Table();}
+      if(changed){renderFlowCards();renderK8Table();renderGsTable();renderOcTable();}
       try{const saved={};for(const[k,id]of Object.entries(map)){const v=document.getElementById(id).value.trim();if(v)saved[k]=v;}localStorage.setItem('k8_ips2',JSON.stringify(saved));}catch(e){}
     }
     function loadSavedIPs(){
@@ -780,6 +814,7 @@
       <div class="k8opt-tabs">
         <button class="k8opt-tab gs-tab active" onclick="k8optSwitch('genestack',this)">🟩 Genestack / Kubespray</button>
         <button class="k8opt-tab" onclick="k8optSwitch('opencenter',this)">🔵 OpenCenter</button>
+        <button class="k8opt-tab" onclick="k8optSwitch('magnum',this)" style="border-color:rgba(251,146,60,.35);color:#fb923c;">🔴 OSPC K8 → Flex Magnum</button>
       </div>
 
       <!-- ─── GENESTACK PANEL ───────────────────────────────────── -->
@@ -871,6 +906,257 @@
         </div>
       </div>
 
+      <!-- ─── METHOD 3: OSPC K8 → FLEX MAGNUM PANEL ─────────────────────── -->
+      <div class="k8opt-panel" id="k8opt-magnum">
+        <style>
+        .mg-note{background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.78rem;color:#fed7aa;line-height:1.6;}
+        .mg-note strong{color:#fb923c;}
+        .mg-tbl{width:100%;border-collapse:collapse;font-size:0.84rem;table-layout:fixed;}
+        .mg-tbl th{padding:11px 14px;text-align:left;font-weight:700;color:#fb923c;background:rgba(20,10,5,0.88);border-bottom:2px solid rgba(251,146,60,.25);font-size:0.69rem;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+        .mg-tbl td{padding:11px 14px;border-bottom:1px solid rgba(251,146,60,.07);vertical-align:top;}
+        .mg-tbl tr:hover td{background:rgba(251,146,60,.03);}
+        .mg-num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(251,146,60,.18);border:1px solid #fb923c;color:#fed7aa;font-weight:800;font-size:0.78rem;flex-shrink:0;}
+        .mg-what{font-weight:600;color:#fed7aa;min-width:200px;font-size:0.88rem;line-height:1.5;}
+        .mg-cmd-wrap{position:relative;}
+        .mg-cmd-ta{width:100%;background:rgba(20,8,3,.8);border:1px solid rgba(251,146,60,.2);border-radius:6px;color:#fed7aa;font-family:'Courier New',monospace;font-size:0.78rem;padding:10px 12px;resize:vertical;min-height:90px;outline:none;line-height:1.6;box-sizing:border-box;}
+        .mg-cmd-ta:focus{border-color:#fb923c;box-shadow:0 0 0 2px rgba(251,146,60,.18);}
+        .mg-btn-row{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
+        .mg-run-btn{background:linear-gradient(135deg,#9a3412,#ea580c);color:#fff;border:none;padding:4px 12px;border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer;transition:all .15s;}
+        .mg-run-btn:hover{box-shadow:0 2px 8px rgba(251,146,60,.4);}
+        .mg-run-btn:disabled{opacity:.45;cursor:not-allowed;}
+        .mg-copy-btn{background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.35);color:#fb923c;padding:4px 10px;border-radius:5px;font-size:0.7rem;font-weight:600;cursor:pointer;}
+        .mg-copy-btn:hover{background:rgba(251,146,60,.25);}
+        .mg-phase-row td{padding:7px 14px;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.05);}
+        .mg-log-row{display:none;}.mg-log-row.open{display:table-row;}
+        .mg-log-row td{padding:0;border-bottom:1px solid rgba(251,146,60,.1);}
+        .mg-log-inner{background:#0a0400;font-family:'Courier New',monospace;font-size:11px;color:#fed7aa;padding:10px 14px;max-height:150px;overflow-y:auto;white-space:pre-wrap;line-height:1.5;border-top:1px solid rgba(251,146,60,.12);}
+        /* config panel */
+        .mg-cfg-panel{background:rgba(20,10,3,.8);border:1px solid rgba(251,146,60,.18);border-radius:10px;overflow:hidden;margin-bottom:16px;}
+        .mg-cfg-toggle{display:flex;align-items:center;gap:9px;padding:10px 16px;cursor:pointer;background:rgba(10,5,2,.6);user-select:none;}
+        .mg-cfg-toggle:hover{background:rgba(251,146,60,.06);}
+        .mg-cfg-toggle span{font-weight:700;font-size:0.84rem;color:#fb923c;}
+        .mg-cfg-body{padding:14px 16px;display:none;background:rgba(12,6,2,.5);}
+        .mg-cfg-body.open{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+        .mg-input-grp label{font-size:0.68rem;font-weight:700;color:#fb923c;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px;}
+        .mg-input-grp input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(251,146,60,.2);border-radius:5px;color:#fed7aa;padding:5px 9px;font-size:0.78rem;font-family:'Courier New',monospace;outline:none;box-sizing:border-box;}
+        .mg-input-grp input:focus{border-color:#fb923c;}
+        /* map panel */
+        .mg-map-row{display:flex;gap:8px;margin-bottom:6px;align-items:center;}
+        .mg-map-row input{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(251,146,60,.15);border-radius:4px;color:#fed7aa;padding:4px 7px;font-size:0.75rem;font-family:'Courier New',monospace;outline:none;}
+        .mg-map-row input:focus{border-color:#fb923c;}
+        .mg-map-arrow{color:#fb923c;font-weight:800;font-size:0.8rem;flex-shrink:0;}
+        .mg-phase-legend{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+        .mg-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:16px;font-size:0.7rem;font-weight:700;border:1px solid;cursor:pointer;transition:filter .15s;}
+        .mg-pill:hover{filter:brightness(1.3);}
+        .mg-pill.active{box-shadow:0 0 0 2px currentColor;}
+        </style>
+
+        <div style="margin-bottom:14px;padding:13px 20px;background:rgba(251,146,60,.08);border:2px solid rgba(251,146,60,.3);border-radius:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <span style="font-size:1.1rem;font-weight:800;color:#fb923c;text-transform:uppercase;letter-spacing:.1em;">🔴 Method 3 — OSPC K8 → Flex Magnum 2025.2 Update</span>
+          <span style="font-size:0.82rem;color:#94a3b8;">Export workloads from OSPC cluster · Design &amp; validate ClusterTemplate · Provision via Magnum 2025.2 · Restore on Flex</span>
+        </div>
+
+        <div class="mg-note">
+          <strong>⚠ Architecture rule:</strong> Magnum 2025.2 creates a <em>new</em> cluster from a <code>ClusterTemplate</code> — do <strong>not</strong> attempt to import the old OSPC control plane.
+          This pipeline exports source cluster config, Helm metadata, image references and PVC metadata; then <strong>designs and validates a Magnum 2025.2 ClusterTemplate</strong> (COE, image os_distro, network/volume driver, LB, NodeGroup); then provisions a fresh Flex Magnum cluster, transforms manifests for Flex compatibility, and restores workloads in dependency order.
+          <br><br>
+          <strong>📥 Stage 1 runs in remote master mode:</strong>
+          SSH to the OSPC master → run all kubectl/helm exports there → copy results back locally via scp → clean up remote temp dir.
+          Inputs required: <code>OSPC Master IP</code> · <code>SSH User</code> · <code>SSH Key Path</code>. Set them in the config panel below.
+          <br><br>
+          <strong>🔷 Stage 2 — Design Template:</strong>
+          Before creating the cluster, validate ClusterTemplate parameters against Magnum 2025.2 constraints: COE=kubernetes, image os_distro=fedora-coreos, network_driver=flannel|calico, volume_driver=cinder. Heat driver is deprecated — do not set it.
+          <br><br>
+          <!-- ASCII pipeline diagram -->
+          <pre style="font-family:'Courier New',monospace;font-size:0.72rem;color:#fed7aa;line-height:1.55;background:rgba(0,0,0,.25);border:1px solid rgba(251,146,60,.18);border-radius:6px;padding:12px 16px;overflow-x:auto;margin:0;">OSPC K8 Cluster
+      |
+      v
++-------------------------+
+| 1. Export from OSPC     |
+| - SSH to OSPC master    |
+| - Run kubectl / helm    |
+| - Copy bundle locally   |
++-------------------------+
+      |
+      v
++----------------------------------------------+
+| 2. Design &amp; validate Flex ClusterTemplate    |
+| - Kubernetes COE                             |
+| - Image / os_distro                          |
+| - External network                           |
+| - Network driver                             |
+| - Volume driver                              |
+| - Keypair / flavors / TLS / master LB        |
++----------------------------------------------+
+      |
+      v
++-------------------------------+
+| 3. Create Flex Magnum cluster |
+| - openstack coe cluster create|
+| - Wait for ready              |
+| - Fetch kubeconfig            |
++-------------------------------+
+      |
+      v
++----------------------------------+
+| 4. Transform manifests for Flex  |
+| - StorageClass mapping           |
+| - Ingress / service adjustments  |
+| - Endpoint replacement           |
+| - Strip source metadata          |
+| - CNI / storage compatibility    |
++----------------------------------+
+      |
+      v
++-----------------------------+
+| 5. Restore apps to Flex     |
+| - CRDs                      |
+| - Namespaces                |
+| - RBAC                      |
+| - Config / Secrets          |
+| - Services / Workloads      |
+| - Ingress / Helm redeploy   |
++-----------------------------+
+      |
+      v
++-----------------------------+
+| 6. Restore data             |
+| - DB restore                |
+| - PVC/file restore          |
++-----------------------------+
+      |
+      v
++--------------------------------------+
+| 7. Test and validate                 |
+| - kubectl health checks              |
+| - PVC / ingress / app smoke tests    |
+| - Magnum health/status               |
+| - LoadBalancer test service          |
++--------------------------------------+
+      |
+      +-------------------+
+      |                   |
+   PASS v                 v FAIL
++------------------+   +--------------------+
+| 8. Cut over      |   | 9. Rollback        |
+| - Final sync     |   | - Switch back      |
+| - DNS / traffic  |   | - Preserve source  |
++------------------+   +--------------------+</pre>
+        </div>
+
+        <!-- 9-Stage Pipeline Summary (collapsible) -->
+        <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.3);border-radius:8px;margin-bottom:16px;">
+          <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.mg-sum-arrow').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼';"
+               style="display:flex;align-items:center;gap:9px;padding:10px 16px;cursor:pointer;user-select:none;">
+            <span style="font-size:0.84rem;font-weight:700;color:#93c5fd;">📋 9-Stage Pipeline Summary</span>
+            <span class="mg-sum-arrow" style="margin-left:auto;color:#64748b;font-size:0.7rem;font-weight:700;">▼</span>
+          </div>
+          <div style="display:block;padding:4px 16px 14px;font-size:0.78rem;color:#bfdbfe;line-height:1.7;">
+            <strong style="color:#93c5fd;">Stage 1 — Export from OSPC:</strong> SSH to the OSPC Kubernetes master node, run <code>kubectl</code> and <code>helm</code> export commands remotely, then <code>scp</code> the resulting bundle back to the local workstation. The OSPC cluster is read-only during this step — no changes are made.<br><br>
+            <strong style="color:#a5b4fc;">Stage 2 — Design &amp; Validate ClusterTemplate:</strong> Before provisioning anything on Flex, define and validate the Magnum 2025.2 <code>ClusterTemplate</code> parameters: COE (<code>kubernetes</code>), image with <code>os_distro=fedora-coreos</code>, network driver (<code>flannel</code> or <code>calico</code>), volume driver (<code>cinder</code>), LoadBalancer driver, and NodeGroup shapes. This stage produces a <code>cluster-template.yaml</code> design artifact reviewed before any API calls are made.<br><br>
+            <strong style="color:#86efac;">Stage 3 — Create Flex Magnum Cluster:</strong> Submit the validated <code>ClusterTemplate</code> to the Flex Magnum API and create the <code>Cluster</code> object. Poll until <code>CREATE_COMPLETE</code>, then download and verify the Flex kubeconfig. The Heat driver is explicitly <em>not used</em> — Magnum 2025.2 manages the cluster lifecycle directly.<br><br>
+            <strong style="color:#c4b5fd;">Stage 4 — Transform Manifests for Flex:</strong> Process the exported OSPC manifests through the transform pipeline: patch <code>StorageClass</code> to use the Cinder CSI driver, update Ingress class annotations, remove OSPC-specific node selectors and taints, and verify CNI and storage driver compatibility with Flex.<br><br>
+            <strong style="color:#fed7aa;">Stage 5 — Restore Workloads to Flex:</strong> Apply CRDs first (required before any custom resources), then restore namespaces, RBAC, ConfigMaps/Secrets, Services, Deployments/StatefulSets/DaemonSets, and HPA in dependency order. Helm-managed workloads are re-installed via <code>helm upgrade --install</code> rather than raw manifest apply.<br><br>
+            <strong style="color:#f9a8d4;">Stage 6 — Restore Data:</strong> Handled separately from workload restore. Restore Cinder PVC data (snapshots or rsync), re-attach volumes to the correct pods, and verify database contents. The Cinder volume driver replaces any Ceph-direct or NFS mounts from OSPC.<br><br>
+            <strong style="color:#fcd34d;">Stage 7 — Test &amp; Validate:</strong> Run Magnum cluster health checks (<code>openstack coe cluster show</code>), deploy a LoadBalancer test Service to confirm Octavia LB provisioning end-to-end, execute application smoke tests and readiness probes, and confirm all PVCs are <code>Bound</code>.<br><br>
+            <strong style="color:#6ee7b7;">Stage 8 — Cut Over:</strong> Only after all Stage 7 checks pass: update DNS records or load balancer VIPs to point to the Flex cluster, quiesce writes on the OSPC side, perform a final data sync if needed, and confirm traffic flowing on Flex.<br><br>
+            <strong style="color:#fca5a5;">Stage 9 — Rollback (if needed):</strong> If any critical failure occurs after cutover, revert DNS/LB to OSPC, restore any delta data written to Flex back to OSPC, and document the failure root cause. The rollback window remains open until OSPC is formally decommissioned.
+          </div>
+        </div>
+
+        <!-- Phase legend — click to jump to that phase in the table -->
+        <div class="mg-phase-legend" id="mgPhaseLegend">
+          <span class="mg-pill" onclick="mgJumpPhase('export',this)"   style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.4);color:#93c5fd;">📥 Export</span>
+          <span class="mg-pill" onclick="mgJumpPhase('design',this)"   style="background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.4);color:#a5b4fc;">🔷 Design Template</span>
+          <span class="mg-pill" onclick="mgJumpPhase('create',this)"   style="background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.4);color:#86efac;">🏗 Create Cluster</span>
+          <span class="mg-pill" onclick="mgJumpPhase('transform',this)" style="background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.4);color:#c4b5fd;">🔄 Transform</span>
+          <span class="mg-pill" onclick="mgJumpPhase('restore',this)"  style="background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.4);color:#fed7aa;">♻ Restore</span>
+          <span class="mg-pill" onclick="mgJumpPhase('data',this)"     style="background:rgba(236,72,153,.1);border-color:rgba(236,72,153,.4);color:#f9a8d4;">💾 Data</span>
+          <span class="mg-pill" onclick="mgJumpPhase('validate',this)" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.4);color:#fcd34d;">✅ Validate</span>
+          <span class="mg-pill" onclick="mgJumpPhase('cutover',this)"  style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.4);color:#6ee7b7;">✂ Cutover</span>
+        </div>
+
+        <!-- Cluster config panel -->
+        <div class="mg-cfg-panel">
+          <div class="mg-cfg-toggle" onclick="const b=this.nextElementSibling;b.classList.toggle('open');this.querySelector('.mg-cfg-arrow').textContent=b.classList.contains('open')?'▲ collapse':'▼ expand';">
+            <span>⚙ Cluster Config</span>
+
+            <span class="mg-cfg-arrow" style="margin-left:auto;color:#64748b;font-size:0.7rem;">▲ collapse</span>
+          </div>
+          <div class="mg-cfg-body open" id="mgCfgBody">
+
+            <!-- Stage 1: OSPC SSH inputs -->
+            <div style="grid-column:1/-1;font-size:0.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#fb923c;border-bottom:1px solid rgba(251,146,60,.2);padding-bottom:4px;margin-bottom:2px;">
+              📥 Stage 1 — OSPC Master SSH (remote export mode)
+            </div>
+            <div class="mg-input-grp">
+              <label>OSPC Master IP <span style="color:#f87171;font-size:0.65rem;">(required)</span></label>
+              <input id="mg_master_ip" placeholder="10.x.x.x" value="10.20.30.40" style="border-color:rgba(251,146,60,.45);">
+            </div>
+            <div class="mg-input-grp">
+              <label>SSH User <span style="color:#f87171;font-size:0.65rem;">(required)</span></label>
+              <input id="mg_ssh_user" placeholder="centos" value="centos">
+            </div>
+            <div class="mg-input-grp">
+              <label>SSH Key Path <span style="color:#f87171;font-size:0.65rem;">(required)</span></label>
+              <input id="mg_ssh_key" placeholder="~/.ssh/id_rsa" value="~/.ssh/id_rsa">
+            </div>
+            <div class="mg-input-grp">
+              <label>SSH Port</label>
+              <input id="mg_ssh_port" placeholder="22" value="22">
+            </div>
+            <div class="mg-input-grp">
+              <label>Migration output dir</label>
+              <input id="mg_outdir" placeholder="./output" value="./output">
+            </div>
+            <div class="mg-input-grp">
+              <label>Keep remote export?</label>
+              <input id="mg_keep_remote" placeholder="false" value="false" style="font-size:0.72rem;">
+            </div>
+
+            <!-- Stage 2+: Flex / Magnum inputs -->
+            <div style="grid-column:1/-1;font-size:0.67rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#86efac;border-bottom:1px solid rgba(34,197,94,.2);padding-bottom:4px;margin-top:6px;margin-bottom:2px;">
+              🏗 Stage 2 — Flex Magnum Cluster
+            </div>
+            <div class="mg-input-grp"><label>Flex OpenRC path</label><input id="mg_openrc" placeholder="~/flex-openrc.sh" value="~/flex-openrc.sh"></div>
+            <div class="mg-input-grp"><label>New cluster name</label><input id="mg_cluster" placeholder="flex-k8s-prod" value="flex-k8s-prod"></div>
+            <div class="mg-input-grp"><label>Magnum template name</label><input id="mg_template" placeholder="k8s-v1.28" value="k8s-v1.28"></div>
+            <div class="mg-input-grp"><label>Master count</label><input id="mg_masters" placeholder="3" value="3"></div>
+            <div class="mg-input-grp"><label>Worker count</label><input id="mg_workers" placeholder="3" value="3"></div>
+            <div class="mg-input-grp"><label>Keypair name</label><input id="mg_keypair" placeholder="flex-keypair" value="flex-keypair"></div>
+            <div class="mg-input-grp"><label>Flex kubeconfig output</label><input id="mg_flex_kube" placeholder="~/.kube/flex-config" value="~/.kube/flex-config"></div>
+
+          </div>
+        </div>
+
+        <!-- Step table -->
+        <div style="overflow-x:auto;border-radius:9px;border:1px solid rgba(251,146,60,.2);">
+          <table class="mg-tbl" id="mgTbl">
+            <thead><tr>
+              <th style="width:36px;">#</th>
+              <th style="width:220px;">Step</th>
+              <th>Command / action (editable ▶)</th>
+              <th style="width:160px;">Output / notes</th>
+            </tr></thead>
+            <tbody id="mgTBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Global log terminal -->
+        <div style="margin-top:14px;background:rgba(10,4,0,.9);border:1px solid rgba(251,146,60,.15);border-radius:9px;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:rgba(0,0,0,.45);border-bottom:1px solid rgba(251,146,60,.12);">
+            <span style="background:#ff5f56;width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+            <span style="background:#ffbd2e;width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+            <span style="background:#27c93f;width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+            <span style="font-size:0.78rem;font-weight:700;color:#fb923c;margin-left:6px;">🔴 Magnum Migration Terminal</span>
+            <span id="mgSshBadge" style="font-size:0.68rem;color:#93c5fd;margin-left:8px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:2px 8px;display:none;">SSH: …</span>
+            <span id="mgSpinner" style="color:#fb923c;font-size:0.72rem;display:none;margin-left:4px;">● Running…</span>
+            <button onclick="document.getElementById('mgLog').textContent='Ready.'" style="margin-left:auto;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:3px 9px;border-radius:5px;font-size:0.69rem;cursor:pointer;">Clear</button>
+          </div>
+          <pre id="mgLog" style="margin:0;padding:10px 14px;font-family:'Courier New',monospace;font-size:11px;color:#fed7aa;height:180px;overflow-y:auto;white-space:pre-wrap;background:transparent;line-height:1.5;">Ready — configure cluster settings above then click ▶ Run on each step.</pre>
+        </div>
+      </div><!-- end k8opt-magnum -->
+
       <script>
       // ── Option tab switching ───────────────────────────────────────────────
       function k8optSwitch(id, btn) {
@@ -884,7 +1170,10 @@
       const GS_STEPS = [
         // Phase: Map OSPC data
         {phase:'map',   n:1,  what:'Prepare Flex deployment host',
-         cmd:'# Use a separate control node (NOT a cluster node)\nssh-keygen -t ed25519 -C "genestack-deploy" -f ~/.ssh/genestack\n# Distribute key to all Flex nodes:\nfor ip in MASTER1 MASTER2 MASTER3 WORKER1; do ssh-copy-id -i ~/.ssh/genestack.pub ubuntu@$ip; done',
+         cmd:()=>{
+           const gs=ip('flex_gs'); const m1=ip('flex_m1'); const m2=ip('flex_m2'); const m3=ip('flex_m3');
+           const w1=ip('flex_w1'); const w2=ip('flex_w2');
+           return `# ── Run from the Genestack deployment host ──────────────────────\n# Host: ${gs}  (ssh ubuntu@${gs})\n\n# 1. Generate deploy key (on genestack host, NOT on a cluster node)\nssh ubuntu@${gs} 'ssh-keygen -t ed25519 -C "genestack-deploy" -f ~/.ssh/genestack -N "" <<< y'\n\n# 2. Distribute key to all Flex nodes (populated from OSPC scan):\nfor NODE in ${m1} ${m2} ${m3} ${w1} ${w2}; do\n  ssh-copy-id -i ~/.ssh/genestack.pub ubuntu@$NODE\ndone\n\n# 3. Verify SSH access to all nodes:\nfor NODE in ${m1} ${m2} ${m3} ${w1} ${w2}; do\n  ssh -o BatchMode=yes -o ConnectTimeout=5 ubuntu@$NODE "echo OK: $NODE" || echo "FAIL: $NODE"\ndone`;},
          files:'SSH key pair, host connectivity confirmed'},
         {phase:'map',   n:2,  what:'Clone Genestack',
          cmd:'git clone --recurse-submodules -j4 \\\n  https://github.com/rackerlabs/genestack /opt/genestack',
@@ -897,32 +1186,50 @@
          cmd:'mkdir -p /etc/genestack/inventory/group_vars/{all,k8s_cluster}\n# Copy the example inventory as your starting point:\ncp /opt/genestack/ansible/inventory/inventory.yaml.example \\\n   /etc/genestack/inventory/inventory.yaml',
          files:'/etc/genestack/inventory/'},
         {phase:'inv',   n:5,  what:'Fill inventory.yaml with Flex masters/workers',
-         cmd:'# Edit to match your Flex VMs from OSPC scan output:\ncat > /etc/genestack/inventory/inventory.yaml << \'EOF\'\nall:\n  hosts:\n    flex-master-1:\n      ansible_host: FLEX_MASTER_1_IP\n    flex-master-2:\n      ansible_host: FLEX_MASTER_2_IP\n    flex-worker-1:\n      ansible_host: FLEX_WORKER_1_IP\n  children:\n    kube_control_plane:\n      hosts: {flex-master-1:, flex-master-2:}\n    kube_node:\n      hosts: {flex-worker-1:}\nEOF',
+         cmd:()=>{
+           const m1=ip('flex_m1'); const m2=ip('flex_m2'); const m3=ip('flex_m3');
+           const w1=ip('flex_w1'); const w2=ip('flex_w2'); const gs=ip('flex_gs');
+           const hasW2 = !w2.startsWith('<');
+           const hasM3 = !m3.startsWith('<');
+           return `# ── Auto-populated from Collect from OSPC IPs ──────────────────\ncat > /etc/genestack/inventory/inventory.yaml << 'EOF'\nall:\n  hosts:\n    flex-genestack:\n      ansible_host: ${gs}\n    flex-master-1:\n      ansible_host: ${m1}\n    flex-master-2:\n      ansible_host: ${m2}${hasM3 ? `\n    flex-master-3:\n      ansible_host: ${m3}` : ''}\n    flex-worker-1:\n      ansible_host: ${w1}${hasW2 ? `\n    flex-worker-2:\n      ansible_host: ${w2}` : ''}\n  children:\n    kube_control_plane:\n      hosts:\n        flex-master-1:\n        flex-master-2:${hasM3 ? '\n        flex-master-3:' : ''}\n    kube_node:\n      hosts:\n        flex-worker-1:${hasW2 ? '\n        flex-worker-2:' : ''}\nEOF\necho "✅ inventory.yaml written"\ncat /etc/genestack/inventory/inventory.yaml`;},
          files:'/etc/genestack/inventory/inventory.yaml'},
         {phase:'inv',   n:6,  what:'Set cluster vars (K8s version, settings)',
          cmd:'# Set kube_version (from your OSPC scan):\ncat >> /etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml << EOF\nkube_version: v1.29.3\ncontainer_manager: containerd\nEOF\n# Set global host settings:\ncat >> /etc/genestack/inventory/group_vars/all/all.yml << EOF\nansible_user: ubuntu\nansible_become: true\nEOF',
          files:'/etc/genestack/inventory/group_vars/k8s_cluster/k8s-cluster.yml\n/etc/genestack/inventory/group_vars/all/all.yml'},
         // Phase: Deploy
         {phase:'deploy',n:7,  what:'Run host preparation',
-         cmd:'source /opt/genestack/scripts/genestack.rc\ncd /opt/genestack/ansible/playbooks\nansible-playbook host-setup.yml \\\n  -i /etc/genestack/inventory/inventory.yaml',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# Run on genestack host: ${gs}\nssh ubuntu@${gs} '\nsource /opt/genestack/scripts/genestack.rc\ncd /opt/genestack/ansible/playbooks\nansible-playbook host-setup.yml \\\n  -i /etc/genestack/inventory/inventory.yaml\n'`;},
          files:'Host prep log'},
         {phase:'deploy',n:8,  what:'Deploy Kubernetes with Kubespray',
-         cmd:'cd /opt/genestack/submodules/kubespray\nansible-playbook cluster.yml --become \\\n  -i /etc/genestack/inventory/inventory.yaml \\\n  2>&1 | tee /var/log/kubespray-deploy.log',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# Run on genestack host: ${gs}\nssh ubuntu@${gs} '\ncd /opt/genestack/submodules/kubespray\nansible-playbook cluster.yml --become \\\n  -i /etc/genestack/inventory/inventory.yaml \\\n  2>&1 | tee /var/log/kubespray-deploy.log\n'`;},
          files:'/var/log/kubespray-deploy.log\nFresh K8s cluster on Flex'},
         // Phase: Kube-OVN
         {phase:'ovn',   n:9,  what:'Configure Kube-OVN overrides',
-         cmd:'# Edit the Kube-OVN helm override file:\nvi /etc/genestack/helm-configs/kube-ovn/kube-ovn-helm-overrides.yaml\n# Key values to set: tunnel_type, pod_cidr, service_cidr',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# Run on genestack host: ${gs}\nssh ubuntu@${gs} '\nvi /etc/genestack/helm-configs/kube-ovn/kube-ovn-helm-overrides.yaml\n# Key values: tunnel_type, pod_cidr, service_cidr\n'`;},
          files:'/etc/genestack/helm-configs/kube-ovn/kube-ovn-helm-overrides.yaml'},
         {phase:'ovn',   n:10, what:'Label OVN master nodes',
-         cmd:'kubectl label node -l node-role.kubernetes.io/control-plane \\\n  kube-ovn/role=master\nkubectl get nodes --show-labels | grep kube-ovn',
+         cmd:()=>{
+           const m1=ip('flex_m1'); const m2=ip('flex_m2'); const m3=ip('flex_m3');
+           const gs=ip('flex_gs');
+           return `# Run on genestack host (with kubeconfig already pulled): ${gs}\nexport KUBECONFIG=~/.kube/config\n\n# Label control-plane nodes for OVN\nfor NODE in ${m1} ${m2} ${m3}; do\n  NAME=$(kubectl get nodes -o wide --no-headers | awk "\\$6==\\"$NODE\\"{print \\$1}")\n  [ -n "$NAME" ] && kubectl label node $NAME kube-ovn/role=master || echo "WARN: node $NODE not found"\ndone\nkubectl get nodes --show-labels | grep -E "NAME|kube-ovn"`;},
          files:'Node labels applied'},
         {phase:'ovn',   n:11, what:'Install Kube-OVN',
-         cmd:'/opt/genestack/bin/install-kube-ovn.sh\nkubectl get pods -n kube-system | grep ovn',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# Run on genestack host: ${gs}\nssh ubuntu@${gs} '\n/opt/genestack/bin/install-kube-ovn.sh\nkubectl get pods -n kube-system | grep ovn\n'`;},
          files:'Kube-OVN CNI running'},
         // Phase: Verify
         {phase:'verify',n:12, what:'Pull kubeconfig and verify cluster',
-         cmd:'mkdir -p ~/.kube\nrsync -e "ssh -F ${HOME}/.ssh/openstack-keypair.config" \\\n  --rsync-path="sudo rsync" \\\n  -avz ubuntu@FIRST_CONTROLLER_IP:/root/.kube/config "${HOME}/.kube/config"\nsed -i \'s@server.*@server: https://FIRST_CONTROLLER_IP:6443@g\' "${HOME}/.kube/config"\nkubectl get nodes\nkubectl get pods -A',
-         files:'~/.kube/config (Flex cluster kubeconfig)'},
+         cmd:()=>{
+           const m1=ip('flex_m1'); const gs=ip('flex_gs');
+           return `mkdir -p ~/.kube\nrsync -e "ssh -i ~/.ssh/genestack" \\\n  --rsync-path="sudo rsync" \\\n  -avz ubuntu@${m1}:/root/.kube/config ~/.kube/flex-config\nsed -i 's@server.*@server: https://${m1}:6443@g' ~/.kube/flex-config\n\nexport KUBECONFIG=~/.kube/flex-config\nkubectl get nodes -o wide\nkubectl get pods -A | grep -v Running || echo "✅ All pods Running"\necho ""\necho "✅ Kubeconfig saved: ~/.kube/flex-config"\necho "   Master: ${m1}  Genestack: ${gs}"`;},
+         files:'~/.kube/flex-config (Flex cluster kubeconfig)'},
       ];
 
       const GS_PHASE_META = {
@@ -962,8 +1269,9 @@
             </td>
             <td class="gs-file">${row.files.replace(/\n/g,'<br>')}</td>`;
           tbody.appendChild(tr);
-          // Set textarea value safely
-          document.getElementById('gs-cmd-'+row.n) && (document.getElementById('gs-cmd-'+row.n).value = row.cmd);
+          // Set textarea value safely (cmd may be a function for live IP injection)
+          const el = document.getElementById('gs-cmd-'+row.n);
+          if (el) el.value = typeof row.cmd === 'function' ? row.cmd() : row.cmd;
           // Log row
           const lr = document.createElement('tr');
           lr.className = 'gs-log-row';
@@ -1022,29 +1330,44 @@
       // ── OpenCenter steps data (from official quickstart) ──────────────────
       const OC_STEPS = [
         // Phase: Install CLI
-        {phase:'install', n:1, what:'Download CLI binary (Linux amd64)',
-         cmd:'# Linux amd64 — swap suffix for your platform\ncurl -Lo opencenter https://github.com/rackerlabs/openCenter-cli/releases/download/v1.0.0/opencenter-linux-amd64\nchmod +x opencenter\nsudo mv opencenter /usr/local/bin/',
+        {phase:'install', n:1, what:'SSH to OpenCenter host + download CLI',
+         cmd:()=>{
+           const gs=ip('flex_gs'); const jh=ip('jump');
+           return `# ── Run from your admin / jump host: ${jh} ─────────────────────\n# Then SSH to the OpenCenter host: ${gs}\nssh ubuntu@${gs}\n\n# ── On ${gs}: install opencenter CLI ────────────────────────────────\n# Linux amd64 — swap suffix for your platform:\ncurl -Lo opencenter https://github.com/rackerlabs/openCenter-cli/releases/download/v1.0.0/opencenter-linux-amd64\nchmod +x opencenter\nsudo mv opencenter /usr/local/bin/\nopencenter version`;},
          files:'opencenter binary in /usr/local/bin/'},
-        {phase:'install', n:2, what:'Verify CLI installation',
-         cmd:'opencenter version\n# Expected: opencenter version 1.0.0',
-         files:'CLI ready'},
+        {phase:'install', n:2, what:'Verify CLI + set Flex credentials',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# On OpenCenter host: ${gs}\nopencenter version\n# Expected: opencenter version 1.0.0\n\n# Set OpenStack credentials (source your openrc or export env vars)\n# source ~/flex-openrc.sh\necho "OS_AUTH_URL: $OS_AUTH_URL"\necho "OS_PROJECT_NAME: $OS_PROJECT_NAME"`;},
+         files:'CLI ready, credentials verified'},
         // Phase: Kind cluster
-        {phase:'cluster', n:3, what:'Initialize a Kind cluster',
-         cmd:'# Create cluster configuration\nopencenter cluster init my-first-cluster --type kind\n\n# Review the generated configuration\nopencenter cluster edit my-first-cluster',
+        {phase:'cluster', n:3, what:'Initialize cluster config',
+         cmd:()=>{
+           const gs=ip('flex_gs'); const m1=ip('flex_m1'); const m2=ip('flex_m2'); const m3=ip('flex_m3');
+           const w1=ip('flex_w1'); const w2=ip('flex_w2');
+           return `# On OpenCenter host: ${gs}\n\n# Create cluster configuration (name: flex-k8s-prod)\nopencenter cluster init flex-k8s-prod --type kind\n\n# ── Flex node IPs (from OSPC scan — edit cluster config to include these) ──\n# Masters:  ${m1}  ${m2}  ${m3}\n# Workers:  ${w1}  ${w2}\n\n# Review and edit the generated configuration:\nopencenter cluster edit flex-k8s-prod`;},
          files:'Cluster config generated'},
         {phase:'cluster', n:4, what:'Provision the cluster',
-         cmd:'# Generate and apply infrastructure\nopencenter cluster setup my-first-cluster\n\n# Check cluster status (takes 30–50 min)\nopencenter cluster status my-first-cluster',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# On OpenCenter host: ${gs}\n\n# Generate and apply infrastructure\nopencenter cluster setup flex-k8s-prod\n\n# Check cluster status (takes 30–50 min)\nopencenter cluster status flex-k8s-prod\n\n# Watch for READY state:\nuntil opencenter cluster status flex-k8s-prod 2>/dev/null | grep -qi ready; do\n  echo "[$(date +%T)] waiting…"; sleep 30\ndone\necho "✅ Cluster READY"`;},
          files:'Cluster provisioned'},
         // Phase: GitOps
         {phase:'gitops', n:5, what:'Bootstrap GitOps (FluxCD)',
-         cmd:'# Install FluxCD and start reconciliation\nopencenter cluster bootstrap my-first-cluster',
+         cmd:()=>{
+           const gs=ip('flex_gs');
+           return `# On OpenCenter host: ${gs}\n\n# Install FluxCD and start reconciliation\nopencenter cluster bootstrap flex-k8s-prod\n\n# Check flux pods\nkubectl get pods -n flux-system\n# Expected: source-controller, kustomize-controller, helm-controller all Running`;},
          files:'FluxCD reconciliation started'},
         // Phase: Verify
         {phase:'verify', n:6, what:'Check platform services',
-         cmd:'kubectl get pods -A\n# Verify: flux-system pods Running\n# Platform services deploying: cert-manager, kyverno, etc.',
+         cmd:()=>{
+           const gs=ip('flex_gs'); const m1=ip('flex_m1');
+           return `# On OpenCenter host: ${gs}\n# (kubectl configured to cluster at ${m1})\n\nkubectl get nodes -o wide\nkubectl get pods -A\n# Verify: flux-system, cert-manager, kyverno pods Running\n\nNOT_RUNNING=$(kubectl get pods -A --no-headers | grep -v -E 'Running|Completed|Succeeded')\n[ -z "$NOT_RUNNING" ] && echo "✅ All pods Running" || echo "$NOT_RUNNING"`;},
          files:'All pods Running'},
         {phase:'verify', n:7, what:'Access Headlamp UI',
-         cmd:'kubectl port-forward -n headlamp svc/headlamp 8080:80\n# Open: http://localhost:8080',
+         cmd:()=>{
+           const gs=ip('flex_gs'); const jh=ip('jump');
+           return `# ── Option A: port-forward from OpenCenter host ─────────────────\n# On ${gs}:\nkubectl port-forward -n headlamp svc/headlamp 8080:80 &\n\n# ── Option B: SSH tunnel from jump host to OpenCenter host ──────────\n# On ${jh}:\n# ssh -L 8080:localhost:8080 ubuntu@${gs} -N &\n\n# Open in browser: http://localhost:8080\necho "Headlamp UI: http://localhost:8080"`;},
          files:'Headlamp UI accessible at :8080'},
       ];
 
@@ -1085,7 +1408,8 @@
             </td>
             <td class="gs-file">${row.files.replace(/\n/g,'<br>')}</td>`;
           tbody.appendChild(tr);
-          document.getElementById('oc-cmd-'+row.n) && (document.getElementById('oc-cmd-'+row.n).value = row.cmd);
+          const ocEl = document.getElementById('oc-cmd-'+row.n);
+          if (ocEl) ocEl.value = typeof row.cmd === 'function' ? row.cmd() : row.cmd;
           const lr = document.createElement('tr');
           lr.className = 'gs-log-row'; lr.id = 'oc-log-row-'+row.n;
           lr.innerHTML = `<td colspan="4"><div class="gs-log-inner" id="oc-log-inner-${row.n}"></div></td>`;
@@ -1136,7 +1460,370 @@
       document.addEventListener('DOMContentLoaded', () => {
         renderGsTable();
         renderOcTable();
+        renderMgTable();
       });
+
+      // ── Method 3 helpers ──────────────────────────────────────────────────
+      let _mgScRows = 2, _mgEpRows = 2;
+      function mgAddScRow() {
+        const i = _mgScRows++;
+        const d = document.createElement('div'); d.className='mg-map-row';
+        d.innerHTML=`<input placeholder="ospc-sc" id="mg_sc_old_${i}"><span class="mg-map-arrow">→</span><input placeholder="cinder-sc" id="mg_sc_new_${i}">`;
+        document.getElementById('mg-sc-rows').appendChild(d);
+      }
+      function mgAddEpRow() {
+        const i = _mgEpRows++;
+        const d = document.createElement('div'); d.className='mg-map-row';
+        d.innerHTML=`<input placeholder="old.hostname" id="mg_ep_old_${i}"><span class="mg-map-arrow">→</span><input placeholder="new.hostname" id="mg_ep_new_${i}">`;
+        document.getElementById('mg-ep-rows').appendChild(d);
+      }
+
+      function mgV(id) { return (document.getElementById(id)||{value:''}).value.trim(); }
+
+      function mgJumpPhase(phase, pillEl) {
+        // Highlight the clicked pill
+        document.querySelectorAll('#mgPhaseLegend .mg-pill').forEach(p => p.classList.remove('active'));
+        if (pillEl) pillEl.classList.add('active');
+        // Scroll to the phase header row in the table
+        const row = document.getElementById('mg-phase-' + phase);
+        if (row) row.scrollIntoView({behavior:'smooth', block:'start'});
+        // Remove highlight after 2s
+        if (pillEl) setTimeout(() => pillEl.classList.remove('active'), 2000);
+      }
+
+      // ── Magnum step data ──────────────────────────────────────────────────
+      const MG_STEPS = [
+        // ── PHASE 1: EXPORT (remote master mode) ────────────────────────
+        {phase:'export', n:1, what:'Test SSH connection to OSPC master',
+         cmd:()=>{
+           const ip=mgV('mg_master_ip')||'<OSPC_MASTER_IP>';
+           const u=mgV('mg_ssh_user')||'centos';
+           const k=mgV('mg_ssh_key')||'~/.ssh/id_rsa';
+           const p=mgV('mg_ssh_port')||'22';
+           return `# ── Stage 1 uses REMOTE MASTER MODE ──────────────────────────────\n# All kubectl/helm commands run ON the OSPC master via SSH.\n# Results are copied back via scp.\n\n# 1. Test SSH connectivity\nssh -i ${k} -p ${p} \\\n  -o StrictHostKeyChecking=no \\\n  -o ConnectTimeout=10 \\\n  -o BatchMode=yes \\\n  ${u}@${ip} \\\n  "echo ssh-ok && hostname && uptime"\n\n# Expected output: ssh-ok + hostname + uptime`;},
+         notes:'Required: SSH access to OSPC master. Check firewall + key authorization first.'},
+
+        {phase:'export', n:2, what:'Verify kubectl + helm on remote master',
+         cmd:()=>{
+           const ip=mgV('mg_master_ip')||'<OSPC_MASTER_IP>';
+           const u=mgV('mg_ssh_user')||'centos';
+           const k=mgV('mg_ssh_key')||'~/.ssh/id_rsa';
+           const p=mgV('mg_ssh_port')||'22';
+           return `SSH="ssh -i ${k} -p ${p} -o StrictHostKeyChecking=no -o BatchMode=yes ${u}@${ip}"\n\n# Check kubectl\necho "── kubectl ──"\n$SSH "kubectl version --client --short 2>/dev/null || kubectl version --client"\n$SSH "kubectl get nodes"\n\n# Check helm (non-fatal if missing)\necho ""\necho "── helm (optional) ──"\n$SSH "helm version --short 2>/dev/null && echo helm-ok || echo 'WARN: helm not found — Helm exports will be skipped'"\n\n# Check python3 (needed for remote summary generation)\necho ""\necho "── python3 ──"\n$SSH "python3 --version 2>/dev/null || echo 'WARN: python3 not found on master'"`;},
+         notes:'kubectl must work. helm optional. python3 needed for summary.json generation.'},
+
+        {phase:'export', n:3, what:'Run full export on remote master (SSH)',
+         cmd:()=>{
+           const ip=mgV('mg_master_ip')||'<OSPC_MASTER_IP>';
+           const u=mgV('mg_ssh_user')||'centos';
+           const k=mgV('mg_ssh_key')||'~/.ssh/id_rsa';
+           const p=mgV('mg_ssh_port')||'22';
+           const d=mgV('mg_outdir')||'./output';
+           const keep=mgV('mg_keep_remote')||'false';
+           return `# ── Exports via Python CLI (recommended) ─────────────────────────\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\nexport OSPC_MASTER_IP="${ip}"\nexport SSH_USER="${u}"\nexport SSH_KEY_PATH="${k}"\nexport KEEP_REMOTE_EXPORT="${keep}"\n\npython -m ospc_to_flex_k8.cli export \\\n  --master-ip   "${ip}" \\\n  --ssh-user    "${u}" \\\n  --ssh-key     "${k}" \\\n  --ssh-port    "${p}" \\\n  --output-dir  "${d}" \\\n  ${keep==='true'?'--keep-remote':''}\n\n# What this does on the remote master:\n#  1. Creates /tmp/ospc-k8-export-<timestamp>/\n#  2. Exports: ns sc crd sa role rolebinding clusterrole clusterrolebinding\n#              configmap secret svc ingress deployment statefulset daemonset\n#              hpa pdb networkpolicy pvc  (per-namespace + cluster-scoped)\n#  3. Copies kubeconfig if available\n#  4. Exports helm releases + values + manifests\n#  5. Builds container image inventory\n#  6. Writes summary.json + inventory.txt\n#  7. scp results → ${d}/<timestamp>/export/\n#  8. Removes /tmp/ospc-k8-export-<timestamp>/ (unless KEEP_REMOTE_EXPORT=true)`;},
+         notes:'All export content runs on OSPC master. Results land in output/<timestamp>/export/'},
+
+        {phase:'export', n:4, what:'Verify Stage 1 success criteria',
+         cmd:()=>{
+           const d=mgV('mg_outdir')||'./output';
+           return `# ── Check all Stage 1 success criteria ───────────────────────────\nEXPORT_DIR=$(ls -dt ${d}/*/export 2>/dev/null | head -1)\nif [ -z "$EXPORT_DIR" ]; then\n  echo "❌ No export directory found under ${d}/ — did Stage 1 run?"\n  exit 1\nfi\necho "Export dir: $EXPORT_DIR"\necho ""\n\n# Required output files\necho "── Required files ──"\n[ -f "$EXPORT_DIR/summary.json"   ] && echo "✅ summary.json"    || echo "❌ summary.json MISSING"\n[ -f "$EXPORT_DIR/inventory.txt"  ] && echo "✅ inventory.txt"   || echo "❌ inventory.txt MISSING"\n[ -d "$EXPORT_DIR/manifests"      ] && echo "✅ manifests/"      || echo "❌ manifests/ MISSING"\n[ -f "$EXPORT_DIR/images/images.txt" ] && echo "✅ images.txt"   || echo "⚠  images.txt not found"\n[ -f "$EXPORT_DIR/helm/releases.json" ] && echo "✅ helm/releases.json" || echo "⚠  helm/releases.json not found (helm may not be installed)"\necho ""\n\n# Print summary\necho "── Summary ──"\ncat "$EXPORT_DIR/summary.json" 2>/dev/null | python3 -m json.tool 2>/dev/null || cat "$EXPORT_DIR/summary.json"\necho ""\n\n# Print inventory\necho "── Inventory (first 30 lines) ──"\nhead -30 "$EXPORT_DIR/inventory.txt" 2>/dev/null\necho ""\n\n# Warning count\nWARNS=$(cat "$EXPORT_DIR/warnings.txt" 2>/dev/null | grep -vc '^$' || echo 0)\n[ "$WARNS" -gt 0 ] && echo "⚠ $WARNS warning(s) — review $EXPORT_DIR/warnings.txt" || echo "✅ No export warnings"\necho ""\necho "✅ Stage 1 complete — proceed to Stage 2"`;},
+         notes:'Verify: SSH worked, kubectl ran, files copied, summary.json + inventory.txt exist'},
+
+        // ── PHASE 2: DESIGN & VALIDATE CLUSTERTEMPLATE ───────────────────
+        {phase:'design', n:5, what:'Design ClusterTemplate parameters (Magnum 2025.2)',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const t=mgV('mg_template')||'k8s-v1.28';
+           const n=mgV('mg_cluster')||'flex-k8s-prod'; const k=mgV('mg_keypair')||'<keypair>';
+           const m=mgV('mg_masters')||'3'; const w=mgV('mg_workers')||'3';
+           return `source ${src}\n\n# ── List available Magnum 2025.2 compatible templates ─────────────────\necho "── Available ClusterTemplates ──"\nopenstack coe cluster template list -f table\n\n# ── Show selected template in full ────────────────────────────────────\necho ""\necho "── Selected template: ${t} ──"\nopenstack coe cluster template show ${t} 2>/dev/null || echo "Template '${t}' not found yet — see list above"\n\n# ── Generate design artifact (cluster-template-design.yaml) ───────────\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\npython -m ospc_to_flex_k8.cli design-template \\\n  --template-name  "${t}" \\\n  --cluster-name   "${n}" \\\n  --master-count   ${m} \\\n  --worker-count   ${w} \\\n  --keypair        "${k}" \\\n  --openrc         "${src}" \\\n  --output         ./output/cluster-template-design.yaml\n\necho ""\necho "✅ Design artifact written to ./output/cluster-template-design.yaml"\necho "   Review before proceeding to Stage 3 (Create Cluster)"\ncat ./output/cluster-template-design.yaml 2>/dev/null || true`;},
+         notes:'Produces cluster-template-design.yaml with validated COE, image, network/volume driver settings.'},
+
+        {phase:'design', n:6, what:'Validate ClusterTemplate constraints (Magnum 2025.2 rules)',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const t=mgV('mg_template')||'k8s-v1.28';
+           return `source ${src}\n\n# ── Validate Magnum 2025.2 constraints on the chosen template ─────────\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\npython -m ospc_to_flex_k8.cli validate \\\n  --template-name "${t}" \\\n  --openrc        "${src}"\n\n# What this checks:\n#  ✅ COE = kubernetes (not swarm)\n#  ✅ image os_distro = fedora-coreos (required for Magnum 2025.2)\n#  ✅ network_driver = flannel or calico (calico preferred)\n#  ✅ volume_driver = cinder (NOT rbd / NFS)\n#  ✅ heat_driver NOT set (deprecated in 2025.2)\n#  ✅ docker_storage_driver = overlay2\n#  ✅ master_lb_enabled = true (required for HA)\n#  ✅ floating_ip_enabled = true if external access needed\n#  ✅ tls_disabled = false (must stay enabled for Flex)\n\necho ""\necho "If any check fails, adjust template parameters before running Stage 3"\necho "See: docs/architecture.md §Stage 2 for full constraint list"`;},
+         notes:'All checks must PASS before Stage 3. Heat driver must NOT be set in Magnum 2025.2.'},
+
+        {phase:'design', n:7, what:'Check NodeGroup shapes + network/storage driver compatibility',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const t=mgV('mg_template')||'k8s-v1.28';
+           return `source ${src}\n\n# ── Check available flavors for master/worker nodes ───────────────────\necho "── Available flavors (pick masters + workers) ──"\nopenstack flavor list -f table | grep -E "^|memory|vcpu|disk" | head -20\n\n# ── Check available images with os_distro=fedora-coreos ───────────────\necho ""\necho "── Images with os_distro=fedora-coreos ──"\nopenstack image list --property os_distro=fedora-coreos -f table\n\n# ── Check available networks ──────────────────────────────────────────\necho ""\necho "── Networks (pick fixed_network) ──"\nopenstack network list -f table\n\n# ── Verify Cinder volume types (for volume_driver=cinder) ─────────────\necho ""\necho "── Cinder volume types ──"\nopenstack volume type list -f table\n\n# ── Verify Octavia LB service is available ────────────────────────────\necho ""\necho "── Octavia LB availability ──"\nopenstack loadbalancer list -f table 2>/dev/null || echo "Octavia not yet accessible (needs cluster first)"\n\n# ── Summary: NodeGroup design ─────────────────────────────────────────\necho ""\necho "Recommended NodeGroup design for ${t}:"\necho "  masters: 3 × <master-flavor>   (control plane, HA)"\necho "  workers: N × <worker-flavor>   (match OSPC capacity from Stage 1 inventory)"\necho ""\necho "Review inventory.txt from Stage 1 to size workers appropriately"\ncat ./output/*/export/inventory.txt 2>/dev/null | grep -E "node|worker|master" | head -10 || true`;},
+         notes:'Size worker nodes from Stage 1 inventory. fedora-coreos image required. Cinder for PVCs.'},
+
+        // ── PHASE 3: CREATE MAGNUM CLUSTER ───────────────────────────────
+        {phase:'create', n:8, what:'Source OpenRC + validate Flex CLI + confirm template (Stage 3)',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const t=mgV('mg_template')||'k8s-v1.28';
+           return `source ${src}\n\n# Verify auth\necho "── Auth ──"\nopenstack token issue | grep -E "expires|project_id"\n\n# List all available templates\necho ""\necho "── Available cluster templates ──"\nopenstack coe cluster template list\n\n# Validate the exact template we will use\necho ""\necho "── Validate template: ${t} ──"\nopenstack coe cluster template show ${t} | grep -E "name|coe|image|k8s_version|tls_disabled"\n[ $? -eq 0 ] && echo "✅ Template '${t}' confirmed" || { echo "❌ Template '${t}' not found — pick one from the list above"; exit 1; }`;},
+         notes:'Template must exist before cluster create. k8s-v1.28 is typical on Rackspace Flex.'},
+
+        {phase:'create', n:9, what:'Validate keypair exists on Flex',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const k=mgV('mg_keypair')||'<keypair>';
+           return `source ${src}\n\n# List all keypairs\necho "── Keypairs ──"\nopenstack keypair list -f table\n\n# Confirm target keypair is present\necho ""\necho "── Looking for keypair: ${k} ──"\nif openstack keypair show ${k} > /dev/null 2>&1; then\n  echo "✅ Keypair '${k}' exists"\n  openstack keypair show ${k} | grep -E "name|fingerprint|type"\nelse\n  echo "❌ Keypair '${k}' not found"\n  echo ""\n  echo "To create it from your current SSH public key:"\n  echo "  openstack keypair create --public-key ~/.ssh/id_rsa.pub ${k}"\n  exit 1\nfi`;},
+         notes:'Create keypair if missing: openstack keypair create --public-key ~/.ssh/id_rsa.pub <name>'},
+
+        {phase:'create', n:10, what:'Create Magnum cluster',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh';
+           const n=mgV('mg_cluster')||'flex-k8s-prod'; const t=mgV('mg_template')||'k8s-v1.28';
+           const m=mgV('mg_masters')||'3'; const w=mgV('mg_workers')||'3'; const k=mgV('mg_keypair')||'<keypair>';
+           return `source ${src}\n\nopenstack coe cluster create ${n} \\\n  --cluster-template ${t} \\\n  --master-count ${m} \\\n  --node-count ${w} \\\n  --keypair ${k}\n\necho "Cluster creation submitted."\necho "  Name:     ${n}"\necho "  Template: ${t}"\necho "  Masters:  ${m}   Workers: ${w}"\necho ""\necho "Poll status with: openstack coe cluster show ${n} -f value -c status"\necho "Expected flow: CREATE_IN_PROGRESS → CREATE_COMPLETE  (~10-20 min)"`;},
+         notes:'CREATE_IN_PROGRESS → CREATE_COMPLETE (10-20 min). Do not proceed until COMPLETE.'},
+
+        {phase:'create', n:11, what:'Poll until CREATE_COMPLETE',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const n=mgV('mg_cluster')||'flex-k8s-prod';
+           return `source ${src}\n\necho "Polling cluster '${n}' every 30s …"\nuntil openstack coe cluster show ${n} -f value -c status 2>/dev/null | grep -qE "COMPLETE|FAILED|ERROR"; do\n  STATUS=$(openstack coe cluster show ${n} -f value -c status 2>/dev/null || echo "UNKNOWN")\n  REASON=$(openstack coe cluster show ${n} -f value -c status_reason 2>/dev/null | head -1 || true)\n  echo "[$(date '+%H:%M:%S')] $STATUS  \${REASON:+— $REASON}"\n  sleep 30\ndone\n\nFINAL=$(openstack coe cluster show ${n} -f value -c status)\necho ""\necho "Final status: $FINAL"\nif [[ "$FINAL" == "CREATE_COMPLETE" ]]; then\n  echo "✅ Cluster ready — proceed to kubeconfig download"\nelse\n  echo "❌ Cluster ended in unexpected state: $FINAL"\n  echo "Inspect with: openstack coe cluster show ${n}"\n  exit 1\nfi`;},
+         notes:'Wait for CREATE_COMPLETE. On failure check status_reason for Magnum error details.'},
+
+        {phase:'create', n:12, what:'Download Flex kubeconfig + verify nodes',
+         cmd:()=>{const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const n=mgV('mg_cluster')||'flex-k8s-prod';
+           const out=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `source ${src}\n\n# Download kubeconfig from Magnum\nKUBEDIR=$(dirname ${out})\nmkdir -p "$KUBEDIR"\nopenstack coe cluster config ${n} --output-certs --dir "$KUBEDIR"\n[ -f "$KUBEDIR/config" ] && mv "$KUBEDIR/config" ${out} || true\n\n# Point kubectl at new config\nexport KUBECONFIG=${out}\necho "KUBECONFIG=${out}"\necho ""\n\n# Verify connectivity\necho "── kubectl get nodes ──"\nif kubectl get nodes --request-timeout=30s; then\n  echo ""\n  READY=$(kubectl get nodes --no-headers | grep -c ' Ready' || echo 0)\n  TOTAL=$(kubectl get nodes --no-headers | wc -l)\n  echo "✅ $READY/$TOTAL nodes Ready"\n  [ "$READY" -eq "$TOTAL" ] && echo "✅ Stage 2 complete" || echo "⚠ Not all nodes Ready yet — wait and re-check"\nelse\n  echo "❌ kubectl could not reach the cluster — check KUBECONFIG and cluster status"\n  exit 1\nfi`;},
+         notes:'KUBECONFIG must point to Flex cluster for all Stage 3-8 steps'},
+
+        // ── PHASE 4: TRANSFORM ────────────────────────────────────────────
+        {phase:'transform', n:13, what:'Write migration config files',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output';
+           const scRows=[];
+           for(let i=0;i<_mgScRows;i++){const o=mgV(`mg_sc_old_${i}`),n2=mgV(`mg_sc_new_${i}`);if(o&&n2)scRows.push(`  ${o}: ${n2}`);}
+           const epRows=[];
+           for(let i=0;i<_mgEpRows;i++){const o=mgV(`mg_ep_old_${i}`),n2=mgV(`mg_ep_new_${i}`);if(o&&n2)epRows.push(`  - old: ${o}\n    new: ${n2}`);}
+           const ns=mgV('mg_namespaces');
+           const nsBlock=ns?ns.split(/\s+/).filter(Boolean).map(n2=>`  - ${n2}`).join('\n'):'  # (all non-system namespaces)';
+           return `mkdir -p ${d}/configs\n\n# ── storage-map.yaml ────────────────────────────────────────────────\ncat > ${d}/configs/storage-map.yaml <<'EOF'\nold_to_new_storageclass:\n${scRows.join('\n')||'  ospc-standard: cinder-standard'}\ndefault: cinder-standard\nEOF\n\n# ── migration-plan.yaml ─────────────────────────────────────────────\ncat > ${d}/configs/migration-plan.yaml <<'EOF'\ninclude_namespaces:\n${nsBlock}\nexclude_namespaces:\n  - kube-system\n  - kube-public\n  - kube-node-lease\nexclude_kinds:\n  - Event\n  - Lease\nstrip_fields:\n  - metadata.uid\n  - metadata.resourceVersion\n  - metadata.generation\n  - metadata.creationTimestamp\n  - metadata.managedFields\n  - status\nremove_node_selectors: true\nexclude_secret_names:\n  - default-token\n  - kube-proxy\nEOF\n\n# ── ingress-map.yaml ────────────────────────────────────────────────\ncat > ${d}/configs/ingress-map.yaml <<'EOF'\nold_class: nginx\nnew_class: nginx\nannotation_overrides:\n  kubernetes.io/ingress.class: nginx\nEOF\n\n# ── endpoint-map.yaml ───────────────────────────────────────────────\ncat > ${d}/configs/endpoint-map.yaml <<'EOF'\nreplacements:\n${epRows.join('\n')||'  - old: svc.ospc.local\n    new: svc.flex.local'}\nEOF\n\necho "✅ Config files written to ${d}/configs/"`;},
+         notes:'Auto-built from mapping inputs above — edit files manually if transformer needs tuning'},
+
+        {phase:'transform', n:14, what:'Run manifest transformer (all transformations)',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output';
+           return `cd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\npip install -r requirements.txt -q\n\n# Find the latest export dir\nEXPORT_MANIFESTS=$(ls -dt ${d}/*/export/manifests 2>/dev/null | head -1)\nif [ -z "$EXPORT_MANIFESTS" ]; then\n  echo "❌ No export/manifests dir found under ${d}/ — run Stage 1 first"\n  exit 1\nfi\nTS=$(basename $(dirname $(dirname $EXPORT_MANIFESTS)))\nOUTPUT_TS="${d}/$TS"\n\necho "Source:  $EXPORT_MANIFESTS"\necho "Output:  $OUTPUT_TS/transform/transformed-manifests/"\necho ""\n\n# Transformations applied by the engine:\n# 1. storageClassName — remapped per storage-map.yaml\n# 2. ingress class annotations — remapped per ingress-map.yaml\n# 3. LoadBalancer Service annotations → Flex Octavia\n# 4. endpoint/FQDN substitution — per endpoint-map.yaml\n# 5. nodeSelector / affinity / tolerations — node-specific fields stripped\n# 6. Namespace filter — only include_namespaces in plan\n# 7. Secret filter — exclude source-cluster SA tokens, excluded names\n# 8. Source-cluster metadata strip — uid, resourceVersion, generation, managedFields, status\n# 9. ReadWriteMany access modes → flagged in transform-report.json (manual review needed)\n\npython -m ospc_to_flex_k8.cli transform \\\n  --source-dir "$EXPORT_MANIFESTS" \\\n  --output-dir "$OUTPUT_TS" \\\n  --plan       ${d}/configs/migration-plan.yaml\n\necho ""\necho "── transform-report.json ──"\ncat "$OUTPUT_TS/transform/transform-report.json" 2>/dev/null | python3 -m json.tool || true\necho ""\necho "✅ Transform complete → $OUTPUT_TS/transform/transformed-manifests/"\necho "   Review transform-report.json for warnings (RWX PVCs, secret exclusions, etc.)"`;},
+         notes:'Output: output/<ts>/transform/transformed-manifests/ + transform-report.json + logs/'},
+
+        // ── PHASE 5: RESTORE ─────────────────────────────────────────────
+        {phase:'restore', n:15, what:'Dry-run restore (validate before applying)',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output'; const k=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `export KUBECONFIG=${k}\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\n# Find latest transform output\nTRANSFORMED=$(ls -dt ${d}/*/transform/transformed-manifests 2>/dev/null | head -1)\nif [ -z "$TRANSFORMED" ]; then\n  echo "❌ No transformed-manifests dir found — run Stage 3 first"\n  exit 1\nfi\nTS=$(basename $(dirname $(dirname $(dirname $TRANSFORMED))))\n\necho "Dry-run restore from: $TRANSFORMED"\necho ""\n\n# DRY-RUN: validate manifests against the live Flex API server\npython -m ospc_to_flex_k8.cli restore \\\n  --transformed-dir "$TRANSFORMED" \\\n  --kubeconfig     "${k}" \\\n  --report-dir     "${d}/$TS" \\\n  --dry-run\n\necho ""\necho "✅ Dry-run complete — review output above for errors before real apply"\necho "   Phase order: CRDs → Namespaces → RBAC → ConfigMaps → Secrets → Storage → Services → Deployments → StatefulSets → DaemonSets → Ingresses → Policy → Helm"`;},
+         notes:'ALWAYS dry-run first. Check for API version errors, missing CRDs, forbidden fields.'},
+
+        {phase:'restore', n:16, what:'Apply restore — CRDs → Namespaces → RBAC → ConfigMaps → Secrets',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output'; const k=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `export KUBECONFIG=${k}\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\nTRANSFORMED=$(ls -dt ${d}/*/transform/transformed-manifests 2>/dev/null | head -1)\nTS=$(basename $(dirname $(dirname $(dirname $TRANSFORMED))))\n\necho "Restoring foundation resources (phases: crd → namespace → rbac → configmap → secret)"\n\npython -m ospc_to_flex_k8.cli restore \\\n  --transformed-dir "$TRANSFORMED" \\\n  --kubeconfig     "${k}" \\\n  --report-dir     "${d}/$TS" \\\n  --phases         crd,namespace,rbac,configmap,secret\n\necho ""\necho "── CRD readiness ──"\nkubectl get crd --no-headers 2>/dev/null | wc -l | xargs -I{} echo "CRDs installed: {}"\n\necho "── Namespaces ──"\nkubectl get ns --no-headers | grep -v -E '^kube-|^default'\n\necho "✅ Foundation resources applied — proceed to storage + workloads"`;},
+         notes:'CRDs must be established before any custom resources are applied'},
+
+        {phase:'restore', n:17, what:'Apply restore — Storage → Services → Deployments → StatefulSets → DaemonSets → Ingresses → Policy',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output'; const k=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `export KUBECONFIG=${k}\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\nTRANSFORMED=$(ls -dt ${d}/*/transform/transformed-manifests 2>/dev/null | head -1)\nTS=$(basename $(dirname $(dirname $(dirname $TRANSFORMED))))\n\necho "Restoring workloads (phases: storage → service → deployment → statefulset → daemonset → ingress → policy)"\n\npython -m ospc_to_flex_k8.cli restore \\\n  --transformed-dir "$TRANSFORMED" \\\n  --kubeconfig     "${k}" \\\n  --report-dir     "${d}/$TS" \\\n  --phases         storage,service,deployment,statefulset,daemonset,ingress,policy\n\necho ""\necho "── Rollout status (2 min timeout) ──"\nkubectl rollout status deployment --all-namespaces --timeout=120s 2>/dev/null || true\nkubectl rollout status statefulset --all-namespaces --timeout=120s 2>/dev/null || true\n\necho ""\necho "── apply-report.json ──"\ncat "${d}/$TS/apply-report.json" 2>/dev/null | python3 -m json.tool | head -60 || true\necho "✅ Workload restore submitted — review apply-report.json for per-resource status"`;},
+         notes:'PVCs will be empty until Stage 5 data restore. Services before Deployments so DNS resolves on first pod boot.'},
+
+        {phase:'restore', n:18, what:'Re-deploy Helm releases',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output'; const k=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `export KUBECONFIG=${k}\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\nTRANSFORMED=$(ls -dt ${d}/*/transform/transformed-manifests 2>/dev/null | head -1)\nTS=$(basename $(dirname $(dirname $(dirname $TRANSFORMED))))\n\n# Run Helm phase via Python CLI (reads helm/ dir from export, applies in correct order)\npython -m ospc_to_flex_k8.cli restore \\\n  --transformed-dir "$TRANSFORMED" \\\n  --kubeconfig     "${k}" \\\n  --report-dir     "${d}/$TS" \\\n  --phases         helm \\\n  --dry-run\n\n# ⚠ Review above then remove --dry-run to apply\n# Helm releases are re-installed from original chart registry + exported values.yaml\n# Ensure chart repos are accessible: helm repo list && helm repo update\n\ncat "${d}/$TS/restore-order.txt" 2>/dev/null || true\necho ""\necho "Review dry-run output, remove --dry-run flag above to apply Helm releases"`;},
+         notes:'Remove --dry-run once values.yaml validated. Chart registry must be reachable.'},
+
+        // ── PHASE 6: DATA RESTORE ─────────────────────────────────────────
+        {phase:'data', n:19, what:'Database restore via restore_db.sh',
+         cmd:()=>{const k=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `export KUBECONFIG=${k}\nREPO=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\n# ── MySQL: dump on source, restore on Flex ───────────────────────────\n# Credentials are read from pod environment — do NOT hardcode here\n# Fill in: SOURCE_NS SOURCE_POD TARGET_NS TARGET_POD DB_NAME\n\n$REPO/scripts/restore_db.sh \\\n  --type         mysql \\\n  --source-context  ospc-cluster \\\n  --source-ns    <SOURCE_NS> \\\n  --source-pod   <SOURCE_MYSQL_POD> \\\n  --target-context  flex-magnum-production \\\n  --target-ns    <TARGET_NS> \\\n  --target-pod   <TARGET_MYSQL_POD> \\\n  --db-name      <DB_NAME>\n\n# ── PostgreSQL ────────────────────────────────────────────────────────\n# $REPO/scripts/restore_db.sh \\\n#   --type         postgres \\\n#   --source-context  ospc-cluster \\\n#   --source-ns    <SOURCE_NS> \\\n#   --source-pod   <SOURCE_PG_POD> \\\n#   --target-context  flex-magnum-production \\\n#   --target-ns    <TARGET_NS> \\\n#   --target-pod   <TARGET_PG_POD> \\\n#   --db-name      <DB_NAME>\n\n# ── Verify row counts ─────────────────────────────────────────────────\n# kubectl exec -n <TARGET_NS> <TARGET_MYSQL_POD> -- \\\n#   mysql -u root -p"$MYSQL_ROOT_PASSWORD" <DB_NAME> -e "SELECT COUNT(*) FROM important_table;"\necho "Fill in SOURCE_NS, SOURCE_POD, TARGET_NS, TARGET_POD, DB_NAME before running"`;},
+         notes:'Do NOT hardcode credentials. Script reads MYSQL_ROOT_PASSWORD / POSTGRES_PASSWORD from pod env.'},
+
+        {phase:'data', n:20, what:'PVC file restore via helper pod + rsync',
+         cmd:()=>{const k=mgV('mg_flex_kube')||'~/.kube/flex-config'; const d=mgV('mg_outdir')||'./output';
+           return `export KUBECONFIG=${k}\nREPO=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\n# ── Option A: use pre-built helper template ──────────────────────────\n# Edit namespace + pvc name in template, then:\n# kubectl apply -f $REPO/templates/pvc_restore_helper.pod.yaml\n# kubectl wait pod/pvc-restore-helper -n <NAMESPACE> --for=condition=Ready --timeout=60s\n# kubectl cp ./backup/ <NAMESPACE>/pvc-restore-helper:/data/\n# kubectl exec -n <NAMESPACE> pvc-restore-helper -- chown -R 1000:1000 /data\n# kubectl delete pod pvc-restore-helper -n <NAMESPACE>\n\n# ── Option B: inline helper pod (customize NAMESPACE + PVC_NAME) ──────\nkubectl apply -f - <<'YAML'\napiVersion: v1\nkind: Pod\nmetadata:\n  name: pvc-restore-helper\n  namespace: <NAMESPACE>\nspec:\n  containers:\n  - name: helper\n    image: ubuntu:22.04\n    command: ["sleep","7200"]\n    volumeMounts:\n    - name: data\n      mountPath: /data\n  volumes:\n  - name: data\n    persistentVolumeClaim:\n      claimName: <PVC_NAME>\nYAML\n\nkubectl wait pod/pvc-restore-helper -n <NAMESPACE> --for=condition=Ready --timeout=60s\n\n# ── Copy via kubectl cp ───────────────────────────────────────────────\nkubectl cp ./local-backup/ <NAMESPACE>/pvc-restore-helper:/data/\n\n# ── Or rsync via port-forward (large datasets) ────────────────────────\n# kubectl port-forward -n <NAMESPACE> pod/pvc-restore-helper 2222:22 &\n# rsync -avz --progress -e "ssh -p 2222" ./local-backup/ root@localhost:/data/\n\n# Fix permissions after restore\nkubectl exec -n <NAMESPACE> pvc-restore-helper -- chown -R 1000:1000 /data\n\n# Cleanup\nkubectl delete pod pvc-restore-helper -n <NAMESPACE>`;},
+         notes:'Use rsync via port-forward for multi-GB datasets. Fix permissions to match app UID.'},
+
+        // ── PHASE 7: VALIDATE ─────────────────────────────────────────────
+        {phase:'validate', n:21, what:'Nodes + Pods + PVCs + Ingress health check',
+         cmd:()=>{const k=mgV('mg_flex_kube')||'~/.kube/flex-config';
+           return `export KUBECONFIG=${k}\necho "═══════════════════════════════════════════"\necho " Flex Cluster Health Check"\necho "═══════════════════════════════════════════"\n\necho "── Nodes ──────────────────────────"\nkubectl get nodes -o wide\nREADY=$(kubectl get nodes --no-headers | grep -c Ready || echo 0)\nTOTAL=$(kubectl get nodes --no-headers | wc -l)\n[ "$READY" -eq "$TOTAL" ] && echo "✅ $READY/$TOTAL nodes Ready" || echo "⚠ $READY/$TOTAL nodes Ready"\n\necho ""\necho "── Pod status by namespace ────────"\nkubectl get pods -A --no-headers | awk '{ns[$1]; st[$6]++} END {for(n in ns) print n}' | sort | \\\n  xargs -I{} sh -c 'NS={}; TOTAL=$(kubectl get pods -n $NS --no-headers 2>/dev/null | wc -l); RUNNING=$(kubectl get pods -n $NS --no-headers 2>/dev/null | grep -c Running || echo 0); echo "  $NS: $RUNNING/$TOTAL Running"'\n\necho ""\necho "── Unhealthy pods ─────────────────"\nkubectl get pods -A --no-headers | grep -v -E 'Running|Completed|Succeeded' || echo "  ✅ None"\n\necho ""\necho "── PVC status ─────────────────────"\nkubectl get pvc -A | awk 'NR==1 || $3!="Bound" {print}'\nBOUND=$(kubectl get pvc -A --no-headers 2>/dev/null | grep -c Bound || echo 0)\nTOTAL_PVC=$(kubectl get pvc -A --no-headers 2>/dev/null | wc -l)\n[ "$BOUND" -eq "$TOTAL_PVC" ] && echo "✅ $BOUND/$TOTAL_PVC PVCs Bound" || echo "⚠ $BOUND/$TOTAL_PVC PVCs Bound"\n\necho ""\necho "── Ingress addresses ──────────────"\nkubectl get ingress -A -o wide\n\necho ""\necho "── Services with no endpoints ─────"\nkubectl get ep -A --no-headers | awk '$3=="<none>" {print "  ⚠ No endpoints: "$1"/"$2}' || echo "  ✅ All services have endpoints"`;},
+         notes:'All nodes Ready, no CrashLoop/Pending pods, PVCs Bound, Ingresses have addresses'},
+
+        {phase:'validate', n:22, what:'Python validation suite + optional URL health checks',
+         cmd:()=>{const k=mgV('mg_flex_kube')||'~/.kube/flex-config'; const d=mgV('mg_outdir')||'./output';
+           return `export KUBECONFIG=${k}\ncd /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\n\nTS=$(ls -dt ${d}/*/export 2>/dev/null | head -1 | xargs -I{} basename $(dirname {}) || date +%Y%m%dT%H%M%SZ)\nREPORT_DIR="${d}/$TS"\nmkdir -p "$REPORT_DIR"\n\n# Run structured validation (non-zero exit on any FAIL)\nset +e\npython -m ospc_to_flex_k8.cli validate \\\n  --kubeconfig   "${k}" \\\n  --report-dir   "$REPORT_DIR"\nVALIDATE_EXIT=$?\nset -e\n\necho ""\necho "── validation-report.json ──"\ncat "$REPORT_DIR/validation-report.json" 2>/dev/null | python3 -m json.tool | head -80 || true\n\necho ""\necho "── validation-summary.txt ──"\ncat "$REPORT_DIR/validation-summary.txt" 2>/dev/null || true\n\n# ── Optional: URL health checks ─────────────────────────────────────\n# Uncomment and fill in your app URLs to verify HTTP 200 responses:\n# URLS=(\n#   "https://myapp.flex-domain.com/health"\n#   "https://api.flex-domain.com/status"\n# )\n# for URL in "\${URLS[@]}"; do\n#   STATUS=$(curl -sk -o /dev/null -w "%{http_code}" "$URL")\n#   [ "$STATUS" = "200" ] && echo "✅ $URL → $STATUS" || echo "❌ $URL → $STATUS"\n# done\n\necho ""\n[ $VALIDATE_EXIT -eq 0 ] && echo "✅ All validation checks PASSED — proceed to Stage 7" || { echo "❌ Validation FAILED (exit $VALIDATE_EXIT) — fix issues before cutover"; exit 1; }`;},
+         notes:'Writes validation-report.json + validation-summary.txt. Non-zero exit if any check fails.'},
+
+        // ── PHASE 8: CUTOVER ──────────────────────────────────────────────
+        {phase:'cutover', n:23, what:'Pre-cutover: maintenance mode + final sync',
+         cmd:()=>{const k=mgV('mg_flex_kube')||'~/.kube/flex-config'; const d=mgV('mg_outdir')||'./output';
+           const src=mgV('mg_openrc')||'~/flex-openrc.sh'; const n=mgV('mg_cluster')||'flex-k8s-prod';
+           return `# ═══════════════════════════════════════════════════════════════════\n# PRE-CUTOVER CHECKLIST — verify ALL items before proceeding\n# ═══════════════════════════════════════════════════════════════════\nexport KUBECONFIG=${k}\nsource ${src}\n\necho "Pre-cutover status"\necho ""\n\n# ── Checklist (manual sign-off required) ─────────────────────────────\necho "[ ] All Stage 6 validation checks PASSED"\necho "[ ] All PVCs Bound and data row-counts verified vs. source"\necho "[ ] All DB restore row counts match source"\necho "[ ] App URLs responding on Flex ingress/LB IPs"\necho "[ ] DNS TTL lowered ≥ 24h ago (current TTL ≤ 60s)"\necho "[ ] Maintenance window confirmed with stakeholders"\necho "[ ] OSPC cluster still healthy (do NOT tear down yet)"\necho "[ ] Rollback procedure reviewed and accessible"\necho ""\n\n# ── Final DB delta sync (capture changes since initial restore) ───────\nREPO=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\necho "── Running final DB delta sync ──"\n# $REPO/scripts/delta_sync.sh \\\n#   --namespaces <NS1>,<NS2> \\\n#   --src-context ospc-cluster \\\n#   --tgt-context flex-magnum-production \\\n#   --tgt-kubeconfig ${k}\n# (uncomment and fill in namespaces above)\n\n# ── Final file/PVC sync placeholder ──────────────────────────────────\necho "── Final file sync (fill in PVC names) ──"\n# kubectl exec -n <NS> pvc-restore-helper -- rsync -av /src-data/ /tgt-data/\n\n# ── Flex LB IPs (for DNS update) ──────────────────────────────────────\necho ""\necho "── Flex LoadBalancer IPs ──"\nkubectl get svc -A | grep LoadBalancer\necho ""\necho "── Magnum API endpoint ──"\nopenstack coe cluster show ${n} | grep api_address\necho ""\necho "→ When ALL checklist items confirmed, proceed to Step 21 (DNS switch)"`;},
+         notes:'Do not auto-execute DNS changes. Confirm all checklist items and maintenance window first.'},
+
+        {phase:'cutover', n:24, what:'DNS/LB switch + record cutover state',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output'; const n=mgV('mg_cluster')||'flex-k8s-prod';
+           return `# ── DNS / Load Balancer switch ────────────────────────────────────\n# This step is informational — execute DNS changes in your DNS provider\nexport KUBECONFIG=${mgV('mg_flex_kube')||'~/.kube/flex-config'}\n\necho "── Flex Ingress / LB IPs ──"\nkubectl get ingress -A -o=custom-columns=NS:.metadata.namespace,NAME:.metadata.name,HOSTS:.spec.rules[*].host,ADDRESS:.status.loadBalancer.ingress[*].ip 2>/dev/null\nkubectl get svc -A --field-selector='spec.type=LoadBalancer' -o=custom-columns=NS:.metadata.namespace,NAME:.metadata.name,EXTERNAL-IP:.status.loadBalancer.ingress[*].ip\n\necho ""\necho "DNS switch actions (execute in your DNS provider):"\necho "  1. Update A/CNAME records → Flex LB IPs above"\necho "  2. Verify propagation: dig +short <your-domain>"\necho "  3. Monitor error rates for 15-30 min after switch"\necho ""\n\n# ── Record cutover state + generate rollback plan ─────────────────────\nREPO=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\nTS=$(ls -dt ${d}/*/export 2>/dev/null | head -1 | xargs -I{} basename $(dirname {}) || date +%Y%m%dT%H%M%SZ)\nREPORT_DIR="${d}/$TS"\nmkdir -p "$REPORT_DIR"\n\ncd "$REPO"\npython -m ospc_to_flex_k8.cli rollback-plan \\\n  --stage           cutover-complete \\\n  --source-context  ospc-cluster \\\n  --target-context  ${n} \\\n  --output          "$REPORT_DIR/rollback-plan.json"\n\n# Record cutover timestamp\nCUTOVER_TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")\necho "{ \\"cutover_complete_at\\": \\"$CUTOVER_TS\\", \\"cluster\\": \\"${n}\\", \\"migration_state\\": \\"cutover-complete\\" }" \\\n  > "$REPORT_DIR/cutover-record.json"\n\necho ""\necho "✅ Cutover complete."\necho "   Rollback plan:    $REPORT_DIR/rollback-plan.json"\necho "   Cutover record:   $REPORT_DIR/cutover-record.json"\necho "   Cutover time:     $CUTOVER_TS"\necho ""\necho "IMPORTANT: Keep OSPC cluster healthy for ≥ 48h as rollback safety net"\necho "           Decommission only after: cutover-complete confirmed + 48h monitoring"`;},
+         notes:'Keep OSPC cluster running 48h. Rollback window closes once OSPC data is deleted.'},
+
+        // ── PHASE 9: ROLLBACK ─────────────────────────────────────────────
+        {phase:'rollback', n:25, what:'Generate rollback plan + execute if needed',
+         cmd:()=>{const d=mgV('mg_outdir')||'./output'; const n=mgV('mg_cluster')||'flex-k8s-prod';
+           return `# ── Migration states ─────────────────────────────────────────────\n# rehearsal          — dry-run / test migration (no production impact)\n# pre-cutover        — Flex cluster ready, OSPC still primary\n# cutover-started    — traffic switch in progress\n# cutover-complete   — Flex is primary, OSPC kept as safety net\n# rollback-triggered — decision made to revert to OSPC\n# rollback-complete  — OSPC is primary again, Flex traffic drained\n\nREPO=/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0/ospc2flex-k8-migration/ospc-to-flex-k8-migrator\nTS=$(ls -dt ${d}/*/export 2>/dev/null | head -1 | xargs -I{} basename $(dirname {}) || date +%Y%m%dT%H%M%SZ)\nREPORT_DIR="${d}/$TS"\nmkdir -p "$REPORT_DIR"\n\n# ── Generate rollback plan for current stage ────────────────────────\ncd "$REPO"\nMIGRATION_STAGE="\${MIGRATION_STAGE:-cutover-started}\"\npython -m ospc_to_flex_k8.cli rollback-plan \\\n  --stage           "$MIGRATION_STAGE" \\\n  --source-context  ospc-cluster \\\n  --target-context  ${n} \\\n  --output          "$REPORT_DIR/rollback-plan.json"\n\necho ""\necho "── rollback-plan.json ──"\ncat "$REPORT_DIR/rollback-plan.json" 2>/dev/null | python3 -m json.tool || true\n\n# ── To EXECUTE rollback ──────────────────────────────────────────────\necho ""\necho "If rollback is needed, run:"\necho ""\necho "  $REPO/scripts/rollback_helper.sh \\\\"\necho "    --src-context ospc-cluster \\\\"\necho "    --tgt-context ${n} \\\\"\necho "    --namespaces  <ns1>,<ns2>"\necho ""\necho "Rollback steps the script will perform:"\necho "  1. Scale down Flex deployments to 0"\necho "  2. Remove Flex ingress resources"\necho "  3. Repoint DNS/LB back to OSPC"\necho "  4. Verify OSPC pods healthy"\necho "  5. Record rollback-complete state + timestamp"\necho ""\n# Store rollback trigger timestamp (if rolling back)\n# echo "{ \\"rollback_triggered_at\\": \\"$(date -u +\\'%Y-%m-%dT%H:%M:%SZ\\')\\" }" >> "$REPORT_DIR/rollback-record.json"\necho "Set MIGRATION_STAGE env var to override stage (default: cutover-started)"`;},
+         notes:'Rollback window: open until OSPC data deleted. Never decommission OSPC before rollback-complete confirmed.'},
+      ];
+
+      const MG_PHASE_LABELS = {
+        export:   {label:'📥 Phase 1 — Export OSPC Cluster  (SSH → remote master → scp back)',  color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        design:   {label:'🔷 Phase 2 — Design &amp; Validate ClusterTemplate (Magnum 2025.2)',   color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        create:   {label:'🏗 Phase 3 — Create Flex Magnum Cluster',                              color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        transform:{label:'🔄 Phase 4 — Transform Manifests for Flex',                           color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        restore:  {label:'♻ Phase 5 — Restore Workloads to Flex',                               color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        data:     {label:'💾 Phase 6 — Data Restore (DB + PVC)',                                color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        validate: {label:'✅ Phase 7 — Validate + Smoke Tests',                                 color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        cutover:  {label:'✂ Phase 8 — Cutover (DNS / LB switch)',                               color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+        rollback: {label:'🔄 Phase 9 — Rollback Plan',                                          color:'rgba(34,197,94,.08)',   tc:'#86efac'},
+      };
+
+      function renderMgTable() {
+        const tb = document.getElementById('mgTBody');
+        if (!tb) return;
+        tb.innerHTML = '';
+        let lastPhase = null;
+        MG_STEPS.forEach((s, idx) => {
+          if (s.phase !== lastPhase) {
+            lastPhase = s.phase;
+            const pl = MG_PHASE_LABELS[s.phase] || {};
+            const tr = document.createElement('tr');
+            tr.className = 'mg-phase-row';
+            tr.id = 'mg-phase-' + s.phase;
+            tr.innerHTML = `<td colspan="4" style="background:${pl.color||'rgba(251,146,60,.05)'};color:${pl.tc||'#fb923c'};border-left:3px solid ${pl.tc||'#fb923c'};">${pl.label||s.phase}</td>`;
+            tb.appendChild(tr);
+            // Inject transform config inputs inline after the Transform phase header
+            if (s.phase === 'transform') {
+              const cfgTr = document.createElement('tr');
+              cfgTr.id = 'mg-transform-cfg';
+              cfgTr.innerHTML = `<td colspan="4" style="padding:12px 14px;background:rgba(168,85,247,.04);border-bottom:1px solid rgba(168,85,247,.12);">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+                  <div>
+                    <div style="font-size:0.67rem;font-weight:700;color:#c4b5fd;margin-bottom:6px;">StorageClass map <span style="color:#64748b;font-weight:400;">(old → new)</span></div>
+                    <div id="mg-sc-rows">
+                      <div class="mg-map-row"><input placeholder="ospc-standard" id="mg_sc_old_0"><span class="mg-map-arrow">→</span><input placeholder="cinder-standard" id="mg_sc_new_0"></div>
+                      <div class="mg-map-row"><input placeholder="ospc-fast" id="mg_sc_old_1"><span class="mg-map-arrow">→</span><input placeholder="cinder-fast" id="mg_sc_new_1"></div>
+                    </div>
+                    <button onclick="mgAddScRow()" style="margin-top:5px;background:none;border:1px dashed rgba(168,85,247,.3);color:#c4b5fd;padding:2px 10px;border-radius:5px;font-size:0.7rem;cursor:pointer;">+ add row</button>
+                  </div>
+                  <div>
+                    <div style="font-size:0.67rem;font-weight:700;color:#c4b5fd;margin-bottom:6px;">Endpoint replacements <span style="color:#64748b;font-weight:400;">(old → new)</span></div>
+                    <div id="mg-ep-rows">
+                      <div class="mg-map-row"><input placeholder="postgres.ospc.local" id="mg_ep_old_0"><span class="mg-map-arrow">→</span><input placeholder="postgres.flex.local" id="mg_ep_new_0"></div>
+                      <div class="mg-map-row"><input placeholder="redis.ospc.local" id="mg_ep_old_1"><span class="mg-map-arrow">→</span><input placeholder="redis.flex.local" id="mg_ep_new_1"></div>
+                    </div>
+                    <button onclick="mgAddEpRow()" style="margin-top:5px;background:none;border:1px dashed rgba(168,85,247,.3);color:#c4b5fd;padding:2px 10px;border-radius:5px;font-size:0.7rem;cursor:pointer;">+ add row</button>
+                  </div>
+                </div>
+                <div>
+                  <label style="font-size:0.67rem;font-weight:700;color:#c4b5fd;display:block;margin-bottom:4px;">Namespaces to migrate <span style="color:#64748b;font-weight:400;">(leave blank = all non-system)</span></label>
+                  <input id="mg_namespaces" placeholder="app monitoring ingress-nginx" style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(168,85,247,.2);border-radius:5px;color:#fed7aa;padding:5px 9px;font-size:0.78rem;font-family:'Courier New',monospace;outline:none;box-sizing:border-box;">
+                </div>
+              </td>`;
+              tb.appendChild(cfgTr);
+            }
+          }
+          const cmd = typeof s.cmd === 'function' ? s.cmd() : s.cmd;
+          const tr = document.createElement('tr');
+          tr.id = `mg-row-${idx}`;
+          tr.innerHTML = `
+            <td><span class="mg-num">${s.n}</span></td>
+            <td><div class="mg-what">${s.what}</div></td>
+            <td>
+              <div class="mg-cmd-wrap">
+                <textarea class="mg-cmd-ta" id="mg-cmd-${idx}" rows="5">${cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+                <div class="mg-btn-row">
+                  <button class="mg-run-btn" id="mg-run-${idx}" onclick="mgRun(${idx})">▶ Run</button>
+                  <button class="mg-copy-btn" onclick="mgCopy(${idx})">📋 Copy</button>
+                </div>
+              </div>
+            </td>
+            <td style="color:#94a3b8;font-size:0.75rem;line-height:1.5;">${s.notes}</td>`;
+          tb.appendChild(tr);
+          // log row
+          const lr = document.createElement('tr');
+          lr.className = 'mg-log-row'; lr.id = `mg-log-row-${idx}`;
+          lr.innerHTML = `<td colspan="4"><div class="mg-log-inner" id="mg-log-${idx}"></div></td>`;
+          tb.appendChild(lr);
+        });
+      }
+
+      // Update SSH badge in terminal header
+      function mgUpdateSshBadge() {
+        const ip = mgV('mg_master_ip');
+        const u  = mgV('mg_ssh_user') || 'centos';
+        const badge = document.getElementById('mgSshBadge');
+        if (!badge) return;
+        if (ip) {
+          badge.textContent = `SSH: ${u}@${ip}`;
+          badge.style.display = 'inline';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+
+      // Re-render step commands when config inputs change (live substitution)
+      document.addEventListener('input', e => {
+        if (e.target.id && e.target.id.startsWith('mg_')) {
+          MG_STEPS.forEach((s, idx) => {
+            const ta = document.getElementById(`mg-cmd-${idx}`);
+            if (ta && typeof s.cmd === 'function') {
+              const cmd = s.cmd();
+              ta.value = cmd;
+            }
+          });
+          mgUpdateSshBadge();
+        }
+      });
+
+      async function mgRun(idx) {
+        const ta  = document.getElementById(`mg-cmd-${idx}`);
+        const btn = document.getElementById(`mg-run-${idx}`);
+        const log = document.getElementById('mgLog');
+        const logRow = document.getElementById(`mg-log-row-${idx}`);
+        const logInner = document.getElementById(`mg-log-${idx}`);
+        const spin = document.getElementById('mgSpinner');
+        if (!ta) return;
+        const script = ta.value;
+
+        btn.disabled = true; btn.textContent = '⏳ Running…';
+        if (spin) spin.style.display = 'inline';
+        if (logRow) logRow.classList.add('open');
+        const ts = new Date().toLocaleTimeString();
+        const prefix = `[${ts}] Step ${MG_STEPS[idx]?.n} — ${MG_STEPS[idx]?.what}\n${'─'.repeat(60)}\n`;
+        if (logInner) { logInner.textContent = prefix; logInner.scrollTop = 0; }
+        if (log) { log.textContent += prefix; log.scrollTop = log.scrollHeight; }
+
+        // Use the Jobs Board if available (parent frame), otherwise fall back to fetch
+        try {
+          const label = `K8 Magnum: ${MG_STEPS[idx]?.what||'Step '+MG_STEPS[idx]?.n}`;
+          // Try parent frame launchJob
+          const win = window.parent !== window ? window.parent : window;
+          if (typeof win.launchJob === 'function') {
+            await win.launchJob(script, label, 'server');
+          } else {
+            // Fallback: direct fetch stream
+            const resp = await fetch('/api/agent1/jobs/launch', {
+              method: 'POST',
+              headers: {'Content-Type': 'text/plain', 'X-Job-Label': label, 'X-Job-Type': 'server'},
+              body: script,
+            });
+            if (!resp.ok) throw new Error('Launch error: ' + resp.statusText);
+            const {job_id} = await resp.json();
+            const stream = await fetch(`/api/agent1/jobs/${job_id}/stream`);
+            const reader = stream.body.getReader(); const dec = new TextDecoder();
+            while (true) {
+              const {value, done} = await reader.read(); if (done) break;
+              const txt = dec.decode(value, {stream:true});
+              if (logInner) { logInner.textContent += txt; logInner.scrollTop = logInner.scrollHeight; }
+              if (log) { log.textContent += txt; log.scrollTop = log.scrollHeight; }
+            }
+          }
+        } catch(e) {
+          const msg = `[ERROR] ${e.message}\n`;
+          if (logInner) logInner.textContent += msg;
+          if (log) { log.textContent += msg; log.scrollTop = log.scrollHeight; }
+        }
+        btn.disabled = false; btn.textContent = '▶ Run';
+        if (spin) spin.style.display = 'none';
+      }
+
+      function mgCopy(idx) {
+        const ta = document.getElementById(`mg-cmd-${idx}`);
+        if (!ta) return;
+        navigator.clipboard.writeText(ta.value);
+        const btn = document.getElementById(`mg-run-${idx}`)?.nextElementSibling;
+        if (btn) { const o = btn.textContent; btn.textContent='✓ Copied'; setTimeout(()=>btn.textContent=o,1200); }
+      }
       </script>
     </section>
 
