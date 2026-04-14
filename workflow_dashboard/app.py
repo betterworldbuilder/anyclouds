@@ -6347,6 +6347,36 @@ def download_report_file(filename):
         return send_file(safe_path, as_attachment=True)
     return jsonify({"error": "File not found"}), 404
 
+@app.get("/api/coder-drinks")
+def api_coder_drinks():
+    """Top-10 most-liked drinks by coders — queried live from pocdb on 104.130.169.61."""
+    try:
+        result = subprocess.run(
+            [
+                "ssh", "-i", "/root/.ssh/id_rsa",
+                "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=10",
+                "root@104.130.169.61",
+                "sudo -u postgres psql -d pocdb -t -A -F'|' -c "
+                "\"SELECT emoji, drink, category, likes FROM coder_drinks ORDER BY likes DESC LIMIT 10;\""
+            ],
+            capture_output=True, text=True, timeout=20
+        )
+        rows = []
+        for line in result.stdout.strip().splitlines():
+            parts = line.split("|")
+            if len(parts) == 4:
+                rows.append({
+                    "emoji": parts[0].strip(),
+                    "drink": parts[1].strip(),
+                    "category": parts[2].strip(),
+                    "likes": int(parts[3].strip()),
+                })
+        return jsonify({"ok": True, "rows": rows})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))

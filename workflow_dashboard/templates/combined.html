@@ -602,6 +602,28 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Top 10 Drinks by Coders widget ─────────────────────────────── -->
+    <div style="margin-top:28px; max-width:520px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:20px;">☕</span>
+          <div>
+            <div style="color:#e8edf8; font-size:16px; font-weight:700; letter-spacing:-.01em;">Top 10 Coder Drinks</div>
+            <div style="color:#4b5563; font-size:10px; font-family:monospace; margin-top:1px;">live · pocdb @ 104.130.169.61</div>
+          </div>
+        </div>
+        <button onclick="loadCoderDrinks()" id="btnRefreshDrinks"
+          style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:#94a3b8; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:11px;">
+          ↺ Refresh
+        </button>
+      </div>
+      <div id="coderDrinksTable" style="border-radius:12px; overflow:hidden; background:rgba(10,16,36,0.65); border:1px solid rgba(120,150,220,0.15); backdrop-filter:blur(14px);">
+        <div style="padding:20px; text-align:center; color:#374151; font-family:monospace; font-size:12px;">Loading…</div>
+      </div>
+    </div>
+
+  </div>
   </div>
 
   <!-- STAGE 1 panels -->
@@ -1984,6 +2006,81 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       });
   }
   loadTracker();
+
+  // ── Coder Drinks widget ──────────────────────────────────────────────
+  const CATEGORY_COLORS = {
+    'Coffee':       {bg:'rgba(161,91,41,.18)',  text:'#c97c3a', border:'rgba(161,91,41,.35)'},
+    'Energy Drink': {bg:'rgba(22,163,74,.15)',  text:'#4ade80', border:'rgba(22,163,74,.3)'},
+    'Tea':          {bg:'rgba(16,185,129,.14)', text:'#34d399', border:'rgba(16,185,129,.28)'},
+    'Soda':         {bg:'rgba(99,102,241,.15)', text:'#818cf8', border:'rgba(99,102,241,.3)'},
+    'Water':        {bg:'rgba(56,189,248,.13)', text:'#38bdf8', border:'rgba(56,189,248,.26)'},
+    'Other':        {bg:'rgba(148,163,184,.1)', text:'#94a3b8', border:'rgba(148,163,184,.22)'},
+  };
+
+  window.loadCoderDrinks = async function() {
+    const box = document.getElementById('coderDrinksTable');
+    const btn = document.getElementById('btnRefreshDrinks');
+    if (!box) return;
+    box.innerHTML = '<div style="padding:18px; text-align:center; color:#374151; font-family:monospace; font-size:12px; letter-spacing:.05em;">⏳ querying pocdb…</div>';
+    if (btn) btn.disabled = true;
+    try {
+      const res  = await fetch('/api/coder-drinks');
+      const data = await res.json();
+      if (!data.ok || !data.rows.length) throw new Error(data.error || 'empty');
+
+      const maxLikes = data.rows[0].likes;
+      let html = `
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(120,150,220,0.15);">
+              <th style="padding:9px 14px; text-align:left; color:#4b5563; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; width:32px;">#</th>
+              <th style="padding:9px 14px; text-align:left; color:#4b5563; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;">Drink</th>
+              <th style="padding:9px 14px; text-align:left; color:#4b5563; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;">Category</th>
+              <th style="padding:9px 14px; text-align:right; color:#4b5563; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;">Likes</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      data.rows.forEach((r, i) => {
+        const pct  = Math.round((r.likes / maxLikes) * 100);
+        const cat  = CATEGORY_COLORS[r.category] || CATEGORY_COLORS['Other'];
+        const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="color:#4b5563;font-size:11px;">${i+1}</span>`;
+        const bg   = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+        html += `
+            <tr style="background:${bg}; border-bottom:1px solid rgba(255,255,255,0.04); transition:background .12s;"
+                onmouseenter="this.style.background='rgba(99,155,255,0.07)'"
+                onmouseleave="this.style.background='${bg}'">
+              <td style="padding:10px 14px; text-align:center; font-size:15px;">${rank}</td>
+              <td style="padding:10px 14px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:17px; line-height:1;">${r.emoji}</span>
+                  <div>
+                    <div style="color:#dce6f8; font-weight:600; font-size:13px;">${r.drink}</div>
+                    <div style="margin-top:4px; height:3px; width:100%; background:rgba(255,255,255,0.06); border-radius:2px; min-width:80px;">
+                      <div style="height:100%; width:${pct}%; background:linear-gradient(90deg,#3b82f6,#7c3aed); border-radius:2px;"></div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding:10px 14px;">
+                <span style="background:${cat.bg}; color:${cat.text}; border:1px solid ${cat.border}; border-radius:5px; padding:2px 8px; font-size:10px; font-weight:600; white-space:nowrap;">${r.category}</span>
+              </td>
+              <td style="padding:10px 14px; text-align:right; color:#f1f5f9; font-weight:700; font-size:13px; font-family:monospace;">
+                ${r.likes.toLocaleString()}
+                <span style="color:#4b5563; font-size:10px; font-weight:400;"> ♥</span>
+              </td>
+            </tr>`;
+      });
+
+      html += '</tbody></table>';
+      box.innerHTML = html;
+    } catch(e) {
+      box.innerHTML = `<div style="padding:16px; color:#f87171; font-family:monospace; font-size:12px;">Error: ${e.message}</div>`;
+    }
+    if (btn) btn.disabled = false;
+  };
+
+  loadCoderDrinks();
 
   // ── OpenStack compat matrix ──
   (function(){
