@@ -1664,65 +1664,20 @@
                     if (!raw.trim()) { alert('Generate the DB script first'); return; }
                     if (!termBox || !log) { alert('UI elements missing — reload the page'); return; }
 
-                    if (execBtn) execBtn.style.display = 'none';
-                    if (stopBtn) stopBtn.style.display = 'inline-block';
-                    if (spinner) spinner.style.display = 'inline';
-                    termBox.style.display = 'block';
-                    log.textContent = '';
-                    termBox.scrollIntoView({behavior:'smooth'});
+                    // Build label: scenario + dry/live mode
+                    const dryEl2    = document.getElementById('db_dry_run');
+                    const isDry2    = dryEl2 ? dryEl2.checked : true;
+                    const dbScLabel = (document.querySelector('input[name="db_scenario"]:checked')||{value:'db'}).value;
+                    const jobLabel  = `DB: ${dbScLabel} | ${isDry2 ? 'DRY RUN' : 'LIVE'}`;
 
-                    const dryEl = document.getElementById('db_dry_run');
-                    const isDry = dryEl ? dryEl.checked : true;
-                    log.textContent += `[${new Date().toLocaleTimeString()}] ▶ Starting DB migration — ${isDry ? 'DRY RUN' : 'LIVE'}\n`;
+                    // Keep old terminal hidden — output goes to Jobs Board
+                    if (termBox) termBox.style.display = 'none';
+                    if (execBtn) execBtn.style.display = 'inline-block';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                    if (spinner) spinner.style.display = 'none';
 
-                    try {
-                        const resp = await fetch('/api/agent1/run/migration', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'text/plain'},
-                            body: raw
-                        });
-                        if (!resp.ok) throw new Error(`Server error ${resp.status}: ${resp.statusText}`);
-                        const reader  = resp.body.getReader();
-                        const dec     = new TextDecoder();
-                        let   lineBuf = '';
-                        const reportBanner = document.getElementById('db-report-banner');
-                        const reportLink   = document.getElementById('db-report-link');
-                        const reportPath   = document.getElementById('db-report-path');
-                        if (reportBanner) reportBanner.style.display = 'none';
-                        while (true) {
-                            const {value, done} = await reader.read();
-                            if (done) break;
-                            const chunk = dec.decode(value, {stream: true});
-                            log.textContent += chunk;
-                            log.scrollTop = log.scrollHeight;
-                            // Scan for [REPORT] lines in buffered stream
-                            lineBuf += chunk;
-                            let nl;
-                            while ((nl = lineBuf.indexOf('\n')) !== -1) {
-                                const line = lineBuf.slice(0, nl).trimEnd();
-                                lineBuf = lineBuf.slice(nl + 1);
-                                if (line.startsWith('[REPORT] ')) {
-                                    const htmlPath = line.slice('[REPORT] '.length).trim();
-                                    const fname    = htmlPath.split('/').pop();
-                                    if (reportBanner && reportLink && reportPath) {
-                                        reportPath.textContent = htmlPath;
-                                        reportLink.href = '/api/agent1/db-report/' + encodeURIComponent(fname);
-                                        reportBanner.style.display = 'flex';
-                                        reportBanner.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-                                    }
-                                }
-                            }
-                        }
-                        log.textContent += `\n[${new Date().toLocaleTimeString()}] ✓ DB migration complete`;
-                        // Auto-trigger comparison panel after successful migration
-                        // comparison triggered manually via button
-                    } catch(e) {
-                        log.textContent += `\n[ERROR] ${e.message}`;
-                    } finally {
-                        if (execBtn) execBtn.style.display = 'inline-block';
-                        if (stopBtn) stopBtn.style.display = 'none';
-                        if (spinner) spinner.style.display = 'none';
-                    }
+                    // Launch as parallel job card
+                    launchJob(raw, jobLabel, 'db');
                 };
 
                 window.stopDbScript = function() {
@@ -2191,6 +2146,24 @@ printf '</div>\\n'
         </div>
     </div>
     
+    <!-- ─── Jobs Board — unified parallel output (server + DB) ─────────────── -->
+    <div id="jobs-board" style="margin-top:24px; display:none;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 18px; background:#1e293b; border-radius:10px 10px 0 0; border:1px solid #334155; border-bottom:2px solid #334155;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:16px;">⚡</span>
+                <span style="color:#f1f5f9; font-weight:700; font-family:monospace; font-size:13px; letter-spacing:.5px;">MIGRATION JOBS</span>
+                <span id="jobs-running-badge" style="background:#3b82f6; color:#fff; font-size:11px; font-weight:700; padding:2px 10px; border-radius:10px;">0 running</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button onclick="stopAllJobs()" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); color:#f87171; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:700;">⏹ Stop All</button>
+                <button onclick="clearFinishedJobs()" style="background:rgba(71,85,105,0.2); border:1px solid #475569; color:#94a3b8; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:12px;">🗑 Clear Finished</button>
+            </div>
+        </div>
+        <div id="jobs-list" style="border:1px solid #334155; border-top:none; border-radius:0 0 10px 10px; background:#0d1117; padding:10px; display:flex; flex-direction:column; gap:8px; min-height:64px;">
+            <div id="jobs-empty-msg" style="color:#475569; font-family:monospace; font-size:12px; padding:16px; text-align:center;">No active jobs — click Execute on any migration to launch</div>
+        </div>
+    </div>
+
     <!-- Report XLS — Batch Engine -->
     <div class="panel output-panel" id="report-container-stage2" style="display:none; margin-top:20px; background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.3);">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
@@ -4126,6 +4099,231 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         window.URL.revokeObjectURL(url);
     });
 
+    // ── Jobs Board ─────────────────────────────────────────────────────────────
+
+    function rhLog(panel, msg, color) {
+        // alias so both Stage 1 and Stage 2 code can call rhLog
+        if (!panel) return;
+        const el = document.createElement('div');
+        const ts = new Date().toLocaleTimeString();
+        el.innerHTML = `<span style="color:#475569">[${ts}]</span> <span style="color:${color||'#a5d6ff'}">${String(msg).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
+        panel.appendChild(el);
+        panel.scrollTop = panel.scrollHeight;
+    }
+
+    function _jobBoardShow() {
+        const board = document.getElementById('jobs-board');
+        const empty = document.getElementById('jobs-empty-msg');
+        if (board) board.style.display = 'block';
+        if (empty) empty.style.display = 'none';
+    }
+
+    function _jobCardHTML(jobId, label, type) {
+        const isDB     = type === 'db';
+        const typeColor = isDB ? '#7c3aed' : '#3b82f6';
+        const typeBadge = isDB ? '🗄 DB' : '🖥 Server';
+        const reportSection = isDB ? `
+            <div id="job-report-${jobId}" style="display:none; padding:9px 14px; background:linear-gradient(135deg,#0d2818,#0d1a2d); border-top:1px solid #238636; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:18px;">📊</span>
+                    <div>
+                        <div style="color:#3fb950; font-weight:700; font-size:13px;">Comparison Report Ready</div>
+                        <div id="job-report-path-${jobId}" style="color:#8b949e; font-size:10px; font-family:monospace; margin-top:1px;"></div>
+                    </div>
+                </div>
+                <a id="job-report-link-${jobId}" href="#" target="_blank" style="padding:6px 14px; background:#238636; color:#fff; border-radius:6px; text-decoration:none; font-weight:700; font-size:12px;">📊 View Report</a>
+            </div>` : '';
+        return `
+        <div id="job-card-${jobId}" data-job-label="${label.replace(/"/g,'&quot;')}" style="border-radius:8px; overflow:hidden; border:1px solid #334155; transition:border-color 0.3s;">
+            <div style="background:#1e293b; padding:7px 12px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #334155; flex-wrap:wrap;">
+                <span id="job-status-icon-${jobId}" style="font-size:14px;">⏳</span>
+                <span style="background:${typeColor}22; color:${typeColor}; font-size:11px; font-weight:700; padding:1px 8px; border-radius:10px; border:1px solid ${typeColor}44;">${typeBadge}</span>
+                <span style="color:#f1f5f9; font-family:monospace; font-size:12px; font-weight:600; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${label.replace(/</g,'&lt;')}</span>
+                <span id="job-status-text-${jobId}" style="color:#3b82f6; font-size:11px; font-family:monospace;">● running</span>
+                <span style="flex:1;"></span>
+                <button onclick="exportJobLog('${jobId}')" style="background:transparent; border:1px solid #334155; border-radius:4px; cursor:pointer; font-size:10px; padding:2px 7px; color:#64748b;">📄 Export</button>
+                <button onclick="stopJob('${jobId}')" id="job-stop-btn-${jobId}" style="background:transparent; border:1px solid rgba(239,68,68,0.4); border-radius:4px; cursor:pointer; font-size:10px; padding:2px 7px; color:#f87171; font-weight:700;">⏹ Stop</button>
+                <button onclick="toggleJobPanel('${jobId}')" style="background:transparent; border:1px solid #334155; border-radius:4px; cursor:pointer; font-size:10px; padding:2px 7px; color:#64748b;">▲▼</button>
+            </div>
+            <div id="job-output-${jobId}" style="height:220px; overflow-y:auto; overflow-x:hidden; padding:12px 16px; background:#0b0f19; font-family:'Courier New',monospace; font-size:12px; color:#a5d6ff; word-wrap:break-word; word-break:break-all; white-space:pre-wrap; box-sizing:border-box; display:flex; flex-direction:column; gap:2px;"></div>
+            ${reportSection}
+        </div>`;
+    }
+
+    function _jobLog(jobId, msg, color) {
+        const out = document.getElementById('job-output-' + jobId);
+        if (!out) return;
+        const el = document.createElement('div');
+        el.style.color = color || '#a5d6ff';
+        el.textContent = msg;
+        out.appendChild(el);
+        out.scrollTop = out.scrollHeight;
+    }
+
+    function setJobStatus(jobId, status) {
+        const icon  = document.getElementById('job-status-icon-'  + jobId);
+        const text  = document.getElementById('job-status-text-'  + jobId);
+        const card  = document.getElementById('job-card-'          + jobId);
+        const stop  = document.getElementById('job-stop-btn-'      + jobId);
+        const icons  = {running:'⏳', success:'✅', failed:'❌', stopped:'⏹️', error:'❌'};
+        const colors = {running:'#3b82f6', success:'#22c55e', failed:'#ef4444', stopped:'#475569', error:'#ef4444'};
+        const texts  = {running:'● running', success:'● done', failed:'● failed', stopped:'● stopped', error:'● error'};
+        if (icon) icon.textContent    = icons[status]  || '⏳';
+        if (text) { text.textContent  = texts[status]  || ''; text.style.color = colors[status] || '#64748b'; }
+        if (card) card.style.borderColor = colors[status] || '#334155';
+        if (stop && status !== 'running') stop.style.display = 'none';
+        updateJobsBadge();
+    }
+
+    function updateJobsBadge() {
+        const badge = document.getElementById('jobs-running-badge');
+        if (!badge) return;
+        const count = document.querySelectorAll('[id^="job-status-icon-"]');
+        let running = 0;
+        count.forEach(el => { if (el.textContent === '⏳') running++; });
+        badge.textContent = running + ' running';
+        badge.style.background = running > 0 ? '#3b82f6' : '#475569';
+    }
+
+    async function launchJob(script, label, type) {
+        _jobBoardShow();
+        const list = document.getElementById('jobs-list');
+
+        // 0. Deduplicate: one card per label
+        const existing = list && list.querySelector(`[data-job-label="${label.replace(/"/g,'\\"')}"]`);
+        if (existing) {
+            const existingId = existing.id.replace('job-card-', '');
+            const statusIcon = document.getElementById('job-status-icon-' + existingId);
+            if (statusIcon && statusIcon.textContent === '⏳') {
+                // Already running — block re-launch
+                if (typeof showToast === 'function') showToast(`⚠️ "${label}" is already running`);
+                existing.scrollIntoView({behavior:'smooth', block:'nearest'});
+                return existingId;
+            }
+            // Finished card — remove it so we get a clean new card
+            existing.remove();
+        }
+
+        // 1. Launch job on backend → get job_id
+        let jobId;
+        try {
+            const resp = await fetch('/api/agent1/jobs/launch', {
+                method: 'POST',
+                headers: {'Content-Type': 'text/plain', 'X-Job-Label': label, 'X-Job-Type': type},
+                body: script,
+            });
+            if (!resp.ok) throw new Error(`Launch error ${resp.status}: ${resp.statusText}`);
+            const data = await resp.json();
+            jobId = data.job_id;
+        } catch(e) {
+            if (typeof showToast === 'function') showToast('❌ Job launch failed: ' + e.message);
+            else alert('Job launch failed: ' + e.message);
+            return null;
+        }
+
+        // 2. Create card immediately
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = _jobCardHTML(jobId, label, type);
+        const card = wrapper.firstElementChild;
+        if (list) list.appendChild(card);
+        document.getElementById('jobs-board').scrollIntoView({behavior:'smooth', block:'nearest'});
+        updateJobsBadge();
+
+        _jobLog(jobId, `[${new Date().toLocaleTimeString()}] ▶ Job launched — ${label}`, '#4ade80');
+
+        // 3. Stream output
+        try {
+            const streamResp = await fetch(`/api/agent1/jobs/${jobId}/stream`);
+            if (!streamResp.ok) throw new Error('Stream failed: ' + streamResp.status);
+
+            const reader  = streamResp.body.getReader();
+            const dec     = new TextDecoder();
+            let   lineBuf = '';
+            if (!window._jobReaders) window._jobReaders = {};
+            window._jobReaders[jobId] = reader;
+
+            while (true) {
+                const {value, done} = await reader.read();
+                if (done) break;
+                lineBuf += dec.decode(value, {stream: true});
+                let nl;
+                while ((nl = lineBuf.indexOf('\n')) !== -1) {
+                    const line = lineBuf.slice(0, nl).trimEnd();
+                    lineBuf = lineBuf.slice(nl + 1);
+                    if (!line) continue;
+
+                    if (line.startsWith('[JOB_DONE]')) {
+                        const rc = parseInt((line.match(/exit=(-?\d+)/) || [])[1] ?? '0');
+                        setJobStatus(jobId, rc === 0 ? 'success' : 'failed');
+                        _jobLog(jobId, `[${new Date().toLocaleTimeString()}] ${rc === 0 ? '✅ Complete' : '❌ Failed'} (exit=${rc})`, rc === 0 ? '#4ade80' : '#f87171');
+                    } else if (line.startsWith('[REPORT] ') && type === 'db') {
+                        const htmlPath = line.slice('[REPORT] '.length).trim();
+                        const fname    = htmlPath.split('/').pop();
+                        const banner   = document.getElementById('job-report-'      + jobId);
+                        const link     = document.getElementById('job-report-link-' + jobId);
+                        const path     = document.getElementById('job-report-path-' + jobId);
+                        if (banner) banner.style.display = 'flex';
+                        if (link)   link.href = '/api/agent1/db-report/' + encodeURIComponent(fname);
+                        if (path)   path.textContent = htmlPath;
+                        _jobLog(jobId, line, '#3fb950');
+                    } else {
+                        _jobLog(jobId, line);
+                    }
+                }
+            }
+        } catch(e) {
+            if (e.name !== 'AbortError') {
+                _jobLog(jobId, '[STREAM ERROR] ' + e.message, '#f87171');
+                setJobStatus(jobId, 'error');
+            }
+        }
+        return jobId;
+    }
+
+    async function stopJob(jobId) {
+        const r = window._jobReaders && window._jobReaders[jobId];
+        if (r) { try { r.cancel(); } catch(e) {} }
+        try { await fetch(`/api/agent1/jobs/${jobId}/stop`, {method:'POST'}); } catch(e) {}
+        setJobStatus(jobId, 'stopped');
+    }
+
+    async function stopAllJobs() {
+        try {
+            const resp = await fetch('/api/agent1/jobs');
+            const jobs = await resp.json();
+            await Promise.all(jobs.filter(j => j.status === 'running').map(j => stopJob(j.id)));
+        } catch(e) {}
+    }
+
+    function clearFinishedJobs() {
+        document.querySelectorAll('[id^="job-card-"]').forEach(card => {
+            const jobId = card.id.replace('job-card-', '');
+            const icon  = document.getElementById('job-status-icon-' + jobId);
+            if (icon && icon.textContent !== '⏳') card.remove();
+        });
+        const list = document.getElementById('jobs-list');
+        if (list && !list.querySelector('[id^="job-card-"]')) {
+            const empty = document.getElementById('jobs-empty-msg');
+            if (empty) empty.style.display = 'block';
+        }
+        updateJobsBadge();
+    }
+
+    function exportJobLog(jobId) {
+        const out = document.getElementById('job-output-' + jobId);
+        if (!out) return;
+        const text = Array.from(out.children).map(d => d.textContent).join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], {type:'text/plain'}));
+        a.download = `job_${jobId.slice(0,8)}_log.txt`;
+        a.click();
+    }
+
+    function toggleJobPanel(jobId) {
+        const p = document.getElementById('job-output-' + jobId);
+        if (p) p.style.display = p.style.display === 'none' ? 'flex' : 'none';
+    }
+
     // ── Rehost Stacked Panel helpers ───────────────────────────────────────
     function rhSafeId(name) { return 'rh_' + String(name).replace(/[^a-zA-Z0-9]/g, '_'); }
 
@@ -4292,10 +4490,12 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
 
         // Show terminal, update UI
         term.style.display = 'block';
-        spinner.style.display = 'inline';
+        // Show Jobs Board; keep old panel hidden
+        _jobBoardShow();
+        term.style.display = 'none';
+        spinner.style.display = 'none';
         execBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
-        term.scrollIntoView({ behavior: 'smooth' });
         window._allMigrationReaders = [];
         window._migrationReader = null;
 
@@ -4338,77 +4538,29 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
             createRehostTab(n); // no-op in stacked layout
             const panel = createRehostPanel(n, flexIP || ospcIP || '');
 
-            rhLog(panel, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, '#334155');
-            rhLog(panel, `🚀 Node: ${n}  |  FLEX IP: ${flexIP||'?'}  |  OSPC IP: ${ospcIP||'?'}`, '#60a5fa');
-            rhLog(panel, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, '#334155');
-
-            try {
-                setRehostTabStatus(n, 'running');
-                const resp = await fetch('/api/agent1/run/migration', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: nodeScript
-                });
-                if (!resp.ok) throw new Error(`API error ${resp.status}`);
-
-                const reader = resp.body.getReader();
-                window._allMigrationReaders.push(reader);
-                window._migrationReader = reader;
-                window._rhReaderMap[rhSafeId(n)] = reader;  // register for individual Stop
-                const decoder = new TextDecoder();
-
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    const txt = decoder.decode(value, { stream: true });
-                    txt.split('\n').forEach(l => { if (l.trim()) rhLog(panel, l); });
-                }
-
-                setRehostTabStatus(n, 'success');
-                rhLog(panel, `✔ Node migration complete: ${n}`, '#4ade80');
-                rhLog(overviewPanel, `✅ [${i+1}/${okS2Groups.length}] Done: ${n}`, '#4ade80');
-
-            } catch(e) {
-                setRehostTabStatus(n, 'error');
-                rhLog(panel, `[ERROR] ${e.message}`, '#ef4444');
-                rhLog(overviewPanel, `❌ [${i+1}/${okS2Groups.length}] Error: ${n} — ${e.message}`, '#ef4444');
-            }
+            // Launch as a Jobs Board card — streams its own output
+            const nodeLabel = `${n}  ${flexIP ? '→ ' + flexIP : (ospcIP ? ospcIP : '')}`;
+            rhLog(overviewPanel, `  [${i+1}] Launching: ${n}`, '#94a3b8');
+            await launchJob(nodeScript, nodeLabel, 'server');
+            rhLog(overviewPanel, `✅ [${i+1}/${okS2Groups.length}] Done: ${n}`, '#4ade80');
         });
 
         await Promise.all(nodePromises);
 
-        spinner.style.display = 'none';
         execBtn.style.display = 'inline-block';
         stopBtn.style.display = 'none';
         rhLog(overviewPanel, '=== ✅ All Node Migrations Complete ===', '#22c55e');
         showToast('✅ All parallel migrations complete');
-        // Auto-generate report after all jobs finish
         setTimeout(() => generateMigrationReport('stage2'), 500);
     });
 
     document.getElementById('stop-btn').addEventListener('click', async () => {
-        // Cancel all parallel readers
-        if (window._allMigrationReaders) {
-            for (const r of window._allMigrationReaders) { try { r.cancel(); } catch(e) {} }
-            window._allMigrationReaders = [];
-        }
-        if (window._migrationReader) { try { window._migrationReader.cancel(); } catch(e) {} window._migrationReader = null; }
-        // Tell backend to kill child processes
-        try { await fetch('/api/agent1/stop/migration', { method: 'POST' }); } catch(e) {}
-        // Mark all running node blocks as stopped
-        document.querySelectorAll('[id^="rh-status-icon-"]').forEach(icon => {
-            if (icon.textContent === '⏳') {
-                icon.textContent = '⏹️';
-                const block = document.getElementById('rh-block-' + icon.id.replace('rh-status-icon-', ''));
-                if (block) block.style.borderColor = '#475569';
-            }
-        });
+        await stopAllJobs();
         const overviewPanel = document.getElementById('rh-panel-overview');
         rhLog(overviewPanel, '[⏹ STOPPED by operator]', '#f59e0b');
-        document.getElementById('exec-spinner').style.display = 'none';
         document.getElementById('execute-btn').style.display = 'inline-block';
         document.getElementById('stop-btn').style.display = 'none';
-        showToast('🛑 Migration stopped');
+        showToast('🛑 All jobs stopped');
     });
 
     // (global-exec-controls panel removed)
