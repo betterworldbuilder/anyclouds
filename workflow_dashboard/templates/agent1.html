@@ -913,37 +913,31 @@
 
                     <!-- RIGHT: DB column -->
                     <div style="flex:1; min-width:270px; max-width:420px; display:flex; flex-direction:column; align-items:center; gap:10px;">
-                        <!-- Generate button (top) -->
-                        <button type="button" id="generate-db-btn"
+                        <!-- Generate All Scripts button -->
+                        <button type="button" id="generate-db-btn" onclick="generateAllDbScripts()"
                             style="width:100%;background:linear-gradient(135deg,#7c3aed,#6d28d9);font-size:1rem;padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:8px;color:#fff;cursor:pointer;font-weight:700;">
                             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3v2c0 1.657-3.582 3-8 3S4 11.657 4 9V7z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 9v4c0 1.657 3.582 3 8 3s8-1.343 8-3V9"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 13v4c0 1.657 3.582 3 8 3s8-1.343 8-3v-4"/></svg>
-                            <span id="generate-db-btn-label">Generate DB Script — Single</span>
+                            <span id="generate-db-btn-label">⚡ Generate All Scripts</span>
                         </button>
-                        <!-- Scenario toggle below -->
-                        <div style="display:flex;gap:0;background:rgba(0,0,0,0.4);border:1px solid rgba(124,58,237,0.35);border-radius:8px;overflow:hidden;font-size:0.82rem;font-weight:700;">
-                            <label id="db-sc-dbvm-lbl" title="Standalone DB VM: SSH direct to OSPC DB server → dump → restore on FLEX DB VM"
-                                style="display:flex;align-items:center;gap:6px;padding:8px 15px;cursor:pointer;color:#64748b;border-right:1px solid rgba(124,58,237,0.25);transition:background .15s;">
-                                <input type="radio" name="db_scenario" id="db_sc_dbvm" value="dbvm" style="display:none;" onchange="dbScenarioChanged()">
-                                🗃 Single DB VM
-                            </label>
-                            <label id="db-sc-single-lbl" title="Single OSPC DBaaS → single Flex DB VM, no replicas"
-                                style="display:flex;align-items:center;gap:6px;padding:8px 15px;cursor:pointer;background:rgba(124,58,237,0.25);color:#c4b5fd;border-right:1px solid rgba(124,58,237,0.25);transition:background .15s;">
-                                <input type="radio" name="db_scenario" id="db_sc_single" value="single" checked style="display:none;" onchange="dbScenarioChanged()">
-                                🗄 Single DBaaS
-                            </label>
-                            <label id="db-sc-replica-lbl" title="OSPC DBaaS (Cloud LB) → FLEX primary + FLEX replica VMs (13 steps)"
-                                style="display:flex;align-items:center;gap:6px;padding:8px 15px;cursor:pointer;color:#64748b;border-right:1px solid rgba(124,58,237,0.25);transition:background .15s;">
-                                <input type="radio" name="db_scenario" id="db_sc_replica" value="replica" style="display:none;" onchange="dbScenarioChanged()">
-                                🔁 DBaaS + Replica
-                            </label>
-                            <label id="db-sc-ha-lbl" title="HA DBaaS: OSPC HA VIP → FLEX primary → FLEX replicas (15 steps)"
-                                style="display:flex;align-items:center;gap:6px;padding:8px 15px;cursor:pointer;color:#64748b;transition:background .15s;">
-                                <input type="radio" name="db_scenario" id="db_sc_ha" value="ha" style="display:none;" onchange="dbScenarioChanged()">
-                                🔄 HA DBaaS
-                            </label>
+                        <!-- Status line: shows how many entries found in table -->
+                        <div id="db-gen-status" style="font-size:0.75rem;color:#8b7cc8;text-align:center;max-width:340px;line-height:1.4;">
+                            Scripts are generated per table entry — each row uses its own public IPs.
                         </div>
-                        <!-- Hint under toggle -->
-                        <div id="db-scenario-hint" style="font-size:0.75rem;color:#8b7cc8;text-align:center;max-width:340px;line-height:1.4;"></div>
+                        <!-- Keep hidden radio inputs for legacy compatibility -->
+                        <div style="display:none;">
+                            <input type="radio" name="db_scenario" id="db_sc_dbvm"   value="dbvm"    onchange="dbScenarioChanged()">
+                            <input type="radio" name="db_scenario" id="db_sc_single" value="single"  onchange="dbScenarioChanged()" checked>
+                            <input type="radio" name="db_scenario" id="db_sc_replica" value="replica" onchange="dbScenarioChanged()">
+                            <input type="radio" name="db_scenario" id="db_sc_ha"     value="ha"      onchange="dbScenarioChanged()">
+                        </div>
+                        <!-- DB scenario tab buttons -->
+                        <div style="display:flex; gap:0; width:100%; border-radius:8px; overflow:hidden; border:1px solid rgba(124,58,237,0.3); margin-top:4px;">
+                            <label id="db-sc-dbvm-lbl" onclick="document.getElementById('db_sc_dbvm').checked=true; dbScenarioChanged()" style="flex:1; padding:7px 4px; text-align:center; font-size:0.72rem; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.04); color:#64748b; border-right:1px solid rgba(255,255,255,0.08); line-height:1.3;">🗃 Single<br>DB VM</label>
+                            <label id="db-sc-single-lbl" onclick="document.getElementById('db_sc_single').checked=true; dbScenarioChanged()" style="flex:1; padding:7px 4px; text-align:center; font-size:0.72rem; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.04); color:#64748b; border-right:1px solid rgba(255,255,255,0.08); line-height:1.3;">🗄 Single<br>DBaaS</label>
+                            <label id="db-sc-replica-lbl" onclick="document.getElementById('db_sc_replica').checked=true; dbScenarioChanged()" style="flex:1; padding:7px 4px; text-align:center; font-size:0.72rem; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.04); color:#64748b; border-right:1px solid rgba(255,255,255,0.08); line-height:1.3;">🔁 DBaaS +<br>Replica</label>
+                            <label id="db-sc-ha-lbl" onclick="document.getElementById('db_sc_ha').checked=true; dbScenarioChanged()" style="flex:1; padding:7px 4px; text-align:center; font-size:0.72rem; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.04); color:#64748b; line-height:1.3;">🔄 HA<br>DBaaS</label>
+                        </div>
+                        <div id="db-scenario-hint" style="display:none;"></div>
                     </div>
 
                 </div><!-- end two-column -->
@@ -983,61 +977,75 @@
                                 <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (jumphost)</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">OSPC SSH ok, DB auth ok, FLEX SSH ok</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(20,184,166,0.06);">
+                                <td style="padding:6px 10px; text-align:center; color:#2dd4bf; font-weight:700;">✦</td>
+                                <td style="padding:6px 10px; color:#2dd4bf; font-weight:600; white-space:nowrap;">Engine detect</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">detect_db_port_remote</code> → <code style="color:#2dd4bf;">identify_db_engine_remote</code> → <code style="color:#2dd4bf;">DB_ENGINE_FAMILY</code> (mysql · mariadb · percona · postgresql · mongodb · mssql)</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → OSPC VM</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine type + version auto-identified — all subsequent steps engine-aware</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1</td>
                                 <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Discover</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">ssh OSPC_IP mysql SHOW DATABASES</code> — engine version, charset, users</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">_eng_version_ssh</code> + <code style="color:#2dd4bf;">_eng_discover_ssh</code> — DB list, engine version, charset, users</td>
                                 <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → OSPC VM</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">DB inventory + engine info recorded</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
-                                <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Compatibility</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Check MySQL/MariaDB version + GTID mode on OSPC; install matching engine on FLEX</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → OSPC + FLEX</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine versions matched, FLEX DB server running</td>
-                            </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
+                                <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Install engine</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">install_db_stack_on_node</code> on FLEX — installs engine matching <code style="color:#2dd4bf;">DB_ENGINE_FAMILY</code></td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → FLEX VM</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Matching DB engine running on FLEX</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
                                 <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Dump</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">ssh OSPC_IP mysqldump --single-transaction</code> per DB → gzip on source VM</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">_eng_dump_ssh</code> per DB — engine-aware dump (mysqldump · pg_dump · mongodump) on source VM</td>
                                 <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → OSPC VM</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Compressed dumps saved in OSPC /tmp</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine-native compressed dumps saved in OSPC /tmp</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
                                 <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Transfer</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">scp OSPC:/tmp/*.sql.gz → FLEX:/tmp/</code> direct VM-to-VM transfer</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → OSPC → FLEX</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Dumps arrive on FLEX /tmp</td>
-                            </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
-                                <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Restore</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">ssh FLEX zcat *.sql.gz | mysql</code> — CREATE DATABASE + import per DB</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → FLEX VM</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX DB populated with all schemas</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">ssh OSPC cat dump</code> <span style="color:#94a3b8;">|</span> <code style="color:#2dd4bf;">ssh FLEX cat &gt; dump</code> — direct SSH pipe, no local disk, no jump-host staging</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH pipe (OSPC → FLEX)</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Dumps stream directly to FLEX /tmp — no temp files on jumphost</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
-                                <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Validate</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Row-count + first-table comparison <code style="color:#2dd4bf;">mysql OSPC</code> vs <code style="color:#2dd4bf;">ssh FLEX mysql</code> per table</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">OSPC SSH + FLEX SSH</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Counts match — data integrity confirmed</td>
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
+                                <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Restore</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">_eng_restore_ssh</code> per DB — engine-aware restore (mysql · pg_restore · mongorestore) on FLEX</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → FLEX VM</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX DB populated with all schemas + data</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
+                                <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Validate</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">_eng_validate_counts_ssh</code> — row-count comparison OSPC vs FLEX per DB · <code style="color:#f87171;">exit 1</code> on mismatch</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">OSPC SSH + FLEX SSH</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Row counts match — data integrity confirmed or script aborts</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">7</td>
                                 <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Cutover</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Stop app → set OSPC <code style="color:#2dd4bf;">read_only=ON</code> → wait for queries to drain → repoint <code style="color:#2dd4bf;">DB_HOST → FLEX_IP</code></td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Engine-aware cutover — MySQL: <code style="color:#2dd4bf;">read_only=ON</code> · PG: <code style="color:#2dd4bf;">pg_ctl promote</code> · repoint <code style="color:#2dd4bf;">DB_HOST → FLEX_IP</code></td>
                                 <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">App config + SSH → OSPC</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writes to FLEX — OSPC isolated</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">8</td>
                                 <td style="padding:6px 10px; color:#5eead4; font-weight:600; white-space:nowrap;">Cleanup</td>
                                 <td style="padding:6px 10px; color:#e2e8f0;">Remove dumps from OSPC + FLEX · retain OSPC 48–72h · decommission OSPC DB VM</td>
                                 <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">SSH → OSPC + FLEX</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">Migration complete — OSPC DB VM retired</td>
+                            </tr>
+                            <tr style="border-top:2px solid rgba(20,184,166,0.3); background:rgba(20,184,166,0.05);">
+                                <td style="padding:6px 10px; text-align:center; color:#2dd4bf; font-weight:700;">★</td>
+                                <td style="padding:6px 10px; color:#2dd4bf; font-weight:600; white-space:nowrap;">DB Comparison</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#2dd4bf;">_run_db_cmp_phase "FLEX PRIMARY"</code> — databases · tables · columns · indexes · views · triggers · procs · row counts · DDL · data diff/checksum → HTML report</td>
+                                <td style="padding:6px 10px; color:#2dd4bf; font-size:0.75rem;">OSPC SSH + FLEX SSH</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Full OSPC ↔ FLEX parity report + CSV export generated</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1065,58 +1073,65 @@
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">0</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Pre-flight</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">nc -zv LB_IP 3306</code> + <code style="color:#a78bfa;">mysql -h LB_IP</code> auth test + SSH → Flex</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">nc -zv LB_IP PORT</code> + <code style="color:#a78bfa;">mysql -h LB_IP</code> auth test + SSH → FLEX</td>
                                 <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (jumphost)</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">LB reachable, DBaaS auth ok, Flex SSH ok</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">LB reachable, DBaaS auth ok, FLEX SSH ok</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(124,58,237,0.08);">
+                                <td style="padding:6px 10px; text-align:center; color:#a78bfa; font-weight:700;">✦</td>
+                                <td style="padding:6px 10px; color:#a78bfa; font-weight:600; white-space:nowrap;">Engine detect</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">detect_db_port</code> via LB → <code style="color:#a78bfa;">identify_db_engine</code> → <code style="color:#a78bfa;">DB_ENGINE_FAMILY</code> (mysql · mariadb · percona · postgresql · mongodb · mssql)</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (via LB)</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine type auto-identified — all steps adapt to detected engine</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Discover</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">mysql -h LB_IP SHOW DATABASES</code> — no SSH to DBaaS</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">DB list ready for loop</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">discover_databases()</code> via LB — <code style="color:#a78bfa;">SHOW DATABASES</code>, engine version, charset · no SSH to DBaaS</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (via LB)</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">DB list + engine info ready</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
-                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Dump</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">mysqldump -h LB_IP --single-transaction</code> per DB → local gzip</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local (no SSH to DBaaS)</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Compressed dumps in local /tmp</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Prepare FLEX</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Create dump dirs · create replication user if needed · configure primary replication settings</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">SSH → FLEX VM</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX node ready to receive seed</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
-                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Transfer</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">scp</code> dumps from local jumphost → Flex DB VM</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local → Flex SSH</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Dumps arrive on Flex /tmp</td>
-                            </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
-                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Restore</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">zcat *.sql.gz | mysql</code> — CREATE DATABASE + import per DB</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">SSH → Flex DB</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex DB populated</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Stream seed</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">stream_seed_to_primary()</code> — engine-aware dump via LB → SCP → restore on FLEX primary per DB</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local + FLEX SSH</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX primary has full DB copy</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Validate</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Row counts: <code style="color:#a78bfa;">mysql -h LB_IP</code> vs <code style="color:#a78bfa;">ssh Flex mysql</code> per table</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local + Flex SSH</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Counts match — data integrity confirmed</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">validate_primary()</code> — row-count comparison OSPC vs FLEX primary · <code style="color:#f87171;">exit 1</code> on mismatch</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local + FLEX SSH</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Seed integrity verified or script aborts</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
+                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Postcheck</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">postcheck_all_nodes()</code> · <code style="color:#a78bfa;">cleanup_seed_files()</code> — final node checks + remove dumps</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">SSH → FLEX VM</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">All nodes healthy · dumps removed</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
                                 <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Cut over</td>
                                 <td style="padding:6px 10px; color:#e2e8f0;">Repoint app <code style="color:#a78bfa;">DB_HOST → FLEX_IP</code> · delete OSPC Cloud LB to freeze DBaaS writes</td>
                                 <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">App config + Cloud Control Panel</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writes to Flex DB · OSPC DBaaS isolated</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writes to FLEX DB · OSPC DBaaS isolated</td>
                             </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">7</td>
-                                <td style="padding:6px 10px; color:#c4b5fd; font-weight:600; white-space:nowrap;">Cleanup</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Remove local + Flex /tmp dumps · delete Cloud LB (manual)</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-size:0.75rem;">Local + Flex SSH + Cloud CP</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Migration complete</td>
+                            <tr style="border-top:2px solid rgba(124,58,237,0.3); background:rgba(124,58,237,0.06);">
+                                <td style="padding:6px 10px; text-align:center; color:#a78bfa; font-weight:700;">★</td>
+                                <td style="padding:6px 10px; color:#a78bfa; font-weight:600; white-space:nowrap;">DB Comparison</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#a78bfa;">_run_db_cmp_phase "FLEX PRIMARY"</code> — databases · tables · columns · indexes · views · triggers · procs · row counts · DDL · data diff/checksum → HTML report</td>
+                                <td style="padding:6px 10px; color:#a78bfa; font-size:0.75rem;">Local (via LB) + FLEX SSH</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Full OSPC ↔ FLEX parity report + CSV export generated</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1162,9 +1177,17 @@
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
                                 <td style="padding:6px 10px; color:#a5b4fc; font-weight:600; white-space:nowrap;">Compatibility</td>
                                 <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Report engine/version/charset</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Install matching engine on all FLEX VMs</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;"><code style="color:#a5b4fc;">install_db_stack_on_node</code> on all FLEX VMs</td>
                                 <td style="padding:6px 10px; color:#e2e8f0;">Version/charset/GTID check OSPC vs FLEX — install matching engine version</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine versions matched, FLEX DB server running</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(99,102,241,0.08);">
+                                <td style="padding:6px 10px; text-align:center; color:#818cf8; font-weight:700;">✦</td>
+                                <td style="padding:6px 10px; color:#818cf8; font-weight:600; white-space:nowrap;">Engine detect</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">LB VIP port scan</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">All FLEX VMs prepared for detected engine</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#818cf8;">detect_db_port</code> → <code style="color:#818cf8;">identify_db_engine</code> → <code style="color:#818cf8;">DB_ENGINE_FAMILY</code> — all subsequent steps engine-aware</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine auto-identified — mysql · mariadb · percona · postgresql · mongodb · mssql</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
@@ -1246,6 +1269,14 @@
                                 <td style="padding:6px 10px; color:#e2e8f0;">Delete OSPC Cloud LB → retire DBaaS instance → remove replication user credentials</td>
                                 <td style="padding:6px 10px; color:#64748b; font-style:italic;">Migration complete — FLEX fully standalone</td>
                             </tr>
+                            <tr style="border-top:2px solid rgba(99,102,241,0.35); background:rgba(99,102,241,0.06);">
+                                <td style="padding:6px 10px; text-align:center; color:#818cf8; font-weight:700;">★</td>
+                                <td style="padding:6px 10px; color:#818cf8; font-weight:600; white-space:nowrap;">DB Comparison</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Active writer (OSPC)</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX primary + each replica verified</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#818cf8;">_run_db_cmp_phase "FLEX PRIMARY"</code> + per-replica loop <code style="color:#818cf8;">_run_db_cmp_phase "REPLICA IP"</code> — tables · columns · indexes · row counts · DDL · data checksum → HTML report</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Full OSPC ↔ FLEX primary + all replicas parity report generated</td>
+                            </tr>
                         </tbody>
                     </table>
                     </div>
@@ -1270,53 +1301,93 @@
                             </tr>
                         </thead>
                         <tbody>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(251,146,60,0.08);">
+                                <td style="padding:6px 10px; text-align:center; color:#fb923c; font-weight:700;">✦</td>
+                                <td style="padding:6px 10px; color:#fb923c; font-weight:600; white-space:nowrap;">Engine detect</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">HA VIP port scan</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;"><code style="color:#fcd34d;">install_db_stack_on_node</code> primary + all standbys</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">detect_db_port_remote</code> → <code style="color:#fcd34d;">identify_db_engine_remote</code> → <code style="color:#fcd34d;">DB_ENGINE_FAMILY</code> · install matching engine on all FLEX nodes</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Engine auto-identified · matching DB server running on all FLEX nodes</td>
+                            </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Expose source</td>
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">1/2</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Connectivity</td>
                                 <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">HA VIP = seed source (port 3306)</td>
                                 <td style="padding:6px 10px; color:#64748b; font-size:0.75rem; font-style:italic;">No DB role yet</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Verify Flex primary can reach OSPC HA VIP:3306 — TCP + root auth check on all 3 nodes</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex primary can connect to OSPC seed source</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">SSH to OSPC HA VIP + FLEX primary · <code style="color:#fcd34d;">_eng_discover_ssh</code> — DB list, engine version, charset</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">All nodes reachable · DB inventory recorded</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">2</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Verify engines</td>
-                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Source version + GTID checked</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex Pri + Flex Rep both verified</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Check MySQL/MariaDB version + GTID mode on OSPC, Flex primary, Flex replica — must match major version</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">All 3 nodes version-compatible</td>
-                            </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Seed Flex primary</td>
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">3/4</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Seed FLEX primary</td>
                                 <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Provides dump — role ends here</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex primary receives full clone</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">mysqldump --single-transaction --master-data=2</code> from OSPC HA VIP → restore on Flex primary → row-count validate</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;"><strong style="color:#fb923c;">OSPC disconnected</strong> — Flex primary is now self-contained clone</td>
-                            </tr>
-                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
-                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">4</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Bootstrap internal HA</td>
-                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex primary seeds Flex replica</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Create <code style="color:#fcd34d;">REPLICATION SLAVE</code> user on Flex primary for Flex replica; dump Flex primary → restore on Flex replica</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex replica seeded and ready to follow Flex primary</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX primary receives full clone</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">_eng_dump_ssh</code> on OSPC → SSH pipe stream to FLEX → <code style="color:#fcd34d;">_eng_restore_ssh</code> on FLEX primary per DB</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX primary has full DB copy · OSPC role ends</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">5</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Start Flex replication</td>
-                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex replica follows Flex primary</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP; START SLAVE</code> on Flex replica — monitor <code style="color:#fcd34d;">Seconds_Behind_Master → 0</code></td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex has its own internal HA pair (no OSPC dependency)</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Validate primary</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Read-only after dump</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX primary — verify row counts</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">_eng_validate_counts_ssh</code> per DB · row-count comparison OSPC vs FLEX · <code style="color:#f87171;">exit 1</code> on mismatch</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;"><strong style="color:#fb923c;">OSPC disconnected</strong> — FLEX primary is self-contained clone</td>
                             </tr>
                             <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
                                 <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">6</td>
-                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Cut over</td>
-                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Set read_only=ON → decommission</td>
-                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Flex primary = new app DB endpoint</td>
-                                <td style="padding:6px 10px; color:#e2e8f0;">Set OSPC read_only=ON; repoint app <code style="color:#fcd34d;">DB_HOST → Flex primary</code>; Flex replica provides HA; 48h stability before OSPC retirement</td>
-                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Flex HA pair fully independent — OSPC decommissioned</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Seed standbys</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX primary seeds FLEX standbys</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Create replication user on FLEX primary · <code style="color:#fcd34d;">mysqldump --all-databases --master-data=2</code> → SCP → restore on each standby</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">All standbys seeded from FLEX primary</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">7</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Start replication</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Standbys follow FLEX primary</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">CHANGE MASTER TO MASTER_HOST=FLEX_PRI_IP; START SLAVE</code> on each standby — monitor <code style="color:#fcd34d;">Seconds_Behind_Master → 0</code></td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX internal HA replication running — no OSPC dependency</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">8</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">HA control layer</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem; font-style:italic;">Not involved</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Deploy VIP + proxy</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Configure keepalived / ProxySQL / MaxScale · set FLEX HA VIP · verify <code style="color:#fcd34d;">SHOW SLAVE STATUS</code> on all standbys</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX HA cluster fully operational</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">9–12</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">App validation</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Still active — final writes</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">Staging tests on FLEX primary</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Point staging app → FLEX primary · run smoke tests · set <code style="color:#fcd34d;">super_read_only=ON</code> on OSPC · verify FLEX current</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">FLEX validated · OSPC write-frozen</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">13</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Cutover</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Set <code style="color:#f9a8d4;">read_only=ON</code> → decommission</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX primary = new app DB endpoint</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Confirm FLEX primary writable · repoint app <code style="color:#fcd34d;">DB_HOST → HA_VIP</code> · FLEX replica provides standby</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">App writing to FLEX — OSPC isolated</td>
+                            </tr>
+                            <tr style="border-top:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:6px 10px; text-align:center; color:#475569; font-weight:700;">14/15</td>
+                                <td style="padding:6px 10px; color:#fcd34d; font-weight:600; white-space:nowrap;">Post-cutover</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">Idle — 48–72h rollback window</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX HA pair live in production</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;">Verify <code style="color:#fcd34d;">SHOW SLAVE STATUS</code> on standbys · remove seed files · retain OSPC 48–72h · decommission</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Migration complete — FLEX HA fully independent</td>
+                            </tr>
+                            <tr style="border-top:2px solid rgba(251,146,60,0.35); background:rgba(251,146,60,0.05);">
+                                <td style="padding:6px 10px; text-align:center; color:#fb923c; font-weight:700;">★</td>
+                                <td style="padding:6px 10px; color:#fb923c; font-weight:600; white-space:nowrap;">DB Comparison</td>
+                                <td style="padding:6px 10px; color:#f9a8d4; font-size:0.75rem;">OSPC HA VIP (SSH)</td>
+                                <td style="padding:6px 10px; color:#6ee7b7; font-size:0.75rem;">FLEX primary verified (standbys via replication)</td>
+                                <td style="padding:6px 10px; color:#e2e8f0;"><code style="color:#fcd34d;">_run_db_cmp_phase "FLEX PRIMARY"</code> — databases · tables · columns · indexes · views · triggers · procs · row counts · DDL · data checksum → HTML report</td>
+                                <td style="padding:6px 10px; color:#64748b; font-style:italic;">Full OSPC ↔ FLEX primary parity report · standbys confirmed via SLAVE STATUS</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1420,11 +1491,6 @@
                     rLbl.style.background  = sc === 'replica' ? on   : off; rLbl.style.color  = sc === 'replica' ? onC   : offC;
                     hLbl.style.background  = sc === 'ha'      ? on   : off; hLbl.style.color  = sc === 'ha'      ? onC   : offC;
                     document.getElementById('db-scenario-hint').textContent = DB_SC_HINTS[sc] || '';
-                    document.getElementById('generate-db-btn-label').textContent =
-                        sc === 'ha'      ? 'Generate DB Script — HA DBaaS'        :
-                        sc === 'replica' ? 'Generate DB Script — DBaaS + Replica' :
-                        sc === 'dbvm'    ? 'Generate DB Script — Single DB VM'    :
-                                           'Generate DB Script — Single DBaaS';
                     const dbvmEl = document.getElementById('db-steps-dbvm');
                     if (dbvmEl) dbvmEl.style.display = sc === 'dbvm'    ? 'block' : 'none';
                     document.getElementById('db-steps-single').style.display  = sc === 'single'  ? 'block' : 'none';
@@ -1458,11 +1524,12 @@
                             <button id="copy-btn-db" onclick="copyDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">📋 Copy</button>
                             <button id="download-btn-db" onclick="downloadDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">⬇ Download</button>
                             <button type="button" id="execute-btn-db" onclick="executeDbScript()" class="secondary"
-                                style="padding:6px 14px;font-size:0.82rem;border-color:#7c3aed;color:#c4b5fd;font-weight:700;">🚀 Execute DB Migration</button>
+                                style="padding:6px 14px;font-size:0.82rem;border-color:#7c3aed;color:#c4b5fd;font-weight:700;"><span id="execute-btn-db-label">🚀 Execute DB Migration</span></button>
                             <button id="stop-btn-db" onclick="stopDbScript()" class="secondary"
                                 style="padding:6px 14px;font-size:0.82rem;border-color:#ef4444;color:#ef4444;display:none;">🛑 Stop</button>
                         </div>
                     </div>
+                    <div id="db-script-tabs" style="display:none;padding:4px 14px 0;background:rgba(76,29,149,0.15);border-bottom:1px solid rgba(124,58,237,0.2);display:flex;gap:6px;flex-wrap:wrap;"></div>
                     <pre style="margin:0;max-height:420px;overflow-y:auto;background:#0d0618;"><code id="script-output-db" style="font-family:'Fira Code',monospace;font-size:11.5px;color:#ddd8fe;"></code></pre>
                 </div>
 
@@ -1524,106 +1591,134 @@
                         b.style.background='rgba(124,58,237,0.15)'; b.style.color='#c4b5fd';
                         b.style.borderColor='rgba(124,58,237,0.4)'; b.textContent='⚡ LIVE — data will be moved';
                     }
+                    // Auto-regenerate so the displayed script always matches the current mode
+                    if (window._dbScripts && window._dbScripts.length > 0) {
+                        generateAllDbScripts(true);
+                    }
                 }
 
                 // ── DB script generator — two scenarios ───────────────────────
-                async function generateDbScript(quiet = false) {
+                // ── type → backend scenario key ──────────────────────────────
+                const _DB_TYPE_TO_SCENARIO = {
+                  'dbaas':       'v2_dbaas',   // DBaaS+Replicas
+                  'singledbaas': 'single',      // Single DBaaS
+                  'ha':          'ha',          // HA DBaaS
+                  'dbvm':        'dbvm',        // DB VM
+                };
+                const _DB_TYPE_LABEL = {
+                  'dbaas':       'DBaaS+Replica',
+                  'singledbaas': 'Single DBaaS',
+                  'ha':          'HA DBaaS',
+                  'dbvm':        'DB VM',
+                };
+
+                async function generateAllDbScripts(quiet = false) {
                   const btn = document.getElementById('generate-db-btn');
                   const lbl = document.getElementById('generate-db-btn-label');
-                  const origText = lbl ? lbl.textContent : '';
+                  const statusEl = document.getElementById('db-gen-status');
+                  const origText = lbl ? lbl.textContent : '⚡ Generate All Scripts';
                   try {
                     if (lbl) lbl.textContent = 'Generating…';
                     if (btn) btn.disabled = true;
 
                     const fv = id => (document.getElementById(id)||{value:''}).value.trim();
-                    const dbSc    = (document.querySelector('input[name="db_scenario"]:checked') || {value:'single'}).value;
-                    const isDry   = document.getElementById('db_dry_run').checked;
-                    const sshUser = fv('ssh_user')  || 'ubuntu';
-                    const sshKey  = fv('ssh_key_path') || '~/.ssh/id_rsa';
-                    const custName = fv('project_customer_name') || 'customer';
-                    const dbaasUser = fv('dbaas_user') || 'admin';
-                    const dbaasPass = fv('dbaas_pass');
+                    const isDry        = document.getElementById('db_dry_run') ? document.getElementById('db_dry_run').checked : false;
+                    const sshUser      = fv('ssh_user')   || 'ubuntu';
+                    const sshKey       = fv('ssh_key_path') || '~/.ssh/id_rsa';
+                    const custName     = fv('project_customer_name') || 'customer';
+                    const dbaasUser    = fv('dbaas_user') || 'admin';
+                    const dbaasPass    = fv('dbaas_pass');
                     const flexRootPass = fv('flex_root_pass');
-                    const dbaasLbOver  = fv('dbaas_lb_ip');
-                    const replUser = fv('repl_user') || 'replicator';
-                    const replPass = fv('repl_pass') || '';
+                    const replUser     = fv('repl_user')  || 'replicator';
+                    const replPass     = fv('repl_pass')  || '';
 
-                    // IPs from node cards
-                    function ipFromCard(role, inputName) {
-                      const isFlex = inputName.startsWith('flex_');
-                      const sel = isFlex ? `.custom-node-group-s2[data-role="${role}"]` : `.custom-node-group:not(.custom-node-group-s2)[data-role="${role}"]`;
-                      const card = document.querySelector(sel);
-                      if (!card) return null;
-                      const inp = card.querySelector(`input[name="${inputName}"]`);
-                      return inp ? inp.value.trim() : null;
+                    // Collect ALL table rows that have a known DB type
+                    const allRows = Array.from(document.querySelectorAll('tr[data-manual-type]'));
+                    const dbRows  = allRows.filter(tr => _DB_TYPE_TO_SCENARIO[tr.getAttribute('data-manual-type')]);
+
+                    if (dbRows.length === 0) {
+                      if (statusEl) statusEl.textContent = '⚠️ No entries in the table — add a server first.';
+                      if (typeof showToast === 'function') showToast('⚠️ No DB entries in the table.');
+                      return;
                     }
-                    const MOCK_DB = {
-                      single: { ospcPri: '162.209.114.67', flexPri: '104.130.29.16', ospcRep: '', flexRep: '' },
-                      ha:     { ospcPri: '10.0.0.10',      flexPri: '10.1.0.10',      ospcRep: '10.0.0.11', flexRep: '10.1.0.11' },
-                    };
-                    const mockScenario = dbSc === 'ha' ? 'ha' : 'single';
-                    let ospcPri = ipFromCard('db-primary', 'ospc_custom_ip[]') || fv('source_ip') || MOCK_DB[mockScenario].ospcPri;
-                    let flexPri = ipFromCard('db-primary', 'flex_custom_ip[]') || fv('target_ip') || MOCK_DB[mockScenario].flexPri;
 
-                    const flexRepIps = [];
-                    document.querySelectorAll('.custom-node-group-s2[data-role="db-replica"] input[name="flex_custom_ip[]"]').forEach(inp => { if (inp.value.trim()) flexRepIps.push(inp.value.trim()); });
-                    const flexRep = ipFromCard('db-replica', 'flex_custom_ip[]') || fv('target_ip_ha') || '';
-                    if (flexRepIps.length === 0 && flexRep) flexRepIps.push(flexRep);
-                    const flexRepIpsStr = flexRepIps.join(' ');
+                    if (statusEl) statusEl.textContent = `Generating ${dbRows.length} script(s)…`;
 
-                    const lbPublicIp = dbaasLbOver || ospcPri;
-                    const haRow    = document.querySelector('tr[data-manual-type="ha"]');
-                    const haVip    = haRow ? (haRow.getAttribute('data-ha-vip') || '') : '';
-                    const haMethod = haRow ? (haRow.getAttribute('data-ha-method') || '') : '';
+                    const prevActiveTab = quiet ? (parseInt((document.getElementById('script-output-db')||{}).getAttribute('data-tab-idx') || '0')) : 0;
 
-                    // Update button label based on scenario
-                    const scenarioLabel = dbSc === 'ha' ? 'HA DBaaS' : dbSc === 'dbvm' ? 'Single DB VM' : flexRepIpsStr ? 'DBaaS + Replica' : 'Single DBaaS';
-                    const labelEl = document.getElementById('generate-db-btn-label');
-                    if (labelEl) labelEl.textContent = `🗄 Generate DB Script — ${scenarioLabel}`;
+                    window._dbScripts = [];
 
-                    const payload = {
-                      scenario: dbSc === 'replica' || flexRepIpsStr ? (dbSc === 'ha' ? 'ha' : dbSc === 'dbvm' ? 'dbvm' : 'replica') : dbSc,
-                      dry: isDry ? '1' : '0',
-                      cust: custName,
-                      ssh_user: sshUser,
-                      ssh_key: sshKey,
-                      lb_ip: lbPublicIp,
-                      dbaas_user: dbaasUser,
-                      dbaas_pass: dbaasPass,
-                      flex_pri: flexPri,
-                      flex_rep_ips: flexRepIpsStr,
-                      flex_root_pass: flexRootPass,
-                      repl_user: replUser,
-                      repl_pass: replPass,
-                      ospc_pri: ospcPri,
-                      ha_method: haMethod,
-                      ha_vip: haVip,
-                    };
+                    for (const tr of dbRows) {
+                      const type     = tr.getAttribute('data-manual-type');
+                      const scenario = _DB_TYPE_TO_SCENARIO[type];
+                      const typeLabel= _DB_TYPE_LABEL[type] || type;
+                      const cb       = tr.querySelector('input[type="checkbox"]');
 
-                    const resp = await fetch('/api/agent1/generate/db-script', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify(payload),
-                    });
-                    if (!resp.ok) { const t = await resp.text(); throw new Error(t || resp.statusText); }
-                    const script = await resp.text();
+                      // ── IPs come ONLY from this row's data attributes ──
+                      const ospcIp   = (cb && cb.getAttribute('data-ospc-ip')) || '';
+                      const flexIp   = (cb && cb.getAttribute('data-flex-ip')) || '';
+                      const repAttr  = (type !== 'singledbaas' && type !== 'dbvm')
+                                        ? (tr.getAttribute('data-replica-ips') || '') : '';
+                      const repIps   = repAttr.split(' ').filter(Boolean).join(',');
 
-                    const el = document.getElementById('script-output-db');
-                    if (el) { el.innerHTML = (typeof syntaxHighlight === 'function') ? syntaxHighlight(script) : script; el.setAttribute('data-raw', script); }
+                      const rowName  = (tr.getAttribute('data-manual-name') || ospcIp).replace(/_+/g, ' ');
+                      const tabLabel = `${rowName} — ${typeLabel}`;
+
+                      if (!ospcIp || !flexIp) {
+                        window._dbScripts.push({ name: tabLabel, script: `# ERROR: missing IP for "${tabLabel}" (ospc=${ospcIp} flex=${flexIp})` });
+                        continue;
+                      }
+
+                      const haVip    = tr.getAttribute('data-ha-vip')    || '';
+                      const haMethod = tr.getAttribute('data-ha-method') || '';
+
+                      const payload = {
+                        scenario:       scenario,
+                        dry:            isDry ? '1' : '0',
+                        cust:           custName,
+                        ssh_user:       sshUser,
+                        ssh_key:        sshKey,
+                        lb_ip:          ospcIp,
+                        dbaas_user:     dbaasUser,
+                        dbaas_pass:     dbaasPass,
+                        flex_pri:       flexIp,
+                        flex_rep_ips:   repIps,
+                        flex_root_pass: flexRootPass,
+                        repl_user:      replUser,
+                        repl_pass:      replPass,
+                        ospc_pri:       ospcIp,
+                        ha_method:      haMethod,
+                        ha_vip:         haVip,
+                      };
+
+                      const resp = await fetch('/api/agent1/generate/db-script', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload),
+                      });
+                      if (!resp.ok) { const t = await resp.text(); throw new Error(`[${tabLabel}] ${t || resp.statusText}`); }
+                      const script = await resp.text();
+                      window._dbScripts.push({ name: tabLabel, script, type, ospcIp, flexIp, repIps });
+                    }
+
+                    const activeIdx = Math.min(prevActiveTab, window._dbScripts.length - 1);
+                    renderDbScriptTabs(activeIdx);
+
+                    if (statusEl) statusEl.textContent = `✅ ${window._dbScripts.length} script(s) generated — click a tab to view, then Execute.`;
+
                     const dbOut = document.getElementById('output-container-db');
                     if (!quiet) {
-                      // Reset terminal so it's ready for next execution
                       const termBox = document.getElementById('db-terminal-box');
                       const dbLog   = document.getElementById('db-log-output');
                       if (termBox) termBox.style.display = 'none';
                       if (dbLog)   dbLog.textContent = '';
                       if (dbOut) { dbOut.style.display = 'block'; setTimeout(() => dbOut.scrollIntoView({behavior:'smooth'}), 100); }
                     } else {
-                      // quiet mode (called from executeDbScript): just ensure script panel is visible
                       if (dbOut) dbOut.style.display = 'block';
                     }
                   } catch(err) {
-                    console.error('[generateDbScript] ERROR:', err);
+                    console.error('[generateAllDbScripts] ERROR:', err);
+                    if (statusEl) statusEl.textContent = '❌ Error: ' + err.message;
                     if (typeof showToast === 'function') showToast('❌ DB script error: ' + err.message);
                     else alert('DB script error: ' + err.message);
                   } finally {
@@ -1631,6 +1726,37 @@
                     if (lbl) lbl.textContent = origText;
                   }
                 }
+
+                // Keep legacy alias so any other code calling generateDbScript() still works
+                async function generateDbScript(quiet = false) { return generateAllDbScripts(quiet); }
+
+                function renderDbScriptTabs(activeIdx) {
+                  const tabBar = document.getElementById('db-script-tabs');
+                  const el     = document.getElementById('script-output-db');
+                  if (!tabBar || !el || !window._dbScripts || window._dbScripts.length === 0) return;
+
+                  const s = window._dbScripts[activeIdx];
+                  el.innerHTML = (typeof syntaxHighlight === 'function') ? syntaxHighlight(s.script) : s.script;
+                  el.setAttribute('data-raw', s.script);
+                  el.setAttribute('data-tab-idx', String(activeIdx));
+
+                  // Always show tabs (even 1 entry — makes the Execute button context clear)
+                  tabBar.style.display = 'flex';
+                  tabBar.style.flexWrap = 'wrap';
+                  tabBar.style.gap = '4px';
+                  tabBar.innerHTML = window._dbScripts.map((sc, i) => {
+                    const active = i === activeIdx;
+                    return `<button onclick="selectDbScriptTab(${i})" style="padding:5px 14px;font-size:0.78rem;border-radius:6px 6px 0 0;border:1px solid rgba(124,58,237,${active?'0.8':'0.3'});border-bottom:none;background:${active?'rgba(124,58,237,0.3)':'rgba(124,58,237,0.07)'};color:${active?'#c4b5fd':'#7c5cbf'};cursor:pointer;font-weight:${active?'700':'400'};">${sc.name}</button>`;
+                  }).join('');
+
+                  // Update the Execute button label to show which entry it will run
+                  const execBtn = document.getElementById('execute-btn-db');
+                  if (execBtn) execBtn.title = `Execute: ${s.name}`;
+                  const execLbl = document.getElementById('execute-btn-db-label');
+                  if (execLbl) execLbl.textContent = `▶ Execute — ${s.name}`;
+                }
+
+                window.selectDbScriptTab = function(idx) { renderDbScriptTabs(idx); };
 
                 function copyDbScript() {
                     const raw = document.getElementById('script-output-db').getAttribute('data-raw') || '';
@@ -1641,42 +1767,39 @@
                 }
 
                 function downloadDbScript() {
-                    const raw = document.getElementById('script-output-db').getAttribute('data-raw') || '';
-                    const cust = (document.getElementById('project_customer_name')||{value:'customer'}).value.replace(/[^a-z0-9_-]/gi,'_');
+                    const codeEl  = document.getElementById('script-output-db');
+                    const raw     = codeEl.getAttribute('data-raw') || '';
+                    const idx     = parseInt(codeEl.getAttribute('data-tab-idx') || '0');
+                    const tabName = (window._dbScripts && window._dbScripts[idx]) ? window._dbScripts[idx].name.replace(/[^a-z0-9_-]/gi,'_') : 'db';
+                    const cust    = (document.getElementById('project_customer_name')||{value:'customer'}).value.replace(/[^a-z0-9_-]/gi,'_');
                     const a = document.createElement('a');
                     a.href = URL.createObjectURL(new Blob([raw], {type:'text/plain'}));
-                    a.download = `${cust}_db_migration.sh`;
+                    a.download = `${cust}_${tabName}_db_migration.sh`;
                     a.click();
                 }
 
                 window.executeDbScript = async function() {
-                    // Always regenerate from current UI state so DRY_RUN flag and IPs are fresh
-                    await generateDbScript(true);   // quiet=true: don't hide terminal or scroll away
-
+                    // Regenerate with current DRY/LIVE toggle so stale cached scripts are never executed
+                    await generateAllDbScripts(true);
                     const codeEl  = document.getElementById('script-output-db');
                     const raw     = (codeEl ? codeEl.getAttribute('data-raw') : '') || '';
+                    const idx     = parseInt((codeEl ? codeEl.getAttribute('data-tab-idx') : '0') || '0');
                     const execBtn = document.getElementById('execute-btn-db');
                     const stopBtn = document.getElementById('stop-btn-db');
-                    const spinner = document.getElementById('db-spinner');
                     const termBox = document.getElementById('db-terminal-box');
-                    const log     = document.getElementById('db-log-output');
 
-                    if (!raw.trim()) { alert('Generate the DB script first'); return; }
-                    if (!termBox || !log) { alert('UI elements missing — reload the page'); return; }
+                    if (!raw.trim()) { alert('Generate scripts first using "⚡ Generate All Scripts"'); return; }
 
-                    // Build label: scenario + dry/live mode
-                    const dryEl2    = document.getElementById('db_dry_run');
-                    const isDry2    = dryEl2 ? dryEl2.checked : true;
-                    const dbScLabel = (document.querySelector('input[name="db_scenario"]:checked')||{value:'db'}).value;
-                    const jobLabel  = `DB: ${dbScLabel} | ${isDry2 ? 'DRY RUN' : 'LIVE'}`;
+                    const dryEl2   = document.getElementById('db_dry_run');
+                    const isDry2   = dryEl2 ? dryEl2.checked : false;
+                    const entry    = (window._dbScripts && window._dbScripts[idx]) ? window._dbScripts[idx] : null;
+                    const tabName  = entry ? entry.name : 'DB script';
+                    const jobLabel = `DB: ${tabName} | ${isDry2 ? 'DRY RUN' : 'LIVE'}`;
 
-                    // Keep old terminal hidden — output goes to Jobs Board
                     if (termBox) termBox.style.display = 'none';
                     if (execBtn) execBtn.style.display = 'inline-block';
                     if (stopBtn) stopBtn.style.display = 'none';
-                    if (spinner) spinner.style.display = 'none';
 
-                    // Launch as parallel job card
                     launchJob(raw, jobLabel, 'db');
                 };
 
@@ -3275,12 +3398,14 @@ printf '</div>\\n'
         const haVip        = document.getElementById('modal-ha-vip').value.trim();
         const haMethod     = document.getElementById('modal-ha-failover-method').value;
 
-        // Collect all dynamic replica IP rows
+        // Collect all dynamic replica IP rows — only for types that have replicas
         const replicaIps = [];
-        document.querySelectorAll('#modal-flex-replica-list .flex-replica-ip-row').forEach(inp => {
-            const v = inp.value.trim();
-            if (v) replicaIps.push(v);
-        });
+        if (_addPairType === 'dbaas' || _addPairType === 'ha') {
+            document.querySelectorAll('#modal-flex-replica-list .flex-replica-ip-row').forEach(inp => {
+                const v = inp.value.trim();
+                if (v) replicaIps.push(v);
+            });
+        }
         // Sync first replica into legacy hidden field (injectDbNodeCards fallback)
         document.getElementById('modal-flex-replica-ip').value = replicaIps[0] || '';
         const flexReplicaIp = replicaIps[0] || '';
@@ -3310,6 +3435,16 @@ printf '</div>\\n'
         haVip       = haVip       || '';
         haMethod    = haMethod    || '';
         flexVmUser  = flexVmUser  || 'ubuntu';
+
+        // Persist to localStorage (skip during loadPairsCache restore to avoid duplication)
+        if (!window._pairsRestoring) {
+          if (!window._pairsStore) window._pairsStore = [];
+          window._pairsStore.push({ name, type, ospcIp, flexIp, dbaasUser, dbaasPass, flexSshKey,
+            replicaVip, flexReplicaIp, replUser, replPass, replicaIps: replicaIps.slice(),
+            haVip, haMethod, flexVmUser, flexDbPass });
+          savePairsCache();
+        }
+
         const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
         const tbody = document.getElementById('node-pair-tbody');
         if (!tbody) return;
@@ -3352,6 +3487,7 @@ printf '</div>\\n'
         tr.setAttribute('data-manual-type', type);
         if (haVip)    tr.setAttribute('data-ha-vip',    haVip);
         if (haMethod) tr.setAttribute('data-ha-method', haMethod);
+        if (replicaIps && replicaIps.length > 0) tr.setAttribute('data-replica-ips', replicaIps.join(' '));
         tr.style.cssText = `background:${rowBg}; border-bottom:1px solid rgba(255,255,255,0.06);`;
         tr.innerHTML = `
             <td style="padding:10px 14px; text-align:center;">
@@ -3392,22 +3528,28 @@ printf '</div>\\n'
 
     function injectDbNodeCards(normalized, type, ospcIp, flexIp, dbaasUser, dbaasPass, flexSshKey, replicaVip, flexReplicaIp, replUser, replPass, replicaIps, flexDbPass) {
         replicaIps = replicaIps || (flexReplicaIp ? [flexReplicaIp] : []);
-        // Remove any stale cards with the same name first
-        document.querySelectorAll(`.custom-node-group[data-name^="${normalized}"]`).forEach(el => el.remove());
+        // Map type → scenario key used by generateDbScript()
+        const scenarioKey = type === 'dbvm' ? 'dbvm' : type === 'ha' ? 'ha' : 'single';
+        // Use type-scoped card name so pairs with the same server name but different types coexist
+        const cardName = `${normalized}__${type}`;
+        // Remove only stale cards for THIS exact type (not all pairs with the same server name)
+        document.querySelectorAll(`.custom-node-group[data-name^="${cardName}"]`).forEach(el => el.remove());
 
         // OSPC card — queried by ipFromCard(..., 'ospc_custom_ip[]') → not(.custom-node-group-s2)
         const oCard = document.createElement('div');
         oCard.className = 'node-group custom-node-group';
-        oCard.setAttribute('data-name', normalized);
+        oCard.setAttribute('data-name', cardName);
         oCard.setAttribute('data-role', 'db-primary');
+        oCard.setAttribute('data-scenario', scenarioKey);
         oCard.innerHTML = `<input type="hidden" name="ospc_custom_ip[]" value="${ospcIp}">`;
         document.getElementById('ospc-custom-fields').appendChild(oCard);
 
         // FLEX primary card
         const fCard = document.createElement('div');
         fCard.className = 'node-group custom-node-group custom-node-group-s2';
-        fCard.setAttribute('data-name', normalized);
+        fCard.setAttribute('data-name', cardName);
         fCard.setAttribute('data-role', 'db-primary');
+        fCard.setAttribute('data-scenario', scenarioKey);
         fCard.innerHTML = `<input type="hidden" name="flex_custom_ip[]" value="${flexIp}">`;
         document.getElementById('flex-custom-fields').appendChild(fCard);
 
@@ -3416,21 +3558,22 @@ printf '</div>\\n'
             replicaIps.forEach((rIp, i) => {
                 const rCard = document.createElement('div');
                 rCard.className = 'node-group custom-node-group custom-node-group-s2';
-                rCard.setAttribute('data-name', `${normalized}_replica${i > 0 ? (i+1) : ''}`);
+                rCard.setAttribute('data-name', `${cardName}_replica${i > 0 ? (i+1) : ''}`);
                 rCard.setAttribute('data-role', 'db-replica');
+                rCard.setAttribute('data-scenario', scenarioKey);
                 rCard.innerHTML = `<input type="hidden" name="flex_custom_ip[]" value="${rIp}">`;
                 document.getElementById('flex-custom-fields').appendChild(rCard);
             });
         }
 
-        // Auto-fill the DBaaS config strip (first pair wins for LB IP)
+        // Auto-fill the DBaaS config strip (only update if this is a DBaaS/HA pair, not VM)
         const lbField       = document.getElementById('dbaas_lb_ip');
         const userField     = document.getElementById('dbaas_user');
         const passField     = document.getElementById('dbaas_pass');
         const flexPassField = document.getElementById('flex_root_pass');
         const sshKeyField   = document.getElementById('ssh_key_path');
         const repVipField   = document.getElementById('dbaas_replica_vip');
-        if (lbField      && !lbField.value)   lbField.value       = ospcIp;
+        if (lbField && ospcIp && type !== 'dbvm') lbField.value = ospcIp;
         if (userField    && dbaasUser)         userField.value     = dbaasUser;
         if (passField    && dbaasPass)         passField.value     = dbaasPass;
         if (flexPassField && flexDbPass)       flexPassField.value = flexDbPass;
@@ -3445,13 +3588,59 @@ printf '</div>\\n'
         }
     }
 
+    // ── Pairs persistence (localStorage) ─────────────────────────────
+    const _PAIRS_KEY = 'ospc2flex_db_pairs_v1';
+
+    function savePairsCache() {
+      try { localStorage.setItem(_PAIRS_KEY, JSON.stringify(window._pairsStore || [])); } catch(e) {}
+    }
+
+    function loadPairsCache() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(_PAIRS_KEY) || '[]');
+        if (Array.isArray(stored) && stored.length > 0) {
+          window._pairsStore = [];
+          window._pairsRestoring = true;
+          stored.forEach(p => {
+            addMigrationPair(
+              p.name, p.type, p.ospcIp, p.flexIp,
+              p.dbaasUser, p.dbaasPass, p.flexSshKey,
+              p.replicaVip, p.flexReplicaIp,
+              p.replUser, p.replPass, p.replicaIps || [],
+              p.haVip, p.haMethod, p.flexVmUser, p.flexDbPass
+            );
+            window._pairsStore.push(p);
+          });
+          window._pairsRestoring = false;
+        }
+      } catch(e) { window._pairsRestoring = false; }
+    }
+
+    window.clearPairsCache = function() {
+      try { localStorage.removeItem(_PAIRS_KEY); } catch(e) {}
+      window._pairsStore = [];
+    };
+
     window.removeManualPair = function(normalized, btn) {
         const tr   = btn.closest('tr');
         const type = tr ? tr.getAttribute('data-manual-type') : null;
+        const cb   = tr ? tr.querySelector('input[type="checkbox"]') : null;
+        const ospcIp = cb ? cb.getAttribute('data-ospc-ip') : null;
         if (tr) tr.remove();
-        // Clean up hidden DB cards
-        if (type === 'dbaas' || type === 'singledbaas' || type === 'ha') {
-            document.querySelectorAll(`.custom-node-group[data-name="${normalized}"], .custom-node-group[data-name="${normalized}_replica"]`).forEach(el => el.remove());
+        // Clean up hidden DB cards — cards now use cardName = normalized__type
+        if (type) {
+            const cardName = `${normalized}__${type}`;
+            document.querySelectorAll(`.custom-node-group[data-name^="${cardName}"]`).forEach(el => el.remove());
+        }
+        // Remove from persistent store
+        if (window._pairsStore) {
+          const idx = window._pairsStore.findIndex(p =>
+            p.name.toLowerCase().replace(/[^a-z0-9]/g, '_') === normalized
+            && p.type === type
+            && (!ospcIp || p.ospcIp === ospcIp)
+          );
+          if (idx !== -1) window._pairsStore.splice(idx, 1);
+          savePairsCache();
         }
         updateManualPairCount();
         // Restore placeholder if tbody is now empty
@@ -4285,7 +4474,7 @@ echo "[A/B Strategy] Inline HAProxy successfully provisioned and load balancing 
         try {
             const resp = await fetch('/api/agent1/jobs/launch', {
                 method: 'POST',
-                headers: {'Content-Type': 'text/plain', 'X-Job-Label': label, 'X-Job-Type': type},
+                headers: {'Content-Type': 'text/plain', 'X-Job-Label': label.replace(/[^\x00-\x7F]/g, '-'), 'X-Job-Type': type},
                 body: script,
             });
             if (!resp.ok) throw new Error(`Launch error ${resp.status}: ${resp.statusText}`);
@@ -5280,6 +5469,14 @@ echo "[MOCK] Done — ${p.name} simulation complete"`;
             setTimeout(doInit, 800);
         }
     })();
+
+    // ══════ PAIRS CACHE RESTORE ══════
+    // Run after DOM is ready — restores all DB migration pairs from localStorage
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(loadPairsCache, 200));
+    } else {
+        setTimeout(loadPairsCache, 200);
+    }
 
     // ══════ CREDENTIAL PERSISTENCE → handled by /static/cred-cache.js ══════
 
