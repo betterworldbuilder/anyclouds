@@ -56,9 +56,13 @@ tsv_path, html_path = sys.argv[1], sys.argv[2]
 with open(tsv_path) as f:
     rows = list(csv.DictReader(f, delimiter='\t'))
 
-phases = list(dict.fromkeys(r['phase'] for r in rows))
-checks = list(dict.fromkeys(r['check'] for r in rows))
-data   = {(r['phase'], r['check']): (r['result'], r['detail']) for r in rows}
+# Separate failover test rows from comparison rows
+fo_rows = [r for r in rows if r['phase'] == 'FAILOVER TEST']
+cmp_rows = [r for r in rows if r['phase'] != 'FAILOVER TEST']
+
+phases = list(dict.fromkeys(r['phase'] for r in cmp_rows))
+checks = list(dict.fromkeys(r['check'] for r in cmp_rows))
+data   = {(r['phase'], r['check']): (r['result'], r['detail']) for r in cmp_rows}
 
 def pcnt(ph, res):
     return sum(1 for (p, c) in data if p == ph and data[(p, c)][0] == res)
@@ -73,7 +77,7 @@ csv_txt = buf.getvalue()
 
 now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-# Summary cards
+# Summary cards (comparison phases only)
 cards = ''
 for ph in phases:
     p, f = pcnt(ph, 'PASS'), pcnt(ph, 'FAIL')
@@ -85,6 +89,24 @@ for ph in phases:
               '&nbsp;&nbsp;'
               '<span class="fb">&#10008;&nbsp;' + str(f) + '&nbsp;FAIL</span>'
               '</div></div>')
+
+# Failover card (if data present)
+fo_card = ''
+if fo_rows:
+    fo_pass = sum(1 for r in fo_rows if r['result'] == 'PASS')
+    fo_fail = sum(1 for r in fo_rows if r['result'] == 'FAIL')
+    fo_final = next((r for r in fo_rows if r['check'] == 'Failover result'), None)
+    fo_status = fo_final['detail'] if fo_final else ('FAILOVER ENGINE WORKING' if fo_fail == 0 else 'FAILOVER FAILED')
+    fo_cls = 'all-pass' if fo_fail == 0 else 'has-fail'
+    fo_card = ('<div class="card fo-card ' + fo_cls + '">'
+               '<b>&#9889; Failover Test</b>'
+               '<div class="counts">'
+               '<span class="pg">&#10004;&nbsp;' + str(fo_pass) + '&nbsp;PASS</span>'
+               '&nbsp;&nbsp;'
+               '<span class="fb">&#10008;&nbsp;' + str(fo_fail) + '&nbsp;FAIL</span>'
+               '</div>'
+               '<div class="fo-status">' + H.escape(fo_status) + '</div>'
+               '</div>')
 
 # Section detection for grouping
 def get_section(chk):
@@ -102,7 +124,7 @@ def get_label(chk):
             return chk.split(sep, 1)[1]
     return chk
 
-# Table rows
+# Comparison table rows
 thead = '<tr><th>Check</th>' + ''.join('<th>' + H.escape(p) + '</th>' for p in phases) + '</tr>'
 cells = ''
 last_sec = None
@@ -128,11 +150,36 @@ for chk in checks:
             cells += '<td class="n">&mdash;</td>'
     cells += '</tr>\n'
 
+# Failover results table
+fo_section = ''
+if fo_rows:
+    fo_cells = ''
+    for r in fo_rows:
+        res, det, chk = r['result'], r['detail'], r['check']
+        if res == 'PASS':
+            badge = '<td class="p fo-res">&#10004;&nbsp;PASS</td>'
+        elif res == 'FAIL':
+            badge = '<td class="f fo-res">&#10008;&nbsp;FAIL</td>'
+        else:
+            badge = '<td class="i fo-res">&#8505;&nbsp;INFO</td>'
+        fo_cells += ('<tr>'
+                     '<td class="fo-step">' + H.escape(chk) + '</td>'
+                     + badge +
+                     '<td class="fo-det">' + H.escape(det) + '</td>'
+                     '</tr>\n')
+    fo_section = ('<h2 class="fo-hdr">&#9889; HA Failover Test Results</h2>'
+                  '<table class="fo-tbl">'
+                  '<thead><tr><th>Step</th><th>Result</th><th>Detail</th></tr></thead>'
+                  '<tbody>' + fo_cells + '</tbody>'
+                  '</table>')
+
 CSS = (
     '*{box-sizing:border-box;margin:0;padding:0}'
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
     'background:#0d1117;color:#e6edf3;padding:28px 32px}'
     'h1{color:#58a6ff;font-size:24px;font-weight:700;margin-bottom:4px}'
+    'h2.fo-hdr{color:#f0a83a;font-size:18px;font-weight:700;margin:32px 0 14px;'
+    'border-top:2px solid #30363d;padding-top:24px}'
     '.ts{color:#8b949e;font-size:12px;margin-bottom:22px}'
     '.cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px}'
     '.card{background:#161b22;border:1px solid #30363d;border-radius:10px;'
@@ -140,6 +187,8 @@ CSS = (
     '.card.all-pass{border-color:#238636}'
     '.card.has-fail{border-color:#da3633}'
     '.card b{display:block;color:#79c0ff;font-size:13px;font-weight:600;margin-bottom:10px}'
+    '.fo-card b{color:#f0a83a}'
+    '.fo-status{margin-top:8px;font-size:11px;color:#8b949e;word-break:break-word}'
     '.counts{display:flex;gap:14px;align-items:baseline}'
     '.pg{color:#3fb950;font-weight:700;font-size:20px}'
     '.fb{color:#f85149;font-weight:700;font-size:20px}'
@@ -162,6 +211,11 @@ CSS = (
     '.sec-hdr td{background:#1c2128!important;color:#58a6ff;font-weight:700;'
     'font-size:11px;text-transform:uppercase;letter-spacing:.06em;'
     'padding:6px 14px;border-top:2px solid #30363d}'
+    '.fo-tbl th:nth-child(1){min-width:260px}'
+    '.fo-tbl th:nth-child(2){width:110px}'
+    '.fo-step{color:#c9d1d9;font-weight:500}'
+    '.fo-res{text-align:center;font-weight:700;width:110px}'
+    '.fo-det{color:#8b949e;font-size:11px;word-break:break-all}'
 )
 
 doc = ('<!DOCTYPE html><html lang="en"><head>'
@@ -170,9 +224,10 @@ doc = ('<!DOCTYPE html><html lang="en"><head>'
        '<style>' + CSS + '</style></head><body>'
        '<h1>&#128202; DB Migration Comparison Report</h1>'
        '<div class="ts">Generated: ' + now + '</div>'
-       '<div class="cards">' + cards + '</div>'
+       '<div class="cards">' + cards + fo_card + '</div>'
        '<button class="btn" onclick="exportCSV()">&#8659;&nbsp;Export CSV</button>'
        '<table><thead>' + thead + '</thead><tbody>' + cells + '</tbody></table>'
+       + fo_section +
        '<script>\nconst _CSV=' + json.dumps(csv_txt) + ';\n'
        'function exportCSV(){'
        'const b=new Blob([_CSV],{type:"text/csv"});'
@@ -384,6 +439,7 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
   # Pick first replica as failover target
   _FO_IP=$(echo "$FLEX_REPLICA_IPS" | awk '{print $1}')
   echo "[INFO] Failover target: $_FO_IP"
+  printf 'FAILOVER TEST\tFailover target\tINFO\t%s\n' "$_FO_IP" >> "$_G_RPT"
 
   # Step 1: Write a sentinel row on current primary
   _FO_DB=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
@@ -392,12 +448,15 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
     2>/dev/null | head -1 || true)
   if [ -z "$_FO_DB" ]; then
     echo "[WARN]  No user DB found on primary — skipping failover write test"
+    printf 'FAILOVER TEST\tSentinel write on primary\tFAIL\tNo user DB found on primary\n' >> "$_G_RPT"
+    printf 'FAILOVER TEST\tFailover result\tFAIL\tFAILOVER TEST SKIPPED — no user DB\n' >> "$_G_RPT"
   else
     ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
       "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
        -e \"CREATE TABLE IF NOT EXISTS \\\`$_FO_DB\\\`.__ha_failover_test (id INT PRIMARY KEY, ts DATETIME); \
             INSERT INTO \\\`$_FO_DB\\\`.__ha_failover_test VALUES (1, NOW()) ON DUPLICATE KEY UPDATE ts=NOW();\"" 2>/dev/null
     echo "[OK]   Sentinel row written to $_FO_DB.__ha_failover_test on primary"
+    printf 'FAILOVER TEST\tSentinel write on primary\tPASS\t%s.__ha_failover_test on %s\n' "$_FO_DB" "$FLEX_IP" >> "$_G_RPT"
 
     # Step 2: Wait for replica to receive it (up to 10s)
     _FO_OK=0
@@ -407,23 +466,29 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
          -e 'SELECT COUNT(*) FROM \`$_FO_DB\`.__ha_failover_test;'" 2>/dev/null || echo 0)
       if [ "${_got:-0}" -ge 1 ] 2>/dev/null; then
         echo "[OK]   Replica $_FO_IP received sentinel row after ${_fi}s — replication lag OK"
+        printf 'FAILOVER TEST\tReplica received sentinel\tPASS\t%s — received in %ss\n' "$_FO_IP" "$_fi" >> "$_G_RPT"
         _FO_OK=1; break
       fi
       sleep 1
     done
-    [ "$_FO_OK" = "0" ] && echo "[WARN]  Replica $_FO_IP did not receive sentinel row within 10s — check replication"
+    if [ "$_FO_OK" = "0" ]; then
+      echo "[WARN]  Replica $_FO_IP did not receive sentinel row within 10s — check replication"
+      printf 'FAILOVER TEST\tReplica received sentinel\tFAIL\t%s — not received within 10s\n' "$_FO_IP" >> "$_G_RPT"
+    fi
 
     # Step 3: Simulate primary failure — set read_only on primary
     ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
       "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
        -e 'SET GLOBAL read_only=ON; SET GLOBAL super_read_only=ON;'" 2>/dev/null || true
     echo "[OK]   Primary $FLEX_IP set to read_only=ON (simulating failure)"
+    printf 'FAILOVER TEST\tPrimary set read_only=ON\tPASS\t%s simulated failure\n' "$FLEX_IP" >> "$_G_RPT"
 
     # Step 4: Stop replica thread on failover target, promote it
     ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
       "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
        -e 'STOP SLAVE; RESET SLAVE ALL; SET GLOBAL read_only=OFF; SET GLOBAL super_read_only=OFF;'" 2>/dev/null
     echo "[OK]   $_FO_IP promoted to primary (STOP SLAVE; RESET SLAVE ALL; read_only=OFF)"
+    printf 'FAILOVER TEST\tReplica promoted to primary\tPASS\t%s — STOP SLAVE; RESET SLAVE ALL; read_only=OFF\n' "$_FO_IP" >> "$_G_RPT"
 
     # Step 5: Write a new row on the promoted replica — proves it accepts writes
     ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
@@ -433,12 +498,14 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
       "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 -N -B \
        -e 'SELECT COUNT(*) FROM \`$_FO_DB\`.__ha_failover_test;'" 2>/dev/null || echo ERR)
     echo "[OK]   Promoted primary $_FO_IP has $_new_rows rows in failover test table — writes confirmed"
+    printf 'FAILOVER TEST\tWrites on promoted primary\tPASS\t%s — %s rows confirmed\n' "$_FO_IP" "$_new_rows" >> "$_G_RPT"
 
     # Step 6: Restore original primary to read-write
     ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
       "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
        -e 'SET GLOBAL super_read_only=OFF; SET GLOBAL read_only=OFF;'" 2>/dev/null || true
     echo "[OK]   Original primary $FLEX_IP restored to read_only=OFF"
+    printf 'FAILOVER TEST\tOriginal primary restored\tPASS\t%s read_only=OFF\n' "$FLEX_IP" >> "$_G_RPT"
 
     # Step 7: Re-point other replicas to the promoted primary
     for _rip in $FLEX_REPLICA_IPS; do
@@ -450,6 +517,7 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
                MASTER_USER=\"$REPL_USER\", MASTER_PASSWORD=\"$REPL_PASS\", $REPL_GTID_OPT; \
              START SLAVE;'" 2>/dev/null || true
       echo "[INFO] Replica $_rip re-pointed to new primary $_FO_IP"
+      printf 'FAILOVER TEST\tReplica re-pointed\tINFO\t%s → new primary %s\n' "$_rip" "$_FO_IP" >> "$_G_RPT"
     done
 
     # Cleanup sentinel table
@@ -458,6 +526,12 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
        -e 'DROP TABLE IF EXISTS \`$_FO_DB\`.__ha_failover_test;'" 2>/dev/null || true
 
     echo ""
+    # Write final failover status to HTML report
+    if [ "$_FO_OK" = "1" ]; then
+      printf 'FAILOVER TEST\tFailover result\tPASS\tFAILOVER ENGINE WORKING\n' >> "$_G_RPT"
+    else
+      printf 'FAILOVER TEST\tFailover result\tFAIL\tFAILOVER ENGINE FAILED — replica did not replicate in time\n' >> "$_G_RPT"
+    fi
     echo "════════════════════════════════════════════════════════════════════"
     echo "   FAILOVER TEST RESULT"
     echo "   Original primary : $FLEX_IP  (restored to read-write)"
