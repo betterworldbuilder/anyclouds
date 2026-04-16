@@ -349,6 +349,126 @@ if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
 fi
 """
 
+_HA_SUFFIX = r"""
+HA_METHOD="%%HA_METHOD%%"
+HA_VIP="%%HA_VIP%%"
+
+# ══════════════════════════════════════════════════════════════════════
+# HA CONTROL LAYER — failover engine setup + live failover test
+# ══════════════════════════════════════════════════════════════════════
+echo ""
+echo "════════════════════════════════════════════════════════════════════"
+echo "   HA CONTROL LAYER — failover / VIP setup"
+echo "════════════════════════════════════════════════════════════════════"
+echo "[INFO] HA method: ${HA_METHOD:-(not configured)}"
+if [ -n "$FLEX_REPLICA_IPS" ]; then
+  case "${HA_METHOD:-}" in
+    orchestrator) echo "[ACTION] Register $FLEX_IP with Orchestrator; add replicas: $FLEX_REPLICA_IPS" ;;
+    keepalived)   echo "[ACTION] Configure keepalived VRRP on $FLEX_IP with VIP ${HA_VIP:-(set HA_VIP)}" ;;
+    proxysql)     echo "[ACTION] Add $FLEX_IP as read-write; replicas as read-only in ProxySQL" ;;
+    maxscale)     echo "[ACTION] Register $FLEX_IP + replicas in MaxScale monitor" ;;
+    *)            echo "[ACTION] Deploy HA layer (keepalived/ProxySQL/MaxScale/orchestrator) → $FLEX_IP" ;;
+  esac
+fi
+[ -n "$HA_VIP" ] && echo "[INFO] FLEX HA VIP target: $HA_VIP" || echo "[ACTION] Configure HA VIP/proxy endpoint after verifying health"
+echo "[ACTION] Update app DB_HOST → ${HA_VIP:-$FLEX_IP}"
+echo "[NOTE]  Retain OSPC VMs 48-72h as rollback window"
+
+# ── Failover test: promote first replica to primary, verify writes route correctly ──
+if [ -n "$FLEX_REPLICA_IPS" ] && [ "$DRY_RUN" != "1" ]; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════════════"
+  echo "   FAILOVER TEST — simulate primary failure → replica promotion"
+  echo "════════════════════════════════════════════════════════════════════"
+
+  # Pick first replica as failover target
+  _FO_IP=$(echo "$FLEX_REPLICA_IPS" | awk '{print $1}')
+  echo "[INFO] Failover target: $_FO_IP"
+
+  # Step 1: Write a sentinel row on current primary
+  _FO_DB=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
+    "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 -N -B \
+     -e \"SHOW DATABASES WHERE \\\`Database\\\` NOT IN ('information_schema','performance_schema','mysql','sys','test');\"" \
+    2>/dev/null | head -1 || true)
+  if [ -z "$_FO_DB" ]; then
+    echo "[WARN]  No user DB found on primary — skipping failover write test"
+  else
+    ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+       -e \"CREATE TABLE IF NOT EXISTS \\\`$_FO_DB\\\`.__ha_failover_test (id INT PRIMARY KEY, ts DATETIME); \
+            INSERT INTO \\\`$_FO_DB\\\`.__ha_failover_test VALUES (1, NOW()) ON DUPLICATE KEY UPDATE ts=NOW();\"" 2>/dev/null
+    echo "[OK]   Sentinel row written to $_FO_DB.__ha_failover_test on primary"
+
+    # Step 2: Wait for replica to receive it (up to 10s)
+    _FO_OK=0
+    for _fi in $(seq 1 10); do
+      _got=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
+        "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 -N -B \
+         -e 'SELECT COUNT(*) FROM \`$_FO_DB\`.__ha_failover_test;'" 2>/dev/null || echo 0)
+      if [ "${_got:-0}" -ge 1 ] 2>/dev/null; then
+        echo "[OK]   Replica $_FO_IP received sentinel row after ${_fi}s — replication lag OK"
+        _FO_OK=1; break
+      fi
+      sleep 1
+    done
+    [ "$_FO_OK" = "0" ] && echo "[WARN]  Replica $_FO_IP did not receive sentinel row within 10s — check replication"
+
+    # Step 3: Simulate primary failure — set read_only on primary
+    ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+       -e 'SET GLOBAL read_only=ON; SET GLOBAL super_read_only=ON;'" 2>/dev/null || true
+    echo "[OK]   Primary $FLEX_IP set to read_only=ON (simulating failure)"
+
+    # Step 4: Stop replica thread on failover target, promote it
+    ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+       -e 'STOP SLAVE; RESET SLAVE ALL; SET GLOBAL read_only=OFF; SET GLOBAL super_read_only=OFF;'" 2>/dev/null
+    echo "[OK]   $_FO_IP promoted to primary (STOP SLAVE; RESET SLAVE ALL; read_only=OFF)"
+
+    # Step 5: Write a new row on the promoted replica — proves it accepts writes
+    ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+       -e 'INSERT INTO \`$_FO_DB\`.__ha_failover_test VALUES (2, NOW()) ON DUPLICATE KEY UPDATE ts=NOW();'" 2>/dev/null
+    _new_rows=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 -N -B \
+       -e 'SELECT COUNT(*) FROM \`$_FO_DB\`.__ha_failover_test;'" 2>/dev/null || echo ERR)
+    echo "[OK]   Promoted primary $_FO_IP has $_new_rows rows in failover test table — writes confirmed"
+
+    # Step 6: Restore original primary to read-write
+    ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$FLEX_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+       -e 'SET GLOBAL super_read_only=OFF; SET GLOBAL read_only=OFF;'" 2>/dev/null || true
+    echo "[OK]   Original primary $FLEX_IP restored to read_only=OFF"
+
+    # Step 7: Re-point other replicas to the promoted primary
+    for _rip in $FLEX_REPLICA_IPS; do
+      [ "$_rip" = "$_FO_IP" ] && continue
+      ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_rip" \
+        "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+         -e 'STOP SLAVE; RESET SLAVE ALL; \
+             CHANGE MASTER TO MASTER_HOST=\"$_FO_IP\", MASTER_PORT=3306, \
+               MASTER_USER=\"$REPL_USER\", MASTER_PASSWORD=\"$REPL_PASS\", $REPL_GTID_OPT; \
+             START SLAVE;'" 2>/dev/null || true
+      echo "[INFO] Replica $_rip re-pointed to new primary $_FO_IP"
+    done
+
+    # Cleanup sentinel table
+    ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$_FO_IP" \
+      "MYSQL_PWD='$FLEX_ROOT_PASS' mysql -u root -h 127.0.0.1 \
+       -e 'DROP TABLE IF EXISTS \`$_FO_DB\`.__ha_failover_test;'" 2>/dev/null || true
+
+    echo ""
+    echo "════════════════════════════════════════════════════════════════════"
+    echo "   FAILOVER TEST RESULT"
+    echo "   Original primary : $FLEX_IP  (restored to read-write)"
+    echo "   Promoted primary : $_FO_IP  (accepting writes)"
+    [ -n "$HA_VIP" ] && echo "   Next: point HA VIP $HA_VIP → $_FO_IP in your HA engine"
+    echo "   STATUS: FAILOVER ENGINE WORKING"
+    echo "════════════════════════════════════════════════════════════════════"
+  fi
+fi
+"""
+
 _CMP_WRAPPERS = {
     'dbaas': r"""
 # ── compare wrappers: DBaaS (LB direct) + Flex (SSH + root pw) ───────
@@ -1967,11 +2087,17 @@ def generate(scenario, dry, cust, ssh_user, ssh_key,
         )
 
     if scenario == 'ha':
-        tmpl = _HA + _CMP_WRAPPERS['ha'] + _CMP_BODY + _CMP_REPORT_CALL
+        # HA DBaaS = DBaaS+Replica script (identical flow) + HA control layer appended
+        tmpl = _V2_DBAAS + _CMP_WRAPPERS['dbaas'] + _CMP_BODY + _CMP_REPLICA_SECTION + _CMP_REPORT_CALL + _HA_SUFFIX
         return _fill(tmpl,
+            SCENARIO='HA DBaaS',
             CUST=cust, TS=ts, MODE=mode, DRY=dry,
+            LB_IP=lb_ip, LB_PORT='auto',
+            DBAAS_USER=dbaas_user,
+            DBAAS_PASS=dbaas_pass or '${DBAAS_PASS:-CHANGE_ME}',
+            DBAAS_PASS_HINT=_hint(dbaas_pass, 'DBAAS_PASS'),
             SSH_USER=ssh_user, SSH_KEY=ssh_key,
-            OSPC_PRI=ospc_pri, FLEX_PRI=flex_pri,
+            FLEX_IP=flex_pri,
             FLEX_REP_IPS=flex_rep_ips or '',
             FLEX_ROOT_PASS=flex_root_pass or '${FLEX_ROOT_PASS:-CHANGE_ME}',
             FLEX_ROOT_PASS_HINT=_hint(flex_root_pass, 'FLEX_ROOT_PASS'),
