@@ -27,6 +27,9 @@ pkill -f "python3 app.py" 2>/dev/null || true
 fuser -k 5001/tcp 2>/dev/null || true
 sleep 1
 
+echo "-> Starting nginx (HTTP/2 on port 5002)..."
+systemctl restart nginx 2>/dev/null || true
+
 echo "-> Installing dependencies..."
 pip3 install --break-system-packages -q -r "$SCRIPT_DIR/requirements/requirements.txt"
 
@@ -53,22 +56,22 @@ for i in $(seq 1 30); do
         cat "$SCRIPT_DIR/dashboard.log" | tail -20
         exit 1
     fi
-    if curl -s --max-time 1 http://127.0.0.1:5001/ > /dev/null 2>&1; then
+    if curl -sk --max-time 1 https://127.0.0.1:5002/ > /dev/null 2>&1; then
         echo "-> Server is up!"
         break
     fi
     echo "   ... waiting ($i/30)"
 done
 
-echo "-> Opening Google Chrome to http://127.0.0.1:5001..."
-if command -v cmd.exe >/dev/null 2>&1; then
-    cmd.exe /C start chrome "http://127.0.0.1:5001"
-elif command -v explorer.exe >/dev/null 2>&1; then
-    explorer.exe "http://127.0.0.1:5001"
-elif command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "http://127.0.0.1:5001"
+echo "-> Opening Google Chrome to https://127.0.0.1:5002..."
+if command -v cmd.exe > /dev/null 2>&1; then
+    cmd.exe /C start chrome "https://127.0.0.1:5002"
+elif command -v explorer.exe > /dev/null 2>&1; then
+    explorer.exe "https://127.0.0.1:5002"
+elif command -v xdg-open > /dev/null 2>&1; then
+    xdg-open "https://127.0.0.1:5002"
 else
-    echo "Please manually open http://127.0.0.1:5001 in Google Chrome."
+    echo "Please manually open https://127.0.0.1:5002 in Google Chrome."
 fi
 
 echo "================================================"

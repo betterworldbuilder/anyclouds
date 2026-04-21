@@ -323,10 +323,44 @@
   </div>
 </header>
 
+<!-- ══ LED Migration Counter Dashboard ══ -->
+<div id="ledCounterBar" style="
+  display:flex; gap:0; padding:6px 16px; background:#000;
+  border-bottom:1px solid rgba(0,255,65,0.15);
+  justify-content:center; align-items:stretch; flex-shrink:0;
+">
+  <!-- To Be Migrated -->
+  <div style="flex:1; text-align:center; padding:10px 8px; border:1px solid #0a1a0a; border-right:none; background:#000;">
+    <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#2a5a2a; margin-bottom:6px; font-weight:600;">To Be Migrated</div>
+    <div id="ledToBeMigrated" style="
+      font-family:'Share Tech Mono','Courier New',monospace; font-size:42px; font-weight:700;
+      color:#00ff41; letter-spacing:5px;
+      text-shadow: 0 0 7px #00ff41, 0 0 15px #00ff41, 0 0 30px rgba(0,255,65,0.4), 0 0 50px rgba(0,255,65,0.2);
+    ">--</div>
+  </div>
+  <!-- Ready for Migration -->
+  <div style="flex:1; text-align:center; padding:10px 8px; border:1px solid #0a1a0a; border-right:none; background:#000;">
+    <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#2a5a2a; margin-bottom:6px; font-weight:600;">Ready for Migration</div>
+    <div id="ledReady" style="
+      font-family:'Share Tech Mono','Courier New',monospace; font-size:42px; font-weight:700;
+      color:#00ff41; letter-spacing:5px;
+      text-shadow: 0 0 7px #00ff41, 0 0 15px #00ff41, 0 0 30px rgba(0,255,65,0.4), 0 0 50px rgba(0,255,65,0.2);
+    ">--</div>
+  </div>
+  <!-- Successfully Migrated -->
+  <div style="flex:1; text-align:center; padding:10px 8px; border:1px solid #0a1a0a; background:#000;">
+    <div style="font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#2a5a2a; margin-bottom:6px; font-weight:600;">Successfully Migrated</div>
+    <div id="ledSuccess" style="
+      font-family:'Share Tech Mono','Courier New',monospace; font-size:42px; font-weight:700;
+      color:#00ff41; letter-spacing:5px;
+      text-shadow: 0 0 7px #00ff41, 0 0 15px #00ff41, 0 0 30px rgba(0,255,65,0.4), 0 0 50px rgba(0,255,65,0.2);
+    ">--</div>
+  </div>
+</div>
 <!-- ── All 5 stage buttons on one row ───────────────── -->
 <div class="stage-bar" id="stageBar">
-  <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 Why move to FLEX<br><small>Tech stack comparison & Business value</small></button>
-  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customers Log<br><small>Migration Tracker</small></button>
+  <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 Why and When Move to FLEX<br><small>Tech stack comparison & Business value</small></button>
+  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customer List<br><small>Migration Tracker</small></button>
   <button class="stage-btn" data-stage="s1">STAGE 1<br><small>Discovery</small></button>
   <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Migration</small></button>
   <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
@@ -358,7 +392,7 @@
   <!-- WHY MOVE TO FLEX PROMO PAGE -->
   <div class="panel active" id="panel-s_why">
     <div style="padding:40px; max-width:1000px; margin:0 auto; overflow:auto; height:100%;">
-      <h1 style="color:#7ecfff; font-size:36px; margin-bottom:10px; text-align:center;">Why Move to FLEX?</h1>
+      <h1 style="color:#7ecfff; font-size:36px; margin-bottom:10px; text-align:center;">Why and When Move to FLEX?</h1>
       <p style="color:#a8d8ff; font-size:18px; text-align:center; margin-bottom:40px;">Rackspace encourages OSPC (OpenStack Public Cloud) customers to upgrade to FLEX for its superior performance, cost savings, and modern capabilities.</p>
       
       <div style="display:flex; flex-direction:column; gap:25px;">
@@ -374,6 +408,42 @@
           <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0;">
             Upgrading reduces total cost of ownership (TCO) with license-free operations and efficient resource scaling, outperforming proprietary platforms. FLEX offers cost management tools and no licensing fees, making it ideal for optimizing spend while maintaining reliability.
           </p>
+          <p style="color:#ddd; line-height:1.6; font-size:15px; margin-top:15px; margin-bottom:15px;">
+            Switching from Legacy Rackspace Public Cloud (OSPC) to Rackspace OpenStack Flex typically offers lower licensing and long-term TCO but can involve similar or slightly higher per-VM compute costs, depending on sizing and region.
+          </p>
+          <p style="color:#ddd; line-height:1.6; font-size:15px; margin-bottom:15px;">
+            Below is a practical breakdown of costs and savings drivers and how they usually balance out.
+          </p>
+          
+          <div style="background:rgba(0,0,0,0.3); border-radius:8px; overflow:hidden; border:1px solid rgba(243,156,18,0.3); margin-top:10px;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+              <thead style="background:rgba(243,156,18,0.15); border-bottom:1px solid rgba(243,156,18,0.25);">
+                <tr>
+                  <th style="padding:12px 16px; color:#fcd34d; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">Area</th>
+                  <th style="padding:12px 16px; color:#fcd34d; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">How Flex reduces cost</th>
+                  <th style="padding:12px 16px; color:#fcd34d; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">Typical saving angle</th>
+                </tr>
+              </thead>
+              <tbody style="color:#cbd5e1;">
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition:background 0.2s;">
+                  <td style="padding:12px 16px; font-weight:600; color:#fff; vertical-align:top;">Licensing and vendor lock-in</td>
+                  <td style="padding:12px 16px; vertical-align:top;">Flex is license-free, open-source OpenStack, unlike proprietary hyperscalers and some legacy-layer products.</td>
+                  <td style="padding:12px 16px; vertical-align:top;">Lower TCO: no vendor-specific license fees, plus easier migration off-platform if needed.</td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.06); transition:background 0.2s;">
+                  <td style="padding:12px 16px; font-weight:600; color:#fff; vertical-align:top;">Bandwidth and egress</td>
+                  <td style="padding:12px 16px; vertical-align:top;">Flex advertises no egress-style overage fees (included bandwidth within its pricing model), unlike some hyperscalers that charge per-GB egress.</td>
+                  <td style="padding:12px 16px; vertical-align:top;">High-traffic or hybrid apps gain: predictable monthly bills vs. "surprise" bandwidth spikes.</td>
+                </tr>
+                <tr style="transition:background 0.2s;">
+                  <td style="padding:12px 16px; font-weight:600; color:#fff; vertical-align:top;">Infrastructure efficiency</td>
+                  <td style="padding:12px 16px; vertical-align:top;">Newer, modern hardware and flexible scaling mean you can right-size VMs and avoid over-provisioning older OSPC-era instances.</td>
+                  <td style="padding:12px 16px; vertical-align:top;">Moderate savings (roughly 10–30% TCO) if you optimize instance sizes and turn off unused VMs.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
         </div>
 
         <div style="background:rgba(0,0,0,0.25); border-left:4px solid #e056fd; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
@@ -416,6 +486,71 @@
           </table>
         </div>
       </div>
+
+      <!-- When to move to FLEX -->
+      <div style="margin-top:48px;">
+        <h2 style="color:#e8edf8; font-size:26px; font-weight:700; letter-spacing:-.01em; margin-bottom:4px;">When to move to FLEX</h2>
+        <p style="color:#7889a8; font-size:13px; margin-bottom:20px; letter-spacing:.01em;">Technical and business conditions triggering a migration from Legacy Rackspace Public Cloud (OSPC) to Rackspace OpenStack Flex (FLEX).</p>
+        <div style="border-radius:14px; overflow:hidden; background:rgba(10,16,36,0.72); border:1px solid rgba(120,150,220,0.18); box-shadow:0 4px 32px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,0.05) inset; backdrop-filter:blur(16px);">
+          <table class="matrix-table" style="width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; margin-top:0;">
+            <colgroup>
+              <col style="width:25%">
+              <col style="width:40%">
+              <col style="width:35%">
+            </colgroup>
+            <thead>
+              <tr style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(120,150,220,0.2);">
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Condition / trigger</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Why it matters</th>
+                <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Example use case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Need for modern, OpenStack-based infrastructure</td>
+                <td>FLEX runs on current-generation OpenStack with newer APIs, better automation, and alignment with upstream cloud standards, while OSPC is based on older, legacy Rackspace Cloud architecture.</td>
+                <td>A company operating a legacy PHP app on OSPC wants to automate deployments with Terraform and Kubernetes; FLEX's OpenStack API and ecosystem support tools like Magnum and Terraform more natively.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Desire for more flexible networking and segmentation</td>
+                <td>FLEX offers advanced networking (VLANs, segmentation within a single account, floating IPs, etc.), whereas OSPC has more rigid networking and lacks some modern segmentation capabilities.</td>
+                <td>An e-commerce platform needs separate isolated networks for PCI-compliant payment workloads and analytics; FLEX allows segmented networks under one account, which OSPC cannot easily support.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Need to import custom images or use vendor images</td>
+                <td>FLEX supports custom image uploads and lets you consume upstream images from vendors like Red Hat, Canonical, Microsoft, and SUSE; OSPC is more limited in this regard.</td>
+                <td>A DevOps team wants to run a Red Hat Enterprise Linux image with a pre-built tuning profile; FLEX allows direct import or use of RH images, while OSPC would require extra workarounds.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Scaling beyond legacy limits or regions</td>
+                <td>FLEX provides better scalability, multi-tenant capacity, and newer hardware; OSPC is being sunsetted and does not scale as easily into newer regions or hardware generations.</td>
+                <td>A SaaS provider sees traffic doubling annually and wants to add bursting in a new region; FLEX lets them scale horizontally across regions with modern hardware, while OSPC will not be expanded.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Push toward cost-efficient, license-free infrastructure</td>
+                <td>FLEX is a license-free, open-source-based private cloud, which can reduce some licensing and vendor-lock-in costs compared with older OSPC models.</td>
+                <td>A financial services firm wants to cut licensing fees tied to proprietary cloud layers; they migrate app workloads from OSPC to FLEX to run on fully managed, open-source infrastructure.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Requirement for advanced automation and CI/CD pipelines</td>
+                <td>FLEX integrates well with modern CI/CD and orchestration tools (e.g., Kubernetes, Terraform, Ansible) because it is built on current OpenStack, while OSPC tooling is more constrained.</td>
+                <td>A startup wants GitOps-driven deployments using ArgoCD; FLEX's modern API and compute flavors make it easier to automate than OSPC's legacy surfaces.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Compliance or security posture upgrade</td>
+                <td>FLEX adds newer security and compliance features and supports more granular segmentation and isolation, while OSPC is being deprecated and will not receive further security enhancements.</td>
+                <td>A healthcare company must comply with updated data-residency and isolation rules; they migrate from OSPC to FLEX to leverage its improved security controls and segmentation.</td>
+              </tr>
+              <tr>
+                <td style="color:#e2e8f0; font-weight:600;">Long-term roadmap: OSPC migration program</td>
+                <td>Rackspace explicitly encourages and plans migration of OSPC workloads to the Flex platform, providing migration guidance and support.</td>
+                <td>A customer still running legacy WebLogic servers on OSPC works with Rackspace to migrate those VMs to FLEX over a 6-month window, aligning with their expiry roadmap.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1921,6 +2056,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         if(kSu) kSu.innerText = tSuccess;
         const kFa = document.getElementById("kpiFailed");
         if(kFa) kFa.innerText = tFail;
+        // LED counter bar
+        const lTo = document.getElementById("ledToBeMigrated");
+        const lRd = document.getElementById("ledReady");
+        const lSc = document.getElementById("ledSuccess");
+        if (lTo) lTo.textContent = String(tQueue).padStart(2, '0');
+        if (lRd) lRd.textContent = String(tReady).padStart(2, '0');
+        if (lSc) lSc.textContent = String(tSuccess).padStart(2, '0');
 
         // Sorting disabled as per user request: "just display the uploaded file as is without sorting anything"
         // Preserve exact file columns natively via backend CSV DictReader extracting fieldnames
@@ -2189,6 +2331,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       document.getElementById("kpiReady").innerText = ready;
       document.getElementById("kpiSuccess").innerText = succ;
       document.getElementById("kpiFailed").innerText = fail;
+      // Update LED counter bar in header
+      const ledTo = document.getElementById("ledToBeMigrated");
+      const ledRd = document.getElementById("ledReady");
+      const ledSc = document.getElementById("ledSuccess");
+      if (ledTo) ledTo.textContent = String(toMig).padStart(2, '0');
+      if (ledRd) ledRd.textContent = String(ready).padStart(2, '0');
+      if (ledSc) ledSc.textContent = String(succ).padStart(2, '0');
   };
   
   window.deleteRow = function(btn) {

@@ -9,3 +9,24 @@ xlrd
 # ── System packages (install via apt, not pip) ────────────────────────────────
 # sudo apt-get install -y mysql-client     # required on jumphost for DBaaS migration
 #                                          # (mysqldump + mysql CLI to reach OSPC DBaaS via Cloud LB)
+#
+# ── Jumphost: Linux VM offline repair (ospc2flex_offline_repair.sh) ───────────
+# sudo apt-get install -y qemu-utils       # qemu-nbd, qemu-img (NBD export + qcow2 convert)
+# sudo apt-get install -y gdisk            # sgdisk (GPT backup header fix)
+# sudo apt-get install -y e2fsprogs        # fsck, e2fsck (ext4 filesystem check)
+# sudo apt-get install -y xfsprogs         # xfs_repair (XFS filesystem check — Alma/CentOS)
+# sudo apt-get install -y parted           # partprobe (partition table reload)
+# sudo apt-get install -y lsblk            # (usually pre-installed)
+#
+# ── Jumphost: Windows VM offline repair (ospc2flex_windows_repair.sh) ─────────
+# sudo apt-get install -y ntfs-3g          # NTFS read/write mount for Windows partitions
+# sudo apt-get install -y chntpw           # Windows registry editor (offline hive patching)
+# sudo apt-get install -y libhivex-bin     # hivex tools (alternative registry editing)
+# sudo apt-get install -y wget             # download VirtIO ISO from Fedora
+#
+# ── VirtIO Windows drivers (downloaded at runtime) ────────────────────────────
+# ISO: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
+# Drivers: viostor (block), vioscsi (SCSI), netkvm (network), balloon (memory)
+#
+# ── One-liner to install ALL jumphost deps ────────────────────────────────────
+# sudo apt-get install -y qemu-utils gdisk e2fsprogs xfsprogs parted ntfs-3g chntpw libhivex-bin wget

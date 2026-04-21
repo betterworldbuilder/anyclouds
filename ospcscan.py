@@ -209,7 +209,7 @@ for s in all_servers:
         "os_version":   os_version,
         "os_label":     make_label(os_type, os_distro, os_version),
         "service_type": "cloud_server",
-        "region":       REGION,
+        "region":       s.get("_region", REGION),
     })
 
 # ── Step 6: Fetch databases (Trove) ──────────────────────────────────────────
