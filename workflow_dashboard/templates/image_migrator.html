@@ -1697,8 +1697,10 @@ function switchVersion(osId, ver) {
                     const idx = this.allStages.indexOf(stageInfo);
                     // Mark previous stages as done
                     this.allStages.forEach((s, i) => {
-                        if (i < idx && !vm.stages[s.key]) {
-                            vm.stages[s.key] = { status: 'done', ts: now, duration: 0 };
+                        if (i < idx) {
+                            if (!vm.stages[s.key] || vm.stages[s.key].status === 'active') {
+                                vm.stages[s.key] = { status: 'done', ts: now, duration: 0 };
+                            }
                         }
                     });
                     if (!vm.stages[stageKey] || vm.stages[stageKey].status !== 'done') {
