@@ -5791,7 +5791,7 @@ def nbd_run_single():
             try:
                 result = subprocess.run(
                     ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
-                    capture_output=True, text=True, timeout=15
+                    capture_output=True, text=True, timeout=15, errors='replace'
                 )
                 new_lines = result.stdout.rstrip('\n').split('\n') if result.stdout.strip() else []
                 if new_lines:
@@ -5809,12 +5809,12 @@ def nbd_run_single():
                     if empty_polls % 5 == 0:
                         chk = subprocess.run(
                             ssh_base + [f"(pgrep -f 'mig_worker.*{label}' >/dev/null 2>&1 || pgrep -f 'ospc2flex_windows_migrate.*{label}' >/dev/null 2>&1 || pgrep -f 'qemu-img.*{label}' >/dev/null 2>&1 || pgrep -f 'openstack.*{label}' >/dev/null 2>&1) && echo RUNNING || echo STOPPED"],
-                            capture_output=True, text=True, timeout=10
+                            capture_output=True, text=True, timeout=10, errors='replace'
                         )
                         if "STOPPED" in chk.stdout and seen_lines > 0:
                             result2 = subprocess.run(
                                 ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
-                                capture_output=True, text=True, timeout=15
+                                capture_output=True, text=True, timeout=15, errors='replace'
                             )
                             for line in (result2.stdout.rstrip('\n').split('\n') if result2.stdout.strip() else []):
                                 stripped = line.rstrip()
@@ -5874,7 +5874,7 @@ def nbd_stream():
             try:
                 result = subprocess.run(
                     ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
-                    capture_output=True, text=True, timeout=15
+                    capture_output=True, text=True, timeout=15, errors='replace'
                 )
                 new_lines = result.stdout.rstrip('\n').split('\n') if result.stdout.strip() else []
                 if new_lines:
@@ -5895,13 +5895,13 @@ def nbd_stream():
                     if empty_polls % 5 == 0:
                         chk = subprocess.run(
                             ssh_base + [f"pgrep -f 'mig_worker.*{label}' >/dev/null && echo RUNNING || echo STOPPED"],
-                            capture_output=True, text=True, timeout=10
+                            capture_output=True, text=True, timeout=10, errors='replace'
                         )
                         if "STOPPED" in chk.stdout and seen_lines > 0:
                             # Worker done, flush remaining
                             result2 = subprocess.run(
                                 ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
-                                capture_output=True, text=True, timeout=15
+                                capture_output=True, text=True, timeout=15, errors='replace'
                             )
                             for line in (result2.stdout.rstrip('\n').split('\n') if result2.stdout.strip() else []):
                                 stripped = line.rstrip()

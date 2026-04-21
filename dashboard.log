@@ -122,3 +122,7 @@ Press CTRL+C to quit
 127.0.0.1 - - [21/Apr/2026 13:18:14] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
 127.0.0.1 - - [21/Apr/2026 13:18:44] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
 127.0.0.1 - - [21/Apr/2026 13:19:14] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 13:19:44] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 13:20:14] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 13:20:44] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 13:21:14] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
