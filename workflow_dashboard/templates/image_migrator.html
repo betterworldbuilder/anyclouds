@@ -2939,8 +2939,7 @@ function switchVersion(osId, ver) {
 
             // ── Migration Manifest ────────────────────────────────────────
             const serverNamesList = _newCheckedVMs.map(cb => cb.dataset.sourceName.replace(/-/g, ' ')).join(', ');
-            const etaMins = Math.ceil(_newCheckedVMs.length * 2.5);
-            jarvisAnnounce(`Hello Operator... starting migration of ${_newCheckedVMs.length} virtual machines: ${serverNamesList}. Estimated time is approximately ${etaMins} minutes.`);
+            jarvisAnnounce(`Hello Operator... starting migration of ${_newCheckedVMs.length} virtual machines: ${serverNamesList}.`);
             const tsBatch = new Date().toLocaleTimeString();
             const vmRows = Array.from(_newCheckedVMs).map((cb, idx) => {
                 const nm = cb.dataset.sourceName || '?';
