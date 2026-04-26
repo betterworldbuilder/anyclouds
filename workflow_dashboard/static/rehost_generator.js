@@ -92,12 +92,12 @@ window.generateRehostScript = function() {
 
         s += `trap 'pkill -P $$ 2>/dev/null' EXIT HUP INT TERM\n\n`;
 
-        s += `# DRY_RUN wrapper\n`;
+        s += `# DRY_RUN wrapper — always uses "$@" (no eval, safe from injection)\n`;
         s += `run() {\n`;
         s += `  if [ "$DRY_RUN" = "1" ]; then\n`;
-        s += `    if [ $# -eq 1 ]; then echo "  [DRY] $1"; else echo "  [DRY] $*"; fi\n`;
+        s += `    echo "  [DRY] $*"\n`;
         s += `  else\n`;
-        s += `    if [ $# -eq 1 ]; then eval "$1"; else "$@"; fi\n`;
+        s += `    "$@"\n`;
         s += `  fi\n`;
         s += `}\n\n`;
 
@@ -221,6 +221,8 @@ window.generateRehostScript = function() {
                 s += `  echo "#  OSPC : ${ospcIp || '(not set)'}  [user: ${oUser}]"\n`;
                 s += `  echo "#  FLEX : ${flexIp}  [user: ${nodeUser}]  OS: ${osStr || 'unknown'}"\n`;
                 s += `  echo "##############################################################"\n\n`;
+                // Unified logging — tee all output to per-node log file
+                s += `  exec > >(tee -a "$NODE_AUDIT/migration.log") 2>&1\n\n`;
 
                 // ── STAGE 0 — PRE-FLIGHT ──────────────────────────────────
                 s += `  ${sec('STAGE 0 -- PRE-FLIGHT CHECKS').replace(/\n/g, '\n  ')}\n`;
@@ -234,8 +236,10 @@ window.generateRehostScript = function() {
                     s += `  ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on OSPC -- install with: sudo apt-get install -y rsync"; }\n`;
                     s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "which rsync" 2>/dev/null || { echo "[WARN] rsync missing on FLEX -- install with: sudo apt-get install -y rsync"; }\n`;
                     s += `  echo "[P0] Disk space check (OSPC used vs FLEX free)..."\n`;
-                    s += `  OSPC_USED=$(ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "df / --output=used | tail -1" 2>/dev/null || echo 0)\n`;
-                    s += `  FLEX_FREE=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df / --output=avail | tail -1" 2>/dev/null || echo 999999999)\n`;
+                    // grep -Eo '[0-9]+' locally ensures we always get a pure integer even if SSH returns partial garbage
+                    s += `  OSPC_USED=$(ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "df / --output=used | tail -1" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || echo 0)\n`;
+                    s += `  FLEX_FREE=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "df / --output=avail | tail -1" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || echo 999999999)\n`;
+                    s += `  OSPC_USED=\${OSPC_USED:-0}; FLEX_FREE=\${FLEX_FREE:-999999999}\n`;
                     s += `  if [ "$OSPC_USED" -gt "$FLEX_FREE" ] 2>/dev/null; then\n`;
                     s += `    echo "[WARN] OSPC used (${ospcIp}): $((OSPC_USED/1024))MB > FLEX free (${flexIp}): $((FLEX_FREE/1024))MB -- proceed with caution"\n`;
                     s += `  else\n`;
@@ -246,6 +250,16 @@ window.generateRehostScript = function() {
                 s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "if [ -f /tmp/.ospc-migration-lock ]; then echo '[WARN] Stale lock found -- auto-removing (leftover from previous run)'; rm -f /tmp/.ospc-migration-lock; fi" 2>/dev/null || true\n`;
                 s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" "touch /tmp/.ospc-migration-lock" 2>/dev/null || true\n`;
                 s += `  echo "[P0] All pre-flight checks passed"\n\n`;
+                // Rollback snapshot — taken before any mutations so FLEX can be reverted
+                s += `  echo "[P0] Taking FLEX VM snapshot as rollback point before mutations..."\n`;
+                s += `  SNAP_NAME="pre-migration-${name}-$(date +%Y%m%d%H%M%S)"\n`;
+                s += `  if command -v openstack >/dev/null 2>&1; then\n`;
+                s += `    openstack server image create --name "$SNAP_NAME" "${flexIp}" --wait 2>/dev/null \\\n`;
+                s += `      && echo "  [P0] ✅ Rollback snapshot: $SNAP_NAME" \\\n`;
+                s += `      || echo "  [P0] ⚠  Snapshot failed (no openstack CLI or permissions) -- proceed manually if needed"\n`;
+                s += `  else\n`;
+                s += `    echo "  [P0] ⚠  openstack CLI not found -- skipping snapshot. Create one manually before proceeding."\n`;
+                s += `  fi\n\n`;
                 // Deploy SSH key to OSPC so direct OSPC→FLEX transfers work
                 if (ospcIp) {
                     s += `  echo "[P0] Deploying transfer key to OSPC for direct server-to-server transfers..."\n`;
@@ -294,38 +308,73 @@ window.generateRehostScript = function() {
 
                 if (L.identity && ospcIp) {
                     s += `  echo "[L1] Server Identity"\n`;
-                    s += `  SRC_HOST=$(src_cmd "hostname -f 2>/dev/null || hostname")\n`;
+                    // Use short hostname only — FQDN may point to OSPC DNS which won't resolve on FLEX
+                    s += `  SRC_HOST=$(src_cmd "hostname -s 2>/dev/null || hostname")\n`;
                     s += `  SRC_TZ=$(src_cmd "cat /etc/timezone 2>/dev/null || timedatectl show -p Timezone --value 2>/dev/null || echo UTC")\n`;
-                    s += `  echo "  [L1] Detected hostname: $SRC_HOST  timezone: $SRC_TZ"\n`;
+                    s += `  SRC_LOCALE=$(src_cmd "localectl status 2>/dev/null | grep 'System Locale' | cut -d= -f2 | tr -d ' '" || echo "en_US.UTF-8")\n`;
+                    s += `  echo "  [L1] Detected hostname: $SRC_HOST  timezone: $SRC_TZ  locale: $SRC_LOCALE"\n`;
                     s += `  run dst_cmd "sudo hostnamectl set-hostname '\${SRC_HOST:-$(hostname)}'"\n`;
                     s += `  run dst_cmd "sudo timedatectl set-timezone '\${SRC_TZ:-UTC}'"\n`;
-                    s += `  echo "  [L1] FLEX hostname set to: $SRC_HOST"\n\n`;
+                    s += `  [ -n "$SRC_LOCALE" ] && run dst_cmd "sudo localectl set-locale LANG=$SRC_LOCALE 2>/dev/null || true"\n`;
+                    s += `  echo "  [L1] FLEX hostname set to: $SRC_HOST  timezone: $SRC_TZ"\n\n`;
                 }
 
                 if (L.ssh && ospcIp) {
                     s += `  echo "[L2] SSH & Access"\n`;
-                    s += `  ospc_to_flex "/etc/ssh/sshd_config" "/tmp/sshd_config"\n`;
-                    s += `  run dst_cmd "sudo cp /tmp/sshd_config /etc/ssh/sshd_config && sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true"\n`;
-                    s += `  echo "  [L2] sshd_config applied on FLEX"\n`;
-                    s += `  ospc_to_flex "~/.ssh/authorized_keys" "~/.ssh/authorized_keys"\n`;
-                    s += `  run dst_cmd "chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"\n`;
-                    s += `  echo "  [L2] authorized_keys synced to FLEX"\n`;
+                    // Safe sshd_config merge: copy OSPC config, strip dangerous directives,
+                    // then apply on FLEX (preserves auth settings without risking lockout)
+                    s += `  ospc_to_flex "/etc/ssh/sshd_config" "/tmp/sshd_config_ospc"\n`;
+                    s += `  dst_cmd "sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.ospc2flex" 2>/dev/null || true\n`;
+                    s += `  # Strip OSPC-specific directives that would break FLEX SSH\n`;
+                    s += `  ssh $SSH_OPTS "$DST_USER@$DST_IP" bash <<'SSHD_MERGE'\n`;
+                    s += `    if [ -f /tmp/sshd_config_ospc ]; then\n`;
+                    s += `      sed -i '/^[[:space:]]*ListenAddress/d' /tmp/sshd_config_ospc\n`;
+                    s += `      sed -i '/rackspace/Id' /tmp/sshd_config_ospc\n`;
+                    s += `      sed -i '/^[[:space:]]*Match.*rackspace/I,/^[[:space:]]*Match\\|^$/d' /tmp/sshd_config_ospc\n`;
+                    s += `      sed -i '/${ospcIp.replace(/\./g, '\\\\.')}/d' /tmp/sshd_config_ospc\n`;
+                    s += `      if sudo sshd -t -f /tmp/sshd_config_ospc 2>/dev/null; then\n`;
+                    s += `        sudo cp /tmp/sshd_config_ospc /etc/ssh/sshd_config\n`;
+                    s += `        sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd 2>/dev/null || true\n`;
+                    s += `        echo "  [L2] sshd_config applied (sanitized) on FLEX"\n`;
+                    s += `      else\n`;
+                    s += `        echo "  [WARN] Sanitized sshd_config failed validation — keeping FLEX original"\n`;
+                    s += `        sudo cp /etc/ssh/sshd_config.bak.ospc2flex /etc/ssh/sshd_config\n`;
+                    s += `      fi\n`;
+                    s += `    fi\n`;
+                    s += `SSHD_MERGE\n`;
+                    s += `  ospc_to_flex "~/.ssh/authorized_keys" "/tmp/ospc_authorized_keys"\n`;
+                    s += `  # Merge OSPC keys into FLEX (append, don't overwrite)\n`;
+                    s += `  run dst_cmd "cat /tmp/ospc_authorized_keys >> ~/.ssh/authorized_keys && sort -u -o ~/.ssh/authorized_keys ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"\n`;
+                    s += `  echo "  [L2] authorized_keys merged on FLEX"\n`;
                     s += `  src_cmd "sudo tar -czf /tmp/sudoers_d.tgz /etc/sudoers.d/ 2>/dev/null || true"\n`;
                     s += `  ospc_to_flex "/tmp/sudoers_d.tgz" "/tmp/sudoers_d.tgz"\n`;
-                    s += `  run dst_cmd "sudo tar -xzf /tmp/sudoers_d.tgz -C / 2>/dev/null || true"\n`;
+                    s += `  run dst_cmd "sudo tar -xzf /tmp/sudoers_d.tgz -C / 2>/dev/null || true && sudo visudo -c 2>/dev/null || echo '  [WARN] sudoers syntax check failed — review /etc/sudoers.d/'"\n`;
                     s += `  echo "  [L2] sudoers.d synced to FLEX"\n\n`;
                 }
 
                 if (L.users && ospcIp) {
                     s += `  echo "[L3] Users & Groups (UID/GID preserved)"\n`;
+                    // Sync groups first (separate from users — group name may differ from username)
+                    s += `  echo "  [L3] Syncing groups (GID>=1000)..."\n`;
+                    s += `  src_cmd "getent group | awk -F: '\\$3>=1000 && \\$3<65000{print}'" | while IFS=: read grp gpw gid members; do\n`;
+                    s += `    run dst_cmd "sudo groupadd -g $gid '$grp' 2>/dev/null || true"\n`;
+                    s += `  done\n`;
+                    // Then sync users referencing existing GIDs
                     s += `  USER_COUNT=$(src_cmd "getent passwd | awk -F: '\\$3>=1000 && \\$3<65000{print}' | wc -l" || echo 0)\n`;
                     s += `  echo "  [L3] Found $USER_COUNT non-system users -- syncing..."\n`;
                     s += `  src_cmd "getent passwd | awk -F: '\\$3>=1000 && \\$3<65000{print}'" | while IFS=: read user pw uid gid gecos home shell; do\n`;
                     s += `    echo "    -> user: $user uid:$uid gid:$gid"\n`;
-                    s += `    run dst_cmd "sudo groupadd -g $gid $user 2>/dev/null || true && sudo useradd -u $uid -g $gid -m -s '$shell' -c '$gecos' '$user' 2>/dev/null || true"\n`;
+                    s += `    run dst_cmd "id -u '$user' >/dev/null 2>&1 || sudo useradd -u $uid -g $gid -m -s '$shell' -c '$gecos' '$user' 2>/dev/null || true"\n`;
                     s += `  done\n`;
+                    // Sync shadow entries for password auth
+                    s += `  echo "  [L3] Syncing password hashes (shadow entries UID>=1000)..."\n`;
+                    s += `  src_cmd "sudo getent shadow" | while IFS=: read suser shash rest; do\n`;
+                    s += `    [ -z "$shash" ] || [ "$shash" = "!" ] || [ "$shash" = "*" ] || [ "$shash" = "!!" ] && continue\n`;
+                    s += `    run dst_cmd "sudo usermod -p '$shash' '$suser' 2>/dev/null || true"\n`;
+                    s += `  done\n`;
+                    // Rsync home dirs but protect the SSH login user's authorized_keys
                     s += `  echo "  [L3] Direct rsync OSPC:/home/ -> FLEX:/home/ (server-to-server)"\n`;
-                    s += `  rsync_direct "/home/" "/home/"\n`;
+                    s += `  rsync_direct "--exclude='$DST_USER/.ssh/authorized_keys' /home/" "/home/"\n`;
                     s += `  echo "  [L3] Home directories synced OK"\n\n`;
                 }
 
@@ -339,23 +388,34 @@ window.generateRehostScript = function() {
 
                 if (L.packages) {
                     s += `  echo "[L5] Packages & Repos  [pkg-mgr: ${pkgMgr}]"\n`;
+                    // Filter patterns: kernel/boot packages that would break FLEX + Rackspace agents
+                    s += `  PKG_FILTER='linux-image|linux-headers|linux-modules|linux-firmware|grub-|initramfs-tools|rackspace-|nova-agent|xe-guest|driveclient|holland'\n`;
                     if (pkgMgr === 'apt') {
                         s += `  run dst_cmd "sudo sed -i '/rax\\.mirror\\.rackspace\\.com/d;/mirror\\.rackspace\\.com\\/opensuse/d' /etc/apt/sources.list 2>/dev/null || true"\n`;
                         s += `  run dst_cmd "sudo find /etc/apt/sources.list.d/ \\( -name 'holland*' -o -name '*rackspace*' \\) -delete 2>/dev/null || true"\n`;
                         s += `  echo "  [L5] Rackspace repos cleaned from FLEX apt sources"\n`;
                         if (ospcIp) {
-                            s += `  APT_LIST=$(src_cmd "apt-mark showmanual 2>/dev/null" | tr '\\n' ' ' || true)\n`;
+                            s += `  APT_RAW=$(src_cmd "apt-mark showmanual 2>/dev/null" || true)\n`;
+                            s += `  APT_FILTERED=$(echo "$APT_RAW" | grep -vE "$PKG_FILTER" || true)\n`;
+                            s += `  APT_SKIPPED=$(echo "$APT_RAW" | grep -cE "$PKG_FILTER" || echo 0)\n`;
+                            s += `  APT_LIST=$(echo "$APT_FILTERED" | tr '\\n' ' ')\n`;
                             s += `  APT_COUNT=$(echo "$APT_LIST" | wc -w)\n`;
-                            s += `  echo "  [L5] Detected $APT_COUNT manually installed packages on OSPC"\n`;
-                            s += `  [ -n "$APT_LIST" ] && run dst_cmd "sudo apt-get update -qq 2>/dev/null || true && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $APT_LIST" || true\n`;
+                            s += `  echo "  [L5] OSPC packages: $APT_COUNT to install, $APT_SKIPPED filtered (kernel/boot/rackspace)"\n`;
+                            s += `  if [ -n "$APT_LIST" ]; then\n`;
+                            s += `    run dst_cmd "sudo apt-get update -qq" || echo "  [WARN] apt-get update failed — some packages may not install"\n`;
+                            s += `    run dst_cmd "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y $APT_LIST" || echo "  [WARN] Some packages failed to install — check $NODE_AUDIT/migration.log"\n`;
+                            s += `  fi\n`;
                             s += `  echo "  [L5] Package install complete"\n\n`;
                         }
                     } else {
                         // dnf/rpm path
                         if (ospcIp) {
-                            s += `  RPM_LIST=$(src_cmd "rpm -qa --queryformat '%{NAME}\\n' 2>/dev/null" | tr '\\n' ' ' || true)\n`;
+                            s += `  RPM_RAW=$(src_cmd "rpm -qa --queryformat '%{NAME}\\n' 2>/dev/null" || true)\n`;
+                            s += `  RPM_FILTERED=$(echo "$RPM_RAW" | grep -vE "$PKG_FILTER|^kernel|^kmod-" || true)\n`;
+                            s += `  RPM_SKIPPED=$(echo "$RPM_RAW" | grep -cE "$PKG_FILTER|^kernel|^kmod-" || echo 0)\n`;
+                            s += `  RPM_LIST=$(echo "$RPM_FILTERED" | tr '\\n' ' ')\n`;
                             s += `  RPM_COUNT=$(echo "$RPM_LIST" | wc -w)\n`;
-                            s += `  echo "  [L5] Detected $RPM_COUNT RPM packages on OSPC"\n`;
+                            s += `  echo "  [L5] OSPC packages: $RPM_COUNT to install, $RPM_SKIPPED filtered (kernel/boot/rackspace)"\n`;
                             s += `  [ -n "$RPM_LIST" ] && run dst_cmd "sudo dnf install -y $RPM_LIST 2>/dev/null || true" || true\n`;
                             s += `  echo "  [L5] Package install complete"\n\n`;
                         }
@@ -364,7 +424,13 @@ window.generateRehostScript = function() {
 
                 if (L.kernel && ospcIp) {
                     s += `  echo "[L6] Kernel / Sysctl / Limits"\n`;
-                    s += `  src_cmd "sudo cat /etc/sysctl.conf; grep -r . /etc/sysctl.d/ 2>/dev/null" | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/sysctl_clone.conf" || true\n`;
+                    // Only copy app-relevant sysctl — skip net.* (FLEX has its own network stack)
+                    // net.* settings are OSPC Xen-specific and can conflict with FLEX virtio networking
+                    s += `  src_cmd "sudo cat /etc/sysctl.conf 2>/dev/null; sudo grep -r . /etc/sysctl.d/ 2>/dev/null" \\\n`;
+                    s += `    | grep -vE '^[[:space:]]*(net\\.|#.*net\\.|$)' \\\n`;
+                    s += `    | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/sysctl_clone.conf" || true\n`;
+                    s += `  SYSCTL_LINES=$(ssh $SSH_OPTS "$DST_USER@$DST_IP" "wc -l < /tmp/sysctl_clone.conf 2>/dev/null || echo 0")\n`;
+                    s += `  echo "  [L6] sysctl: $SYSCTL_LINES non-network settings to apply (net.* excluded)"\n`;
                     s += `  run dst_cmd "sudo cp /tmp/sysctl_clone.conf /etc/sysctl.d/99-ospc-clone.conf && sudo sysctl --system 2>/dev/null || true"\n`;
                     s += `  echo "  [L6] sysctl settings applied on FLEX"\n`;
                     s += `  src_cmd "grep -r . /etc/security/limits.conf /etc/security/limits.d/ 2>/dev/null" | ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/limits_clone.conf" || true\n`;
@@ -384,9 +450,10 @@ window.generateRehostScript = function() {
                     s += `  echo "[L8] Runtime Environment"\n`;
                     s += `  PYTHON_V=$(src_cmd "python3 --version 2>/dev/null" | awk '{print $2}' | cut -d. -f1-2 || true)\n`;
                     s += `  NODE_V=$(src_cmd "node --version 2>/dev/null" | tr -d 'v' || true)\n`;
-                    s += `  HAS_DOCKER=$(src_cmd "which docker 2>/dev/null" || true)\n`;
+                    s += `  DOCKER_V=$(src_cmd "docker version --format '{{.Server.Version}}' 2>/dev/null" || true)\n`;
                     s += `  HAS_PM2=$(src_cmd "which pm2 2>/dev/null" || true)\n`;
-                    s += `  echo "  [L8] Detected: python=$PYTHON_V node=$NODE_V docker=$([ -n \"$HAS_DOCKER\" ] && echo yes || echo no) pm2=$([ -n \"$HAS_PM2\" ] && echo yes || echo no)"\n`;
+                    s += `  HAS_SNAP=$(src_cmd "which snap 2>/dev/null" || true)\n`;
+                    s += `  echo "  [L8] Detected: python=$PYTHON_V node=$NODE_V docker=\${DOCKER_V:-no} pm2=$([ -n "$HAS_PM2" ] && echo yes || echo no)"\n`;
                     if (pkgMgr === 'apt') {
                         s += `  [ -n "$PYTHON_V" ] && run dst_cmd "which python3 || sudo apt-get install -y python3 python3-pip python3-venv" || true\n`;
                         s += `  [ -n "$NODE_V" ] && run dst_cmd "which node || (curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs)" || true\n`;
@@ -394,8 +461,52 @@ window.generateRehostScript = function() {
                         s += `  [ -n "$PYTHON_V" ] && run dst_cmd "which python3 || sudo dnf install -y python3 python3-pip" || true\n`;
                         s += `  [ -n "$NODE_V" ] && run dst_cmd "which node || sudo dnf install -y nodejs" || true\n`;
                     }
-                    s += `  [ -n "$HAS_DOCKER" ] && run dst_cmd "which docker || (curl -fsSL https://get.docker.com | sudo sh)" || true\n`;
+                    // Install matching Docker version from OSPC
+                    s += `  if [ -n "$DOCKER_V" ]; then\n`;
+                    s += `    FLEX_DOCKER=$(dst_cmd "docker version --format '{{.Server.Version}}' 2>/dev/null" || true)\n`;
+                    s += `    if [ -z "$FLEX_DOCKER" ]; then\n`;
+                    s += `      echo "  [L8] Installing Docker $DOCKER_V (matching OSPC version)"\n`;
+                    if (pkgMgr === 'apt') {
+                        s += `      run dst_cmd "curl -fsSL https://get.docker.com | sudo VERSION=$DOCKER_V sh 2>/dev/null || (curl -fsSL https://get.docker.com | sudo sh)" || true\n`;
+                    } else {
+                        s += `      run dst_cmd "sudo dnf install -y docker-ce-$DOCKER_V 2>/dev/null || sudo dnf install -y docker-ce" || true\n`;
+                    }
+                    s += `      run dst_cmd "sudo systemctl enable --now docker" || true\n`;
+                    s += `    else\n`;
+                    s += `      echo "  [L8] Docker already on FLEX: $FLEX_DOCKER (OSPC had: $DOCKER_V)"\n`;
+                    s += `    fi\n`;
+                    s += `  fi\n`;
                     s += `  [ -n "$HAS_PM2" ] && run dst_cmd "which pm2 || sudo npm install -g pm2" || true\n`;
+                    // Snap packages
+                    s += `  if [ -n "$HAS_SNAP" ]; then\n`;
+                    s += `    SNAP_LIST=$(src_cmd "snap list --unicode=never 2>/dev/null | awk 'NR>1{print \\$1}'" | grep -v snapd || true)\n`;
+                    s += `    SNAP_COUNT=$(echo "$SNAP_LIST" | grep -c . || echo 0)\n`;
+                    s += `    echo "  [L8] Snap packages detected: $SNAP_COUNT"\n`;
+                    s += `    for SNAP_PKG in $SNAP_LIST; do\n`;
+                    s += `      run dst_cmd "sudo snap install $SNAP_PKG 2>/dev/null || true"\n`;
+                    s += `    done\n`;
+                    s += `  fi\n`;
+                    // Python virtualenv dependency sync per app path
+                    s += `  echo "  [L8] Scanning for Python virtualenvs to sync pip dependencies..."\n`;
+                    s += `  for AP in ${appPaths}; do\n`;
+                    s += `    src_cmd "find $AP -name 'pyvenv.cfg' -maxdepth 4 2>/dev/null | head -5" | while read VENV_CFG; do\n`;
+                    s += `      VENV_DIR=$(dirname "$VENV_CFG")\n`;
+                    s += `      echo "  [L8] Virtualenv: $VENV_DIR"\n`;
+                    s += `      src_cmd "$VENV_DIR/bin/pip freeze 2>/dev/null" > /tmp/reqs_$$.txt || true\n`;
+                    s += `      [ -s /tmp/reqs_$$.txt ] && ssh $SSH_OPTS "$DST_USER@$DST_IP" "cat > /tmp/reqs_$$.txt" < /tmp/reqs_$$.txt || true\n`;
+                    s += `      run dst_cmd "python3 -m venv $VENV_DIR 2>/dev/null && $VENV_DIR/bin/pip install -q -r /tmp/reqs_$$.txt 2>/dev/null || true"\n`;
+                    s += `      rm -f /tmp/reqs_$$.txt\n`;
+                    s += `    done\n`;
+                    s += `  done\n`;
+                    // Node.js — npm ci wherever package-lock.json exists
+                    s += `  echo "  [L8] Scanning for Node.js apps to reinstall npm dependencies..."\n`;
+                    s += `  for AP in ${appPaths}; do\n`;
+                    s += `    src_cmd "find $AP -name 'package-lock.json' -not -path '*/node_modules/*' -maxdepth 5 2>/dev/null | head -5" | while read PKG_LOCK; do\n`;
+                    s += `      APP_DIR=$(dirname "$PKG_LOCK")\n`;
+                    s += `      echo "  [L8] npm ci: $APP_DIR"\n`;
+                    s += `      run dst_cmd "cd $APP_DIR && npm ci --silent 2>/dev/null || npm install --silent 2>/dev/null || true"\n`;
+                    s += `    done\n`;
+                    s += `  done\n`;
                     s += `  echo "  [L8] Runtime environment sync complete"\n\n`;
                 }
 
@@ -411,27 +522,35 @@ window.generateRehostScript = function() {
                     s += `  echo "  Config file list saved to $NODE_AUDIT/L9_configs.txt"\n`;
                     s += `  echo "[L9.5] Config IP fixup -- replacing OSPC IP ${ospcIp} with FLEX IP ${flexIp}"\n`;
                     s += `  FIXUP_DIRS="${appPaths} /etc/nginx /etc/apache2 /etc/haproxy"\n`;
-                    s += `  run dst_cmd "for DIR in $FIXUP_DIRS; do [ -d \\$DIR ] && sudo grep -rl '${ospcIp}' \\$DIR 2>/dev/null | xargs -r sudo sed -i 's|${ospcIp}|${flexIp}|g'; done || true"\n`;
+                    // Use --binary-files=without-match and restrict to text config extensions to avoid corrupting binaries/DBs/git
+                    s += `  run dst_cmd "for DIR in \\$FIXUP_DIRS; do [ -d \\$DIR ] || continue; sudo grep -rlI --include='*.conf' --include='*.cfg' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.xml' --include='*.ini' --include='*.env' --include='*.txt' --include='*.toml' --include='*.properties' '${ospcIp}' \\$DIR 2>/dev/null | xargs -r sudo sed -i 's|${ospcIp}|${flexIp}|g'; done || true"\n`;
                     s += `  echo "  [L9.5] Also checking for hardcoded hostnames..."\n`;
-                    s += `  SRC_HOST_IP=$(src_cmd "hostname -f 2>/dev/null || hostname")\n`;
-                    s += `  DST_HOST_IP=$(dst_cmd "hostname -f 2>/dev/null || hostname")\n`;
-                    s += `  [ -n "$SRC_HOST_IP" ] && run dst_cmd "for DIR in $FIXUP_DIRS; do [ -d \\$DIR ] && sudo grep -rl '$SRC_HOST_IP' \\$DIR 2>/dev/null | xargs -r sudo sed -i 's|'\\$SRC_HOST_IP'|'\\$DST_HOST_IP'|g'; done || true" || true\n\n`;
+                    s += `  SRC_HOST_IP=$(src_cmd "hostname 2>/dev/null || true")\n`;
+                    s += `  DST_HOST_IP=$(dst_cmd "hostname 2>/dev/null || true")\n`;
+                    s += `  [ -n "$SRC_HOST_IP" ] && run dst_cmd "for DIR in \\$FIXUP_DIRS; do [ -d \\$DIR ] || continue; sudo grep -rlI --include='*.conf' --include='*.cfg' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.xml' --include='*.ini' --include='*.env' '\\$SRC_HOST_IP' \\$DIR 2>/dev/null | xargs -r sudo sed -i 's|\\$SRC_HOST_IP|\\$DST_HOST_IP|g'; done || true" || true\n\n`;
                 }
 
                 if (L.services && ospcIp) {
                     s += `  echo "[L10] Systemd Units & Cron"\n`;
-                    s += `  src_cmd "sudo tar -czf /tmp/systemd_units.tgz /etc/systemd/system/ 2>/dev/null || true"\n`;
+                    // Filter for OSPC/Rackspace platform agents that must NOT run on FLEX
+                    s += `  SVC_FILTER='rackspace|nova-agent|xe-guest|driveclient|holland|cloud-init|snapd|ufw|networkd|systemd-net|systemd-resolve|multipathd|open-vm'\n`;
+                    // Only copy custom app units from /etc/systemd/system — skip symlinks to /lib (those are distro units)
+                    // This avoids overwriting FLEX's own cloud-init, networking, SSH system units
+                    s += `  echo "  [L10] Copying custom app service units (excluding platform/OSPC agents)..."\n`;
+                    s += `  src_cmd "find /etc/systemd/system -maxdepth 1 -type f -name '*.service' 2>/dev/null | xargs -r grep -lv 'rackspace\\|nova-agent\\|xe-guest\\|driveclient' 2>/dev/null | tar -czf /tmp/systemd_units.tgz --files-from=- 2>/dev/null; echo done" 2>/dev/null || true\n`;
                     s += `  ospc_to_flex "/tmp/systemd_units.tgz" "/tmp/systemd_units.tgz"\n`;
                     s += `  run dst_cmd "sudo tar -xzf /tmp/systemd_units.tgz -C / 2>/dev/null || true && sudo systemctl daemon-reload"\n`;
-                    s += `  echo "  [L10] systemd units transferred and daemon reloaded"\n`;
-                    s += `  ENABLED=$(src_cmd "systemctl list-unit-files --state=enabled --type=service --no-legend 2>/dev/null | awk '{print \\$1}'" || true)\n`;
+                    s += `  echo "  [L10] Custom systemd units transferred and daemon reloaded"\n`;
+                    // Enable app services only — filter out OSPC/Rackspace services
+                    s += `  ENABLED=$(src_cmd "systemctl list-unit-files --state=enabled --type=service --no-legend 2>/dev/null | awk '{print \\$1}'" | grep -vE "$SVC_FILTER" || true)\n`;
                     s += `  ENABLED_COUNT=$(echo "$ENABLED" | grep -c . || echo 0)\n`;
-                    s += `  echo "  [L10] Enabling $ENABLED_COUNT services on FLEX..."\n`;
+                    s += `  echo "  [L10] Enabling $ENABLED_COUNT app services on FLEX (platform services filtered)..."\n`;
                     s += `  for svc in $ENABLED; do\n`;
                     s += `    echo "    -> enabling: $svc"\n`;
                     s += `    run dst_cmd "sudo systemctl enable '$svc' 2>/dev/null || true"\n`;
                     s += `  done\n`;
-                    s += `  src_cmd "sudo tar -czf /tmp/cron_backup.tgz /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly 2>/dev/null || true"\n`;
+                    // Cron — filter out Rackspace cron jobs
+                    s += `  src_cmd "sudo tar -czf /tmp/cron_backup.tgz --exclude='*rackspace*' --exclude='*holland*' /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly 2>/dev/null || true"\n`;
                     s += `  ospc_to_flex "/tmp/cron_backup.tgz" "/tmp/cron_backup.tgz"\n`;
                     s += `  run dst_cmd "sudo tar -xzf /tmp/cron_backup.tgz -C / 2>/dev/null || true"\n`;
                     s += `  echo "  [L10] Cron jobs synced to FLEX"\n\n`;
@@ -471,6 +590,7 @@ window.generateRehostScript = function() {
 
                 if (L.tls && ospcIp) {
                     s += `  echo "[L12] TLS & Certs"\n`;
+                    // Let's Encrypt
                     s += `  TLS_EXISTS=$(src_cmd "[ -d /etc/letsencrypt ] && echo exists" 2>/dev/null || true)\n`;
                     s += `  if echo "$TLS_EXISTS" | grep -q exists; then\n`;
                     s += `    echo "  [L12] Let's Encrypt detected on OSPC -- copying certs direct to FLEX"\n`;
@@ -481,6 +601,28 @@ window.generateRehostScript = function() {
                     s += `  else\n`;
                     s += `    echo "  [L12] No Let's Encrypt certs on OSPC -- skipping"\n`;
                     s += `  fi\n`;
+                    // /etc/ssl/private (nginx/apache inline certs)
+                    s += `  SSL_EXISTS=$(src_cmd "sudo ls /etc/ssl/private/*.pem /etc/ssl/private/*.crt /etc/ssl/private/*.key 2>/dev/null | wc -l" || echo 0)\n`;
+                    s += `  if [ "$SSL_EXISTS" -gt 0 ] 2>/dev/null; then\n`;
+                    s += `    echo "  [L12] /etc/ssl/private certs found ($SSL_EXISTS files) -- transferring"\n`;
+                    s += `    src_cmd "sudo tar -czf /tmp/ssl_private.tgz /etc/ssl/private/ 2>/dev/null || true"\n`;
+                    s += `    ospc_to_flex "/tmp/ssl_private.tgz" "/tmp/ssl_private.tgz"\n`;
+                    s += `    run dst_cmd "sudo tar -xzf /tmp/ssl_private.tgz -C / 2>/dev/null || true && sudo chmod 710 /etc/ssl/private"\n`;
+                    s += `    echo "  [L12] /etc/ssl/private transferred"\n`;
+                    s += `  fi\n`;
+                    // /etc/pki/tls (RHEL/CentOS)
+                    s += `  PKI_EXISTS=$(src_cmd "sudo ls /etc/pki/tls/certs/*.pem /etc/pki/tls/private/*.key 2>/dev/null | wc -l" || echo 0)\n`;
+                    s += `  if [ "$PKI_EXISTS" -gt 0 ] 2>/dev/null; then\n`;
+                    s += `    echo "  [L12] /etc/pki/tls certs found ($PKI_EXISTS files) -- transferring"\n`;
+                    s += `    src_cmd "sudo tar -czf /tmp/pki_tls.tgz /etc/pki/tls/ 2>/dev/null || true"\n`;
+                    s += `    ospc_to_flex "/tmp/pki_tls.tgz" "/tmp/pki_tls.tgz"\n`;
+                    s += `    run dst_cmd "sudo tar -xzf /tmp/pki_tls.tgz -C / 2>/dev/null || true"\n`;
+                    s += `    echo "  [L12] /etc/pki/tls transferred"\n`;
+                    s += `  fi\n`;
+                    // Audit any remaining .pem/.crt/.key files outside standard paths
+                    s += `  src_cmd "sudo find /opt /srv /var/www /etc/nginx /etc/apache2 -name '*.pem' -o -name '*.crt' -o -name '*.key' 2>/dev/null | grep -v letsencrypt | head -20" > "$NODE_AUDIT/L12_extra_certs.txt" 2>/dev/null || true\n`;
+                    s += `  EXTRA_CERTS=$(wc -l < "$NODE_AUDIT/L12_extra_certs.txt" 2>/dev/null || echo 0)\n`;
+                    s += `  [ "$EXTRA_CERTS" -gt 0 ] && echo "  [L12] ⚠  $EXTRA_CERTS extra cert files found outside standard paths -- review $NODE_AUDIT/L12_extra_certs.txt"\n`;
                     s += `  run dst_cmd "sudo update-ca-certificates 2>/dev/null || sudo update-ca-trust 2>/dev/null || true"\n`;
                     s += `  echo "  [L12] CA trust store updated on FLEX"\n\n`;
                 }
@@ -698,7 +840,7 @@ window.generateRehostScript = function() {
         h += `deploy_key_to_ospc() { scp -O -q $SSH_OPTS "$SSH_KEY" "$SRC_USER@$SRC_IP:$MIG_KEY_REMOTE" 2>/dev/null && ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "chmod 600 $MIG_KEY_REMOTE" 2>/dev/null || echo "  [WARN] Could not deploy SSH key"; }\n`;
         h += `remove_key_from_ospc() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rm -f $MIG_KEY_REMOTE" 2>/dev/null || true; }\n`;
         h += `ospc_to_flex() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "scp -O -q -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no '$1' '$DST_USER@$DST_IP:$2' 2>/dev/null || true"; }\n`;
-        h += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
+        h += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no -o BatchMode=yes' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
         return h;
     }
 };
@@ -756,7 +898,7 @@ window.generateRehostNodeScript = function(pair) {
     s += `deploy_key_to_ospc() { scp -O -q $SSH_OPTS "$SSH_KEY" "$SRC_USER@$SRC_IP:$MIG_KEY_REMOTE" 2>/dev/null && ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "chmod 600 $MIG_KEY_REMOTE" 2>/dev/null || echo "  [WARN] Could not deploy SSH key"; }\n`;
     s += `remove_key_from_ospc() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rm -f $MIG_KEY_REMOTE" 2>/dev/null || true; }\n`;
     s += `ospc_to_flex() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "scp -O -q -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no '$1' '$DST_USER@$DST_IP:$2' 2>/dev/null || true"; }\n`;
-    s += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
+    s += `rsync_direct() { ssh $SSH_OPTS "$SRC_USER@$SRC_IP" "rsync $RSYNC_OPTS --rsync-path='sudo rsync' -e 'ssh -i $MIG_KEY_REMOTE -o StrictHostKeyChecking=no -o BatchMode=yes' '$1' '$DST_USER@$DST_IP:$2'"; }\n\n`;
 
     // Node function — extract from full generated script via regex
     const fullScript = (document.getElementById('script-output-stage1')||{getAttribute:()=>''}).getAttribute('data-raw') || '';

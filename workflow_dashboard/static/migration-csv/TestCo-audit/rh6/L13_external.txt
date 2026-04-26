@@ -1,0 +1,2 @@
+[STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@104.239.142.102 grep -rE '(DB_HOST|DATABASE_URL|PG_HOST|REDIS_URL|API_URL)' /opt/app /srv /var/www 2>/dev/null | head -30
+[STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@104.239.142.102 ss -ltnp 2>/dev/null

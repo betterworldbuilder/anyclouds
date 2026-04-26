@@ -1,16 +1,13 @@
-[INFO] LB_PORT=auto — scanning open DB ports on 162.209.114.163 …
-[INFO] Auto-detected DB port: 3306
-[INFO] Source DB type: MySQL (unknown) — target will use MySQL
-[INFO] Local mysql client SSL flag: --ssl-mode=DISABLED
+# Source: 1 selected node pairs
 
-════════════════════════════════════════════════════════════════════
-DB MIGRATION V2 — Thu Apr 16 11:00:49 +07 2026
-════════════════════════════════════════════════════════════════════
-Source OSPC LB : 162.209.114.163:3306  (user: admin)
-FLEX primary   : 174.143.59.111
-FLEX replicas  : 174.143.59.247,174.143.59.106
-Log            : /tmp/db_mig_v2/db_mig_v2_20260416_110047.log
-ERROR 1045 (28000): Access denied for user 'admin'@'10.189.254.6' (using password: YES)
-[FATAL] line 137: MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" $_LOCAL_SSL_OPT --batch --raw --skip-column-names "$@" (rc=1)
-[FATAL] line 160: sed 's/[[:space:]]*$//' (rc=1)
-[FATAL] line 471: DATABASES="$(discover_databases)" (rc=1)
+##############################################################
+#  NODE : rh6
+#  OSPC : 104.239.142.102  [user: ubuntu]
+#  FLEX : 50.56.158.179  [user: ubuntu]  OS: Linux
+##############################################################
+
+══════════════════════ STAGE 0 -- PRE-FLIGHT CHECKS ══════════════════════
+[P0] SSH connectivity check...
+[ERROR] Cannot SSH to OSPC 104.239.142.102 as ubuntu -- skipping rh6
+
+[PARALLEL-DONE] rh6 execution complete

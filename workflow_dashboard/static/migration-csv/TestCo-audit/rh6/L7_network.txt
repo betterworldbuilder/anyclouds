@@ -1,0 +1,1 @@
+[STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@104.239.142.102 ip addr; ip route; cat /etc/netplan/*.yaml 2>/dev/null || true

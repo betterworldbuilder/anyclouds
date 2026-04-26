@@ -602,10 +602,8 @@ REPLICA_LAG_WAIT_SEC=15
 mkdir -p "$WORKDIR"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-# ── Auto-detect DB port if not supplied ──────────────────────────────
-# Strategy: TCP probe first (fast), then direct mysql connect as fallback.
-# Firewalls may block raw TCP SYN probes but allow MySQL protocol — so we
-# always try a real mysql login on 3306 before giving up.
+# ── Auto-detect DB port / SSL / engine when LIVE only ─────────────────
+# Dry-run must not make live DB auth attempts. It should print the plan only.
 detect_db_port() {
   local _host="$1"
   local _candidates="3306 3307 5432 1433 27017"
@@ -623,70 +621,102 @@ detect_db_port() {
   echo ""
 }
 
-if [ -z "$LB_PORT" ] || [ "$LB_PORT" = "auto" ]; then
-  echo "[INFO] LB_PORT=auto — scanning open DB ports on $LB_PUBLIC_IP …"
-  _detected="$(detect_db_port "$LB_PUBLIC_IP")"
-  if [ -z "$_detected" ]; then
-    # TCP probe failed — firewall may block SYN scans but allow MySQL protocol.
-    # Try a direct mysql connect on 3306 (with each SSL mode) as last resort.
-    echo "[WARN] TCP scan found nothing — trying direct mysql connect on 3306 …"
-    for _try_ssl in "--ssl-mode=DISABLED" "--skip-ssl" ""; do
-      if MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P 3306 -u "$DBAAS_USER" \
-          $_try_ssl --connect-timeout=8 -N -B -e "SELECT 1;" 2>/dev/null | grep -q "^1$"; then
-        _detected="3306"
-        echo "[INFO] Direct mysql on port 3306 succeeded (firewall blocks SYN probes)"
-        break
-      fi
-    done
+if [ "$DRY_RUN" = "1" ]; then
+  if [ -z "$LB_PORT" ] || [ "$LB_PORT" = "auto" ]; then
+    LB_PORT="${DB_DRY_PORT:-3306}"
+    echo "[DRY] LB_PORT=auto — skipping live source port scan, assuming $LB_PORT"
   fi
-  if [ -z "$_detected" ]; then
-    echo "[FATAL] Cannot reach $LB_PUBLIC_IP on any DB port." >&2
-    echo "[FATAL] Tried TCP probe + direct mysql on 3306. Check: host reachable, DB running, firewall allows port 3306 from this runner." >&2
-    exit 1
-  fi
-  LB_PORT="$_detected"
-  echo "[INFO] Auto-detected DB port: $LB_PORT"
-fi
-
-# ── Detect which SSL option actually works against this source DB ─────
-# Test real connectivity — don't guess from client help text.
-# Percona/MySQL 8 may REQUIRE SSL and drop the connection (ERROR 2013) if disabled.
-_LOCAL_SSL_OPT="NONE"
-for _try_ssl in "--ssl-mode=DISABLED" "--skip-ssl" ""; do
-  if MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" \
-      $_try_ssl -N -B -e "SELECT 1;" 2>/dev/null | grep -q "^1$"; then
-    _LOCAL_SSL_OPT="$_try_ssl"
-    break
-  fi
-done
-[ "$_LOCAL_SSL_OPT" = "NONE" ] && { echo "[FATAL] Cannot connect to $LB_PUBLIC_IP:$LB_PORT — check credentials/firewall" >&2; exit 1; }
-echo "[INFO] Source DB SSL flag: ${_LOCAL_SSL_OPT:-(default SSL)}"
-
-# ── Auto-detect source DB type and set target-matching variables ─────
-# Percona Server 8.0 VERSION() = "8.0.x-N" (no "Percona" in string) — must also check @@version_comment.
-_SRC_VER=$(MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" \
-  $_LOCAL_SSL_OPT -N -B -e "SELECT VERSION();" 2>/dev/null || echo "unknown")
-_SRC_COMMENT=$(MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" \
-  $_LOCAL_SSL_OPT -N -B -e "SELECT @@version_comment;" 2>/dev/null || echo "")
-echo "[INFO] Source DB: VERSION=$_SRC_VER  COMMENT=$_SRC_COMMENT"
-if echo "$_SRC_VER $_SRC_COMMENT" | grep -qi "mariadb"; then
-  DB_TYPE="mariadb"
-  DB_SSL_OPT="--skip-ssl"
-  DB_PKG="mariadb-server mariadb-client"
-  REPL_GTID_OPT="MASTER_USE_GTID=slave_pos"
-  echo "[INFO] Source DB type: MariaDB ($_SRC_VER) — target will use MariaDB"
-elif echo "$_SRC_COMMENT" | grep -qi "percona"; then
-  DB_TYPE="percona"
-  DB_SSL_OPT="--ssl-mode=DISABLED"
-  DB_PKG="percona-server-server percona-server-client"
-  REPL_GTID_OPT="MASTER_AUTO_POSITION=1, GET_MASTER_PUBLIC_KEY=1"
-  echo "[INFO] Source DB type: Percona ($_SRC_VER) — target will use Percona Server"
+  DB_TYPE="${DB_DRY_TYPE:-mysql}"
+  _LOCAL_SSL_OPT="${DB_DRY_SSL_OPT:---ssl-mode=DISABLED}"
+  case "$DB_TYPE" in
+    mariadb)
+      DB_SSL_OPT="--skip-ssl"
+      DB_PKG="mariadb-server mariadb-client"
+      REPL_GTID_OPT="MASTER_USE_GTID=slave_pos"
+      ;;
+    percona)
+      DB_SSL_OPT="--ssl-mode=DISABLED"
+      DB_PKG="percona-server-server percona-server-client"
+      REPL_GTID_OPT="MASTER_AUTO_POSITION=1, GET_MASTER_PUBLIC_KEY=1"
+      ;;
+    *)
+      DB_TYPE="mysql"
+      DB_SSL_OPT="--ssl-mode=DISABLED"
+      DB_PKG="mysql-server mysql-client"
+      REPL_GTID_OPT="MASTER_AUTO_POSITION=1, GET_MASTER_PUBLIC_KEY=1"
+      ;;
+  esac
+  echo "[DRY] Skipping live source DB auth and engine detection on $LB_PUBLIC_IP:$LB_PORT"
+  echo "[DRY] Assuming DB_TYPE=$DB_TYPE SSL=${_LOCAL_SSL_OPT:-(default SSL)}"
 else
-  DB_TYPE="mysql"
-  DB_SSL_OPT="--ssl-mode=DISABLED"
-  DB_PKG="mysql-server mysql-client"
-  REPL_GTID_OPT="MASTER_AUTO_POSITION=1, GET_MASTER_PUBLIC_KEY=1"
-  echo "[INFO] Source DB type: MySQL ($_SRC_VER) — target will use MySQL"
+  # Strategy: TCP probe first (fast), then direct mysql connect as fallback.
+  # Firewalls may block raw TCP SYN probes but allow MySQL protocol — so we
+  # always try a real mysql login on 3306 before giving up.
+  if [ -z "$LB_PORT" ] || [ "$LB_PORT" = "auto" ]; then
+    echo "[INFO] LB_PORT=auto — scanning open DB ports on $LB_PUBLIC_IP …"
+    _detected="$(detect_db_port "$LB_PUBLIC_IP")"
+    if [ -z "$_detected" ]; then
+      # TCP probe failed — firewall may block SYN scans but allow MySQL protocol.
+      # Try a direct mysql connect on 3306 (with each SSL mode) as last resort.
+      echo "[WARN] TCP scan found nothing — trying direct mysql connect on 3306 …"
+      for _try_ssl in "--ssl-mode=DISABLED" "--skip-ssl" ""; do
+        if MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P 3306 -u "$DBAAS_USER" \
+            $_try_ssl --connect-timeout=8 -N -B -e "SELECT 1;" 2>/dev/null | grep -q "^1$"; then
+          _detected="3306"
+          echo "[INFO] Direct mysql on port 3306 succeeded (firewall blocks SYN probes)"
+          break
+        fi
+      done
+    fi
+    if [ -z "$_detected" ]; then
+      echo "[FATAL] Cannot reach $LB_PUBLIC_IP on any DB port." >&2
+      echo "[FATAL] Tried TCP probe + direct mysql on 3306. Check: host reachable, DB running, firewall allows port 3306 from this runner." >&2
+      exit 1
+    fi
+    LB_PORT="$_detected"
+    echo "[INFO] Auto-detected DB port: $LB_PORT"
+  fi
+
+  # ── Detect which SSL option actually works against this source DB ─────
+  # Test real connectivity — don't guess from client help text.
+  # Percona/MySQL 8 may REQUIRE SSL and drop the connection (ERROR 2013) if disabled.
+  _LOCAL_SSL_OPT="NONE"
+  for _try_ssl in "--ssl-mode=DISABLED" "--skip-ssl" ""; do
+    if MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" \
+        $_try_ssl -N -B -e "SELECT 1;" 2>/dev/null | grep -q "^1$"; then
+      _LOCAL_SSL_OPT="$_try_ssl"
+      break
+    fi
+  done
+  [ "$_LOCAL_SSL_OPT" = "NONE" ] && { echo "[FATAL] Cannot connect to $LB_PUBLIC_IP:$LB_PORT — check credentials/firewall" >&2; exit 1; }
+  echo "[INFO] Source DB SSL flag: ${_LOCAL_SSL_OPT:-(default SSL)}"
+
+  # ── Auto-detect source DB type and set target-matching variables ─────
+  # Percona Server 8.0 VERSION() = "8.0.x-N" (no "Percona" in string) — must also check @@version_comment.
+  _SRC_VER=$(MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" \
+    $_LOCAL_SSL_OPT -N -B -e "SELECT VERSION();" 2>/dev/null || echo "unknown")
+  _SRC_COMMENT=$(MYSQL_PWD="$DBAAS_PASS" mysql -h "$LB_PUBLIC_IP" -P "$LB_PORT" -u "$DBAAS_USER" \
+    $_LOCAL_SSL_OPT -N -B -e "SELECT @@version_comment;" 2>/dev/null || echo "")
+  echo "[INFO] Source DB: VERSION=$_SRC_VER  COMMENT=$_SRC_COMMENT"
+  if echo "$_SRC_VER $_SRC_COMMENT" | grep -qi "mariadb"; then
+    DB_TYPE="mariadb"
+    DB_SSL_OPT="--skip-ssl"
+    DB_PKG="mariadb-server mariadb-client"
+    REPL_GTID_OPT="MASTER_USE_GTID=slave_pos"
+    echo "[INFO] Source DB type: MariaDB ($_SRC_VER) — target will use MariaDB"
+  elif echo "$_SRC_COMMENT" | grep -qi "percona"; then
+    DB_TYPE="percona"
+    DB_SSL_OPT="--ssl-mode=DISABLED"
+    DB_PKG="percona-server-server percona-server-client"
+    REPL_GTID_OPT="MASTER_AUTO_POSITION=1, GET_MASTER_PUBLIC_KEY=1"
+    echo "[INFO] Source DB type: Percona ($_SRC_VER) — target will use Percona Server"
+  else
+    DB_TYPE="mysql"
+    DB_SSL_OPT="--ssl-mode=DISABLED"
+    DB_PKG="mysql-server mysql-client"
+    REPL_GTID_OPT="MASTER_AUTO_POSITION=1, GET_MASTER_PUBLIC_KEY=1"
+    echo "[INFO] Source DB type: MySQL ($_SRC_VER) — target will use MySQL"
+  fi
 fi
 
 log()  { echo; echo "════════════════════════════════════════════════════════════════════"; echo "$1"; echo "════════════════════════════════════════════════════════════════════"; }
@@ -755,6 +785,10 @@ mysql_replica() {
 
 discover_databases() {
   if [ -n "$DATABASES" ]; then echo "$DATABASES"; return 0; fi
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "${DB_DRY_DATABASES:-sampledb}"
+    return 0
+  fi
   mysql_src -e "SHOW DATABASES;" \
     | grep -Ev '^(information_schema|performance_schema|mysql|sys)$' \
     | tr '\n' ' ' | sed 's/[[:space:]]*$//'

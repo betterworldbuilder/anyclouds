@@ -1,0 +1,1 @@
+[STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@104.239.142.102 find /opt/app /srv /var/www -name '.env' -o -name '*.yml' -o -name '*.yaml' -o -name '*.ini' 2>/dev/null | head -30

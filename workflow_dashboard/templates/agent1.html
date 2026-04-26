@@ -441,47 +441,14 @@
                     </div>
                 </div>
 
-                <!-- OSPC ↔ FLEX MATCHING TABLE -->
-                <div id="ospc-flex-matching" style="display: none; margin-top: 25px; border-top: 1px solid rgba(16,185,129,0.2); padding-top: 20px;">
-                    <h3 style="color: #fbbf24; font-size: 1.05rem; margin-bottom: 15px;">🔗 OSPC ↔ FLEX Server & DB Matching</h3>
-                    <table class="grid-table" style="width: 100%; text-align: left; border-collapse: collapse;">
-                        <thead><tr style="border-bottom: 2px solid var(--border);">
-                            <th style="padding: 10px 5px; color: #f9a8d4; width: 25%;">OSPC Server Name</th>
-                            <th style="padding: 10px 5px; color: #f9a8d4; width: 15%;">OSPC External IP</th>
-                            <th style="padding: 10px 5px; color: #6ee7b7; width: 25%;">FLEX Server Name</th>
-                            <th style="padding: 10px 5px; color: #6ee7b7; width: 15%;">FLEX External IP</th>
-                            <th style="padding: 10px 5px; color: var(--text-muted); width: 20%;">Match Status</th>
-                        </tr></thead>
-                        <tbody id="ospc-flex-match-body"></tbody>
-                    </table>
-                </div>
+
             </div>
         </div>
     </div>
 
 
 
-    <!-- ══════ STAGE 1.4: DEEP STACK SCAN ══════ -->
-    <div class="panel" style="margin-bottom: 30px; border-color: #6366f1;">
-        <h2 class="section-title"><div class="section-title-wrapper">Stage 1.3: Deep Stack Scan & Playbook Assignment</div></h2>
-        <p style="color: var(--text-muted); margin-bottom: 15px;">Full scan: packages, runtimes, open ports, systemd services. Auto-assigns migration playbook.</p>
-        <div style="overflow-x: auto;">
-            <table class="grid-table" style="width: 100%; text-align: left; border-collapse: collapse;">
-                <thead><tr style="border-bottom: 2px solid var(--border);">
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Server</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">IP</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">OS</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Kernel</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Role</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Services</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Runtimes</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Ports</th>
-                    <th style="padding: 10px 5px; color: var(--text-muted);">Playbook</th>
-                </tr></thead>
-                <tbody id="deep-scan-body"></tbody>
-            </table>
-        </div>
-    </div>
+
 
 
 
@@ -743,6 +710,32 @@
                             style="width:100%; box-sizing:border-box; padding:9px 12px; background:rgba(110,231,183,0.07); border:1px solid rgba(110,231,183,0.3); border-radius:7px; color:#e2e8f0; font-family:'Fira Code',monospace; font-size:0.88rem;">
                     </div>
 
+                    <!-- ── OSPC SERVER SSH AUTH (Server & DB VM Mode) ── -->
+                    <div id="modal-server-ssh-auth" style="margin-bottom:14px; padding:12px 14px; background:rgba(99,102,241,0.06); border:1px solid rgba(99,102,241,0.25); border-radius:8px;">
+                        <p style="margin:0 0 10px; font-size:0.75rem; font-weight:700; color:#818cf8; text-transform:uppercase; letter-spacing:0.04em;">🔐 OSPC Server SSH Auth</p>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
+                            <div>
+                                <label style="color:#94a3b8; font-size:0.75rem; font-weight:600; display:block; margin-bottom:4px;">SSH Username</label>
+                                <input type="text" id="modal-ssh-user" value="root"
+                                    style="width:100%; box-sizing:border-box; padding:7px 10px; background:rgba(0,0,0,0.3); border:1px solid rgba(99,102,241,0.3); border-radius:6px; color:#e2e8f0; font-size:0.85rem;">
+                            </div>
+                            <div>
+                                <label style="color:#94a3b8; font-size:0.75rem; font-weight:600; display:block; margin-bottom:4px;">SSH Password <span style="font-size:0.65rem; color:#475569;">(if no key)</span></label>
+                                <div style="display:flex;">
+                                    <input type="password" id="modal-ssh-pass" placeholder="Optional"
+                                        style="flex:1; min-width:0; padding:7px 10px; background:rgba(0,0,0,0.3); border:1px solid rgba(99,102,241,0.3); border-radius:6px 0 0 6px; color:#e2e8f0; font-size:0.85rem; font-family:'Fira Code',monospace;">
+                                    <button type="button" onclick="(function(b){const i=b.previousElementSibling;i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'👁':'🙈';})(this)"
+                                        style="padding:3px 8px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); border-left:none; border-radius:0 6px 6px 0; color:#818cf8; cursor:pointer; font-size:0.8rem;">👁</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="color:#94a3b8; font-size:0.75rem; font-weight:600; display:block; margin-bottom:4px;">SSH Key Path / Paste Key</label>
+                            <input type="text" id="modal-ssh-key" value="~/.ssh/id_rsa" placeholder="~/.ssh/id_rsa or paste raw key contents"
+                                style="width:100%; box-sizing:border-box; padding:7px 10px; background:rgba(0,0,0,0.3); border:1px solid rgba(99,102,241,0.3); border-radius:6px; color:#e2e8f0; font-size:0.85rem; font-family:'Fira Code',monospace;">
+                        </div>
+                    </div>
+
                     <!-- ═══ Shared DB credential panel (shown for dbaas / dbaas+replica / ha) ═══ -->
                     <div id="modal-dbaas-extra" style="display:none; margin-bottom:14px; font-size:0.77rem; line-height:1.5;">
 
@@ -950,6 +943,85 @@
                 <input type="hidden" id="dbaas_replica_vip" value="">
                 <input type="hidden" id="flex_root_pass" value="">
                 <input type="hidden" id="ssh_key_path" value="~/.ssh/id_rsa">
+
+                <!-- ── DBaaS engine/version support matrix ─────────────────── -->
+                <div style="margin-top:16px; border:1px solid rgba(99,102,241,0.24); border-radius:10px; overflow:hidden; background:rgba(15,23,42,0.55);">
+                    <div style="background:rgba(99,102,241,0.12); border-bottom:1px solid rgba(99,102,241,0.22); padding:8px 14px; font-weight:700; color:#c4b5fd; font-size:0.74rem; letter-spacing:0.06em; text-transform:uppercase; display:flex; align-items:center; gap:10px;">
+                        🗄 DBaaS Migration Support Matrix
+                        <span style="font-size:0.67rem; font-weight:500; color:#94a3b8; text-transform:none; letter-spacing:0;">What the current automation supports today for managed DBaaS migration paths</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; min-width:980px; font-size:0.74rem; color:#cbd5e1;">
+                            <thead>
+                                <tr style="background:rgba(30,41,59,0.92); border-bottom:1px solid rgba(148,163,184,0.18);">
+                                    <th style="padding:8px 10px; text-align:left; color:#94a3b8; min-width:140px;">Category</th>
+                                    <th style="padding:8px 10px; text-align:center; color:#a78bfa; min-width:130px;">MySQL 5.7 / 8.0</th>
+                                    <th style="padding:8px 10px; text-align:center; color:#34d399; min-width:130px;">MariaDB 10.x</th>
+                                    <th style="padding:8px 10px; text-align:center; color:#f59e0b; min-width:140px;">Percona 5.7 / 8.0</th>
+                                    <th style="padding:8px 10px; text-align:center; color:#60a5fa; min-width:140px;">PostgreSQL 12 / 13 / 14</th>
+                                    <th style="padding:8px 10px; text-align:center; color:#f472b6; min-width:130px;">MongoDB 4 / 5 / 6</th>
+                                    <th style="padding:8px 10px; text-align:center; color:#f87171; min-width:150px;">SQL Server 2016 / 2019</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-top:1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding:7px 10px; color:#94a3b8; font-weight:600;">Managed source access</td>
+                                    <td style="padding:7px 10px; text-align:center;">Cloud LB VIP</td>
+                                    <td style="padding:7px 10px; text-align:center;">Cloud LB VIP</td>
+                                    <td style="padding:7px 10px; text-align:center;">Cloud LB VIP</td>
+                                    <td style="padding:7px 10px; text-align:center;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center;">To be tested</td>
+                                </tr>
+                                <tr style="border-top:1px solid rgba(255,255,255,0.05); background:rgba(255,255,255,0.02);">
+                                    <td style="padding:7px 10px; color:#94a3b8; font-weight:600;">Single DBaaS</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                </tr>
+                                <tr style="border-top:1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding:7px 10px; color:#94a3b8; font-weight:600;">DBaaS + Replica</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                </tr>
+                                <tr style="border-top:1px solid rgba(255,255,255,0.05); background:rgba(255,255,255,0.02);">
+                                    <td style="padding:7px 10px; color:#94a3b8; font-weight:600;">HA DBaaS</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#4ade80; font-weight:700;">Ready now</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                    <td style="padding:7px 10px; text-align:center; color:#fbbf24; font-weight:700;">To be tested</td>
+                                </tr>
+                                <tr style="border-top:1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding:7px 10px; color:#94a3b8; font-weight:600;">Automation path today</td>
+                                    <td style="padding:7px 10px; text-align:center;">LB VIP → <code style="color:#c4b5fd;">mysqldump</code> → FLEX restore</td>
+                                    <td style="padding:7px 10px; text-align:center;">LB VIP → <code style="color:#34d399;">mysqldump</code> → FLEX restore</td>
+                                    <td style="padding:7px 10px; text-align:center;">LB VIP → <code style="color:#f59e0b;">mysqldump</code> → FLEX restore</td>
+                                    <td style="padding:7px 10px; text-align:center;">Planned / validate first</td>
+                                    <td style="padding:7px 10px; text-align:center;">Planned / validate first</td>
+                                    <td style="padding:7px 10px; text-align:center;">Planned / validate first</td>
+                                </tr>
+                                <tr style="border-top:1px solid rgba(255,255,255,0.05); background:rgba(255,255,255,0.02);">
+                                    <td style="padding:7px 10px; color:#94a3b8; font-weight:600;">Notes</td>
+                                    <td style="padding:7px 10px; text-align:center;">GTID-aware path for MySQL</td>
+                                    <td style="padding:7px 10px; text-align:center;">MariaDB replication path supported</td>
+                                    <td style="padding:7px 10px; text-align:center;">Percona detected via version_comment</td>
+                                    <td style="padding:7px 10px; text-align:center;">DB VM path exists elsewhere; DBaaS path not certified</td>
+                                    <td style="padding:7px 10px; text-align:center;">UI mentions engine family; script path not certified</td>
+                                    <td style="padding:7px 10px; text-align:center;">UI mentions engine family; script path not certified</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
                 <!-- ── DB Steps tables (full width, toggle by scenario) ───── -->
                 <!-- Single DB VM steps -->
@@ -3321,6 +3393,7 @@ printf '</div>\\n'
         const oLabel  = document.getElementById('modal-ospc-label');
         const fLabel  = document.getElementById('modal-flex-label');
         const extra   = document.getElementById('modal-dbaas-extra');
+        const sshAuth = document.getElementById('modal-server-ssh-auth');
         const repWrap = document.getElementById('modal-flex-replica-wrap');
         const replSec = document.getElementById('modal-repl-section');
         const haEpSec = document.getElementById('modal-ha-endpoint-section');
@@ -3335,6 +3408,7 @@ printf '</div>\\n'
             oLabel.textContent = 'OSPC Public IP';
             fLabel.textContent = 'FLEX Public IP';
             extra.style.display = 'none';
+            if (sshAuth) sshAuth.style.display = 'block';
         } else if (type === 'dbvm') {
             vmBtn.style.background = 'rgba(20,184,166,0.22)'; vmBtn.style.color = '#5eead4';
             hint.textContent = 'Standalone DB VM: SSH-accessible OSPC DB server → dump directly via SSH → restore on FLEX DB VM. No Cloud LB required.';
@@ -3342,6 +3416,7 @@ printf '</div>\\n'
             fLabel.textContent = 'FLEX DB VM Public IP (SSH)';
             note.textContent = 'DB VM: direct SSH access to source DB. mysqldump runs on the source VM — no Cloud LB required.';
             extra.style.display   = 'block';
+            if (sshAuth) sshAuth.style.display = 'block';
             repWrap.style.display = 'none';
             replSec.style.display = 'none';
             haEpSec.style.display = 'none';
@@ -3352,6 +3427,7 @@ printf '</div>\\n'
             fLabel.textContent = 'FLEX DB IP';
             note.textContent = 'Single DBaaS: OSPC IP = Cloud LB VIP (port 3306). No SSH to DB host — dumps run locally via mysqldump -h LB_IP. No replica dump source.';
             extra.style.display   = 'block';
+            if (sshAuth) sshAuth.style.display = 'none';
             repWrap.style.display = 'none';
             replSec.style.display = 'none';
             haEpSec.style.display = 'none';
@@ -3362,6 +3438,7 @@ printf '</div>\\n'
             fLabel.textContent = 'FLEX DB Primary IP';
             note.textContent = 'DBaaS + Replica: OSPC IP = Cloud LB VIP. Replica VIP = optional read-replica endpoint for dump. FLEX replicas listed below sync from FLEX primary after restore.';
             extra.style.display   = 'block';
+            if (sshAuth) sshAuth.style.display = 'none';
             repWrap.style.display = 'block';   // show FLEX replica VM IPs
             replSec.style.display = 'block';   // show replication user config
             haEpSec.style.display = 'none';
@@ -3375,6 +3452,7 @@ printf '</div>\\n'
             fLabel.textContent = 'FLEX Primary DB IP (VM 1)';
             note.textContent = 'HA DBaaS: OSPC HA VIP is seed source only. After dump→restore on FLEX primary, OSPC is disconnected. FLEX replicas listed below sync from FLEX primary (internal replication only).';
             extra.style.display   = 'block';
+            if (sshAuth) sshAuth.style.display = 'none';
             repWrap.style.display = 'block';   // show FLEX replica VM IPs
             replSec.style.display = 'block';   // show replication user config
             haEpSec.style.display = 'block';   // show HA endpoint / failover options
@@ -3398,6 +3476,11 @@ printf '</div>\\n'
         const haVip        = document.getElementById('modal-ha-vip').value.trim();
         const haMethod     = document.getElementById('modal-ha-failover-method').value;
 
+        // OSPC Server SSH Auth
+        const ospcSshUser  = document.getElementById('modal-ssh-user') ? document.getElementById('modal-ssh-user').value.trim() : 'root';
+        const ospcSshPass  = document.getElementById('modal-ssh-pass') ? document.getElementById('modal-ssh-pass').value : '';
+        const ospcSshKey   = document.getElementById('modal-ssh-key') ? document.getElementById('modal-ssh-key').value.trim() : '~/.ssh/id_rsa';
+
         // Collect all dynamic replica IP rows — only for types that have replicas
         const replicaIps = [];
         if (_addPairType === 'dbaas' || _addPairType === 'ha') {
@@ -3418,7 +3501,7 @@ printf '</div>\\n'
             if (!confirm('No FLEX Replica IPs added — continue without replica setup?')) return;
         }
         saveModalCache();
-        addMigrationPair(name, _addPairType, ospcIp, flexIp, dbUser, dbPass, flexSshKey, '', flexReplicaIp, replUser, replPass, replicaIps, haVip, haMethod, flexVmUser, flexDbPass);
+        addMigrationPair(name, _addPairType, ospcIp, flexIp, dbUser, dbPass, flexSshKey, '', flexReplicaIp, replUser, replPass, replicaIps, haVip, haMethod, flexVmUser, flexDbPass, ospcSshUser, ospcSshPass, ospcSshKey);
         closeAddPairModal();
     };
 
@@ -3430,18 +3513,20 @@ printf '</div>\\n'
         });
     });
 
-    window.addMigrationPair = function(name, type, ospcIp, flexIp, dbaasUser, dbaasPass, flexSshKey, replicaVip, flexReplicaIp, replUser, replPass, replicaIps, haVip, haMethod, flexVmUser, flexDbPass) {
+    window.addMigrationPair = function(name, type, ospcIp, flexIp, dbaasUser, dbaasPass, flexSshKey, replicaVip, flexReplicaIp, replUser, replPass, replicaIps, haVip, haMethod, flexVmUser, flexDbPass, ospcSshUser, ospcSshPass, ospcSshKey) {
         replicaIps  = replicaIps  || (flexReplicaIp ? [flexReplicaIp] : []);
         haVip       = haVip       || '';
         haMethod    = haMethod    || '';
         flexVmUser  = flexVmUser  || 'ubuntu';
+        ospcSshUser = ospcSshUser || 'root';
+        ospcSshKey  = ospcSshKey  || '~/.ssh/id_rsa';
 
         // Persist to localStorage (skip during loadPairsCache restore to avoid duplication)
         if (!window._pairsRestoring) {
           if (!window._pairsStore) window._pairsStore = [];
           window._pairsStore.push({ name, type, ospcIp, flexIp, dbaasUser, dbaasPass, flexSshKey,
             replicaVip, flexReplicaIp, replUser, replPass, replicaIps: replicaIps.slice(),
-            haVip, haMethod, flexVmUser, flexDbPass });
+            haVip, haMethod, flexVmUser, flexDbPass, ospcSshUser, ospcSshPass, ospcSshKey });
           savePairsCache();
         }
 
@@ -3488,6 +3573,10 @@ printf '</div>\\n'
         if (haVip)    tr.setAttribute('data-ha-vip',    haVip);
         if (haMethod) tr.setAttribute('data-ha-method', haMethod);
         if (replicaIps && replicaIps.length > 0) tr.setAttribute('data-replica-ips', replicaIps.join(' '));
+        if (ospcSshUser) tr.setAttribute('data-ospc-user', ospcSshUser);
+        if (ospcSshPass) tr.setAttribute('data-ospc-pass', ospcSshPass);
+        if (ospcSshKey)  tr.setAttribute('data-ospc-key',  ospcSshKey);
+
         tr.style.cssText = `background:${rowBg}; border-bottom:1px solid rgba(255,255,255,0.06);`;
         tr.innerHTML = `
             <td style="padding:10px 14px; text-align:center;">
@@ -3499,11 +3588,11 @@ printf '</div>\\n'
             </td>
             <td style="padding:10px 14px; color:#f9a8d4; font-weight:600;">${name}${badge}</td>
             <td style="padding:10px 14px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#e2e8f0;">${ospcIp}${ospcSub}</td>
-            <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">ubuntu@22</td>
+            <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">${ospcSshUser}@22</td>
             <td style="padding:10px 8px; text-align:center; color:#6366f1; font-size:1.1rem;">→</td>
             <td style="padding:10px 14px; color:#6ee7b7; font-weight:600;">${name}-flex</td>
             <td style="padding:10px 14px; font-family:'Fira Code',monospace; font-size:0.82rem; color:#e2e8f0;">${flexIp}${flexSub}</td>
-            <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">ubuntu@22</td>
+            <td style="padding:10px 14px; font-size:0.8rem; color:#94a3b8;">${flexVmUser}@22</td>
             <td style="padding:10px 12px;">${dbTypeLabel}</td>
             <td style="padding:10px 14px; font-size:0.78rem; color:#94a3b8;">Linux</td>
             <td style="padding:10px 14px;">

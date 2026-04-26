@@ -1,0 +1,2081 @@
+Created: flexvmconfig_ubuntu-24.04_u24-frontend-snap-20260408131920-flex_20260417_022140.txt
+Run this on a healthy FLEX VM of the same OS type/version as the target image.
+ubuntu@u24-frontend-snap-20260408131920-flex:~$ cat flexvmconfig_ubuntu-24.04_u24-frontend-snap-20260408131920-flex_20260417_022140.txt
+FLEX VM BOOT REFERENCE
+Generated: 2026-04-17T02:21:40+00:00
+Host: u24-frontend-snap-20260408131920-flex
+OS: Ubuntu 24.04.2 LTS
+OS_ID: ubuntu
+OS_VERSION: 24.04
+Kernel: 6.8.0-107-generic
+Boot mode: BIOS
+Initramfs tool: update-initramfs
+Default NIC: ens3
+Primary IP: 10.60.0.98/24
+
+BOOT-CRITICAL SUMMARY
+ROOT_SOURCE=/dev/vda1
+ROOT_FSTYPE=ext4
+ROOT_UUID=21f08275-91e8-4a2a-85f9-9a52f3ea034b
+BOOT_SOURCE=/dev/vda16
+BOOT_UUID=5922ac07-180c-49b7-bb8e-a15e5b318385
+EFI_SOURCE=/dev/vda15
+EFI_UUID=B26C-AC4D
+GRUB_CFG=/boot/grub/grub.cfg
+KERNEL_CMDLINE=BOOT_IMAGE=/vmlinuz-6.8.0-107-generic root=UUID=21f08275-91e8-4a2a-85f9-9a52f3ea034b ro console=tty1 console=ttyS0
+
+USE THIS FILE TO FIX AN IMPORTED OSPC IMAGE FOR FLEX:
+- update /etc/fstab to use correct UUIDs or correct device mapping
+- remove old /dev/xvd* references if present
+- rebuild initramfs with the tool above
+- rebuild grub config to the path above
+- confirm root/boot/efi UUIDs match the repaired image
+
+============================================================
+OS RELEASE
+============================================================
+$ cat /etc/os-release
+PRETTY_NAME="Ubuntu 24.04.2 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.2 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+
+============================================================
+KERNEL / CMDLINE
+============================================================
+$ uname -a
+Linux u24-frontend-snap-20260408131920-flex 6.8.0-107-generic #107-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar 13 19:51:50 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-6.8.0-107-generic root=UUID=21f08275-91e8-4a2a-85f9-9a52f3ea034b ro console=tty1 console=ttyS0
+
+============================================================
+BOOT MODE / FIRMWARE
+============================================================
+$ test -d /sys/firmware/efi && echo UEFI || echo BIOS
+BIOS
+$ efibootmgr -v
+EFI variables are not supported on this system.
+error trace:
+
+============================================================
+BLOCK DEVICES / UUID / MOUNTS
+============================================================
+$ lsblk -e7 -o NAME,KNAME,TYPE,FSTYPE,SIZE,MOUNTPOINT,UUID,PARTUUID
+NAME    KNAME TYPE FSTYPE  SIZE MOUNTPOINT UUID                                 PARTUUID
+vda     vda   disk          40G
+├─vda1  vda1  part ext4     39G /          21f08275-91e8-4a2a-85f9-9a52f3ea034b 9e1ca62a-be24-426b-b5d1-34363809589b
+├─vda14 vda14 part           4M                                                 25cd581f-7366-4b12-95c2-28e49b726e1f
+├─vda15 vda15 part vfat    106M /boot/efi  B26C-AC4D                            f28171c0-99cf-4502-a69d-a8ac59e867f2
+└─vda16 vda16 part ext4    913M /boot      5922ac07-180c-49b7-bb8e-a15e5b318385 fc5fcf26-ac3b-456d-85cf-42d2bc91d6d1
+vdb     vdb   disk swap      1G [SWAP]     f337ed98-4839-47c3-a6d6-09923f48251e
+$ blkid
+/dev/vdb: UUID="f337ed98-4839-47c3-a6d6-09923f48251e" TYPE="swap"
+/dev/vda15: LABEL_FATBOOT="UEFI" LABEL="UEFI" UUID="B26C-AC4D" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="f28171c0-99cf-4502-a69d-a8ac59e867f2"
+/dev/vda1: LABEL="cloudimg-rootfs" UUID="21f08275-91e8-4a2a-85f9-9a52f3ea034b" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="9e1ca62a-be24-426b-b5d1-34363809589b"
+/dev/vda16: LABEL="BOOT" UUID="5922ac07-180c-49b7-bb8e-a15e5b318385" BLOCK_SIZE="4096" TYPE="ext4" PARTUUID="fc5fcf26-ac3b-456d-85cf-42d2bc91d6d1"
+$ findmnt -A -o TARGET,SOURCE,FSTYPE,OPTIONS,UUID
+TARGET                         SOURCE      FSTYPE      OPTIONS                                                                                              UUID
+/                              /dev/vda1   ext4        rw,relatime,discard,errors=remount-ro,commit=30                                                      21f08275-91e8-4a2a-85f9-9a52f3ea034b
+├─/sys                         sysfs       sysfs       rw,nosuid,nodev,noexec,relatime                          
+│ ├─/sys/kernel/security       securityfs  securityfs  rw,nosuid,nodev,noexec,relatime                          
+│ ├─/sys/fs/cgroup             cgroup2     cgroup2     rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+│ ├─/sys/fs/pstore             pstore      pstore      rw,nosuid,nodev,noexec,relatime                          
+│ ├─/sys/fs/bpf                bpf         bpf         rw,nosuid,nodev,noexec,relatime,mode=700                 
+│ ├─/sys/kernel/debug          debugfs     debugfs     rw,nosuid,nodev,noexec,relatime                          
+│ ├─/sys/kernel/tracing        tracefs     tracefs     rw,nosuid,nodev,noexec,relatime                          
+│ ├─/sys/fs/fuse/connections   fusectl     fusectl     rw,nosuid,nodev,noexec,relatime                          
+│ └─/sys/kernel/config         configfs    configfs    rw,nosuid,nodev,noexec,relatime                          
+├─/proc                        proc        proc        rw,nosuid,nodev,noexec,relatime                          
+│ └─/proc/sys/fs/binfmt_misc   systemd-1   autofs      rw,relatime,fd=32,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=3098
+│   └─/proc/sys/fs/binfmt_misc binfmt_misc binfmt_misc rw,nosuid,nodev,noexec,relatime                          
+├─/dev                         udev        devtmpfs    rw,nosuid,relatime,size=3013848k,nr_inodes=753462,mode=755,inode64
+│ ├─/dev/pts                   devpts      devpts      rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000    
+│ ├─/dev/shm                   tmpfs       tmpfs       rw,nosuid,nodev,inode64                                  
+│ ├─/dev/hugepages             hugetlbfs   hugetlbfs   rw,nosuid,nodev,relatime,pagesize=2M                     
+│ └─/dev/mqueue                mqueue      mqueue      rw,nosuid,nodev,noexec,relatime                          
+├─/run                         tmpfs       tmpfs       rw,nosuid,nodev,noexec,relatime,size=606712k,mode=755,inode64
+│ ├─/run/lock                  tmpfs       tmpfs       rw,nosuid,nodev,noexec,relatime,size=5120k,inode64       
+│ ├─/run/qemu                  tmpfs       tmpfs       rw,nosuid,nodev,relatime,mode=755,inode64                
+│ └─/run/user/1000             tmpfs       tmpfs       rw,nosuid,nodev,relatime,size=606708k,nr_inodes=151677,mode=700,uid=1000,gid=1000,inode64
+└─/boot                        /dev/vda16  ext4        rw,relatime                                                                                          5922ac07-180c-49b7-bb8e-a15e5b318385
+  └─/boot/efi                  /dev/vda15  vfat        rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro B26C-AC4D
+$ cat /etc/fstab
+LABEL=cloudimg-rootfs   /        ext4   discard,commit=30,errors=remount-ro     0 1
+LABEL=BOOT      /boot   ext4    defaults        0 2
+LABEL=UEFI      /boot/efi       vfat    umask=0077      0 1
+/dev/vdb        none    swap    sw,comment=cloudconfig  0       0
+
+============================================================
+GRUB DEFAULT
+============================================================
+$ cat /etc/default/grub
+# If you change this file, run 'update-grub' afterwards to update
+# /boot/grub/grub.cfg.
+# For full documentation of the options in this file, see:
+#   info -f grub -n 'Simple configuration'
+
+GRUB_DEFAULT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=0
+GRUB_DISTRIBUTOR=`( . /etc/os-release; echo ${NAME:-Ubuntu} ) 2>/dev/null || echo Ubuntu`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+
+# If your computer has multiple operating systems installed, then you
+# probably want to run os-prober. However, if your computer is a host
+# for guest OSes installed via LVM or raw disk devices, running
+# os-prober can cause damage to those guest OSes as it mounts
+# filesystems to look for things.
+#GRUB_DISABLE_OS_PROBER=false
+
+# Uncomment to enable BadRAM filtering, modify to suit your needs
+# This works with Linux (no patch required) and with any kernel that obtains
+# the memory map information from GRUB (GNU Mach, kernel of FreeBSD ...)
+#GRUB_BADRAM="0x01234567,0xfefefefe,0x89abcdef,0xefefefef"
+
+# Uncomment to disable graphical terminal
+#GRUB_TERMINAL=console
+
+# The resolution used on graphical terminal
+# note that you can use only modes which your graphic card supports via VBE
+# you can see them in real GRUB with the command `vbeinfo'
+#GRUB_GFXMODE=640x480
+
+# Uncomment if you don't want GRUB to pass "root=UUID=xxx" parameter to Linux
+#GRUB_DISABLE_LINUX_UUID=true
+
+# Uncomment to disable generation of recovery mode menu entries
+#GRUB_DISABLE_RECOVERY="true"
+
+# Uncomment to get a beep at grub start
+#GRUB_INIT_TUNE="480 440 1"
+
+============================================================
+GRUB CONFIG
+============================================================
+$ cat '/boot/grub/grub.cfg'
+cat: /boot/grub/grub.cfg: Permission denied
+
+============================================================
+INITRAMFS / BOOT PACKAGES
+============================================================
+$ dracut --version
+bash: line 1: dracut: command not found
+$ update-initramfs -V
+/usr/sbin/update-initramfs: invalid option -- 'V'
+
+Usage: update-initramfs {-c|-d|-u} [-k version] [-v] [-b directory]
+
+Options:
+ -k version     Specify kernel version or 'all'
+ -c             Create a new initramfs
+ -u             Update an existing initramfs
+ -d             Remove an existing initramfs
+ -b directory   Set alternate boot directory
+ -v             Be verbose
+
+See update-initramfs(8) for further details.
+
+$ mkinitcpio -V
+bash: line 1: mkinitcpio: command not found
+$ rpm -qa | egrep '^(kernel|dracut|grub2|shim|cloud-init|qemu-guest-agent|virtio)'
+bash: line 1: rpm: command not found
+$ dpkg -l | egrep 'linux-image|initramfs-tools|grub|shim|cloud-init|qemu-guest-agent'
+ii  cloud-init                           25.1.4-0ubuntu0~24.04.1                    all          initialization and customization tool for cloud instances
+ii  cloud-initramfs-copymods             0.49~24.04.1                               all          copy initramfs modules into root filesystem for later use
+ii  cloud-initramfs-dyn-netconf          0.49~24.04.1                               all          write a network interface file in /run for BOOTIF
+ii  grub-common                          2.12-1ubuntu7.3                            amd64        GRand Unified Bootloader (common files)
+ii  grub-efi-amd64-bin                   2.12-1ubuntu7.3                            amd64        GRand Unified Bootloader, version 2 (EFI-AMD64 modules)
+ii  grub-efi-amd64-signed                1.202.5+2.12-1ubuntu7.3                    amd64        GRand Unified Bootloader, version 2 (EFI-AMD64 version, signed)
+ii  grub-gfxpayload-lists                0.7build2                                  amd64        GRUB gfxpayload blacklist
+ii  grub-pc                              2.12-1ubuntu7.3                            amd64        GRand Unified Bootloader, version 2 (PC/BIOS version)
+ii  grub-pc-bin                          2.12-1ubuntu7.3                            amd64        GRand Unified Bootloader, version 2 (PC/BIOS modules)
+ii  grub2-common                         2.12-1ubuntu7.3                            amd64        GRand Unified Bootloader (common files for version 2)
+ii  initramfs-tools                      0.142ubuntu25.5                            all          generic modular initramfs generator (automation)
+ii  initramfs-tools-bin                  0.142ubuntu25.5                            amd64        binaries used by initramfs-tools
+ii  initramfs-tools-core                 0.142ubuntu25.5                            all          generic modular initramfs generator (core tools)
+rc  linux-image-6.8.0-106-generic        6.8.0-106.106                              amd64        Signed kernel image generic
+ii  linux-image-6.8.0-107-generic        6.8.0-107.107                              amd64        Signed kernel image generic
+ii  linux-image-6.8.0-60-generic         6.8.0-60.63                                amd64        Signed kernel image generic
+ii  linux-image-virtual                  6.8.0-107.107                              amd64        Virtual Linux kernel image
+ii  qemu-guest-agent                     1:8.2.2+ds-0ubuntu1.16                     amd64        Guest-side qemu-system agent
+ii  shim-signed                          1.58+15.8-0ubuntu1                         amd64        Secure Boot chain-loading bootloader (Microsoft-signed binary)
+
+============================================================
+NETWORK BASELINE
+============================================================
+$ ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+ens3             UP             10.60.0.98/24 metric 100 fe80::f816:3eff:fead:284b/64
+$ ip route
+default via 10.60.0.1 dev ens3 proto dhcp src 10.60.0.98 metric 100
+10.60.0.0/24 dev ens3 proto kernel scope link src 10.60.0.98 metric 100
+10.60.0.1 dev ens3 proto dhcp scope link src 10.60.0.98 metric 100
+10.60.0.2 dev ens3 proto dhcp scope link src 10.60.0.98 metric 100
+72.3.128.240 via 10.60.0.1 dev ens3 proto dhcp src 10.60.0.98 metric 100
+72.3.128.241 via 10.60.0.1 dev ens3 proto dhcp src 10.60.0.98 metric 100
+169.254.169.254 via 10.60.0.2 dev ens3 proto dhcp src 10.60.0.98 metric 100
+$ cat /etc/resolv.conf
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+# Do not edit.
+#
+# This file might be symlinked as /etc/resolv.conf. If you're looking at
+# /etc/resolv.conf and seeing this text, you have followed the symlink.
+#
+# This is a dynamic resolv.conf file for connecting local clients to the
+# internal DNS stub resolver of systemd-resolved. This file lists all
+# configured search domains.
+#
+# Run "resolvectl status" to see details about the uplink DNS servers
+# currently in use.
+#
+# Third party programs should typically not access this file directly, but only
+# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+# different way, replace this symlink by a static file or a different symlink.
+#
+# See man:systemd-resolved.service(8) for details about the supported modes of
+# operation for /etc/resolv.conf.
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
+
+============================================================
+NETPLAN / IFCFG / NM
+============================================================
+$ find /etc/netplan -maxdepth 2 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+--- /etc/netplan/50-cloud-init.yaml
+cat: /etc/netplan/50-cloud-init.yaml: Permission denied
+--- /etc/netplan/99-flex-fallback.yaml
+cat: /etc/netplan/99-flex-fallback.yaml: Permission denied
+$ find /etc/sysconfig/network-scripts -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/sysconfig/network-scripts’: No such file or directory
+$ find /etc/NetworkManager/system-connections -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/NetworkManager/system-connections’: No such file or directory
+
+============================================================
+CLOUD INIT / GUEST AGENT
+============================================================
+$ cloud-init status --long
+status: done
+extended_status: done
+boot_status_code: enabled-by-generator
+last_update: Thu, 01 Jan 1970 00:02:10 +0000
+detail: DataSourceOpenStackLocal [net,ver=2]
+errors: []
+recoverable_errors: {}
+$ systemctl status qemu-guest-agent --no-pager
+○ qemu-guest-agent.service - QEMU Guest Agent
+     Loaded: loaded (/usr/lib/systemd/system/qemu-guest-agent.service; static)
+     Active: inactive (dead)
+
+Apr 09 07:11:34 u24-frontend-snap-20260408131920-flex systemd[1]: Dependency failed for qemu-guest-agent.service - QEMU Guest Agent.
+Apr 09 07:11:34 u24-frontend-snap-20260408131920-flex systemd[1]: qemu-guest-agent.service: Job qemu-guest-agent.service/start failed with result 'dependency'.
+
+============================================================
+SSH / CONSOLE
+============================================================
+$ sshd -T
+sshd: no hostkeys available -- exiting.
+$ grep -RinE 'ttyS0|console=' /etc/default/grub /boot/grub2/grub.cfg /boot/grub/grub.cfg /boot/efi/EFI 2>/dev/null
+
+============================================================
+VIRTUALIZATION
+============================================================
+$ systemd-detect-virt
+kvm
+$ lsmod | egrep 'virtio|xen'
+virtio_rng             12288  0
+virtio_gpu             98304  0
+virtio_dma_buf         12288  1 virtio_gpu
+
+============================================================
+REPAIR COMMAND HINTS
+============================================================
+Debian/Ubuntu initramfs rebuild: update-initramfs -u -k all
+RHEL/Rocky/Alma/CentOS initramfs rebuild: dracut -f --regenerate-all
+Debian/Ubuntu grub rebuild BIOS: grub-mkconfig -o /boot/grub/grub.cfg
+RHEL/Rocky/Alma/CentOS grub rebuild BIOS: grub2-mkconfig -o /boot/grub2/grub.cfg
+UEFI grub path varies by distro/vendor; use the GRUB_CFG path collected above
+
+
+
+debian@debian10-flav2gv1:~$ cat flexvmconfig_debian-11_debian10-flav2gv1_20260417_022811.txt
+FLEX VM BOOT REFERENCE
+Generated: 2026-04-17T02:28:11+00:00
+Host: debian10-flav2gv1.novalocal
+OS: Debian GNU/Linux 11 (bullseye)
+OS_ID: debian
+OS_VERSION: 11
+Kernel: 5.10.0-35-amd64
+Boot mode: UEFI
+Initramfs tool: unknown
+Default NIC: eth0
+Primary IP: 10.60.0.251/24
+
+BOOT-CRITICAL SUMMARY
+ROOT_SOURCE=/dev/vda1
+ROOT_FSTYPE=ext4
+ROOT_UUID=9feb19ab-e7d0-483c-b283-4af7b45e22c9
+BOOT_SOURCE=none
+BOOT_UUID=none
+EFI_SOURCE=/dev/vda15
+EFI_UUID=113B-BF3C
+GRUB_CFG=/boot/grub/grub.cfg
+KERNEL_CMDLINE=BOOT_IMAGE=/boot/vmlinuz-5.10.0-35-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+
+USE THIS FILE TO FIX AN IMPORTED OSPC IMAGE FOR FLEX:
+- update /etc/fstab to use correct UUIDs or correct device mapping
+- remove old /dev/xvd* references if present
+- rebuild initramfs with the tool above
+- rebuild grub config to the path above
+- confirm root/boot/efi UUIDs match the repaired image
+
+============================================================
+OS RELEASE
+============================================================
+$ cat /etc/os-release
+PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
+NAME="Debian GNU/Linux"
+VERSION_ID="11"
+VERSION="11 (bullseye)"
+VERSION_CODENAME=bullseye
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+
+============================================================
+KERNEL / CMDLINE
+============================================================
+$ uname -a
+Linux debian10-flav2gv1 5.10.0-35-amd64 #1 SMP Debian 5.10.237-1 (2025-05-19) x86_64 GNU/Linux
+$ cat /proc/cmdline
+BOOT_IMAGE=/boot/vmlinuz-5.10.0-35-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+
+============================================================
+BOOT MODE / FIRMWARE
+============================================================
+$ test -d /sys/firmware/efi && echo UEFI || echo BIOS
+UEFI
+$ efibootmgr -v
+bash: line 1: efibootmgr: command not found
+
+============================================================
+BLOCK DEVICES / UUID / MOUNTS
+============================================================
+$ lsblk -e7 -o NAME,KNAME,TYPE,FSTYPE,SIZE,MOUNTPOINT,UUID,PARTUUID
+NAME    KNAME TYPE FSTYPE  SIZE MOUNTPOINT UUID                                 PARTUUID
+vda     vda   disk          40G
+├─vda1  vda1  part ext4   39.9G /          9feb19ab-e7d0-483c-b283-4af7b45e22c9 f0ff5907-2b0d-4761-8e07-668419e9cbfb
+├─vda14 vda14 part           3M                                                 53e8391e-85fa-0345-9cfb-0dc50d71b729
+└─vda15 vda15 part vfat    124M /boot/efi  113B-BF3C                            6bbdd4d2-b911-488a-ae6c-ec68d67a02a1
+vdb     vdb   disk swap      1G [SWAP]     8c2a6035-6bdf-4f96-9020-339b31c00ff3
+$ blkid
+bash: line 1: blkid: command not found
+$ findmnt -A -o TARGET,SOURCE,FSTYPE,OPTIONS,UUID
+TARGET                        SOURCE     FSTYPE     OPTIONS                                                                                               UUID
+/                             /dev/vda1  ext4       rw,relatime,discard,errors=remount-ro                                                                 9feb19ab-e7d0-483c-b283-4af7b45e22c9
+├─/sys                        sysfs      sysfs      rw,nosuid,nodev,noexec,relatime                             
+│ ├─/sys/kernel/security      securityfs securityfs rw,nosuid,nodev,noexec,relatime                             
+│ ├─/sys/fs/cgroup            cgroup2    cgroup2    rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+│ ├─/sys/fs/pstore            pstore     pstore     rw,nosuid,nodev,noexec,relatime                             
+│ ├─/sys/firmware/efi/efivars efivarfs   efivarfs   rw,nosuid,nodev,noexec,relatime                             
+│ ├─/sys/fs/bpf               none       bpf        rw,nosuid,nodev,noexec,relatime,mode=700                    
+│ ├─/sys/kernel/debug         debugfs    debugfs    rw,nosuid,nodev,noexec,relatime                             
+│ ├─/sys/kernel/tracing       tracefs    tracefs    rw,nosuid,nodev,noexec,relatime                             
+│ ├─/sys/kernel/config        configfs   configfs   rw,nosuid,nodev,noexec,relatime                             
+│ └─/sys/fs/fuse/connections  fusectl    fusectl    rw,nosuid,nodev,noexec,relatime                             
+├─/proc                       proc       proc       rw,nosuid,nodev,noexec,relatime                             
+│ └─/proc/sys/fs/binfmt_misc  systemd-1  autofs     rw,relatime,fd=30,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=11596
+├─/dev                        udev       devtmpfs   rw,nosuid,relatime,size=988080k,nr_inodes=247020,mode=755   
+│ ├─/dev/pts                  devpts     devpts     rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000       
+│ ├─/dev/shm                  tmpfs      tmpfs      rw,nosuid,nodev                                             
+│ ├─/dev/hugepages            hugetlbfs  hugetlbfs  rw,relatime,pagesize=2M                                     
+│ └─/dev/mqueue               mqueue     mqueue     rw,nosuid,nodev,noexec,relatime                             
+├─/run                        tmpfs      tmpfs      rw,nosuid,nodev,noexec,relatime,size=201192k,mode=755       
+│ ├─/run/lock                 tmpfs      tmpfs      rw,nosuid,nodev,noexec,relatime,size=5120k                  
+│ └─/run/user/1000            tmpfs      tmpfs      rw,nosuid,nodev,relatime,size=201192k,nr_inodes=50298,mode=700,uid=1000,gid=1000
+└─/boot/efi                   /dev/vda15 vfat       rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro 113B-BF3C
+$ cat /etc/fstab
+PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb / ext4 rw,discard,errors=remount-ro,x-systemd.growfs 0 1
+PARTUUID=6bbdd4d2-b911-488a-ae6c-ec68d67a02a1 /boot/efi vfat defaults 0 0
+/dev/vdb        none    swap    sw,comment=cloudconfig  0       0
+
+============================================================
+GRUB DEFAULT
+============================================================
+$ cat /etc/default/grub
+# If you change this file, run 'update-grub' afterwards to update
+# /boot/grub/grub.cfg.
+# For full documentation of the options in this file, see:
+#   info -f grub -n 'Simple configuration'
+
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
+GRUB_CMDLINE_LINUX_DEFAULT=""
+GRUB_CMDLINE_LINUX="console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0"
+GRUB_TERMINAL="console serial"
+GRUB_SERIAL_COMMAND="serial --speed=115200"
+
+============================================================
+GRUB CONFIG
+============================================================
+$ cat '/boot/grub/grub.cfg'
+#
+# DO NOT EDIT THIS FILE
+#
+# It is automatically generated by grub-mkconfig using templates
+# from /etc/grub.d and settings from /etc/default/grub
+#
+
+### BEGIN /etc/grub.d/00_header ###
+if [ -s $prefix/grubenv ]; then
+  set have_grubenv=true
+  load_env
+fi
+if [ "${next_entry}" ] ; then
+   set default="${next_entry}"
+   set next_entry=
+   save_env next_entry
+   set boot_once=true
+else
+   set default="0"
+fi
+
+if [ x"${feature_menuentry_id}" = xy ]; then
+  menuentry_id_option="--id"
+else
+  menuentry_id_option=""
+fi
+
+export menuentry_id_option
+
+if [ "${prev_saved_entry}" ]; then
+  set saved_entry="${prev_saved_entry}"
+  save_env saved_entry
+  set prev_saved_entry=
+  save_env prev_saved_entry
+  set boot_once=true
+fi
+
+function savedefault {
+  if [ -z "${boot_once}" ]; then
+    saved_entry="${chosen}"
+    save_env saved_entry
+  fi
+}
+function load_video {
+  if [ x$feature_all_video_module = xy ]; then
+    insmod all_video
+  else
+    insmod efi_gop
+    insmod efi_uga
+    insmod ieee1275_fb
+    insmod vbe
+    insmod vga
+    insmod video_bochs
+    insmod video_cirrus
+  fi
+}
+
+serial --speed=115200
+terminal_input console serial
+terminal_output console serial
+if [ "${recordfail}" = 1 ] ; then
+  set timeout=30
+else
+  if [ x$feature_timeout_style = xy ] ; then
+    set timeout_style=menu
+    set timeout=0
+  # Fallback normal timeout code in case the timeout_style feature is
+  # unavailable.
+  else
+    set timeout=0
+  fi
+fi
+### END /etc/grub.d/00_header ###
+
+### BEGIN /etc/grub.d/05_debian_theme ###
+set menu_color_normal=cyan/blue
+set menu_color_highlight=white/blue
+### END /etc/grub.d/05_debian_theme ###
+
+### BEGIN /etc/grub.d/10_linux ###
+function gfxmode {
+        set gfxpayload="${1}"
+}
+set linux_gfx_mode=
+export linux_gfx_mode
+menuentry 'Debian GNU/Linux' --class debian --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-simple-9feb19ab-e7d0-483c-b283-4af7b45e22c9' {
+        load_video
+        insmod gzio
+        if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+        insmod part_gpt
+        insmod ext2
+        search --no-floppy --fs-uuid --set=root 9feb19ab-e7d0-483c-b283-4af7b45e22c9
+        echo    'Loading Linux 5.10.0-39-amd64 ...'
+        linux   /boot/vmlinuz-5.10.0-39-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+        echo    'Loading initial ramdisk ...'
+        initrd  /boot/initrd.img-5.10.0-39-amd64
+}
+submenu 'Advanced options for Debian GNU/Linux' $menuentry_id_option 'gnulinux-advanced-9feb19ab-e7d0-483c-b283-4af7b45e22c9' {
+        menuentry 'Debian GNU/Linux, with Linux 5.10.0-39-amd64' --class debian --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-5.10.0-39-amd64-advanced-9feb19ab-e7d0-483c-b283-4af7b45e22c9' {
+                load_video
+                insmod gzio
+                if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+                insmod part_gpt
+                insmod ext2
+                search --no-floppy --fs-uuid --set=root 9feb19ab-e7d0-483c-b283-4af7b45e22c9
+                echo    'Loading Linux 5.10.0-39-amd64 ...'
+                linux   /boot/vmlinuz-5.10.0-39-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+                echo    'Loading initial ramdisk ...'
+                initrd  /boot/initrd.img-5.10.0-39-amd64
+        }
+        menuentry 'Debian GNU/Linux, with Linux 5.10.0-39-amd64 (recovery mode)' --class debian --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-5.10.0-39-amd64-recovery-9feb19ab-e7d0-483c-b283-4af7b45e22c9' {
+                load_video
+                insmod gzio
+                if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+                insmod part_gpt
+                insmod ext2
+                search --no-floppy --fs-uuid --set=root 9feb19ab-e7d0-483c-b283-4af7b45e22c9
+                echo    'Loading Linux 5.10.0-39-amd64 ...'
+                linux   /boot/vmlinuz-5.10.0-39-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro single console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+                echo    'Loading initial ramdisk ...'
+                initrd  /boot/initrd.img-5.10.0-39-amd64
+        }
+        menuentry 'Debian GNU/Linux, with Linux 5.10.0-35-amd64' --class debian --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-5.10.0-35-amd64-advanced-9feb19ab-e7d0-483c-b283-4af7b45e22c9' {
+                load_video
+                insmod gzio
+                if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+                insmod part_gpt
+                insmod ext2
+                search --no-floppy --fs-uuid --set=root 9feb19ab-e7d0-483c-b283-4af7b45e22c9
+                echo    'Loading Linux 5.10.0-35-amd64 ...'
+                linux   /boot/vmlinuz-5.10.0-35-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+                echo    'Loading initial ramdisk ...'
+                initrd  /boot/initrd.img-5.10.0-35-amd64
+        }
+        menuentry 'Debian GNU/Linux, with Linux 5.10.0-35-amd64 (recovery mode)' --class debian --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-5.10.0-35-amd64-recovery-9feb19ab-e7d0-483c-b283-4af7b45e22c9' {
+                load_video
+                insmod gzio
+                if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+                insmod part_gpt
+                insmod ext2
+                search --no-floppy --fs-uuid --set=root 9feb19ab-e7d0-483c-b283-4af7b45e22c9
+                echo    'Loading Linux 5.10.0-35-amd64 ...'
+                linux   /boot/vmlinuz-5.10.0-35-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro single console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+                echo    'Loading initial ramdisk ...'
+                initrd  /boot/initrd.img-5.10.0-35-amd64
+        }
+}
+
+### END /etc/grub.d/10_linux ###
+
+### BEGIN /etc/grub.d/20_linux_xen ###
+
+### END /etc/grub.d/20_linux_xen ###
+
+### BEGIN /etc/grub.d/30_os-prober ###
+### END /etc/grub.d/30_os-prober ###
+
+### BEGIN /etc/grub.d/30_uefi-firmware ###
+menuentry 'UEFI Firmware Settings' $menuentry_id_option 'uefi-firmware' {
+        fwsetup
+}
+### END /etc/grub.d/30_uefi-firmware ###
+
+### BEGIN /etc/grub.d/40_custom ###
+# This file provides an easy way to add custom menu entries.  Simply type the
+# menu entries you want to add after this comment.  Be careful not to change
+# the 'exec tail' line above.
+### END /etc/grub.d/40_custom ###
+
+### BEGIN /etc/grub.d/41_custom ###
+if [ -f  ${config_directory}/custom.cfg ]; then
+  source ${config_directory}/custom.cfg
+elif [ -z "${config_directory}" -a -f  $prefix/custom.cfg ]; then
+  source $prefix/custom.cfg
+fi
+### END /etc/grub.d/41_custom ###
+
+============================================================
+INITRAMFS / BOOT PACKAGES
+============================================================
+$ dracut --version
+bash: line 1: dracut: command not found
+$ update-initramfs -V
+bash: line 1: update-initramfs: command not found
+$ mkinitcpio -V
+bash: line 1: mkinitcpio: command not found
+$ rpm -qa | egrep '^(kernel|dracut|grub2|shim|cloud-init|qemu-guest-agent|virtio)'
+bash: line 1: rpm: command not found
+$ dpkg -l | egrep 'linux-image|initramfs-tools|grub|shim|cloud-init|qemu-guest-agent'
+ii  cloud-init                    20.4.1-2+deb11u1                   all          initialization system for infrastructure cloud instances
+ii  cloud-initramfs-growroot      0.18.debian8                       all          automatically resize the root partition on first boot
+ii  grub-cloud-amd64              0.0.5                              amd64        GRand Unified Bootloader (cloud setup)
+ii  grub-common                   2.06-3~deb11u6                     amd64        GRand Unified Bootloader (common files)
+ii  grub-efi-amd64-bin            2.06-3~deb11u6                     amd64        GRand Unified Bootloader, version 2 (EFI-AMD64 modules)
+ii  grub-efi-amd64-signed         1+2.06+3~deb11u6                   amd64        GRand Unified Bootloader, version 2 (amd64 UEFI signed by Debian)
+ii  grub-pc-bin                   2.06-3~deb11u6                     amd64        GRand Unified Bootloader, version 2 (PC/BIOS modules)
+ii  grub2-common                  2.06-3~deb11u6                     amd64        GRand Unified Bootloader (common files for version 2)
+ii  initramfs-tools               0.140                              all          generic modular initramfs generator (automation)
+ii  initramfs-tools-core          0.140                              all          generic modular initramfs generator (core tools)
+ii  linux-image-5.10.0-35-amd64   5.10.237-1                         amd64        Linux 5.10 for 64-bit PCs (signed)
+ii  linux-image-5.10.0-39-amd64   5.10.251-1                         amd64        Linux 5.10 for 64-bit PCs (signed)
+ii  linux-image-amd64             5.10.251-1                         amd64        Linux for 64-bit PCs (meta-package)
+ii  qemu-guest-agent              1:5.2+dfsg-11+deb11u5              amd64        Guest-side qemu-system agent
+ii  shim-helpers-amd64-signed     1+15.8+1~deb11u1                   amd64        boot loader to chain-load signed boot loaders (signed by Debian)
+ii  shim-signed:amd64             1.44~1+deb11u1+15.8-1~deb11u1      amd64        Secure Boot chain-loading bootloader (Microsoft-signed binary)
+ii  shim-signed-common            1.44~1+deb11u1+15.8-1~deb11u1      all          Secure Boot chain-loading bootloader (common helper scripts)
+ii  shim-unsigned                 15.8-1~deb11u1                     amd64        boot loader to chain-load signed boot loaders under Secure Boot
+
+============================================================
+NETWORK BASELINE
+============================================================
+$ ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0             UP             10.60.0.251/24 fe80::f816:3eff:feed:32b2/64
+$ ip route
+default via 10.60.0.1 dev eth0
+10.60.0.0/24 dev eth0 proto kernel scope link src 10.60.0.251
+169.254.169.254 via 10.60.0.2 dev eth0
+$ cat /etc/resolv.conf
+# Dynamic resolv.conf(5) file for glibc resolver(3) generated by resolvconf(8)
+#     DO NOT EDIT THIS FILE BY HAND -- YOUR CHANGES WILL BE OVERWRITTEN
+# 127.0.0.53 is the systemd-resolved stub resolver.
+# run "resolvectl status" to see details about the actual nameservers.
+
+nameserver 72.3.128.240
+nameserver 72.3.128.241
+
+============================================================
+NETPLAN / IFCFG / NM
+============================================================
+$ find /etc/netplan -maxdepth 2 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/netplan’: No such file or directory
+$ find /etc/sysconfig/network-scripts -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/sysconfig/network-scripts’: No such file or directory
+$ find /etc/NetworkManager/system-connections -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/NetworkManager/system-connections’: No such file or directory
+
+============================================================
+CLOUD INIT / GUEST AGENT
+============================================================
+$ cloud-init status --long
+status: done
+time: Sun, 05 Apr 2026 07:59:33 +0000
+detail:
+DataSourceOpenStackLocal [net,ver=2]
+$ systemctl status qemu-guest-agent --no-pager
+● qemu-guest-agent.service - QEMU Guest Agent
+     Loaded: loaded (/lib/systemd/system/qemu-guest-agent.service; static)
+     Active: active (running) since Sun 2026-04-05 07:59:28 UTC; 1 weeks 4 days ago
+   Main PID: 672 (qemu-ga)
+      Tasks: 2 (limit: 2315)
+     Memory: 2.2M
+        CPU: 2ms
+     CGroup: /system.slice/qemu-guest-agent.service
+             └─672 /usr/sbin/qemu-ga
+
+Apr 05 07:59:28 debian10-flav2gv1 systemd[1]: Started QEMU Guest Agent.
+
+============================================================
+SSH / CONSOLE
+============================================================
+$ sshd -T
+bash: line 1: sshd: command not found
+$ grep -RinE 'ttyS0|console=' /etc/default/grub /boot/grub2/grub.cfg /boot/grub/grub.cfg /boot/efi/EFI 2>/dev/null
+/etc/default/grub:10:GRUB_CMDLINE_LINUX="console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0"
+/boot/grub/grub.cfg:94: linux   /boot/vmlinuz-5.10.0-39-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+/boot/grub/grub.cfg:107:                linux   /boot/vmlinuz-5.10.0-39-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+/boot/grub/grub.cfg:119:                linux   /boot/vmlinuz-5.10.0-39-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro single console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+/boot/grub/grub.cfg:131:                linux   /boot/vmlinuz-5.10.0-35-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+/boot/grub/grub.cfg:143:                linux   /boot/vmlinuz-5.10.0-35-amd64 root=PARTUUID=f0ff5907-2b0d-4761-8e07-668419e9cbfb ro single console=ttyS0,115200 console=tty0 earlyprintk=ttyS0,115200 consoleblank=0 net.ifnames=0
+
+============================================================
+VIRTUALIZATION
+============================================================
+$ systemd-detect-virt
+kvm
+$ lsmod | egrep 'virtio|xen'
+virtio_gpu             65536  0
+virtio_dma_buf         16384  1 virtio_gpu
+drm_kms_helper        282624  3 virtio_gpu
+virtio_balloon         24576  0
+virtio_console         40960  1
+drm                   634880  3 drm_kms_helper,virtio_gpu
+virtio_rng             16384  0
+rng_core               16384  1 virtio_rng
+virtio_net             61440  0
+net_failover           24576  1 virtio_net
+virtio_blk             20480  4
+virtio_pci             28672  0
+virtio_ring            36864  7 virtio_rng,virtio_console,virtio_balloon,virtio_gpu,virtio_pci,virtio_blk,virtio_net
+virtio                 16384  7 virtio_rng,virtio_console,virtio_balloon,virtio_gpu,virtio_pci,virtio_blk,virtio_net
+
+============================================================
+REPAIR COMMAND HINTS
+============================================================
+Debian/Ubuntu initramfs rebuild: update-initramfs -u -k all
+RHEL/Rocky/Alma/CentOS initramfs rebuild: dracut -f --regenerate-all
+Debian/Ubuntu grub rebuild BIOS: grub-mkconfig -o /boot/grub/grub.cfg
+RHEL/Rocky/Alma/CentOS grub rebuild BIOS: grub2-mkconfig -o /boot/grub2/grub.cfg
+UEFI grub path varies by distro/vendor; use the GRUB_CFG path collected above
+debian@debian10-flav2gv1:~$
+
+
+=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0 "
+
+============================================================
+VIRTUALIZATION
+============================================================
+$ systemd-detect-virt
+kvm
+$ lsmod | egrep 'virtio|xen'
+virtio_gpu             73728  0
+drm_shmem_helper       16384  1 virtio_gpu
+drm_kms_helper        184320  3 virtio_gpu
+drm                   602112  4 drm_kms_helper,drm_shmem_helper,virtio_gpu
+virtio_balloon         20480  0
+virtio_net             61440  0
+virtio_blk             20480  5
+virtio_console         36864  1
+net_failover           24576  1 virtio_net
+
+============================================================
+REPAIR COMMAND HINTS
+============================================================
+Debian/Ubuntu initramfs rebuild: update-initramfs -u -k all
+RHEL/Rocky/Alma/CentOS initramfs rebuild: dracut -f --regenerate-all
+Debian/Ubuntu grub rebuild BIOS: grub-mkconfig -o /boot/grub/grub.cfg
+RHEL/Rocky/Alma/CentOS grub rebuild BIOS: grub2-mkconfig -o /boot/grub2/grub.cfg
+UEFI grub path varies by distro/vendor; use the GRUB_CFG path collected above
+[almalinux@alma9-2gv1 ~]$ clear
+[almalinux@alma9-2gv1 ~]$ cat  flexvmconfig_almalinux-8.10_alma9-2gv1_20260417_023231.txt
+FLEX VM BOOT REFERENCE
+Generated: 2026-04-17T02:32:31+00:00
+Host: alma9-2gv1
+OS: AlmaLinux 8.10 (Cerulean Leopard)
+OS_ID: almalinux
+OS_VERSION: 8.10
+Kernel: 4.18.0-553.74.1.el8_10.x86_64
+Boot mode: UEFI
+Initramfs tool: dracut
+Default NIC: eth0
+Primary IP: 10.60.0.162/24
+
+BOOT-CRITICAL SUMMARY
+ROOT_SOURCE=/dev/vda4
+ROOT_FSTYPE=xfs
+ROOT_UUID=82937238-3da4-4dda-9db2-29556dccce0a
+BOOT_SOURCE=/dev/vda3
+BOOT_UUID=37e38df4-28dc-4d9c-acb5-1a2fd7e6130b
+EFI_SOURCE=/dev/vda2
+EFI_UUID=3F31-DBA5
+GRUB_CFG=/boot/grub2/grub.cfg
+KERNEL_CMDLINE=BOOT_IMAGE=(hd0,gpt3)/vmlinuz-4.18.0-553.74.1.el8_10.x86_64 root=UUID=82937238-3da4-4dda-9db2-29556dccce0a ro console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0
+
+USE THIS FILE TO FIX AN IMPORTED OSPC IMAGE FOR FLEX:
+- update /etc/fstab to use correct UUIDs or correct device mapping
+- remove old /dev/xvd* references if present
+- rebuild initramfs with the tool above
+- rebuild grub config to the path above
+- confirm root/boot/efi UUIDs match the repaired image
+
+============================================================
+OS RELEASE
+============================================================
+$ cat /etc/os-release
+NAME="AlmaLinux"
+VERSION="8.10 (Cerulean Leopard)"
+ID="almalinux"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="8.10"
+PLATFORM_ID="platform:el8"
+PRETTY_NAME="AlmaLinux 8.10 (Cerulean Leopard)"
+ANSI_COLOR="0;34"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:almalinux:almalinux:8::baseos"
+HOME_URL="https://almalinux.org/"
+DOCUMENTATION_URL="https://wiki.almalinux.org/"
+BUG_REPORT_URL="https://bugs.almalinux.org/"
+
+ALMALINUX_MANTISBT_PROJECT="AlmaLinux-8"
+ALMALINUX_MANTISBT_PROJECT_VERSION="8.10"
+REDHAT_SUPPORT_PRODUCT="AlmaLinux"
+REDHAT_SUPPORT_PRODUCT_VERSION="8.10"
+SUPPORT_END=2029-06-01
+
+============================================================
+KERNEL / CMDLINE
+============================================================
+$ uname -a
+Linux alma9-2gv1 4.18.0-553.74.1.el8_10.x86_64 #1 SMP Mon Sep 8 12:04:40 EDT 2025 x86_64 x86_64 x86_64 GNU/Linux
+$ cat /proc/cmdline
+BOOT_IMAGE=(hd0,gpt3)/vmlinuz-4.18.0-553.74.1.el8_10.x86_64 root=UUID=82937238-3da4-4dda-9db2-29556dccce0a ro console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0
+
+============================================================
+BOOT MODE / FIRMWARE
+============================================================
+$ test -d /sys/firmware/efi && echo UEFI || echo BIOS
+UEFI
+$ efibootmgr -v
+BootCurrent: 0001
+Timeout: 0 seconds
+BootOrder: 0003,0001,0000,0002
+Boot0000* UiApp FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device      PciRoot(0x0)/Pci(0x2,0x3)/Pci(0x0,0x0)N.....YM....R,Y.
+Boot0002* EFI Internal Shell    FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(7c04a583-9e3e-4f1c-ad65-e05268d0b4d1)
+Boot0003* AlmaLinux     HD(2,GPT,1866550d-93fd-4631-94e7-088f1f86f7e3,0x1000,0x64000)/File(\EFI\almalinux\shimx64.efi)
+
+============================================================
+BLOCK DEVICES / UUID / MOUNTS
+============================================================
+$ lsblk -e7 -o NAME,KNAME,TYPE,FSTYPE,SIZE,MOUNTPOINT,UUID,PARTUUID
+NAME   KNAME TYPE FSTYPE  SIZE MOUNTPOINT UUID                                 PARTUUID
+vda    vda   disk          40G
+├─vda1 vda1  part           1M                                                 aa2505e0-0947-4347-a5d2-27e1bc41003e
+├─vda2 vda2  part vfat    200M /boot/efi  3F31-DBA5                            1866550d-93fd-4631-94e7-088f1f86f7e3
+├─vda3 vda3  part xfs       1G /boot      37e38df4-28dc-4d9c-acb5-1a2fd7e6130b 7cd1ad0d-6948-42f2-aeb1-c6a87da3d979
+└─vda4 vda4  part xfs    38.8G /          82937238-3da4-4dda-9db2-29556dccce0a af8a132e-4aea-4d9f-ac34-6b95812d5db8
+vdb    vdb   disk swap      1G [SWAP]     e5fd1f99-4ffe-43dc-99a2-43c0d89eb37a
+$ blkid
+/dev/vda2: SEC_TYPE="msdos" UUID="3F31-DBA5" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="EFI System Partition" PARTUUID="1866550d-93fd-4631-94e7-088f1f86f7e3"
+/dev/vda3: UUID="37e38df4-28dc-4d9c-acb5-1a2fd7e6130b" BLOCK_SIZE="512" TYPE="xfs" PARTLABEL="boot" PARTUUID="7cd1ad0d-6948-42f2-aeb1-c6a87da3d979"
+/dev/vda4: UUID="82937238-3da4-4dda-9db2-29556dccce0a" BLOCK_SIZE="512" TYPE="xfs" PARTLABEL="root" PARTUUID="af8a132e-4aea-4d9f-ac34-6b95812d5db8"
+/dev/vdb: UUID="e5fd1f99-4ffe-43dc-99a2-43c0d89eb37a" TYPE="swap"
+/dev/vda1: PARTLABEL="biosboot" PARTUUID="aa2505e0-0947-4347-a5d2-27e1bc41003e"
+$ findmnt -A -o TARGET,SOURCE,FSTYPE,OPTIONS,UUID
+TARGET                                SOURCE     FSTYPE     OPTIONS                                                                                                          UUID
+/                                     /dev/vda4  xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota                                                82937238-3da4-4dda-9db2-29556dccce0a
+├─/sys                                sysfs      sysfs      rw,nosuid,nodev,noexec,relatime,seclabel            
+│ ├─/sys/kernel/security              securityfs securityfs rw,nosuid,nodev,noexec,relatime                     
+│ ├─/sys/fs/cgroup                    tmpfs      tmpfs      ro,nosuid,nodev,noexec,seclabel,mode=755            
+│ │ ├─/sys/fs/cgroup/systemd          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,xattr,release_agent=/usr/lib/systemd/systemd-cgroups-agent,name=systemd
+│ │ ├─/sys/fs/cgroup/devices          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,devices    
+│ │ ├─/sys/fs/cgroup/cpuset           cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,cpuset     
+│ │ ├─/sys/fs/cgroup/cpu,cpuacct      cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,cpu,cpuacct
+│ │ ├─/sys/fs/cgroup/memory           cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,memory     
+│ │ ├─/sys/fs/cgroup/blkio            cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,blkio      
+│ │ ├─/sys/fs/cgroup/rdma             cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,rdma       
+│ │ ├─/sys/fs/cgroup/hugetlb          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,hugetlb    
+│ │ ├─/sys/fs/cgroup/freezer          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,freezer    
+│ │ ├─/sys/fs/cgroup/net_cls,net_prio cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,net_cls,net_prio
+│ │ ├─/sys/fs/cgroup/pids             cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,pids       
+│ │ └─/sys/fs/cgroup/perf_event       cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,perf_event 
+│ ├─/sys/fs/pstore                    pstore     pstore     rw,nosuid,nodev,noexec,relatime,seclabel            
+│ ├─/sys/firmware/efi/efivars         efivarfs   efivarfs   rw,nosuid,nodev,noexec,relatime                     
+│ ├─/sys/fs/bpf                       bpf        bpf        rw,nosuid,nodev,noexec,relatime,mode=700            
+│ ├─/sys/kernel/tracing               none       tracefs    rw,relatime,seclabel                                
+│ ├─/sys/fs/selinux                   selinuxfs  selinuxfs  rw,relatime                                         
+│ ├─/sys/kernel/debug                 debugfs    debugfs    rw,relatime,seclabel                                
+│ └─/sys/kernel/config                configfs   configfs   rw,relatime                                         
+├─/proc                               proc       proc       rw,nosuid,nodev,noexec,relatime                     
+│ └─/proc/sys/fs/binfmt_misc          systemd-1  autofs     rw,relatime,fd=38,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=16969
+├─/dev                                devtmpfs   devtmpfs   rw,nosuid,seclabel,size=960260k,nr_inodes=240065,mode=755
+│ ├─/dev/shm                          tmpfs      tmpfs      rw,nosuid,nodev,seclabel                            
+│ ├─/dev/pts                          devpts     devpts     rw,nosuid,noexec,relatime,seclabel,gid=5,mode=620,ptmxmode=000
+│ ├─/dev/mqueue                       mqueue     mqueue     rw,relatime,seclabel                                
+│ └─/dev/hugepages                    hugetlbfs  hugetlbfs  rw,relatime,seclabel,pagesize=2M                    
+├─/run                                tmpfs      tmpfs      rw,nosuid,nodev,seclabel,mode=755                   
+│ └─/run/user/1000                    tmpfs      tmpfs      rw,nosuid,nodev,relatime,seclabel,size=200924k,mode=700,uid=1000,gid=1000
+├─/var/lib/nfs/rpc_pipefs             rpc_pipefs rpc_pipefs rw,relatime                                         
+└─/boot                               /dev/vda3  xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota                                                37e38df4-28dc-4d9c-acb5-1a2fd7e6130b
+  └─/boot/efi                         /dev/vda2  vfat       rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro                 3F31-DBA5
+$ cat /etc/fstab
+
+#
+# /etc/fstab
+# Created by anaconda on Mon Aug 19 17:42:13 2024
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+UUID=82937238-3da4-4dda-9db2-29556dccce0a /                       xfs     defaults        0 0
+UUID=37e38df4-28dc-4d9c-acb5-1a2fd7e6130b /boot                   xfs     defaults        0 0
+UUID=3F31-DBA5          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
+/dev/vdb        none    swap    sw,comment=cloudconfig  0       0
+
+============================================================
+GRUB DEFAULT
+============================================================
+$ cat /etc/default/grub
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
+GRUB_DEFAULT=saved
+GRUB_DISABLE_SUBMENU=true
+GRUB_TERMINAL_OUTPUT="console"
+GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0"
+GRUB_DISABLE_RECOVERY="true"
+GRUB_ENABLE_BLSCFG=true
+
+============================================================
+GRUB CONFIG
+============================================================
+$ cat '/boot/grub2/grub.cfg'
+#
+# DO NOT EDIT THIS FILE
+#
+# It is automatically generated by grub2-mkconfig using templates
+# from /etc/grub.d and settings from /etc/default/grub
+#
+
+### BEGIN /etc/grub.d/00_header ###
+set pager=1
+
+if [ -f ${config_directory}/grubenv ]; then
+  load_env -f ${config_directory}/grubenv
+elif [ -s $prefix/grubenv ]; then
+  load_env
+fi
+if [ "${next_entry}" ] ; then
+   set default="${next_entry}"
+   set next_entry=
+   save_env next_entry
+   set boot_once=true
+else
+   set default="${saved_entry}"
+fi
+
+if [ x"${feature_menuentry_id}" = xy ]; then
+  menuentry_id_option="--id"
+else
+  menuentry_id_option=""
+fi
+
+export menuentry_id_option
+
+if [ "${prev_saved_entry}" ]; then
+  set saved_entry="${prev_saved_entry}"
+  save_env saved_entry
+  set prev_saved_entry=
+  save_env prev_saved_entry
+  set boot_once=true
+fi
+
+function savedefault {
+  if [ -z "${boot_once}" ]; then
+    saved_entry="${chosen}"
+    save_env saved_entry
+  fi
+}
+
+function load_video {
+  if [ x$feature_all_video_module = xy ]; then
+    insmod all_video
+  else
+    insmod efi_gop
+    insmod efi_uga
+    insmod ieee1275_fb
+    insmod vbe
+    insmod vga
+    insmod video_bochs
+    insmod video_cirrus
+  fi
+}
+
+terminal_output console
+if [ x$feature_timeout_style = xy ] ; then
+  set timeout_style=menu
+  set timeout=5
+# Fallback normal timeout code in case the timeout_style feature is
+# unavailable.
+else
+  set timeout=5
+fi
+### END /etc/grub.d/00_header ###
+
+### BEGIN /etc/grub.d/00_tuned ###
+set tuned_params=""
+set tuned_initrd=""
+### END /etc/grub.d/00_tuned ###
+
+### BEGIN /etc/grub.d/01_users ###
+if [ -f ${prefix}/user.cfg ]; then
+  source ${prefix}/user.cfg
+  if [ -n "${GRUB2_PASSWORD}" ]; then
+    set superusers="root"
+    export superusers
+    password_pbkdf2 root ${GRUB2_PASSWORD}
+  fi
+fi
+### END /etc/grub.d/01_users ###
+
+### BEGIN /etc/grub.d/08_fallback_counting ###
+insmod increment
+# Check if boot_counter exists and boot_success=0 to activate this behaviour.
+if [ -n "${boot_counter}" -a "${boot_success}" = "0" ]; then
+  # if countdown has ended, choose to boot rollback deployment,
+  # i.e. default=1 on OSTree-based systems.
+  if  [ "${boot_counter}" = "0" -o "${boot_counter}" = "-1" ]; then
+    set default=1
+    set boot_counter=-1
+  # otherwise decrement boot_counter
+  else
+    decrement boot_counter
+  fi
+  save_env boot_counter
+fi
+### END /etc/grub.d/08_fallback_counting ###
+
+### BEGIN /etc/grub.d/10_linux ###
+insmod part_gpt
+insmod xfs
+set root='hd0,gpt3'
+if [ x$feature_platform_search_hint = xy ]; then
+  search --no-floppy --fs-uuid --set=root --hint-bios=hd0,gpt3 --hint-efi=hd0,gpt3 --hint-baremetal=ahci0,gpt3  37e38df4-28dc-4d9c-acb5-1a2fd7e6130b
+else
+  search --no-floppy --fs-uuid --set=root 37e38df4-28dc-4d9c-acb5-1a2fd7e6130b
+fi
+insmod part_gpt
+insmod xfs
+set boot='hd0,gpt3'
+if [ x$feature_platform_search_hint = xy ]; then
+  search --no-floppy --fs-uuid --set=boot --hint-bios=hd0,gpt3 --hint-efi=hd0,gpt3 --hint-baremetal=ahci0,gpt3  37e38df4-28dc-4d9c-acb5-1a2fd7e6130b
+else
+  search --no-floppy --fs-uuid --set=boot 37e38df4-28dc-4d9c-acb5-1a2fd7e6130b
+fi
+
+# This section was generated by a script. Do not modify the generated file - all changes
+# will be lost the next time file is regenerated. Instead edit the BootLoaderSpec files.
+#
+# The blscfg command parses the BootLoaderSpec files stored in /boot/loader/entries and
+# populates the boot menu. Please refer to the Boot Loader Specification documentation
+# for the files format: https://www.freedesktop.org/wiki/Specifications/BootLoaderSpec/.
+
+# The kernelopts variable should be defined in the grubenv file. But to ensure that menu
+# entries populated from BootLoaderSpec files that use this variable work correctly even
+# without a grubenv file, define a fallback kernelopts variable if this has not been set.
+#
+# The kernelopts variable in the grubenv file can be modified using the grubby tool or by
+# executing the grub2-mkconfig tool. For the latter, the values of the GRUB_CMDLINE_LINUX
+# and GRUB_CMDLINE_LINUX_DEFAULT options from /etc/default/grub file are used to set both
+# the kernelopts variable in the grubenv file and the fallback kernelopts variable.
+if [ -z "${kernelopts}" ]; then
+  set kernelopts="root=UUID=82937238-3da4-4dda-9db2-29556dccce0a ro console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0 "
+fi
+
+insmod blscfg
+blscfg
+### END /etc/grub.d/10_linux ###
+
+### BEGIN /etc/grub.d/10_reset_boot_success ###
+# Hiding the menu is ok if last boot was ok or if this is a first boot attempt to boot the entry
+if [ "${boot_success}" = "1" -o "${boot_indeterminate}" = "1" ]; then
+  set menu_hide_ok=1
+else
+  set menu_hide_ok=0
+fi
+# Reset boot_indeterminate after a successful boot
+if [ "${boot_success}" = "1" ] ; then
+  set boot_indeterminate=0
+# Avoid boot_indeterminate causing the menu to be hidden more then once
+elif [ "${boot_indeterminate}" = "1" ]; then
+  set boot_indeterminate=2
+fi
+# Reset boot_success for current boot
+set boot_success=0
+save_env boot_success boot_indeterminate
+### END /etc/grub.d/10_reset_boot_success ###
+
+### BEGIN /etc/grub.d/12_menu_auto_hide ###
+if [ x$feature_timeout_style = xy ] ; then
+  if [ "${menu_show_once}" ]; then
+    unset menu_show_once
+    save_env menu_show_once
+    set timeout_style=menu
+    set timeout=60
+  elif [ "${menu_auto_hide}" -a "${menu_hide_ok}" = "1" ]; then
+    set orig_timeout_style=${timeout_style}
+    set orig_timeout=${timeout}
+    if [ "${fastboot}" = "1" ]; then
+      # timeout_style=menu + timeout=0 avoids the countdown code keypress check
+      set timeout_style=menu
+      set timeout=0
+    else
+      set timeout_style=hidden
+      set timeout=1
+    fi
+  fi
+fi
+### END /etc/grub.d/12_menu_auto_hide ###
+
+### BEGIN /etc/grub.d/20_linux_xen ###
+### END /etc/grub.d/20_linux_xen ###
+
+### BEGIN /etc/grub.d/20_ppc_terminfo ###
+### END /etc/grub.d/20_ppc_terminfo ###
+
+### BEGIN /etc/grub.d/30_os-prober ###
+### END /etc/grub.d/30_os-prober ###
+
+### BEGIN /etc/grub.d/30_uefi-firmware ###
+### END /etc/grub.d/30_uefi-firmware ###
+
+### BEGIN /etc/grub.d/35_fwupd ###
+### END /etc/grub.d/35_fwupd ###
+
+### BEGIN /etc/grub.d/40_custom ###
+# This file provides an easy way to add custom menu entries.  Simply type the
+# menu entries you want to add after this comment.  Be careful not to change
+# the 'exec tail' line above.
+### END /etc/grub.d/40_custom ###
+
+### BEGIN /etc/grub.d/41_custom ###
+if [ -f  ${config_directory}/custom.cfg ]; then
+  source ${config_directory}/custom.cfg
+elif [ -z "${config_directory}" -a -f  $prefix/custom.cfg ]; then
+  source $prefix/custom.cfg;
+fi
+### END /etc/grub.d/41_custom ###
+
+============================================================
+INITRAMFS / BOOT PACKAGES
+============================================================
+$ dracut --version
+getopt: unrecognized option '--version'
+Usage: /usr/bin/dracut [OPTION]... [<initramfs> [<kernel-version>]]
+
+Version: 049-237.git20250603.el8_10
+
+Creates initial ramdisk images for preloading modules
+
+  -h, --help  Display all options
+
+If a [LIST] has multiple arguments, then you have to put these in quotes.
+
+For example:
+
+    # dracut --add-drivers "module1 module2"  ...
+
+$ update-initramfs -V
+bash: update-initramfs: command not found
+$ mkinitcpio -V
+bash: mkinitcpio: command not found
+$ rpm -qa | egrep '^(kernel|dracut|grub2|shim|cloud-init|qemu-guest-agent|virtio)'
+grub2-tools-minimal-2.02-167.el8_10.alma.1.x86_64
+shim-x64-15.8-4.el8_9.alma.2.x86_64
+grub2-tools-2.02-167.el8_10.alma.1.x86_64
+dracut-squash-049-237.git20250603.el8_10.x86_64
+dracut-config-generic-049-237.git20250603.el8_10.x86_64
+grub2-pc-modules-2.02-167.el8_10.alma.1.noarch
+kernel-modules-4.18.0-553.16.1.el8_10.x86_64
+kernel-tools-libs-4.18.0-553.74.1.el8_10.x86_64
+grub2-tools-extra-2.02-167.el8_10.alma.1.x86_64
+dracut-049-237.git20250603.el8_10.x86_64
+grub2-efi-x64-2.02-167.el8_10.alma.1.x86_64
+dracut-network-049-237.git20250603.el8_10.x86_64
+kernel-core-4.18.0-553.74.1.el8_10.x86_64
+kernel-4.18.0-553.74.1.el8_10.x86_64
+dracut-config-rescue-049-237.git20250603.el8_10.x86_64
+qemu-guest-agent-6.2.0-53.module_el8.10.0+4031+06966654.4.x86_64
+grub2-common-2.02-167.el8_10.alma.1.noarch
+kernel-tools-4.18.0-553.74.1.el8_10.x86_64
+kernel-core-4.18.0-553.16.1.el8_10.x86_64
+grub2-pc-2.02-167.el8_10.alma.1.x86_64
+kernel-modules-4.18.0-553.74.1.el8_10.x86_64
+kernel-4.18.0-553.16.1.el8_10.x86_64
+grub2-tools-efi-2.02-167.el8_10.alma.1.x86_64
+cloud-init-23.4-7.el8_10.10.alma.1.noarch
+$ dpkg -l | egrep 'linux-image|initramfs-tools|grub|shim|cloud-init|qemu-guest-agent'
+bash: dpkg: command not found
+
+============================================================
+NETWORK BASELINE
+============================================================
+$ ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0             UP             10.60.0.162/24 fe80::f816:3eff:fe37:968f/64
+$ ip route
+default via 10.60.0.1 dev eth0 proto dhcp src 10.60.0.162 metric 100
+10.60.0.0/24 dev eth0 proto kernel scope link src 10.60.0.162 metric 100
+169.254.169.254 via 10.60.0.2 dev eth0 proto dhcp src 10.60.0.162 metric 100
+$ cat /etc/resolv.conf
+# Generated by NetworkManager
+nameserver 72.3.128.240
+nameserver 72.3.128.241
+
+============================================================
+NETPLAN / IFCFG / NM
+============================================================
+$ find /etc/netplan -maxdepth 2 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/netplan’: No such file or directory
+$ find /etc/sysconfig/network-scripts -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+--- /etc/sysconfig/network-scripts/ifcfg-eth0
+# Created by cloud-init automatically, do not edit.
+#
+BOOTPROTO=dhcp
+DEVICE=eth0
+HWADDR=fa:16:3e:37:96:8f
+MTU=3942
+ONBOOT=yes
+TYPE=Ethernet
+USERCTL=no
+$ find /etc/NetworkManager/system-connections -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+
+============================================================
+CLOUD INIT / GUEST AGENT
+============================================================
+$ cloud-init status --long
+status: done
+extended_status: degraded done
+boot_status_code: enabled-by-generator
+last_update: Sun, 05 Apr 2026 07:59:41 +0000
+detail:
+DataSourceOpenStackLocal [net,ver=2]
+errors: []
+recoverable_errors:
+WARNING:
+        - Failed at merging in cloud config part from part-001: empty cloud config
+$ systemctl status qemu-guest-agent --no-pager
+● qemu-guest-agent.service - QEMU Guest Agent
+   Loaded: loaded (/usr/lib/systemd/system/qemu-guest-agent.service; enabled; vendor preset: enabled)
+   Active: active (running) since Sun 2026-04-05 07:59:35 UTC; 1 weeks 4 days ago
+ Main PID: 755 (qemu-ga)
+    Tasks: 2 (limit: 12002)
+   Memory: 1.9M
+   CGroup: /system.slice/qemu-guest-agent.service
+           └─755 /usr/bin/qemu-ga --method=virtio-serial --path=/dev/virtio-ports/org.qemu.guest_agent.0 --blacklist=guest-file-open,guest-file-close,guest-file-read,guest-file-write,guest-file-seek,guest-file-flush,guest-exec,guest-exec-status -F/etc/qemu-ga/fsfreeze-hook
+
+Apr 05 07:59:35 localhost systemd[1]: Started QEMU Guest Agent.
+Apr 09 05:06:06 alma9-2gv1 qemu-ga[755]: info: guest-fsfreeze called
+Apr 09 05:06:06 alma9-2gv1 qemu-ga[755]: info: executing fsfreeze hook with arg 'freeze'
+Apr 09 05:06:06 alma9-2gv1 qemu-ga[755]: info: executing fsfreeze hook with arg 'thaw'
+
+============================================================
+SSH / CONSOLE
+============================================================
+$ sshd -T
+port 22
+addressfamily any
+listenaddress [::]:22
+listenaddress 0.0.0.0:22
+usepam yes
+logingracetime 120
+x11displayoffset 10
+x11maxdisplays 1000
+maxauthtries 6
+maxsessions 10
+clientaliveinterval 0
+clientalivecountmax 3
+streamlocalbindmask 0177
+permitrootlogin yes
+ignorerhosts yes
+ignoreuserknownhosts no
+hostbasedauthentication no
+hostbasedusesnamefrompacketonly no
+pubkeyauthentication yes
+kerberosauthentication no
+kerberosorlocalpasswd yes
+kerberosticketcleanup yes
+kerberosuniqueccache no
+kerberosusekuserok yes
+gssapienablek5users no
+gssapiauthentication yes
+gssapicleanupcredentials no
+gssapikeyexchange no
+gssapistrictacceptorcheck yes
+gssapistorecredentialsonrekey no
+gssapikexalgorithms gss-group14-sha256-,gss-group16-sha512-,gss-nistp256-sha256-,gss-curve25519-sha256-,gss-group14-sha1-,gss-gex-sha1-
+passwordauthentication no
+kbdinteractiveauthentication no
+challengeresponseauthentication no
+printmotd no
+printlastlog yes
+x11forwarding yes
+x11uselocalhost yes
+permittty yes
+permituserrc yes
+strictmodes yes
+tcpkeepalive yes
+permitemptypasswords no
+compression yes
+gatewayports no
+usedns no
+allowtcpforwarding yes
+allowagentforwarding yes
+disableforwarding no
+allowstreamlocalforwarding yes
+streamlocalbindunlink no
+fingerprinthash SHA256
+exposeauthinfo no
+pidfile /var/run/sshd.pid
+xauthlocation /usr/bin/xauth
+ciphers chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com
+macs umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1
+banner none
+forcecommand none
+chrootdirectory none
+trustedusercakeys none
+revokedkeys none
+authorizedprincipalsfile none
+versionaddendum none
+authorizedkeyscommand none
+authorizedkeyscommanduser none
+authorizedprincipalscommand none
+authorizedprincipalscommanduser none
+hostkeyagent none
+kexalgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1
+casignaturealgorithms ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+hostbasedacceptedkeytypes ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+hostkeyalgorithms ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+pubkeyacceptedkeytypes ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+loglevel INFO
+syslogfacility AUTHPRIV
+authorizedkeysfile .ssh/authorized_keys
+hostkey /etc/ssh/ssh_host_rsa_key
+hostkey /etc/ssh/ssh_host_ecdsa_key
+hostkey /etc/ssh/ssh_host_ed25519_key
+acceptenv LANG
+acceptenv LC_CTYPE
+acceptenv LC_NUMERIC
+acceptenv LC_TIME
+acceptenv LC_COLLATE
+acceptenv LC_MONETARY
+acceptenv LC_MESSAGES
+acceptenv LC_PAPER
+acceptenv LC_NAME
+acceptenv LC_ADDRESS
+acceptenv LC_TELEPHONE
+acceptenv LC_MEASUREMENT
+acceptenv LC_IDENTIFICATION
+acceptenv LC_ALL
+acceptenv LANGUAGE
+acceptenv XMODIFIERS
+authenticationmethods any
+subsystem sftp /usr/libexec/openssh/sftp-server
+maxstartups 10:30:100
+permittunnel no
+ipqos af21 cs1
+rekeylimit 0 0
+permitopen any
+permitlisten any
+permituserenvironment no
+$ grep -RinE 'ttyS0|console=' /etc/default/grub /boot/grub2/grub.cfg /boot/grub/grub.cfg /boot/efi/EFI 2>/dev/null
+/etc/default/grub:6:GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0"
+/boot/grub2/grub.cfg:140:  set kernelopts="root=UUID=82937238-3da4-4dda-9db2-29556dccce0a ro console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0 "
+/boot/efi/EFI/almalinux/grub.cfg:140:  set kernelopts="root=UUID=82937238-3da4-4dda-9db2-29556dccce0a ro console=tty0 console=ttyS0,115200n8 no_timer_check biosdevname=0 net.ifnames=0 "
+
+============================================================
+VIRTUALIZATION
+============================================================
+$ systemd-detect-virt
+kvm
+$ lsmod | egrep 'virtio|xen'
+virtio_gpu             73728  0
+drm_shmem_helper       16384  1 virtio_gpu
+drm_kms_helper        184320  3 virtio_gpu
+drm                   602112  4 drm_kms_helper,drm_shmem_helper,virtio_gpu
+virtio_balloon         20480  0
+virtio_net             61440  0
+virtio_blk             20480  5
+virtio_console         36864  1
+net_failover           24576  1 virtio_net
+
+============================================================
+REPAIR COMMAND HINTS
+============================================================
+Debian/Ubuntu initramfs rebuild: update-initramfs -u -k all
+RHEL/Rocky/Alma/CentOS initramfs rebuild: dracut -f --regenerate-all
+Debian/Ubuntu grub rebuild BIOS: grub-mkconfig -o /boot/grub/grub.cfg
+RHEL/Rocky/Alma/CentOS grub rebuild BIOS: grub2-mkconfig -o /boot/grub2/grub.cfg
+UEFI grub path varies by distro/vendor; use the GRUB_CFG path collected above
+[almalinux@alma9-2gv1 ~]$
+
+
+S0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto "
+
+============================================================
+VIRTUALIZATION
+============================================================
+$ systemd-detect-virt
+kvm
+$ lsmod | egrep 'virtio|xen'
+virtio_gpu             73728  0
+drm_shmem_helper       16384  1 virtio_gpu
+drm_kms_helper        184320  3 virtio_gpu
+drm                   602112  4 drm_kms_helper,drm_shmem_helper,virtio_gpu
+virtio_balloon         20480  0
+virtio_net             61440  0
+virtio_console         36864  1
+net_failover           24576  1 virtio_net
+virtio_blk             20480  6
+
+============================================================
+REPAIR COMMAND HINTS
+============================================================
+Debian/Ubuntu initramfs rebuild: update-initramfs -u -k all
+RHEL/Rocky/Alma/CentOS initramfs rebuild: dracut -f --regenerate-all
+Debian/Ubuntu grub rebuild BIOS: grub-mkconfig -o /boot/grub/grub.cfg
+RHEL/Rocky/Alma/CentOS grub rebuild BIOS: grub2-mkconfig -o /boot/grub2/grub.cfg
+UEFI grub path varies by distro/vendor; use the GRUB_CFG path collected above
+[rocky@rocky8 ~]$ clear
+[rocky@rocky8 ~]$ cat  flexvmconfig_rocky-8.10_rocky8_20260417_023450.txt
+FLEX VM BOOT REFERENCE
+Generated: 2026-04-17T02:34:50+00:00
+Host: rocky8.novalocal
+OS: Rocky Linux 8.10 (Green Obsidian)
+OS_ID: rocky
+OS_VERSION: 8.10
+Kernel: 4.18.0-553.72.1.el8_10.x86_64
+Boot mode: UEFI
+Initramfs tool: dracut
+Default NIC: eth0
+Primary IP: 10.60.0.45/24
+
+BOOT-CRITICAL SUMMARY
+ROOT_SOURCE=/dev/vda5
+ROOT_FSTYPE=xfs
+ROOT_UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40
+BOOT_SOURCE=/dev/vda2
+BOOT_UUID=e9cc59a8-8cd5-4972-8ff0-592fb41238d2
+EFI_SOURCE=/dev/vda1
+EFI_UUID=51D8-0B33
+GRUB_CFG=/boot/grub2/grub.cfg
+KERNEL_CMDLINE=BOOT_IMAGE=(hd0,gpt2)/vmlinuz-4.18.0-553.72.1.el8_10.x86_64 root=UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 ro console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto
+
+USE THIS FILE TO FIX AN IMPORTED OSPC IMAGE FOR FLEX:
+- update /etc/fstab to use correct UUIDs or correct device mapping
+- remove old /dev/xvd* references if present
+- rebuild initramfs with the tool above
+- rebuild grub config to the path above
+- confirm root/boot/efi UUIDs match the repaired image
+
+============================================================
+OS RELEASE
+============================================================
+$ cat /etc/os-release
+NAME="Rocky Linux"
+VERSION="8.10 (Green Obsidian)"
+ID="rocky"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="8.10"
+PLATFORM_ID="platform:el8"
+PRETTY_NAME="Rocky Linux 8.10 (Green Obsidian)"
+ANSI_COLOR="0;32"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:rocky:rocky:8:GA"
+HOME_URL="https://rockylinux.org/"
+BUG_REPORT_URL="https://bugs.rockylinux.org/"
+SUPPORT_END="2029-05-31"
+ROCKY_SUPPORT_PRODUCT="Rocky-Linux-8"
+ROCKY_SUPPORT_PRODUCT_VERSION="8.10"
+REDHAT_SUPPORT_PRODUCT="Rocky Linux"
+REDHAT_SUPPORT_PRODUCT_VERSION="8.10"
+
+============================================================
+KERNEL / CMDLINE
+============================================================
+$ uname -a
+Linux rocky8.novalocal 4.18.0-553.72.1.el8_10.x86_64 #1 SMP Sat Sep 6 19:16:09 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+$ cat /proc/cmdline
+BOOT_IMAGE=(hd0,gpt2)/vmlinuz-4.18.0-553.72.1.el8_10.x86_64 root=UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 ro console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto
+
+============================================================
+BOOT MODE / FIRMWARE
+============================================================
+$ test -d /sys/firmware/efi && echo UEFI || echo BIOS
+UEFI
+$ efibootmgr -v
+BootCurrent: 0001
+Timeout: 0 seconds
+BootOrder: 0003,0001,0000,0002
+Boot0000* UiApp FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(462caa21-7614-4503-836e-8ab6f4662331)
+Boot0001* UEFI Misc Device      PciRoot(0x0)/Pci(0x2,0x3)/Pci(0x0,0x0)N.....YM....R,Y.
+Boot0002* EFI Internal Shell    FvVol(7cb8bdc9-f8eb-4f34-aaea-3ee4af6516a1)/FvFile(7c04a583-9e3e-4f1c-ad65-e05268d0b4d1)
+Boot0003* rocky HD(1,GPT,ebdee067-1691-45bc-8964-87cec3b23904,0x800,0x31800)/File(\EFI\rocky\shimx64.efi)
+
+============================================================
+BLOCK DEVICES / UUID / MOUNTS
+============================================================
+$ lsblk -e7 -o NAME,KNAME,TYPE,FSTYPE,SIZE,MOUNTPOINT,UUID,PARTUUID
+NAME   KNAME TYPE FSTYPE  SIZE MOUNTPOINT UUID                                 PARTUUID
+vda    vda   disk          80G
+├─vda1 vda1  part vfat     99M /boot/efi  51D8-0B33                            ebdee067-1691-45bc-8964-87cec3b23904
+├─vda2 vda2  part xfs    1000M /boot      e9cc59a8-8cd5-4972-8ff0-592fb41238d2 5e398bff-eea1-49bf-bed9-224ebab3419e
+├─vda3 vda3  part           4M                                                 4000f6dc-06af-44db-abe3-318ab7da077e
+├─vda4 vda4  part           1M                                                 53144e3b-613a-4594-a865-2fc476947d80
+└─vda5 vda5  part xfs    78.9G /          4990ceaa-f9c5-4fa5-abef-198724d21f40 6aa156cf-181c-4087-a436-9cfef081af5d
+vdb    vdb   disk ext4     64G /mnt       c25a46d9-3fd3-4cf3-919f-c0c423ce25a2
+vdc    vdc   disk swap      4G [SWAP]     8e2dffcc-984a-4faf-8b6d-05ca379d45ff
+$ blkid
+/dev/vda5: UUID="4990ceaa-f9c5-4fa5-abef-198724d21f40" BLOCK_SIZE="512" TYPE="xfs" PARTLABEL="primary" PARTUUID="6aa156cf-181c-4087-a436-9cfef081af5d"
+/dev/vda1: SEC_TYPE="msdos" UUID="51D8-0B33" BLOCK_SIZE="512" TYPE="vfat" PARTLABEL="EFI System Partition" PARTUUID="ebdee067-1691-45bc-8964-87cec3b23904"
+/dev/vda2: LABEL="boot" UUID="e9cc59a8-8cd5-4972-8ff0-592fb41238d2" BLOCK_SIZE="512" TYPE="xfs" PARTLABEL="primary" PARTUUID="5e398bff-eea1-49bf-bed9-224ebab3419e"
+/dev/vda3: PARTLABEL="primary" PARTUUID="4000f6dc-06af-44db-abe3-318ab7da077e"
+/dev/vda4: PARTLABEL="primary" PARTUUID="53144e3b-613a-4594-a865-2fc476947d80"
+/dev/vdb: LABEL="ephemeral0" UUID="c25a46d9-3fd3-4cf3-919f-c0c423ce25a2" BLOCK_SIZE="4096" TYPE="ext4"
+/dev/vdc: UUID="8e2dffcc-984a-4faf-8b6d-05ca379d45ff" TYPE="swap"
+$ findmnt -A -o TARGET,SOURCE,FSTYPE,OPTIONS,UUID
+TARGET                                SOURCE     FSTYPE     OPTIONS                                                                                                          UUID
+/                                     /dev/vda5  xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota                                                4990ceaa-f9c5-4fa5-abef-198724d21f40
+├─/sys                                sysfs      sysfs      rw,nosuid,nodev,noexec,relatime,seclabel            
+│ ├─/sys/kernel/security              securityfs securityfs rw,nosuid,nodev,noexec,relatime                     
+│ ├─/sys/fs/cgroup                    tmpfs      tmpfs      ro,nosuid,nodev,noexec,seclabel,mode=755            
+│ │ ├─/sys/fs/cgroup/systemd          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,xattr,release_agent=/usr/lib/systemd/systemd-cgroups-agent,name=systemd
+│ │ ├─/sys/fs/cgroup/perf_event       cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,perf_event 
+│ │ ├─/sys/fs/cgroup/blkio            cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,blkio      
+│ │ ├─/sys/fs/cgroup/cpu,cpuacct      cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,cpu,cpuacct
+│ │ ├─/sys/fs/cgroup/net_cls,net_prio cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,net_cls,net_prio
+│ │ ├─/sys/fs/cgroup/cpuset           cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,cpuset     
+│ │ ├─/sys/fs/cgroup/hugetlb          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,hugetlb    
+│ │ ├─/sys/fs/cgroup/pids             cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,pids       
+│ │ ├─/sys/fs/cgroup/freezer          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,freezer    
+│ │ ├─/sys/fs/cgroup/devices          cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,devices    
+│ │ ├─/sys/fs/cgroup/rdma             cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,rdma       
+│ │ └─/sys/fs/cgroup/memory           cgroup     cgroup     rw,nosuid,nodev,noexec,relatime,seclabel,memory     
+│ ├─/sys/fs/pstore                    pstore     pstore     rw,nosuid,nodev,noexec,relatime,seclabel            
+│ ├─/sys/firmware/efi/efivars         efivarfs   efivarfs   rw,nosuid,nodev,noexec,relatime                     
+│ ├─/sys/fs/bpf                       bpf        bpf        rw,nosuid,nodev,noexec,relatime,mode=700            
+│ ├─/sys/kernel/tracing               none       tracefs    rw,relatime,seclabel                                
+│ ├─/sys/fs/selinux                   selinuxfs  selinuxfs  rw,relatime                                         
+│ ├─/sys/kernel/debug                 debugfs    debugfs    rw,relatime,seclabel                                
+│ └─/sys/kernel/config                configfs   configfs   rw,relatime                                         
+├─/proc                               proc       proc       rw,nosuid,nodev,noexec,relatime                     
+│ └─/proc/sys/fs/binfmt_misc          systemd-1  autofs     rw,relatime,fd=42,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=22019
+├─/dev                                devtmpfs   devtmpfs   rw,nosuid,seclabel,size=3892012k,nr_inodes=973003,mode=755
+│ ├─/dev/shm                          tmpfs      tmpfs      rw,nosuid,nodev,seclabel                            
+│ ├─/dev/pts                          devpts     devpts     rw,nosuid,noexec,relatime,seclabel,gid=5,mode=620,ptmxmode=000
+│ ├─/dev/mqueue                       mqueue     mqueue     rw,relatime,seclabel                                
+│ └─/dev/hugepages                    hugetlbfs  hugetlbfs  rw,relatime,seclabel,pagesize=2M                    
+├─/run                                tmpfs      tmpfs      rw,nosuid,nodev,seclabel,mode=755                   
+│ └─/run/user/1000                    tmpfs      tmpfs      rw,nosuid,nodev,relatime,seclabel,size=787336k,mode=700,uid=1000,gid=1000
+├─/boot                               /dev/vda2  xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota                                                e9cc59a8-8cd5-4972-8ff0-592fb41238d2
+│ └─/boot/efi                         /dev/vda1  vfat       rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro                 51D8-0B33
+├─/var/lib/nfs/rpc_pipefs             rpc_pipefs rpc_pipefs rw,relatime                                         
+└─/mnt                                /dev/vdb   ext4       rw,relatime,seclabel                                                                                             c25a46d9-3fd3-4cf3-919f-c0c423ce25a2
+$ cat /etc/fstab
+
+#
+# /etc/fstab
+# Created by anaconda on Tue May 28 14:07:28 2024
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 /                       xfs     defaults        0 0
+UUID=e9cc59a8-8cd5-4972-8ff0-592fb41238d2 /boot                   xfs     defaults        0 0
+UUID=51D8-0B33          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
+/dev/vdb        /mnt    auto    defaults,nofail,comment=cloudconfig     0       2
+/dev/vdc        none    swap    sw,comment=cloudconfig  0       0
+
+============================================================
+GRUB DEFAULT
+============================================================
+$ cat /etc/default/grub
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
+GRUB_DEFAULT=saved
+GRUB_DISABLE_SUBMENU=true
+GRUB_TERMINAL_OUTPUT="console"
+GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto"
+GRUB_DISABLE_RECOVERY="true"
+GRUB_ENABLE_BLSCFG=true
+
+============================================================
+GRUB CONFIG
+============================================================
+$ cat '/boot/grub2/grub.cfg'
+#
+# DO NOT EDIT THIS FILE
+#
+# It is automatically generated by grub2-mkconfig using templates
+# from /etc/grub.d and settings from /etc/default/grub
+#
+
+### BEGIN /etc/grub.d/00_header ###
+set pager=1
+
+if [ -f ${config_directory}/grubenv ]; then
+  load_env -f ${config_directory}/grubenv
+elif [ -s $prefix/grubenv ]; then
+  load_env
+fi
+if [ "${next_entry}" ] ; then
+   set default="${next_entry}"
+   set next_entry=
+   save_env next_entry
+   set boot_once=true
+else
+   set default="${saved_entry}"
+fi
+
+if [ x"${feature_menuentry_id}" = xy ]; then
+  menuentry_id_option="--id"
+else
+  menuentry_id_option=""
+fi
+
+export menuentry_id_option
+
+if [ "${prev_saved_entry}" ]; then
+  set saved_entry="${prev_saved_entry}"
+  save_env saved_entry
+  set prev_saved_entry=
+  save_env prev_saved_entry
+  set boot_once=true
+fi
+
+function savedefault {
+  if [ -z "${boot_once}" ]; then
+    saved_entry="${chosen}"
+    save_env saved_entry
+  fi
+}
+
+function load_video {
+  if [ x$feature_all_video_module = xy ]; then
+    insmod all_video
+  else
+    insmod efi_gop
+    insmod efi_uga
+    insmod ieee1275_fb
+    insmod vbe
+    insmod vga
+    insmod video_bochs
+    insmod video_cirrus
+  fi
+}
+
+terminal_output console
+if [ x$feature_timeout_style = xy ] ; then
+  set timeout_style=menu
+  set timeout=5
+# Fallback normal timeout code in case the timeout_style feature is
+# unavailable.
+else
+  set timeout=5
+fi
+### END /etc/grub.d/00_header ###
+
+### BEGIN /etc/grub.d/00_tuned ###
+set tuned_params=""
+set tuned_initrd=""
+### END /etc/grub.d/00_tuned ###
+
+### BEGIN /etc/grub.d/01_users ###
+if [ -f ${prefix}/user.cfg ]; then
+  source ${prefix}/user.cfg
+  if [ -n "${GRUB2_PASSWORD}" ]; then
+    set superusers="root"
+    export superusers
+    password_pbkdf2 root ${GRUB2_PASSWORD}
+  fi
+fi
+### END /etc/grub.d/01_users ###
+
+### BEGIN /etc/grub.d/08_fallback_counting ###
+insmod increment
+# Check if boot_counter exists and boot_success=0 to activate this behaviour.
+if [ -n "${boot_counter}" -a "${boot_success}" = "0" ]; then
+  # if countdown has ended, choose to boot rollback deployment,
+  # i.e. default=1 on OSTree-based systems.
+  if  [ "${boot_counter}" = "0" -o "${boot_counter}" = "-1" ]; then
+    set default=1
+    set boot_counter=-1
+  # otherwise decrement boot_counter
+  else
+    decrement boot_counter
+  fi
+  save_env boot_counter
+fi
+### END /etc/grub.d/08_fallback_counting ###
+
+### BEGIN /etc/grub.d/10_linux ###
+insmod part_gpt
+insmod xfs
+set root='hd0,gpt2'
+if [ x$feature_platform_search_hint = xy ]; then
+  search --no-floppy --fs-uuid --set=root --hint-bios=hd0,gpt2 --hint-efi=hd0,gpt2 --hint-baremetal=ahci0,gpt2  e9cc59a8-8cd5-4972-8ff0-592fb41238d2
+else
+  search --no-floppy --fs-uuid --set=root e9cc59a8-8cd5-4972-8ff0-592fb41238d2
+fi
+insmod part_gpt
+insmod xfs
+set boot='hd0,gpt2'
+if [ x$feature_platform_search_hint = xy ]; then
+  search --no-floppy --fs-uuid --set=boot --hint-bios=hd0,gpt2 --hint-efi=hd0,gpt2 --hint-baremetal=ahci0,gpt2  e9cc59a8-8cd5-4972-8ff0-592fb41238d2
+else
+  search --no-floppy --fs-uuid --set=boot e9cc59a8-8cd5-4972-8ff0-592fb41238d2
+fi
+
+# This section was generated by a script. Do not modify the generated file - all changes
+# will be lost the next time file is regenerated. Instead edit the BootLoaderSpec files.
+#
+# The blscfg command parses the BootLoaderSpec files stored in /boot/loader/entries and
+# populates the boot menu. Please refer to the Boot Loader Specification documentation
+# for the files format: https://www.freedesktop.org/wiki/Specifications/BootLoaderSpec/.
+
+# The kernelopts variable should be defined in the grubenv file. But to ensure that menu
+# entries populated from BootLoaderSpec files that use this variable work correctly even
+# without a grubenv file, define a fallback kernelopts variable if this has not been set.
+#
+# The kernelopts variable in the grubenv file can be modified using the grubby tool or by
+# executing the grub2-mkconfig tool. For the latter, the values of the GRUB_CMDLINE_LINUX
+# and GRUB_CMDLINE_LINUX_DEFAULT options from /etc/default/grub file are used to set both
+# the kernelopts variable in the grubenv file and the fallback kernelopts variable.
+if [ -z "${kernelopts}" ]; then
+  set kernelopts="root=UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 ro console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto "
+fi
+
+insmod blscfg
+blscfg
+### END /etc/grub.d/10_linux ###
+
+### BEGIN /etc/grub.d/10_reset_boot_success ###
+# Hiding the menu is ok if last boot was ok or if this is a first boot attempt to boot the entry
+if [ "${boot_success}" = "1" -o "${boot_indeterminate}" = "1" ]; then
+  set menu_hide_ok=1
+else
+  set menu_hide_ok=0
+fi
+# Reset boot_indeterminate after a successful boot
+if [ "${boot_success}" = "1" ] ; then
+  set boot_indeterminate=0
+# Avoid boot_indeterminate causing the menu to be hidden more then once
+elif [ "${boot_indeterminate}" = "1" ]; then
+  set boot_indeterminate=2
+fi
+# Reset boot_success for current boot
+set boot_success=0
+save_env boot_success boot_indeterminate
+### END /etc/grub.d/10_reset_boot_success ###
+
+### BEGIN /etc/grub.d/12_menu_auto_hide ###
+if [ x$feature_timeout_style = xy ] ; then
+  if [ "${menu_show_once}" ]; then
+    unset menu_show_once
+    save_env menu_show_once
+    set timeout_style=menu
+    set timeout=60
+  elif [ "${menu_auto_hide}" -a "${menu_hide_ok}" = "1" ]; then
+    set orig_timeout_style=${timeout_style}
+    set orig_timeout=${timeout}
+    if [ "${fastboot}" = "1" ]; then
+      # timeout_style=menu + timeout=0 avoids the countdown code keypress check
+      set timeout_style=menu
+      set timeout=0
+    else
+      set timeout_style=hidden
+      set timeout=1
+    fi
+  fi
+fi
+### END /etc/grub.d/12_menu_auto_hide ###
+
+### BEGIN /etc/grub.d/20_linux_xen ###
+### END /etc/grub.d/20_linux_xen ###
+
+### BEGIN /etc/grub.d/20_ppc_terminfo ###
+### END /etc/grub.d/20_ppc_terminfo ###
+
+### BEGIN /etc/grub.d/30_os-prober ###
+### END /etc/grub.d/30_os-prober ###
+
+### BEGIN /etc/grub.d/30_uefi-firmware ###
+### END /etc/grub.d/30_uefi-firmware ###
+
+### BEGIN /etc/grub.d/35_fwupd ###
+### END /etc/grub.d/35_fwupd ###
+
+### BEGIN /etc/grub.d/40_custom ###
+# This file provides an easy way to add custom menu entries.  Simply type the
+# menu entries you want to add after this comment.  Be careful not to change
+# the 'exec tail' line above.
+### END /etc/grub.d/40_custom ###
+
+### BEGIN /etc/grub.d/41_custom ###
+if [ -f  ${config_directory}/custom.cfg ]; then
+  source ${config_directory}/custom.cfg
+elif [ -z "${config_directory}" -a -f  $prefix/custom.cfg ]; then
+  source $prefix/custom.cfg;
+fi
+### END /etc/grub.d/41_custom ###
+
+============================================================
+INITRAMFS / BOOT PACKAGES
+============================================================
+$ dracut --version
+getopt: unrecognized option '--version'
+Usage: /usr/bin/dracut [OPTION]... [<initramfs> [<kernel-version>]]
+
+Version: 049-237.git20250603.el8_10
+
+Creates initial ramdisk images for preloading modules
+
+  -h, --help  Display all options
+
+If a [LIST] has multiple arguments, then you have to put these in quotes.
+
+For example:
+
+    # dracut --add-drivers "module1 module2"  ...
+
+$ update-initramfs -V
+bash: update-initramfs: command not found
+$ mkinitcpio -V
+bash: mkinitcpio: command not found
+$ rpm -qa | egrep '^(kernel|dracut|grub2|shim|cloud-init|qemu-guest-agent|virtio)'
+grub2-pc-modules-2.02-167.el8_10.rocky.0.1.noarch
+grub2-pc-2.02-167.el8_10.rocky.0.1.x86_64
+qemu-guest-agent-6.2.0-53.module+el8.10.0+2055+8eb7870b.4.x86_64
+kernel-modules-4.18.0-553.el8_10.x86_64
+kernel-tools-libs-4.18.0-553.72.1.el8_10.x86_64
+grub2-tools-extra-2.02-167.el8_10.rocky.0.1.x86_64
+dracut-049-237.git20250603.el8_10.x86_64
+grub2-efi-x64-2.02-167.el8_10.rocky.0.1.x86_64
+dracut-network-049-237.git20250603.el8_10.x86_64
+kernel-core-4.18.0-553.72.1.el8_10.x86_64
+kernel-4.18.0-553.72.1.el8_10.x86_64
+dracut-config-generic-049-237.git20250603.el8_10.x86_64
+grub2-tools-efi-2.02-167.el8_10.rocky.0.1.x86_64
+cloud-init-23.4-7.el8_10.10.0.2.noarch
+shim-x64-15.8-2.el8.x86_64
+grub2-common-2.02-167.el8_10.rocky.0.1.noarch
+kernel-tools-4.18.0-553.72.1.el8_10.x86_64
+kernel-core-4.18.0-553.el8_10.x86_64
+grub2-tools-minimal-2.02-167.el8_10.rocky.0.1.x86_64
+grub2-tools-2.02-167.el8_10.rocky.0.1.x86_64
+dracut-squash-049-237.git20250603.el8_10.x86_64
+kernel-modules-4.18.0-553.72.1.el8_10.x86_64
+dracut-config-rescue-049-237.git20250603.el8_10.x86_64
+kernel-4.18.0-553.el8_10.x86_64
+$ dpkg -l | egrep 'linux-image|initramfs-tools|grub|shim|cloud-init|qemu-guest-agent'
+bash: dpkg: command not found
+
+============================================================
+NETWORK BASELINE
+============================================================
+$ ip -br a
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0             UP             10.60.0.45/24 fe80::f816:3eff:fef8:41fb/64
+$ ip route
+default via 10.60.0.1 dev eth0 proto dhcp src 10.60.0.45 metric 100
+10.60.0.0/24 dev eth0 proto kernel scope link src 10.60.0.45 metric 100
+169.254.169.254 via 10.60.0.2 dev eth0 proto dhcp src 10.60.0.45 metric 100
+$ cat /etc/resolv.conf
+# Generated by NetworkManager
+search novalocal
+nameserver 72.3.128.240
+nameserver 72.3.128.241
+
+============================================================
+NETPLAN / IFCFG / NM
+============================================================
+$ find /etc/netplan -maxdepth 2 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+find: ‘/etc/netplan’: No such file or directory
+$ find /etc/sysconfig/network-scripts -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+--- /etc/sysconfig/network-scripts/ifcfg-ens3
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=dhcp
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+IPV6_ADDR_GEN_MODE=eui64
+NAME=ens3
+UUID=61c74dca-d53f-4784-bbe4-9c898cdb0563
+DEVICE=ens3
+ONBOOT=yes
+--- /etc/sysconfig/network-scripts/ifcfg-eth0
+# Created by cloud-init automatically, do not edit.
+#
+BOOTPROTO=dhcp
+DEVICE=eth0
+HWADDR=fa:16:3e:f8:41:fb
+MTU=3942
+ONBOOT=yes
+TYPE=Ethernet
+USERCTL=no
+$ find /etc/NetworkManager/system-connections -maxdepth 1 -type f | sort | xargs -r -I{} sh -c 'echo --- {}; cat {}'
+
+============================================================
+CLOUD INIT / GUEST AGENT
+============================================================
+$ cloud-init status --long
+status: done
+extended_status: degraded done
+boot_status_code: enabled-by-generator
+last_update: Sun, 05 Apr 2026 09:21:44 +0000
+detail:
+DataSourceOpenStackLocal [net,ver=2]
+errors: []
+recoverable_errors:
+WARNING:
+        - Failed at merging in cloud config part from part-001: empty cloud config
+        - Could not find module named cc_refresh_rmc_and_interface (searched ['cc_refresh_rmc_and_interface', 'cloudinit.config.cc_refresh_rmc_and_interface'])
+$ systemctl status qemu-guest-agent --no-pager
+● qemu-guest-agent.service - QEMU Guest Agent
+   Loaded: loaded (/usr/lib/systemd/system/qemu-guest-agent.service; enabled; vendor preset: enabled)
+   Active: active (running) since Sun 2026-04-05 09:21:34 UTC; 1 weeks 4 days ago
+ Main PID: 790 (qemu-ga)
+    Tasks: 2 (limit: 48649)
+   Memory: 1.7M
+   CGroup: /system.slice/qemu-guest-agent.service
+           └─790 /usr/bin/qemu-ga --method=virtio-serial --path=/dev/virtio-ports/org.qemu.guest_agent.0 --blacklist=guest-file-open,guest-file-close,guest-file-read,guest-file-write,guest-file-seek,guest-file-flush,guest-exec,guest-exec-status -F/etc/qemu-ga/fsfreeze-hook
+
+Apr 05 09:21:34 localhost.localdomain systemd[1]: Started QEMU Guest Agent.
+
+============================================================
+SSH / CONSOLE
+============================================================
+$ sshd -T
+port 22
+addressfamily any
+listenaddress [::]:22
+listenaddress 0.0.0.0:22
+usepam yes
+logingracetime 120
+x11displayoffset 10
+x11maxdisplays 1000
+maxauthtries 6
+maxsessions 10
+clientaliveinterval 0
+clientalivecountmax 3
+streamlocalbindmask 0177
+permitrootlogin yes
+ignorerhosts yes
+ignoreuserknownhosts no
+hostbasedauthentication no
+hostbasedusesnamefrompacketonly no
+pubkeyauthentication yes
+kerberosauthentication no
+kerberosorlocalpasswd yes
+kerberosticketcleanup yes
+kerberosuniqueccache no
+kerberosusekuserok yes
+gssapienablek5users no
+gssapiauthentication yes
+gssapicleanupcredentials no
+gssapikeyexchange no
+gssapistrictacceptorcheck yes
+gssapistorecredentialsonrekey no
+gssapikexalgorithms gss-group14-sha256-,gss-group16-sha512-,gss-nistp256-sha256-,gss-curve25519-sha256-,gss-group14-sha1-,gss-gex-sha1-
+passwordauthentication no
+kbdinteractiveauthentication no
+challengeresponseauthentication no
+printmotd no
+printlastlog yes
+x11forwarding yes
+x11uselocalhost yes
+permittty yes
+permituserrc yes
+strictmodes yes
+tcpkeepalive yes
+permitemptypasswords no
+compression yes
+gatewayports no
+usedns no
+allowtcpforwarding yes
+allowagentforwarding yes
+disableforwarding no
+allowstreamlocalforwarding yes
+streamlocalbindunlink no
+fingerprinthash SHA256
+exposeauthinfo no
+pidfile /var/run/sshd.pid
+xauthlocation /usr/bin/xauth
+ciphers chacha20-poly1305@openssh.com,aes128-ctr,aes192-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com
+macs umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1
+banner none
+forcecommand none
+chrootdirectory none
+trustedusercakeys none
+revokedkeys none
+authorizedprincipalsfile none
+versionaddendum none
+authorizedkeyscommand none
+authorizedkeyscommanduser none
+authorizedprincipalscommand none
+authorizedprincipalscommanduser none
+hostkeyagent none
+kexalgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256,diffie-hellman-group14-sha1
+casignaturealgorithms ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+hostbasedacceptedkeytypes ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+hostkeyalgorithms ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+pubkeyacceptedkeytypes ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+loglevel INFO
+syslogfacility AUTHPRIV
+authorizedkeysfile .ssh/authorized_keys
+hostkey /etc/ssh/ssh_host_rsa_key
+hostkey /etc/ssh/ssh_host_ecdsa_key
+hostkey /etc/ssh/ssh_host_ed25519_key
+acceptenv LANG
+acceptenv LC_CTYPE
+acceptenv LC_NUMERIC
+acceptenv LC_TIME
+acceptenv LC_COLLATE
+acceptenv LC_MONETARY
+acceptenv LC_MESSAGES
+acceptenv LC_PAPER
+acceptenv LC_NAME
+acceptenv LC_ADDRESS
+acceptenv LC_TELEPHONE
+acceptenv LC_MEASUREMENT
+acceptenv LC_IDENTIFICATION
+acceptenv LC_ALL
+acceptenv LANGUAGE
+acceptenv XMODIFIERS
+authenticationmethods any
+subsystem sftp /usr/libexec/openssh/sftp-server
+maxstartups 10:30:100
+permittunnel no
+ipqos af21 cs1
+rekeylimit 0 0
+permitopen any
+permitlisten any
+permituserenvironment no
+$ grep -RinE 'ttyS0|console=' /etc/default/grub /boot/grub2/grub.cfg /boot/grub/grub.cfg /boot/efi/EFI 2>/dev/null
+/etc/default/grub:6:GRUB_CMDLINE_LINUX="console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto"
+/boot/grub2/grub.cfg:140:  set kernelopts="root=UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 ro console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto "
+/boot/efi/EFI/rocky/grubenv:3:kernelopts=root=UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 ro console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto
+/boot/efi/EFI/rocky/grub.cfg:140:  set kernelopts="root=UUID=4990ceaa-f9c5-4fa5-abef-198724d21f40 ro console=ttyS0,115200n8 no_timer_check net.ifnames=0 crashkernel=auto "
+
+============================================================
+VIRTUALIZATION
+============================================================
+$ systemd-detect-virt
+kvm
+$ lsmod | egrep 'virtio|xen'
+virtio_gpu             73728  0
+drm_shmem_helper       16384  1 virtio_gpu
+drm_kms_helper        184320  3 virtio_gpu
+drm                   602112  4 drm_kms_helper,drm_shmem_helper,virtio_gpu
+virtio_balloon         20480  0
+virtio_net             61440  0
+virtio_console         36864  1
+net_failover           24576  1 virtio_net
+virtio_blk             20480  6
+
+============================================================
+REPAIR COMMAND HINTS
+============================================================
+Debian/Ubuntu initramfs rebuild: update-initramfs -u -k all
+RHEL/Rocky/Alma/CentOS initramfs rebuild: dracut -f --regenerate-all
+Debian/Ubuntu grub rebuild BIOS: grub-mkconfig -o /boot/grub/grub.cfg
+RHEL/Rocky/Alma/CentOS grub rebuild BIOS: grub2-mkconfig -o /boot/grub2/grub.cfg
+UEFI grub path varies by distro/vendor; use the GRUB_CFG path collected above
+[rocky@rocky8 ~]$
+
+

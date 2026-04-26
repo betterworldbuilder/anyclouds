@@ -1,2 +1,2 @@
 severity,code,scope,message
-WARN,duplicate_server_name,flavormap,"Included server_name 'u24-BackEnd-2' appears multiple times at rows [3, 4]; name collisions can break deployment"
+INFO,validation_passed,all,No issues found

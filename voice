@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# voice — record mic audio and transcribe with Whisper (local)
+# Usage: ./voice [seconds]   (default: record until Ctrl+C)
+# Env:   WHISPER_MODEL=base|small|medium|large  (default: base)
+#
+# Dependencies:
+#   sudo apt install pulseaudio-utils
+#   pipx install openai-whisper
+
+set -euo pipefail
+
+check_dep() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "Error: '$1' not found. $2" >&2
+        exit 1
+    fi
+}
+
+check_dep parec   "Install: sudo apt install pulseaudio-utils"
+check_dep whisper "Install: pipx install openai-whisper && pipx ensurepath"
+
+# WSLg PulseAudio socket
+export PULSE_SERVER=unix:/mnt/wslg/PulseServer
+
+MODEL="${WHISPER_MODEL:-base}"
+DURATION="${1:-0}"
+TMPFILE=$(mktemp /tmp/voice_XXXXXX.wav)
+TXTFILE="/tmp/$(basename "$TMPFILE" .wav).txt"
+
+cleanup() { rm -f "$TMPFILE" "$TXTFILE"; }
+trap cleanup EXIT
+
+if [[ "$DURATION" -gt 0 ]]; then
+    echo "Recording for ${DURATION}s... (Ctrl+C to stop early)"
+else
+    echo "Recording... press Ctrl+C to stop."
+fi
+
+# Ignore SIGINT so Ctrl+C stops parec but script continues to transcribe
+PAREC_ARGS=(--channels=1 --rate=16000 --format=s16le --file-format=wav)
+trap '' INT
+if [[ "$DURATION" -gt 0 ]]; then
+    timeout "$DURATION" parec "${PAREC_ARGS[@]}" "$TMPFILE" 2>/dev/null || true
+else
+    parec "${PAREC_ARGS[@]}" "$TMPFILE" 2>/dev/null || true
+fi
+trap - INT
+
+echo ""
+
+if [[ ! -s "$TMPFILE" ]]; then
+    echo "No audio captured." >&2
+    exit 1
+fi
+
+echo "Transcribing with whisper (model: $MODEL)..."
+whisper "$TMPFILE" \
+    --model "$MODEL" \
+    --language en \
+    --output_format txt \
+    --output_dir /tmp \
+    --fp16 False \
+    2>/dev/null
+
+echo ""
+if [[ -f "$TXTFILE" ]]; then
+    cat "$TXTFILE"
+else
+    echo "No transcription output found." >&2
+    exit 1
+fi

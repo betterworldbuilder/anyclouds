@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import base64
 import csv
 import ipaddress
 import json
@@ -887,6 +888,219 @@ def parse_openrc_exports(text: str) -> Dict[str, str]:
             value = value[1:-1]
         exports[key] = value
     return exports
+
+
+def parse_json_mixed_output(raw: str) -> Any:
+    """
+    Parse JSON from tools that may print extra non-JSON lines before/after the
+    actual payload (warnings, banners, debug lines).
+    """
+    text = (raw or "").strip()
+    if not text:
+        raise json.JSONDecodeError("empty output", text, 0)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch not in "[{":
+            continue
+        try:
+            obj, _end = decoder.raw_decode(text[i:])
+            return obj
+        except json.JSONDecodeError:
+            continue
+    # Re-raise with original content context for callers to log.
+    return json.loads(text)
+
+
+def _truthy(v: Any) -> bool:
+    return str(v).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _rackspace_v2_auth(username: str, api_key: str, tenant_id: str, timeout_sec: int = 30) -> Tuple[str, dict]:
+    payload = {
+        "auth": {
+            "RAX-KSKEY:apiKeyCredentials": {"username": username, "apiKey": api_key},
+            "tenantId": tenant_id,
+        }
+    }
+    proc = subprocess.run(
+        [
+            "curl", "-sS", "-k", "-X", "POST",
+            "https://identity.api.rackspacecloud.com/v2.0/tokens",
+            "-H", "Content-Type: application/json",
+            "-H", "Accept: application/json",
+            "-d", json.dumps(payload),
+        ],
+        cwd=str(BASE_DIR),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=timeout_sec,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"Identity auth failed rc={proc.returncode}: {(proc.stderr or '')[:300]}")
+    body = parse_json_mixed_output(proc.stdout or "")
+    token = (((body or {}).get("access") or {}).get("token") or {}).get("id", "")
+    if not token:
+        raise RuntimeError("Identity auth succeeded but token was missing")
+    return str(token), body
+
+
+def _extract_glance_endpoints_from_catalog(auth_body: dict, wanted_region: str) -> List[Tuple[str, str]]:
+    wanted = (wanted_region or "ALL").strip().upper()
+    out: List[Tuple[str, str]] = []
+    for svc in ((auth_body or {}).get("access") or {}).get("serviceCatalog", []) or []:
+        stype = str((svc or {}).get("type", "")).strip().lower()
+        sname = str((svc or {}).get("name", "")).strip().lower()
+        if stype not in {"image", "cloudimages"} and sname not in {"cloudimages", "image"}:
+            continue
+        for ep in (svc or {}).get("endpoints", []) or []:
+            region = str((ep or {}).get("region", "")).strip().upper()
+            url = str((ep or {}).get("publicURL", "") or (ep or {}).get("url", "")).strip().rstrip("/")
+            if not url:
+                continue
+            if wanted != "ALL" and region != wanted:
+                continue
+            out.append((region or "UNK", url))
+    # de-dupe while preserving order
+    seen = set()
+    uniq: List[Tuple[str, str]] = []
+    for r, u in out:
+        k = (r, u)
+        if k in seen:
+            continue
+        seen.add(k)
+        uniq.append((r, u))
+    return uniq
+
+
+@app.post("/api/image_migrator/images/scan")
+def image_migrator_scan_images():
+    req = request.get_json(silent=True) or {}
+    ospc_user = str(req.get("ospc_username") or "").strip()
+    ospc_key = str(req.get("ospc_apikey") or "").strip()
+    ospc_tenant = str(req.get("ospc_tenant") or req.get("ospc_account_id") or "").strip()
+    region = str(req.get("region") or req.get("ospc_region") or "ALL").strip().upper() or "ALL"
+
+    if not (ospc_user and ospc_key and ospc_tenant):
+        return jsonify({"error": "Missing OSPC credentials", "rows": [], "summary": {}, "logs": []}), 400
+
+    logs: List[str] = [f"[INFO] Private snapshot scan started (region={region})"]
+    try:
+        token, auth_body = _rackspace_v2_auth(ospc_user, ospc_key, ospc_tenant)
+        logs.append("[OK] Rackspace Identity v2 auth succeeded")
+        endpoints = _extract_glance_endpoints_from_catalog(auth_body, region)
+        if not endpoints:
+            return jsonify({
+                "error": f"No Glance endpoint found for region={region}",
+                "rows": [],
+                "summary": {},
+                "logs": logs,
+            }), 400
+
+        rows: List[Dict[str, Any]] = []
+        seen_ids: set = set()
+        skipped_public_provider = 0
+        excluded_private = 0
+        migratable = 0
+
+        for ep_region, ep_url in endpoints:
+            logs.append(f"[INFO] Querying Glance endpoint {ep_region}: {ep_url}")
+            list_url = f"{ep_url}/images?visibility=private&limit=1000"
+            proc = subprocess.run(
+                [
+                    "curl", "-sS", "-k", list_url,
+                    "-H", f"X-Auth-Token: {token}",
+                    "-H", "Accept: application/json",
+                    "-H", f"X-Auth-Project-Id: {ospc_tenant}",
+                ],
+                cwd=str(BASE_DIR),
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            if proc.returncode != 0:
+                logs.append(f"[WARN] Endpoint query failed rc={proc.returncode}: {(proc.stderr or '')[:220]}")
+                continue
+            payload = parse_json_mixed_output(proc.stdout or "{}")
+            images = (payload or {}).get("images") if isinstance(payload, dict) else []
+            if not isinstance(images, list):
+                images = []
+            logs.append(f"[INFO] {ep_region}: {len(images)} private images returned")
+
+            for img in images:
+                iid = str((img or {}).get("id", "")).strip()
+                if not iid or iid in seen_ids:
+                    continue
+                seen_ids.add(iid)
+
+                visibility = str((img or {}).get("visibility", "")).strip().lower()
+                protected = _truthy((img or {}).get("protected", False))
+                status = str((img or {}).get("status", "")).strip().lower()
+                props = (img or {}).get("properties") if isinstance((img or {}).get("properties"), dict) else {}
+                source_vm = str(
+                    props.get("instance_name")
+                    or props.get("source_vm_name")
+                    or props.get("vm_name")
+                    or ""
+                ).strip()
+                size_bytes = int((img or {}).get("size") or 0)
+                size_gb = round(size_bytes / (1024 ** 3), 2) if size_bytes > 0 else 0
+
+                ok = True
+                reason = "downloadable saved image"
+                if visibility != "private":
+                    ok = False
+                    reason = f"visibility={visibility or 'unknown'} (not private)"
+                    skipped_public_provider += 1
+                elif protected:
+                    ok = False
+                    reason = "image is protected/provider-managed"
+                    excluded_private += 1
+                elif status != "active":
+                    ok = False
+                    reason = f"image status={status or 'unknown'}"
+                    excluded_private += 1
+
+                if ok:
+                    migratable += 1
+
+                rows.append({
+                    "snapshot_name": str((img or {}).get("name", "")).strip(),
+                    "snapshot_id": iid,
+                    "source_vm_name": source_vm,
+                    "created_at": str((img or {}).get("created_at", "")),
+                    "updated_at": str((img or {}).get("updated_at", "")),
+                    "disk_format": str((img or {}).get("disk_format", "")),
+                    "size_gb": size_gb,
+                    "visibility": visibility,
+                    "protected": protected,
+                    "status": status,
+                    "migratable": ok,
+                    "reason": reason,
+                    "region": ep_region,
+                })
+
+        rows.sort(key=lambda r: str(r.get("updated_at") or r.get("created_at") or ""), reverse=True)
+        summary = {
+            "private_images_found": len(rows),
+            "migratable_snapshots": migratable,
+            "excluded_private_images": excluded_private,
+            "skipped_public_provider_images": skipped_public_provider,
+        }
+        logs.append(
+            f"[OK] Scan complete: total={summary['private_images_found']} "
+            f"migratable={summary['migratable_snapshots']}"
+        )
+        return jsonify({"rows": rows, "summary": summary, "logs": logs})
+    except Exception as exc:
+        logs.append(f"[ERROR] Scan failed: {exc}")
+        return jsonify({"error": str(exc), "rows": [], "summary": {}, "logs": logs}), 500
 
 
 def openstack_json(env: Dict[str, str], args: List[str], timeout_sec: int = 45) -> Any:
@@ -2575,7 +2789,21 @@ def image_migrator_ui():
             entry = _cache_map_file(key, files[0])
             if entry:
                 preloaded[key] = entry   # {'filename': '...', 'content': '...'}
-    return render_template("image_migrator.html", preloaded_maps=preloaded)
+    _jh = {'jumphost_ip': '', 'jumphost_user': 'ubuntu', 'ssh_key': '~/.ssh/id_rsa'}
+    try:
+        import json as _json
+        _cache_path = os.path.join(os.path.dirname(__file__), '.jumphost_cache.json')
+        if os.path.exists(_cache_path):
+            _jh.update(_json.load(open(_cache_path)))
+    except Exception:
+        pass
+    return render_template(
+        "image_migrator.html",
+        preloaded_maps=preloaded,
+        default_jh_ip=getattr(app, '_last_jumphost_ip', '') or os.environ.get('NBD_JUMPHOST_IP', '') or _jh['jumphost_ip'],
+        default_jh_user=getattr(app, '_last_jumphost_user', '') or os.environ.get('NBD_JUMPHOST_USER', '') or _jh['jumphost_user'],
+        default_jh_key=os.environ.get('NBD_JUMPHOST_KEY', '') or _jh['ssh_key'],
+    )
 
 
 @app.get("/dashboard/")
@@ -4324,7 +4552,7 @@ def run_k8s_deploy():
         return jsonify({"status": "error", "error": "Unknown deployment type"}), 400
 
     try:
-        proc = subprocess.run(cmd, env=env, shell=True, capture_output=True, text=True, timeout=300)
+        proc = subprocess.run(cmd, env=env, shell=True, capture_output=True, text=True, timeout=600)
         output = proc.stdout + "\n" + proc.stderr
         if proc.returncode == 0:
             return jsonify({"status": "success", "message": output})
@@ -4657,6 +4885,7 @@ import sys
 import subprocess
 
 ACTIVE_MIGRATOR_PROCESSES = set()
+ACTIVE_MIGRATOR_PROCESSES_BY_SERVER = {}
 
 # ── Server-side map file cache (avoid disk read on every page refresh) ────────
 # Structure: { 'key': {'path': str, 'mtime': float, 'filename': str, 'content': str} }
@@ -4712,7 +4941,7 @@ def get_latest_maps():
 
 @app.post("/api/image_migrator/stop")
 def stop_image_migrator():
-    global ACTIVE_MIGRATOR_PROCESSES
+    global ACTIVE_MIGRATOR_PROCESSES, ACTIVE_MIGRATOR_PROCESSES_BY_SERVER
     if ACTIVE_MIGRATOR_PROCESSES:
         for p in list(ACTIVE_MIGRATOR_PROCESSES):
             try:
@@ -4726,12 +4955,45 @@ def stop_image_migrator():
             except Exception:
                 pass
         ACTIVE_MIGRATOR_PROCESSES.clear()
+        ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.clear()
         return jsonify({"status": "stopped", "message": "All migration processes and child processes killed."})
     return jsonify({"status": "idle", "message": "No active migration process found."})
+
+
+@app.post("/api/image_migrator/kill_one")
+def kill_one_image_migrator():
+    global ACTIVE_MIGRATOR_PROCESSES, ACTIVE_MIGRATOR_PROCESSES_BY_SERVER
+    req = request.get_json(force=True, silent=True) or {}
+    server_name = (req.get("server_name") or "").strip()
+    if not server_name:
+        return jsonify({"error": "server_name required"}), 400
+
+    process = ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.get(server_name)
+    if not process:
+        return jsonify({"status": "idle", "message": f"No active migration process found for {server_name}."})
+
+    try:
+        import os, signal
+        try:
+            pgid = os.getpgid(process.pid)
+            os.killpg(pgid, signal.SIGTERM)
+        except Exception:
+            pass
+        try:
+            process.kill()
+        except Exception:
+            pass
+    finally:
+        ACTIVE_MIGRATOR_PROCESSES.discard(process)
+        ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(server_name, None)
+
+    return jsonify({"status": "stopped", "message": f"Kill signal sent for {server_name}."})
+
+
 @app.post("/api/image_migrator/run")
 def run_image_migrator():
     req = request.get_json(force=True, silent=True) or {}
-    script_path = "/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-4.0.lastok1504/ospc2Flex-Image-migtool/ospc2flex_image_migrator.py"
+    script_path = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_image_migrator.py")
 
     cmd = ["python3", script_path]
     
@@ -4778,7 +5040,7 @@ def run_image_migrator():
                             "username": req.get('ospc_username'),
                             "apiKey":   req.get('ospc_apikey'),
                         }}},
-                        timeout=15
+                        timeout=90
                     )
                     _data = _resp.json()
                     _token = _data['access']['token']['id']
@@ -4856,7 +5118,7 @@ def run_image_migrator():
     cmd.append("--remote-export")
 
     # SSH credentials for the processing host (jumphost) — always ubuntu, never per-VM OS user
-    ssh_key = req.get('process_ssh_key') or req.get('ssh_key_path')
+    ssh_key = os.path.expanduser((req.get('process_ssh_key') or req.get('ssh_key_path') or '').strip())
     ssh_usr = req.get('process_ssh_user') or 'ubuntu'
     if ssh_key: cmd.extend(["--ssh-key-path", ssh_key])
     if ssh_usr: cmd.extend(["--ssh-user", ssh_usr])
@@ -4873,6 +5135,12 @@ def run_image_migrator():
     # origin_vm_user = per-VM OS user (rocky, almalinux, etc.) used to SSH into origin VM in Mode 3
     origin_user = req.get('origin_vm_user') or req.get('ssh_user') or ssh_usr
     cmd.extend(["--origin-vm-user", origin_user])
+    origin_vm_ssh_key = os.path.expanduser((req.get('origin_vm_ssh_key') or req.get('origin_vm_key') or '').strip())
+    origin_vm_password = (req.get('origin_vm_password') or '').strip()
+    if origin_vm_ssh_key:
+        cmd.extend(["--origin-vm-ssh-key-path", origin_vm_ssh_key])
+    if origin_vm_password:
+        cmd.extend(["--origin-vm-password", origin_vm_password])
 
     # Production Mode: pass the per-VM origin IP separately so migrator knows to SSH-pipe from it
     origin_vm_ip_override = (req.get('source_server_ip') or req.get('origin_vm_ip') or '').strip()
@@ -4908,11 +5176,23 @@ def run_image_migrator():
         if req.get('clean_hosts_file'): cmd.append("--clean-hosts-file")
         if req.get('systemd_services'): cmd.extend(["--systemd-services", req.get('systemd_services')])
 
-    safe_cmd_str = " ".join(shlex.quote(str(c)) for c in cmd)
+    safe_cmd_parts = []
+    _mask_next = False
+    for part in cmd:
+        part_s = str(part)
+        if _mask_next:
+            safe_cmd_parts.append(shlex.quote("********"))
+            _mask_next = False
+            continue
+        safe_cmd_parts.append(shlex.quote(part_s))
+        if part_s in {"--origin-vm-password"}:
+            _mask_next = True
+    safe_cmd_str = " ".join(safe_cmd_parts)
     cwd_dir = os.path.dirname(script_path)
+    server_name = str(req.get('server_name') or '').strip()
     
     def generate():
-        global ACTIVE_MIGRATOR_PROCESSES
+        global ACTIVE_MIGRATOR_PROCESSES, ACTIVE_MIGRATOR_PROCESSES_BY_SERVER
         yield f"data: --- EXECUTING ---\n\n"
         yield f"data: {safe_cmd_str}\n\n"
         yield f"data: \n\n"
@@ -4923,6 +5203,8 @@ def run_image_migrator():
                 cwd=cwd_dir, text=True, bufsize=1, start_new_session=True
             )
             ACTIVE_MIGRATOR_PROCESSES.add(process)
+            if server_name:
+                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[server_name] = process
             for line in iter(process.stdout.readline, ''):
                 if not line: break
                 yield f"data: {line.rstrip()}\n\n"
@@ -4934,6 +5216,8 @@ def run_image_migrator():
         finally:
             if process in ACTIVE_MIGRATOR_PROCESSES:
                 ACTIVE_MIGRATOR_PROCESSES.remove(process)
+            if server_name and ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.get(server_name) is process:
+                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(server_name, None)
             yield "data: [DONE]\n\n"
             
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
@@ -4963,8 +5247,13 @@ _NBD_OS_DEFAULTS = {
     'alma8':    {'src_user': 'almalinux', 'flex_user': 'almalinux', 'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
     'almalinux':{'src_user': 'almalinux', 'flex_user': 'almalinux', 'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
     'centos7':  {'src_user': 'centos',    'flex_user': 'centos',    'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
+    'centos8':  {'src_user': 'centos',    'flex_user': 'centos',    'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
+    'centos9':  {'src_user': 'centos',    'flex_user': 'centos',    'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
+    'centosstream9': {'src_user': 'centos', 'flex_user': 'centos',  'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
     'centos':   {'src_user': 'centos',    'flex_user': 'centos',    'nbd': 1, 'src_port': 10812, 'tun_port': 10822},
+    'rhel7':    {'src_user': 'ec2-user',  'flex_user': 'ec2-user',  'nbd': 2, 'src_port': 10813, 'tun_port': 10823},
     'rhel8':    {'src_user': 'ec2-user',  'flex_user': 'ec2-user',  'nbd': 2, 'src_port': 10813, 'tun_port': 10823},
+    'rhel9':    {'src_user': 'ec2-user',  'flex_user': 'ec2-user',  'nbd': 2, 'src_port': 10813, 'tun_port': 10823},
     'rhel':     {'src_user': 'ec2-user',  'flex_user': 'ec2-user',  'nbd': 2, 'src_port': 10813, 'tun_port': 10823},
 }
 
@@ -4976,7 +5265,11 @@ set -euo pipefail
 
 LABEL=$1; SRC_IP=$2; SRC_USER=$3; OS_TYPE=$4; FLEX_USER=$5
 NBD_DEV=$6; SRC_PORT=$7; TUN_PORT=$8
-SSH_KEY=${9:-~/.ssh/id_rsa}
+SSH_KEY=${9:-/tmp/ospc2flex_origin_key.pem}
+SRC_PASS_B64=${10:-}
+FORCE_DD=${11:-0}
+SRC_PASS=""
+[ -n "$SRC_PASS_B64" ] && SRC_PASS=$(printf '%s' "$SRC_PASS_B64" | base64 -d 2>/dev/null || true)
 
 source /tmp/ospc2flex_flex.sh
 WORK=/mnt/migration/ospc2flex_image
@@ -4986,7 +5279,8 @@ EXT_NET=82be3711-cd97-4f7c-8bbd-59f5524a949e
 KEYPAIR=laptopubuntu24
 DATE=$(date +%Y%m%d-%H%M)
 LOG=/tmp/mig_${LABEL}.log
-QCOW=${WORK}/${LABEL}.qcow2
+# [CACHE BUST 2026-04-22 v4] Sync variable-based output capture for NBD checks
+QCOW=${WORK}/${LABEL}-${SRC_IP}.qcow2
 MNT=/tmp/mnt_${LABEL}_$$
 IMG=ospc2flex-${LABEL}-${DATE}
 VMNAME=${IMG}
@@ -4996,6 +5290,62 @@ SUDO=""; [ "$SRC_USER" != "root" ] && SUDO="sudo" || true
 > "$LOG"
 TS() { TZ='Asia/Bangkok' date '+%H:%M:%S'; }
 log() { echo "[$(TS)][$LABEL] $*"; }
+# Global auth mode (auto-detected in Step 0.6)
+AUTH_MODE=""
+USE_LEGACY_SSH="0"
+src_ssh_as() {
+  local user_host="$1"; shift
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15)
+  if [ "$USE_LEGACY_SSH" = "1" ]; then
+    opts+=(-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa)
+  fi
+  
+  # Try forcing based on globally detected AUTH_MODE
+  if [ "$AUTH_MODE" = "pass" ]; then
+    sshpass -p "$SRC_PASS" ssh "${opts[@]}" -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$user_host" "$@"
+    return $?
+  elif [ "$AUTH_MODE" = "key" ]; then
+    local cmd=(ssh "${opts[@]}" -o BatchMode=yes)
+    [ -n "$SSH_KEY" ] && cmd+=(-i "$SSH_KEY")
+    cmd+=("$user_host")
+    "${cmd[@]}" "$@"
+    return $?
+  fi
+
+  # If AUTH_MODE not set yet (during step 0.5 detection), try both blindly but safely (informational only)
+  if [ -n "$SRC_PASS" ]; then
+    set +e
+    sshpass -p "$SRC_PASS" ssh "${opts[@]}" -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$user_host" "$@" 2>/dev/null
+    local c=$?
+    set -e
+    [ $c -eq 0 ] && return 0
+  fi
+  local cmd=(ssh "${opts[@]}" -o BatchMode=yes)
+  [ -n "$SSH_KEY" ] && cmd+=(-i "$SSH_KEY")
+  cmd+=("$user_host")
+  set +e; "${cmd[@]}" "$@" 2>/dev/null; local c=$?; set -e
+  return $c
+}
+src_ssh() {
+  src_ssh_as "${SRC_USER}@${SRC_IP}" "$@"
+}
+src_ssh_tunnel() {
+  local forward_spec="$1"
+  local user_host="${2:-${SRC_USER}@${SRC_IP}}"
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o Ciphers=aes128-gcm@openssh.com -L "$forward_spec" -N -f)
+  if [ "$USE_LEGACY_SSH" = "1" ]; then
+    opts+=(-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa)
+  fi
+  
+  if [ "$AUTH_MODE" = "pass" ]; then
+    sshpass -p "$SRC_PASS" ssh "${opts[@]}" -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$user_host"
+  else
+    local cmd=(ssh "${opts[@]}" -o BatchMode=yes)
+    [ -n "$SSH_KEY" ] && cmd+=(-i "$SSH_KEY")
+    cmd+=("$user_host")
+    "${cmd[@]}"
+  fi
+}
 
 log "=== START ${SRC_USER}@${SRC_IP} OS=${OS_TYPE} NBD=${NBD_DEV} ==="
 
@@ -5009,34 +5359,81 @@ pkill -f "ssh.*${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true
 pkill -f "ssh.*${SRC_IP}.*dd if=" 2>/dev/null || true
 # Kill orphaned repair scripts and old workers for this label (exclude own PID)
 pkill -f "ospc2flex_offline_repair.*${LABEL}" 2>/dev/null || true
+pkill -f "openstack.*${LABEL}" 2>/dev/null || true
 pgrep -f "mig_worker_v4.*${LABEL}" 2>/dev/null | grep -v "^$$\$" | xargs -r kill 2>/dev/null || true
+# Kill any process holding a write lock on the local qcow2 file (stale qemu-nbd from a previous run)
+sudo fuser -k "$QCOW" 2>/dev/null || true
+sleep 1
+sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
+sleep 1
 # Kill qemu-nbd on source VM (from previous runs)
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=5 "$SRC_USER@$SRC_IP" \
+src_ssh \
   "$SUDO fuser -k ${SRC_PORT}/tcp 2>/dev/null || true" 2>/dev/null || true
 # Check if we can resume from a previously converted image
 SKIP_SYNC=0
 # === RESUME LOGIC ===
-# If the .converted sentinel exists, it means the qemu-img convert fully finished.
-if [ -f "${QCOW}.converted" ]; then
+# Skip Stage 3 if a valid qcow2 already exists (>100MB = not a partial/empty file)
+if [ -f "${QCOW}.converted" ] && [ -f "$QCOW" ]; then
     log "=========================================================="
     log "[+] Found fully completed ${QCOW}.converted. RESUMING directly to Step 4 (Repair)."
     log "=========================================================="
     SKIP_SYNC=1
+elif [ -f "${QCOW}.converted" ] && [ ! -f "$QCOW" ]; then
+    log "[!] Sentinel ${QCOW}.converted found but $QCOW is missing — removing sentinel, re-running full sync."
+    rm -f "${QCOW}.converted"
 elif [ -f "$QCOW" ]; then
-    log "[-] Found incomplete $QCOW. Removing to ensure clean download..."
-    rm -f "$QCOW"
+    _existing_sz=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
+    if [ "$_existing_sz" -gt 100000000 ]; then
+        log "=========================================================="
+        log "[+] Found existing $QCOW ($((_existing_sz/1024/1024))MB) — skipping Stage 3."
+        log "=========================================================="
+        SKIP_SYNC=1
+    else
+        log "[-] Found incomplete $QCOW ($_existing_sz bytes) — removing for clean download..."
+        rm -f "$QCOW"
+    fi
 fi
 sleep 2
 log "  Stale processes killed"
 # Proceeding without deleting old FLEX VM or image (preserving history)
 
+# === SKIP_REPAIR: always re-run repair when qcow2 exists ===
+# If .repaired sentinel exists: delete it so repair runs fresh, and clear stale image_id
+SKIP_REPAIR=0
+if [ "$SKIP_SYNC" -eq 1 ] && [ -f "${QCOW}.repaired" ]; then
+    log "[+] ${QCOW}.repaired found — deleting sentinel and re-running Stage 4 repair"
+    rm -f "${QCOW}.repaired"
+    rm -f "${QCOW}.image_id"
+fi
+
+# === SKIP_UPLOAD: if image already uploaded and active in Glance, reuse it ===
+SKIP_UPLOAD=0
+NEW_ID=""
+if [ "$SKIP_SYNC" -eq 1 ] && [ -f "${QCOW}.image_id" ]; then
+    _cached_id=$(cat "${QCOW}.image_id" 2>/dev/null | tr -d '[:space:]')
+    if [ -n "$_cached_id" ]; then
+        _cached_status=$(openstack image show "$_cached_id" -f value -c status 2>/dev/null || true)
+        if [ "$_cached_status" = "active" ]; then
+            log "[+] Reusing existing Glance image $_cached_id (status=active) — skipping upload"
+            NEW_ID="$_cached_id"
+            SKIP_UPLOAD=1
+        else
+            log "[-] Cached image $_cached_id status=$_cached_status — will re-upload"
+            rm -f "${QCOW}.image_id"
+        fi
+    fi
+fi
+
+# Step 0.5/0.6: Only SSH to source if we actually need to pull the disk image
+if [ "$SKIP_SYNC" -eq 0 ]; then
+
 # Step 0.5: Auto-detect OS from source VM (try multiple users if needed)
 log "Step 0.5: Auto-detecting OS from source ${SRC_IP}..."
 DETECTED_OS=""
 WORKING_USER=""
-for _TRY_USER in "$SRC_USER" root ubuntu debian almalinux centos; do
-  DETECTED_OS=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=8 "$_TRY_USER@$SRC_IP" \
-    "cat /etc/os-release 2>/dev/null" 2>/dev/null || true)
+for _TRY_USER in "$SRC_USER" root ubuntu debian almalinux centos ec2-user; do
+  DETECTED_OS=$(src_ssh_as "$_TRY_USER@$SRC_IP" \
+    "cat /etc/os-release 2>/dev/null || cat /etc/redhat-release 2>/dev/null || echo ssh-ok" 2>/dev/null || true)
   if [ -n "$DETECTED_OS" ]; then
     WORKING_USER="$_TRY_USER"
     break
@@ -5065,6 +5462,7 @@ if [ -n "$DETECTED_OS" ]; then
   if [ "$WORKING_USER" != "$SRC_USER" ]; then
     log "  SSH user corrected: ${WORKING_USER} (was: ${SRC_USER})"
     SRC_USER="$WORKING_USER"
+    SUDO=""; [ "$SRC_USER" != "root" ] && SUDO="sudo" || true
   fi
 else
   # Fallback: guess OS from server name (LABEL)
@@ -5075,7 +5473,8 @@ else
     *rocky*)     FALLBACK_TYPE="rocky8";   SRC_USER="root" ;;
     *alma*)      FALLBACK_TYPE="alma9";    SRC_USER="almalinux" ;;
     *centos*)    FALLBACK_TYPE="centos7";  SRC_USER="centos" ;;
-    *rhel*)      FALLBACK_TYPE="rhel8";    SRC_USER="root" ;;
+    *redhat*)    FALLBACK_TYPE="rhel8";    SRC_USER="ec2-user" ;;
+    *rhel*)      FALLBACK_TYPE="rhel8";    SRC_USER="ec2-user" ;;
     *ubuntu*)    FALLBACK_TYPE="ubuntu24"; SRC_USER="ubuntu" ;;
   esac
   if [ -n "$FALLBACK_TYPE" ] && [ "$FALLBACK_TYPE" != "$OS_TYPE" ]; then
@@ -5085,12 +5484,104 @@ else
     log "  OS detection failed — keeping ${OS_TYPE}"
   fi
 fi
+# Step 0.6: Enforce SSH connectivity and pin auth method
+log "Step 0.6: Validating SSH connectivity with user $SRC_USER..."
+AUTH_MODE=""
+USE_LEGACY_SSH="0"
 
-# Step 1: qemu-nbd on source (auto-install qemu-utils if missing)
+check_auth() {
+  local legacy_flag="$1"
+  local legacy_opts=""
+  [ "$legacy_flag" = "1" ] && legacy_opts="-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
+  
+  if [ -n "$SRC_PASS" ] && sshpass -p "$SRC_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$SRC_USER@$SRC_IP" "echo ssh-ok" 2>/dev/null | grep -q "ssh-ok"; then
+    AUTH_MODE="pass"
+    USE_LEGACY_SSH=$legacy_flag
+    return 0
+  elif ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes "$SRC_USER@$SRC_IP" "echo ssh-ok" 2>/dev/null | grep -q "ssh-ok"; then
+    AUTH_MODE="key"
+    USE_LEGACY_SSH=$legacy_flag
+    return 0
+  fi
+  return 1
+}
+
+if check_auth "0"; then
+  log "  SSH connection verified (Method: $AUTH_MODE)."
+elif check_auth "1"; then
+  log "  SSH connection verified (Method: Legacy $AUTH_MODE - RSA Fallback active)."
+else
+  log "[ERROR] SSH authentication/connectivity failed for $SRC_USER@$SRC_IP."
+  log "        Tried both Key and Password Auth."
+  log "        Are you using the correct SSH key or password on the jumphost?"
+  log "        Is the VM running? (Or is it Windows?)"
+  echo "FAIL_SSH|$LABEL" >> "$RESULTS"
+  exit 1
+fi
+log "  SSH connection verified."
+
+RAW_SZ_BYTES=$(src_ssh "${SUDO} blockdev --getsize64 /dev/xvda 2>/dev/null || ${SUDO} fdisk -s /dev/xvda 2>/dev/null | awk '{print \$1*1024}' || ${SUDO} df -B1 / | tail -1 | awk '{print \$$2}'" 2>/dev/null || echo 0)
+RAW_SZ_BYTES=$(echo "$RAW_SZ_BYTES" | tr -d '\r\n' | grep -o '^[0-9]\+')
+if [ -n "$RAW_SZ_BYTES" ] && [ "$RAW_SZ_BYTES" -gt 0 ]; then
+  RAW_SZ_GB=$((RAW_SZ_BYTES / 1024 / 1024 / 1024))
+  log "[SRC_SIZE_GB=${RAW_SZ_GB}]"
+fi
+
+# Deep Discovery Profiling
+log "  Executing Remote OS Parameter Discovery Sweep..."
+cat << 'EOFDS' > /tmp/${LABEL}_discovery.sh
+echo "=== OS VERSION ==="
+cat /etc/os-release 2>/dev/null || cat /etc/redhat-release 2>/dev/null || uname -a
+echo ""
+echo "=== RUNTIMES (SERVICES) ==="
+if command -v systemctl >/dev/null; then systemctl list-unit-files --state=enabled 2>/dev/null; else chkconfig --list 2>/dev/null | grep "3:on"; fi
+echo ""
+echo "=== CRON ==="
+crontab -l 2>/dev/null || echo "No crontab for root"
+ls -la /etc/cron.d/ 2>/dev/null
+echo ""
+echo "=== ENV ==="
+env
+echo ""
+echo "=== PACKAGES ==="
+if command -v dpkg >/dev/null; then dpkg -l | wc -l; dpkg -l | grep linux-image; else rpm -qa | wc -l; rpm -qa | grep kernel; fi
+echo ""
+echo "=== HARDWARE CONFIG & TOPOLOGY ==="
+echo "- vCPUs:"  ; nproc 2>/dev/null || cat /proc/cpuinfo | grep -c "^processor" 
+echo "- Memory:" ; free -m 2>/dev/null | grep Mem || grep MemTotal /proc/meminfo
+echo "- Disks:"  ; lsblk -o NAME,SIZE,TYPE,MOUNTPOINT 2>/dev/null || df -h
+echo ""
+echo "=== BOOT CONFIG (FSTAB & GRUB) ==="
+cat /etc/fstab | grep -v '^#' | grep -v '^$'
+echo "- Boot directory:"
+ls -l /boot/ | grep -E 'vmlinuz|initr'
+echo "- Grub CFG:"
+cat /boot/grub/grub.conf 2>/dev/null | grep -E 'kernel|root|title' || cat /boot/grub2/grub.cfg 2>/dev/null | grep -E 'linux16|menuentry'
+EOFDS
+src_ssh "bash -s" < /tmp/${LABEL}_discovery.sh > "/mnt/migration/ospc2flex_image/${LABEL}_discovery.txt" 2>/dev/null || true
+rm -f /tmp/${LABEL}_discovery.sh
+log "  Discovery payload successfully extracted: /mnt/migration/ospc2flex_image/${LABEL}_discovery.txt"
+
+fi  # end: SKIP_SYNC=0 guard for source SSH (0.5/0.6/discovery)
+
+# Step 1: qemu-nbd on source
 if [ "$SKIP_SYNC" -eq 0 ]; then
+if [ "$FORCE_DD" -eq 1 ]; then
+  log "Step 1: DD mode forced — skipping qemu-nbd entirely"
+  QSZ=0
+else
   log "Step 1: qemu-nbd on source port=${SRC_PORT}..."
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes "$SRC_USER@$SRC_IP" \
-  "command -v qemu-nbd >/dev/null 2>&1 || { echo installing-qemu-utils; $SUDO apt-get update -qq >/dev/null 2>&1; $SUDO apt-get install -y qemu-utils >/dev/null 2>&1 || $SUDO yum install -y qemu-img >/dev/null 2>&1 || true; }
+  RES=$(src_ssh \
+  "if ! command -v qemu-nbd >/dev/null 2>&1; then
+     if command -v apt-get >/dev/null 2>&1; then
+       $SUDO apt-get update -qq >/dev/null 2>&1 && $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y qemu-utils >/dev/null 2>&1 || true
+     elif command -v dnf >/dev/null 2>&1; then
+       $SUDO dnf install -y qemu-img >/dev/null 2>&1 || true
+     elif command -v yum >/dev/null 2>&1; then
+       $SUDO yum install -y qemu-img >/dev/null 2>&1 || true
+     fi
+   fi
+   command -v qemu-nbd >/dev/null 2>&1 || { echo no-qemu-nbd; exit 0; }
    $SUDO fuser -k $SRC_PORT/tcp 2>/dev/null || true; sleep 1
    SRC_DISK=\$(${SUDO} lsblk -d -n -o NAME,TYPE 2>/dev/null | awk '\$2==\"disk\"{print \"/dev/\"\$1}' | head -1)
    [ -z \"\$SRC_DISK\" ] && SRC_DISK=/dev/xvda
@@ -5098,13 +5589,20 @@ if [ "$SKIP_SYNC" -eq 0 ]; then
    $SUDO rm -f /tmp/nbd_${SRC_PORT}.log 2>/dev/null || true; $SUDO bash -c \"nohup qemu-nbd -r --port=$SRC_PORT \$SRC_DISK </dev/null >/tmp/nbd_${SRC_PORT}.log 2>&1 &\"
    sleep 3
    (nc -z localhost $SRC_PORT 2>/dev/null || ss -tlnp 2>/dev/null | grep -q :$SRC_PORT) && echo nbd-ok || (echo nbd-FAIL; cat /tmp/nbd_${SRC_PORT}.log)" \
-  2>&1 || true
-grep -q "nbd-ok" "$LOG" || { log "ERROR: qemu-nbd failed"; echo "FAIL_NBD|$LABEL" >> "$RESULTS"; exit 1; }
+  2>&1 || true)
+  echo "$RES"
+if echo "$RES" | grep -q "no-qemu-nbd"; then
+  log "  qemu-nbd not installed on source — skipping NBD, will use dd fallback"
+  QSZ=0
+elif ! echo "$RES" | grep -q "nbd-ok"; then
+  log "  [WARN] qemu-nbd failed — will try dd fallback"
+  QSZ=0
+else
 
 # Step 2: SSH tunnel
 log "Step 2: tunnel ${TUN_PORT} -> ${SRC_IP}:${SRC_PORT}..."
 pkill -f "ssh.*${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true; sleep 1
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o Ciphers=aes128-gcm@openssh.com -L "${TUN_PORT}:localhost:${SRC_PORT}" -N -f "$SRC_USER@$SRC_IP"
+src_ssh_tunnel "${TUN_PORT}:localhost:${SRC_PORT}"
 sleep 2
 nc -z localhost "$TUN_PORT" 2>/dev/null && log "  Tunnel OK" || { log "ERROR: tunnel failed"; echo "FAIL_TUNNEL|$LABEL" >> "$RESULTS"; exit 1; }
 
@@ -5117,35 +5615,45 @@ log "  qcow2 (NBD): $((QSZ/1024/1024))MB"
 if [ "$QSZ" -lt 100000000 ]; then
   # First retry: restart qemu-nbd on source (may have crashed on bad blocks) and retry NBD path
   log "  NBD convert failed -- restarting source qemu-nbd and retrying once..."
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes "$SRC_USER@$SRC_IP" \
+  RETRY_RES=$(src_ssh \
     "$SUDO fuser -k ${SRC_PORT}/tcp 2>/dev/null || true; sleep 2
      _D=\$($SUDO lsblk -d -n -o NAME,TYPE 2>/dev/null | awk '\$2==\"disk\"{print \"/dev/\"\$1}' | head -1)
      [ -z \"\$_D\" ] && _D=/dev/xvda
      $SUDO rm -f /tmp/nbd_retry_${SRC_PORT}.log 2>/dev/null || true; $SUDO bash -c \"nohup qemu-nbd -r --port=${SRC_PORT} \$_D </dev/null >/tmp/nbd_retry_${SRC_PORT}.log 2>&1 &\"
      sleep 4
      (nc -z localhost ${SRC_PORT} 2>/dev/null || ss -tlnp 2>/dev/null | grep -q :${SRC_PORT}) && echo nbd-retry-ok || echo nbd-retry-FAIL" \
-    2>&1 || true
-  if grep -q "nbd-retry-ok" "$LOG"; then
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o Ciphers=aes128-gcm@openssh.com -L "${TUN_PORT}:localhost:${SRC_PORT}" -N -f "$SRC_USER@$SRC_IP" 2>/dev/null || true
+    2>&1 || true)
+  echo "$RETRY_RES"
+  if echo "$RETRY_RES" | grep -q "nbd-retry-ok"; then
+    src_ssh_tunnel "${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true
     sleep 2
     rm -f "$QCOW"
     qemu-img convert "nbd://localhost:${TUN_PORT}/" -O qcow2 "$QCOW" 2>&1 || true
     pkill -f "ssh.*${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true
     QSZ=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
     log "  qcow2 (NBD retry): $((QSZ/1024/1024))MB"
-  fi
 fi
+fi
+fi  # close the nbd-ok / no-qemu-nbd branch
+fi  # close FORCE_DD if/else
 if [ "$QSZ" -lt 100000000 ]; then
   # Final fallback: dd conv=noerror,sync to raw file then convert — /dev/stdin not supported by qemu-img
-  log "  NBD convert failed -- falling back to dd conv=noerror,sync (bad sectors)..."
+  log "  NBD path unavailable or failed -- falling back to dd conv=noerror,sync..."
   rm -f "$QCOW"
   RAW_FILE="${WORK}/${LABEL}.raw"
   rm -f "$RAW_FILE"
-  SRC_DISK=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes "$SRC_USER@$SRC_IP" \
+  SRC_DISK=$(src_ssh \
     "lsblk -d -n -o NAME,TYPE 2>/dev/null | awk '\$2==\"disk\"{print \"/dev/\"\$1}' | head -1" 2>/dev/null || echo "")
   [ -z "$SRC_DISK" ] && SRC_DISK="/dev/xvda"
+  log "  Verifying source disk exists: $SRC_DISK"
+  if ! src_ssh "$SUDO blockdev --getsize64 $SRC_DISK >/dev/null 2>&1 || $SUDO fdisk -l $SRC_DISK >/dev/null 2>&1"; then
+    log "  [ERROR] Source disk $SRC_DISK not found or inaccessible!"
+    echo "FAIL_DISK_MISSING|$LABEL" >> "$RESULTS"
+    exit 1
+  fi
+
   log "  dd source disk: $SRC_DISK -> $RAW_FILE"
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o Ciphers=aes128-gcm@openssh.com "$SRC_USER@$SRC_IP" \
+  src_ssh \
     "$SUDO dd if=$SRC_DISK bs=4M conv=noerror,sync 2>/dev/null" > "$RAW_FILE" || true
   RAW_SZ=$(stat -c%s "$RAW_FILE" 2>/dev/null || echo 0)
   log "  raw file: $((RAW_SZ/1024/1024))MB"
@@ -5161,7 +5669,7 @@ if [ "$QSZ" -lt 100000000 ]; then
   QSZ=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
   log "  qcow2 (dd): $((QSZ/1024/1024))MB"
 fi
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o BatchMode=yes "$SRC_USER@$SRC_IP" "$SUDO fuser -k $SRC_PORT/tcp 2>/dev/null || true" 2>/dev/null || true
+  src_ssh "$SUDO fuser -k $SRC_PORT/tcp 2>/dev/null || true" 2>/dev/null || true
   log "  qcow2: $((QSZ/1024/1024))MB"
   [ "$QSZ" -lt 100000000 ] && { log "ERROR: too small"; echo "FAIL_CONVERT|$LABEL" >> "$RESULTS"; exit 1; }
 fi
@@ -5177,14 +5685,18 @@ fi
 log "Step 4: Offline repair (ospc2flex_offline_repair.sh)..."
   REPAIR_SCRIPT=/tmp/ospc2flex_offline_repair.sh
   if [ -f "$REPAIR_SCRIPT" ]; then
-    log "  [REPAIR] Running ospc2flex_offline_repair.sh --qcow2 $QCOW --os-type $OS_TYPE --nbd-dev $NBD_DEV --force"
-  bash "$REPAIR_SCRIPT" --qcow2 "$QCOW" --os-type "$OS_TYPE" --nbd-dev "$NBD_DEV" --force 2>&1
-  REPAIR_EXIT=$?
-  if [ "$REPAIR_EXIT" -eq 0 ]; then
-    log "  [REPAIR] ospc2flex_offline_repair.sh completed successfully"
-  else
-    log "  [WARN] ospc2flex_offline_repair.sh exited with code $REPAIR_EXIT — continuing anyway"
-  fi
+    if [ "$SKIP_REPAIR" -eq 1 ]; then
+      log "  [REPAIR] SKIP — ${QCOW}.repaired sentinel exists (already repaired, no --force)"
+    else
+      log "  [REPAIR] Running ospc2flex_offline_repair.sh --qcow2 $QCOW --os-type $OS_TYPE --nbd-dev $NBD_DEV --force"
+      bash "$REPAIR_SCRIPT" --qcow2 "$QCOW" --os-type "$OS_TYPE" --nbd-dev "$NBD_DEV" --force --preserve-password-auth 2>&1
+      REPAIR_EXIT=$?
+      if [ "$REPAIR_EXIT" -eq 0 ]; then
+        log "  [REPAIR] ospc2flex_offline_repair.sh completed successfully"
+      else
+        log "  [WARN] ospc2flex_offline_repair.sh exited with code $REPAIR_EXIT — continuing anyway"
+      fi
+    fi
 else
   # Fallback: minimal inline repair (mount, fstab, netplan/interfaces, cloud-init)
   log "  [WARN] ospc2flex_offline_repair.sh not found — minimal inline repair"
@@ -5205,7 +5717,7 @@ else
   if [ "$FS_TYPE" = "xfs" ]; then
     sudo xfs_repair -L "$ROOT_PART" >/dev/null 2>&1 || true
   else
-    sudo fsck -y "$ROOT_PART" >/dev/null 2>&1 || true
+    sudo fsck -y -f "$ROOT_PART" >/dev/null 2>&1 || true
   fi
   sudo mkdir -p "$MNT"
   sudo mount "$ROOT_PART" "$MNT" 2>/dev/null || sudo mount -o norecovery "$ROOT_PART" "$MNT" 2>/dev/null || { log "ERROR: mount failed"; sudo qemu-nbd --disconnect "$NBD_DEV"; }
@@ -5234,36 +5746,42 @@ log "Step 4 DONE"
 # Step 5: Upload
 log "Step 5: Upload $IMG..."
 log "  [DEBUG] Auth check: OS_USERNAME=${OS_USERNAME:-MISSING_USER} OS_AUTH_TYPE=${OS_AUTH_TYPE:-MISSING_TYPE}"
-NEW_ID=""
-for _up_try in 1 2 3; do
-  if [ "$_up_try" -gt 1 ]; then
-    log "  Upload attempt $_up_try..."
-  fi
-  NEW_ID=$(openstack image create --disk-format qcow2 --container-format bare \
-    --file "$QCOW" --private "$IMG" --format value -c id 2>/tmp/os_err_$$.txt || true)
-    
-  if [ -n "$NEW_ID" ]; then
-    break
-  fi
-  
-  ERR_MSG=$(cat /tmp/os_err_$$.txt 2>/dev/null | tr '\n' ' ' | cut -c 1-200 || echo "Unknown error")
-  log "  [WARN] Upload attempt $_up_try failed: $ERR_MSG"
-  
-  if [ "$_up_try" -lt 3 ]; then
-    log "  Cleaning up any partial broken images before retry..."
-    BROKEN_IIDS=$(openstack image list --format value -c ID -c Name 2>/dev/null | grep "$IMG" | awk '{print $1}' || true)
-    for iid in $BROKEN_IIDS; do openstack image delete "$iid" 2>/dev/null || true; done
-    sleep 20
-  fi
-done
+if [ "$SKIP_UPLOAD" -eq 1 ] && [ -n "$NEW_ID" ]; then
+  log "  [SKIP] Reusing cached Glance image $NEW_ID — skipping upload (6h saved)"
+else
+  NEW_ID=""
+  for _up_try in 1 2 3; do
+    if [ "$_up_try" -gt 1 ]; then
+      log "  Upload attempt $_up_try..."
+    fi
+    NEW_ID=$(openstack image create --disk-format qcow2 --container-format bare \
+      --file "$QCOW" --private "$IMG" --format value -c id 2>/tmp/os_err_$$.txt || true)
 
-if [ -z "$NEW_ID" ]; then
-  log "ERROR: upload failed after 3 attempts"
-  echo "FAIL_UPLOAD|$LABEL" >> "$RESULTS"
+    if [ -n "$NEW_ID" ]; then
+      break
+    fi
+
+    ERR_MSG=$(cat /tmp/os_err_$$.txt 2>/dev/null | tr '\n' ' ' | cut -c 1-200 || echo "Unknown error")
+    log "  [WARN] Upload attempt $_up_try failed: $ERR_MSG"
+
+    if [ "$_up_try" -lt 3 ]; then
+      log "  Cleaning up any partial broken images before retry..."
+      BROKEN_IIDS=$(openstack image list --format value -c ID -c Name 2>/dev/null | grep "$IMG" | awk '{print $1}' || true)
+      for iid in $BROKEN_IIDS; do openstack image delete "$iid" 2>/dev/null || true; done
+      sleep 20
+    fi
+  done
+
+  if [ -z "$NEW_ID" ]; then
+    log "ERROR: upload failed after 3 attempts"
+    echo "FAIL_UPLOAD|$LABEL" >> "$RESULTS"
+    rm -f /tmp/os_err_$$.txt
+    exit 1
+  fi
   rm -f /tmp/os_err_$$.txt
-  exit 1
+  # Save image ID so future re-runs can skip the 6h upload
+  echo "$NEW_ID" > "${QCOW}.image_id"
 fi
-rm -f /tmp/os_err_$$.txt
 log "  Image ID: $NEW_ID"
 
 # Step 6: Wait active
@@ -5275,36 +5793,90 @@ for i in $(seq 1 60); do
   sleep 20
 done
 [ "$ST" != "active" ] && { echo "FAIL_INACTIVE|$LABEL" >> "$RESULTS"; exit 1; }
-rm -f "$QCOW"
+# Keep qcow2 + .repaired + .converted + .image_id for future resume
+# DO NOT delete .repaired — it is the skip-repair sentinel for next re-run
 
 # Step 7: Boot
 log "Step 7: Boot $VMNAME..."
-VM_ID=$(openstack server create --image "$NEW_ID" --flavor "$FLAVOR" --network "$NETWORK" \
-  --key-name "$KEYPAIR" --wait --format value -c id "$VMNAME" 2>/dev/null)
+# Reuse existing ACTIVE VM only when it is running the same image we just repaired.
+# If it's ACTIVE with a different (old/pre-repair) image, delete it and boot fresh.
+EXISTING_VM=$(openstack server list --name "ospc2flex-${LABEL}-" --format value -c ID -c Status 2>/dev/null | head -1 || true)
+if [ -n "$EXISTING_VM" ]; then
+  VM_ID=$(echo "$EXISTING_VM" | awk '{print $1}')
+  VM_ST=$(echo "$EXISTING_VM" | awk '{print $2}')
+  if [ "$VM_ST" = "ACTIVE" ]; then
+    _vm_img=$(openstack server show "$VM_ID" -f value -c image 2>/dev/null | grep -oE '[0-9a-f-]{36}' | head -1 || true)
+    if [ "$_vm_img" = "$NEW_ID" ]; then
+      log "  [SKIP] VM already ACTIVE with repaired image $NEW_ID: $VM_ID — reusing"
+    else
+      log "  [DELETE] VM $VM_ID is ACTIVE but running old image ($_vm_img ≠ $NEW_ID) — deleting and booting from repaired image"
+      openstack server delete "$VM_ID" --wait 2>/dev/null || true
+      EXISTING_VM=""
+    fi
+  else
+    log "  [DELETE] Existing VM $VM_ID in state $VM_ST (not ACTIVE) — deleting and rebooting from repaired image"
+    openstack server delete "$VM_ID" --wait 2>/dev/null || true
+    EXISTING_VM=""
+  fi
+fi
+if [ -z "$EXISTING_VM" ]; then
+  VM_ID=$(openstack server create --image "$NEW_ID" --flavor "$FLAVOR" --network "$NETWORK" \
+    --key-name "$KEYPAIR" --wait --format value -c id "$VMNAME" 2>/dev/null)
+fi
 log "  VM: $VM_ID"
 [ -z "$VM_ID" ] && { echo "FAIL_BOOT|$LABEL" >> "$RESULTS"; exit 1; }
 
 # Step 8: FIP (staggered by port offset to avoid race)
 log "Step 8: Floating IP..."
 sleep $(( (TUN_PORT - 10821) * 10 ))
+
+# Wait for the VM's neutron port to reach ACTIVE before attaching FIP.
+# server create --wait only guarantees server=ACTIVE; the port binding in
+# neutron can lag by 10-60s. Attaching a FIP to a non-ACTIVE port silently
+# succeeds (exit 0) but the neutron backend rejects it — this was the root
+# cause of every "FIP did not attach" failure.
+_port_id=""
+for _pw in $(seq 1 18); do
+  _port_id=$(openstack port list --server "$VM_ID" --format value -c ID -c Status 2>/dev/null \
+    | awk '$2=="ACTIVE"{print $1; exit}')
+  [ -n "$_port_id" ] && break
+  log "  [$_pw/18] Waiting for port ACTIVE (10s)..."; sleep 10
+done
+if [ -z "$_port_id" ]; then
+  _port_id=$(openstack port list --server "$VM_ID" --format value -c ID 2>/dev/null | head -1)
+  log "  WARN: Port never reached ACTIVE — proceeding with port $_port_id"
+fi
+log "  Port: $_port_id"
+
 REAL_FIP=""
 for _fip_try in 1 2 3; do
-  # Try to create a new FIP first
-  FIP=$(openstack floating ip create "$EXT_NET" --format value -c floating_ip_address 2>/dev/null || true)
-  # If quota full, grab an unused DOWN FIP (skip ones that might be grabbed by other workers)
-  if [ -z "$FIP" ]; then
-    FIP=$(openstack floating ip list --status DOWN --format value -c "Floating IP Address" 2>/dev/null | \
-      shuf | head -1 || true)
+  # Try to create a new FIP; fall back to grabbing an unused DOWN FIP
+  _fip_row=$(openstack floating ip create "$EXT_NET" \
+    --format value -c id -c floating_ip_address 2>/dev/null || true)
+  FIP_ID=$(echo "$_fip_row" | awk '{print $1}')
+  FIP=$(echo "$_fip_row"    | awk '{print $2}')
+  if [ -z "$FIP_ID" ]; then
+    _fip_row=$(openstack floating ip list --status DOWN \
+      --format value -c ID -c "Floating IP Address" 2>/dev/null | shuf | head -1 || true)
+    FIP_ID=$(echo "$_fip_row" | awk '{print $1}')
+    FIP=$(echo "$_fip_row"    | awk '{print $2}')
   fi
-  [ -z "$FIP" ] && { log "  No FIP available (try $_fip_try)"; sleep 5; continue; }
-  openstack server add floating ip "$VM_ID" "$FIP" 2>/dev/null || true
-  sleep 8
-  # Verify FIP actually attached to THIS VM
-  REAL_FIP=$(openstack server show "$VM_ID" -f value -c addresses 2>/dev/null | \
-    grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | grep -v '^10\.' | head -1 || true)
-  [ -n "$REAL_FIP" ] && break
-  log "  FIP $FIP did not attach (try $_fip_try), retrying..."
+  [ -z "$FIP_ID" ] && { log "  No FIP available (try $_fip_try)"; sleep 10; continue; }
+  log "  Attaching FIP $FIP (id=$FIP_ID) via port $_port_id..."
+  # Port-based attach is synchronous and reliable; "server add floating ip"
+  # is a legacy alias that silently no-ops when the port isn't ready.
+  _attach_out=$(openstack floating ip set --port "$_port_id" "$FIP_ID" 2>&1 || true)
+  [ -n "$_attach_out" ] && log "  attach: $_attach_out"
+  # Verify via floating ip show — authoritative and immediate (no server-show lag)
   sleep 5
+  _fip_fixed=$(openstack floating ip show "$FIP_ID" --format value -c fixed_ip_address 2>/dev/null || true)
+  if [ -n "$_fip_fixed" ] && [ "$_fip_fixed" != "None" ]; then
+    REAL_FIP="$FIP"
+    log "  FIP attached OK: $REAL_FIP → $_fip_fixed"
+    break
+  fi
+  log "  FIP $FIP did not attach (try $_fip_try, fixed_ip=$_fip_fixed)"
+  sleep 15
 done
 if [ -z "$REAL_FIP" ]; then
   log "  WARNING: No floating IP attached — VM has private IP only"
@@ -5317,9 +5889,11 @@ log "Step 9: SSH test ${FLEX_USER}@${REAL_FIP} (informational)..."
 SSH_OK=0
 SSH_ACTUAL_USER=""
 for i in $(seq 1 6); do
-  ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes \
+  legacy_opts=""
+  [ "$USE_LEGACY_SSH" = "1" ] && legacy_opts="-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
+  ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes \
     "${FLEX_USER}@${REAL_FIP}" 'echo ssh-ok' 2>/dev/null | grep -q ssh-ok && { SSH_OK=1; SSH_ACTUAL_USER="$FLEX_USER"; break; }
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes \
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes \
     "root@${REAL_FIP}" 'echo ssh-ok' 2>/dev/null | grep -q ssh-ok && { SSH_OK=1; SSH_ACTUAL_USER="root"; break; }
   log "  [$i/6] retry 10s..."; sleep 10
 done
@@ -5364,125 +5938,45 @@ def nbd_run():
     app._last_jumphost_ip = jumphost_ip
     app._last_jumphost_user = jumphost_user
     app._last_ssh_key = ssh_key
-
-    # Build /tmp/ospc2flex_flex.sh content from creds
-    flex_sh = "#!/usr/bin/env bash\n"
-    flex_sh += f"export OS_AUTH_URL={shlex.quote(flex_creds.get('auth_url','https://keystone.api.dfw3.rackspacecloud.com/v3/'))}\n"
-    flex_sh += "export OS_IDENTITY_API_VERSION=3\nexport OS_INTERFACE=public\n"
-    flex_region = flex_creds.get('region','DFW3')
-    if flex_region == 'DFW': flex_region = 'DFW3'
-    flex_sh += f"export OS_REGION_NAME={shlex.quote(flex_region)}\n"
-    if flex_creds.get('app_cred_id'):
-        flex_sh += "export OS_AUTH_TYPE=v3applicationcredential\n"
-        flex_sh += f"export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(flex_creds['app_cred_id'])}\n"
-        flex_sh += f"export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(flex_creds.get('app_cred_secret',''))}\n"
-    else:
-        flex_sh += "export OS_AUTH_TYPE=password\n"
-        flex_sh += f"export OS_USERNAME={shlex.quote(flex_creds.get('username',''))}\n"
-        flex_sh += f"export OS_PASSWORD={shlex.quote(flex_creds.get('password',''))}\n"
-        flex_sh += f"export OS_API_KEY={shlex.quote(flex_creds.get('password',''))}\n"
-        domain = flex_creds.get('domain','rackspace_cloud_domain')
-        flex_sh += f"export OS_USER_DOMAIN_NAME={shlex.quote(domain)}\n"
-        flex_sh += f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(domain)}\n"
-        if flex_creds.get('project_id'):
-            flex_sh += f"export OS_PROJECT_ID={shlex.quote(flex_creds['project_id'])}\n"
-
-    ssh_base = ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-                "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
-
-    # Stage mig_worker_v4.sh and ospc2flex_flex.sh on jumphost
     try:
-        import tempfile
-        # Write flex creds to temp file, scp it
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
-            tf.write(flex_sh)
-            tf_path = tf.name
-        for _up_try in range(3):
-            try:
-                subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-                                tf_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_flex.sh"],
-                               check=True, timeout=30)
-                break
-            except subprocess.CalledProcessError:
-                import time; time.sleep(2)
-        os.unlink(tf_path)
+        import json as _json
+        _jh_cache = os.path.join(os.path.dirname(__file__), '.jumphost_cache.json')
+        with open(_jh_cache, 'w') as _f:
+            _json.dump({'jumphost_ip': jumphost_ip, 'jumphost_user': jumphost_user, 'ssh_key': ssh_key}, _f)
+    except Exception:
+        pass
 
-        # Write worker script to temp file, scp it
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
-            tf.write(_MIG_WORKER_V4)
-            tw_path = tf.name
-        for _up_try in range(3):
-            try:
-                subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-                                tw_path, f"{jumphost_user}@{jumphost_ip}:/tmp/mig_worker_v4.sh"],
-                               check=True, timeout=30)
-                break
-            except subprocess.CalledProcessError:
-                import time; time.sleep(2)
-        os.unlink(tw_path)
+    # Replace hardcoded staging with the deduplicating `stage_mig_files` generator
+    app._repair_hash = _file_md5(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ospc2Flex-Image-migtool", "ospc2flex_offline_repair.sh")
+    ) if getattr(app, '_repair_hash', None) is None else app._repair_hash
 
-        # Ensure NBD module loaded + create results file + chmod script
-        subprocess.run(ssh_base + [
-            "chmod +x /tmp/mig_worker_v4.sh; "
-            "sudo modprobe nbd max_part=16 2>/dev/null || true; "
-            "mkdir -p /mnt/migration/ospc2flex_image; "
-            "> /tmp/par_results_v4.txt"
-        ], check=True, timeout=30)
-
-        # Stage ospc2flex_offline_repair.sh so NBD workers use the same per-OS
-        # repair logic as the custom_os pipeline (single source of truth)
-        _repair_script = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..",
-            "ospc2Flex-Image-migtool", "ospc2flex_offline_repair.sh"
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+                "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
+    
+    try:
+        ospc_creds = req.get('ospc_creds', {})
+        msgs, ok = _stage_scripts_on_jumphost(
+            jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base, ospc_creds=ospc_creds
         )
-        if os.path.isfile(_repair_script):
-            for _up_try in range(3):
-                try:
-                    subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-                                    _repair_script, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_offline_repair.sh"],
-                                   check=True, timeout=30)
-                    subprocess.run(ssh_base + ["chmod +x /tmp/ospc2flex_offline_repair.sh"],
-                                   check=True, timeout=30)
-                    break
-                except subprocess.CalledProcessError:
-                    import time; time.sleep(2)
-
-        # Stage the SSH key on jumphost so workers can SSH into source VMs
-        if os.path.isfile(ssh_key):
-            subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-                            ssh_key,
-                            f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_origin_key.pem"],
-                           check=True, timeout=30)
-            subprocess.run(ssh_base + ["chmod 600 /tmp/ospc2flex_origin_key.pem"],
-                           check=True, timeout=30)
-
+        if not ok:
+            return jsonify({"error": "Failed to stage scripts on jumphost"}), 500
     except Exception as e:
         return jsonify({"error": f"Failed to stage scripts on jumphost: {e}"}), 500
 
-    # ── Global cleanup: kill ALL stale migration processes from previous batches ──
-    # Prevents orphaned qemu-img and SSH tunnels from polluting new batch logs
-    global_cleanup = (
-        "pkill -f mig_worker_v4 2>/dev/null || true; "
-        "pkill -f 'qemu-img convert nbd://' 2>/dev/null || true; "
-        "pkill -f 'ssh.*1082.*localhost.*1081' 2>/dev/null || true; "
-        "sleep 2; "
-        "echo 'Global cleanup done'"
-    )
-    try:
-        subprocess.run(ssh_base + [global_cleanup], timeout=15)
-    except Exception:
-        pass  # non-fatal
-
     launched = []
     for vm in vms:
-        label    = str(vm.get('label','vm')).strip()
+        label    = re.sub(r'[^a-zA-Z0-9._-]', '_', str(vm.get('label','vm')).strip())
         src_ip   = str(vm.get('src_ip','')).strip()
         os_type  = str(vm.get('os_type','ubuntu24')).strip().lower()
         defaults = _NBD_OS_DEFAULTS.get(os_type, _NBD_OS_DEFAULTS['ubuntu24'])
 
         src_user  = str(vm.get('src_user') or defaults['src_user']).strip()
         flex_user = str(vm.get('flex_user') or defaults['flex_user']).strip()
-        ssh_key   = str(vm.get('ssh_key') or '~/.ssh/id_rsa').strip()
+        ssh_key   = str(vm.get('ssh_key') or '').strip()
+        worker_ssh_key = ssh_key or "/tmp/ospc2flex_origin_key.pem"
+        vm_password = str(vm.get('password') or '').strip()
+        vm_password_b64 = base64.b64encode(vm_password.encode()).decode() if vm_password else ""
         nbd_idx   = int(vm.get('nbd_idx', defaults['nbd']))
         src_port  = int(vm.get('src_port', defaults['src_port']))
         tun_port  = int(vm.get('tun_port', defaults['tun_port']))
@@ -5496,7 +5990,7 @@ def nbd_run():
             f"> /tmp/mig_{label}.log"
         )
         try:
-            subprocess.run(ssh_base + [kill_stale], timeout=15)
+            subprocess.run(ssh_base + [kill_stale], timeout=90)
         except Exception:
             pass  # non-fatal
 
@@ -5505,11 +5999,11 @@ def nbd_run():
             f"{shlex.quote(label)} {shlex.quote(src_ip)} {shlex.quote(src_user)} "
             f"{shlex.quote(os_type)} {shlex.quote(flex_user)} "
             f"{shlex.quote(nbd_dev)} {src_port} {tun_port} "
-            f"{shlex.quote(ssh_key)} "
+            f"{shlex.quote(worker_ssh_key)} {shlex.quote(vm_password_b64)} "
             f"</dev/null >/tmp/mig_{label}.log 2>&1 &"
         )
         try:
-            subprocess.run(ssh_base + [cmd_remote], check=True, timeout=30)
+            subprocess.run(ssh_base + [cmd_remote], check=True, timeout=60)
             launched.append({"label": label, "log": f"/tmp/mig_{label}.log",
                              "nbd_dev": nbd_dev, "src_port": src_port, "tun_port": tun_port})
         except Exception as e:
@@ -5523,6 +6017,7 @@ def nbd_run():
 import threading, hashlib
 _nbd_staging_cache = {}   # { jumphost_ip: { "hash": md5, "init_done": bool } }
 _nbd_staging_lock = threading.Lock()
+_nbd_job_launch_lock = threading.Lock()
 
 
 def _md5_of(content: str) -> str:
@@ -5539,7 +6034,7 @@ def _file_md5(path: str) -> str:
     return h.hexdigest()
 
 
-def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base):
+def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base, ospc_creds=None):
     """Stage scripts on jumphost. Returns (messages: list[str], ok: bool).
     
     Smart staging strategy:
@@ -5550,6 +6045,18 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
     """
     import tempfile
     msgs = []
+    def safe_run(cmd, **kwargs):
+        import time
+        import subprocess
+        for attempt in range(3):
+            try:
+                # Ensure timeout is always at least 30
+                if kwargs.get('timeout', 0) < 30: kwargs['timeout'] = 30
+                return subprocess.run(cmd, **kwargs)
+            except Exception:
+                if attempt == 2: raise
+                time.sleep(2)
+
 
     # --- Compute local hashes ---
     worker_hash = _md5_of(_MIG_WORKER_V4)
@@ -5598,30 +6105,54 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
         tf.write(flex_sh); tf_path = tf.name
-    subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+    safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                     tf_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_flex.sh"],
                    check=True, timeout=30)
     os.unlink(tf_path)
+
+    # 1b. Stage OSPC creds for Windows Glance fallback (if NBD inline mode)
+    if ospc_creds and (ospc_creds.get('username') or ospc_creds.get('apikey')):
+        ospc_sh = "#!/usr/bin/env bash\n"
+        ospc_region = ospc_creds.get('region') or 'IAD'
+        ospc_sh += f"export OS_REGION_NAME={shlex.quote(ospc_region)}\nexport OS_NO_CACHE=1\n"
+        ospc_sh += f"export OS_USERNAME={shlex.quote(ospc_creds.get('username', ''))}\n"
+        ospc_sh += f"export OS_PASSWORD={shlex.quote(ospc_creds.get('apikey', ''))}\n"
+        ospc_sh += f"export OS_API_KEY={shlex.quote(ospc_creds.get('apikey', ''))}\n"
+        ospc_auth_url = ospc_creds.get('auth_url') or 'https://identity.api.rackspacecloud.com/v2.0/'
+        ospc_sh += f"export OS_AUTH_URL={shlex.quote(ospc_auth_url)}\n"
+        ospc_account_id = ospc_creds.get('account_id') or ''
+        if ospc_account_id:
+            ospc_sh += f"export OS_TENANT_ID={shlex.quote(ospc_account_id)}\n"
+            ospc_sh += f"export OS_PROJECT_ID={shlex.quote(ospc_account_id)}\n"
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
+            tf.write(ospc_sh)
+            tf_path_ospc = tf.name
+            
+        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
+                        tf_path_ospc, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_ospc.sh"],
+                       check=True, timeout=30)
+        os.unlink(tf_path_ospc)
 
     # 2. Worker script — only if hash changed
     if scripts_changed:
         msgs.append("[STAGE] Uploading worker script (changed)")
         with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
             tf.write(_MIG_WORKER_V4); tw_path = tf.name
-        subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                         tw_path, f"{jumphost_user}@{jumphost_ip}:/tmp/mig_worker_v4.sh"],
                        check=True, timeout=60)
         os.unlink(tw_path)
-        subprocess.run(ssh_base + ["chmod +x /tmp/mig_worker_v4.sh"], check=True, timeout=15)
+        safe_run(ssh_base + ["chmod +x /tmp/mig_worker_v4.sh"], check=True, timeout=15)
 
         # 3. Repair script — only if hash changed (they share the flag)
         # 3. Repair script — only if hash changed (they share the flag)
         if os.path.isfile(_repair_path):
             msgs.append("[STAGE] Uploading repair script (changed)")
-            subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                             _repair_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_offline_repair.sh"],
                            check=True, timeout=60)
-            subprocess.run(ssh_base + ["chmod +x /tmp/ospc2flex_offline_repair.sh"],
+            safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_offline_repair.sh"],
                            check=True, timeout=15)
 
         # 4. Windows repair script — always stage alongside Linux repair
@@ -5631,10 +6162,10 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         )
         if os.path.isfile(_win_repair_path):
             msgs.append("[STAGE] Uploading Windows repair script")
-            subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                             _win_repair_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_repair.sh"],
                            check=True, timeout=60)
-            subprocess.run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_repair.sh"],
+            safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_repair.sh"],
                            check=True, timeout=15)
 
         # 5. Windows Glance migration script (for VMs with no SSH)
@@ -5644,10 +6175,10 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         )
         if os.path.isfile(_win_migrate_path):
             msgs.append("[STAGE] Uploading Windows migration script (Glance)")
-            subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                             _win_migrate_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_migrate.sh"],
                            check=True, timeout=60)
-            subprocess.run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_migrate.sh"],
+            safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_migrate.sh"],
                            check=True, timeout=15)
     else:
         msgs.append("[STAGE] Worker + repair scripts unchanged (skipped)")
@@ -5655,16 +6186,20 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
     # 4. One-time init: SSH key, modprobe, workspace dir
     if not init_done:
         msgs.append("[STAGE] First-run init: modprobe nbd, workspace, SSH key")
-        subprocess.run(ssh_base + [
+        safe_run(ssh_base + [
             "sudo modprobe nbd max_part=16 2>/dev/null || true; "
+            "if ! command -v qemu-nbd &>/dev/null || ! command -v sshpass &>/dev/null; then "
+            "sudo apt-get update -qq >/dev/null 2>&1 || true; "
+            "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y sshpass qemu-utils gdisk xfsprogs jq python3-openstackclient >/dev/null 2>&1 || true; "
+            "fi; "
             "mkdir -p /mnt/migration/ospc2flex_image"
-        ], check=True, timeout=30)
+        ], check=True, timeout=180)
 
         if os.path.isfile(ssh_key):
-            subprocess.run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                             ssh_key, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_origin_key.pem"],
                            check=True, timeout=30)
-            subprocess.run(ssh_base + ["chmod 600 /tmp/ospc2flex_origin_key.pem"],
+            safe_run(ssh_base + ["chmod 600 /tmp/ospc2flex_origin_key.pem"],
                            check=True, timeout=15)
 
         with _nbd_staging_lock:
@@ -5690,25 +6225,29 @@ def nbd_run_single():
     ssh_key       = os.path.expanduser((req.get('ssh_key_path') or '~/.ssh/id_rsa').strip())
     vm            = req.get('vm') or {}
     flex_creds    = req.get('flex_creds') or {}
+    ospc_creds    = req.get('ospc_creds') or {}
 
     if not jumphost_ip:
         return Response("data: [ERROR] jumphost_ip required\n\ndata: [DONE]\n\n",
                         mimetype='text/event-stream')
 
-    label    = str(vm.get('label','vm')).strip()
+    label    = __import__('re').sub(r'[^a-zA-Z0-9._-]', '_', str(vm.get('label','vm')).strip())
     src_ip   = str(vm.get('src_ip','')).strip()
     os_type  = str(vm.get('os_type','ubuntu24')).strip().lower()
     defaults = _NBD_OS_DEFAULTS.get(os_type, _NBD_OS_DEFAULTS.get('ubuntu24', {}))
 
     src_user  = str(vm.get('src_user') or defaults.get('src_user','ubuntu')).strip()
     flex_user = str(vm.get('flex_user') or defaults.get('flex_user','ubuntu')).strip()
-    vm_ssh_key = str(vm.get('ssh_key') or '~/.ssh/id_rsa').strip()
+    vm_ssh_key = str(vm.get('ssh_key') or '').strip()
+    worker_ssh_key = vm_ssh_key or "/tmp/ospc2flex_origin_key.pem"
+    vm_password = str(vm.get('password') or '').strip()
+    vm_password_b64 = base64.b64encode(vm_password.encode()).decode() if vm_password else ""
     nbd_idx   = int(vm.get('nbd_idx', defaults.get('nbd', 0)))
     src_port  = int(vm.get('src_port', defaults.get('src_port', 10811)))
     tun_port  = int(vm.get('tun_port', defaults.get('tun_port', 10821)))
     nbd_dev   = f"/dev/nbd{nbd_idx}"
 
-    ssh_base = ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
                 "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
     log_path = f"/tmp/mig_{label}.log"
 
@@ -5727,7 +6266,8 @@ def nbd_run_single():
                 yield f"data: [REMOTE WORKER] Checking scripts on {jumphost_ip}...\n\n"
 
             stage_msgs, stage_ok = _stage_scripts_on_jumphost(
-                jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base
+                jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base,
+                ospc_creds=ospc_creds
             )
             for msg in stage_msgs:
                 yield f"data: {msg}\n\n"
@@ -5759,6 +6299,7 @@ def nbd_run_single():
                 yield f"data: [REMOTE WORKER] Worker launched: {label} (Glance mode)\n\n"
             else:
                 _force_sync = vm.get('force_sync') == True
+                _force_dd = '1' if vm.get('force_dd') else '0'
                 if _force_sync:
                     try:
                         subprocess.run(ssh_base + [f"rm -f /mnt/migration/ospc2flex_image/{label}.qcow2*"], check=True, timeout=30)
@@ -5766,12 +6307,25 @@ def nbd_run_single():
                     except Exception:
                         pass
                 
+                # Kill any stale workers for this label before launching a fresh one
+                kill_stale_cmd = (
+                    f"pkill -f 'mig_worker_v4.sh {label}' 2>/dev/null || true; "
+                    f"pkill -f 'ospc2flex_windows_migrate.sh.*{label}' 2>/dev/null || true; "
+                    f"sleep 1; "
+                    f"> {log_path}"
+                )
+                try:
+                    subprocess.run(ssh_base + [kill_stale_cmd], timeout=15)
+                except Exception:
+                    pass
+
                 cmd_remote = (
                     f"nohup bash /tmp/mig_worker_v4.sh "
                     f"{shlex.quote(label)} {shlex.quote(src_ip)} {shlex.quote(src_user)} "
                     f"{shlex.quote(os_type)} {shlex.quote(flex_user)} "
                     f"{shlex.quote(nbd_dev)} {src_port} {tun_port} "
-                    f"{shlex.quote(vm_ssh_key)} "
+                    f"{shlex.quote(worker_ssh_key)} {shlex.quote(vm_password_b64)} "
+                    f"{_force_dd} "
                     f"</dev/null >{log_path} 2>&1 &"
                 )
                 subprocess.run(ssh_base + [cmd_remote], check=True, timeout=30)
@@ -5859,7 +6413,7 @@ def nbd_stream():
         seen_start = int(request.args.get("seen", 0))
     except (ValueError, TypeError):
         seen_start = 0
-    ssh_base = ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
                 "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                 f"{jumphost_user}@{jumphost_ip}"]
 
@@ -5926,7 +6480,7 @@ def nbd_stream():
 
 @app.get("/api/vm_migrator/nbd/status")
 def nbd_status():
-    """Poll results file and process list on jumphost."""
+    """Poll telemetry and process list on jumphost for dashboard MBUX."""
     jumphost_ip   = request.args.get("jumphost_ip", "").strip()
     jumphost_user = request.args.get("jumphost_user", "ubuntu").strip()
     ssh_key       = os.path.expanduser(request.args.get("ssh_key", "~/.ssh/id_rsa").strip())
@@ -5934,30 +6488,123 @@ def nbd_status():
     if not jumphost_ip:
         return jsonify({"error": "jumphost_ip required"}), 400
 
-    ssh_base = ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-                "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
+    
     try:
-        out = subprocess.check_output(
-            ssh_base + [
-                "cat /tmp/par_results_v4.txt 2>/dev/null || true; "
-                "echo '---PROCS---'; "
-                "pgrep -a mig_worker_v4 2>/dev/null || echo 'none'; "
-                "echo '---QEMU---'; "
-                "pgrep -a qemu-img 2>/dev/null | head -8 || echo 'none'"
-            ], timeout=15, text=True
-        )
-        lines = out.split('\n')
-        results = []
-        procs = []
-        qemu = []
-        section = 'results'
-        for l in lines:
-            if l == '---PROCS---':  section = 'procs'; continue
-            if l == '---QEMU---':   section = 'qemu';  continue
-            if section == 'results' and l.strip(): results.append(l.strip())
-            elif section == 'procs' and l.strip():  procs.append(l.strip())
-            elif section == 'qemu' and l.strip():   qemu.append(l.strip())
-        return jsonify({"results": results, "workers_running": procs, "qemu_active": qemu})
+        remote_script = r"""
+echo '---SYS---'
+CPU_PCT=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8}' || echo 0)
+MEM_PCT=$(free | awk '/Mem/ {printf("%d", $3/$2 * 100)}' || echo 0)
+echo "$(hostname -I | awk '{print $1}')|$(nproc)|$(cat /proc/loadavg | awk '{print $1" "$2" "$3}')|${MEM_PCT}|${CPU_PCT}"
+echo '---DISK---'
+df -h /mnt/migration 2>/dev/null | tail -1 | awk '{print "Filesystem "$2" "$3" "$5" "$4}' || echo ""
+echo '---NET---'
+R1=$(cat /sys/class/net/eth0/statistics/rx_bytes 2>/dev/null || echo 0)
+T1=$(cat /sys/class/net/eth0/statistics/tx_bytes 2>/dev/null || echo 0)
+sleep 0.5
+R2=$(cat /sys/class/net/eth0/statistics/rx_bytes 2>/dev/null || echo 0)
+T2=$(cat /sys/class/net/eth0/statistics/tx_bytes 2>/dev/null || echo 0)
+echo "$R1 $R2 $T1 $T2"
+echo '---PROCS---'
+ps -eo pid,etimes,cmd | grep -E 'mig_worker_v4[.]sh|qemu-img' | grep -v 'grep' || true
+echo '---FILES---'
+find /mnt/migration/ospc2flex_image -maxdepth 1 -type f \( -name '*.qcow2' -o -name '*.raw' \) -printf "%f|%s|%T@\n" 2>/dev/null | sort -t'|' -k3 -n || true
+echo '---LOGS---'
+for f in /tmp/mig_*.log; do
+  [ -f "$f" ] || continue
+  label=$(basename "$f" | sed 's/^mig_//; s/\.log$//')
+  sz=$(grep -oE '\[SRC_SIZE_GB=[0-9]+\]' "$f" 2>/dev/null | tail -1 | grep -oE '[0-9]+')
+  mt=$(stat -c%Y "$f" 2>/dev/null || echo 0)
+  loglines=$(tail -20 "$f" 2>/dev/null | tr '\011\015' '  ' | sed 's/@@/__/g' | sed 's/|||/!!!/g' | awk 'NF{printf "%s|||",$0}')
+  echo "@@${label}@@${sz:-0}@@${mt}@@${loglines}"
+done
+"""
+        out = subprocess.check_output(ssh_base + [remote_script], timeout=20, text=True)
+
+        import time
+        import re
+        res = {
+            "sys": None, "disk": None, "timestamp": int(time.time()),
+            "jobs": {}
+        }
+
+        section = None
+        for line in out.split('\n'):
+            line = line.strip()
+            if not line: continue
+            if line.startswith('---'):
+                section = line.strip('-')
+                continue
+
+            if section == 'SYS':
+                parts = line.split('|')
+                if len(parts) >= 4:
+                    res["sys"] = {"ip": parts[0], "cpus": int(parts[1]), "load": parts[2], "ram": int(parts[3]), "cpu": float(parts[4]) if len(parts)>4 else 0}
+            elif section == 'DISK':
+                d_pts = line.split()
+                res["disk"] = d_pts[3].replace("%", "") if len(d_pts)>3 else "0"
+            elif section == 'NET':
+                n_pts = line.split()
+                if len(n_pts) == 4:
+                    rx_mbps = (int(n_pts[1]) - int(n_pts[0])) * 8 / 1000000 / 0.5
+                    tx_mbps = (int(n_pts[3]) - int(n_pts[2])) * 8 / 1000000 / 0.5
+                    res["net"] = {"rx": round(rx_mbps, 1), "tx": round(tx_mbps, 1)}
+            elif section == 'PROCS':
+                m = re.search(r'mig_worker_v4(?:_.*?)*\.sh\s+([^\s]+)', line)
+                if not m:
+                    m = re.search(r'qemu-img.*?/([^\s/]+)\.(?:qcow2|raw)', line)
+                if m:
+                    label = re.sub(r'\.(qcow2|raw)$', '', m.group(1))
+                    if label not in res["jobs"]:
+                        res["jobs"][label] = {
+                            "status": "Running",
+                            "lines": ["[ACTIVE] Worker running..."],
+                            "mtime": 0, "size": "0", "converted": False
+                        }
+            elif section == 'FILES':
+                # Sorted ascending by mtime — newest file wins (overwrites older entries)
+                parts = line.split('|')
+                if len(parts) >= 3:
+                    fname = parts[0]
+                    label = re.sub(r'\.(qcow2|raw)$', '', fname)
+                    fsize = parts[1]
+                    fmtime = int(float(parts[2]))
+                    is_converted = fname.endswith('.qcow2') and not fname.endswith('.raw')
+                    if label not in res["jobs"]:
+                        res["jobs"][label] = {
+                            "status": "Waiting",
+                            "lines": ["[QCOW2] Export on disk. Standing by."],
+                            "mtime": fmtime, "size": fsize, "converted": is_converted
+                        }
+                    else:
+                        res["jobs"][label]["mtime"] = fmtime
+                        res["jobs"][label]["size"] = fsize
+                        if is_converted:
+                            res["jobs"][label]["converted"] = True
+            elif section == 'LOGS':
+                if not line.startswith('@@'):
+                    continue
+                parts = line[2:].split('@@', 3)
+                if len(parts) < 4:
+                    continue
+                lbl, sz_str, mt_str, raw_lines = parts[0], parts[1], parts[2], parts[3]
+                if lbl not in res["jobs"]:
+                    continue
+                try:
+                    sz = int(sz_str)
+                    if sz > 0:
+                        res["jobs"][lbl]["src_size_gb"] = sz
+                except (ValueError, TypeError):
+                    pass
+                try:
+                    res["jobs"][lbl]["mtime"] = int(mt_str)
+                except (ValueError, TypeError):
+                    pass
+                log_lines = [l.strip() for l in raw_lines.split('|||') if l.strip()]
+                if log_lines:
+                    res["jobs"][lbl]["lines"] = log_lines[-20:]
+
+        return jsonify(res)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -5971,7 +6618,7 @@ def nbd_stop():
     ssh_key       = (req.get('ssh_key_path') or os.path.expanduser('~/.ssh/id_rsa')).strip()
     if not jumphost_ip:
         return jsonify({"error": "jumphost_ip required"}), 400
-    ssh_base = ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
                 "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
     try:
         subprocess.run(ssh_base + [
@@ -5979,8 +6626,75 @@ def nbd_stop():
             "pkill -f qemu-img 2>/dev/null || true; "
             "sudo killall qemu-nbd 2>/dev/null || true; "
             "echo stopped"
-        ], timeout=15)
+        ], timeout=90)
         return jsonify({"status": "stopped"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/vm_migrator/nbd/kill_one")
+def nbd_kill_one():
+    """Kill a single NBD worker/job on jumphost by label."""
+    req = request.get_json(force=True, silent=True) or {}
+    jumphost_ip = (req.get('jumphost_ip') or '').strip()
+    jumphost_user = (req.get('jumphost_user') or 'ubuntu').strip()
+    ssh_key = (req.get('ssh_key_path') or os.path.expanduser('~/.ssh/id_rsa')).strip()
+    label = (req.get('label') or '').strip()
+    if not jumphost_ip or not label:
+        return jsonify({"error": "jumphost_ip and label required"}), 400
+
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+                "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
+    remote_cmd = (
+        f"pkill -f 'mig_worker_v4.sh {label}' 2>/dev/null || true; "
+        f"pkill -f 'ospc2flex_windows_migrate.*{label}' 2>/dev/null || true; "
+        f"pkill -f 'qemu-img.*{label}' 2>/dev/null || true; "
+        f"pkill -f 'openstack.*{label}' 2>/dev/null || true; "
+        f"echo killed:{shlex.quote(label)}"
+    )
+    try:
+        subprocess.run(ssh_base + [remote_cmd], timeout=20, check=False)
+        return jsonify({"status": "stopped", "message": f"Kill signal sent for {label}."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/vm_migrator/nbd/job_control")
+def nbd_job_control():
+    """Pause / resume / kill a specific NBD worker on jumphost by label."""
+    req = request.get_json(force=True, silent=True) or {}
+    jumphost_ip   = (req.get('jumphost_ip') or '').strip()
+    jumphost_user = (req.get('jumphost_user') or 'ubuntu').strip()
+    ssh_key       = (req.get('ssh_key_path') or os.path.expanduser('~/.ssh/id_rsa')).strip()
+    label         = (req.get('label') or '').strip()
+    action        = (req.get('action') or '').strip()   # pause | resume | kill
+
+    if not jumphost_ip or not label or not action:
+        return jsonify({"error": "jumphost_ip, label, action required"}), 400
+
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
+                "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+                "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
+    lq = shlex.quote(label)
+    try:
+        if action == "pause":
+            cmd = (f"pids=$(pgrep -f 'mig_worker_v4.sh {lq}' 2>/dev/null); "
+                   f"[ -n \"$pids\" ] && kill -STOP $pids 2>/dev/null && echo \"paused:$pids\" || echo no-worker; "
+                   f"pgrep -f 'dd.*{lq}\\|qemu-img.*{lq}' 2>/dev/null | xargs -r kill -STOP 2>/dev/null; true")
+        elif action == "resume":
+            cmd = (f"pids=$(pgrep -f 'mig_worker_v4.sh {lq}' 2>/dev/null); "
+                   f"[ -n \"$pids\" ] && kill -CONT $pids 2>/dev/null && echo \"resumed:$pids\" || echo no-worker; "
+                   f"pgrep -f 'dd.*{lq}\\|qemu-img.*{lq}' 2>/dev/null | xargs -r kill -CONT 2>/dev/null; true")
+        elif action == "kill":
+            cmd = (f"pkill -9 -f 'mig_worker_v4.sh {lq}' 2>/dev/null || true; "
+                   f"pkill -9 -f 'qemu-img.*{lq}' 2>/dev/null || true; "
+                   f"pkill -9 -f 'dd.*{lq}' 2>/dev/null || true; "
+                   f"echo killed:{lq}")
+        else:
+            return jsonify({"error": f"unknown action: {action}"}), 400
+
+        out = subprocess.check_output(ssh_base + [cmd], timeout=15, text=True)
+        return jsonify({"status": "ok", "action": action, "label": label, "output": out.strip()})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -6004,7 +6718,7 @@ def nbd_sizes():
     if not jumphost_ip or not labels:
         return jsonify({"sizes": {}})
 
-    ssh_base = ["ssh", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
                 "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
                 f"{jumphost_user}@{jumphost_ip}"]
     try:
@@ -6025,6 +6739,19 @@ def nbd_sizes():
         return jsonify({"sizes": sizes})
     except Exception:
         return jsonify({"sizes": {}})
+
+
+@app.get("/api/vm_migrator/global_jobs")
+def global_jobs():
+    """Returns the live text output of check_jumphost.sh"""
+    try:
+        out = subprocess.check_output(
+            ["bash", "-c", "wsl -d Ubuntu -e bash /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/check_jumphost.sh 2>/dev/null || bash /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/check_jumphost.sh"], 
+            text=True, timeout=90
+        )
+        return jsonify({"output": out})
+    except Exception as e:
+        return jsonify({"error": str(e), "output": "Failed to run check_jumphost.sh on backend."})
 
 
 @app.route("/api/stream/repair-guest", methods=["GET"])
@@ -6100,7 +6827,7 @@ log "=== Repair Complete. Recommend: sudo reboot ==="
 
             # SCP script
             scp_cmd = scp_base + [script_path, f"{user}@{ip}:{remote_path}"]
-            r = subprocess.run(scp_cmd, capture_output=True, text=True, timeout=30)
+            r = subprocess.run(scp_cmd, capture_output=True, text=True, timeout=60)
             if r.returncode != 0:
                 yield f"data: [ERROR] SCP failed: {r.stderr.strip()}\n\n"
                 yield "data: [DONE]\n\n"
@@ -6277,7 +7004,7 @@ def agent1_run_discovery():
                 if r.returncode != 0:
                     log(f"[ERROR] ospcscan exited {r.returncode}: {r.stderr[:400]}")
                 if r.stdout.strip():
-                    scan_result = json.loads(r.stdout.strip())
+                    scan_result = parse_json_mixed_output(r.stdout)
                     if "error" in scan_result:
                         log(f"[ERROR] {scan_result['error']}")
                         scan_result = None
@@ -6445,7 +7172,7 @@ def agent1_run_flex_discovery():
             return jsonify({"status": "error", "message": "flexscan returned no output",
                             "log": "\n".join(log_lines)}), 500
 
-        scan = _json.loads(r.stdout.strip())
+        scan = parse_json_mixed_output(r.stdout)
         if "error" in scan:
             log_lines.append(f"[ERROR] {scan['error']}")
             return jsonify({"status": "error", "message": scan["error"],
@@ -6973,7 +7700,7 @@ echo ""
 if [ -f "{ssh_key}" ]; then
     chmod 400 "{ssh_key}"
     echo "SSH Connection Test executing..."
-    ssh -i "{ssh_key}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 {ssh_user}@{db_ip} "echo '[SUCCESS] SSH Connection established to DB Backend!'" || echo "[WARNING] SSH Authentication rejected or Network Tunnel blocked."
+    ssh -i "{ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 {ssh_user}@{db_ip} "echo '[SUCCESS] SSH Connection established to DB Backend!'" || echo "[WARNING] SSH Authentication rejected or Network Tunnel blocked."
 else
     echo "[ERROR] Keyfile '{ssh_key}' not found on orchestration disk. Skipping DB SSH test."
 fi
@@ -7470,7 +8197,7 @@ def api_coder_drinks():
         result = subprocess.run(
             [
                 "ssh", "-i", "/root/.ssh/id_rsa",
-                "-o", "StrictHostKeyChecking=no",
+                "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
                 "-o", "ConnectTimeout=10",
                 "root@104.130.169.61",
                 "sudo -u postgres psql -d pocdb -t -A -F'|' -c "

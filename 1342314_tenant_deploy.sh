@@ -8,11 +8,11 @@ SUBNET_CIDR='10.60.0.0/24'
 ROUTER_NAME='tenant-router'
 SECURITY_GROUP='default'
 VOLUME_TYPE='Performance'
-KEY_NAME='laptopubuntu24'
+KEY_NAME='ospc2flex'
 SSH_PUB_KEY=''
 FAIL_FAST=0
-RESULTS_CSV='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/1342314_tenant_deploy_results.csv'
-RESOURCE_MAP_CSV='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/1342314_tenant_deploy_resource_map.csv'
+RESULTS_CSV='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/1342314_tenant_deploy_results.csv'
+RESOURCE_MAP_CSV='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/1342314_tenant_deploy_resource_map.csv'
 STEP_PASS=0
 STEP_FAIL=0
 
@@ -281,95 +281,243 @@ openstack router add subnet "$ROUTER_NAME" "$SUBNET_NAME" >/dev/null 2>&1 || tru
 
 echo "Executing deployment steps..."
 
-run_step 'step-0001' 'compute' 'server' 'u24-postgresl-2' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server u24-postgresl-2"
-openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-postgresl-2'
+run_step 'step-0001' 'compute' 'server' 'jenkins' 'create_server_local_boot' 'image=Rocky Linux 8,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server jenkins"
+openstack server create --flavor 'gp.5.4.4' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'jenkins'
 STEP_EOF
 
 # Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'u24-postgresl-2' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'u24-postgresl-2' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u24-postgresl-2' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'jenkins' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'jenkins' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'jenkins' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
 _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'dc368b96-8438-435e-a658-80de118e6c0b' 'u24-postgresl-2' 'server' 'u24-postgresl-2' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+append_resource_map '55ee25c0-0fea-45c7-a800-8594ba587ba8' 'jenkins' 'server' 'jenkins' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0002' 'compute' 'floating_ip' 'u24-postgresl-2' 'assign_floating_ip' 'server=u24-postgresl-2,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24-postgresl-2'
-if server_has_floating_ip 'u24-postgresl-2'; then
-  echo "Server u24-postgresl-2 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24-postgresl-2' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0003' 'compute' 'server' 'u24-BackEnd-2' 'create_server_local_boot' 'image=Ubuntu 20.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server u24-BackEnd-2"
-openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 20.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-BackEnd-2'
+run_step 'step-0002' 'compute' 'server' 'debian11new' 'create_server_local_boot' 'image=Debian 11,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server debian11new"
+openstack server create --flavor 'gp.5.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian11new'
 STEP_EOF
 
 # Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'u24-BackEnd-2' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'u24-BackEnd-2' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u24-BackEnd-2' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'debian11new' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'debian11new' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'debian11new' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
 _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'd4270fdb-5def-472b-bafd-3d461c4d5d4c' 'u24-BackEnd-2' 'server' 'u24-BackEnd-2' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+append_resource_map 'cd6a356c-62fc-4763-aafc-ca342ec8f923' 'debian11new' 'server' 'debian11new' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0004' 'compute' 'floating_ip' 'u24-BackEnd-2' 'assign_floating_ip' 'server=u24-BackEnd-2,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24-BackEnd-2'
-if server_has_floating_ip 'u24-BackEnd-2'; then
-  echo "Server u24-BackEnd-2 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24-BackEnd-2' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0005' 'compute' 'server' 'u24-BackEnd-2' 'create_server_local_boot' 'image=Ubuntu 20.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server u24-BackEnd-2"
-openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 20.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-BackEnd-2'
+run_step 'step-0003' 'compute' 'server' 'dbian10new' 'create_server_local_boot' 'image=Debian 11,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server dbian10new"
+openstack server create --flavor 'gp.5.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian10new'
 STEP_EOF
 
 # Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'u24-BackEnd-2' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'u24-BackEnd-2' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u24-BackEnd-2' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'dbian10new' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'dbian10new' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'dbian10new' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
 _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'ece54f3a-6c6d-490a-ba59-e28e135878f6' 'u24-BackEnd-2' 'server' 'u24-BackEnd-2' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+append_resource_map '9262a99e-6bd3-495d-bacd-06a015b29088' 'dbian10new' 'server' 'dbian10new' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0006' 'compute' 'floating_ip' 'u24-BackEnd-2' 'assign_floating_ip' 'server=u24-BackEnd-2,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24-BackEnd-2'
-if server_has_floating_ip 'u24-BackEnd-2'; then
-  echo "Server u24-BackEnd-2 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24-BackEnd-2' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0007' 'compute' 'server' 'u24-FrontEnd 2' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server u24-FrontEnd 2"
-openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-FrontEnd 2'
+run_step 'step-0004' 'compute' 'server' 'u20' 'create_server_local_boot' 'image=Ubuntu 20.04,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server u20"
+openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 20.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u20'
 STEP_EOF
 
 # Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'u24-FrontEnd 2' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'u24-FrontEnd 2' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u24-FrontEnd 2' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'u20' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'u20' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u20' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
 _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '13822abd-c2c5-49d0-97d2-4b4c627df7a6' 'u24-FrontEnd 2' 'server' 'u24-FrontEnd 2' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+append_resource_map 'f4dd8084-20c4-40a4-8784-7db8c6c5162a' 'u20' 'server' 'u20' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0008' 'compute' 'floating_ip' 'u24-FrontEnd 2' 'assign_floating_ip' 'server=u24-FrontEnd 2,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24-FrontEnd 2'
-if server_has_floating_ip 'u24-FrontEnd 2'; then
-  echo "Server u24-FrontEnd 2 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24-FrontEnd 2' 'PUBLICNET'
-fi
+run_step 'step-0005' 'compute' 'server' 'debian10' 'create_server_local_boot' 'image=Debian 11,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server debian10"
+openstack server create --flavor 'gp.5.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian10'
 STEP_EOF
 
-run_step 'step-0009' 'compute' 'server' 'rocky8' 'create_server_local_boot' 'image=Rocky Linux 8,auth_mode=ssh_key' <<'STEP_EOF'
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'debian10' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'debian10' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'debian10' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '690a3cb9-2cd7-43ac-aa5d-16f1092b9ac2' 'debian10' 'server' 'debian10' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0006' 'compute' 'server' 'rocky9' 'create_server_local_boot' 'image=Rocky Linux 9,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server rocky9"
+openstack server create --flavor 'gp.5.2.2' --image 'Rocky Linux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'rocky9'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'rocky9' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'rocky9' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'rocky9' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '12962165-11ca-498c-8a2f-db69947f9264' 'rocky9' 'server' 'rocky9' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0007' 'compute' 'server' 'alma8' 'create_server_boot_from_volume' 'boot_volume_size_gb=50,source_boot_size_gb=50,image_min_disk_gb=20,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating boot volume for alma8"
+openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'AlmaLinux 8' 'boot-alma8'
+wait_for_volume_available 'boot-alma8'
+BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-alma8')
+openstack server create --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'alma8'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'alma8' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'alma8' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'alma8' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map 'f4680994-c54f-473a-8549-b6fb1176088c' 'alma8' 'server' 'alma8' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0008' 'compute' 'server' 'dbian11' 'create_server_boot_from_volume' 'boot_volume_size_gb=50,source_boot_size_gb=50,image_min_disk_gb=20,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating boot volume for dbian11"
+openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'Debian 11' 'boot-dbian11'
+wait_for_volume_available 'boot-dbian11'
+BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-dbian11')
+openstack server create --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian11'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'dbian11' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'dbian11' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'dbian11' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '74ae2aed-ea59-49f4-8e1d-cca502d526b8' 'dbian11' 'server' 'dbian11' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0009' 'compute' 'server' 'dbian12' 'create_server_boot_from_volume' 'boot_volume_size_gb=50,source_boot_size_gb=50,image_min_disk_gb=20,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating boot volume for dbian12"
+openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'Debian 12' 'boot-dbian12'
+wait_for_volume_available 'boot-dbian12'
+BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-dbian12')
+openstack server create --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian12'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'dbian12' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'dbian12' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'dbian12' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '8d7309ea-f39c-417b-8f50-c28f76ffd9db' 'dbian12' 'server' 'dbian12' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0010' 'compute' 'server' 'u22' 'create_server_boot_from_volume' 'boot_volume_size_gb=50,source_boot_size_gb=50,image_min_disk_gb=20,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating boot volume for u22"
+openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'Ubuntu 22.04' 'boot-u22'
+wait_for_volume_available 'boot-u22'
+BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-u22')
+openstack server create --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u22'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'u22' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'u22' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u22' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '3c37b506-7570-4d9d-8843-3629f65bcbda' 'u22' 'server' 'u22' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0011' 'compute' 'server' 'debianlaptopu24' 'create_server_boot_from_volume' 'boot_volume_size_gb=50,source_boot_size_gb=50,image_min_disk_gb=20,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating boot volume for debianlaptopu24"
+openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'Debian 12' 'boot-debianlaptopu24'
+wait_for_volume_available 'boot-debianlaptopu24'
+BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-debianlaptopu24')
+openstack server create --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debianlaptopu24'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'debianlaptopu24' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'debianlaptopu24' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'debianlaptopu24' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map 'e177369d-f3f2-4593-bfb1-d8837614ce57' 'debianlaptopu24' 'server' 'debianlaptopu24' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0012' 'compute' 'server' 'VMmigrator' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server VMmigrator"
+openstack server create --flavor 'gp.5.8.16' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'VMmigrator'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'VMmigrator' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'VMmigrator' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'VMmigrator' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '4229bb9a-cc0e-4f4b-9142-949cb887cc50' 'VMmigrator' 'server' 'VMmigrator' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0013' 'compute' 'server' 'u24-FrontEndlaptou24' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server u24-FrontEndlaptou24"
+openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-FrontEndlaptou24'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'u24-FrontEndlaptou24' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'u24-FrontEndlaptou24' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u24-FrontEndlaptou24' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map 'e015f188-5e04-4af8-884b-d924375c82ea' 'u24-FrontEndlaptou24' 'server' 'u24-FrontEndlaptou24' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0014' 'compute' 'server' 'db-replica2' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server db-replica2"
+openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'db-replica2'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'db-replica2' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'db-replica2' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'db-replica2' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '0c0f8ab2-da94-4356-9bc0-ca13e0a14563' 'db-replica2' 'server' 'db-replica2' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0015' 'compute' 'server' 'db-replica1' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server db-replica1"
+openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'db-replica1'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'db-replica1' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'db-replica1' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'db-replica1' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '6f7faf71-b98b-4b2f-a99e-92da841318fa' 'db-replica1' 'server' 'db-replica1' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0016' 'compute' 'server' 'target flex dbaas' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server target flex dbaas"
+openstack server create --flavor 'gp.5.4.8' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'target flex dbaas'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'target flex dbaas' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'target flex dbaas' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'target flex dbaas' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map '64783844-672f-4c87-8bd5-dac19690875f' 'target flex dbaas' 'server' 'target flex dbaas' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0017' 'compute' 'server' 'Alma9' 'create_server_local_boot' 'image=AlmaLinux 9,auth_mode=ssh_key' <<'STEP_EOF'
+echo "Creating server Alma9"
+openstack server create --flavor 'gp.5.4.8' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Alma9'
+STEP_EOF
+
+# Map OSPC server → FLEX server
+_MAP_FLEX_ID=$(openstack server show -f value -c id 'Alma9' 2>/dev/null || echo "")
+_MAP_FLEX_PRIV=$(instance_ip_on_network 'Alma9' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
+_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'Alma9' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
+_MAP_STATUS="created"
+[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
+append_resource_map 'de2cc03b-b53a-4f32-8b1b-8a3c9d757069' 'Alma9' 'server' 'Alma9' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
+
+run_step 'step-0018' 'compute' 'server' 'rocky8' 'create_server_local_boot' 'image=Rocky Linux 8,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server rocky8"
 openstack server create --flavor 'gp.5.4.8' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'rocky8'
 STEP_EOF
@@ -382,60 +530,7 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map '7afcc45d-4080-475e-a771-8ee1f265ef5c' 'rocky8' 'server' 'rocky8' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0010' 'compute' 'floating_ip' 'rocky8' 'assign_floating_ip' 'server=rocky8,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'rocky8'
-if server_has_floating_ip 'rocky8'; then
-  echo "Server rocky8 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'rocky8' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0011' 'compute' 'server' 'alma9-2gv1' 'create_server_local_boot' 'image=AlmaLinux 8,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server alma9-2gv1"
-openstack server create --flavor 'gp.5.2.2' --image 'AlmaLinux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'alma9-2gv1'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'alma9-2gv1' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'alma9-2gv1' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'alma9-2gv1' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '61313846-d2c3-4159-b471-7b9ab60be650' 'alma9-2gv1' 'server' 'alma9-2gv1' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0012' 'compute' 'floating_ip' 'alma9-2gv1' 'assign_floating_ip' 'server=alma9-2gv1,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'alma9-2gv1'
-if server_has_floating_ip 'alma9-2gv1'; then
-  echo "Server alma9-2gv1 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'alma9-2gv1' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0013' 'compute' 'server' 'debian10-Flav2gv1' 'create_server_local_boot' 'image=Debian 11,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server debian10-Flav2gv1"
-openstack server create --flavor 'gp.5.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian10-Flav2gv1'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'debian10-Flav2gv1' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'debian10-Flav2gv1' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'debian10-Flav2gv1' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '30a41d3e-718e-4410-a2c1-505edb81c092' 'debian10-Flav2gv1' 'server' 'debian10-Flav2gv1' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0014' 'compute' 'floating_ip' 'debian10-Flav2gv1' 'assign_floating_ip' 'server=debian10-Flav2gv1,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'debian10-Flav2gv1'
-if server_has_floating_ip 'debian10-Flav2gv1'; then
-  echo "Server debian10-Flav2gv1 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'debian10-Flav2gv1' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0015' 'compute' 'server' 'ospc-jumpHost' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+run_step 'step-0019' 'compute' 'server' 'ospc-jumpHost' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server ospc-jumpHost"
 openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'ospc-jumpHost'
 STEP_EOF
@@ -448,16 +543,7 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map '39e0d438-46cf-47c3-88e6-5a5f84859a84' 'ospc-jumpHost' 'server' 'ospc-jumpHost' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0016' 'compute' 'floating_ip' 'ospc-jumpHost' 'assign_floating_ip' 'server=ospc-jumpHost,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'ospc-jumpHost'
-if server_has_floating_ip 'ospc-jumpHost'; then
-  echo "Server ospc-jumpHost already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'ospc-jumpHost' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0017' 'compute' 'server' 'u24-postgresl' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+run_step 'step-0020' 'compute' 'server' 'u24-postgresl' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server u24-postgresl"
 openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-postgresl'
 STEP_EOF
@@ -470,62 +556,9 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map 'd9b51e0a-f7ae-4678-9e18-2971089c6af7' 'u24-postgresl' 'server' 'u24-postgresl' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0018' 'compute' 'floating_ip' 'u24-postgresl' 'assign_floating_ip' 'server=u24-postgresl,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24-postgresl'
-if server_has_floating_ip 'u24-postgresl'; then
-  echo "Server u24-postgresl already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24-postgresl' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0019' 'compute' 'server' 'u24-FrontEnd' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server u24-FrontEnd"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24-FrontEnd'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'u24-FrontEnd' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'u24-FrontEnd' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'u24-FrontEnd' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '7c7f7240-9973-43b6-9b14-bf4969806e86' 'u24-FrontEnd' 'server' 'u24-FrontEnd' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0020' 'compute' 'floating_ip' 'u24-FrontEnd' 'assign_floating_ip' 'server=u24-FrontEnd,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24-FrontEnd'
-if server_has_floating_ip 'u24-FrontEnd'; then
-  echo "Server u24-FrontEnd already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24-FrontEnd' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0021' 'compute' 'server' 'php-ospc' 'create_server_local_boot' 'image=Rocky Linux 8,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server php-ospc"
-openstack server create --flavor 'gp.5.4.4' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'php-ospc'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'php-ospc' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'php-ospc' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'php-ospc' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'b6bbe416-0eac-4aa2-8dd1-89b8e0fbd969' 'php-ospc' 'server' 'php-ospc' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0022' 'compute' 'floating_ip' 'php-ospc' 'assign_floating_ip' 'server=php-ospc,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'php-ospc'
-if server_has_floating_ip 'php-ospc'; then
-  echo "Server php-ospc already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'php-ospc' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0023' 'compute' 'server' 'Windows Server 2019Re' 'create_server_local_boot' 'image=Windows Server 2019,auth_mode=windows_password' <<'STEP_EOF'
+run_step 'step-0021' 'compute' 'server' 'Windows Server 2019Re' 'create_server_local_boot' 'image=Windows Server 2019,auth_mode=windows_password' <<'STEP_EOF'
 echo "Creating server Windows Server 2019Re"
-openstack server create --flavor 'gp.5.2.4' --image 'Windows Server 2019' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password '2UuKmoCptzNpm3' 'Windows Server 2019Re'
+openstack server create --flavor 'gp.5.2.4' --image 'Windows Server 2019' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'IHxswwOBzjptZc' 'Windows Server 2019Re'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -536,18 +569,9 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map 'd8753e16-0039-4c04-993c-7e14be21e212' 'Windows Server 2019Re' 'server' 'Windows Server 2019Re' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0024' 'compute' 'floating_ip' 'Windows Server 2019Re' 'assign_floating_ip' 'server=Windows Server 2019Re,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'Windows Server 2019Re'
-if server_has_floating_ip 'Windows Server 2019Re'; then
-  echo "Server Windows Server 2019Re already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'Windows Server 2019Re' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0025' 'compute' 'server' 'win2019websql2019' 'create_server_local_boot' 'image=Windows Server 2019 with SQL 2019 Web,auth_mode=windows_password' <<'STEP_EOF'
+run_step 'step-0022' 'compute' 'server' 'win2019websql2019' 'create_server_local_boot' 'image=Windows Server 2019 with SQL 2019 Web,auth_mode=windows_password' <<'STEP_EOF'
 echo "Creating server win2019websql2019"
-openstack server create --flavor 'gp.5.2.4' --image 'Windows Server 2019 with SQL 2019 Web' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'PgQChS5vqZJWmU' 'win2019websql2019'
+openstack server create --flavor 'gp.5.2.4' --image 'Windows Server 2019 with SQL 2019 Web' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'Ji7fRagQVsGzMQ' 'win2019websql2019'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -558,18 +582,9 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map '47f882bf-4d6d-41d6-baef-cfcc7a9c5e61' 'win2019websql2019' 'server' 'win2019websql2019' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0026' 'compute' 'floating_ip' 'win2019websql2019' 'assign_floating_ip' 'server=win2019websql2019,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'win2019websql2019'
-if server_has_floating_ip 'win2019websql2019'; then
-  echo "Server win2019websql2019 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'win2019websql2019' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0027' 'compute' 'server' 'Windows Server 2016 + SQL Server 2019' 'create_server_local_boot' 'image=Windows Server 2016,auth_mode=windows_password' <<'STEP_EOF'
+run_step 'step-0023' 'compute' 'server' 'Windows Server 2016 + SQL Server 2019' 'create_server_local_boot' 'image=Windows Server 2016,auth_mode=windows_password' <<'STEP_EOF'
 echo "Creating server Windows Server 2016 + SQL Server 2019"
-openstack server create --flavor 'gp.5.2.4' --image 'Windows Server 2016' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'x1ScQcStTrkNNp' 'Windows Server 2016 + SQL Server 2019'
+openstack server create --flavor 'gp.5.2.4' --image 'Windows Server 2016' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'jafbZgqNLhE0ae' 'Windows Server 2016 + SQL Server 2019'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -580,16 +595,7 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map '741c63ea-e4ae-4048-b6cb-fc7b7716034e' 'Windows Server 2016 + SQL Server 2019' 'server' 'Windows Server 2016 + SQL Server 2019' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0028' 'compute' 'floating_ip' 'Windows Server 2016 + SQL Server 2019' 'assign_floating_ip' 'server=Windows Server 2016 + SQL Server 2019,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'Windows Server 2016 + SQL Server 2019'
-if server_has_floating_ip 'Windows Server 2016 + SQL Server 2019'; then
-  echo "Server Windows Server 2016 + SQL Server 2019 already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'Windows Server 2016 + SQL Server 2019' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0029' 'compute' 'server' 'u24Backend' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
+run_step 'step-0024' 'compute' 'server' 'u24Backend' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server u24Backend"
 openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24Backend'
 STEP_EOF
@@ -602,211 +608,7 @@ _MAP_STATUS="created"
 [ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
 append_resource_map '6b24fa27-fada-461b-b50a-41cb64e453ab' 'u24Backend' 'server' 'u24Backend' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
 
-run_step 'step-0030' 'compute' 'floating_ip' 'u24Backend' 'assign_floating_ip' 'server=u24Backend,network=PUBLICNET' <<'STEP_EOF'
-wait_for_server_active 'u24Backend'
-if server_has_floating_ip 'u24Backend'; then
-  echo "Server u24Backend already has a floating IP; skipping assignment."
-else
-  assign_floating_ip 'u24Backend' 'PUBLICNET'
-fi
-STEP_EOF
-
-run_step 'step-0031' 'compute' 'server' 'HA percona 8-02' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA percona 8-02"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-02'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA percona 8-02' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA percona 8-02' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA percona 8-02' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '0651b25a-9810-41d2-ac00-d30aae53fcdc' 'HA percona 8-02' 'server' 'HA percona 8-02' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0032' 'compute' 'server' 'drupal' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server drupal"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'drupal'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'drupal' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'drupal' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'drupal' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '0e0c1ccf-e8be-4e40-8e04-772307364118' 'drupal' 'server' 'drupal' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0033' 'compute' 'server' 'HA-Mysql8-01' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA-Mysql8-01"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-Mysql8-01'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA-Mysql8-01' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA-Mysql8-01' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA-Mysql8-01' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '15794001-4db3-41bf-adbd-a00a149d02d6' 'HA-Mysql8-01' 'server' 'HA-Mysql8-01' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0034' 'compute' 'server' 'HA-mariaDB-02' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA-mariaDB-02"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-02'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA-mariaDB-02' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA-mariaDB-02' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA-mariaDB-02' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '1a36ff59-5a25-4777-a8df-aabf6cf7edb0' 'HA-mariaDB-02' 'server' 'HA-mariaDB-02' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0035' 'compute' 'server' 'php-ospc_Database' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server php-ospc_Database"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'php-ospc_Database'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'php-ospc_Database' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'php-ospc_Database' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'php-ospc_Database' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '2c3305c8-ce6b-4863-a2a7-2c3d198f314c' 'php-ospc_Database' 'server' 'php-ospc_Database' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0036' 'compute' 'server' 'HA percona 8-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA percona 8-03"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-03'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA percona 8-03' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA percona 8-03' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA percona 8-03' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '3fdbbf29-3a17-4bd3-9c86-0b74baf18624' 'HA percona 8-03' 'server' 'HA percona 8-03' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0037' 'compute' 'server' 'HA-mariaDB-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA-mariaDB-03"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-03'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA-mariaDB-03' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA-mariaDB-03' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA-mariaDB-03' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '40a3b380-61cf-4a69-a474-d8f68d81c750' 'HA-mariaDB-03' 'server' 'HA-mariaDB-03' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0038' 'compute' 'server' 'Stack-05_Database' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server Stack-05_Database"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Stack-05_Database'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'Stack-05_Database' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'Stack-05_Database' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'Stack-05_Database' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '4d0ced3c-c5b5-4cf3-aa17-729cd74ce1e5' 'Stack-05_Database' 'server' 'Stack-05_Database' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0039' 'compute' 'server' 'sql' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server sql"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'sql'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'sql' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'sql' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'sql' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '5b05ea2c-c452-4069-97f3-f2bc80e7182f' 'sql' 'server' 'sql' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0040' 'compute' 'server' 'HA-Mysql8-02' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA-Mysql8-02"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-Mysql8-02'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA-Mysql8-02' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA-Mysql8-02' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA-Mysql8-02' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '8e0d09e1-fce1-4343-b84c-cc2342b21310' 'HA-Mysql8-02' 'server' 'HA-Mysql8-02' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0041' 'compute' 'server' 'HA-mariaDB-01' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA-mariaDB-01"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-01'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA-mariaDB-01' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA-mariaDB-01' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA-mariaDB-01' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map '8fa64835-2ae3-492d-8d9b-7c19a40715b3' 'HA-mariaDB-01' 'server' 'HA-mariaDB-01' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0042' 'compute' 'server' 'Instance-05-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server Instance-05-03"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Instance-05-03'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'Instance-05-03' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'Instance-05-03' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'Instance-05-03' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'aa2c81fd-18de-4258-a5b5-5f23c44e8bb7' 'Instance-05-03' 'server' 'Instance-05-03' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0043' 'compute' 'server' 'HA percona 8-01' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA percona 8-01"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-01'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA percona 8-01' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA percona 8-01' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA percona 8-01' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'b5101823-3e0c-4885-9ab9-ad06f40f5c64' 'HA percona 8-01' 'server' 'HA percona 8-01' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0044' 'compute' 'server' 'Instance-05-02' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server Instance-05-02"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Instance-05-02'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'Instance-05-02' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'Instance-05-02' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'Instance-05-02' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'c0e7d35e-1065-458e-b5f8-64fc68fcfa41' 'Instance-05-02' 'server' 'Instance-05-02' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0045' 'compute' 'server' 'HA-Mysql8-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
-echo "Creating server HA-Mysql8-03"
-openstack server create --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-Mysql8-03'
-STEP_EOF
-
-# Map OSPC server → FLEX server
-_MAP_FLEX_ID=$(openstack server show -f value -c id 'HA-Mysql8-03' 2>/dev/null || echo "")
-_MAP_FLEX_PRIV=$(instance_ip_on_network 'HA-Mysql8-03' "$PRIVATE_NETWORK" 2>/dev/null || echo "")
-_MAP_FLEX_FLOAT=$(openstack floating ip list --server 'HA-Mysql8-03' -f value -c 'Floating IP Address' 2>/dev/null | head -n1 || echo "")
-_MAP_STATUS="created"
-[ -z "$_MAP_FLEX_ID" ] && _MAP_STATUS="failed"
-append_resource_map 'c1b4a7aa-edc1-49b3-b6dc-cc136e52a06b' 'HA-Mysql8-03' 'server' 'HA-Mysql8-03' "$_MAP_FLEX_ID" "$_MAP_FLEX_PRIV" "$_MAP_FLEX_FLOAT" "$_MAP_STATUS"
-
-run_step 'step-0046' 'load_balancer' 'load_balancer' 'frontend- Load-Balancer-01' 'create_or_reuse_lb_stack' 'provider=amphora,protocol=HTTP,listener_port=80,algorithm=LEAST_CONNECTIONS' <<'STEP_EOF'
+run_step 'step-0025' 'load_balancer' 'load_balancer' 'frontend- Load-Balancer-01' 'create_or_reuse_lb_stack' 'provider=amphora,protocol=HTTP,listener_port=80,algorithm=LEAST_CONNECTIONS' <<'STEP_EOF'
 echo "Ensuring load balancer frontend- Load-Balancer-01"
 VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
 openstack loadbalancer show 'frontend- Load-Balancer-01' >/dev/null 2>&1 || openstack loadbalancer create --name 'frontend- Load-Balancer-01' --provider 'amphora' --vip-subnet-id "$VIP_SUBNET_ID"
@@ -822,22 +624,143 @@ _MAP_LB_ID=$(openstack loadbalancer show -f value -c id 'frontend- Load-Balancer
 _MAP_LB_VIP=$(openstack loadbalancer show -f value -c vip_address 'frontend- Load-Balancer-01' 2>/dev/null || echo "")
 append_resource_map '' '' 'load_balancer' 'frontend- Load-Balancer-01' "$_MAP_LB_ID" "$_MAP_LB_VIP" "" 'created'
 
-run_step 'step-0047' 'load_balancer' 'load_balancer_member' 'u24-FrontEnd' 'ensure_lb_pool_member' 'lb=frontend- Load-Balancer-01,pool=frontend-load-balancer-01-pool,member_port=80' <<'STEP_EOF'
-wait_for_server_active 'u24-FrontEnd'
+run_step 'step-0026' 'load_balancer' 'load_balancer' 'u24backend' 'create_or_reuse_lb_stack' 'provider=amphora,protocol=HTTP,listener_port=80,algorithm=LEAST_CONNECTIONS' <<'STEP_EOF'
+echo "Ensuring load balancer u24backend"
 VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
-MEMBER_IP=$(wait_for_instance_ip_on_network 'u24-FrontEnd' "$PRIVATE_NETWORK" || true)
+openstack loadbalancer show 'u24backend' >/dev/null 2>&1 || openstack loadbalancer create --name 'u24backend' --provider 'amphora' --vip-subnet-id "$VIP_SUBNET_ID"
+wait_for_loadbalancer_active 'u24backend'
+openstack loadbalancer listener show 'u24backend-listener' >/dev/null 2>&1 || openstack loadbalancer listener create --name 'u24backend-listener' --protocol 'HTTP' --protocol-port 80 'u24backend'
+wait_for_loadbalancer_active 'u24backend'
+openstack loadbalancer pool show 'u24backend-pool' >/dev/null 2>&1 || openstack loadbalancer pool create --name 'u24backend-pool' --lb-algorithm 'LEAST_CONNECTIONS' --listener 'u24backend-listener' --protocol 'HTTP'
+wait_for_loadbalancer_active 'u24backend'
+STEP_EOF
+
+# Map OSPC LB → FLEX LB
+_MAP_LB_ID=$(openstack loadbalancer show -f value -c id 'u24backend' 2>/dev/null || echo "")
+_MAP_LB_VIP=$(openstack loadbalancer show -f value -c vip_address 'u24backend' 2>/dev/null || echo "")
+append_resource_map '' '' 'load_balancer' 'u24backend' "$_MAP_LB_ID" "$_MAP_LB_VIP" "" 'created'
+
+run_step 'step-0027' 'load_balancer' 'load_balancer_member' 'Alma9' 'ensure_lb_pool_member' 'lb=u24backend,pool=u24backend-pool,member_port=80' <<'STEP_EOF'
+wait_for_server_active 'Alma9'
+VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
+MEMBER_IP=$(wait_for_instance_ip_on_network 'Alma9' "$PRIVATE_NETWORK" || true)
 if [ -n "$MEMBER_IP" ]; then
-  if openstack loadbalancer member list 'frontend-load-balancer-01-pool' -f value -c address 2>/dev/null | grep -Fx "$MEMBER_IP" >/dev/null 2>&1; then
-    echo "LB member already exists for $MEMBER_IP on pool frontend-load-balancer-01-pool"
+  if openstack loadbalancer member list 'u24backend-pool' -f value -c address 2>/dev/null | grep -Fx "$MEMBER_IP" >/dev/null 2>&1; then
+    echo "LB member already exists for $MEMBER_IP on pool u24backend-pool"
   else
-    openstack loadbalancer member create --subnet-id "$VIP_SUBNET_ID" --address "$MEMBER_IP" --protocol-port 80 'frontend-load-balancer-01-pool' || true
+    openstack loadbalancer member create --subnet-id "$VIP_SUBNET_ID" --address "$MEMBER_IP" --protocol-port 80 'u24backend-pool' || true
   fi
 else
-  echo "Could not resolve member IP for u24-FrontEnd on $PRIVATE_NETWORK; skipping member add." >&2
+  echo "Could not resolve member IP for Alma9 on $PRIVATE_NETWORK; skipping member add." >&2
 fi
 STEP_EOF
 
-run_step 'step-0048' 'storage' 'volume' 'u24-postgresl-data-1' 'create_and_attach_volume' 'server=u24-postgresl,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
+run_step 'step-0028' 'load_balancer' 'load_balancer_member' 'u24Backend' 'ensure_lb_pool_member' 'lb=u24backend,pool=u24backend-pool,member_port=80' <<'STEP_EOF'
+wait_for_server_active 'u24Backend'
+VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
+MEMBER_IP=$(wait_for_instance_ip_on_network 'u24Backend' "$PRIVATE_NETWORK" || true)
+if [ -n "$MEMBER_IP" ]; then
+  if openstack loadbalancer member list 'u24backend-pool' -f value -c address 2>/dev/null | grep -Fx "$MEMBER_IP" >/dev/null 2>&1; then
+    echo "LB member already exists for $MEMBER_IP on pool u24backend-pool"
+  else
+    openstack loadbalancer member create --subnet-id "$VIP_SUBNET_ID" --address "$MEMBER_IP" --protocol-port 80 'u24backend-pool' || true
+  fi
+else
+  echo "Could not resolve member IP for u24Backend on $PRIVATE_NETWORK; skipping member add." >&2
+fi
+STEP_EOF
+
+run_step 'step-0029' 'load_balancer' 'load_balancer' 'DB_loadbalancer MYSQL' 'create_or_reuse_lb_stack' 'provider=amphora,protocol=MYSQL,listener_port=3306,algorithm=ROUND_ROBIN' <<'STEP_EOF'
+echo "Ensuring load balancer DB_loadbalancer MYSQL"
+VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
+openstack loadbalancer show 'DB_loadbalancer MYSQL' >/dev/null 2>&1 || openstack loadbalancer create --name 'DB_loadbalancer MYSQL' --provider 'amphora' --vip-subnet-id "$VIP_SUBNET_ID"
+wait_for_loadbalancer_active 'DB_loadbalancer MYSQL'
+openstack loadbalancer listener show 'db-loadbalancer-mysql-listener' >/dev/null 2>&1 || openstack loadbalancer listener create --name 'db-loadbalancer-mysql-listener' --protocol 'MYSQL' --protocol-port 3306 'DB_loadbalancer MYSQL'
+wait_for_loadbalancer_active 'DB_loadbalancer MYSQL'
+openstack loadbalancer pool show 'db-loadbalancer-mysql-pool' >/dev/null 2>&1 || openstack loadbalancer pool create --name 'db-loadbalancer-mysql-pool' --lb-algorithm 'ROUND_ROBIN' --listener 'db-loadbalancer-mysql-listener' --protocol 'MYSQL'
+wait_for_loadbalancer_active 'DB_loadbalancer MYSQL'
+STEP_EOF
+
+# Map OSPC LB → FLEX LB
+_MAP_LB_ID=$(openstack loadbalancer show -f value -c id 'DB_loadbalancer MYSQL' 2>/dev/null || echo "")
+_MAP_LB_VIP=$(openstack loadbalancer show -f value -c vip_address 'DB_loadbalancer MYSQL' 2>/dev/null || echo "")
+append_resource_map '' '' 'load_balancer' 'DB_loadbalancer MYSQL' "$_MAP_LB_ID" "$_MAP_LB_VIP" "" 'created'
+
+run_step 'step-0030' 'load_balancer' 'load_balancer' 'LBmariaDB' 'create_or_reuse_lb_stack' 'provider=amphora,protocol=MYSQL,listener_port=3306,algorithm=LEAST_CONNECTIONS' <<'STEP_EOF'
+echo "Ensuring load balancer LBmariaDB"
+VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
+openstack loadbalancer show 'LBmariaDB' >/dev/null 2>&1 || openstack loadbalancer create --name 'LBmariaDB' --provider 'amphora' --vip-subnet-id "$VIP_SUBNET_ID"
+wait_for_loadbalancer_active 'LBmariaDB'
+openstack loadbalancer listener show 'lbmariadb-listener' >/dev/null 2>&1 || openstack loadbalancer listener create --name 'lbmariadb-listener' --protocol 'MYSQL' --protocol-port 3306 'LBmariaDB'
+wait_for_loadbalancer_active 'LBmariaDB'
+openstack loadbalancer pool show 'lbmariadb-pool' >/dev/null 2>&1 || openstack loadbalancer pool create --name 'lbmariadb-pool' --lb-algorithm 'LEAST_CONNECTIONS' --listener 'lbmariadb-listener' --protocol 'MYSQL'
+wait_for_loadbalancer_active 'LBmariaDB'
+STEP_EOF
+
+# Map OSPC LB → FLEX LB
+_MAP_LB_ID=$(openstack loadbalancer show -f value -c id 'LBmariaDB' 2>/dev/null || echo "")
+_MAP_LB_VIP=$(openstack loadbalancer show -f value -c vip_address 'LBmariaDB' 2>/dev/null || echo "")
+append_resource_map '' '' 'load_balancer' 'LBmariaDB' "$_MAP_LB_ID" "$_MAP_LB_VIP" "" 'created'
+
+run_step 'step-0031' 'load_balancer' 'load_balancer' 'perconaLB' 'create_or_reuse_lb_stack' 'provider=amphora,protocol=MYSQL,listener_port=3306,algorithm=LEAST_CONNECTIONS' <<'STEP_EOF'
+echo "Ensuring load balancer perconaLB"
+VIP_SUBNET_ID=$(openstack subnet show -f value -c id "$SUBNET_NAME")
+openstack loadbalancer show 'perconaLB' >/dev/null 2>&1 || openstack loadbalancer create --name 'perconaLB' --provider 'amphora' --vip-subnet-id "$VIP_SUBNET_ID"
+wait_for_loadbalancer_active 'perconaLB'
+openstack loadbalancer listener show 'perconalb-listener' >/dev/null 2>&1 || openstack loadbalancer listener create --name 'perconalb-listener' --protocol 'MYSQL' --protocol-port 3306 'perconaLB'
+wait_for_loadbalancer_active 'perconaLB'
+openstack loadbalancer pool show 'perconalb-pool' >/dev/null 2>&1 || openstack loadbalancer pool create --name 'perconalb-pool' --lb-algorithm 'LEAST_CONNECTIONS' --listener 'perconalb-listener' --protocol 'MYSQL'
+wait_for_loadbalancer_active 'perconaLB'
+STEP_EOF
+
+# Map OSPC LB → FLEX LB
+_MAP_LB_ID=$(openstack loadbalancer show -f value -c id 'perconaLB' 2>/dev/null || echo "")
+_MAP_LB_VIP=$(openstack loadbalancer show -f value -c vip_address 'perconaLB' 2>/dev/null || echo "")
+append_resource_map '' '' 'load_balancer' 'perconaLB' "$_MAP_LB_ID" "$_MAP_LB_VIP" "" 'created'
+
+run_step 'step-0032' 'storage' 'volume' 'vmmigrator-data-1' 'create_and_attach_volume' 'server=VMmigrator,device=/dev/vdb,size_gb=750' <<'STEP_EOF'
+wait_for_server_active 'VMmigrator'
+echo "Creating data volume vmmigrator-data-1 for instance VMmigrator"
+openstack volume create --size 750 --type "$VOLUME_TYPE" 'vmmigrator-data-1'
+wait_for_volume_available 'vmmigrator-data-1'
+VOL_ID=$(openstack volume show -f value -c id 'vmmigrator-data-1')
+echo "Attaching volume vmmigrator-data-1 to instance VMmigrator at /dev/vdb (max 5 retries)"
+attach_volume_with_retry 'VMmigrator' "$VOL_ID" '/dev/vdb'
+STEP_EOF
+
+# Map OSPC volume → FLEX volume
+_MAP_VOL_ID=$(openstack volume show -f value -c id 'vmmigrator-data-1' 2>/dev/null || echo "")
+append_resource_map '4229bb9a-cc0e-4f4b-9142-949cb887cc50' 'VMmigrator' 'volume' 'vmmigrator-data-1' "$_MAP_VOL_ID" "" "" 'created'
+
+run_step 'step-0033' 'storage' 'volume' 'ospc-jumphost-data-1' 'create_and_attach_volume' 'server=ospc-jumpHost,device=/dev/vdc,size_gb=200' <<'STEP_EOF'
+wait_for_server_active 'ospc-jumpHost'
+echo "Creating data volume ospc-jumphost-data-1 for instance ospc-jumpHost"
+openstack volume create --size 200 --type "$VOLUME_TYPE" 'ospc-jumphost-data-1'
+wait_for_volume_available 'ospc-jumphost-data-1'
+VOL_ID=$(openstack volume show -f value -c id 'ospc-jumphost-data-1')
+echo "Attaching volume ospc-jumphost-data-1 to instance ospc-jumpHost at /dev/vdc (max 5 retries)"
+attach_volume_with_retry 'ospc-jumpHost' "$VOL_ID" '/dev/vdc'
+STEP_EOF
+
+# Map OSPC volume → FLEX volume
+_MAP_VOL_ID=$(openstack volume show -f value -c id 'ospc-jumphost-data-1' 2>/dev/null || echo "")
+append_resource_map '39e0d438-46cf-47c3-88e6-5a5f84859a84' 'ospc-jumpHost' 'volume' 'ospc-jumphost-data-1' "$_MAP_VOL_ID" "" "" 'created'
+
+run_step 'step-0034' 'storage' 'volume' 'ospc-jumphost-data-2' 'create_and_attach_volume' 'server=ospc-jumpHost,device=/dev/vdb,size_gb=500' <<'STEP_EOF'
+wait_for_server_active 'ospc-jumpHost'
+echo "Creating data volume ospc-jumphost-data-2 for instance ospc-jumpHost"
+openstack volume create --size 500 --type "$VOLUME_TYPE" 'ospc-jumphost-data-2'
+wait_for_volume_available 'ospc-jumphost-data-2'
+VOL_ID=$(openstack volume show -f value -c id 'ospc-jumphost-data-2')
+echo "Attaching volume ospc-jumphost-data-2 to instance ospc-jumpHost at /dev/vdb (max 5 retries)"
+attach_volume_with_retry 'ospc-jumpHost' "$VOL_ID" '/dev/vdb'
+STEP_EOF
+
+# Map OSPC volume → FLEX volume
+_MAP_VOL_ID=$(openstack volume show -f value -c id 'ospc-jumphost-data-2' 2>/dev/null || echo "")
+append_resource_map '39e0d438-46cf-47c3-88e6-5a5f84859a84' 'ospc-jumpHost' 'volume' 'ospc-jumphost-data-2' "$_MAP_VOL_ID" "" "" 'created'
+
+run_step 'step-0035' 'storage' 'volume' 'u24-postgresl-data-1' 'create_and_attach_volume' 'server=u24-postgresl,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
 wait_for_server_active 'u24-postgresl'
 echo "Creating data volume u24-postgresl-data-1 for instance u24-postgresl"
 openstack volume create --size 75 --type "$VOLUME_TYPE" 'u24-postgresl-data-1'
@@ -851,35 +774,7 @@ STEP_EOF
 _MAP_VOL_ID=$(openstack volume show -f value -c id 'u24-postgresl-data-1' 2>/dev/null || echo "")
 append_resource_map 'd9b51e0a-f7ae-4678-9e18-2971089c6af7' 'u24-postgresl' 'volume' 'u24-postgresl-data-1' "$_MAP_VOL_ID" "" "" 'created'
 
-run_step 'step-0049' 'storage' 'volume' 'u24-frontend-data-1' 'create_and_attach_volume' 'server=u24-FrontEnd,device=/dev/vdc,size_gb=75' <<'STEP_EOF'
-wait_for_server_active 'u24-FrontEnd'
-echo "Creating data volume u24-frontend-data-1 for instance u24-FrontEnd"
-openstack volume create --size 75 --type "$VOLUME_TYPE" 'u24-frontend-data-1'
-wait_for_volume_available 'u24-frontend-data-1'
-VOL_ID=$(openstack volume show -f value -c id 'u24-frontend-data-1')
-echo "Attaching volume u24-frontend-data-1 to instance u24-FrontEnd at /dev/vdc (max 5 retries)"
-attach_volume_with_retry 'u24-FrontEnd' "$VOL_ID" '/dev/vdc'
-STEP_EOF
-
-# Map OSPC volume → FLEX volume
-_MAP_VOL_ID=$(openstack volume show -f value -c id 'u24-frontend-data-1' 2>/dev/null || echo "")
-append_resource_map '7c7f7240-9973-43b6-9b14-bf4969806e86' 'u24-FrontEnd' 'volume' 'u24-frontend-data-1' "$_MAP_VOL_ID" "" "" 'created'
-
-run_step 'step-0050' 'storage' 'volume' 'u24-frontend-data-2' 'create_and_attach_volume' 'server=u24-FrontEnd,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
-wait_for_server_active 'u24-FrontEnd'
-echo "Creating data volume u24-frontend-data-2 for instance u24-FrontEnd"
-openstack volume create --size 75 --type "$VOLUME_TYPE" 'u24-frontend-data-2'
-wait_for_volume_available 'u24-frontend-data-2'
-VOL_ID=$(openstack volume show -f value -c id 'u24-frontend-data-2')
-echo "Attaching volume u24-frontend-data-2 to instance u24-FrontEnd at /dev/vdb (max 5 retries)"
-attach_volume_with_retry 'u24-FrontEnd' "$VOL_ID" '/dev/vdb'
-STEP_EOF
-
-# Map OSPC volume → FLEX volume
-_MAP_VOL_ID=$(openstack volume show -f value -c id 'u24-frontend-data-2' 2>/dev/null || echo "")
-append_resource_map '7c7f7240-9973-43b6-9b14-bf4969806e86' 'u24-FrontEnd' 'volume' 'u24-frontend-data-2' "$_MAP_VOL_ID" "" "" 'created'
-
-run_step 'step-0051' 'storage' 'volume' 'windows-server-2019re-data-1' 'create_and_attach_volume' 'server=Windows Server 2019Re,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
+run_step 'step-0036' 'storage' 'volume' 'windows-server-2019re-data-1' 'create_and_attach_volume' 'server=Windows Server 2019Re,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
 wait_for_server_active 'Windows Server 2019Re'
 echo "Creating data volume windows-server-2019re-data-1 for instance Windows Server 2019Re"
 openstack volume create --size 75 --type "$VOLUME_TYPE" 'windows-server-2019re-data-1'
@@ -893,7 +788,7 @@ STEP_EOF
 _MAP_VOL_ID=$(openstack volume show -f value -c id 'windows-server-2019re-data-1' 2>/dev/null || echo "")
 append_resource_map 'd8753e16-0039-4c04-993c-7e14be21e212' 'Windows Server 2019Re' 'volume' 'windows-server-2019re-data-1' "$_MAP_VOL_ID" "" "" 'created'
 
-run_step 'step-0052' 'storage' 'volume' 'win2019websql2019-data-1' 'create_and_attach_volume' 'server=win2019websql2019,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
+run_step 'step-0037' 'storage' 'volume' 'win2019websql2019-data-1' 'create_and_attach_volume' 'server=win2019websql2019,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
 wait_for_server_active 'win2019websql2019'
 echo "Creating data volume win2019websql2019-data-1 for instance win2019websql2019"
 openstack volume create --size 75 --type "$VOLUME_TYPE" 'win2019websql2019-data-1'
@@ -907,7 +802,7 @@ STEP_EOF
 _MAP_VOL_ID=$(openstack volume show -f value -c id 'win2019websql2019-data-1' 2>/dev/null || echo "")
 append_resource_map '47f882bf-4d6d-41d6-baef-cfcc7a9c5e61' 'win2019websql2019' 'volume' 'win2019websql2019-data-1' "$_MAP_VOL_ID" "" "" 'created'
 
-run_step 'step-0053' 'storage' 'volume' 'windows-server-2016-sql-server-2019-data-1' 'create_and_attach_volume' 'server=Windows Server 2016 + SQL Server 2019,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
+run_step 'step-0038' 'storage' 'volume' 'windows-server-2016-sql-server-2019-data-1' 'create_and_attach_volume' 'server=Windows Server 2016 + SQL Server 2019,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
 wait_for_server_active 'Windows Server 2016 + SQL Server 2019'
 echo "Creating data volume windows-server-2016-sql-server-2019-data-1 for instance Windows Server 2016 + SQL Server 2019"
 openstack volume create --size 75 --type "$VOLUME_TYPE" 'windows-server-2016-sql-server-2019-data-1'
@@ -921,7 +816,7 @@ STEP_EOF
 _MAP_VOL_ID=$(openstack volume show -f value -c id 'windows-server-2016-sql-server-2019-data-1' 2>/dev/null || echo "")
 append_resource_map '741c63ea-e4ae-4048-b6cb-fc7b7716034e' 'Windows Server 2016 + SQL Server 2019' 'volume' 'windows-server-2016-sql-server-2019-data-1' "$_MAP_VOL_ID" "" "" 'created'
 
-run_step 'step-0054' 'storage' 'volume' 'u24backend-data-1' 'create_and_attach_volume' 'server=u24Backend,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
+run_step 'step-0039' 'storage' 'volume' 'u24backend-data-1' 'create_and_attach_volume' 'server=u24Backend,device=/dev/vdb,size_gb=75' <<'STEP_EOF'
 wait_for_server_active 'u24Backend'
 echo "Creating data volume u24backend-data-1 for instance u24Backend"
 openstack volume create --size 75 --type "$VOLUME_TYPE" 'u24backend-data-1'

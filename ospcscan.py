@@ -163,7 +163,16 @@ for s in all_servers:
             ip = a.get("addr", "")
             if ":" in ip:
                 continue
-            if ip.startswith(("10.", "192.168.", "172.")):
+            
+            is_priv = False
+            if ip.startswith("10.") or ip.startswith("192.168."):
+                is_priv = True
+            elif ip.startswith("172."):
+                parts = ip.split(".")
+                if len(parts) >= 2 and parts[1].isdigit() and 16 <= int(parts[1]) <= 31:
+                    is_priv = True
+            
+            if is_priv:
                 priv_ip = priv_ip or ip
             elif ip:
                 pub_ip = pub_ip or ip

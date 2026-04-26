@@ -14,8 +14,8 @@
     body {
       font-family: "Segoe UI", Tahoma, sans-serif; font-size: 14px;
       background: linear-gradient(120deg,#2a4e8d 0%,#374a86 45%,#5a4b72 100%);
-      color: var(--text); height: 100vh; display: flex;
-      flex-direction: column; overflow: hidden;
+      color: var(--text); min-height: 100vh; height: auto;
+      display: block; overflow-x: hidden; overflow-y: auto;
     }
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
     /* ── Real neon tube: title text blinks cyan ── */
@@ -269,13 +269,13 @@
     .sub-btn.active { background: var(--primary); border-color: #8ea2cc; }
 
     /* Panel area */
-    .panel-area { flex: 1; overflow: hidden; position: relative; }
-    .panel { display: none; width: 100%; height: 100%; }
+    .panel-area { overflow: visible; position: relative; }
+    .panel { display: none; width: 100%; height: auto; min-height: calc(100vh - 260px); }
     .panel.active { display: block; }
-    iframe { width: 100%; height: 100%; border: none; background: transparent; }
+    iframe { width: 100%; min-height: calc(100vh - 260px); height: 1200px; border: none; background: transparent; display: block; }
 
     /* Info panels */
-    .info-panel { height: 100%; overflow-y: auto; padding: 20px 24px; }
+    .info-panel { height: auto; overflow: visible; min-height: calc(100vh - 260px); padding: 20px 24px; }
     .info-panel h2 { font-size: 17px; color: #7ecfff; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
     .info-panel h3 { font-size: 13px; color: #a8d8ff; margin: 14px 0 6px; }
     .info-panel ul { padding-left: 20px; line-height: 1.75; color: var(--muted); }
@@ -562,6 +562,11 @@
           <h1 style="color:#7ecfff; margin:0; font-size:28px;">Customer FLEX migration readiness and backlog</h1>
           <p style="color:#a8d8ff; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
         </div>
+        <div style="flex:1; display:flex; justify-content:center; padding:0 24px;">
+          <button id="btnToggleProjectDocsUpload" style="padding:12px 20px; background:linear-gradient(135deg, #0f766e, #0891b2); color:white; border:1px solid #67e8f9; border-radius:8px; font-weight:700; cursor:pointer; box-shadow:0 0 16px rgba(34,211,238,0.18); white-space:nowrap;">
+            ⬆ Upload projects data (docx, pdf, xls, ppt, visio)
+          </button>
+        </div>
         <div style="display:flex; gap:10px;">
           <button id="btnAddNewRow" style="padding:10px 15px; background:#17a2b8; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">➕ Add Row</button>
           <button id="btnSaveEdits" style="padding:10px 15px; background:#2ecc71; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; display:none; box-shadow:0 0 10px #2ecc71;">💾 Save Edits</button>
@@ -574,6 +579,12 @@
       <div id="uploadZone" style="display:none; border:2px dashed #7ecfff; padding:30px; text-align:center; border-radius:8px; margin-bottom:20px; background:rgba(0,0,0,0.1); cursor:pointer;">
         <p style="color:#a8d8ff; margin:0; font-weight:bold;" id="uploadModeText">Drag & Drop your <code>customers_backlog.csv</code> or <code>.xlsx</code> here, or click to browse.</p>
         <input type="file" id="fileBacklog" style="display:none;" accept=".csv, .xls, .xlsx" />
+      </div>
+
+      <div id="projectDocsUploadZone" style="display:none; border:2px dashed #67e8f9; padding:28px; text-align:center; border-radius:10px; margin-bottom:20px; background:rgba(8,145,178,0.08); cursor:pointer; box-shadow:inset 0 0 20px rgba(103,232,249,0.08);">
+        <p style="color:#cffafe; margin:0; font-weight:700;" id="projectDocsUploadText">Drag & Drop project documents here, or click to browse. Accepted: <code>.doc</code>, <code>.docx</code>, <code>.pdf</code>, <code>.xls</code>, <code>.xlsx</code>, <code>.ppt</code>, <code>.pptx</code>, <code>.vsd</code>, <code>.vsdx</code>.</p>
+        <div id="projectDocsUploadStatus" style="margin-top:10px; color:#89e6ff; font-size:13px;"></div>
+        <input type="file" id="fileProjectDocs" style="display:none;" accept=".doc,.docx,.pdf,.xls,.xlsx,.ppt,.pptx,.vsd,.vsdx" multiple />
       </div>
 
       <div style="display:flex; gap:15px; margin-bottom:20px;">
@@ -1901,6 +1912,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       if (!el) return;
       el.style.display = id === activeId ? '' : 'none';
     });
+    requestAnimationFrame(syncVisibleIframeHeights);
   }
 
   function activateStage(stageId) {
@@ -1908,7 +1920,46 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + stageId));
     if(subBar1) subBar1.classList.toggle('visible', stageId === 's1');
     if(subBar2) subBar2.classList.toggle('visible', stageId === 's2');
+    requestAnimationFrame(syncVisibleIframeHeights);
   }
+
+  function resizeEmbeddedIframe(iframe) {
+    if (!iframe || iframe.style.display === 'none' || iframe.offsetParent === null) return;
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc) return;
+      const activeModal = doc.querySelector('#addVmModal[style*="display: flex"], #addVmModal[style*="display:flex"], [data-lock-iframe-resize="true"]');
+      if (iframe.dataset.modalLock === 'true' || activeModal) return;
+      const body = doc.body;
+      const html = doc.documentElement;
+      if (!body || !html) return;
+      const height = Math.max(
+        body.scrollHeight, body.offsetHeight,
+        html.clientHeight, html.scrollHeight, html.offsetHeight
+      );
+      if (height > 200) {
+        iframe.style.height = `${height + 24}px`;
+      }
+    } catch (_) {
+      // same-origin is expected here; ignore if an iframe is not accessible yet
+    }
+  }
+
+  function syncVisibleIframeHeights() {
+    document.querySelectorAll('.panel.active iframe').forEach(resizeEmbeddedIframe);
+  }
+
+  window.addEventListener('message', (event) => {
+    if (!event.data || event.data.type !== 'ospc2flex-modal-lock') return;
+    document.querySelectorAll('iframe').forEach(frame => {
+      if (frame.contentWindow === event.source) {
+        frame.dataset.modalLock = event.data.open ? 'true' : 'false';
+        if (!event.data.open) {
+          requestAnimationFrame(() => resizeEmbeddedIframe(frame));
+        }
+      }
+    });
+  });
 
   // Stage 1 sub-btn clicks
   document.querySelectorAll('#subBar1 .sub-btn').forEach(btn => {
@@ -1977,10 +2028,24 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     });
   });
 
+  document.querySelectorAll('iframe').forEach(frame => {
+    frame.addEventListener('load', () => {
+      resizeEmbeddedIframe(frame);
+      setTimeout(() => resizeEmbeddedIframe(frame), 300);
+      setTimeout(() => resizeEmbeddedIframe(frame), 1200);
+    });
+  });
+  window.addEventListener('resize', syncVisibleIframeHeights);
+  setInterval(syncVisibleIframeHeights, 1500);
+
   // ========== Tracker Logic ==========
   const trackerTbody = document.getElementById("trackerBody");
   const uploadZone = document.getElementById("uploadZone");
   const fileInput = document.getElementById("fileBacklog");
+  const projectDocsUploadZone = document.getElementById("projectDocsUploadZone");
+  const projectDocsFileInput = document.getElementById("fileProjectDocs");
+  const projectDocsUploadText = document.getElementById("projectDocsUploadText");
+  const projectDocsUploadStatus = document.getElementById("projectDocsUploadStatus");
 
   const priorityMatrix = [
     { L1: 'FLEX Ready', L2: 'Small', L3: 'Secondary', Res: 'Earliest priority', Score: 1 },
@@ -2402,7 +2467,32 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     uploadZone.style.display = uploadZone.style.display === 'none' ? 'block' : 'none';
   });
 
+  document.getElementById("btnToggleProjectDocsUpload").addEventListener("click", () => {
+    projectDocsUploadZone.style.display = projectDocsUploadZone.style.display === 'none' ? 'block' : 'none';
+  });
+
   uploadZone.addEventListener("click", () => fileInput.click());
+  projectDocsUploadZone.addEventListener("click", () => projectDocsFileInput.click());
+
+  function bindDropZone(zoneEl, onFiles) {
+    if (!zoneEl) return;
+    ['dragenter', 'dragover'].forEach(evt => zoneEl.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      zoneEl.style.borderColor = '#22d3ee';
+      zoneEl.style.background = 'rgba(8,145,178,0.14)';
+    }));
+    ['dragleave', 'drop'].forEach(evt => zoneEl.addEventListener(evt, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      zoneEl.style.borderColor = '';
+      zoneEl.style.background = '';
+    }));
+    zoneEl.addEventListener('drop', e => {
+      const files = Array.from((e.dataTransfer || {}).files || []);
+      if (files.length) onFiles(files);
+    });
+  }
 
   fileInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
@@ -2418,6 +2508,70 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         else alert("Error: " + data.error);
         fileInput.value = '';
     });
+  });
+
+  async function uploadProjectDocs(files) {
+    const allowedExts = new Set(['doc', 'docx', 'pdf', 'xls', 'xlsx', 'ppt', 'pptx', 'vsd', 'vsdx']);
+    const validFiles = files.filter(file => {
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      return allowedExts.has(ext);
+    });
+    if (!validFiles.length) {
+      projectDocsUploadStatus.innerHTML = '<span style="color:#fca5a5;">No supported files selected.</span>';
+      return;
+    }
+
+    projectDocsUploadText.innerHTML = 'Uploading project data files to <code>uploads/</code>...';
+    projectDocsUploadStatus.innerHTML = `<span style="color:#67e8f9;">${validFiles.length} file(s) queued</span>`;
+
+    const uploaded = [];
+    const failed = [];
+
+    for (const file of validFiles) {
+      projectDocsUploadStatus.innerHTML = `<span style="color:#67e8f9;">Uploading ${file.name}...</span>`;
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'upload failed');
+        uploaded.push(data.saved_as || file.name);
+      } catch (err) {
+        failed.push(`${file.name}: ${err.message}`);
+      }
+    }
+
+    const successHtml = uploaded.length
+      ? `<div style="color:#86efac;">Uploaded ${uploaded.length} file(s): ${uploaded.join(', ')}</div>`
+      : '';
+    const failHtml = failed.length
+      ? `<div style="color:#fca5a5; margin-top:6px;">Failed: ${failed.join(' | ')}</div>`
+      : '';
+    projectDocsUploadText.innerHTML = 'Drag & Drop project documents here, or click to browse. Accepted: <code>.doc</code>, <code>.docx</code>, <code>.pdf</code>, <code>.xls</code>, <code>.xlsx</code>, <code>.ppt</code>, <code>.pptx</code>, <code>.vsd</code>, <code>.vsdx</code>.';
+    projectDocsUploadStatus.innerHTML = successHtml + failHtml;
+    if (!failed.length) {
+      setTimeout(() => { projectDocsUploadZone.style.display = 'none'; }, 1200);
+    }
+    projectDocsFileInput.value = '';
+  }
+
+  projectDocsFileInput.addEventListener("change", (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    uploadProjectDocs(files);
+  });
+
+  bindDropZone(uploadZone, files => {
+    if (!files.length) return;
+    const dt = new DataTransfer();
+    files.forEach(file => dt.items.add(file));
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  });
+
+  bindDropZone(projectDocsUploadZone, files => {
+    if (!files.length) return;
+    uploadProjectDocs(files);
   });
 
   document.getElementById("btnExportCsv").addEventListener("click", () => {

@@ -1,0 +1,1 @@
+[STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@50.56.158.179 bash
