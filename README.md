@@ -1,17 +1,4 @@
-<style>
-@keyframes neonPulse {
-    0%   { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
-    33%  { color: #00e5ff; text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff, 0 0 30px #00e5ff; }
-    66%  { color: #39ff14; text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14; }
-    100% { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
-}
-.mission-control {
-    animation: neonPulse 4s infinite linear;
-    font-weight: 900;
-}
-</style>
-
-# 🚀 OSPC TO FLEX MIGRATION FULL CYCLE <span class="mission-control">MISSION CONTROL</span> –
+# 🚀 OSPC TO FLEX MIGRATION FULL CYCLE MISSION CONTROL
 
 Browser-based orbital migration cockpit for safely jumping Rackspace OpenStack Private Cloud (OSPC) workloads into the modern Rackspace FLEX atmosphere.
 

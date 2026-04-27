@@ -150,3 +150,5 @@ Press CTRL+C to quit
 127.0.0.1 - - [28/Apr/2026 01:55:24] "GET /api/vm_migrator/nbd/status?jumphost_ip=104.239.169.89&jumphost_user=ubuntu&ssh_key=/home/dzoan/.ssh/id_rsa HTTP/1.1" 200 -
 127.0.0.1 - - [28/Apr/2026 01:55:29] "GET /api/vm_migrator/nbd/status?jumphost_ip=104.239.169.89&jumphost_user=ubuntu&ssh_key=/home/dzoan/.ssh/id_rsa HTTP/1.1" 200 -
 127.0.0.1 - - [28/Apr/2026 01:55:34] "GET /api/vm_migrator/nbd/status?jumphost_ip=104.239.169.89&jumphost_user=ubuntu&ssh_key=/home/dzoan/.ssh/id_rsa HTTP/1.1" 200 -
+127.0.0.1 - - [28/Apr/2026 01:56:36] "POST /api/vm_migrator/nbd/sizes HTTP/1.1" 200 -
+127.0.0.1 - - [28/Apr/2026 01:56:38] "GET /api/vm_migrator/nbd/status?jumphost_ip=104.239.169.89&jumphost_user=ubuntu&ssh_key=/home/dzoan/.ssh/id_rsa HTTP/1.1" 200 -
