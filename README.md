@@ -119,3 +119,9 @@ OSPC carried important workloads for a long time. FLEX is where those workloads 
 CloudJumper is the bridge: part scanner, part repair bench, part launch console, part field notebook. It does not replace engineering judgment. It gives that judgment a cockpit, a checklist, and a live instrument panel.
 
 **Move carefully. Verify everything. Bring the customer forward.**
+
+## Details for the Nerds
+
+Need the full operator notes, workflow history, script map, and deeper telemetry? Read the extended mission manual: [README.long.MD](README.long.MD).
+
+Made with Love by Dzoan.nguyen@Rackspace.com using brian.abshier@RACKSPACE.COM awesome flexos tool.

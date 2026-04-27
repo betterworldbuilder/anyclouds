@@ -17,6 +17,15 @@
           66%  { color: #39ff14; text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14; }
           100% { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
       }
+      @keyframes explosion-shake {
+          0%,100% { transform: translate(0,0) rotate(0deg); }
+          15%      { transform: translate(-3px,2px) rotate(-8deg); }
+          30%      { transform: translate(3px,-2px) rotate(8deg); }
+          45%      { transform: translate(-2px,3px) rotate(-5deg); }
+          60%      { transform: translate(2px,-1px) rotate(5deg); }
+          75%      { transform: translate(-1px,2px) rotate(-3deg); }
+          90%      { transform: translate(1px,-1px) rotate(2deg); }
+      }
       .mission-control {
           animation: neonPulse 4s infinite linear;
           font-weight: 900;
@@ -82,10 +91,10 @@
       legend.csv-legend { color: #a5b4fc; padding: 0 10px; font-weight: 500; font-size: 0.95rem; }
 
       .panel {
-          background: rgba(25, 28, 41, 0.6); border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(8, 12, 24, 0.88); border: 1px solid rgba(30, 58, 95, 0.5);
           border-radius: 20px; padding: 30px; margin-bottom: 30px; position: relative;
-          backdrop-filter: blur(16px);
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(20px);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
           width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden;
       }
       .section-title {
@@ -103,9 +112,9 @@
 
       /* ── Mercedes MBUX Aesthetic ── */
       .mbux-panel {
-          background: radial-gradient(circle at top left, #1a1d2d, #05070a);
-          border: 1px solid rgba(0, 163, 255, 0.2);
-          box-shadow: 0 0 30px rgba(0, 163, 255, 0.05), inset 0 0 20px rgba(0,0,0,0.8);
+          background: radial-gradient(circle at top left, #080e1c, #020408);
+          border: 1px solid rgba(0, 100, 200, 0.18);
+          box-shadow: 0 0 30px rgba(0, 100, 200, 0.04), inset 0 0 20px rgba(0,0,0,0.95);
           position: relative; overflow: hidden;
       }
       .mbux-panel::before {
@@ -1475,6 +1484,22 @@
                         </div>
                     </div>
 
+                    <!-- NBD Batch Action Buttons -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:flex-end; margin:16px 0 0;">
+                        <button type="button" class="btn-primary" id="start-batch-btn"
+                            style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-color: #22c55e; justify-content: flex-start;"
+                            onclick="document.getElementById('mig_mode_value').value='live';">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            <span id="start-btn-label">🚀 Start Server Batch NBD — Live</span>
+                        </button>
+                        <button type="button" class="btn-primary" id="start-batch-dryrun-btn"
+                            style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-color: #f59e0b; justify-content: flex-start;"
+                            onclick="document.getElementById('mig_mode_value').value='dryrun';">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>🔍 Start Server Batch NBD — Dry Run</span>
+                        </button>
+                    </div>
+
                     <script>
                     window.addEventListener('DOMContentLoaded', () => {
                         const voiceToggle = document.getElementById('enable_jarvis_voice');
@@ -1745,6 +1770,7 @@
             </div>
 
 
+
                 <hr class="divider">
 
                 <style>
@@ -1861,6 +1887,24 @@
                             </div>
                         </div>
                 </section>
+
+                <!-- Cold Image Migration Action Buttons -->
+                <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:18px 0 24px;">
+                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
+                        style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start;"
+                        title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
+                        onclick="document.getElementById('mig_mode_value').value='live';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        <span>🖼 Direct OSPC 2 Flex Image Live Migration (Fastest)</span>
+                    </button>
+                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-dryrun-btn"
+                        style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); border-color: #a855f7; justify-content: flex-start;"
+                        title="Dry Run: Glance → jumphost → FLEX pipeline"
+                        onclick="document.getElementById('mig_mode_value').value='dryrun';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <span>🖼 Direct OSPC 2 Flex Image Dry run Migration</span>
+                    </button>
+                </div>
 
                 <!-- Jumphost connection fields (hidden — used by batch migration JS) -->
                 <input type="hidden" id="processing_location_type" value="production">
@@ -2110,52 +2154,19 @@
                         <button type="button" onclick="jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.75rem; padding:3px 10px; border-radius:4px; cursor:pointer; transition:0.2s;">Test Voice</button>
                     </div>
 
+                    <!-- Max Concurrent Jobs — below voice block -->
+                    <div style="display:flex;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,0.35);border:1px solid #374151;border-radius:8px;padding:12px 24px;margin-top:10px;">
+                        <label for="max_concurrent_input" style="color:#94a3b8;font-size:15px;white-space:nowrap;font-family:monospace;font-weight:600;">⚡ Max Concurrent Jobs:</label>
+                        <input type="number" id="max_concurrent_input" min="1" max="50" value="20" style="width:76px;background:#111;border:2px solid #4b5563;color:#f9fafb;border-radius:6px;padding:7px 10px;font-size:18px;font-family:monospace;text-align:center;font-weight:700;">
+                    </div>
+
                     <input type="hidden" id="mig_mode_value" value="live">
                     <div class="form-actions" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; align-items: flex-start;">
 
-                        <!-- Server Migration Column -->
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <div style="display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.3);border:1px solid #374151;border-radius:6px;padding:6px 10px;">
-                                <label for="max_concurrent_input" style="color:#94a3b8;font-size:11px;white-space:nowrap;font-family:monospace;">⚡ Max Concurrent Jobs:</label>
-                                <input type="number" id="max_concurrent_input" min="1" max="50" value="20" style="width:56px;background:#111;border:1px solid #4b5563;color:#f9fafb;border-radius:4px;padding:2px 6px;font-size:12px;font-family:monospace;text-align:center;">
-                            </div>
-                            <button type="button" class="btn-primary" id="start-batch-btn"
-                                style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-color: #22c55e; width: 100%; justify-content: flex-start;"
-                                onclick="document.getElementById('mig_mode_value').value='live';">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                <span id="start-btn-label">🚀 Start Server Batch NBD — Live</span>
-                            </button>
-                            <button type="button" class="btn-primary" id="start-batch-dryrun-btn"
-                                style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-color: #f59e0b; width: 100%; justify-content: flex-start;"
-                                onclick="document.getElementById('mig_mode_value').value='dryrun';">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                <span>🔍 Start Server Batch NBD — Dry Run</span>
-                            </button>
-                        </div>
-
-                        <!-- Image Migration Column -->
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
-                                style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; width: 100%; justify-content: flex-start;"
-                                title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
-                                onclick="document.getElementById('mig_mode_value').value='live';">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                                <span>🖼 Direct OSPC 2 Flex Image Live Migration (Fastest)</span>
-                            </button>
-                            <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-dryrun-btn"
-                                style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); border-color: #a855f7; width: 100%; justify-content: flex-start;"
-                                title="Dry Run: Glance → jumphost → FLEX pipeline"
-                                onclick="document.getElementById('mig_mode_value').value='dryrun';">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                                <span>🖼 Direct OSPC 2 Flex Image Dry run Migration</span>
-                            </button>
-                        </div>
+                        <!-- NBD buttons moved to bottom of Live Server VM Migration section above -->
 
                         <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; align-items: center; justify-content: center; margin-top: 10px;">
-                            <button type="button" class="btn-danger" id="stop-batch-btn" style="display: none; background: #ef4444; border: none; border-radius: 6px; padding: 10px 20px; color: white; font-weight: 600; cursor: pointer; align-items: center; gap: 8px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                                Stop Task
-                            </button>
+
                             <button type="button" id="add-batch-btn" style="display: none; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none; border-radius: 6px; padding: 10px 20px; color: white; font-weight: 600; cursor: pointer; align-items: center; gap: 8px;">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                                 Add to Running Batch
@@ -3230,7 +3241,6 @@
                                     <span style="color:#334155;font-family:'Share Tech Mono';font-size:9px;align-self:center;margin-right:auto;">CMD UPLINK</span>
                                     <button onclick="mbuxCtrlJob('nbd','pause','${label}')" style="background:#0f172a;color:#fbbf24;border:1px solid #78350f;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">PAUSE</button>
                                     <button onclick="mbuxCtrlJob('nbd','restart','${label}')" style="background:#0f172a;color:#4ade80;border:1px solid #166534;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">RESUME</button>
-                                    <button onclick="mbuxCtrlJob('nbd','stop','${label}')" style="background:#0f172a;color:#f87171;border:1px solid #7f1d1d;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">STOP</button>
                                 </div>` : `
                                 <div style="padding-top:4px;border-top:1px solid #0f172a;color:#1e293b;font-family:'Share Tech Mono';font-size:9px;text-align:right;letter-spacing:1px;">
                                     UPLINK OFFLINE · ${job.converted ? 'MISSION COMPLETE' : 'TERMINATED'}
@@ -3277,20 +3287,20 @@
                                             const cls = imgStepClass(p.n);
                                             const col = cls === 'active' ? '#c084fc' : cls === 'done' ? '#d8b4fe' : '#475569';
                                             const shadow = cls === 'active' ? '0 0 10px #c084fc' : cls === 'done' ? '0 0 10px #d8b4fe' : 'none';
-                                            return \`<div style="color:\${col}; text-shadow:\${shadow}; font-family:'Orbitron'; font-size:14px; font-weight:bold; letter-spacing:1px; position:relative;">
-                                                \${p.s}
-                                                <div style="position:absolute; right:-20px; top:50%; transform:translateY(-50%); width:8px; height:8px; border-radius:50%; background:\${col}; box-shadow:\${shadow};"></div>
-                                            </div>\`;
+                                            return `<div style="color:${col}; text-shadow:${shadow}; font-family:'Orbitron'; font-size:14px; font-weight:bold; letter-spacing:1px; position:relative;">
+                                                ${p.s}
+                                                <div style="position:absolute; right:-20px; top:50%; transform:translateY(-50%); width:8px; height:8px; border-radius:50%; background:${col}; box-shadow:${shadow};"></div>
+                                            </div>`;
                                         }).join('')}
                                     </div>
 
                                     <div style="position:absolute; left:45%; top:45px; height:${trackHeight}px; width:2px; background:rgba(168,85,247,0.3); transform:translateX(5px); z-index:1; border-radius:2px;">
                                         <div style="position:absolute; left:0; top:0; width:100%; height:${(Math.max(0, imgStageIdx)/5)*100}%; background:#d8b4fe; box-shadow:0 0 10px #d8b4fe; transition:height 1s ease; border-radius:2px;"></div>
                                         ${[0,1,2,3,4,5].map(i => {
-                                            let html = \`<div style="position:absolute; top:\${(i/5)*100}%; left:2px; width:8px; height:2px; background:\${i<=imgStageIdx ? '#d8b4fe' : 'rgba(168,85,247,0.5)'}; box-shadow:\${i<=imgStageIdx ? '0 0 5px #d8b4fe' : 'none'};"></div>\`;
+                                            let html = `<div style="position:absolute; top:${(i/5)*100}%; left:2px; width:8px; height:2px; background:${i<=imgStageIdx ? '#d8b4fe' : 'rgba(168,85,247,0.5)'}; box-shadow:${i<=imgStageIdx ? '0 0 5px #d8b4fe' : 'none'};"></div>`;
                                             if (i < 5) {
-                                                html += \`<div style="position:absolute; top:\${(i/5)*100 + 6.6}%; left:2px; width:4px; height:1px; background:rgba(168,85,247,0.3);"></div>\`;
-                                                html += \`<div style="position:absolute; top:\${(i/5)*100 + 13.3}%; left:2px; width:4px; height:1px; background:rgba(168,85,247,0.3);"></div>\`;
+                                                html += `<div style="position:absolute; top:${(i/5)*100 + 6.6}%; left:2px; width:4px; height:1px; background:rgba(168,85,247,0.3);"></div>`;
+                                                html += `<div style="position:absolute; top:${(i/5)*100 + 13.3}%; left:2px; width:4px; height:1px; background:rgba(168,85,247,0.3);"></div>`;
                                             }
                                             return html;
                                         }).join('')}
@@ -3298,12 +3308,12 @@
 
                                     <div style="width:55%; position:relative; z-index:10;">
                                         <div class="lunar-module" style="position:absolute; left:20px; top:${modTop}px; transition:top 1s ease-in-out; width:60px; height:60px;">
-                                            ${!landed && isRunning ? \`<div style="position:absolute; top:-15px; left:25px; color:#c084fc; font-size:16px; text-shadow:0 0 8px #c084fc; animation: migPulse 1s infinite;">↓</div>\` : ''}
+                                            ${!landed && isRunning ? `<div style="position:absolute; top:-15px; left:25px; color:#c084fc; font-size:16px; text-shadow:0 0 8px #c084fc; animation: migPulse 1s infinite;">↓</div>` : ''}
                                             ${window.LUNAR_SVG.replace(/#38bdf8/g, '#c084fc').replace(/56,189,248/g, '192,132,252')}
-                                            ${!landed && isRunning ? \`<div style="position:absolute; bottom:-15px; left:25px; color:#c084fc; font-size:16px; text-shadow:0 0 8px #c084fc; animation: migPulse 1s infinite;">↓</div>\` : ''}
-                                            ${landed ? \`<div class="astronaut-anim" style="font-size:24px; position:absolute; bottom:-10px; right:-25px;">👨‍🚀🚩</div>\` : ''}
+                                            ${!landed && isRunning ? `<div style="position:absolute; bottom:-15px; left:25px; color:#c084fc; font-size:16px; text-shadow:0 0 8px #c084fc; animation: migPulse 1s infinite;">↓</div>` : ''}
+                                            ${landed ? `<div class="astronaut-anim" style="font-size:24px; position:absolute; bottom:-10px; right:-25px;">👨‍🚀🚩</div>` : ''}
                                         </div>
-                                        ${landed ? \`<div style="position:absolute; bottom: 0px; left: -30px; width:200px; color:#d8b4fe; text-shadow: 0 0 10px #d8b4fe; font-family:'Orbitron'; font-size: 14px; font-weight:bold; animation: blink-slow 2s infinite; text-align:center;">IMAGE \${safeTitle.substring(0,10).toUpperCase()}<br>LANDED ON FLEX</div>\` : ''}
+                                        ${landed ? `<div style="position:absolute; bottom: 0px; left: -30px; width:200px; color:#d8b4fe; text-shadow: 0 0 10px #d8b4fe; font-family:'Orbitron'; font-size: 14px; font-weight:bold; animation: blink-slow 2s infinite; text-align:center;">IMAGE ${safeTitle.substring(0,10).toUpperCase()}<br>LANDED ON FLEX</div>` : ''}
                                     </div>
                                 </div>
 
@@ -3725,6 +3735,23 @@
                 }
                 vm.status = 'failed';
                 vm.stage = '❌ Failed';
+                // Record which stage was active when failure hit
+                if (!vm.failedStageKey) {
+                    const activeStage = this.allStages.find(s => vm.stages[s.key] && vm.stages[s.key].status === 'active');
+                    if (activeStage) vm.failedStageKey = activeStage.key;
+                }
+            }
+            // Also parse ❌ STAGE X RESULT: FAILED directly to pinpoint failed stage
+            const stageFailMatch = text.match(/STAGE\s+(\d+(?:\.\d+)?)\s+RESULT:\s+FAILED/i);
+            if (stageFailMatch && !vm.failedStageKey) {
+                const failKey = 'step' + stageFailMatch[1];
+                const found = this.allStages.find(s => s.key === failKey);
+                if (found) vm.failedStageKey = failKey;
+                else {
+                    // Try mapping stage number to step keys
+                    const stageNumMap = {'1':'step1','2':'step2','2.5':'step2','3':'step3','4':'step4','5':'step5','6':'step6','7':'step7'};
+                    if (stageNumMap[stageFailMatch[1]]) vm.failedStageKey = stageNumMap[stageFailMatch[1]];
+                }
             }
 
             // Image upload line
@@ -3826,8 +3853,14 @@
                         if (st.status === 'done') {
                             cellHtml = `<span style="display:inline-block; color:${isApollo?'#34d399':'#00ff41'};text-shadow:0 0 8px ${isApollo?'#34d399':'#00ff41'};font-size:16px;">●</span>`;
                         } else if (st.status === 'active') {
-                            if (isFailed) {
-                                cellHtml = `<span style="display:inline-block; color:${isApollo?'#f87171':'#ff2222'};text-shadow:0 0 12px ${isApollo?'#f87171':'#ff2222'};font-size:16px;">${isApollo?'💥':'⬤'}</span>`;
+                            const isFailedStage = vm.failedStageKey === stage.key;
+                            if (vm.status === 'failed') {
+                                if (isFailedStage) {
+                                    // Exploded lunar module at the exact failed stage
+                                    cellHtml = `<span style="display:inline-block;width:32px;height:32px;vertical-align:middle;animation:explosion-shake 0.4s infinite;filter:sepia(1) saturate(8) hue-rotate(320deg) brightness(1.2) drop-shadow(0 0 6px #ff3300) drop-shadow(0 0 12px #ff6600);" title="❌ CRASHED AT THIS STAGE">${window.LUNAR_SVG}</span>`;
+                                } else {
+                                    cellHtml = `<span style="display:inline-block; color:${isApollo?'#f87171':'#ff2222'};font-size:16px;">●</span>`;
+                                }
                             } else {
                                 cellHtml = isApollo
                                     ? `<span class="lunar-module" style="display:inline-block; width:28px; height:28px; vertical-align:middle;">${window.LUNAR_SVG}</span>`
@@ -5413,7 +5446,7 @@
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearImagePanelLog(id), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadImagePanelLog === 'function' ? downloadImagePanelLog(id) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
             actions.appendChild(mkHwBtn('RESUME', 'Resume job', () => window.mbuxCtrlJob ? window.mbuxCtrlJob('image', 'resume', id) : null, '#1a2e05', '#4ade80', '#22c55e'));
-            actions.appendChild(mkHwBtn('STOP', 'Graceful stop', () => window.mbuxCtrlJob ? window.mbuxCtrlJob('image', 'stop', id) : null, '#450a0a', '#f87171', '#ef4444'));
+
             actions.appendChild(mkHwBtn('CLOSE', 'Close panel', () => closeImageTerminal && closeImageTerminal(id), '#1f2937', '#94a3b8', '#64748b'));
 
             return document.getElementById('img-panel-' + safeId);
@@ -5599,7 +5632,7 @@
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearVmPanelLog(vmName), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadVmPanelLog === 'function' ? downloadVmPanelLog(vmName) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
             actions.appendChild(mkHwBtn('RESUME', 'Resume paused worker (SIGCONT)', () => window.mbuxCtrlJob && window.mbuxCtrlJob('vm', 'resume', vmName), '#1a2e05', '#4ade80', '#22c55e'));
-            actions.appendChild(mkHwBtn('STOP',   'Kill worker + stop stream',      () => window.mbuxCtrlJob && window.mbuxCtrlJob('vm', 'stop',   vmName), '#450a0a', '#f87171', '#ef4444'));
+
             actions.appendChild(mkHwBtn('CLOSE',  'Close panel (job keeps running)',() => closeVmTerminal && closeVmTerminal(vmName),                        '#1f2937', '#94a3b8', '#64748b'));
 
             return document.getElementById('vm-panel-' + safeId);
@@ -5808,7 +5841,7 @@
         }
 
 
-        const stopBtn = document.getElementById('stop-batch-btn');
+        const stopBtn = document.getElementById('stop-batch-btn') || null;
         let activeReader = null;
         let isVmBatchRunning = false;
         let isImageBatchRunning = false;
@@ -5854,7 +5887,7 @@
             });
         }, 1000);
 
-        stopBtn.addEventListener('click', async () => {
+        if (stopBtn) stopBtn.addEventListener('click', async () => {
             if (!isVmBatchRunning && !isImageBatchRunning) return;
             appendLog(`[SYSTEM] Attempting to interrupt active migration stream(s)...`, 'system');
             try {
