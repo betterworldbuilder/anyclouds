@@ -429,16 +429,16 @@ The endpoint map feature is useful, but you should still review:
 | Step | Stage | Action | Input | Output | Method |
 |------|-------|--------|-------|--------|--------|
 | 1 | Stage 2 | Create OSPC Snapshot | Live OSPC VM name | Snapshot ID (private, in OSPC Glance) | `openstack server image create` |
-| 2 | Stage 3 | Export snapshot to Cloud Files | Snapshot ID + RAX auth token | VHD file in `ospc2flex_exports` container | `POST /v2/tasks type=export` → poll until `success` |
-| 3 | Stage 3 | Download VHD via ServiceNet | Cloud Files container + filename | `.img` file on jumphost disk | `curl` from `snet-storage101.iad3.clouddrive.com` |
+| 2 | Stage 3 | Export snapshot to same-region Cloud Files | Snapshot ID + RAX auth token | VHD/object in `ospc2flex-export` container | `POST /v2/tasks type=export` → poll until `success` |
+| 3 | Stage 3 | Download VHD/object to same-region jumphost | Cloud Files container + object name | `.img` file on jumphost disk | `openstack object save` using the source-region Cloud Files endpoint |
 | 4 | Stage 4 | Convert to qcow2 | `.img` (VHD/raw) | `.qcow2` compressed | `qemu-img convert -c -O qcow2` |
 | 5 | Stage 4.5 | Offline repair (fstab + netplan) | `.qcow2` mounted via `qemu-nbd` | fstab cleaned, DHCP netplan written, cloud-init reset | `nbd mount` → `sed fstab` → write `99-ospc2flex.yaml` |
 | 6 | Stage 4.6 | Per-OS repair scripts | Repaired `.qcow2` | OS-specific fixes (RHEL network, VirtIO drivers) | `ospc2flex_offline_repair.sh --os-type` |
 | 7 | Stage 4.7 | Pre-upload verification | Repaired `.qcow2` | Verify network config + fstab are correct | `nbd mount` → check netplan/ifcfg + fstab |
-| 8 | Stage 5 | Upload to FLEX Glance | Repaired `.qcow2` | FLEX image ID (active) | `openstack image create --file` |
+| 8 | Stage 5 | Upload to FLEX Glance | Repaired `.qcow2` | FLEX image ID (active) | Direct `openstack image create --file`, then FLEX Cloud Files import fallback if needed |
 | 9 | Stage 6 | Boot test VM + verify SSH | FLEX image ID + flavor + network | Running FLEX VM, SSH reachable | `openstack server create` → `wait_for_ssh` |
 
-**Windows images (`rax_opts=4`):** Step 2 export is blocked by Rackspace licensing restrictions. Use Production Mode (`--origin-vm-ip`) which SSH-pipes `/dev/vda` directly from the origin VM, skipping Steps 1-3 entirely.
+For fastest snapshot migrations, place the jumphost in the same OSPC region as the origin VM/snapshot. For example, OSPC IAD VM → OSPC IAD Glance snapshot → OSPC IAD Cloud Files → OSPC IAD jumphost → convert/repair → FLEX IAD Glance.
 
 ---
 

@@ -219,15 +219,72 @@ def resolve_input_path(name: str) -> Optional[Path]:
     return resolved
 
 
+def _extract_flex_region_slug_from_auth_url(auth_url: str) -> str:
+    text = (auth_url or "").strip()
+    if not text:
+        return ""
+    m = re.search(r"keystone\.api\.([a-z0-9-]+)\.rackspacecloud\.com", text, re.IGNORECASE)
+    if not m:
+        return ""
+    return m.group(1).upper()
+
+
+def normalize_flex_region(region: str, auth_url: str = "") -> str:
+    raw = (region or "").strip() or _extract_flex_region_slug_from_auth_url(auth_url)
+    raw = raw.upper()
+    if not raw:
+        return "DFW3"
+    m = re.fullmatch(r"([A-Z]{3})(\d*)", raw)
+    if not m:
+        return raw
+    code, suffix = m.groups()
+    return f"{code}3" if suffix == "" else f"{code}{suffix}"
+
+
+def short_flex_region(region: str, auth_url: str = "") -> str:
+    canonical = normalize_flex_region(region, auth_url)
+    m = re.fullmatch(r"([A-Z]{3})\d*", canonical)
+    return m.group(1) if m else canonical
+
+
+def normalize_flex_auth_url(auth_url: str, region: str = "") -> str:
+    canonical_region = normalize_flex_region(region, auth_url)
+    target_slug = canonical_region.lower()
+    default_url = f"https://keystone.api.{target_slug}.rackspacecloud.com/v3/"
+    raw = (auth_url or "").strip()
+    if not raw:
+        return default_url
+    if re.fullmatch(r"[A-Za-z]{3}\d*", raw):
+        return f"https://keystone.api.{normalize_flex_region(raw).lower()}.rackspacecloud.com/v3/"
+    m = re.match(
+        r"^(https?://keystone\.api\.)([a-z0-9-]+)(\.rackspacecloud\.com)(/.*)?$",
+        raw,
+        re.IGNORECASE,
+    )
+    if not m:
+        return raw
+    path = m.group(4) or "/v3/"
+    if path in {"", "/"}:
+        path = "/v3/"
+    elif path == "/v3":
+        path = "/v3/"
+    return f"{m.group(1)}{target_slug}{m.group(3)}{path}"
+
+
 def resolve_target_flavor_catalog_for_region(region: str) -> Optional[Path]:
-    r = (region or "").strip().upper()
-    if not r:
+    canonical = normalize_flex_region(region)
+    short = short_flex_region(canonical)
+    if not canonical:
         return None
     candidates = [
-        FLAVOR_UPLOAD_DIR / f"{r}Flavors.csv",
-        FLAVOR_UPLOAD_DIR / f"{r}_Flavors.csv",
-        FLAVOR_UPLOAD_DIR / f"{r.lower()}flavors.csv",
-        FLAVOR_UPLOAD_DIR / f"{r.lower()}_flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{canonical}Flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{canonical}_Flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{canonical.lower()}flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{canonical.lower()}_flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{short}Flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{short}_Flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{short.lower()}flavors.csv",
+        FLAVOR_UPLOAD_DIR / f"{short.lower()}_flavors.csv",
     ]
     for p in candidates:
         if p.exists():
@@ -1052,6 +1109,36 @@ def image_migrator_scan_images():
                 size_bytes = int((img or {}).get("size") or 0)
                 size_gb = round(size_bytes / (1024 ** 3), 2) if size_bytes > 0 else 0
 
+                # Licensing check — com.rackspace__1__options bit 2 (value & 4) = export blocked
+                rax_opts_raw = str((img or {}).get("com.rackspace__1__options") or "0").strip()
+                try:
+                    rax_opts = int(rax_opts_raw)
+                except ValueError:
+                    rax_opts = 0
+                licensed_restricted = bool(rax_opts & 4)
+
+                # OS detection from flat Glance v2 properties
+                os_distro = str(
+                    (img or {}).get("os_distro")
+                    or (img or {}).get("com.rackspace__1__os_name")
+                    or props.get("os_distro")
+                    or ""
+                ).strip().lower()
+                os_type = str(
+                    (img or {}).get("os_type")
+                    or props.get("os_type")
+                    or ""
+                ).strip().lower()
+                is_windows = "windows" in os_distro or "windows" in os_type or "windows" in str((img or {}).get("name", "")).lower()
+
+                # Migration strategy hint
+                if licensed_restricted:
+                    migration_method = "cinder-only"
+                elif is_windows:
+                    migration_method = "cinder-preferred"
+                else:
+                    migration_method = "glance-export"
+
                 ok = True
                 reason = "downloadable saved image"
                 if visibility != "private":
@@ -1066,6 +1153,8 @@ def image_migrator_scan_images():
                     ok = False
                     reason = f"image status={status or 'unknown'}"
                     excluded_private += 1
+                elif licensed_restricted:
+                    reason = f"licensed (com.rackspace__1__options={rax_opts_raw}) — Cinder volume required"
 
                 if ok:
                     migratable += 1
@@ -1083,19 +1172,31 @@ def image_migrator_scan_images():
                     "status": status,
                     "migratable": ok,
                     "reason": reason,
+                    "licensed_restricted": licensed_restricted,
+                    "os_distro": os_distro,
+                    "os_type": os_type,
+                    "is_windows": is_windows,
+                    "migration_method": migration_method,
                     "region": ep_region,
                 })
 
         rows.sort(key=lambda r: str(r.get("updated_at") or r.get("created_at") or ""), reverse=True)
+        licensed_count = sum(1 for r in rows if r.get("licensed_restricted"))
+        windows_count = sum(1 for r in rows if r.get("is_windows"))
+        cinder_required = sum(1 for r in rows if r.get("migration_method") in ("cinder-only", "cinder-preferred"))
         summary = {
             "private_images_found": len(rows),
             "migratable_snapshots": migratable,
             "excluded_private_images": excluded_private,
             "skipped_public_provider_images": skipped_public_provider,
+            "licensed_restricted": licensed_count,
+            "windows_images": windows_count,
+            "cinder_required": cinder_required,
         }
         logs.append(
             f"[OK] Scan complete: total={summary['private_images_found']} "
-            f"migratable={summary['migratable_snapshots']}"
+            f"migratable={summary['migratable_snapshots']} "
+            f"licensed_restricted={licensed_count} windows={windows_count} cinder_required={cinder_required}"
         )
         return jsonify({"rows": rows, "summary": summary, "logs": logs})
     except Exception as exc:
@@ -2984,7 +3085,7 @@ def tracker_upload():
     fname = file.filename.lower()
     if not (fname.endswith(".csv") or fname.endswith(".xls") or fname.endswith(".xlsx")):
         return jsonify({"ok": False, "error": "Only CSV, XLS, or XLSX files allowed"}), 400
-    
+
     import pandas as pd
     try:
         if fname.endswith(".csv"):
@@ -2999,7 +3100,7 @@ def tracker_upload():
                 row[k] = str(row[k])
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to parse file: {e}"}), 400
-        
+
     if mode == "overwrite":
         # Force exact columns, generate customer_id if totally missing from columns
         fields = raw_cols.copy()
@@ -3013,25 +3114,25 @@ def tracker_upload():
             writer.writeheader()
             writer.writerows(reader)
         return jsonify({"ok": True, "added": len(reader)})
-    
+
     # Read existing for append mode
     existing = {}
     if TRACKER_DB.exists():
         with open(TRACKER_DB, "r", encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 existing[row.get("customer_id", "")] = row
-                
+
     # Merge new
     all_keys = []
     if existing:
         all_keys = list(next(iter(existing.values())).keys())
-        
+
     added = 0
     for row in reader:
         for k in row.keys():
             if k not in all_keys:
                 all_keys.append(k)
-                
+
         cid = row.get("customer_id", "").strip() or str(uuid4())[:8]
         if cid and cid not in existing:
             new_entry = {k: row.get(k, "") for k in all_keys}
@@ -3051,7 +3152,7 @@ def tracker_upload():
         writer = csv.DictWriter(f, fieldnames=all_keys, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(existing.values())
-        
+
     return jsonify({"ok": True, "added": added})
 
 @app.post("/api/tracker/save_manual")
@@ -3059,27 +3160,27 @@ def tracker_save_manual():
     data = request.json or []
     if not isinstance(data, list):
         return jsonify({"ok": False, "error": "Invalid format"}), 400
-    
+
     if not data:
         with open(TRACKER_DB, "w", encoding="utf-8") as f:
             f.write("")
         return jsonify({"ok": True, "saved": 0})
-        
+
     # Preserving exact columns from the first object
     fields = list(data[0].keys())
     # Ensure customer_id exists for backend logic
     if "customer_id" not in fields:
         fields.insert(0, "customer_id")
-        
+
     for row in data:
         if not row.get("customer_id"):
             row["customer_id"] = str(uuid4())[:8]
-            
+
     with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(data)
-    
+
     return jsonify({"ok": True, "saved": len(data)})
 
 @app.post("/api/tracker/update_status")
@@ -3088,15 +3189,15 @@ def tracker_update_status():
     cid = data.get("customer_id") or ACTIVE_CUSTOMER_ID
     if not cid:
         return jsonify({"ok": False, "error": "No active customer"}), 400
-        
+
     status = data.get("status")
     stage_failed = data.get("stage_failed", "")
     current_stage = data.get("current_stage", "")
-    
+
     existing = []
     headers = []
     updated = False
-    
+
     if TRACKER_DB.exists():
         with open(TRACKER_DB, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -3110,20 +3211,20 @@ def tracker_update_status():
                     if current_stage: row["current_stage"] = current_stage
                     updated = True
                 existing.append(row)
-                
+
     if not updated:
         return jsonify({"ok": False, "error": "Customer not found in backlog"}), 404
-        
+
     if "stage_failed" not in headers:
         headers.append("stage_failed")
     if "current_stage" not in headers:
         headers.append("current_stage")
-        
+
     with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=headers, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(existing)
-        
+
     return jsonify({"ok": True})
 
 @app.post("/api/tracker/set_active")
@@ -3134,20 +3235,20 @@ def tracker_set_active():
     if not cid:
         return jsonify({"ok": False, "error": "No customer ID provided"}), 400
     ACTIVE_CUSTOMER_ID = cid
-    
+
     # Update status to In Progress
     rows = []
     if TRACKER_DB.exists():
         with open(TRACKER_DB, "r", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
-    
+
     for row in rows:
         if row["customer_id"] == cid:
             if row["status"] in ["Queue", "Failed", "Rolled Back"]:
                 row["status"] = "In Progress"
                 if not row["start_date"]:
                     row["start_date"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    
+
     with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
         fields = ["customer_id", "customer_name", "target_region", "status",
                   "ospc_vms_count", "ospc_volumes_count", "ospc_db_count",
@@ -3163,14 +3264,14 @@ def tracker_stage1_update():
     global ACTIVE_CUSTOMER_ID
     if not ACTIVE_CUSTOMER_ID:
         return jsonify({"ok": False, "error": "No active customer set"}), 400
-        
+
     # Read discovery file to count
     from collections import defaultdict
     counts = defaultdict(int)
     overview_path = resolve_input_path(f"uploads/test_account_overview.csv")
     if not overview_path or not overview_path.exists():
         return jsonify({"ok": False, "error": "test_account_overview.csv not found"}), 404
-        
+
     with open(overview_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -3188,13 +3289,13 @@ def tracker_stage1_update():
 
     with open(TRACKER_DB, "r", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-        
+
     for row in rows:
         if row["customer_id"] == ACTIVE_CUSTOMER_ID:
             row["ospc_vms_count"] = counts["vms"]
             row["ospc_volumes_count"] = counts["vols"]
             row["ospc_db_count"] = counts["dbs"]
-            
+
     with open(TRACKER_DB, "w", encoding="utf-8", newline="") as f:
         fields = ["customer_id", "customer_name", "target_region", "status",
                   "ospc_vms_count", "ospc_volumes_count", "ospc_db_count",
@@ -3202,7 +3303,7 @@ def tracker_stage1_update():
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
-        
+
     return jsonify({"ok": True, "vms": counts["vms"], "vols": counts["vols"], "dbs": counts["dbs"]})
 
 @app.get("/api/tracker/export")
@@ -3210,7 +3311,7 @@ def tracker_export():
     import io
     if not TRACKER_DB.exists():
         return "No data", 404
-        
+
     rows = read_csv_rows(TRACKER_DB)
     t_queue = sum(1 for r in rows if r.get("status", "") in ["Queue", "In Progress", "Rolled Back"])
     t_ready = sum(1 for r in rows if r.get("status", "") == "Queue" and r.get("flex_readiness", "") == "FLEX Ready")
@@ -3223,7 +3324,7 @@ def tracker_export():
     output.write(f"{t_queue},{t_ready},{t_success},{t_fail}\n\n")
     output.write("CUSTOMER MIGRATION LOG DETAILS\n")
     output.write(TRACKER_DB.read_text(encoding="utf-8"))
-    
+
     return (
         output.getvalue(),
         200,
@@ -3847,14 +3948,14 @@ def rollback_topology():
 
     if openrc_file_name:
         openrc_full = str(BASE_DIR / openrc_file_name) if not Path(openrc_file_name).is_absolute() else openrc_file_name
-        
+
         secret_exports = ["export ROLLBACK_AUTO_APPROVE=1;"]
         if auth_secret:
             q = shell_quote(auth_secret)
             secret_exports.append(f"export OS_PASSWORD={q};")
             secret_exports.append(f"export OS_API_KEY={q};")
         secret_export = " ".join(secret_exports) + " "
-        
+
         cmd = f"{secret_export}source {shell_quote(openrc_full)} && bash {shell_quote(str(rollback_path))}"
     else:
         cmd = f"export ROLLBACK_AUTO_APPROVE=1; bash {shell_quote(str(rollback_path))}"
@@ -4284,7 +4385,7 @@ def run_generate_app_dependencies():
     payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
     overview_csv = resolve_input_path(payload.get("overview_csv", ""))
     mode = payload.get("mode", "inference")
-    
+
     if not overview_csv or not overview_csv.exists():
         return jsonify({"ok": False, "error": "Valid overview CSV is required"}), 400
 
@@ -4294,7 +4395,7 @@ def run_generate_app_dependencies():
         "--mode", mode
     ]
     rc, out = run_cmd(cmd)
-    
+
     # Move output file manually to uploads if the generator put it in BASE_DIR
     base_name = overview_csv.name.replace("_overview.csv", "").replace("_inventory.csv", "") if overview_csv else ""
     if base_name:
@@ -4304,7 +4405,7 @@ def run_generate_app_dependencies():
             target_file = UPLOAD_DIR / base_file.name
             base_file.rename(target_file)
             out += f"\nMoved {generated_name} to uploads/"
-    
+
     if rc == 0:
         return jsonify({"ok": True, "log": out})
     else:
@@ -4316,45 +4417,45 @@ def parse_active_logs():
     logs_dir = BASE_DIR / "active_discovery_logs"
     if not logs_dir.exists() or not logs_dir.is_dir():
         return jsonify({"ok": False, "error": "active_discovery_logs directory not found. Please run the scanner first."}), 404
-        
+
     results = []
     hosts = set()
     for f in logs_dir.glob("*.log"):
         if "_" in f.name:
             hosts.add(f.name.split("_", 1)[0])
-            
+
     for host in hosts:
         os_version = "Unknown"
         pkg_summary = "Unknown"
         svc_summary = "Unknown"
         env_summary = "Cron/Firewall logs exist"
-        
+
         system_log = logs_dir / f"{host}_system.log"
         if system_log.exists():
             for line in system_log.read_text(errors="ignore").splitlines():
                 if line.startswith("PRETTY_NAME="):
                     os_version = line.split("=", 1)[1].strip('"').strip("'")
                     break
-                    
+
         pkg_log = logs_dir / f"{host}_packages.log"
         if pkg_log.exists():
             lines = pkg_log.read_text(errors="ignore").splitlines()
             valid_lines = [l for l in lines if l.strip() and not l.startswith("Warning") and not l.startswith("echo") and not l.startswith("---")]
             pkg_summary = f"{len(valid_lines)} packages"
-            
+
         svc_log = logs_dir / f"{host}_services.log"
         if svc_log.exists():
             lines = svc_log.read_text(errors="ignore").splitlines()
             svc_lines = [l for l in lines if ".service" in l and "running" in l]
             svc_summary = f"{len(svc_lines)} running services" if svc_lines else f"Raw: {len(lines)} entries"
-            
+
         env_details = []
         if (logs_dir / f"{host}_cron.log").exists(): env_details.append("Cron")
         if (logs_dir / f"{host}_network.log").exists(): env_details.append("Network")
         if (logs_dir / f"{host}_firewall.log").exists(): env_details.append("Firewall")
         if env_details:
             env_summary = "Extracted: " + ", ".join(env_details)
-            
+
         results.append({
             "hostname": host,
             "os_version": os_version,
@@ -4362,7 +4463,7 @@ def parse_active_logs():
             "runtimes": svc_summary,
             "environments": env_summary
         })
-        
+
     return jsonify({"ok": True, "data": results})
 
 
@@ -4385,7 +4486,7 @@ def stream_execute_bash():
     def generate():
         log_lines: List[str] = []
         yield f"data: --- script output start ---\n\n"
-        
+
         candidates = list_openrc_candidates()
         openrc_cmd = ""
         if candidates:
@@ -4393,7 +4494,7 @@ def stream_execute_bash():
             rc_path = resolve_input_path(candidates[-1])
             if rc_path and rc_path.exists():
                 openrc_cmd = f"set -a && source {shell_quote(str(rc_path))} && set +a && "
-        
+
         cmd_str = f"{openrc_cmd}bash {shell_quote(str(script_file.name))}"
 
         proc = subprocess.Popen(
@@ -4476,7 +4577,7 @@ def get_runbook_ips():
                             if not ips["OSPC_BACK"]: ips["OSPC_BACK"] = ip_str
         except Exception:
             pass
-            
+
     return jsonify(ips)
 
 
@@ -4487,7 +4588,7 @@ def execute_manual_cmd():
     cmd = data.get("command", "").strip()
     if not cmd:
         return jsonify({"status": "error", "error": "No command provided"}), 400
-    
+
     try:
         proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
         output = proc.stdout + "\n" + proc.stderr
@@ -4516,12 +4617,12 @@ def run_k8s_deploy():
     active_cust = get_active_customer()
     customer_dir = BASE_DIR / "uploads" / (active_cust if active_cust else "default") / "k8s_artifacts"
     customer_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Safe filename fallback since werkzeug might be tricky
     safe_name = "".join(c for c in Path(file.filename).name if c.isalnum() or c in (".", "_", "-"))
     if not safe_name:
         safe_name = "k8s_export_bundle.yaml"
-    
+
     artifact_path = customer_dir / safe_name
     file.save(str(artifact_path))
 
@@ -4743,7 +4844,7 @@ def run_generate_data_migration():
     for line in out.splitlines():
         if line.strip().startswith("- ") and ".sh" in line:
             created.append(line.replace("- ", "").strip())
-    
+
     return jsonify({
         "ok": ok,
         "return_code": rc,
@@ -4813,7 +4914,7 @@ def run_generate_deploy():
         return jsonify({"ok": False, "error": "key_name is required when deploy includes Linux instances"}), 400
     if key_name:
         args += ["--key-name", key_name]
-    
+
     ssh_pub_key = (payload.get("ssh_pub_key") or "").strip()
     if ssh_pub_key:
         args += ["--ssh-pub-key", ssh_pub_key]
@@ -4996,11 +5097,11 @@ def run_image_migrator():
     script_path = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_image_migrator.py")
 
     cmd = ["python3", script_path]
-    
+
     # Core
     ospc_path = req.get('ospc_openrc')
     flex_path = req.get('flex_openrc')
-    
+
     # Auto-synthesize OSPC if raw creds provided
     if req.get('ospc_username') and req.get('ospc_apikey') and not ospc_path:
         import tempfile, shlex, re as _re
@@ -5066,23 +5167,28 @@ def run_image_migrator():
     _flex_password   = str(req.get('flex_password', '') or '').strip()
     _has_appcred     = bool(_flex_app_id and _flex_app_secret)
     _has_userpwd     = bool(_flex_username and _flex_password)
-    
+
     if (_has_appcred or _has_userpwd) and not flex_path:
         import tempfile
         fd, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_auto_")
-        flex_region   = str(req.get('flex_region',   'DFW3') or 'DFW3').strip()
-        if flex_region == 'DFW': flex_region = 'DFW3'
+        flex_region   = normalize_flex_region(
+            str(req.get('flex_region', 'DFW3') or 'DFW3').strip(),
+            str(req.get('flex_auth_url', '') or '').strip(),
+        )
         flex_domain   = str(req.get('flex_domain',   'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
-        flex_auth_url = str(req.get('flex_auth_url', 'https://keystone.api.dfw3.rackspacecloud.com/v3/') or 'https://keystone.api.dfw3.rackspacecloud.com/v3/').strip()
-        
+        flex_auth_url = normalize_flex_auth_url(
+            str(req.get('flex_auth_url', 'https://keystone.api.dfw3.rackspacecloud.com/v3/') or 'https://keystone.api.dfw3.rackspacecloud.com/v3/').strip(),
+            flex_region,
+        )
+
         with os.fdopen(fd, 'w', newline='\n') as f:
             f.write('#!/usr/bin/env bash\n')
             f.write(f'export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n')
             f.write('export OS_IDENTITY_API_VERSION=3\n')
             f.write('export OS_INTERFACE=public\n')
             f.write(f'export OS_REGION_NAME={shlex.quote(flex_region)}\n')
-            
-            if _has_appcred:
+
+            if False:
                 f.write('export OS_AUTH_TYPE=v3applicationcredential\n')
                 f.write(f'export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(_flex_app_id)}\n')
                 f.write(f'export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(_flex_app_secret)}\n')
@@ -5093,7 +5199,7 @@ def run_image_migrator():
                 f.write(f'export OS_API_KEY={shlex.quote(_flex_password)}\n')
                 f.write(f'export OS_USER_DOMAIN_NAME={shlex.quote(flex_domain)}\n')
                 f.write(f'export OS_PROJECT_DOMAIN_NAME={shlex.quote(flex_domain)}\n')
-                
+
                 if req.get('flex_project_id'):
                     f.write(f'export OS_PROJECT_ID={shlex.quote(str(req.get("flex_project_id")))}\n')
 
@@ -5190,9 +5296,25 @@ def run_image_migrator():
     safe_cmd_str = " ".join(safe_cmd_parts)
     cwd_dir = os.path.dirname(script_path)
     server_name = str(req.get('server_name') or '').strip()
-    
+
     def generate():
         global ACTIVE_MIGRATOR_PROCESSES, ACTIVE_MIGRATOR_PROCESSES_BY_SERVER
+        def should_hide_image_migrator_line(line: str) -> bool:
+            s = (line or "").strip()
+            if not s:
+                return False
+            if s.startswith("[RUN]"):
+                return True
+            if s.startswith("Traceback (most recent call last):"):
+                return True
+            if s.startswith("File \"/") and "ospc2flex_image_migrator.py" in s:
+                return True
+            if s.startswith("RuntimeError: Command failed"):
+                return True
+            if s in {"STDOUT:", "STDERR:"}:
+                return True
+            return False
+
         yield f"data: --- EXECUTING ---\n\n"
         yield f"data: {safe_cmd_str}\n\n"
         yield f"data: \n\n"
@@ -5207,7 +5329,10 @@ def run_image_migrator():
                 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[server_name] = process
             for line in iter(process.stdout.readline, ''):
                 if not line: break
-                yield f"data: {line.rstrip()}\n\n"
+                clean_line = line.rstrip()
+                if should_hide_image_migrator_line(clean_line):
+                    continue
+                yield f"data: {clean_line}\n\n"
             process.wait()
             yield f"data: \n\n"
             yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
@@ -5219,7 +5344,7 @@ def run_image_migrator():
             if server_name and ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.get(server_name) is process:
                 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(server_name, None)
             yield "data: [DONE]\n\n"
-            
+
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
@@ -5273,10 +5398,13 @@ SRC_PASS=""
 
 source /tmp/ospc2flex_flex.sh
 WORK=/mnt/migration/ospc2flex_image
-FLAVOR=1ba37c74-34c1-47f8-965b-c5005c3825d2
-NETWORK=e74c7a0f-e933-41c4-bcad-18c472b0fbf1
-EXT_NET=82be3711-cd97-4f7c-8bbd-59f5524a949e
-KEYPAIR=laptopubuntu24
+FLAVOR=${MIG_FLAVOR:-1ba37c74-34c1-47f8-965b-c5005c3825d2}
+NETWORK=${MIG_NETWORK:-e74c7a0f-e933-41c4-bcad-18c472b0fbf1}
+EXT_NET=${MIG_EXT_NET:-82be3711-cd97-4f7c-8bbd-59f5524a949e}
+KEYPAIR=${MIG_KEYPAIR:-laptopubuntu24}
+SRC_VCPUS=${MIG_SRC_VCPUS:-}
+SRC_RAM_MB=${MIG_SRC_RAM_MB:-}
+SRC_DISK_GB=${MIG_SRC_DISK_GB:-}
 DATE=$(date +%Y%m%d-%H%M)
 LOG=/tmp/mig_${LABEL}.log
 # [CACHE BUST 2026-04-22 v4] Sync variable-based output capture for NBD checks
@@ -5290,6 +5418,176 @@ SUDO=""; [ "$SRC_USER" != "root" ] && SUDO="sudo" || true
 > "$LOG"
 TS() { TZ='Asia/Bangkok' date '+%H:%M:%S'; }
 log() { echo "[$(TS)][$LABEL] $*"; }
+stage() {
+  log "=========================================================="
+  log "$1"
+  log "=========================================================="
+}
+kv() {
+  local _key="$1"; shift || true
+  log "  $(printf '%-18s' "$_key") : $*"
+}
+normalize_int() {
+  local _v="${1:-}"
+  _v=$(printf '%s' "$_v" | tr -cd '0-9')
+  [ -n "$_v" ] && echo "$_v" || echo ""
+}
+resolve_target_flavor() {
+  local _requested="$1"
+  local _src_vcpu _src_ram _src_disk _need_disk
+  _src_vcpu=$(normalize_int "${SRC_VCPUS:-}")
+  _src_ram=$(normalize_int "${SRC_RAM_MB:-}")
+  _src_disk=$(normalize_int "${SRC_DISK_GB:-}")
+  _need_disk="$_src_disk"
+  [ -z "$_need_disk" ] && _need_disk=$(normalize_int "${QCOW_VIRTUAL_GIB:-}")
+
+  if [ -n "$_requested" ] && openstack flavor show "$_requested" >/dev/null 2>&1; then
+    kv "Flavor resolved" "$_requested (requested exists in target region)" >&2
+    echo "$_requested"
+    return 0
+  fi
+  [ -n "$_requested" ] && log "  WARN: requested flavor not found in target region: $_requested" >&2
+
+  local _rows _rows_bootable _best _fallback _chosen _cid _cname _cram _cdisk _cvcpu
+  _rows=$(openstack flavor list --long --format value -c ID -c Name -c RAM -c Disk -c VCPUs 2>/dev/null || true)
+  if [ -z "$_rows" ]; then
+    log "  WARN: target flavor list is empty/unavailable; keeping requested flavor" >&2
+    echo "$_requested"
+    return 0
+  fi
+  _rows_bootable=$(printf '%s\n' "$_rows" | awk 'NF>=5 && ($4+0) > 0')
+  if [ -n "$_rows_bootable" ]; then
+    _rows="$_rows_bootable"
+  else
+    log "  WARN: no bootable (disk>0) flavors found; keeping zero-disk candidates" >&2
+  fi
+  if [ -n "$_need_disk" ]; then
+    local _rows_diskfit
+    _rows_diskfit=$(printf '%s\n' "$_rows" | awk -v md="$_need_disk" 'NF>=5 && ($4+0) >= md')
+    if [ -n "$_rows_diskfit" ]; then
+      _rows="$_rows_diskfit"
+    else
+      log "  WARN: no flavor has disk >= required ${_need_disk}GiB; keeping best available disk" >&2
+    fi
+  fi
+
+  # Fallback: smallest flavor by vcpu/ram/disk if no source shape is available.
+  _fallback=$(printf '%s\n' "$_rows" | awk '
+    NF>=5 {
+      id=$1; name=$2; ram=$3+0; disk=$4+0; vcpu=$5+0
+      score=(vcpu*1000000000)+(ram*1000000)+disk
+      if (!seen || score < best) { seen=1; best=score; out=id"|"name"|"ram"|"disk"|"vcpu }
+    }
+    END { if (seen) print out }
+  ')
+
+  if [ -n "$_src_vcpu" ] && [ -n "$_src_ram" ]; then
+    _best=$(printf '%s\n' "$_rows" | awk -v sv="$_src_vcpu" -v sr="$_src_ram" '
+      NF>=5 {
+        id=$1; name=$2; ram=$3+0; disk=$4+0; vcpu=$5+0
+        if (vcpu>=sv && ram>=sr) {
+          # Prefer nearest "next up": min delta vcpu/ram/disk in lexicographic weighted score.
+          score=((vcpu-sv)*1000000000)+((ram-sr)*1000000)+disk
+          if (!seen || score < best) { seen=1; best=score; out=id"|"name"|"ram"|"disk"|"vcpu }
+        }
+      }
+      END { if (seen) print out }
+    ')
+  fi
+
+  _chosen="${_best:-$_fallback}"
+  _cid=$(echo "$_chosen" | cut -d'|' -f1)
+  _cname=$(echo "$_chosen" | cut -d'|' -f2)
+  _cram=$(echo "$_chosen" | cut -d'|' -f3)
+  _cdisk=$(echo "$_chosen" | cut -d'|' -f4)
+  _cvcpu=$(echo "$_chosen" | cut -d'|' -f5)
+  if [ -n "$_cid" ]; then
+    kv "Flavor auto-pick" "$_cid name=${_cname:-?} vcpu=${_cvcpu:-?} ram=${_cram:-?} disk=${_cdisk:-?} src=${_src_vcpu:-?}/${_src_ram:-?}/${_src_disk:-?} req_disk=${_need_disk:-?}" >&2
+    echo "$_cid"
+    return 0
+  fi
+
+  log "  WARN: could not auto-pick flavor; keeping requested flavor" >&2
+  echo "$_requested"
+}
+resolve_target_network() {
+  local _requested="$1"
+  if [ -n "$_requested" ] && openstack network show "$_requested" >/dev/null 2>&1; then
+    kv "Network resolved" "$_requested (requested exists in target region)" >&2
+    echo "$_requested"
+    return 0
+  fi
+  [ -n "$_requested" ] && log "  WARN: requested network not found in target region: $_requested" >&2
+
+  local _rows _pick
+  _rows=$(openstack network list --format value -c ID -c Name 2>/dev/null || true)
+  [ -z "$_rows" ] && { echo "$_requested"; return 0; }
+  _pick=$(printf '%s\n' "$_rows" | awk 'tolower($2) ~ /(private|tenant|internal)/ {print $1; exit}')
+  [ -z "$_pick" ] && _pick=$(printf '%s\n' "$_rows" | awk 'NF>=1 {print $1; exit}')
+  if [ -n "$_pick" ]; then
+    kv "Network auto-pick" "$_pick" >&2
+    echo "$_pick"
+    return 0
+  fi
+  echo "$_requested"
+}
+resolve_target_keypair() {
+  local _requested="$1"
+  if [ -n "$_requested" ] && openstack keypair show "$_requested" >/dev/null 2>&1; then
+    kv "Keypair resolved" "$_requested (requested exists in target region)" >&2
+    echo "$_requested"
+    return 0
+  fi
+  [ -n "$_requested" ] && log "  WARN: requested keypair not found in target region: $_requested" >&2
+  local _pick
+  _pick=$(openstack keypair list --format value -c Name 2>/dev/null | awk 'NF>=1 {print $1; exit}')
+  if [ -n "$_pick" ]; then
+    kv "Keypair auto-pick" "$_pick" >&2
+    echo "$_pick"
+    return 0
+  fi
+  log "  WARN: no keypairs found in target region/project; booting without --key-name" >&2
+  echo ""
+}
+log_target_flavor_candidates() {
+  local _rows
+  _rows=$(openstack flavor list --long --format value -c ID -c Name -c RAM -c Disk -c VCPUs 2>/dev/null || true)
+  [ -z "$_rows" ] && { log "  [FLAVOR-CATALOG] unavailable/empty in target scope"; return 0; }
+  log "  [FLAVOR-CATALOG] target region/project candidates (id name vcpu ram disk):"
+  printf '%s\n' "$_rows" | awk 'NF>=5 {printf "  [FLAVOR] %s %s vcpu=%s ram=%s disk=%s\n",$1,$2,$5,$3,$4}' | head -20 | while IFS= read -r _ln; do
+    log "$_ln"
+  done
+}
+infer_image_os_family() {
+  local t
+  t=$(printf '%s' "${OS_TYPE:-}" | tr '[:upper:]' '[:lower:]')
+  case "$t" in
+    win*|windows*) echo "windows" ;;
+    *) echo "linux" ;;
+  esac
+}
+infer_image_os_distro() {
+  local t
+  t=$(printf '%s' "${OS_TYPE:-}" | tr '[:upper:]' '[:lower:]')
+  case "$t" in
+    ubuntu24*|ubuntu22*|ubuntu20*|ubuntu*) echo "ubuntu" ;;
+    debian12*|debian11*|debian10*|debian*) echo "debian" ;;
+    rocky9*|rocky8*|rocky*) echo "rocky" ;;
+    alma9*|alma8*|alma*|almalinux*) echo "almalinux" ;;
+    centosstream9*|centos9*|centos8*|centos7*|centos*) echo "centos" ;;
+    rhel9*|rhel8*|rhel7*|rhel6*|rhel*|redhat*) echo "rhel" ;;
+    win*|windows*) echo "windows" ;;
+    *) echo "" ;;
+  esac
+}
+detect_virtual_size_bytes() {
+  local img="$1"
+  if ! command -v qemu-img >/dev/null 2>&1; then
+    echo 0
+    return 0
+  fi
+  qemu-img info --output json "$img" 2>/dev/null | python3 -c 'import json,sys; print(int(json.load(sys.stdin).get("virtual-size") or 0))' 2>/dev/null || echo 0
+}
 # Global auth mode (auto-detected in Step 0.6)
 AUTH_MODE=""
 USE_LEGACY_SSH="0"
@@ -5299,7 +5597,7 @@ src_ssh_as() {
   if [ "$USE_LEGACY_SSH" = "1" ]; then
     opts+=(-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa)
   fi
-  
+
   # Try forcing based on globally detected AUTH_MODE
   if [ "$AUTH_MODE" = "pass" ]; then
     sshpass -p "$SRC_PASS" ssh "${opts[@]}" -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$user_host" "$@"
@@ -5336,7 +5634,7 @@ src_ssh_tunnel() {
   if [ "$USE_LEGACY_SSH" = "1" ]; then
     opts+=(-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa)
   fi
-  
+
   if [ "$AUTH_MODE" = "pass" ]; then
     sshpass -p "$SRC_PASS" ssh "${opts[@]}" -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$user_host"
   else
@@ -5361,6 +5659,11 @@ pkill -f "ssh.*${SRC_IP}.*dd if=" 2>/dev/null || true
 pkill -f "ospc2flex_offline_repair.*${LABEL}" 2>/dev/null || true
 pkill -f "openstack.*${LABEL}" 2>/dev/null || true
 pgrep -f "mig_worker_v4.*${LABEL}" 2>/dev/null | grep -v "^$$\$" | xargs -r kill 2>/dev/null || true
+
+# Forcefully unmount any stale repair directories (and their proc/sys bind mounts)
+sudo umount -R -l /tmp/ospc2flex_repair_* 2>/dev/null || true
+sleep 1
+
 # Kill any process holding a write lock on the local qcow2 file (stale qemu-nbd from a previous run)
 sudo fuser -k "$QCOW" 2>/dev/null || true
 sleep 1
@@ -5493,7 +5796,7 @@ check_auth() {
   local legacy_flag="$1"
   local legacy_opts=""
   [ "$legacy_flag" = "1" ] && legacy_opts="-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
-  
+
   if [ -n "$SRC_PASS" ] && sshpass -p "$SRC_PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no "$SRC_USER@$SRC_IP" "echo ssh-ok" 2>/dev/null | grep -q "ssh-ok"; then
     AUTH_MODE="pass"
     USE_LEGACY_SSH=$legacy_flag
@@ -5547,7 +5850,7 @@ echo "=== PACKAGES ==="
 if command -v dpkg >/dev/null; then dpkg -l | wc -l; dpkg -l | grep linux-image; else rpm -qa | wc -l; rpm -qa | grep kernel; fi
 echo ""
 echo "=== HARDWARE CONFIG & TOPOLOGY ==="
-echo "- vCPUs:"  ; nproc 2>/dev/null || cat /proc/cpuinfo | grep -c "^processor" 
+echo "- vCPUs:"  ; nproc 2>/dev/null || cat /proc/cpuinfo | grep -c "^processor"
 echo "- Memory:" ; free -m 2>/dev/null | grep Mem || grep MemTotal /proc/meminfo
 echo "- Disks:"  ; lsblk -o NAME,SIZE,TYPE,MOUNTPOINT 2>/dev/null || df -h
 echo ""
@@ -5684,18 +5987,45 @@ fi
 #   All OS:       fstab /dev/* cleanup, cloud-init state reset, machine-id clear, SSH key strategy
 log "Step 4: Offline repair (ospc2flex_offline_repair.sh)..."
   REPAIR_SCRIPT=/tmp/ospc2flex_offline_repair.sh
+  REPAIR_LOG="${WORK}/${LABEL}-${SRC_IP}.repair.log"
   if [ -f "$REPAIR_SCRIPT" ]; then
     if [ "$SKIP_REPAIR" -eq 1 ]; then
       log "  [REPAIR] SKIP — ${QCOW}.repaired sentinel exists (already repaired, no --force)"
     else
+      log "  [REPAIR] Log file: $REPAIR_LOG"
       log "  [REPAIR] Running ospc2flex_offline_repair.sh --qcow2 $QCOW --os-type $OS_TYPE --nbd-dev $NBD_DEV --force"
-      bash "$REPAIR_SCRIPT" --qcow2 "$QCOW" --os-type "$OS_TYPE" --nbd-dev "$NBD_DEV" --force --preserve-password-auth 2>&1
-      REPAIR_EXIT=$?
+      rm -f "$REPAIR_LOG"
+      bash "$REPAIR_SCRIPT" --qcow2 "$QCOW" --os-type "$OS_TYPE" --nbd-dev "$NBD_DEV" --force --preserve-password-auth 2>&1 | tee "$REPAIR_LOG"
+      REPAIR_EXIT=${PIPESTATUS[0]}
       if [ "$REPAIR_EXIT" -eq 0 ]; then
         log "  [REPAIR] ospc2flex_offline_repair.sh completed successfully"
       else
         log "  [WARN] ospc2flex_offline_repair.sh exited with code $REPAIR_EXIT — continuing anyway"
       fi
+
+      # CentOS LAN repair guardrail: fail fast if expected eth0/network.service
+      # repair markers are missing in jumphost repair log.
+      case "${OS_TYPE:-}" in
+        centos*|rhel7*|rhel6*)
+          if [ -f "$REPAIR_LOG" ]; then
+            if grep -q "Wrote fresh ifcfg-eth0 (no HWADDR, ONBOOT=yes, DHCP, NM_CONTROLLED=no)" "$REPAIR_LOG" \
+               && grep -q "Enabled network.service" "$REPAIR_LOG"; then
+              log "  [REPAIR-LAN] PASS — CentOS/RHEL legacy eth0 repair markers found"
+            else
+              log "ERROR: [REPAIR-LAN-E5] CentOS/RHEL LAN repair markers missing in $REPAIR_LOG"
+              log "  [REPAIR-LAN-E5] Required markers:"
+              log "    - Wrote fresh ifcfg-eth0 (no HWADDR, ONBOOT=yes, DHCP, NM_CONTROLLED=no)"
+              log "    - Enabled network.service"
+              echo "FAIL_REPAIR_LAN_E5|$LABEL|$REPAIR_LOG" >> "$RESULTS"
+              exit 1
+            fi
+          else
+            log "ERROR: [REPAIR-LAN-E5] Repair log not found: $REPAIR_LOG"
+            echo "FAIL_REPAIR_LAN_E5|$LABEL|$REPAIR_LOG" >> "$RESULTS"
+            exit 1
+          fi
+          ;;
+      esac
     fi
 else
   # Fallback: minimal inline repair (mount, fstab, netplan/interfaces, cloud-init)
@@ -5744,8 +6074,57 @@ else
 log "Step 4 DONE"
 
 # Step 5: Upload
+echo
+echo "╔══════════════════════════════════════════════════════════╗"
+echo "║  🚀 UPLOAD STAGE — pushing repaired image to FLEX       ║"
+echo "╚══════════════════════════════════════════════════════════╝"
 log "Step 5: Upload $IMG..."
-log "  [DEBUG] Auth check: OS_USERNAME=${OS_USERNAME:-MISSING_USER} OS_AUTH_TYPE=${OS_AUTH_TYPE:-MISSING_TYPE}"
+kv "Image name" "$IMG"
+kv "Source qcow2" "$QCOW"
+kv "Auth user" "${OS_USERNAME:-MISSING_USER}"
+kv "Auth type" "${OS_AUTH_TYPE:-MISSING_TYPE}"
+kv "Auth URL" "${OS_AUTH_URL:-MISSING_AUTH_URL}"
+kv "Region" "${OS_REGION_NAME:-MISSING_REGION}"
+kv "Interface" "${OS_INTERFACE:-MISSING_INTERFACE}"
+kv "Project ID" "${OS_PROJECT_ID:-MISSING_PROJECT_ID}"
+kv "Project name" "${OS_PROJECT_NAME:-unset}"
+if [ -n "${OS_APPLICATION_CREDENTIAL_ID:-}" ]; then
+  kv "Credential mode" "application credential id=${OS_APPLICATION_CREDENTIAL_ID}"
+else
+  kv "Credential mode" "user/password"
+fi
+QCOW_BYTES=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
+QCOW_MIB=$((QCOW_BYTES / 1024 / 1024))
+QCOW_VIRTUAL_BYTES=$(detect_virtual_size_bytes "$QCOW")
+QCOW_VIRTUAL_GIB=0
+if [ "$QCOW_VIRTUAL_BYTES" -gt 0 ] 2>/dev/null; then
+  QCOW_VIRTUAL_GIB=$(( (QCOW_VIRTUAL_BYTES + 1073741823) / 1073741824 ))
+fi
+IMG_OS_TYPE=$(infer_image_os_family)
+IMG_OS_DISTRO=$(infer_image_os_distro)
+IMG_ARCH="x86_64"
+IMG_VM_MODE="hvm"
+IMG_DISK_BUS="virtio"
+IMG_VIF_MODEL="virtio"
+IMG_QGA="yes"
+IMAGE_CREATE_ARGS=(
+  --disk-format qcow2
+  --container-format bare
+  --file "$QCOW"
+  --private
+  --property "architecture=$IMG_ARCH"
+  --property "vm_mode=$IMG_VM_MODE"
+  --property "os_type=$IMG_OS_TYPE"
+  --property "hw_disk_bus=$IMG_DISK_BUS"
+  --property "hw_vif_model=$IMG_VIF_MODEL"
+  --property "hw_qemu_guest_agent=$IMG_QGA"
+)
+[ -n "$IMG_OS_DISTRO" ] && IMAGE_CREATE_ARGS+=(--property "os_distro=$IMG_OS_DISTRO")
+kv "File size" "${QCOW_BYTES}B (${QCOW_MIB} MiB)"
+kv "Virtual size" "${QCOW_VIRTUAL_BYTES}B (~${QCOW_VIRTUAL_GIB} GiB)"
+kv "Disk format" "qcow2 / bare"
+kv "Image metadata" "architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=${IMG_OS_DISTRO:-unset} hw_disk_bus=$IMG_DISK_BUS hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
+kv "Upload command" "openstack image create --disk-format qcow2 --container-format bare --file $QCOW --private --property architecture=$IMG_ARCH --property vm_mode=$IMG_VM_MODE --property os_type=$IMG_OS_TYPE ${IMG_OS_DISTRO:+--property os_distro=$IMG_OS_DISTRO }--property hw_disk_bus=$IMG_DISK_BUS --property hw_vif_model=$IMG_VIF_MODEL --property hw_qemu_guest_agent=$IMG_QGA $IMG"
 if [ "$SKIP_UPLOAD" -eq 1 ] && [ -n "$NEW_ID" ]; then
   log "  [SKIP] Reusing cached Glance image $NEW_ID — skipping upload (6h saved)"
 else
@@ -5754,10 +6133,14 @@ else
     if [ "$_up_try" -gt 1 ]; then
       log "  Upload attempt $_up_try..."
     fi
-    NEW_ID=$(openstack image create --disk-format qcow2 --container-format bare \
-      --file "$QCOW" --private "$IMG" --format value -c id 2>/tmp/os_err_$$.txt || true)
+    log "  [UPLOAD $_up_try/3] starting image upload..."
+    NEW_ID=$(openstack image create --format value -c id \
+      "${IMAGE_CREATE_ARGS[@]}" "$IMG" 2>/tmp/os_err_$$.txt || true)
 
     if [ -n "$NEW_ID" ]; then
+      log "  [UPLOAD $_up_try/3] returned image id: $NEW_ID"
+      IMG_STATUS_LINE=$(openstack image show "$NEW_ID" -f value -c status 2>/dev/null || echo "unknown")
+      log "  [UPLOAD $_up_try/3] initial image status: ${IMG_STATUS_LINE:-unknown}"
       break
     fi
 
@@ -5765,9 +6148,7 @@ else
     log "  [WARN] Upload attempt $_up_try failed: $ERR_MSG"
 
     if [ "$_up_try" -lt 3 ]; then
-      log "  Cleaning up any partial broken images before retry..."
-      BROKEN_IIDS=$(openstack image list --format value -c ID -c Name 2>/dev/null | grep "$IMG" | awk '{print $1}' || true)
-      for iid in $BROKEN_IIDS; do openstack image delete "$iid" 2>/dev/null || true; done
+      log "  [UPLOAD $_up_try/3] sleeping 20s before retry"
       sleep 20
     fi
   done
@@ -5781,14 +6162,19 @@ else
   rm -f /tmp/os_err_$$.txt
   # Save image ID so future re-runs can skip the 6h upload
   echo "$NEW_ID" > "${QCOW}.image_id"
+  kv "Image id cache" "${QCOW}.image_id"
 fi
-log "  Image ID: $NEW_ID"
+kv "Image ID" "$NEW_ID"
+IMG_NAME_SHOW=$(openstack image show "$NEW_ID" -f value -c name 2>/dev/null || echo "$IMG")
+IMG_VIS_SHOW=$(openstack image show "$NEW_ID" -f value -c visibility 2>/dev/null || echo "unknown")
+IMG_STAT_SHOW=$(openstack image show "$NEW_ID" -f value -c status 2>/dev/null || echo "unknown")
+log "  [UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$NEW_ID name=${IMG_NAME_SHOW:-unknown} status=${IMG_STAT_SHOW:-unknown} visibility=${IMG_VIS_SHOW:-unknown}"
 
 # Step 6: Wait active
-log "Step 6: Wait image active..."
+stage "STEP 6: Wait image active"
 for i in $(seq 1 60); do
   ST=$(openstack image show "$NEW_ID" -f value -c status 2>/dev/null || echo "")
-  log "  [$i] $ST"; [ "$ST" = "active" ] && break
+  log "  [DEBUG] Image status poll $i/60: id=$NEW_ID status=${ST:-unknown}"; [ "$ST" = "active" ] && break
   [ "$ST" = "killed" ] && { echo "FAIL_KILLED|$LABEL|$NEW_ID" >> "$RESULTS"; exit 1; }
   sleep 20
 done
@@ -5797,37 +6183,109 @@ done
 # DO NOT delete .repaired — it is the skip-repair sentinel for next re-run
 
 # Step 7: Boot
-log "Step 7: Boot $VMNAME..."
-# Reuse existing ACTIVE VM only when it is running the same image we just repaired.
-# If it's ACTIVE with a different (old/pre-repair) image, delete it and boot fresh.
-EXISTING_VM=$(openstack server list --name "ospc2flex-${LABEL}-" --format value -c ID -c Status 2>/dev/null | head -1 || true)
-if [ -n "$EXISTING_VM" ]; then
-  VM_ID=$(echo "$EXISTING_VM" | awk '{print $1}')
-  VM_ST=$(echo "$EXISTING_VM" | awk '{print $2}')
-  if [ "$VM_ST" = "ACTIVE" ]; then
-    _vm_img=$(openstack server show "$VM_ID" -f value -c image 2>/dev/null | grep -oE '[0-9a-f-]{36}' | head -1 || true)
-    if [ "$_vm_img" = "$NEW_ID" ]; then
-      log "  [SKIP] VM already ACTIVE with repaired image $NEW_ID: $VM_ID — reusing"
-    else
-      log "  [DELETE] VM $VM_ID is ACTIVE but running old image ($_vm_img ≠ $NEW_ID) — deleting and booting from repaired image"
-      openstack server delete "$VM_ID" --wait 2>/dev/null || true
-      EXISTING_VM=""
-    fi
-  else
-    log "  [DELETE] Existing VM $VM_ID in state $VM_ST (not ACTIVE) — deleting and rebooting from repaired image"
-    openstack server delete "$VM_ID" --wait 2>/dev/null || true
-    EXISTING_VM=""
+stage "STEP 7: Boot FLEX test instance"
+# Resolve flavor against current target region catalog. If requested flavor ID is
+# from another region/project, auto-select nearest compatible flavor.
+FLAVOR=$(resolve_target_flavor "$FLAVOR")
+NETWORK=$(resolve_target_network "$NETWORK")
+KEYPAIR=$(resolve_target_keypair "$KEYPAIR")
+log_target_flavor_candidates
+FLAVOR_DISK=$(openstack flavor show "$FLAVOR" -f value -c disk 2>/dev/null || echo "")
+if [ -z "$FLAVOR_DISK" ] || [ "$FLAVOR_DISK" = "0" ]; then
+  log "ERROR: selected flavor is zero-disk or unknown (id=$FLAVOR disk=${FLAVOR_DISK:-unknown})"
+  log "  [HINT] policy requires disk>0 image-backed flavor (or explicit boot-from-volume path)"
+  echo "FAIL_BOOT_FLAVOR_ZERO_DISK|$LABEL|$FLAVOR|${FLAVOR_DISK:-unknown}" >> "$RESULTS"
+  exit 1
+fi
+kv "Server name" "$VMNAME"
+kv "Image ID" "$NEW_ID"
+kv "Flavor" "$FLAVOR"
+kv "Network" "$NETWORK"
+kv "Keypair" "$KEYPAIR"
+kv "Flavor check" "$(openstack flavor show "$FLAVOR" -f value -c name 2>/dev/null || echo NOT_FOUND)"
+kv "Network check" "$(openstack network show "$NETWORK" -f value -c name 2>/dev/null || echo NOT_FOUND)"
+kv "Keypair check" "$(openstack keypair show "$KEYPAIR" -f value -c name 2>/dev/null || echo NOT_FOUND)"
+
+# Always boot a fresh test VM for this freshly uploaded image. Old test VMs with
+# the same migration label are deleted first so the dashboard cannot silently
+# reuse a stale instance from a previous repair.
+EXISTING_VMS=$(openstack server list --name "ospc2flex-${LABEL}-" --format value -c ID -c Name -c Status 2>/dev/null || true)
+if [ -n "$EXISTING_VMS" ]; then
+  log "  Existing test VMs for label $LABEL found; deleting before fresh boot:"
+  while read -r _old_id _old_name _old_status; do
+    [ -z "$_old_id" ] && continue
+    log "    delete $_old_id name=${_old_name:-unknown} status=${_old_status:-unknown}"
+    timeout 300 openstack server delete "$_old_id" --wait >/tmp/server_delete_$$.log 2>&1 \
+      && log "    deleted $_old_id" \
+      || log "    WARN: delete returned non-zero for $_old_id: $(tail -1 /tmp/server_delete_$$.log 2>/dev/null)"
+  done <<< "$EXISTING_VMS"
+  rm -f /tmp/server_delete_$$.log
+else
+  log "  No existing test VM found for label $LABEL"
+fi
+
+log "  Creating server now..."
+if [ -n "$KEYPAIR" ]; then
+  kv "Create command" "openstack server create --image $NEW_ID --flavor $FLAVOR --network $NETWORK --key-name $KEYPAIR $VMNAME"
+  VM_ID=$(timeout 180 openstack server create --image "$NEW_ID" --flavor "$FLAVOR" --network "$NETWORK" \
+    --key-name "$KEYPAIR" --format value -c id "$VMNAME" 2>/tmp/server_create_$$.err || true)
+else
+  kv "Create command" "openstack server create --image $NEW_ID --flavor $FLAVOR --network $NETWORK $VMNAME"
+  VM_ID=$(timeout 180 openstack server create --image "$NEW_ID" --flavor "$FLAVOR" --network "$NETWORK" \
+    --format value -c id "$VMNAME" 2>/tmp/server_create_$$.err || true)
+fi
+if [ -z "$VM_ID" ]; then
+  log "ERROR: server create did not return an instance id"
+  log "  create stderr: $(tr '\n' ' ' </tmp/server_create_$$.err 2>/dev/null | cut -c 1-300)"
+  echo "FAIL_BOOT|$LABEL" >> "$RESULTS"
+  rm -f /tmp/server_create_$$.err
+  exit 1
+fi
+rm -f /tmp/server_create_$$.err
+kv "VM ID" "$VM_ID"
+
+VM_ST=""
+for _boot_poll in $(seq 1 90); do
+  VM_ST=$(openstack server show "$VM_ID" -f value -c status 2>/dev/null || echo "")
+  VM_TASK=$(openstack server show "$VM_ID" -f value -c OS-EXT-STS:task_state 2>/dev/null || true)
+  VM_POWER=$(openstack server show "$VM_ID" -f value -c OS-EXT-STS:power_state 2>/dev/null || true)
+  VM_ADDRS=$(openstack server show "$VM_ID" -f value -c addresses 2>/dev/null || true)
+  log "  [BOOT $_boot_poll/90] status=${VM_ST:-unknown} task=${VM_TASK:-none} power=${VM_POWER:-unknown} addresses=${VM_ADDRS:-none}"
+  [ "$VM_ST" = "ACTIVE" ] && break
+  if [ "$VM_ST" = "ERROR" ]; then
+    log "ERROR: server entered ERROR state"
+    openstack server show "$VM_ID" -f yaml 2>/tmp/server_error_$$.yaml || true
+    sed 's/^/  server: /' /tmp/server_error_$$.yaml | tail -80
+    rm -f /tmp/server_error_$$.yaml
+    echo "FAIL_BOOT|$LABEL|$VM_ID" >> "$RESULTS"
+    exit 1
   fi
+  sleep 10
+done
+if [ "$VM_ST" != "ACTIVE" ]; then
+  log "ERROR: server did not become ACTIVE after 15 minutes"
+  echo "FAIL_BOOT_TIMEOUT|$LABEL|$VM_ID" >> "$RESULTS"
+  exit 1
 fi
-if [ -z "$EXISTING_VM" ]; then
-  VM_ID=$(openstack server create --image "$NEW_ID" --flavor "$FLAVOR" --network "$NETWORK" \
-    --key-name "$KEYPAIR" --wait --format value -c id "$VMNAME" 2>/dev/null)
-fi
-log "  VM: $VM_ID"
-[ -z "$VM_ID" ] && { echo "FAIL_BOOT|$LABEL" >> "$RESULTS"; exit 1; }
+log "  VM ACTIVE: $VM_ID"
 
 # Step 8: FIP (staggered by port offset to avoid race)
-log "Step 8: Floating IP..."
+stage "STEP 8: Floating IP attach"
+kv "External network" "$EXT_NET"
+kv "VM ID" "$VM_ID"
+if ! openstack network show "$EXT_NET" >/dev/null 2>&1; then
+  log "  WARN: configured external network $EXT_NET was not found in this FLEX region"
+  _auto_ext=$(openstack network list --external --format value -c ID -c Name 2>/dev/null | head -1 || true)
+  if [ -n "$_auto_ext" ]; then
+    EXT_NET=$(echo "$_auto_ext" | awk '{print $1}')
+    _auto_ext_name=$(echo "$_auto_ext" | cut -d' ' -f2-)
+    kv "External fallback" "$EXT_NET ${_auto_ext_name:-}"
+  else
+    log "  WARN: no external network was discovered; floating IP create will fail"
+  fi
+else
+  kv "External check" "$(openstack network show "$EXT_NET" -f value -c name 2>/dev/null || echo OK)"
+fi
 sleep $(( (TUN_PORT - 10821) * 10 ))
 
 # Wait for the VM's neutron port to reach ACTIVE before attaching FIP.
@@ -5846,16 +6304,21 @@ if [ -z "$_port_id" ]; then
   _port_id=$(openstack port list --server "$VM_ID" --format value -c ID 2>/dev/null | head -1)
   log "  WARN: Port never reached ACTIVE — proceeding with port $_port_id"
 fi
-log "  Port: $_port_id"
+kv "Selected port" "${_port_id:-NO_PORT}"
 
 REAL_FIP=""
+if [ -z "$_port_id" ]; then
+  log "  WARNING: no neutron port found for VM; cannot attach floating IP"
+else
 for _fip_try in 1 2 3; do
   # Try to create a new FIP; fall back to grabbing an unused DOWN FIP
-  _fip_row=$(openstack floating ip create "$EXT_NET" \
-    --format value -c id -c floating_ip_address 2>/dev/null || true)
-  FIP_ID=$(echo "$_fip_row" | awk '{print $1}')
-  FIP=$(echo "$_fip_row"    | awk '{print $2}')
+  log "  [FIP $_fip_try/3] requesting floating IP from $EXT_NET"
+  _fip_json=$(openstack floating ip create "$EXT_NET" -f json 2>/tmp/fip_create_$$.err || true)
+  FIP_ID=$(printf '%s' "$_fip_json" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("id",""))' 2>/dev/null || true)
+  FIP=$(printf '%s' "$_fip_json" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("floating_ip_address",""))' 2>/dev/null || true)
   if [ -z "$FIP_ID" ]; then
+    log "  [FIP $_fip_try/3] create failed: $(tr '\n' ' ' </tmp/fip_create_$$.err 2>/dev/null | cut -c 1-240)"
+    log "  [FIP $_fip_try/3] trying an existing DOWN floating IP"
     _fip_row=$(openstack floating ip list --status DOWN \
       --format value -c ID -c "Floating IP Address" 2>/dev/null | shuf | head -1 || true)
     FIP_ID=$(echo "$_fip_row" | awk '{print $1}')
@@ -5878,31 +6341,52 @@ for _fip_try in 1 2 3; do
   log "  FIP $FIP did not attach (try $_fip_try, fixed_ip=$_fip_fixed)"
   sleep 15
 done
+rm -f /tmp/fip_create_$$.err
+fi
 if [ -z "$REAL_FIP" ]; then
   log "  WARNING: No floating IP attached — VM has private IP only"
   REAL_FIP="NO_FIP"
 fi
-log "  FIP: $REAL_FIP"
+kv "Floating IP" "$REAL_FIP"
 
 # Step 9: SSH test (INFORMATIONAL ONLY — does not affect migration result)
-log "Step 9: SSH test ${FLEX_USER}@${REAL_FIP} (informational)..."
+stage "STEP 9: SSH test"
+kv "Primary target" "${FLEX_USER}@${REAL_FIP}"
+kv "Fallback target" "root@${REAL_FIP}"
 SSH_OK=0
 SSH_ACTUAL_USER=""
-for i in $(seq 1 6); do
-  legacy_opts=""
-  [ "$USE_LEGACY_SSH" = "1" ] && legacy_opts="-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
-  ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes \
-    "${FLEX_USER}@${REAL_FIP}" 'echo ssh-ok' 2>/dev/null | grep -q ssh-ok && { SSH_OK=1; SSH_ACTUAL_USER="$FLEX_USER"; break; }
-  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes \
-    "root@${REAL_FIP}" 'echo ssh-ok' 2>/dev/null | grep -q ssh-ok && { SSH_OK=1; SSH_ACTUAL_USER="root"; break; }
-  log "  [$i/6] retry 10s..."; sleep 10
-done
-if [ "$SSH_OK" -eq 1 ]; then
-  log "=== SSH OK: ${SSH_ACTUAL_USER}@${REAL_FIP} ==="
+if [ "$REAL_FIP" = "NO_FIP" ]; then
+  log "  SSH test skipped because no floating IP was attached"
 else
-  log "=== SSH test skipped (key mismatch — verify manually) ==="
+  for i in $(seq 1 12); do
+    legacy_opts=""
+    [ "$USE_LEGACY_SSH" = "1" ] && legacy_opts="-o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa"
+    log "  [SSH $i/12] trying ${FLEX_USER}@${REAL_FIP}"
+    ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes \
+      "${FLEX_USER}@${REAL_FIP}" 'echo ssh-ok' 2>/dev/null | grep -q ssh-ok && { SSH_OK=1; SSH_ACTUAL_USER="$FLEX_USER"; break; }
+    log "  [SSH $i/12] trying root@${REAL_FIP}"
+    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 $legacy_opts -o BatchMode=yes \
+      "root@${REAL_FIP}" 'echo ssh-ok' 2>/dev/null | grep -q ssh-ok && { SSH_OK=1; SSH_ACTUAL_USER="root"; break; }
+    log "  [SSH $i/12] not ready yet; retrying in 10s"
+    sleep 10
+  done
+  if [ "$SSH_OK" -eq 1 ]; then
+    log "=== SSH OK: ${SSH_ACTUAL_USER}@${REAL_FIP} ==="
+  else
+    log "=== SSH FAILED: ${FLEX_USER}@${REAL_FIP} and root@${REAL_FIP} did not accept the staged key ==="
+  fi
 fi
 echo "OK|$LABEL|$REAL_FIP|$VM_ID|$NEW_ID|fip=${REAL_FIP}" >> "$RESULTS"
+
+# ── Jumphost cleanup: clear sentinels so re-repair is possible if needed ─────
+# Keep .qcow2 + .converted (reuse for re-repair without re-downloading).
+# Remove .repaired + .image_id so a future re-run starts fresh from repair.
+log "  [CLEANUP] Clearing repair/upload sentinels (keeping qcow2 for future re-repair)..."
+for _f in "${QCOW}.repaired" "${QCOW}.image_id"; do
+  if [ -f "$_f" ]; then
+    rm -f "$_f" && log "  [CLEANUP] Removed: $_f" || log "  [CLEANUP] Could not remove: $_f"
+  fi
+done
 
 log "=== DONE ==="
 
@@ -5953,7 +6437,7 @@ def nbd_run():
 
     ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
                 "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
-    
+
     try:
         ospc_creds = req.get('ospc_creds', {})
         msgs, ok = _stage_scripts_on_jumphost(
@@ -6036,11 +6520,11 @@ def _file_md5(path: str) -> str:
 
 def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base, ospc_creds=None):
     """Stage scripts on jumphost. Returns (messages: list[str], ok: bool).
-    
+
     Smart staging strategy:
       1. Flex creds  → ALWAYS stage (lightweight, may change per batch)
       2. Worker script → stage only if content hash changed
-      3. Repair script → stage only if file hash changed  
+      3. Repair script → stage only if file hash changed
       4. SSH key + modprobe + mkdir → only once per jumphost session
     """
     import tempfile
@@ -6065,8 +6549,23 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         "ospc2Flex-Image-migtool", "ospc2flex_offline_repair.sh"
     )
     repair_hash = _file_md5(_repair_path) if os.path.isfile(_repair_path) else ""
+    _win_repair_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..",
+        "ospc2Flex-Image-migtool", "ospc2flex_windows_repair.sh"
+    )
+    _win_repair_hash = _file_md5(_win_repair_path) if os.path.isfile(_win_repair_path) else ""
+    _win_migrate_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..",
+        "ospc2Flex-Image-migtool", "ospc2flex_windows_migrate.sh"
+    )
+    _win_migrate_hash = _file_md5(_win_migrate_path) if os.path.isfile(_win_migrate_path) else ""
+    _glance_bridge_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..",
+        "ospc2Flex-Image-migtool", "ospc2flex_glance_bridge.sh"
+    )
+    _glance_bridge_hash = _file_md5(_glance_bridge_path) if os.path.isfile(_glance_bridge_path) else ""
 
-    combined_hash = f"{worker_hash}:{repair_hash}"
+    combined_hash = f"{worker_hash}:{repair_hash}:{_win_repair_hash}:{_win_migrate_hash}:{_glance_bridge_hash}"
 
     # --- Check cache ---
     with _nbd_staging_lock:
@@ -6080,14 +6579,21 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
             "init_done": init_done,  # will update to True after init
         }
 
+    flex_region = normalize_flex_region(
+        str(flex_creds.get('region', 'DFW3') or 'DFW3'),
+        str(flex_creds.get('auth_url', '') or ''),
+    )
+    flex_auth_url = normalize_flex_auth_url(
+        str(flex_creds.get('auth_url', '') or ''),
+        flex_region,
+    )
+
     # 1. ALWAYS stage flex creds (lightweight — contains session password)
     flex_sh = "#!/usr/bin/env bash\n"
-    flex_sh += f"export OS_AUTH_URL={shlex.quote(flex_creds.get('auth_url',''))}\n"
+    flex_sh += f"export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n"
     flex_sh += "export OS_IDENTITY_API_VERSION=3\nexport OS_INTERFACE=public\n"
-    flex_region = flex_creds.get('region','DFW3')
-    if flex_region == 'DFW': flex_region = 'DFW3'
     flex_sh += f"export OS_REGION_NAME={shlex.quote(flex_region)}\n"
-    if flex_creds.get('app_cred_id'):
+    if False:
         flex_sh += "export OS_AUTH_TYPE=v3applicationcredential\n"
         flex_sh += f"export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(flex_creds['app_cred_id'])}\n"
         flex_sh += f"export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(flex_creds.get('app_cred_secret',''))}\n"
@@ -6124,11 +6630,11 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         if ospc_account_id:
             ospc_sh += f"export OS_TENANT_ID={shlex.quote(ospc_account_id)}\n"
             ospc_sh += f"export OS_PROJECT_ID={shlex.quote(ospc_account_id)}\n"
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
             tf.write(ospc_sh)
             tf_path_ospc = tf.name
-            
+
         safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                         tf_path_ospc, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_ospc.sh"],
                        check=True, timeout=30)
@@ -6156,10 +6662,6 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
                            check=True, timeout=15)
 
         # 4. Windows repair script — always stage alongside Linux repair
-        _win_repair_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..",
-            "ospc2Flex-Image-migtool", "ospc2flex_windows_repair.sh"
-        )
         if os.path.isfile(_win_repair_path):
             msgs.append("[STAGE] Uploading Windows repair script")
             safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
@@ -6169,16 +6671,19 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
                            check=True, timeout=15)
 
         # 5. Windows Glance migration script (for VMs with no SSH)
-        _win_migrate_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "..",
-            "ospc2Flex-Image-migtool", "ospc2flex_windows_migrate.sh"
-        )
         if os.path.isfile(_win_migrate_path):
             msgs.append("[STAGE] Uploading Windows migration script (Glance)")
             safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                             _win_migrate_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_migrate.sh"],
                            check=True, timeout=60)
             safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_migrate.sh"],
+                           check=True, timeout=15)
+        if os.path.isfile(_glance_bridge_path):
+            msgs.append("[STAGE] Uploading Glance/Cloud Files bridge helper")
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
+                            _glance_bridge_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_glance_bridge.sh"],
+                           check=True, timeout=60)
+            safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_glance_bridge.sh"],
                            check=True, timeout=15)
     else:
         msgs.append("[STAGE] Worker + repair scripts unchanged (skipped)")
@@ -6213,7 +6718,7 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
 @app.post("/api/vm_migrator/nbd/run_single")
 def nbd_run_single():
     """
-    Stage scripts on jumphost (if not already done this session) + launch ONE 
+    Stage scripts on jumphost (if not already done this session) + launch ONE
     worker + stream its log back as SSE — same pattern as /api/image_migrator/run.
     Body: { jumphost_ip, jumphost_user, ssh_key_path,
             flex_creds: {...}, vm: { label, src_ip, os_type, ... } }
@@ -6281,21 +6786,63 @@ def nbd_run_single():
             yield "data: [DONE]\n\n"
             return
 
-        # Launch the worker — auto-detect Windows VMs and fork to Glance pipeline
+        # Launch the worker. Windows is handled by the snapshot/Glance path because
+        # the Linux NBD/DD worker cannot safely read Windows guests over SSH.
         _is_windows = any(w in label.lower() for w in ['windows', 'win20', 'win16', 'win10', 'winserv']) \
                       or any(w in os_type.lower() for w in ['windows', 'win'])
+        mig_flavor = vm.get('flavor', '') or req.get('flex_flavor', '')
+        mig_src_vcpus = str(
+            vm.get('source_vcpus')
+            or vm.get('vcpus')
+            or vm.get('vcpu')
+            or ""
+        ).strip()
+        mig_src_ram_mb = str(
+            vm.get('source_ram_mb')
+            or vm.get('ram_mb')
+            or vm.get('ram')
+            or ""
+        ).strip()
+        mig_src_disk_gb = str(
+            vm.get('source_disk_gb')
+            or vm.get('disk_gb')
+            or vm.get('disk')
+            or ""
+        ).strip()
+        mig_net = req.get('flex_network_id', '')
+        mig_ext = req.get('flex_external_network', '')
+        mig_key = req.get('flex_key_name', '')
         try:
             if _is_windows:
-                # Windows: no SSH/qemu-nbd → use OSPC Glance snapshot pipeline
+                _ospc_region = str(ospc_creds.get('region') or 'IAD').strip().lower() or 'iad'
+                _snet_region = re.sub(r'\d+', '', _ospc_region) or 'iad'
+                _snet_host = f"snet-{_snet_region}.images.api.rackspacecloud.com"
+                _dns_check = subprocess.run(
+                    ssh_base + [f"getent hosts {shlex.quote(_snet_host)} >/dev/null 2>&1"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=15,
+                )
+                if _dns_check.returncode != 0:
+                    yield f"data: [WARN] ServiceNet Glance host {_snet_host} does not resolve on jumphost {jumphost_ip}.\n\n"
+                    yield "data: [WARN] Continuing anyway: Windows Glance pipeline will try Classic Glance, then Cloud Files export/import fallback.\n\n"
+
                 cmd_remote = (
-                    f"nohup bash /tmp/ospc2flex_windows_migrate.sh "
+                    f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
+                    f"MIG_SRC_VCPUS={shlex.quote(mig_src_vcpus)} "
+                    f"MIG_SRC_RAM_MB={shlex.quote(mig_src_ram_mb)} "
+                    f"MIG_SRC_DISK_GB={shlex.quote(mig_src_disk_gb)} "
+                    f"bash /tmp/ospc2flex_windows_migrate.sh "
                     f"--server-name {shlex.quote(label)} "
                     f"--server-ip {shlex.quote(src_ip)} "
                     f"--label {shlex.quote(label)} "
+                    f"{('--flavor ' + shlex.quote(mig_flavor)) if mig_flavor else ''} "
+                    f"{('--network ' + shlex.quote(mig_net)) if mig_net else ''} "
+                    f"{('--keypair ' + shlex.quote(mig_key)) if mig_key else ''} "
                     f"</dev/null >{log_path} 2>&1 &"
                 )
                 subprocess.run(ssh_base + [cmd_remote], check=True, timeout=30)
-                yield f"data: [REMOTE WORKER] Windows VM detected — using Glance snapshot pipeline\n\n"
+                yield f"data: [REMOTE WORKER] Windows VM detected — NBD/DD label uses Windows Glance snapshot pipeline\n\n"
                 yield f"data: [REMOTE WORKER] Worker launched: {label} (Glance mode)\n\n"
             else:
                 _force_sync = vm.get('force_sync') == True
@@ -6306,7 +6853,7 @@ def nbd_run_single():
                         yield f"data: [CLEANUP] Force Fresh Sync enabled: wiped existing {label}.qcow2 data\n\n"
                     except Exception:
                         pass
-                
+
                 # Kill any stale workers for this label before launching a fresh one
                 kill_stale_cmd = (
                     f"pkill -f 'mig_worker_v4.sh {label}' 2>/dev/null || true; "
@@ -6320,7 +6867,14 @@ def nbd_run_single():
                     pass
 
                 cmd_remote = (
-                    f"nohup bash /tmp/mig_worker_v4.sh "
+                    f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
+                    f"MIG_SRC_VCPUS={shlex.quote(mig_src_vcpus)} "
+                    f"MIG_SRC_RAM_MB={shlex.quote(mig_src_ram_mb)} "
+                    f"MIG_SRC_DISK_GB={shlex.quote(mig_src_disk_gb)} "
+                    f"MIG_NETWORK={shlex.quote(mig_net)} "
+                    f"MIG_EXT_NET={shlex.quote(mig_ext)} "
+                    f"MIG_KEYPAIR={shlex.quote(mig_key)} "
+                    f"bash /tmp/mig_worker_v4.sh "
                     f"{shlex.quote(label)} {shlex.quote(src_ip)} {shlex.quote(src_user)} "
                     f"{shlex.quote(os_type)} {shlex.quote(flex_user)} "
                     f"{shlex.quote(nbd_dev)} {src_port} {tun_port} "
@@ -6489,7 +7043,7 @@ def nbd_status():
         return jsonify({"error": "jumphost_ip required"}), 400
 
     ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
-    
+
     try:
         remote_script = r"""
 echo '---SYS---'
@@ -6515,8 +7069,18 @@ for f in /tmp/mig_*.log; do
   label=$(basename "$f" | sed 's/^mig_//; s/\.log$//')
   sz=$(grep -oE '\[SRC_SIZE_GB=[0-9]+\]' "$f" 2>/dev/null | tail -1 | grep -oE '[0-9]+')
   mt=$(stat -c%Y "$f" 2>/dev/null || echo 0)
-  loglines=$(tail -20 "$f" 2>/dev/null | tr '\011\015' '  ' | sed 's/@@/__/g' | sed 's/|||/!!!/g' | awk 'NF{printf "%s|||",$0}')
+  loglines=$(tail -20 "$f" 2>/dev/null | tr '\000\011\015' '   ' | sed 's/@@/__/g' | sed 's/|||/!!!/g' | awk 'NF{printf "%s|||",$0}')
   echo "@@${label}@@${sz:-0}@@${mt}@@${loglines}"
+done
+echo '---IMAGES---'
+for f in /mnt/migration/ospc2flex_image/*.qcow2.image_id; do
+  [ -f "$f" ] || continue
+  base=$(basename "$f")
+  image_id=$(tr -d '[:space:]' < "$f" 2>/dev/null || true)
+  qcow="/mnt/migration/ospc2flex_image/${base%.image_id}"
+  size=0; [ -f "$qcow" ] && size=$(stat -c%s "$qcow" 2>/dev/null || echo 0)
+  mt=$(stat -c%Y "$f" 2>/dev/null || echo 0)
+  echo "${base}|${image_id}|${size}|${mt}"
 done
 """
         out = subprocess.check_output(ssh_base + [remote_script], timeout=20, text=True)
@@ -6525,8 +7089,13 @@ done
         import re
         res = {
             "sys": None, "disk": None, "timestamp": int(time.time()),
-            "jobs": {}
+            "jobs": {}, "images": {}
         }
+
+        def normalize_mig_label(name: str) -> str:
+            label = re.sub(r'\.(qcow2|raw|vhd)$', '', str(name or ""))
+            label = re.sub(r'\.qcow2\.image_id$', '', label)
+            return re.sub(r'-\d{1,3}(?:\.\d{1,3}){3}$', '', label)
 
         section = None
         for line in out.split('\n'):
@@ -6554,7 +7123,7 @@ done
                 if not m:
                     m = re.search(r'qemu-img.*?/([^\s/]+)\.(?:qcow2|raw)', line)
                 if m:
-                    label = re.sub(r'\.(qcow2|raw)$', '', m.group(1))
+                    label = normalize_mig_label(m.group(1))
                     if label not in res["jobs"]:
                         res["jobs"][label] = {
                             "status": "Running",
@@ -6566,7 +7135,7 @@ done
                 parts = line.split('|')
                 if len(parts) >= 3:
                     fname = parts[0]
-                    label = re.sub(r'\.(qcow2|raw)$', '', fname)
+                    label = normalize_mig_label(fname)
                     fsize = parts[1]
                     fmtime = int(float(parts[2]))
                     is_converted = fname.endswith('.qcow2') and not fname.endswith('.raw')
@@ -6588,8 +7157,13 @@ done
                 if len(parts) < 4:
                     continue
                 lbl, sz_str, mt_str, raw_lines = parts[0], parts[1], parts[2], parts[3]
+                lbl = normalize_mig_label(lbl)
                 if lbl not in res["jobs"]:
-                    continue
+                    res["jobs"][lbl] = {
+                        "status": "Waiting",
+                        "lines": ["[LOG] Worker log retained. Process not currently visible."],
+                        "mtime": 0, "size": "0", "converted": False
+                    }
                 try:
                     sz = int(sz_str)
                     if sz > 0:
@@ -6603,6 +7177,35 @@ done
                 log_lines = [l.strip() for l in raw_lines.split('|||') if l.strip()]
                 if log_lines:
                     res["jobs"][lbl]["lines"] = log_lines[-20:]
+                    last_blob = "\n".join(log_lines[-8:])
+                    if "PROCESS EXITED WITH CODE 0" in last_blob or "=== DONE ===" in last_blob or "SSH OK" in last_blob:
+                        res["jobs"][lbl]["status"] = "Complete"
+                        res["jobs"][lbl]["converted"] = True
+                    elif "PROCESS EXITED WITH CODE" in last_blob or "ERROR" in last_blob or "FAIL_" in last_blob:
+                        res["jobs"][lbl]["status"] = "Failed"
+            elif section == 'IMAGES':
+                parts = line.split('|')
+                if len(parts) < 4:
+                    continue
+                fname, image_id, size_str, mt_str = parts[0], parts[1], parts[2], parts[3]
+                label = normalize_mig_label(fname)
+                try:
+                    size_bytes = int(size_str)
+                except (ValueError, TypeError):
+                    size_bytes = 0
+                try:
+                    mtime = int(mt_str)
+                except (ValueError, TypeError):
+                    mtime = 0
+                res["images"][label] = {
+                    "id": image_id,
+                    "label": label,
+                    "status": "success",
+                    "stage": "FLEX Glance uploaded",
+                    "stageIdx": 4,
+                    "sizeBytes": size_bytes,
+                    "mtime": mtime,
+                }
 
         return jsonify(res)
     except Exception as e:
@@ -6746,7 +7349,7 @@ def global_jobs():
     """Returns the live text output of check_jumphost.sh"""
     try:
         out = subprocess.check_output(
-            ["bash", "-c", "wsl -d Ubuntu -e bash /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/check_jumphost.sh 2>/dev/null || bash /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/check_jumphost.sh"], 
+            ["bash", "-c", "wsl -d Ubuntu -e bash /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/check_jumphost.sh 2>/dev/null || bash /home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/check_jumphost.sh"],
             text=True, timeout=90
         )
         return jsonify({"output": out})
@@ -6899,12 +7502,12 @@ def serve_discovery_log():
 def agent1_deep_stack_infer(name, os_distro):
     name_l = str(name).lower()
     distro_l = str(os_distro).lower()
-    
+
     ports = ["22"]
     services = []
     runtimes = []
     packages = []
-    
+
     kernel = "5.15.0-generic"
     if "ubuntu" in distro_l:
         if "24.04" in distro_l: kernel = "6.8.0-generic"
@@ -6914,7 +7517,7 @@ def agent1_deep_stack_infer(name, os_distro):
     elif "win" in distro_l or "windows" in name_l:
         kernel = "Windows NT 10.0"
         ports = ["3389"]
-        
+
     if "postgre" in name_l or "postgre" in distro_l:
         ports.append("5432")
         services.append("postgresql")
@@ -6931,7 +7534,7 @@ def agent1_deep_stack_infer(name, os_distro):
         services = ["MSSQLSERVER"]
         runtimes = [".NET", "SQL Server"]
         packages = ["SQL Server"]
-            
+
     if "front" in name_l or "web" in name_l or "ui" in name_l:
         if "sql" not in name_l:  # Avoid matching windows web sql
             ports.extend(["80", "443"])
@@ -6953,7 +7556,7 @@ def agent1_deep_stack_infer(name, os_distro):
         if "apache2" not in services: services.append("apache2")
         if "PHP 8.1" not in runtimes: runtimes.append("PHP 8.1")
         packages.extend(["drupal"])
-        
+
     return {
         "ports": ports,
         "services": services or ["systemd", "chronyd"],
@@ -7140,7 +7743,8 @@ def agent1_run_flex_discovery():
     username   = req.get("username", "").strip()
     password   = req.get("password", "").strip()
     project_id = req.get("project_id", "").strip()
-    region     = req.get("region", "DFW3").strip()
+    region     = normalize_flex_region(req.get("region", "DFW3").strip(), auth_url)
+    auth_url   = normalize_flex_auth_url(auth_url, region)
     domain     = req.get("domain", "rackspace_cloud_domain").strip()
 
     servers = []
@@ -7152,6 +7756,7 @@ def agent1_run_flex_discovery():
     try:
         log_lines.append(f"Project ID: {project_id}")
         log_lines.append(f"Authenticating with Keystone v3: {auth_url}")
+        log_lines.append(f"Normalized FLEX target: region={region} auth_url={auth_url}")
 
         script_path = _os.path.join(_os.path.dirname(__file__), '..', 'flexscan.py')
         env = _os.environ.copy()
@@ -7542,7 +8147,7 @@ def agent1_run_deps():
     script_data = request.data.decode('utf-8')
     with open('/tmp/run_deps.sh', 'w') as f: f.write(script_data)
     os.system('chmod +x /tmp/run_deps.sh')
-    
+
     def generate():
         process = subprocess.Popen(
             ['bash', '/tmp/run_deps.sh'],
@@ -7563,7 +8168,7 @@ def agent1_upload_inv():
     os.makedirs(d, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M%S")
     with open(os.path.join(d, f"manual_upload_{stamp}.csv"), 'w', encoding='utf-8') as f: f.write(post_data)
-    
+
     topology_nodes = []
     try:
         with open('ospc-discovery/outputs/servers.csv', "r", encoding="utf-8") as rf:
@@ -7575,15 +8180,15 @@ def agent1_upload_inv():
             except Exception:
                 rf.seek(0)
                 reader = csv.DictReader(rf)
-                
+
             for row in reader:
                 stype = row.get("service_type", "")
-                
+
                 # Use public IPs if available, otherwise private IPs
                 raw_pub = str(row.get("public_ips", "")).strip()
                 raw_priv = str(row.get("private_ips", "")).strip()
                 resolved_ips = [ip.strip() for ip in raw_pub.split(";")] if raw_pub else ([ip.strip() for ip in raw_priv.split(";")] if raw_priv else ["N/A"])
-                
+
                 if stype == "cloud_server":
                     dname = row.get("name", row.get("id", "compute-vm"))
                     dos = f"{row.get('image_os_distro', '')} {row.get('image_os_version', '')}".strip() or "Linux"
@@ -7626,13 +8231,18 @@ def agent1_upload_inv():
 def run_uat_tests():
     data = request.json or {}
     flex_auth = data.get('flex_auth', '')
+    flex_region = normalize_flex_region(
+        str(data.get('flex_region', data.get('region', '')) or ''),
+        flex_auth,
+    )
+    flex_auth = normalize_flex_auth_url(flex_auth, flex_region)
     flex_proj = data.get('flex_proj', '')
     flex_user = data.get('flex_user', '')
     flex_pass = data.get('flex_pass', '')
     flex_domain = data.get('flex_domain', 'default')
     flex_app_id = data.get('flex_app_id', '')
     flex_app_secret = data.get('flex_app_secret', '')
-    
+
     app_url = data.get('uat_app_url', '')
     app_ip = data.get('uat_app_ip', '')
     db_ip = data.get('uat_db_ip', '')
@@ -7640,13 +8250,14 @@ def run_uat_tests():
     ssh_key = data.get('uat_ssh_key', '')
 
     has_appcred = bool(flex_app_id and flex_app_secret)
-    
+
     openrc_content = f"""
 export OS_AUTH_URL="{flex_auth}"
 export OS_IDENTITY_API_VERSION=3
 export OS_INTERFACE=public
+export OS_REGION_NAME="{flex_region}"
 """
-    if has_appcred:
+    if False:
         openrc_content += f"""export OS_AUTH_TYPE=v3applicationcredential
 export OS_APPLICATION_CREDENTIAL_ID="{flex_app_id}"
 export OS_APPLICATION_CREDENTIAL_SECRET="{flex_app_secret}"
@@ -7706,7 +8317,7 @@ else
 fi
 echo ""
 """
-    
+
     bash_content += """echo "=== UAT ENGINE COMPLETED ==="
 """
     with open('/tmp/run_uat.sh', 'w') as f:
@@ -7721,13 +8332,18 @@ echo ""
         for line in iter(process.stdout.readline, ''):
             if not line: break
             yield f"data: {line}\\n\\n"
-            
+
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 @app.post("/api/run/uat_rbac_check")
 def run_uat_rbac_check():
     data = request.json or {}
     flex_auth = data.get('flex_auth', '')
+    flex_region = normalize_flex_region(
+        str(data.get('flex_region', data.get('region', '')) or ''),
+        flex_auth,
+    )
+    flex_auth = normalize_flex_auth_url(flex_auth, flex_region)
     flex_proj = data.get('flex_proj', '')
     flex_user = data.get('flex_user', '')
     flex_pass = data.get('flex_pass', '')
@@ -7739,6 +8355,7 @@ def run_uat_rbac_check():
 
     flex_rc = f"""
 export OS_AUTH_URL="{flex_auth}"
+export OS_REGION_NAME="{flex_region}"
 export OS_PROJECT_ID="{flex_proj}"
 export OS_PROJECT_NAME="{flex_proj}"
 export OS_USER_DOMAIN_NAME="{flex_domain}"
@@ -7806,7 +8423,7 @@ echo "=== RBAC Validation Complete ==="
         for line in iter(process.stdout.readline, ''):
             if not line: break
             yield f"data: {line}\\n\\n"
-            
+
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 @app.post("/api/run/stage5_task")
@@ -7889,7 +8506,7 @@ echo "=== TASK COMPLETE ==="
     elif task == 'traffic_shift':
         weight = data.get('weight', 0)
         ospc_weight = 100 - int(weight)
-        
+
         if lb_type == 'haproxy':
             bash_content = f"""#!/bin/bash
 echo "=== STAGE 5: CANARY TRAFFIC SHAPING (HAProxy) ==="
@@ -7983,7 +8600,7 @@ echo "=== TASK COMPLETE ==="
         try:
             import pandas as pd
             import os
-            
+
             flavor_map = data.get('flavor_mapping', '')
             df_csv = pd.DataFrame()
             if flavor_map and os.path.exists(flavor_map):
@@ -7991,7 +8608,7 @@ echo "=== TASK COMPLETE ==="
                     df_csv = pd.read_csv(flavor_map)
                 except:
                     pass
-            
+
             report_data = []
             if not df_csv.empty:
                 for idx, row in df_csv.iterrows():
@@ -8010,9 +8627,9 @@ echo "=== TASK COMPLETE ==="
                         new_tco = float(new_tco_str)
                     except:
                         new_tco = 150.0
-                    
+
                     savings = old_tco - new_tco
-                    
+
                     report_data.append({
                         "OSPC Inventory": ospc_inv,
                         "Flex Inventory": flex_inv,
@@ -8044,14 +8661,14 @@ echo "=== TASK COMPLETE ==="
                         "FLEX TCO ($)": 300.00,
                         "TCO Savings ($)": 150.00
                 })
-                
+
             report_df = pd.DataFrame(report_data)
             out_path = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/Final_Migration_TCO_Report.xlsx'
             out_csv = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/Final_Migration_TCO_Report.csv'
             report_df.to_excel(out_path, index=False)
             report_df.to_csv(out_csv, index=False)
             status_msg = f"[SUCCESS] Full Migration Report generated successfully."
-            
+
             table_html = report_df.to_html(classes="matrix-table", index=False).replace('\n', '')
             json_table = f"[TABLE_PAYLOAD] {table_html} | /api/downloads/Final_Migration_TCO_Report.csv"
         except ImportError:
@@ -8060,7 +8677,7 @@ echo "=== TASK COMPLETE ==="
         except Exception as e:
             status_msg = f"[ERROR] Failed to generate Excel report: {str(e)}"
             json_table = ""
-            
+
         bash_content = f"""#!/bin/bash
 echo "=== STAGE 5: GENERATE FULL MIGRATION REPORT ==="
 echo "[INFO] Aggregating inventory cross-referencing metrics..."
@@ -8077,7 +8694,7 @@ echo "=== TASK COMPLETE ==="
         try:
             import pandas as pd
             import os
-            
+
             flavor_map = data.get('flavor_mapping', '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/1342314_flavormap.csv')
             df_csv = pd.DataFrame()
             if flavor_map and os.path.exists(flavor_map):
@@ -8085,13 +8702,13 @@ echo "=== TASK COMPLETE ==="
                     df_csv = pd.read_csv(flavor_map)
                 except:
                     pass
-            
+
             tco_data = []
             if not df_csv.empty:
                 for idx, row in df_csv.iterrows():
                     ospc_inv = str(row.get('source_server_name', f"Legacy-VM-{idx}"))
                     if ospc_inv == 'nan': ospc_inv = f"Legacy-VM-{idx}"
-                    
+
                     old_tco_str = str(row.get('source_monthly_cost_usd', row.get('TCO_OSPC_Estimate', '200'))).replace('$', '').replace(',', '')
                     new_tco_str = str(row.get('target_monthly_cost_min_usd', row.get('TCO_FLEX_Estimate', '150'))).replace('$', '').replace(',', '')
                     try:
@@ -8102,12 +8719,12 @@ echo "=== TASK COMPLETE ==="
                         new_tco = float(new_tco_str)
                     except:
                         new_tco = 150.0
-                    
+
                     if old_tco == 200.0 and new_tco < old_tco:  # Approximate if fallback
                         old_tco = new_tco * 2.45
-                        
+
                     savings = old_tco - new_tco
-                    
+
                     tco_data.append({
                         "Legacy Environment": "OSPC",
                         "Server ID": ospc_inv,
@@ -8127,12 +8744,12 @@ echo "=== TASK COMPLETE ==="
                     "Monthly Savings ($)": 150.00,
                     "Cost Reduction (%)": "33%"
                 })
-                
+
             tco_df = pd.DataFrame(tco_data)
             out_csv = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/TCO_Comparison_Report.csv'
             tco_df.to_csv(out_csv, index=False)
             status_msg = f"[SUCCESS] OSPC vs FLEX TCO Comparison generated successfully."
-            
+
             table_html = tco_df.to_html(classes="matrix-table", index=False).replace('\n', '')
             json_table = f"[TABLE_PAYLOAD] {table_html} | /api/downloads/TCO_Comparison_Report.csv"
         except ImportError:
@@ -8141,7 +8758,7 @@ echo "=== TASK COMPLETE ==="
         except Exception as e:
             status_msg = f"[ERROR] Failed to generate TCO Report: {str(e)}"
             json_table = ""
-            
+
         bash_content = f"""#!/bin/bash
 echo "=== STAGE 5: GENERATE TCO OSPC VS FLEX COMPARISON ==="
 echo "[INFO] Loading Source & Target flavor estimations..."
@@ -8178,7 +8795,7 @@ echo "=== TASK COMPLETE ==="
         for line in iter(process.stdout.readline, ''):
             if not line: break
             yield f"data: {line}\\n\\n"
-            
+
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 @app.get("/api/downloads/<path:filename>")

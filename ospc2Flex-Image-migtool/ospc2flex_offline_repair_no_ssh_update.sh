@@ -857,28 +857,46 @@ RESOLV_EOF
           || true
         sudo umount "$MNT/proc" 2>/dev/null || true
 
-      # RHEL/CentOS 7: systemd — NetworkManager only (NM_CONTROLLED=yes in ifcfg)
-      # Enabling both network.service + NetworkManager causes a race on first boot:
-      # NM manages eth0, then network-scripts ifup eth0 conflicts → interface may not come up.
+      # RHEL/CentOS 7: use legacy network.service (SysV ifup scripts) with NM_CONTROLLED=no.
+      # OSPC source VMs have NetworkManager=inactive and network=active with NM_CONTROLLED=no.
+      # NM on migrated images fails to activate eth0 (no prior connection profile, timing issues).
+      # Legacy network scripts reliably run dhclient eth0 via ifup — match the source setup.
       elif [ "${OS_MAJOR:-0}" -eq 7 ] && [ "$OS_ID" = "centos" -o "$OS_ID" = "rhel" ]; then
-        # Mask network.service so it cannot start (NM is the sole manager)
-        sudo ln -sf /dev/null "$MNT/etc/systemd/system/network.service" 2>/dev/null || true
-        PASS "Masked network.service (NetworkManager is sole manager for CentOS/RHEL 7)"
-
-        # Enable NetworkManager via multi-user.target.wants symlink
+        # Unmask network.service (remove any /dev/null mask left by previous runs)
+        sudo rm -f "$MNT/etc/systemd/system/network.service" 2>/dev/null || true
+        # Enable network.service via multi-user.target.wants
         sudo mkdir -p "$MNT/etc/systemd/system/multi-user.target.wants"
-        _nm_want="$MNT/etc/systemd/system/multi-user.target.wants/NetworkManager.service"
-        if [ ! -L "$_nm_want" ]; then
-          sudo ln -sf /usr/lib/systemd/system/NetworkManager.service "$_nm_want" 2>/dev/null \
-            && PASS "Enabled NetworkManager.service for CentOS/RHEL 7" \
-            || WARN "Could not enable NetworkManager.service (unit file may be absent in chroot)"
-        else
-          INFO "NetworkManager.service already enabled"
-        fi
+        sudo ln -sf /usr/lib/systemd/system/network.service \
+          "$MNT/etc/systemd/system/multi-user.target.wants/network.service" 2>/dev/null || true
+        PASS "Enabled network.service (legacy SysV ifup scripts — matches OSPC source setup)"
+
+        # Write a clean ifcfg-eth0 — NO HWADDR (old Xen MAC won't match new virtio NIC).
+        # The OSPC source ifcfg-eth0 has HWADDR=<xen-mac>; ifup skips the interface when
+        # the MAC doesn't match, leaving eth0 DOWN. A fresh file with no HWADDR ensures
+        # dhclient runs on first FLEX boot via the legacy network.service SysV path.
+        sudo tee "$MNT/etc/sysconfig/network-scripts/ifcfg-eth0" >/dev/null <<'IFCFG7_EOF'
+DEVICE=eth0
+BOOTPROTO=dhcp
+ONBOOT=yes
+NM_CONTROLLED=no
+PEERDNS=yes
+DEFROUTE=yes
+IPV6INIT=no
+TYPE=Ethernet
+IFCFG7_EOF
+        PASS "Wrote fresh ifcfg-eth0 (no HWADDR, ONBOOT=yes, DHCP, NM_CONTROLLED=no)"
 
         # Disable NetworkManager-wait-online (causes 90s boot hang when DHCP is slow)
         sudo ln -sf /dev/null "$MNT/etc/systemd/system/NetworkManager-wait-online.service" 2>/dev/null || true
         PASS "Masked NetworkManager-wait-online.service (prevents 90s DHCP timeout hang)"
+
+        # RHEL 6: chkconfig NetworkManager off. C7: must not start NM alongside network.service
+        # (race → eth0 down / no DHCP). Mask NM like NetworkManager-wait-online — no host systemctl needed.
+        sudo rm -f "$MNT/etc/systemd/system/multi-user.target.wants/NetworkManager.service" 2>/dev/null || true
+        sudo rm -f "$MNT/etc/systemd/system/dbus-org.freedesktop.NetworkManager.service" 2>/dev/null || true
+        sudo rm -f "$MNT/etc/systemd/system/graphical.target.wants/NetworkManager.service" 2>/dev/null || true
+        sudo ln -sf /dev/null "$MNT/etc/systemd/system/NetworkManager.service" 2>/dev/null || true
+        PASS "Masked NetworkManager.service (legacy network.service owns eth0)"
       fi
 
     else

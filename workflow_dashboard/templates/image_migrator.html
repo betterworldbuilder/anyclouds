@@ -68,7 +68,7 @@
       .batch-table tr:hover { background: rgba(255, 255, 255, 0.05); }
       fieldset.csv-group { border: 1px solid rgba(165,180,252,.2); padding: 15px; border-radius: 8px; margin-bottom: 15px; background: rgba(0,0,0,0.1); }
       legend.csv-legend { color: #a5b4fc; padding: 0 10px; font-weight: 500; font-size: 0.95rem; }
-      
+
       .panel {
           background: rgba(25, 28, 41, 0.6); border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 20px; padding: 30px; margin-bottom: 30px; position: relative;
@@ -88,7 +88,7 @@
       .section-title-wrapper { display: flex; align-items: center; gap: 10px; padding-left: 18px;}
       @keyframes blink-slow { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
       .blink-slow { animation: blink-slow 2s ease-in-out infinite; }
-      
+
       /* ── Mercedes MBUX Aesthetic ── */
       .mbux-panel {
           background: radial-gradient(circle at top left, #1a1d2d, #05070a);
@@ -107,19 +107,65 @@
       .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-family: 'Orbitron', 'Share Tech Mono', sans-serif; text-align: center; }
       .mbux-metric { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
       .mbux-value { font-size: 20px; color: #fff; font-weight: 700; text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+
+      /* ── Apollo Theme ── */
+      body.theme-apollo .panel, body.theme-apollo #mig-progress-panel {
+          background: #000 url('/static/deep_space_bg.png') center/cover no-repeat !important;
+          border-color: #3b82f6 !important;
+      }
+      body.theme-apollo .job-card {
+          background: rgba(10, 15, 30, 0.8) !important;
+          border-color: #1e3a8a !important;
+      }
+      .lunar-module {
+          transition: top 1s ease-in-out;
+          filter: drop-shadow(0 0 10px #60a5fa);
+          z-index: 10;
+      }
+      .astronaut-anim {
+          animation: walkIn 2s ease-out forwards;
+          opacity: 0;
+          transform: translateX(-20px);
+      }
+      @keyframes walkIn {
+          to { opacity: 1; transform: translateX(20px); }
+      }
+      .flex-moon {
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          height: 35px;
+          background: radial-gradient(ellipse at top, #94a3b8 0%, #475569 100%);
+          border-top: 2px dashed #cbd5e1;
+          border-radius: 50% 50% 0 0 / 15px 15px 0 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #0f172a;
+          font-family: 'Orbitron';
+          font-weight: bold;
+          font-size: 10px;
+          letter-spacing: 2px;
+          z-index: 5;
+      }
     </style>
+    <script>
+        window.LUNAR_SVG = `<img src="/static/lunar_module_sprite.png" style="width:100%; height:100%; object-fit:contain; mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));" />`;
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="background-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
-    
+
     <div class="app-container" style="max-width: 1560px; margin: 0 auto; padding: 28px 16px 40px;">
 
         <main class="main-content dashboard-layout">
             <div class="panel" style="border-color: #10b981;">
-                <h2 class="section-title"><div class="section-title-wrapper">Stage 2: Direct Shift and Lift of VM (Batch Engine)</div></h2>
+                <h2 class="section-title">
+                    <div class="section-title-wrapper">Stage 2: Direct Shift and Lift of VM (Batch Engine)</div>
+                    <button class="theme-btn" onclick="toggleTheme()" style="background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#fff; padding:6px 12px; border-radius:6px; font-family:'Orbitron'; font-size:12px; cursor:pointer; box-shadow:0 0 10px rgba(59,130,246,0.5);">🚀 Toggle Apollo Theme</button>
+                </h2>
                 <p style="color: #94a3b8; margin-bottom: 15px; margin-top: -15px;">Load your target maps to automatically inject infrastructure specifications and trigger fleet migrations.</p>
-                    
+
                     <details open style="margin-top: 20px; text-align: left; padding: 15px; background: rgba(0,0,0,0.3); border-left: 4px solid #f43f5e; border-radius: 6px;">
                         <summary style="font-weight: bold; color: #f43f5e; cursor: pointer; outline: none; display: flex; align-items: center; gap: 8px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
@@ -127,9 +173,9 @@
                         </summary>
                         <div style="margin-top: 15px; font-size: 0.9rem; color: #cbd5e1; line-height: 1.6;">
                             <p>This VM migration tool allows us to move live OSPC VMs or static OSPC VM images entirely from OpenStack to Flex. The pipeline ensures all original VM content, users, and disks are carried over intact across the datacenter.</p>
-                            
-                            
-                            
+
+
+
                             <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 12px; border-radius: 6px; margin-top: 15px;">
                                 <span style="font-weight: 600; color: #10b981;">Architectural Advantage:</span> By centralizing execution onto a dedicated <strong>Deployment Jumphost</strong>, we guarantee unparalleled <strong>robustness, safety, and performance</strong>. Both pipelines completely bypass unpredictable origin VM network configurations, origin disk space exhaustion anomalies, and legacy OS tooling failures.
                             </div>
@@ -199,14 +245,7 @@
               <input id="credFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
-            <label style="display:none;flex-direction:column;gap:4px;font-size:.85rem;">App Credential ID <span style="font-size:.75rem;color:#64748b;">(v3applicationcredential — overrides username)</span>
-              <input id="credFlexAppCredId" type="text" placeholder="e.g. 3e27a1c80075436a9f79573fb878e984"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:none;flex-direction:column;gap:4px;font-size:.85rem;">App Credential Secret
-              <input id="credFlexAppCredSecret" type="password" placeholder="App credential secret"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
+
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">
               Target Region <span style="font-size:.75rem;color:#64748b;">(FLEX Glance upload destination)</span>
               <select id="credFlexRegion"
@@ -239,7 +278,7 @@
         ✦ OSPC credentials are saved automatically and used by the scanner below. FLEX credentials are used by Validation (Step 3) and Deploy Generation (Step 4).
       </p>
                 </div>
-                
+
                 <script>
                 // ── Credential localStorage keys ──────────────────────────────────────────
     const CRED_KEYS = {
@@ -372,7 +411,7 @@
 
                 <hr class="divider">
 
-                    
+
                     <style>
                         @keyframes neonPinkTextPulse {
                             0% { text-shadow: 0 0 4px #be185d, 0 0 10px #be185d; }
@@ -871,6 +910,13 @@
                         .adv-table tr:hover td { background: rgba(255,255,255,0.06); color:#fff; }
                         .adv-table td.editable-cell { outline: 1px dashed rgba(198,206,255,0.4); cursor: text; }
                         .adv-table td.editable-cell:focus { outline: 2px solid #ff77c5; background: rgba(255,255,255,0.15); color: #fff; }
+                        #ospc-image-table tr.snapshot-row-windows td { background: rgba(251,191,36,0.08); color:#dbeafe; }
+                        #ospc-image-table tr.snapshot-row-restricted td { background: rgba(248,113,113,0.10); color:#fee2e2; }
+                        #ospc-image-table tr.snapshot-row-windows:hover td,
+                        #ospc-image-table tr.snapshot-row-restricted:hover td { background: rgba(59,130,246,0.16); color:#fff; }
+                        #ospc-image-table td.snapshot-id-cell,
+                        #ospc-image-table td.snapshot-date-cell { color:#b6c7e8; }
+                        #ospc-image-table td.snapshot-size-cell { color:#e2e8f0; text-align:right; }
                     </style>
 
                     <section class="adv-panel" id="mapperTablePanel">
@@ -1101,32 +1147,38 @@
                         const s = imageScanState.summary || {};
                         const el = document.getElementById('imageScanSummary');
                         if (!el) return;
-                        el.textContent = `Private images found: ${Number(s.private_images_found || 0)} | Migratable snapshots: ${Number(s.migratable_snapshots || 0)} | Excluded private images: ${Number(s.excluded_private_images || 0)} | Skipped provider/public images: ${Number(s.skipped_public_provider_images || 0)}`;
+                        el.textContent = `Private images found: ${Number(s.private_images_found || 0)} | Migratable: ${Number(s.migratable_snapshots || 0)} | Licensed/restricted (Cinder only): ${Number(s.licensed_restricted || 0)} | Windows: ${Number(s.windows_images || 0)} | Cinder required: ${Number(s.cinder_required || 0)} | Excluded: ${Number(s.excluded_private_images || 0)}`;
                     }
 
                     function renderImageTable() {
                         filterImageRows();
                         const table = document.getElementById('ospc-image-table');
                         if (!table) return;
-                        const headers = ['Select', 'snapshot_name', 'snapshot_id', 'source_vm_name', 'created_at', 'updated_at', 'disk_format', 'size_gb', 'visibility', 'protected', 'status', 'migratable', 'reason'];
+                        const headers = ['Select', 'snapshot_name', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at'];
                         const rows = imageScanState.filtered || [];
                         const th = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+                        const methodBadge = m => {
+                            if (m === 'cinder-only')      return '<span style="color:#e74c3c;font-weight:bold">⛔ cinder-only</span>';
+                            if (m === 'cinder-preferred') return '<span style="color:#e67e22;font-weight:bold">⚠ cinder-preferred</span>';
+                            return '<span style="color:#27ae60">✅ glance-export</span>';
+                        };
                         const body = rows.map(({ row: r, idx }) => {
                             const isMigratable = !!r.migratable;
-                            return '<tr>'
+                            const rowClass = r.licensed_restricted ? 'snapshot-row-restricted' : (r.is_windows ? 'snapshot-row-windows' : '');
+                            return `<tr class="${rowClass}">`
                                 + `<td><input type="checkbox" class="ospc-image-cb" data-idx="${idx}" ${isMigratable ? '' : 'disabled'}></td>`
                                 + `<td>${escapeHTML(String(r.snapshot_name || ''))}</td>`
-                                + `<td>${escapeHTML(String(r.snapshot_id || ''))}</td>`
+                                + `<td class="snapshot-id-cell" style="font-size:0.8em">${escapeHTML(String(r.snapshot_id || ''))}</td>`
                                 + `<td>${escapeHTML(String(r.source_vm_name || ''))}</td>`
-                                + `<td>${escapeHTML(String(r.created_at || ''))}</td>`
-                                + `<td>${escapeHTML(String(r.updated_at || ''))}</td>`
+                                + `<td>${escapeHTML(String(r.os_distro || r.os_type || ''))}</td>`
+                                + `<td class="snapshot-size-cell">${escapeHTML(String(r.size_gb || 0))} GB</td>`
                                 + `<td>${escapeHTML(String(r.disk_format || ''))}</td>`
-                                + `<td>${escapeHTML(String(r.size_gb || 0))}</td>`
-                                + `<td>${escapeHTML(String(r.visibility || ''))}</td>`
-                                + `<td>${escapeHTML(String(r.protected || false))}</td>`
                                 + `<td>${escapeHTML(String(r.status || ''))}</td>`
-                                + `<td>${isMigratable ? 'true' : 'false'}</td>`
+                                + `<td>${isMigratable ? '✅' : '❌'}</td>`
+                                + `<td>${r.licensed_restricted ? '🔒 yes' : ''}</td>`
+                                + `<td>${methodBadge(r.migration_method || '')}</td>`
                                 + `<td>${escapeHTML(String(r.reason || ''))}</td>`
+                                + `<td class="snapshot-date-cell" style="font-size:0.8em">${escapeHTML(String(r.created_at || '').slice(0,10))}</td>`
                                 + '</tr>';
                         }).join('');
                         table.innerHTML = `<thead>${th}</thead><tbody>${body}</tbody>`;
@@ -1205,7 +1257,7 @@
                                             ospc_apikey: ospcApiKey,
                                             ospc_tenant: ospcTenant,
                                             ospc_account_id: ospcTenant,
-                                            ospc_region: (region && region !== 'ALL') ? region : ((document.getElementById('ospc_cloud_region') || {}).value || '')
+                                            ospc_region: (region && region !== 'ALL') ? region : ((document.getElementById('ospc_cloud_region') || document.getElementById('jh_region_select') || {}).value || '')
                                         })
                                     });
                                     const ct = (resp.headers.get('content-type') || '').toLowerCase();
@@ -1373,7 +1425,7 @@
                                 style="width:16px; height:16px; accent-color:#4ade80; cursor:pointer;">
                             🌐 Auto-Assign Floating IP
                         </label>
-                        
+
                         <!-- OFFLINE REPAIR METHOD -->
                         <div style="flex:1; display:flex; justify-content:center;">
                             <div style="display:flex; align-items:center; gap:10px; background:rgba(245,158,11,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.35);"
@@ -1390,7 +1442,7 @@
                                 </select>
                             </div>
                         </div>
-                        
+
                         <div style="display:flex; align-items:center; gap:8px;">
                             <label for="flex_external_network_input" style="color:#64748b; font-size:0.8rem; white-space:nowrap;">Pool:</label>
                             <input type="text" id="flex_external_network_input" value="PUBLICNET"
@@ -1410,29 +1462,29 @@
                             genderToggle.value = localStorage.getItem('mig_jarvis_gender');
                         }
                     });
-                    
+
                     function jarvisAnnounce(text) {
                         const voiceToggle = document.getElementById('enable_jarvis_voice');
                         if (!voiceToggle || !voiceToggle.checked) return;
                         if (!('speechSynthesis' in window)) return;
-                        
+
                         window.speechSynthesis.cancel();
                         const msg = new SpeechSynthesisUtterance(text);
-                        
+
                         function setVoiceAndSpeak() {
                             const gender = document.getElementById('jarvis_voice_gender').value;
                             const voices = window.speechSynthesis.getVoices();
                             let preferred;
-                            
+
                             if (gender === 'female') {
                                 preferred = voices.find(v => v.name.includes('Google UK English Female') || v.name.includes('Hazel') || v.name.includes('Serena') || v.name.includes('Fiona') || v.name.includes('Susan') || (v.lang === 'en-GB' && v.name.includes('Female')));
                             } else {
                                 preferred = voices.find(v => v.name.includes('Google UK English Male') || v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('Arthur') || (v.lang === 'en-GB' && v.name.includes('Male')));
                             }
-                            
+
                             if (!preferred) preferred = voices.find(v => v.lang === 'en-GB') || voices[0];
                             if (preferred) msg.voice = preferred;
-                            
+
                             msg.rate = 1.0;
                             msg.pitch = gender === 'female' ? 1.15 : 0.95;
                             window.speechSynthesis.speak(msg);
@@ -1691,33 +1743,35 @@
                 </div>
                 <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(0,207,255,0.4);border-radius:12px;padding:20px;margin-top:20px;margin-bottom:25px;display:grid;grid-template-columns:minmax(180px, 1fr) 2fr 1fr 1fr;gap:20px;align-items:start;">
                     <div>
-                        <div style="color:#a855f7;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🖼 Direct OSPC Glance Image</div>
+                        <div style="color:#a855f7;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🖼 OSPC Snapshot Discovery &amp; Cold Migration</div>
                         <span style="font-size:0.75rem;color:#64748b;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px;">Cold Migration (Fastest)</span>
                     </div>
                     <div>
-                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(59,130,246,0.1);border-left:3px solid #3b82f6;border-radius:0 4px 4px 0;font-size:0.8rem;color:#93c5fd;">
-                            <strong style="color:#bfdbfe;">Prerequisite:</strong> User must manually create an image of the existing VMs first.
+                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.12);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
+                            <strong style="color:#fed7aa;">⚡ Recommended:</strong> Use a Jumphost deployed in the <strong>same region</strong> as the origin OSPC VMs or snapshots for fastest transfer speeds and lowest latency.
                         </div>
                         <ol style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.85rem;line-height:1.6;">
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Skip Snapshot:</strong> Targets existing statically saved golden images in OSPC Glance directly.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Direct Download:</strong> Jumphost extracts the exact image bit-stream via regional auth tokens.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Metadata Injection:</strong> Auto-detects OS distributions to inject FLEX-compatible <code>os_type</code> and <code>hw_qemu_guest_agent=yes</code> markers.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Instant Push:</strong> Uploads strictly compliant image straight into FLEX Glance repository.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Scan Private Snapshots:</strong> Discovers all private tenant snapshot images in the selected OSPC region via Glance API.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Download Image:</strong> Jumphost streams the raw image bit-stream from OSPC Glance using regional auth tokens.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Convert to QCOW2:</strong> Converts the downloaded image to FLEX-compatible <code>qcow2</code> format using <code>qemu-img convert</code>.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Offline Disk Repair:</strong> Auto-detects OS type and applies chroot-based fixes (fstab, initramfs, network config, virtio drivers) without booting the VM.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Upload to FLEX Glance:</strong> Pushes the repaired image into FLEX Glance with auto-injected <code>os_type</code> and <code>hw_qemu_guest_agent=yes</code> metadata.</li>
                         </ol>
                     </div>
                     <div>
                         <ul style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.85rem;line-height:1.6;">
-                            <li style="margin-bottom:8px;">Extremely fast (avoids live snapshot wait times).</li>
-                            <li style="margin-bottom:8px;">Maintains structural integrity of golden baselines.</li>
-                            <li style="margin-bottom:8px;">Preps image strictly for orchestration templates.</li>
+                            <li style="margin-bottom:8px;">Extremely fast (no live snapshot wait).</li>
+                            <li style="margin-bottom:8px;">Fully offline repair — no VM boot required.</li>
+                            <li style="margin-bottom:8px;">Preserves golden baseline integrity.</li>
+                            <li style="margin-bottom:8px;">Same-region jumphost minimizes transfer time.</li>
                         </ul>
                     </div>
                     <div style="font-size:0.85rem;color:#94a3b8;line-height:1.6;">
-                        The absolute fastest and safest <strong>cold migration method</strong>. Perfect for porting golden server templates or exact point-in-time static backups.
+                        The absolute fastest and safest <strong>cold migration method</strong>. Perfect for porting golden server templates, exact point-in-time static backups, or bulk snapshot migrations.
                     </div>
                 </div>
 
-                
+
                 <section class="adv-panel" id="imageScannerPanel" style="margin-top: 16px;">
                         <!-- ── Private OSPC Snapshot Scanner ── -->
                         <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
@@ -1784,15 +1838,185 @@
                         </div>
                 </section>
 
-                <hr class="divider">
+                <!-- Jumphost connection fields (hidden — used by batch migration JS) -->
+                <input type="hidden" id="processing_location_type" value="production">
+                <input type="hidden" id="process_host_ip" name="process_host_ip" value="{{ default_jh_ip }}">
+                <input type="hidden" id="workdir" name="workdir" value="/mnt/migration/ospc2flex_image">
+                <input type="hidden" id="process_ssh_user" name="process_ssh_user" value="{{ default_jh_user }}">
+                <input type="hidden" id="process_ssh_key" name="process_ssh_key" value="{{ default_jh_key }}">
+
+                <!-- JUMPHOST CONNECTION — Per-Region -->
+                <div class="config-group" style="margin-top: 16px;">
+                    <div class="group-header">
+                        <h3>🖥 Jumphost Connection <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:8px;">Per-Region Configuration</span></h3>
+                        <label class="toggle-switch accent-blue">
+                            <input type="checkbox" checked onchange="document.getElementById('jumphost-fields').classList.toggle('collapsed')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="jumphost-fields" class="collapsable">
+                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.1);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
+                            <strong style="color:#fed7aa;">⚡ Tip:</strong> Deploy your jumphost in the <strong>same OSPC region</strong> as the source VMs/snapshots for maximum transfer speed.
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+                            <label for="jh_region_select" style="color:#94a3b8;font-size:12px;font-weight:600;white-space:nowrap;">OSPC Region</label>
+                            <select id="jh_region_select"
+                                style="background:#0f172a;border:1px solid rgba(59,130,246,0.5);border-radius:7px;color:#e2e8f0;font-size:13px;padding:8px 12px;cursor:pointer;min-width:120px;font-weight:600;"
+                                onchange="window._jhSelectRegion(this.value)">
+                                <option value="IAD">IAD — Northern Virginia</option>
+                                <option value="DFW">DFW — Dallas Fort Worth</option>
+                                <option value="ORD">ORD — Chicago</option>
+                                <option value="LON">LON — London</option>
+                                <option value="SYD">SYD — Sydney</option>
+                                <option value="HKG">HKG — Hong Kong</option>
+                            </select>
+                            <button type="button" id="jh-sync-region-btn"
+                                style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;padding:7px 10px;cursor:pointer;white-space:nowrap;"
+                                title="Copy region from OSPC Snapshot Scanner"
+                                onclick="const sr=document.getElementById('image_scan_region'); if(sr && sr.value!=='ALL'){document.getElementById('jh_region_select').value=sr.value; window._jhSelectRegion(sr.value);} else {alert('Set a specific region in Snapshot Scanner first.');}">
+                                ⇄ Match Snapshot Scanner
+                            </button>
+                            <span id="jh-region-status" style="color:#4ade80;font-size:11px;font-weight:600;"></span>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-control">
+                                <label for="nbd_jumphost_ip">Jumphost IP</label>
+                                <input type="text" id="nbd_jumphost_ip" placeholder="e.g. 104.239.169.89" value="{{ default_jh_ip }}" oninput="document.getElementById('process_host_ip').value=this.value; window._jhSaveField('ip', this.value);">
+                            </div>
+                            <div class="form-control">
+                                <label for="nbd_jumphost_user">SSH User</label>
+                                <input type="text" id="nbd_jumphost_user" placeholder="ubuntu" value="{{ default_jh_user }}" oninput="document.getElementById('process_ssh_user').value=this.value; window._jhSaveField('user', this.value);">
+                            </div>
+                            <div class="form-control">
+                                <label for="nbd_jumphost_key">SSH Key Path</label>
+                                <input type="text" id="nbd_jumphost_key" placeholder="~/.ssh/id_rsa" value="{{ default_jh_key }}" oninput="document.getElementById('process_ssh_key').value=this.value; window._jhSaveField('key', this.value);">
+                            </div>
+                        </div>
+
+                        <!-- Per-region config summary table -->
+                        <div style="margin-top:14px;border:1px solid #1e293b;border-radius:8px;overflow:hidden;">
+                            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                                <thead>
+                                    <tr style="background:#0f172a;">
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Region</th>
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Jumphost IP</th>
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">SSH User</th>
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Key Path</th>
+                                        <th style="padding:6px 10px;text-align:center;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="jh-region-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                (function() {
+                    const REGIONS = ['IAD', 'DFW', 'ORD', 'LON', 'SYD', 'HKG'];
+                    const STORAGE_KEY = 'jh_region_configs';
+                    const defaultIp = '{{ default_jh_ip }}';
+                    const defaultUser = '{{ default_jh_user }}' || 'ubuntu';
+                    const defaultKey = '{{ default_jh_key }}' || '~/.ssh/id_rsa';
+
+                    function loadConfigs() {
+                        try {
+                            const raw = localStorage.getItem(STORAGE_KEY);
+                            if (raw) return JSON.parse(raw);
+                        } catch(e) {}
+                        // Initialize with defaults — only first region gets the server-side default IP
+                        const configs = {};
+                        REGIONS.forEach((r, i) => {
+                            configs[r] = {
+                                ip: i === 0 ? defaultIp : '',
+                                user: defaultUser,
+                                key: defaultKey
+                            };
+                        });
+                        return configs;
+                    }
+
+                    function saveConfigs(configs) {
+                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(configs)); } catch(e) {}
+                    }
+
+                    const configs = loadConfigs();
+
+                    function applyRegion(region) {
+                        const cfg = configs[region] || { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
+                        const ipEl = document.getElementById('nbd_jumphost_ip');
+                        const userEl = document.getElementById('nbd_jumphost_user');
+                        const keyEl = document.getElementById('nbd_jumphost_key');
+                        if (ipEl)   { ipEl.value = cfg.ip;   document.getElementById('process_host_ip').value = cfg.ip; }
+                        if (userEl) { userEl.value = cfg.user; document.getElementById('process_ssh_user').value = cfg.user; }
+                        if (keyEl)  { keyEl.value = cfg.key;  document.getElementById('process_ssh_key').value = cfg.key; }
+                        const status = document.getElementById('jh-region-status');
+                        if (status) status.textContent = cfg.ip ? `✅ ${region} jumphost loaded` : `⚠ ${region} — no IP configured`;
+                        renderTable(region);
+                    }
+
+                    function renderTable(activeRegion) {
+                        const tbody = document.getElementById('jh-region-table-body');
+                        if (!tbody) return;
+                        let html = '';
+                        REGIONS.forEach(r => {
+                            const cfg = configs[r] || {};
+                            const isActive = r === activeRegion;
+                            const hasIp = !!(cfg.ip && cfg.ip.trim());
+                            const rowBg = isActive ? 'background:rgba(59,130,246,0.12);' : '';
+                            const statusIcon = hasIp ? '<span style="color:#4ade80;">✅</span>' : '<span style="color:#475569;">—</span>';
+                            const regionColor = isActive ? '#60a5fa' : '#94a3b8';
+                            const ipColor = hasIp ? '#e2e8f0' : '#475569';
+                            html += `<tr style="${rowBg}border-bottom:1px solid #1e293b;cursor:pointer;" onclick="document.getElementById('jh_region_select').value='${r}'; window._jhSelectRegion('${r}');" title="Click to switch to ${r}">`;
+                            html += `<td style="padding:5px 10px;color:${regionColor};font-weight:${isActive?'700':'400'};">${isActive ? '▸ ' : ''}${r}</td>`;
+                            html += `<td style="padding:5px 10px;color:${ipColor};font-family:monospace;font-size:11px;">${cfg.ip || '—'}</td>`;
+                            html += `<td style="padding:5px 10px;color:#94a3b8;">${cfg.user || '—'}</td>`;
+                            html += `<td style="padding:5px 10px;color:#94a3b8;font-family:monospace;font-size:10px;">${cfg.key || '—'}</td>`;
+                            html += `<td style="padding:5px 10px;text-align:center;">${statusIcon}</td>`;
+                            html += '</tr>';
+                        });
+                        tbody.innerHTML = html;
+                    }
+
+                    window._jhSelectRegion = function(region) {
+                        applyRegion(region);
+                    };
+
+                    window._jhSaveField = function(field, value) {
+                        const region = document.getElementById('jh_region_select').value;
+                        if (!configs[region]) configs[region] = { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
+                        configs[region][field] = value;
+                        saveConfigs(configs);
+                        renderTable(region);
+                    };
+
+                    // Initialize on page load
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Determine initial region: try to match default IP to a stored config
+                        let initRegion = 'IAD';
+                        if (defaultIp) {
+                            for (const r of REGIONS) {
+                                if (configs[r] && configs[r].ip === defaultIp) { initRegion = r; break; }
+                            }
+                        }
+                        document.getElementById('jh_region_select').value = initRegion;
+                        applyRegion(initRegion);
+                        saveConfigs(configs);
+                    });
+                })();
+                </script>
+
 
                 <!-- 3. GLOBAL MIGRATION SETTINGS -->
                 <form id="batch-mig-form" novalidate onsubmit="return false;">
-                    <div class="config-group">
+                    <div class="config-group" style="margin-top: 16px;">
                         <div class="group-header">
                             <h3>Global Migration Settings</h3>
                         </div>
-                        
+
                         <div class="form-grid mb-3">
                             <div class="form-control">
                                 <label for="target_format">Target Format</label>
@@ -1812,64 +2036,18 @@
                         </div>
                     </div>
 
-
-                    <!-- Jumphost connection fields (hidden — used by batch migration JS) -->
-                    <input type="hidden" id="processing_location_type" value="production">
-                    <input type="hidden" id="process_host_ip" name="process_host_ip" value="{{ default_jh_ip }}">
-                    <input type="hidden" id="workdir" name="workdir" value="/mnt/migration/ospc2flex_image">
-                    <input type="hidden" id="process_ssh_user" name="process_ssh_user" value="{{ default_jh_user }}">
-                    <input type="hidden" id="process_ssh_key" name="process_ssh_key" value="{{ default_jh_key }}">
-
-
-
-
-                    <hr class="divider">
-
-                    <!-- JUMPHOST CONNECTION -->
-                    <div class="config-group">
-                        <div class="group-header">
-                            <h3>Jumphost Connection</h3>
-                            <label class="toggle-switch accent-blue">
-                                <input type="checkbox" checked onchange="document.getElementById('jumphost-fields').classList.toggle('collapsed')">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        
-                        <div id="jumphost-fields" class="collapsable">
-                            <div class="form-grid">
-                                <div class="form-control">
-                                    <label for="nbd_jumphost_ip">Jumphost IP</label>
-                                    <input type="text" id="nbd_jumphost_ip" placeholder="e.g. 146.20.65.148" value="{{ default_jh_ip }}" oninput="document.getElementById('process_host_ip').value=this.value;">
-                                </div>
-                                <div class="form-control">
-                                    <label for="nbd_jumphost_user">SSH User</label>
-                                    <input type="text" id="nbd_jumphost_user" placeholder="ubuntu" value="{{ default_jh_user }}" oninput="document.getElementById('process_ssh_user').value=this.value;">
-                                </div>
-                                <div class="form-control">
-                                    <label for="nbd_jumphost_key">SSH Key Path</label>
-                                    <input type="text" id="nbd_jumphost_key" placeholder="~/.ssh/id_rsa" value="{{ default_jh_key }}" oninput="document.getElementById('process_ssh_key').value=this.value;">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="divider">
-
                     <!-- TEST VM OPTIONS -->
                     <div class="config-group">
                         <div class="group-header">
                             <h3>Global Test VM Deploy Options</h3>
-                            <label class="toggle-switch accent-green">
-                                <input type="checkbox" id="boot_test_vm" checked name="boot_test_vm" onchange="document.getElementById('test-vm-fields').classList.toggle('collapsed')">
-                                <span class="slider"></span>
-                            </label>
                         </div>
-                        
+                        <input type="hidden" id="boot_test_vm" name="boot_test_vm" value="on">
+
                         <div id="test-vm-fields" class="collapsable">
                             <div class="form-grid">
                                 <div class="form-control">
                                     <label>FLEX Flavor</label>
-                                    <input type="text" disabled placeholder="[AUTO-FILLED BY MAPPER]">
+                                    <input type="text" id="flex_flavor_fallback" placeholder="UUID (or leave for auto-map)">
                                 </div>
                                 <div class="form-control">
                                     <label>Test Server Name</label>
@@ -1894,6 +2072,7 @@
 
                     <hr class="divider">
 
+
                     <!-- 🎙️ Jarvis Audio Alerts (moved here so it sits directly above the batch-action buttons) -->
                     <div style="margin: 0 auto 16px auto; padding: 10px 18px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: fit-content;">
                         <label style="color:#c4b5fd; font-size:0.9rem; font-weight:600; display:flex; align-items:center; gap:10px; cursor:pointer;">
@@ -1909,7 +2088,7 @@
 
                     <input type="hidden" id="mig_mode_value" value="live">
                     <div class="form-actions" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; align-items: flex-start;">
-                        
+
                         <!-- Server Migration Column -->
                         <div style="display: flex; flex-direction: column; gap: 10px;">
                             <div style="display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.3);border:1px solid #374151;border-radius:6px;padding:6px 10px;">
@@ -1929,7 +2108,7 @@
                                 <span>🔍 Start Server Batch NBD — Dry Run</span>
                             </button>
                         </div>
-                        
+
                         <!-- Image Migration Column -->
                         <div style="display: flex; flex-direction: column; gap: 10px;">
                             <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
@@ -2029,7 +2208,10 @@
                 <!-- Header -->
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
                     <div>
-                        <div style="color:#00ff41; font-size:15px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; text-shadow:0 0 8px rgba(0,255,65,0.6);">📊 Live Migration Progress</div>
+                        <div style="color:#00ff41; font-size:15px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; text-shadow:0 0 8px rgba(0,255,65,0.6);">📊 Live Migration Progress
+                            <button class="theme-btn" onclick="toggleTheme()" style="margin-left: 15px; background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#fff; padding:4px 8px; border-radius:4px; font-family:'Orbitron'; font-size:10px; cursor:pointer; box-shadow:0 0 10px rgba(59,130,246,0.5); vertical-align: middle;">🚀 Toggle Apollo Theme</button>
+                            <button id="soundToggleBtn" onclick="toggleSpaceBeep()" style="margin-left: 10px; background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#60a5fa; padding:4px 8px; border-radius:4px; font-family:'Orbitron'; font-size:10px; cursor:pointer; box-shadow:0 0 5px rgba(59,130,246,0.3); vertical-align: middle;">🔊 Sound On</button>
+                        </div>
                         <div id="mig-progress-subtitle" style="color:#005500; font-size:13px; margin-top:3px;">Waiting for batch to start…</div>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center;">
@@ -2106,7 +2288,7 @@
                         <div id="jh-sys-ip" style="color:#fff; font-size:16px; font-weight:bold; font-family:'Share Tech Mono';">IP: --</div>
                         <div id="jh-sys-cpus" style="color:#00a3ff; font-size:12px; font-family:'Share Tech Mono'; margin-top:2px;">CLUSTER: -- VCPUS</div>
                     </div>
-                    
+
                     <!-- CENTER: ANALOG GAUGES -->
                     <div style="display:flex; justify-content:center; gap:40px;">
                         <!-- CPU LOAD GAUGE -->
@@ -2178,10 +2360,10 @@
 
                 <!-- DSKY SCOREBOARD REPLICA -->
                 <div style="background-color:#c4c8cb; border-radius:12px; box-shadow:0 25px 45px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.8); max-width:600px; margin:0 auto 30px; font-family:'Share Tech Mono', sans-serif;">
-                    
+
                     <!-- Top modules section -->
                     <div style="display:flex; padding:20px; gap:16px;">
-                        
+
                         <!-- LEFT KEYPAD LIGHTS -->
                         <div style="flex: 0 0 160px; background:#8a8e91; border:4px solid #6c7072; border-radius:4px; padding:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; box-shadow:inset 0 4px 10px rgba(0,0,0,0.5);">
                             <!-- Static glowing buttons -->
@@ -2200,7 +2382,7 @@
                         <!-- RIGHT DISPLAY (MOON MIGRATION TELEMETRY MATRIX) -->
                         <div id="dsky-display" style="flex: 1; background:#000; border:4px solid #6c7072; border-radius:4px; padding:15px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:inset 0 4px 15px rgba(0,0,0,0.8); position:relative; overflow:hidden;">
                             <div style="position:absolute; top:0; left:0; width:100%; height:100%; background:linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 50%); pointer-events:none; z-index:1;"></div>
-                            
+
                             <!-- OVERLAY MOON AND STARS -->
                             <div style="position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%), url('https://www.transparenttextures.com/patterns/stardust.png'); pointer-events:none; z-index:0; opacity: 0.5;"></div>
                             <img src="https://www.transparentpng.com/download/moon/black-and-white-moon-png-transparent-17.png" style="position:absolute; bottom:-120px; right:-120px; width:350px; opacity:0.15; filter:grayscale(100%); z-index:0; pointer-events:none; animation: rotateMoon 180s linear infinite;">
@@ -2233,7 +2415,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- NUMPAD (Cosmetic) -->
                     <div style="background:#a5a9ac; border-top:2px solid #888; border-radius:0 0 12px 12px; padding:20px; display:flex; justify-content:center;">
                         <style>
@@ -2246,13 +2428,13 @@
                             <div class="dsky-btn" style="font-size:22px;">7</div>
                             <div class="dsky-btn" style="font-size:22px;">8</div>
                             <div class="dsky-btn" style="font-size:22px;">9</div>
-                            
+
                             <div class="dsky-btn" style="font-size:12px;">CLR</div>
                             <div class="dsky-btn" style="font-size:12px;">NOUN</div>
                             <div class="dsky-btn" style="font-size:24px; color:#ffdd57;">-</div>
                             <div class="dsky-btn" style="font-size:22px;">4</div>
                             <div class="dsky-btn" style="font-size:22px;">5</div>
-                            
+
                             <div class="dsky-btn" style="font-size:22px;">6</div>
                             <div class="dsky-btn" style="font-size:12px;">PRO</div>
                             <div class="dsky-btn" style="grid-column: span 2; display:flex; justify-content:space-around; align-items:center; padding:0;">
@@ -2260,7 +2442,7 @@
                                 <div style="font-size:22px; width:55%;">0</div>
                             </div>
                             <div class="dsky-btn" style="font-size:22px;">1</div>
-                            
+
                             <div class="dsky-btn" style="font-size:22px;">2</div>
                             <div class="dsky-btn" style="font-size:22px;">3</div>
                             <div class="dsky-btn" style="grid-column: span 3; font-size:16px;">ENTR</div>
@@ -2407,10 +2589,11 @@
 
             function parseToBytes(szStr) {
                 if (!szStr) return 0;
-                let val = parseFloat(szStr);
-                if (szStr.includes('G')) return val * 1024 * 1024 * 1024;
-                if (szStr.includes('M')) return val * 1024 * 1024;
-                if (szStr.includes('K')) return val * 1024;
+                const raw = String(szStr);
+                let val = parseFloat(raw);
+                if (raw.includes('G')) return val * 1024 * 1024 * 1024;
+                if (raw.includes('M')) return val * 1024 * 1024;
+                if (raw.includes('K')) return val * 1024;
                 return val;
             }
 
@@ -2418,7 +2601,7 @@
 
             function calculateJobMetrics(label, currBytes, targetBytes, tsSecs) {
                 const hist = window._jobHistory[label] || { lastBytes: 0, lastTs: 0, speeds: [] };
-                
+
                 let speedStr = "0.0 MB/s", etaStr = "--:--:--", pct = "0.0%";
                 if (targetBytes > 0) {
                     let p = (currBytes / targetBytes) * 100;
@@ -2431,13 +2614,13 @@
                     const diff = currBytes - hist.lastBytes;
                     const MathMax = Math.max;
                     const speedBps = MathMax(0, diff / elapsed);
-                    
+
                     hist.speeds.push(speedBps);
                     if (hist.speeds.length > 5) hist.speeds.shift();
                     const avgSpeed = hist.speeds.reduce((a,b)=>a+b, 0) / hist.speeds.length;
 
                     speedStr = (avgSpeed / (1024*1024)).toFixed(1) + " MB/s";
-                    
+
                     if (avgSpeed > 0 && targetBytes > currBytes) {
                         const remSecs = (targetBytes - currBytes) / avgSpeed;
                         const hr = Math.floor(remSecs / 3600);
@@ -2469,7 +2652,7 @@
                 const user = (document.getElementById('nbd_jumphost_user')||{}).value || window._jhUser || 'ubuntu';
                 const key  = (document.getElementById('nbd_jumphost_key') ||{}).value || window._jhKey  || '~/.ssh/id_rsa';
                 try {
-                    let data = { timestamp: Date.now(), jobs: {} };
+                    let data = { timestamp: Date.now(), jobs: {}, images: {} };
                     if (ip) {
                         try {
                             const r = await fetch('/api/vm_migrator/nbd/status?jumphost_ip=' + encodeURIComponent(ip) +
@@ -2479,23 +2662,81 @@
                     }
 
                     const grid = document.getElementById('jh-mbux-grid');
+                    if (!grid) return;
+                    const mt = (typeof window !== 'undefined' && window.migTracker) ? window.migTracker : null;
+                    const nowMs = Date.now();
+                    const isRecentMs = (ts, ttlMs) => !ts || (nowMs - ts) <= ttlMs;
+                    const normalizeStatus = s => String(s || '').toLowerCase();
 
-                    // Show real jobs from API only; hide stale/inactive historical labels.
+                    // Merge browser-tracked/reconnected jobs into the same source as jumphost telemetry.
+                    // The jumphost can see files/logs; the browser can see jobs launched in this tab.
+                    try {
+                        const savedJobs = JSON.parse(localStorage.getItem('nbd_running_jobs') || '[]');
+                        savedJobs.forEach(j => {
+                            const label = String(j.label || '').trim();
+                            if (!label || (data.jobs || {})[label]) return;
+                            data.jobs[label] = {
+                                status: 'Running',
+                                lines: ['[LOCAL] Browser has this VM job registered; waiting for jumphost log sync.'],
+                                mtime: Math.floor((j.ts || nowMs) / 1000),
+                                size: '0',
+                                converted: false,
+                                src_size_gb: 0
+                            };
+                        });
+                    } catch (_) {}
+                    if (mt && mt.vms) {
+                        Object.entries(mt.vms).forEach(([label, vm]) => {
+                            if (!label || (data.jobs || {})[label]) return;
+                            const st = normalizeStatus(vm.status);
+                            if (!['running', 'success', 'failed', 'error'].includes(st)) return;
+                            if (st !== 'running' && !isRecentMs(vm.stageTs || vm.startTs, 30 * 60 * 1000)) return;
+                            data.jobs[label] = {
+                                status: st === 'running' ? 'Running' : (st === 'success' ? 'Complete' : 'Failed'),
+                                lines: [vm.stage || 'Tracked in browser session'],
+                                mtime: Math.floor((vm.stageTs || vm.startTs || nowMs) / 1000),
+                                size: vm.sizeBytes || '0',
+                                converted: st === 'success',
+                                src_size_gb: 0
+                            };
+                        });
+                    }
+
+                    // Show active jobs plus recently completed/failed jobs, from all merged sources.
                     const labels = Object.keys(data.jobs || {}).filter(label => {
                         const job = data.jobs[label] || {};
-                        if (job.status === 'Running') return true;
-                        // Only keep recently finished/failed jobs (30 min), never idle/waiting
+                        const status = normalizeStatus(job.status);
+                        if (status === 'running') return true;
                         const lastLine = (job.lines || []).slice(-1)[0] || '';
                         const isDoneOrFail = job.converted
+                            || status === 'complete' || status === 'completed' || status === 'failed'
                             || lastLine.includes('DONE') || lastLine.includes('SUCCESS')
                             || lastLine.includes('ERROR') || lastLine.includes('FAIL');
                         if (!isDoneOrFail) return false;
                         const ageSecs = (job.mtime > 0) ? (data.timestamp - job.mtime) : Number.MAX_SAFE_INTEGER;
-                        return ageSecs <= 1800;
+                        return ageSecs <= 21600;
                     }).sort();
 
-                    const mt = (typeof window !== 'undefined' && window.migTracker) ? window.migTracker : null;
                     const imageEntries = [];
+                    if (data.images) {
+                        Object.entries(data.images).forEach(([id, img]) => {
+                            if (!img) return;
+                            const job = {
+                                label: img.label || id,
+                                status: img.status || 'success',
+                                stage: img.stage || 'FLEX Glance uploaded',
+                                stageIdx: typeof img.stageIdx === 'number' ? img.stageIdx : 4,
+                                startTs: (img.mtime ? img.mtime * 1000 : nowMs),
+                                stageTs: (img.mtime ? img.mtime * 1000 : nowMs),
+                                sizeBytes: Number(img.sizeBytes || 0),
+                                size: Number(img.sizeBytes || 0) > 0 ? formatBytesToString(Number(img.sizeBytes || 0), 1) : '—',
+                                errors: 0
+                            };
+                            if (job.status === 'running' || isRecentMs(job.stageTs || job.startTs, 6 * 60 * 60 * 1000)) {
+                                imageEntries.push({ id: img.id || id, job });
+                            }
+                        });
+                    }
                     if (mt && mt.images) {
                         Object.entries(mt.images).forEach(([id, job]) => {
                             if (!job) return;
@@ -2510,10 +2751,10 @@
                         });
                     }
 
-                    const liveVm  = labels.filter(l => (data.jobs[l] || {}).status === 'Running').length;
-                    const liveImg = imageEntries.filter(e => e.job.status === 'running').length;
+                    const liveVm  = labels.filter(l => normalizeStatus((data.jobs[l] || {}).status) === 'running').length;
+                    const liveImg = imageEntries.filter(e => normalizeStatus(e.job.status) === 'running').length;
                     const sumHdr  = document.getElementById('jh-mbux-active-summary');
-                    if (sumHdr) sumHdr.textContent = `Live VM jobs: ${liveVm} · Glance image jobs: ${liveImg}`;
+                    if (sumHdr) sumHdr.textContent = `VM jobs: ${labels.length} (${liveVm} live) · Glance image jobs: ${imageEntries.length} (${liveImg} live)`;
 
                     // Init mission clock on first data
                     if (!window._missionStart && (labels.length > 0 || imageEntries.length > 0)) {
@@ -2522,6 +2763,16 @@
 
                     if (labels.length === 0 && imageEntries.length === 0) {
                         grid.innerHTML = '<div style="grid-column:1/-1; padding:60px; text-align:center; color:rgba(0,163,255,0.3); font-family:Orbitron; letter-spacing:2px; font-size:12px;">NO VM/NBD OR IMAGE PIPELINES ACTIVE · SYSTEM STANDBY</div>';
+                        const dskyBody = document.getElementById('dsky-jobs-matrix-tbody');
+                        if (dskyBody) dskyBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; font-style:italic; opacity:0.5;">WAITING FOR UPLINK...</td></tr>';
+                        ['dsky-matrix-live-count', 'hdr-jobs-actv', 'hdr-jobs-done', 'hdr-jobs-fail'].forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.textContent = '0';
+                        });
+                        const sbD = document.getElementById('sb-done-box');
+                        const sbF = document.getElementById('sb-fail-box');
+                        if (sbD) sbD.textContent = 'DONE 0';
+                        if (sbF) sbF.textContent = 'FAIL 0';
                         return;
                     }
 
@@ -2531,20 +2782,21 @@
                     let totalBandwidthBps = 0;
                     const tsSecs = Math.floor(Date.now() / 1000);
                     const ts = data.timestamp;
+                    const isApollo = document.body.classList.contains('theme-apollo');
                     labels.forEach(label => {
-                        const job = data.jobs[label] || { 
-                            status: 'Waiting', 
-                            lines: ['Initializing mission...'], 
-                            src_size_gb: 0, 
-                            stage: 'Stage 0: Launching', 
-                            mtime: 0, 
-                            size: '0B' 
+                        const job = data.jobs[label] || {
+                            status: 'Waiting',
+                            lines: ['Initializing mission...'],
+                            src_size_gb: 0,
+                            stage: 'Stage 0: Launching',
+                            mtime: 0,
+                            size: '0B'
                         };
                         const currBytes = parseToBytes(job.size);
                         window._activeJobSizes = window._activeJobSizes || { "rh6-GL": 40 }; // Inject hardcoded legacy fallback so ETA continues to spin instantly!
                         const srcRaw = Number(job.src_size_gb || window._activeJobSizes[label] || 0);
                         const srcSizeGb = srcRaw > 100000 ? (srcRaw / (1024 * 1024 * 1024)) : (srcRaw > 0 ? srcRaw : 0);
-                        
+
                         const targetBytes = srcSizeGb * 1024 * 1024 * 1024;
                         const metrics = calculateJobMetrics(label, currBytes, targetBytes, tsSecs);
                         if (['Running', 'running'].includes(job.status)) {
@@ -2564,7 +2816,7 @@
                             </tr>
                         `;
                         const srcSizeBytes = srcSizeGb * 1024 * 1024 * 1024;
-                        
+
                         // ── Speed Calculation ──
                         let speedMbps = 0;
                         if (jhHistory[label]) {
@@ -2576,7 +2828,7 @@
                                 speedMbps = jhHistory[label].prevSpeed || 0;
                             }
                         }
-                        
+
                         // ── ETA Calculation ──
                         let etaStr = "N/A";
                         let progressPct = 0;
@@ -2685,12 +2937,12 @@
                             </div>`;
                         }
                         const coffeeCupHtml = (isRunning || cupsMode === 'done') ? _buildCoffeeHtml(cupsRaw, cupsMode) : '';
-                        
+
                         // ── Ghost Segment Logic ──
                         const velIsRed = speedMbps <= 0 && isRunning;
                         const speedMbpsDisp = speedMbps * 8; // Convert MB/s to Mbps
                         const speedPad = (speedMbpsDisp > 0 ? speedMbpsDisp.toFixed(1) : '0.0').padStart(5, ' ');
-                        const speedBg = speedPad.replace(/[^ .]/g, '8'); 
+                        const speedBg = speedPad.replace(/[^ .]/g, '8');
                         const currGb = currBytes > 0 ? (currBytes / (1024*1024*1024)) : 0;
                         const sizeVal = currGb.toFixed(1);
                         const MathFloorSize = Math.max(0, currGb);
@@ -2704,12 +2956,12 @@
                         } else if (etaStr === 'READY') { etaFmt = 'DONE'; }
                         else if (etaStr === 'N/A') { etaFmt = ' -- '; }
                         const etaBg = etaFmt.replace(/[^ .:]/g, '8');
-                        
+
                         // ── Stage Mapping ──
                         const currentStageStr = job.stage || 'Stage 1: Streaming';
                         const stageMatch = currentStageStr.match(/\d+/);
                         const stageIdx = stageMatch ? parseInt(stageMatch[0]) : 0;
-                        
+
                         // ── Duration ──
                         const durationSecs = (job.mtime > 0) ? Math.floor(ts - job.mtime) : 0;
                         const h = Math.floor(durationSecs / 3600);
@@ -2789,22 +3041,70 @@
                             {n:5, s:'BOOT'},
                             {n:6, s:'DONE'}
                         ];
-                        const pipeHtml = PIPE.map((p,i) => {
-                            const cls = stepClass(p.n);
-                            const isAct = cls === 'active';
-                            const isDn  = cls === 'done';
-                            const isFl  = cls === 'fail';
-                            const bg    = isAct ? '#ffcf33' : isDn ? '#1a3a1a' : isFl ? '#3a0a0a' : '#111';
-                            const col   = isAct ? '#000'    : isDn ? '#4ade80' : isFl ? '#f87171' : '#444';
-                            const bord  = isAct ? '#ffcf33' : isDn ? '#4ade80' : isFl ? '#f87171' : '#333';
-                            const glow  = isAct ? 'box-shadow:0 0 8px #ffcf33;' : isDn ? 'box-shadow:0 0 4px rgba(74,222,128,0.3);' : '';
-                            const arrow = i < PIPE.length-1 ? `<div style="color:#333;font-size:9px;align-self:center;">▶</div>` : '';
-                            return `<div style="display:flex;align-items:center;gap:3px;">
-                                <div style="background:${bg};border:1px solid ${bord};${glow}border-radius:3px;padding:3px 5px;text-align:center;min-width:38px;">
-                                    <div style="color:${col};font-family:'Share Tech Mono';font-size:8px;font-weight:bold;letter-spacing:0.5px;">${p.s}</div>
-                                </div>${arrow}
+                        const isApollo = document.body.classList.contains('theme-apollo');
+                        let pipeHtml = '';
+                        if (isApollo) {
+                            const landed = stageIdx >= 5 || progressPct >= 100;
+                            const trackHeight = 160;
+                            const modTop = 20 + Math.min(1, Math.max(0, stageIdx) / 6) * trackHeight;
+
+                            pipeHtml = `
+                            <div style="position:relative; height: 320px; width:100%; background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ0cmFuc3BhcmVudCIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjEiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIxNTAiIGN5PSIyMzAiIHI9IjEuNSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjI1MCIgY3k9IjgwIiByPSIxIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMzUwIiBjeT0iMzIwIiByPSIyIiBmaWxsPSIjZmZmIi8+PC9zdmc+') repeat #050a15; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; border: 2px solid #38bdf8; box-shadow: inset 0 0 20px rgba(56,189,248,0.2), 0 0 15px rgba(56,189,248,0.4);">
+
+                                <div style="flex:1; position:relative; padding-top:20px; padding-bottom:50px; display:flex;">
+                                    <div style="width:45%; display:flex; flex-direction:column; justify-content:space-between; text-align:right; padding-right:15px; z-index:10; position:relative; height: ${trackHeight}px; margin-top:35px;">
+                                        ${PIPE.map((p, i) => {
+                                            if(i % 2 !== 0 && i !== PIPE.length-1 && i !== 0) return '';
+                                            const cls = stepClass(p.n);
+                                            const col = cls === 'active' ? '#fde047' : cls === 'done' ? '#4ade80' : '#475569';
+                                            const shadow = cls === 'active' ? '0 0 10px #fde047' : cls === 'done' ? '0 0 10px #4ade80' : 'none';
+                                            return \`<div style="color:\${col}; text-shadow:\${shadow}; font-family:'Orbitron'; font-size:14px; font-weight:bold; letter-spacing:1px; position:relative;">
+                                                \${p.s}
+                                                <div style="position:absolute; right:-20px; top:50%; transform:translateY(-50%); width:8px; height:8px; border-radius:50%; background:\${col}; box-shadow:\${shadow};"></div>
+                                            </div>\`;
+                                        }).join('')}
+                                    </div>
+
+                                    <div style="position:absolute; left:45%; top:45px; height:${trackHeight}px; width:2px; background:rgba(56,189,248,0.3); transform:translateX(5px); z-index:1; border-radius:2px;">
+                                        <div style="position:absolute; left:0; top:0; width:100%; height:${(Math.max(0, stageIdx)/6)*100}%; background:#4ade80; box-shadow:0 0 10px #4ade80; transition:height 1s ease; border-radius:2px;"></div>
+                                    </div>
+
+                                    <div style="width:55%; position:relative; z-index:10;">
+                                        <div class="lunar-module" style="position:absolute; left:20px; top:${modTop}px; transition:top 1s ease-in-out; width:60px; height:60px;">
+                                            ${window.LUNAR_SVG}
+                                            ${landed ? \`<div class="astronaut-anim" style="font-size:24px; position:absolute; bottom:-10px; right:-25px;">👨‍🚀🚩</div>\` : ''}
+                                        </div>
+                                        ${landed ? \`<div style="position:absolute; bottom: 0px; left: -30px; width:200px; color:#4ade80; text-shadow: 0 0 10px #4ade80; font-family:'Orbitron'; font-size: 14px; font-weight:bold; animation: blink-slow 2s infinite; text-align:center;">JOB \${label.toUpperCase()}<br>LANDED ON FLEX</div>\` : ''}
+                                    </div>
+                                </div>
+
+                                <div style="height: 70px; width: 100%; position:relative; overflow:hidden;">
+                                    <div style="position:absolute; top:20px; left:-10%; width:120%; height:150px; background: radial-gradient(ellipse at top, #cbd5e1 0%, #64748b 40%, #334155 100%); border-radius:50% 50% 0 0; border-top:2px solid #e2e8f0; display:flex; justify-content:center; padding-top:15px; box-shadow: inset 0 15px 20px rgba(255,255,255,0.2);">
+                                        <div style="position:absolute; top:10px; left:30%; width:30px; height:10px; background:rgba(0,0,0,0.2); border-radius:50%; box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 1px 1px rgba(255,255,255,0.3);"></div>
+                                        <div style="position:absolute; top:25px; left:60%; width:40px; height:15px; background:rgba(0,0,0,0.2); border-radius:50%; box-shadow: inset 0 3px 6px rgba(0,0,0,0.5), 0 1px 1px rgba(255,255,255,0.3);"></div>
+                                        <div style="position:absolute; top:15px; left:80%; width:20px; height:8px; background:rgba(0,0,0,0.2); border-radius:50%; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 1px rgba(255,255,255,0.3);"></div>
+                                        <span style="color:#0f172a; font-family:'Orbitron'; font-weight:900; font-size:18px; letter-spacing:3px; opacity:0.8; z-index:2;">FLEX MOON</span>
+                                    </div>
+                                </div>
                             </div>`;
-                        }).join('');
+                        } else {
+                            pipeHtml = PIPE.map((p,i) => {
+                                const cls = stepClass(p.n);
+                                const isAct = cls === 'active';
+                                const isDn  = cls === 'done';
+                                const isFl  = cls === 'fail';
+                                const bg    = isAct ? '#ffcf33' : isDn ? '#1a3a1a' : isFl ? '#3a0a0a' : '#111';
+                                const col   = isAct ? '#000'    : isDn ? '#4ade80' : isFl ? '#f87171' : '#444';
+                                const bord  = isAct ? '#ffcf33' : isDn ? '#4ade80' : isFl ? '#f87171' : '#333';
+                                const glow  = isAct ? 'box-shadow:0 0 8px #ffcf33;' : isDn ? 'box-shadow:0 0 4px rgba(74,222,128,0.3);' : '';
+                                const arrow = i < PIPE.length-1 ? `<div style="color:#333;font-size:9px;align-self:center;">▶</div>` : '';
+                                return `<div style="display:flex;align-items:center;gap:3px;">
+                                    <div style="background:${bg};border:1px solid ${bord};${glow}border-radius:3px;padding:3px 5px;text-align:center;min-width:38px;">
+                                        <div style="color:${col};font-family:'Share Tech Mono';font-size:8px;font-weight:bold;letter-spacing:0.5px;">${p.s}</div>
+                                    </div>${arrow}
+                                </div>`;
+                            }).join('');
+                        }
 
                         // ── Progress bar ──
                         const barFill = Math.max(2, progressPct);
@@ -2836,7 +3136,7 @@
                                 <!-- ── ROW 3: progress bar ── -->
                                 <div>
                                     <div style="height:6px; background:#0f172a; border-radius:3px; overflow:hidden; border:1px solid #1e293b;">
-                                        <div style="height:100%; width:${barFill}%; background:${barColor}; border-radius:3px; transition:width 0.8s ease; box-shadow:0 0 6px ${barColor};"></div>
+                                        <div style="height:100%; width:${barFill}%; background-color:${barColor}; background-image:url('/static/progress_texture.png'); background-blend-mode: hard-light; background-size: auto 100%; border-radius:3px; transition:width 0.8s ease; box-shadow:0 0 6px ${barColor};"></div>
                                     </div>
                                     <div style="display:flex; justify-content:space-between; margin-top:2px;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:9px;">${progressPct.toFixed(1)}% · ${currGb.toFixed(2)} GB / ${srcSizeGb > 0 ? srcSizeGb.toFixed(1)+' GB' : '? GB'}</div>
@@ -2871,7 +3171,7 @@
                                 <!-- ── ROW 5: sparkline + last log ── -->
                                 <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:5px 8px;">
                                     ${sparkHtml ? `<div style="font-size:13px;letter-spacing:0px;margin-bottom:3px;opacity:0.9;">${sparkHtml} <span style="color:#334155;font-family:'Share Tech Mono';font-size:8px;">${speedFun}</span></div>` : ''}
-                                    ${lastLine.includes('=== NBD Worker:') 
+                                    ${lastLine.includes('=== NBD Worker:')
                                         ? `<div style="color:#eab308; text-shadow:0 0 10px rgba(217,119,6,0.9); font-weight:bold; font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
                                         : `<div style="color:rgba(0,255,65,0.5); font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
                                     }
@@ -2899,29 +3199,88 @@
                         const isRunning = job.status === 'running';
                         const isDone = job.status === 'success';
                         const isFail = job.status === 'failed';
+                        if (isRunning) batchRunning++;
+                        else if (isDone) batchDone++;
+                        else if (isFail) batchFail++;
                         const IMG_PIPE = [{n:0,s:'INIT'},{n:1,s:'DL'},{n:2,s:'QCOW'},{n:3,s:'REPAIR'},{n:4,s:'UPLOAD'},{n:5,s:'DONE'}];
                         const imgStageIdx = typeof job.stageIdx === 'number' ? job.stageIdx : -1;
+                        let progressPct = 8;
+                        if (isDone) progressPct = 100;
+                        else if (isFail) progressPct = Math.min(97, ((Math.max(0, imgStageIdx) + 1) / 5) * 100);
+                        else if (imgStageIdx >= 0) progressPct = Math.min(95, ((imgStageIdx + 0.5) / 5) * 100);
                         function imgStepClass(n) {
                             if (n < imgStageIdx) return 'done';
                             if (n === imgStageIdx && isRunning) return 'active';
                             if (!isRunning && n === imgStageIdx && isFail) return 'fail';
                             return 'pending';
                         }
-                        const imgPipeHtml = IMG_PIPE.map((p,i) => {
-                            const cls = imgStepClass(p.n);
-                            const isAct = cls==='active', isDn=cls==='done', isFl=cls==='fail';
-                            const bg   = isAct?'#ffcf33':isDn?'#1a1a3a':isFl?'#3a0a0a':'#111';
-                            const col  = isAct?'#000':isDn?'#c4b5fd':isFl?'#f87171':'#444';
-                            const bord = isAct?'#ffcf33':isDn?'#7c3aed':isFl?'#f87171':'#333';
-                            const glow = isAct?'box-shadow:0 0 8px #ffcf33;':isDn?'box-shadow:0 0 4px rgba(167,139,250,0.3);':'';
-                            const arrow = i<IMG_PIPE.length-1?`<div style="color:#333;font-size:9px;align-self:center;">▶</div>`:'';
-                            return `<div style="display:flex;align-items:center;gap:3px;"><div style="background:${bg};border:1px solid ${bord};${glow}border-radius:3px;padding:3px 5px;text-align:center;min-width:38px;"><div style="color:${col};font-family:'Share Tech Mono';font-size:8px;font-weight:bold;">${p.s}</div></div>${arrow}</div>`;
-                        }).join('');
+                        let imgPipeHtml = '';
+                        if (isApollo) {
+                            const landed = imgStageIdx >= 4 || progressPct >= 100;
+                            const trackHeight = 160;
+                            const modTop = 20 + Math.min(1, Math.max(0, imgStageIdx) / 5) * trackHeight;
 
-                        let progressPct = 8;
-                        if (isDone) progressPct = 100;
-                        else if (isFail) progressPct = Math.min(97, ((Math.max(0, imgStageIdx) + 1) / 5) * 100);
-                        else if (imgStageIdx >= 0) progressPct = Math.min(95, ((imgStageIdx + 0.5) / 5) * 100);
+                            imgPipeHtml = `
+                            <div style="position:relative; height: 320px; width:100%; background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ0cmFuc3BhcmVudCIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjEiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIxNTAiIGN5PSIyMzAiIHI9IjEuNSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjI1MCIgY3k9IjgwIiByPSIxIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMzUwIiBjeT0iMzIwIiByPSIyIiBmaWxsPSIjZmZmIi8+PC9zdmc+') repeat #050a15; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; border: 2px solid #a855f7; box-shadow: inset 0 0 20px rgba(168,85,247,0.2), 0 0 15px rgba(168,85,247,0.4);">
+
+                                <div style="flex:1; position:relative; padding-top:20px; padding-bottom:50px; display:flex;">
+                                    <div style="width:45%; display:flex; flex-direction:column; justify-content:space-between; text-align:right; padding-right:15px; z-index:10; position:relative; height: ${trackHeight}px; margin-top:35px;">
+                                        ${IMG_PIPE.map((p, i) => {
+                                            if(i % 2 !== 0 && i !== IMG_PIPE.length-1 && i !== 0) return '';
+                                            const cls = imgStepClass(p.n);
+                                            const col = cls === 'active' ? '#c084fc' : cls === 'done' ? '#d8b4fe' : '#475569';
+                                            const shadow = cls === 'active' ? '0 0 10px #c084fc' : cls === 'done' ? '0 0 10px #d8b4fe' : 'none';
+                                            return \`<div style="color:\${col}; text-shadow:\${shadow}; font-family:'Orbitron'; font-size:14px; font-weight:bold; letter-spacing:1px; position:relative;">
+                                                \${p.s}
+                                                <div style="position:absolute; right:-20px; top:50%; transform:translateY(-50%); width:8px; height:8px; border-radius:50%; background:\${col}; box-shadow:\${shadow};"></div>
+                                            </div>\`;
+                                        }).join('')}
+                                    </div>
+
+                                    <div style="position:absolute; left:45%; top:45px; height:${trackHeight}px; width:2px; background:rgba(168,85,247,0.3); transform:translateX(5px); z-index:1; border-radius:2px;">
+                                        <div style="position:absolute; left:0; top:0; width:100%; height:${(Math.max(0, imgStageIdx)/5)*100}%; background:#d8b4fe; box-shadow:0 0 10px #d8b4fe; transition:height 1s ease; border-radius:2px;"></div>
+                                        ${[0,1,2,3,4,5].map(i => {
+                                            let html = \`<div style="position:absolute; top:\${(i/5)*100}%; left:2px; width:8px; height:2px; background:\${i<=imgStageIdx ? '#d8b4fe' : 'rgba(168,85,247,0.5)'}; box-shadow:\${i<=imgStageIdx ? '0 0 5px #d8b4fe' : 'none'};"></div>\`;
+                                            if (i < 5) {
+                                                html += \`<div style="position:absolute; top:\${(i/5)*100 + 6.6}%; left:2px; width:4px; height:1px; background:rgba(168,85,247,0.3);"></div>\`;
+                                                html += \`<div style="position:absolute; top:\${(i/5)*100 + 13.3}%; left:2px; width:4px; height:1px; background:rgba(168,85,247,0.3);"></div>\`;
+                                            }
+                                            return html;
+                                        }).join('')}
+                                    </div>
+
+                                    <div style="width:55%; position:relative; z-index:10;">
+                                        <div class="lunar-module" style="position:absolute; left:20px; top:${modTop}px; transition:top 1s ease-in-out; width:60px; height:60px;">
+                                            ${!landed && isRunning ? \`<div style="position:absolute; top:-15px; left:25px; color:#c084fc; font-size:16px; text-shadow:0 0 8px #c084fc; animation: migPulse 1s infinite;">↓</div>\` : ''}
+                                            ${window.LUNAR_SVG.replace(/#38bdf8/g, '#c084fc').replace(/56,189,248/g, '192,132,252')}
+                                            ${!landed && isRunning ? \`<div style="position:absolute; bottom:-15px; left:25px; color:#c084fc; font-size:16px; text-shadow:0 0 8px #c084fc; animation: migPulse 1s infinite;">↓</div>\` : ''}
+                                            ${landed ? \`<div class="astronaut-anim" style="font-size:24px; position:absolute; bottom:-10px; right:-25px;">👨‍🚀🚩</div>\` : ''}
+                                        </div>
+                                        ${landed ? \`<div style="position:absolute; bottom: 0px; left: -30px; width:200px; color:#d8b4fe; text-shadow: 0 0 10px #d8b4fe; font-family:'Orbitron'; font-size: 14px; font-weight:bold; animation: blink-slow 2s infinite; text-align:center;">IMAGE \${safeTitle.substring(0,10).toUpperCase()}<br>LANDED ON FLEX</div>\` : ''}
+                                    </div>
+                                </div>
+
+                                <div style="height: 70px; width: 100%; position:relative; overflow:hidden;">
+                                    <div style="position:absolute; top:20px; left:-10%; width:120%; height:150px; background: radial-gradient(ellipse at top, #94a3b8 0%, #475569 80%, #1e293b 100%), url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI0MCI+PGVsbGlwc2UgY3g9IjIwIiBjeT0iMTAiIHJ4PSI4IiByeT0iMyIgZmlsbD0icmdiYSgwLDAsMCwwLjI1KSIvPjxlbGxpcHNlIGN4PSI2MCIgY3k9IjMwIiByeD0iMTIiIHJ5PSI0IiBmaWxsPSJyZ2JhKDAsMCwwLDAuMTUpIi8+PC9zdmc+') repeat; background-blend-mode: multiply; border-radius:50% 50% 0 0; border-top:2px solid #e2e8f0; display:flex; justify-content:center; padding-top:15px; box-shadow: inset 0 25px 40px rgba(0,0,0,0.6), inset 0 2px 10px rgba(255,255,255,0.3);">
+                                        <div style="position:absolute; top:10px; left:30%; width:30px; height:10px; background:rgba(0,0,0,0.2); border-radius:50%; box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 1px 1px rgba(255,255,255,0.3);"></div>
+                                        <div style="position:absolute; top:25px; left:60%; width:40px; height:15px; background:rgba(0,0,0,0.2); border-radius:50%; box-shadow: inset 0 3px 6px rgba(0,0,0,0.5), 0 1px 1px rgba(255,255,255,0.3);"></div>
+                                        <div style="position:absolute; top:15px; left:80%; width:20px; height:8px; background:rgba(0,0,0,0.2); border-radius:50%; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 1px rgba(255,255,255,0.3);"></div>
+                                        <span style="color:#0f172a; font-family:'Orbitron'; font-weight:900; font-size:18px; letter-spacing:3px; opacity:0.8; z-index:2; text-shadow:0 1px 1px rgba(255,255,255,0.4);">FLEX MOON</span>
+                                    </div>
+                                </div>
+                            </div>`;
+                        } else {
+                            imgPipeHtml = IMG_PIPE.map((p,i) => {
+                                const cls = imgStepClass(p.n);
+                                const isAct = cls==='active', isDn=cls==='done', isFl=cls==='fail';
+                                const bg   = isAct?'#ffcf33':isDn?'#1a1a3a':isFl?'#3a0a0a':'#111';
+                                const col  = isAct?'#000':isDn?'#c4b5fd':isFl?'#f87171':'#444';
+                                const bord = isAct?'#ffcf33':isDn?'#7c3aed':isFl?'#f87171':'#333';
+                                const glow = isAct?'box-shadow:0 0 8px #ffcf33;':isDn?'box-shadow:0 0 4px rgba(167,139,250,0.3);':'';
+                                const arrow = i<IMG_PIPE.length-1?`<div style="color:#333;font-size:9px;align-self:center;">▶</div>`:'';
+                                return `<div style="display:flex;align-items:center;gap:3px;"><div style="background:${bg};border:1px solid ${bord};${glow}border-radius:3px;padding:3px 5px;text-align:center;min-width:38px;"><div style="color:${col};font-family:'Share Tech Mono';font-size:8px;font-weight:bold;">${p.s}</div></div>${arrow}</div>`;
+                            }).join('');
+                        }
 
                         const currBytes = job.sizeBytes || 0;
                         const srcSizeGb = currBytes > 0 ? (currBytes / (1024 * 1024 * 1024)) : 0;
@@ -2932,6 +3291,16 @@
                         const durationStr = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
 
                         const lastLine = String(job.stage || '—').replace(/</g, '');
+                        dskyHtml += `
+                            <tr style="border-bottom:1px solid rgba(192,132,252,0.18); color:#c084fc;">
+                                <td style="padding:4px 2px; font-weight:bold;">IMG</td>
+                                <td style="padding:4px 2px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${safeTitle}">${safeTitle.slice(0, 24)}</td>
+                                <td style="padding:4px 2px; text-align:right;">${job.size || '—'}</td>
+                                <td style="padding:4px 2px; text-align:right;">${isDone ? '100%' : Math.max(0, imgStageIdx) * 20 + '%'}</td>
+                                <td style="padding:4px 2px; text-align:right;">GLANCE</td>
+                                <td style="padding:4px 2px; text-align:right;">${isRunning ? 'RUN' : isDone ? 'DONE' : 'FAIL'}</td>
+                            </tr>
+                        `;
 
                         const imgBarColor = progressPct >= 100 ? '#c4b5fd' : isRunning ? '#7c3aed' : '#ef4444';
                         const imgSizeGb = srcSizeGb;
@@ -2961,7 +3330,7 @@
                                 <!-- ROW 3: progress bar -->
                                 <div>
                                     <div style="height:6px; background:#0f172a; border-radius:3px; overflow:hidden; border:1px solid #1e293b;">
-                                        <div style="height:100%; width:${Math.max(2,progressPct)}%; background:${imgBarColor}; border-radius:3px; transition:width 0.8s ease; box-shadow:0 0 6px ${imgBarColor};"></div>
+                                        <div style="height:100%; width:${Math.max(2,progressPct)}%; background-color:${imgBarColor}; background-image:url('/static/progress_texture.png'); background-blend-mode: hard-light; background-size: auto 100%; border-radius:3px; transition:width 0.8s ease; box-shadow:0 0 6px ${imgBarColor};"></div>
                                     </div>
                                     <div style="display:flex; justify-content:space-between; margin-top:2px;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:9px;">${progressPct.toFixed(1)}%</div>
@@ -2995,7 +3364,7 @@
 
                                 <!-- ROW 5: last log -->
                                 <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:5px 8px;">
-                                    ${lastLine.includes('=== NBD Worker:') 
+                                    ${lastLine.includes('=== NBD Worker:')
                                         ? `<div style="color:#eab308; text-shadow:0 0 10px rgba(217,119,6,0.9); font-weight:bold; font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
                                         : `<div style="color:rgba(192,132,252,0.6); font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
                                     }
@@ -3031,7 +3400,7 @@
                     if (dskyLiveCount) {
                         dskyLiveCount.innerText = batchRunning.toString();
                     }
-                    
+
                     // Update header counters
                     const hdrActv = document.getElementById('hdr-jobs-actv');
                     const hdrDone = document.getElementById('hdr-jobs-done');
@@ -3042,7 +3411,7 @@
 
                     // Update Bandwidth Gauge (capped at local assumption of 10Gbps = 1250MB/s, so let's scale to 500MB/s for visual movement)
                     const totalMb = totalBandwidthBps / (1024 * 1024);
-                    let bwPct = (totalMb / 250) * 100; 
+                    let bwPct = (totalMb / 250) * 100;
                     if (bwPct > 100) bwPct = 100;
                     setGauge('jh-gauge-net', bwPct, Math.floor(totalMb) + '<br><span style="font-size:8px;">MB/s</span>');
 
@@ -3260,6 +3629,9 @@
                         if (!vm.stages[stageKey] && typeof jarvisAnnounce === 'function') {
                             jarvisAnnounce(`Change of stage for server ${vmName.replace(/-/g, ' ')}, entering ${stageInfo.label.replace(/<[^>]*>/g, '')}.`);
                         }
+                        if (!vm.stages[stageKey] && stageKey === 'step6' && window.EAGLE_AUDIO && typeof spaceBeepEnabled !== 'undefined' && spaceBeepEnabled) {
+                            window.EAGLE_AUDIO.play().catch(e => console.error("Audio playback blocked:", e));
+                        }
                         vm.stages[stageKey] = { status: 'active', ts: now, duration: 0 };
                     }
                     vm.stage = stageInfo.label;
@@ -3324,51 +3696,7 @@
 
         _renderImageMatrix() {
             const sec = document.getElementById('mig-image-matrix-section');
-            const thead = document.getElementById('mig-image-matrix-thead');
-            const tbody = document.getElementById('mig-image-matrix-tbody');
-            if (!sec || !thead || !tbody) return;
-            const ids = Object.keys(this.images || {});
-            if (!ids.length) {
-                sec.style.display = 'none';
-                return;
-            }
-            sec.style.display = 'block';
-            let hdr = '<tr style="border-bottom:2px solid #312e81;">';
-            hdr += '<th style="padding:8px 12px;text-align:left;color:#a78bfa;font-weight:600;min-width:160px;font-size:13px;">Stage</th>';
-            ids.forEach((id) => {
-                const job = this.images[id];
-                const col = job.status === 'success' ? '#a78bfa' : job.status === 'failed' ? '#f472b6' : '#c4b5fd';
-                const title = (job.label || id).replace(/</g, '');
-                hdr += `<th style="padding:8px 10px;text-align:center;color:${col};font-weight:700;font-size:13px;min-width:120px;" title="${title}">${title}</th>`;
-            });
-            hdr += '</tr>';
-            thead.innerHTML = hdr;
-            let rows = '';
-            this.imageStages.forEach((stage, si) => {
-                const rowBg = si % 2 === 0 ? 'rgba(167,139,250,0.06)' : 'transparent';
-                rows += `<tr style="border-bottom:1px solid #1e1b4b;background:${rowBg};">`;
-                rows += `<td style="padding:6px 12px;color:#818cf8;font-weight:600;font-size:12px;white-space:nowrap;">${stage.short}</td>`;
-                ids.forEach((id) => {
-                    const job = this.images[id];
-                    const st = job.stages[stage.key];
-                    let cellHtml = '<span style="color:#312e81;">—</span>';
-                    if (st) {
-                        const failed = job.status === 'failed';
-                        if (st.status === 'done') {
-                            cellHtml = '<span style="display:inline-block;color:#c4b5fd;text-shadow:0 0 6px #a78bfa;font-size:16px;">●</span>';
-                        } else if (st.status === 'active') {
-                            cellHtml = failed
-                                ? '<span style="display:inline-block;color:#f472b6;font-size:16px;">⬤</span>'
-                                : '<span style="display:inline-block;color:#fde047;font-size:16px;animation:migPulse 1s infinite;">◉</span>';
-                        } else if (st.status === 'skipped') {
-                            cellHtml = '<span style="color:#4338ca;font-size:12px;">○</span>';
-                        }
-                    }
-                    rows += `<td style="padding:6px 10px;text-align:center;">${cellHtml}</td>`;
-                });
-                rows += '</tr>';
-            });
-            tbody.innerHTML = rows;
+            if (sec) sec.style.display = 'none';
         },
 
         _renderMatrix() {
@@ -3394,36 +3722,96 @@
             thead.innerHTML = hdr;
 
             // Stage rows
+            const isApollo = document.body.classList.contains('theme-apollo');
             let rows = '';
             this.allStages.forEach((stage, si) => {
-                const rowBg = si % 2 === 0 ? 'rgba(0,255,65,0.02)' : 'transparent';
-                rows += `<tr style="border-bottom:1px solid #001a00;background:${rowBg};">`;
-                rows += `<td style="padding:6px 12px;color:#009920;font-weight:600;font-size:13px;white-space:nowrap;">${stage.short}</td>`;
+                const rowBg = si % 2 === 0 ? (isApollo ? 'rgba(59,130,246,0.05)' : 'rgba(0,255,65,0.02)') : 'transparent';
+                rows += `<tr style="border-bottom:1px solid ${isApollo?'#1e3a8a':'#001a00'};background:${rowBg};">`;
+                let anyActive = false;
+                let anyDone = false;
+                names.forEach(n => {
+                    const st = this.vms[n].stages[stage.key];
+                    if (st) {
+                        if (st.status === 'active') anyActive = true;
+                        if (st.status === 'done') anyDone = true;
+                    }
+                });
+
+                let btnHtml = stage.short;
+                if (isApollo) {
+                    const btnStyleBase = "display:block; width:100%; min-width:80px; max-width:120px; padding:6px 8px; font-family:'Share Tech Mono', monospace; font-size:11px; font-weight:bold; text-align:center; text-transform:uppercase; border-radius:3px; box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5); border: 2px solid; transition: all 0.3s; white-space:normal; line-height:1.2;";
+                    let btnStyle = btnStyleBase + "background-color: #334155; color: #94a3b8; border-color: #475569;";
+                    if (anyActive) {
+                        btnStyle = btnStyleBase + "background-color: #f97316; color: #fff; border-color: #ea580c; animation: migPulse 1s infinite; box-shadow: 0 0 10px #f97316;";
+                    } else if (anyDone) {
+                        btnStyle = btnStyleBase + "background-color: #f8fafc; color: #0f172a; border-color: #cbd5e1; box-shadow: 0 0 8px rgba(255,255,255,0.5);";
+                    }
+                    btnHtml = `<div style="${btnStyle}">${stage.short}</div>`;
+                }
+
+                rows += `<td style="padding:6px 12px;color:${isApollo?'#60a5fa':'#009920'};font-weight:600;font-size:13px;white-space:nowrap;">${btnHtml}</td>`;
                 names.forEach(n => {
                     const vm = this.vms[n];
                     const st = vm.stages[stage.key];
-                    let cellHtml = '<span style="color:#002200;">—</span>';
+                    let cellHtml = `<span style="color:${isApollo?'#1e3a8a':'#002200'};">—</span>`;
                     if (st) {
                         const isFailed = (vm.status === 'failed');
                         if (st.status === 'done') {
-                            // Steps done become green, fixed light (no blink)
-                            cellHtml = '<span style="display:inline-block; color:#00ff41;text-shadow:0 0 8px #00ff41;font-size:16px;">●</span>';
+                            cellHtml = `<span style="display:inline-block; color:${isApollo?'#34d399':'#00ff41'};text-shadow:0 0 8px ${isApollo?'#34d399':'#00ff41'};font-size:16px;">●</span>`;
                         } else if (st.status === 'active') {
                             if (isFailed) {
-                                // Failed ones red, fixed light (no blink)
-                                cellHtml = '<span style="display:inline-block; color:#ff2222;text-shadow:0 0 12px #ff2222;font-size:16px;">⬤</span>';
+                                cellHtml = `<span style="display:inline-block; color:${isApollo?'#f87171':'#ff2222'};text-shadow:0 0 12px ${isApollo?'#f87171':'#ff2222'};font-size:16px;">${isApollo?'💥':'⬤'}</span>`;
                             } else {
-                                // Next ones oranges, medium blink
-                                cellHtml = '<span style="display:inline-block; color:#ffa800;text-shadow:0 0 10px #ffa800;font-size:16px;animation:migPulse 1s infinite;">◉</span>';
+                                cellHtml = isApollo
+                                    ? `<span class="lunar-module" style="display:inline-block; width:28px; height:28px; vertical-align:middle;">${window.LUNAR_SVG}</span>`
+                                    : '<span style="display:inline-block; color:#ffa800;text-shadow:0 0 10px #ffa800;font-size:16px;animation:migPulse 1s infinite;">◉</span>';
                             }
                         } else if (st.status === 'skipped') {
-                            cellHtml = '<span style="color:#333;font-size:12px;">○</span>';
+                            cellHtml = `<span style="color:${isApollo?'#475569':'#333'};font-size:12px;">○</span>`;
                         }
                     }
                     rows += `<td style="padding:6px 10px;text-align:center;">${cellHtml}</td>`;
                 });
                 rows += '</tr>';
             });
+
+            if (isApollo) {
+                const moonBg = "background: url('/static/moonsurf.jpg') repeat-x center/cover; border-top: 2px solid #cbd5e1; box-shadow: inset 0 15px 20px rgba(255,255,255,0.15);";
+                rows += `<tr style="${moonBg}">`;
+                rows += `<td style="padding:15px 12px;color:#0f172a;font-family:'Orbitron';font-weight:900;font-size:14px;letter-spacing:2px;white-space:nowrap;text-shadow:0 1px 1px rgba(255,255,255,0.4);">FLEX MOON</td>`;
+                names.forEach(n => {
+                    const vm = this.vms[n];
+                    let cellHtml = '<span style="color:rgba(15,23,42,0.3); font-weight:bold;">—</span>';
+                    if (vm.status === 'success') {
+                        const safeTitle = n.substring(0,10);
+                        cellHtml = `
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                            <div style="position:relative;">
+                                <span class="lunar-module" style="display:inline-block; width:30px; height:30px; vertical-align:middle; filter:drop-shadow(0 0 5px #38bdf8);">${window.LUNAR_SVG}</span>
+                                <span class="astronaut-anim" style="position:absolute; bottom:-5px; right:-15px; font-size:18px;">👨‍🚀🚩</span>
+                            </div>
+                            <div style="color:#0f172a; text-shadow: 0 1px 2px rgba(255,255,255,0.5); font-family:'Orbitron'; font-size: 10px; font-weight:900; margin-top:8px; white-space:nowrap; background:rgba(74,222,128,0.8); padding:2px 6px; border-radius:4px; border:1px solid #4ade80;">${safeTitle.toUpperCase()}<br>LANDED ON FLEX</div>
+                        </div>`;
+                    } else if (vm.status === 'running' && vm.stages['step5'] && vm.stages['step5'].status === 'active') {
+                        const elapsedSec = (Date.now() - vm.stages['step5'].ts) / 1000;
+                        const assumedMbps = 350 + (Math.sin(Date.now() / 1000) * 50); // fluctuate smoothly
+                        const assumedBps = (assumedMbps * 1000 * 1000) / 8;
+                        const totalBytes = vm.sizeBytes || (40 * 1024 * 1024 * 1024);
+                        const uploaded = elapsedSec * assumedBps;
+                        const remainBytes = Math.max(0, totalBytes - uploaded);
+                        const remainSec = remainBytes / assumedBps;
+                        const mins = Math.floor(remainSec / 60);
+                        const secs = Math.floor(remainSec % 60);
+                        cellHtml = `
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:6px; border:1px solid rgba(56,189,248,0.4);">
+                            <div style="color:#38bdf8; font-family:'Share Tech Mono'; font-size: 11px; text-shadow: 0 0 5px #38bdf8;">T-${mins}m ${secs.toString().padStart(2, '0')}s</div>
+                            <div style="color:#4ade80; font-family:'Share Tech Mono'; font-size: 10px; opacity:0.9;">${assumedMbps.toFixed(1)} Mbps</div>
+                        </div>`;
+                    }
+                    rows += `<td style="padding:10px;text-align:center;">${cellHtml}</td>`;
+                });
+                rows += '</tr>';
+            }
             tbody.innerHTML = rows;
         },
 
@@ -3867,11 +4255,11 @@
                 const dir = (state._sortCol === col && state._sortDir === 'asc') ? 'desc' : 'asc';
                 state._sortCol = col;
                 state._sortDir = dir;
-                
+
                 state.filtered.sort((a, b) => {
                     let valA = (a[col] || '').toString().toLowerCase();
                     let valB = (b[col] || '').toString().toLowerCase();
-                    
+
                     // Handle special calculated/injected fields
                     if (col === 'SSH User') {
                         valA = (a.ssh_user || '').toString().toLowerCase();
@@ -3883,7 +4271,7 @@
                         valA = (a.Source || '').toString().toLowerCase();
                         valB = (b.Source || '').toString().toLowerCase();
                     }
-                    
+
                     if (valA < valB) return dir === 'asc' ? -1 : 1;
                     if (valA > valB) return dir === 'asc' ? 1 : -1;
                     return 0;
@@ -3896,13 +4284,13 @@
             let thead = '<thead><tr>';
             const checkAllId = isBlock ? 'checkAllBlocks' : 'checkAllFlavors';
             thead += `<th style="width:40px;position:sticky;left:0;background:#23315e;z-index:3;border-right:1px solid rgba(184,196,255,0.2);"><input type="checkbox" id="${checkAllId}"></th>`;
-            
+
             const th = (label, colKey, style) => {
                 const isCurrent = state._sortCol === colKey;
                 const arrow = isCurrent ? (state._sortDir === 'asc' ? ' ↑' : ' ↓') : '';
                 return `<th style="cursor:pointer; ${style}" onclick="_sortAdvTable.'${state === flavorState ? 'flavor' : 'block'}'.'${colKey}')">${label}${arrow}</th>`;
             };
-            
+
             // Redefine sort function to be more robust
             window._sortAdvTable = (stateName, colKey) => {
                 const targetState = stateName === 'flavor' ? flavorState : blockState;
@@ -3919,7 +4307,7 @@
                 thead += `<th style="color:#38bdf8;min-width:80px;background:#23315e;cursor:pointer;" onclick="window._sortAdvTable('${isBlock?'block':'flavor'}','Source')">Source${state._sortCol==='Source'?(state._sortDir==='asc'?' ↑':' ↓'):''}</th>`;
                 thead += `<th style="color:#f43f5e;min-width:70px;background:#23315e;text-align:center;" title="Check this to force-delete old qcow2 files on the Jumphost">Fresh Sync</th>`;
             }
-            
+
             visibleHeaders.forEach(h => {
                 const isCurrent = state._sortCol === h;
                 const arrow = isCurrent ? (state._sortDir === 'asc' ? ' ↑' : ' ↓') : '';
@@ -3930,7 +4318,7 @@
                 thead += `<th style="color:#a78bfa;min-width:160px;background:#23315e;cursor:pointer;" onclick="window._sortAdvTable('${isBlock?'block':'flavor'}','Target Flavor')">Target Flavor${state._sortCol==='Target Flavor'?(state._sortDir==='asc'?' ↑':' ↓'):''}</th>`;
             }
             thead += '</tr></thead>';
-            
+
             // Generate Rows
             let tbody = '<tbody>';
             const cname = isBlock ? 'vol-checkbox' : 'vm-checkbox';
@@ -3939,7 +4327,7 @@
                 tbody += manualRow
                     ? '<tr style="background:rgba(250,204,21,0.15);border-left:3px solid #facc15;outline:1px solid rgba(250,204,21,0.25);">'
                     : '<tr>';
-                
+
                 // Inject the mandatory Checkboxes the backend API hunts for (Data attributes bind the row identifiers mapping)
                 const sname = row.source_server_name || row.server_name || row.name || row.source_volume_id || "Unknown";
                 const tname = row.target_server_name || row.server_name || "Unknown";
@@ -3950,7 +4338,7 @@
                     row.flavor || row.flavor_name || row.flavor_id ||
                     row.destination_flavor || row.mapped_flavor || ''
                 ).trim() || "Unknown";
-                
+
                 // Plumb intrinsic OpenStack Source IPs straight into DOM array if utilizing overview.csv inventory overrides
                 // Always prefer IPv4 — skip any IPv6 addresses (contain ':')
                 let sourceIp = "";
@@ -3982,11 +4370,11 @@
                 }
 
                 tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-source-name="${escapeHTML(sname)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
-                
+
                 // SSH User editable cell (injected before CSV columns)
                 if (!isBlock) {
                     tbody += `<td style="background:rgba(217,70,239,0.07);border-right:1px solid rgba(184,196,255,0.1);">
-                        <select class="os-family-cell" data-source-name="${escapeHTML(sname)}" style="background:#0f172a;color:#d946ef;border:1px solid #334155;border-radius:4px;padding:2px;font-size:0.75rem;" 
+                        <select class="os-family-cell" data-source-name="${escapeHTML(sname)}" style="background:#0f172a;color:#d946ef;border:1px solid #334155;border-radius:4px;padding:2px;font-size:0.75rem;"
                         onchange="const cb=document.querySelector('.vm-checkbox[data-source-name=\'${escapeHTML(sname)}\']'); if(cb) cb.dataset.osFamily=this.value; updateVmRowAuthData('${escapeHTML(sname)}','os_family',this.value);">
                           <option value="linux" ${osF==='linux'?'selected':''}>Linux</option>
                           <option value="windows" ${osF==='windows'?'selected':''}>Windows</option>
@@ -4051,10 +4439,10 @@
                             ? 'color:#4ade80;background:rgba(74,222,128,0.08);'
                             : 'color:#38bdf8;background:rgba(56,189,248,0.06);';
                     tbody += `<td style="text-align:center;font-size:0.75rem;font-weight:600;${srcStyle}">${srcLabel}</td>`;
-                    
+
                     // Force Fresh Sync Checkbox
                     tbody += `<td style="text-align:center;background:rgba(244,63,94,0.05);border-right:1px solid rgba(244,63,94,0.1);">
-                        <input type="checkbox" class="force-sync-cb" style="cursor:pointer;" title="Delete old qcow2 and re-download" 
+                        <input type="checkbox" class="force-sync-cb" style="cursor:pointer;" title="Delete old qcow2 and re-download"
                             onchange="const cb=document.querySelector('.vm-checkbox[data-source-name=\\'${escapeHTML(sname)}\\']'); if(cb) cb.dataset.forceSync=this.checked;">
                     </td>`;
                 }
@@ -4116,7 +4504,7 @@
                         if(state.filtered[rIdx]) {
                             const updatedContent = this.textContent.replace(/\\n/g, '').trim();
                             state.filtered[rIdx][colName] = updatedContent;
-                            // Make sure to propagate the edit back to the original payload queue 
+                            // Make sure to propagate the edit back to the original payload queue
                             const origMatch = state.rows.find(or => or === state.filtered[rIdx]);
                             if (origMatch) origMatch[colName] = updatedContent;
                         }
@@ -4133,7 +4521,7 @@
                 complete: function(results) {
                     document.getElementById(containerId).style.display = 'block';
                     state.headers = results.meta.fields || [];
-                    
+
                     // Inject TCO Columns automatically if this is the Flavor mapper
                     if (!isBlock) {
                         if (!state.headers.includes("TCO_OSPC_Estimate")) state.headers.push("TCO_OSPC_Estimate");
@@ -4141,7 +4529,7 @@
                     }
 
                     state.rows = results.data;
-                    
+
                     // Pre-fill default estimates if empty
                     if (!isBlock) {
                         state.rows.forEach(r => {
@@ -4615,7 +5003,7 @@
             const targetFormat = g('target_format')               || 'qcow2';
             const visibility   = g('visibility')                  || 'private';
             const extNet       = g('flex_external_network_name') || g('flex_external_network_input') || 'PUBLICNET';
-            const bootTestVM   = gc('boot_test_vm');
+            const bootTestVM   = (document.getElementById('boot_test_vm') || {}).value === 'on';
 
             // Read checked VMs from batch table (same source the batch processor uses)
             const checkedBoxes = Array.from(document.querySelectorAll('.vm-checkbox:checked'));
@@ -4826,7 +5214,7 @@
                 b.onmouseleave = () => b.style.transform = 'none';
                 b.onclick = onclick; return b;
             };
-            
+
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearImagePanelLog(id), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadImagePanelLog === 'function' ? downloadImagePanelLog(id) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
             actions.appendChild(mkHwBtn('PAUSE', 'Pause job', () => window.mbuxCtrlJob ? window.mbuxCtrlJob('image', 'pause', id) : null, '#451a03', '#fbbf24', '#f59e0b'));
@@ -4916,6 +5304,7 @@
         function appendImageLog(imageId, text) {
             const id = String(imageId || '').trim();
             if (!id) return;
+            if (String(text || '').includes('[RUN]')) return;
             if (typeof migTracker !== 'undefined' && migTracker.parseImageLog) migTracker.parseImageLog(id, text);
             syncJobTerminalFromLog('image', id, text);
 
@@ -4928,7 +5317,9 @@
 
             const panel = getOrCreateImagePanel(id, title);
             if (!panel) return;
-            panel.appendChild(buildJobTerminalLineElement('image', text));
+            const lineEl = buildJobTerminalLineElement('image', text);
+            if (!lineEl) return;
+            panel.appendChild(lineEl);
             panel.scrollTop = panel.scrollHeight;
         }
 
@@ -4996,7 +5387,7 @@
                 </div>
                 <div id="vm-panel-actions-${safeId}" style="display:flex; gap:12px; margin-top:8px; align-items:center; background:#18181b; padding:12px; border:2px solid #27272a; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,0.8);"></div>
             `;
-            
+
             container.appendChild(block);
 
             // Add hardware buttons
@@ -5010,7 +5401,7 @@
                 b.onmouseleave = () => b.style.transform = 'none';
                 b.onclick = onclick; return b;
             };
-            
+
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearVmPanelLog(vmName), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadVmPanelLog === 'function' ? downloadVmPanelLog(vmName) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
             actions.appendChild(mkHwBtn('PAUSE',  'Freeze worker (SIGSTOP)',        () => window.mbuxCtrlJob && window.mbuxCtrlJob('vm', 'pause',  vmName), '#451a03', '#fbbf24', '#f59e0b'));
@@ -5047,6 +5438,8 @@
             const ts = new Date().toLocaleTimeString();
             const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const safe = esc(text);
+
+            if (String(text || '').includes('[RUN]')) return null;
 
             if (text.includes('=== NBD Worker:')) {
                 el.innerHTML = `<span style="color:#fbff00; text-shadow:0 0 8px rgba(251,255,0,0.8); font-weight:bold;">${safe}</span>`;
@@ -5141,12 +5534,15 @@
 
         function appendVmLog(vmName, text, _type) {
             // Feed the migration progress tracker
+            if (String(text || '').includes('[RUN]')) return;
             if (typeof migTracker !== 'undefined' && migTracker.vms[vmName]) migTracker.parseLog(vmName, text);
             if (getBatchJobState(vmName).panelClosed) return;
             syncJobTerminalFromLog('vm', vmName, text);
             const panel = getOrCreateVmPanel(vmName);
             if (!panel) { appendLog('[' + vmName + '] ' + text, 'info'); return; }
-            panel.appendChild(buildJobTerminalLineElement('vm', text));
+            const lineEl = buildJobTerminalLineElement('vm', text);
+            if (!lineEl) return;
+            panel.appendChild(lineEl);
             panel.scrollTop = panel.scrollHeight;
         }
 
@@ -5189,10 +5585,10 @@
                     }
                 }
             }
-            
+
             const stateStr = status === 'success' ? 'completed successfully' : 'failed';
             const speakText = `Job ${vmName} ${stateStr}. It took ${readableTime} to complete.`;
-            
+
             if (typeof jarvisAnnounce === 'function') {
                 jarvisAnnounce(speakText);
             } else if ('speechSynthesis' in window) {
@@ -5435,7 +5831,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 ospc_username: document.getElementById('ospc_cloud_user')?.value || '',
                 ospc_apikey:   document.getElementById('ospc_cloud_key')?.value || '',
                 ospc_account_id: document.getElementById('ospc_cloud_account')?.value || '',
-                ospc_region: 'IAD',
+                ospc_region: (document.getElementById('ospc_cloud_region') || document.getElementById('jh_region_select') || {}).value || 'IAD',
                 flex_auth_url:       document.getElementById('credFlexAuthUrl')?.value || '',
                 flex_username:        document.getElementById('credFlexUsername')?.value || '',
                 flex_password:        document.getElementById('credFlexPassword')?.value || '',
@@ -5453,10 +5849,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 visibility: document.getElementById('visibility').value,
                 dry_run: false,
                 cleanup_snapshot: false,
-                boot_test_vm: document.getElementById('boot_test_vm').checked,
+                boot_test_vm: (document.getElementById('boot_test_vm') || {}).value === 'on',
                 keep_export: document.getElementById('keep_export') ? document.getElementById('keep_export').checked : false,
                 flex_network_id: document.getElementById('flex_network_id').value,
                 flex_key_name: document.getElementById('flex_key_name').value,
+                flex_flavor: document.getElementById('flex_flavor_fallback') ? document.getElementById('flex_flavor_fallback').value : '',
                 repair_guest: true,
                 ssh_key_path: document.getElementById('process_ssh_key') ? document.getElementById('process_ssh_key').value : '',
                 ssh_user: document.getElementById('process_ssh_user') ? document.getElementById('process_ssh_user').value || 'ubuntu' : 'ubuntu',
@@ -5495,7 +5892,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 getOrCreateVmPanel(
                     cb.dataset.sourceName,
                     cb.dataset.sourceIp || '',
-                    cb.dataset.flavor   || ''
+                    cb.dataset.flavor || payload.flex_flavor || ''
                 );
             });
 
@@ -5529,7 +5926,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     if (!isVmBatchRunning) return;
                     const sName = cb.dataset.sourceName;
                     const srcIp = cb.dataset.sourceIp || '';
-                    const flavor = cb.dataset.flavor;
+                    const flavor = cb.dataset.flavor || payload.flex_flavor || '';
                     const vmSshUser = cb.dataset.sshUser || '';
                     const vmSshKey = cb.dataset.sshKey || '';
                     const vmPassword = cb.dataset.password || '';
@@ -5547,7 +5944,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             username:   document.getElementById('ospc_cloud_user')?.value || '',
                             apikey:     document.getElementById('ospc_cloud_key')?.value || '',
                             account_id: document.getElementById('ospc_cloud_account')?.value || '',
-                            region:     document.getElementById('ospc_cloud_region')?.value || 'IAD',
+                            region:     document.getElementById('ospc_cloud_region')?.value || document.getElementById('jh_region_select')?.value || 'IAD',
                             auth_url:   'https://identity.api.rackspacecloud.com/v2.0/'
                         },
                         dry_run:       document.getElementById('mig_mode_value').value === 'dryrun',
@@ -5678,7 +6075,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const vmSshUser = cb.dataset.sshUser || null;
                 const vmSshKey = cb.dataset.sshKey || null;
                 const vmPassword = cb.dataset.password || null;
-                
+
                 appendLog(`► BATCH [${i+1}/${checkedVMs.length}]: Dispatching VM '${sName}' -> FLEX '${tName}' with flavor '${flavor}'...`, 'system');
 
                 // Clone payload and inject VM specifics
@@ -5693,7 +6090,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 if (vmSshKey) payload.origin_vm_ssh_key = vmSshKey;
                 if (vmPassword) payload.origin_vm_password = vmPassword;
                 payload.test_server_name = (tName && tName !== 'Unknown') ? tName + "-lift-test" : "OSPC2FLEX-TEST-VM";
-                
+
                 setVmStatus(sName, 'running');
                 let reader = null;
                 const jobState = resetBatchJobState(sName, 'standard');
@@ -5741,7 +6138,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             }
                         });
                     }
-                    
+
                     if (isVmBatchRunning && !jobState.disconnectReason) {
                         appendLog(`✔ Finished processing VM: ${sName}`, 'system');
                         setVmStatus(sName, 'success');
@@ -5826,7 +6223,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 } else {
                     jarvisAnnounce("Initializing Image Migration Batch.");
                 }
-                
+
                 // Fire without queuing
                 imageBatchInner(btn).catch(e => {
                     console.error("Image batch error:", e);
@@ -5912,7 +6309,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 ospc_username:    ospcUser,
                 ospc_apikey:      ospcApiKey,
                 ospc_account_id:  ospcTenant,
-                ospc_region:      (region && region !== 'ALL') ? region : ((document.getElementById('ospc_cloud_region') || {}).value || ''),
+                ospc_region:      (region && region !== 'ALL') ? region : ((document.getElementById('ospc_cloud_region') || document.getElementById('jh_region_select') || {}).value || ''),
                 flex_username:    flexUser,
                 flex_password:    flexPass,
                 flex_app_cred_id: flexAppId,
@@ -5998,7 +6395,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             // Fire all concurrently — each streams to its own panel independently
             selected.forEach(r => streamOne(r));
         }
-        
+
         // Auto-save & hydrate credentials via localStorage mapping
         const FIELD_DEFAULTS = {
             'flex_key_name': 'laptopubuntu24',
@@ -6019,8 +6416,10 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             'ospc_cloud_user', 'ospc_cloud_key', 'ospc_cloud_account',
             'credFlexAuthUrl', 'credFlexUsername', 'credFlexPassword', 'credFlexProjectId', 'credFlexDomain',
             'flex_network_id', 'flex_key_name', 'flex_key_name_quick', 'flex_external_network_name',
-            'process_host_ip', 'workdir', 'process_ssh_user', 'process_ssh_key',
-            'nbd_jumphost_ip', 'nbd_jumphost_user', 'nbd_jumphost_key'
+            'workdir'
+            // NOTE: jumphost fields (process_host_ip, process_ssh_user, process_ssh_key,
+            // nbd_jumphost_ip, nbd_jumphost_user, nbd_jumphost_key) are now managed by the
+            // per-region jumphost dropdown system (jh_region_configs in localStorage).
         ];
         credIds.forEach(id => {
             const el = document.getElementById(id);
@@ -6089,11 +6488,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const fileInput = document.getElementById('inventory_csv_for_discovery');
                 const file = fileInput.files[0];
                 if(!file) { alert("Please select an Inventory or Overview CSV first to provide IPs."); return; }
-                
+
                 const originalText = osDiscBtn.textContent;
                 osDiscBtn.textContent = "Uploading & Parsing...";
                 osDiscBtn.disabled = true;
-                
+
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     try {
@@ -6104,7 +6503,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         });
                         const uploadData = await uploadRes.json();
                         if(!uploadData.ok) throw new Error("Upload failed: " + uploadData.error);
-                        
+
                         osDiscBtn.textContent = "Generating Scanner Script...";
                         const genRes = await fetch('/api/run/generate-app-dependencies', {
                             method: 'POST',
@@ -6112,14 +6511,14 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         });
                         const genData = await genRes.json();
                         if(!genData.ok) throw new Error("Generation failed: " + genData.error);
-                        
+
                         osDiscBtn.textContent = "Extracting via SSH (Takes time)...";
                         consoleOut.innerHTML = ''; // Clear terminal for Active OS scanner stream
                         appendLog("Starting Active OS Dependency Scanner. This will SSH into source servers...", 'system');
-                        
+
                         const scriptName = file.name.replace('.csv', '').replace('_overview', '').replace('_inventory', '') + '_active_dependency_scanner.sh';
                         const execRes = await fetch('/api/stream/execute-bash?script=uploads/' + scriptName);
-                        
+
                         const execReader = execRes.body.getReader();
                         const decoder = new TextDecoder();
                         while (true) {
@@ -6132,12 +6531,12 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                                 }
                             });
                         }
-                        
+
                         osDiscBtn.textContent = "Parsing Results...";
                         const parseRes = await fetch('/api/run/parse-active-logs');
                         const parseData = await parseRes.json();
                         if(!parseData.ok) throw new Error("Parse failed: " + parseData.error);
-                        
+
                         const tbody = document.getElementById('os-discovery-tbody');
                         tbody.innerHTML = '';
                         parseData.data.forEach(row => {
@@ -6486,7 +6885,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             username:   (document.getElementById('ospc_cloud_user')    || {}).value || '',
             apikey:     (document.getElementById('ospc_cloud_key')     || {}).value || '',
             account_id: (document.getElementById('ospc_cloud_account') || {}).value || '',
-            region:     (document.getElementById('ospc_cloud_region')  || {}).value || 'IAD',
+            region:     (document.getElementById('ospc_cloud_region') || document.getElementById('jh_region_select') || {}).value || 'IAD',
             auth_url:   'https://identity.api.rackspacecloud.com/v2.0/',
         };
     }
@@ -6616,7 +7015,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 window._activeJobSizes[label] = parseFloat(m[1]);
             }
         }
-        
+
         const body = document.getElementById(`nbd-term-body-${label}`);
         if (!body) return;
         const el = document.createElement('div');
@@ -6735,9 +7134,9 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
     async function nbdLaunch() {
         const vms = nbdGetVms();
         if (!vms.length) { alert('Add at least one VM row before launching.'); return; }
-        
+
         const jh = nbdGetJumphostParams();
-        
+
         const flexCreds= nbdGetFlexCreds();
         const ospcCreds= nbdGetOspcCreds();
         const btn      = document.getElementById('nbd-launch-btn');
@@ -6792,7 +7191,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const statusIcon = job.status === 'Running' ? '⣾' : '⏺';
                 const size = job.size || '--';
                 const typeLabel = job.type || 'STAGING';
-                
+
                 // Get last line
                 const lastLine = job.lines.length > 0 ? job.lines[job.lines.length-1].trim() : 'Waiting for output...';
 
@@ -6814,7 +7213,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             });
         }
         tbody.innerHTML = html;
-        
+
         // Auto-show panel if there are active jobs or files
         if (labels.length > 0) {
              const progressPanel = document.getElementById('mig-progress-panel');
@@ -6830,7 +7229,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             try {
                 const r = await fetch(`/api/vm_migrator/nbd/status?jumphost_ip=${encodeURIComponent(jh.jumphost_ip)}&jumphost_user=${encodeURIComponent(jh.jumphost_user)}&ssh_key=${encodeURIComponent(jh.ssh_key_path)}`);
                 const d = await r.json();
-                
+
                 // 1. Render the legacy results div if it exists
                 const resDiv = document.getElementById('nbd-results');
                 if (resDiv && d.results && d.results.length) {
@@ -7014,7 +7413,7 @@ function openAddVmModal() {
     modal.style.alignItems = 'center';
     modal.style.paddingTop = '0';
     modal.style.display = 'flex';
-    
+
     notifyParentModalLock(true);
 }
 
@@ -7116,9 +7515,80 @@ function deleteSelectedVMs() {
         const manuals = flavorState.rows.filter(r => r._manually_added);
         localStorage.setItem('ospc2flex_manual_vms', JSON.stringify(manuals));
     } catch(e){}
-    
+
     if (window._renderAdvTable) {
         window._renderAdvTable(flavorState, 'flavor-table', 'mapperRowCount', false);
+    }
+}
+// ── Apollo Theme Space Beep ──
+let spaceBeepEnabled = false;
+let audioCtx = null;
+let beepInterval = null;
+window.EAGLE_AUDIO = new Audio('/static/eaglelandeshort.mp3');
+window.EAGLE_AUDIO.volume = 0.8;
+
+function toggleSpaceBeep() {
+    spaceBeepEnabled = !spaceBeepEnabled;
+    const btn = document.getElementById('soundToggleBtn');
+    if (spaceBeepEnabled) {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        btn.innerText = '🔇 Sound Off';
+        btn.style.color = '#f87171';
+        btn.style.borderColor = '#ef4444';
+        btn.style.boxShadow = '0 0 10px rgba(239,68,68,0.5)';
+        if (!beepInterval) {
+            beepInterval = setInterval(playApolloPulse, 2000);
+        }
+    } else {
+        btn.innerText = '🔊 Sound On';
+        btn.style.color = '#60a5fa';
+        btn.style.borderColor = '#3b82f6';
+        btn.style.boxShadow = '0 0 5px rgba(59,130,246,0.3)';
+        if (beepInterval) {
+            clearInterval(beepInterval);
+            beepInterval = null;
+        }
+        if (window.EAGLE_AUDIO && !window.EAGLE_AUDIO.paused) {
+            window.EAGLE_AUDIO.pause();
+            window.EAGLE_AUDIO.currentTime = 0;
+        }
+    }
+}
+
+function toggleTheme() {
+    const isApollo = document.body.classList.toggle('theme-apollo');
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        if (isApollo) {
+            btn.innerHTML = '🕺 Sweet 70s';
+        } else {
+            btn.innerHTML = '🚀 Toggle Apollo Theme';
+        }
+    });
+    if (typeof migTracker !== 'undefined' && migTracker.render) migTracker.render();
+}
+function playApolloPulse() {
+    if (!document.body.classList.contains('theme-apollo')) return;
+
+    // Check if any job is actively migrating
+    let isActive = false;
+    if (window.migTracker) {
+        const vms = Object.values(window.migTracker.vms || {});
+        const imgs = Object.values(window.migTracker.images || {});
+        isActive = vms.some(v => v.status === 'active' || v.status === 'running') || imgs.some(i => i.status === 'active' || i.status === 'running');
+    }
+
+    if (isActive && audioCtx) {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime); // High pitch telemetry ping
+        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
     }
 }
 </script>

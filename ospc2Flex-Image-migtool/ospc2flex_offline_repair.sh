@@ -257,7 +257,9 @@ case "$OS_ID_FROM_ARG" in
   almalinux|rocky)
     ROOT_PART=""; ROOT_FSTYPE="xfs"
     ;;
-  centos|rhel) ROOT_PART="${NBD_DEV}p1"; ROOT_FSTYPE="xfs" ;;  # CentOS7/RHEL may be xfs-backed
+  centos|rhel)
+    ROOT_PART=""; ROOT_FSTYPE="xfs"
+    ;;
   *)
     ROOT_PART=""
     WARN "No OS type recognized — relying on auto-detect"
@@ -266,7 +268,7 @@ esac
   if [ -z "${ROOT_PART}" ] || ! test -b "${ROOT_PART}" 2>/dev/null; then
     WARN "Scanning partition table for largest Linux filesystem..."
     BEST_PART=""; BEST_FSTYPE=""; BEST_SIZE=0
-    for _p in $(lsblk -lnpo NAME,TYPE "${NBD_DEV}" 2>/dev/null | awk '$2=="part"{print $1}'); do
+    for _p in $(lsblk -lnpo NAME,TYPE "${NBD_DEV}" 2>/dev/null | awk '($2=="part" || $2=="disk"){print $1}'); do
       _type=$(sudo blkid -o value -s TYPE "${_p}" 2>/dev/null); [ -z "${_type}" ] && continue
       [[ "${_type}" == "vfat" || "${_type}" == "swap" || "${_type}" == "LVM2_member" ]] && continue
       _sz=$(lsblk -lnpo SIZE -b "${_p}" 2>/dev/null | tr -d ' '); _sz=${_sz:-0}
@@ -898,6 +900,14 @@ IFCFG7_EOF
         # Disable NetworkManager-wait-online (causes 90s boot hang when DHCP is slow)
         sudo ln -sf /dev/null "$MNT/etc/systemd/system/NetworkManager-wait-online.service" 2>/dev/null || true
         PASS "Masked NetworkManager-wait-online.service (prevents 90s DHCP timeout hang)"
+
+        # RHEL 6: chkconfig NetworkManager off. C7: must not start NM alongside network.service
+        # (race → eth0 down / no DHCP). Mask NM like NetworkManager-wait-online — no host systemctl needed.
+        sudo rm -f "$MNT/etc/systemd/system/multi-user.target.wants/NetworkManager.service" 2>/dev/null || true
+        sudo rm -f "$MNT/etc/systemd/system/dbus-org.freedesktop.NetworkManager.service" 2>/dev/null || true
+        sudo rm -f "$MNT/etc/systemd/system/graphical.target.wants/NetworkManager.service" 2>/dev/null || true
+        sudo ln -sf /dev/null "$MNT/etc/systemd/system/NetworkManager.service" 2>/dev/null || true
+        PASS "Masked NetworkManager.service (legacy network.service owns eth0)"
       fi
 
     else
@@ -1172,18 +1182,10 @@ IFCFG7_EOF
           sudo sed -i 's|root=/dev/xvda|root=/dev/vda|g' "$_real_gc"
           # Remove rhgb quiet (hides console output on FLEX serial console)
           sudo sed -i 's/ rhgb//g; s/ quiet//g' "$_real_gc"
-          # Add biosdevname=0 to kernel line (forces eth0 naming; net.ifnames not in 2.6.32)
-          if ! sudo grep -q 'biosdevname=0' "$_real_gc"; then
-            sudo sed -i '/^\s*kernel .*vmlinuz/s/$/ biosdevname=0/' "$_real_gc"
-          fi
-          # Add console=ttyS0 (FLEX serial console / OpenStack console log)
-          if ! sudo grep -q 'console=ttyS0' "$_real_gc"; then
-            sudo sed -i '/^\s*kernel .*vmlinuz/s/$/ console=ttyS0,115200 console=tty0/' "$_real_gc"
-          fi
-          # Add no_timer_check (suppresses KVM timer calibration noise on 2.6.32)
-          if ! sudo grep -q 'no_timer_check' "$_real_gc"; then
-            sudo sed -i '/^\s*kernel .*vmlinuz/s/$/ no_timer_check/' "$_real_gc"
-          fi
+          # Strip any existing copies of FLEX params (idempotent — prevents 4x duplication on re-run)
+          sudo sed -i '/^\s*kernel .*vmlinuz/{ s/biosdevname=[01]//g; s/no_timer_check//g; s/console=ttyS0[^ ]*//g; s/console=tty0//g; s/  */ /g; s/ $//; }' "$_real_gc"
+          # Append FLEX params once cleanly
+          sudo sed -i '/^\s*kernel .*vmlinuz/s/$/ biosdevname=0 console=ttyS0,115200 console=tty0 no_timer_check/' "$_real_gc"
           PASS "Patched GRUB Legacy grub.conf: root=vda + biosdevname=0 + console=ttyS0 + no_timer_check"
           INFO "$(basename $_gc) kernel line: $(sudo grep '^\s*kernel ' "$_real_gc" | head -1)"
           _patched_grubconf=1

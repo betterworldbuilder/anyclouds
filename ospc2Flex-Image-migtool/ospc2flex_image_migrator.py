@@ -30,12 +30,13 @@ def shell_quote(s: str) -> str:
     return shlex.quote(str(s))
 
 
-def run(cmd, *, dry_run: bool = False, capture: bool = True, check: bool = True) -> str:
+def run(cmd, *, dry_run: bool = False, capture: bool = True, check: bool = True, log_cmd: bool = True) -> str:
     if isinstance(cmd, str):
         cmd_str = cmd
     else:
         cmd_str = " ".join(str(c) for c in cmd)
-    log(f"[RUN] {cmd_str}")
+    if log_cmd:
+        log(f"[RUN] {cmd_str}")
     if dry_run:
         return ""
     result = subprocess.run(
@@ -51,14 +52,195 @@ def run(cmd, *, dry_run: bool = False, capture: bool = True, check: bool = True)
     else:
         if result.returncode != 0 and check:
             print(f"\n[EXECUTION ERROR] Command failed with code {result.returncode}")
-            print(f"STDOUT:\n{result.stdout or ''}")
-            print(f"STDERR:\n{result.stderr or ''}")
-            raise RuntimeError(f"Command failed ({result.returncode}): {cmd_str}")
+            if result.stdout:
+                print(f"STDOUT:\n{result.stdout}")
+            if result.stderr:
+                print(f"STDERR:\n{result.stderr}")
+            raise RuntimeError(f"Command failed ({result.returncode})")
         return ""
 
 
 def openstack_cmd(openrc_path: str, cmd: str) -> str:
     return f"bash -lc {shell_quote(f'source {openrc_path} && {cmd}')}"
+
+
+def _to_int(value) -> int:
+    try:
+        return int(str(value).strip())
+    except Exception:
+        return 0
+
+
+def resolve_target_flavor_with_fallback(
+    *,
+    flex_openrc: str,
+    requested_flavor: str,
+    source_vcpus: int = 0,
+    source_ram_mb: int = 0,
+    source_disk_gb: int = 0,
+    dry_run: bool = False,
+) -> str:
+    req = (requested_flavor or "").strip()
+    if dry_run:
+        return req
+    if req:
+        ok = run(
+            openstack_cmd(flex_openrc, f"openstack flavor show {shell_quote(req)} -f value -c id"),
+            capture=True, check=False, dry_run=False, log_cmd=False,
+        )
+        if ok.strip():
+            log(f"[INFO] Target flavor exists: {req}")
+            return req
+        log(f"[WARN] Requested target flavor not found in this region: {req}")
+
+    rows_json = run(
+        openstack_cmd(
+            flex_openrc,
+            "openstack flavor list --long -f json -c ID -c Name -c RAM -c Disk -c VCPUs",
+        ),
+        capture=True, check=False, dry_run=False, log_cmd=False,
+    )
+    try:
+        rows = json.loads(rows_json or "[]")
+    except Exception:
+        rows = []
+    candidates = []
+    for r in rows:
+        fid = str(r.get("ID", "")).strip()
+        name = str(r.get("Name", "")).strip()
+        ram = _to_int(r.get("RAM", 0))
+        disk = _to_int(r.get("Disk", 0))
+        vcpus = _to_int(r.get("VCPUs", 0))
+        if fid and ram > 0 and vcpus > 0:
+            candidates.append({"id": fid, "name": name, "ram": ram, "disk": disk, "vcpus": vcpus})
+    if not candidates:
+        return req
+
+    source_vcpus = _to_int(source_vcpus)
+    source_ram_mb = _to_int(source_ram_mb)
+    source_disk_gb = _to_int(source_disk_gb)
+    # Enforce disk-aware pick: same disk size as source or next bigger.
+    # Also avoid zero-disk flavors unless absolutely no alternatives exist.
+    non_zero = [c for c in candidates if c["disk"] > 0]
+    pool = non_zero or candidates
+
+    if source_disk_gb > 0:
+        disk_fit = [c for c in pool if c["disk"] >= source_disk_gb]
+        if disk_fit:
+            pool = disk_fit
+        else:
+            log(f"[WARN] No target flavor has disk >= source disk ({source_disk_gb} GiB); using largest available disk candidate")
+            pool = sorted(pool, key=lambda c: c["disk"], reverse=True)
+
+    chosen = None
+    if source_vcpus > 0 and source_ram_mb > 0:
+        shape_fit = [c for c in pool if c["vcpus"] >= source_vcpus and c["ram"] >= source_ram_mb]
+        if shape_fit:
+            chosen = min(
+                shape_fit,
+                key=lambda c: (
+                    c["disk"] - source_disk_gb if source_disk_gb > 0 else c["disk"],
+                    c["vcpus"] - source_vcpus,
+                    c["ram"] - source_ram_mb,
+                ),
+            )
+    if chosen is None:
+        if source_disk_gb > 0:
+            chosen = min(pool, key=lambda c: (abs(c["disk"] - source_disk_gb), c["vcpus"], c["ram"]))
+        else:
+            chosen = min(pool, key=lambda c: (c["disk"], c["vcpus"], c["ram"]))
+    log(
+        f"[INFO] Auto-selected target flavor: {chosen['id']} ({chosen['name']}) "
+        f"vcpu={chosen['vcpus']} ram={chosen['ram']} disk={chosen['disk']} "
+        f"source={source_vcpus or '?'}:{source_ram_mb or '?'}:{source_disk_gb or '?'}"
+    )
+    return chosen["id"]
+
+
+def resolve_target_network_with_fallback(
+    *,
+    flex_openrc: str,
+    requested_network: str,
+    dry_run: bool = False,
+) -> str:
+    req = (requested_network or "").strip()
+    if dry_run:
+        return req
+    if req:
+        ok = run(
+            openstack_cmd(flex_openrc, f"openstack network show {shell_quote(req)} -f value -c id"),
+            capture=True, check=False, dry_run=False, log_cmd=False,
+        )
+        if ok.strip():
+            log(f"[INFO] Target network exists: {req}")
+            return req
+        log(f"[WARN] Requested target network not found in this region: {req}")
+
+    rows_json = run(
+        openstack_cmd(
+            flex_openrc,
+            "openstack network list -f json -c ID -c Name",
+        ),
+        capture=True, check=False, dry_run=False, log_cmd=False,
+    )
+    try:
+        rows = json.loads(rows_json or "[]")
+    except Exception:
+        rows = []
+    candidates = []
+    for r in rows:
+        nid = str(r.get("ID", "")).strip()
+        name = str(r.get("Name", "")).strip()
+        if nid:
+            candidates.append({"id": nid, "name": name})
+    if not candidates:
+        return req
+
+    preferred = None
+    for c in candidates:
+        lname = c["name"].lower()
+        if any(x in lname for x in ("private", "tenant", "internal")):
+            preferred = c
+            break
+    chosen = preferred or candidates[0]
+    log(f"[INFO] Auto-selected target network: {chosen['id']} ({chosen['name'] or '?'})")
+    return chosen["id"]
+
+
+def resolve_target_keypair_with_fallback(
+    *,
+    flex_openrc: str,
+    requested_keypair: str,
+    dry_run: bool = False,
+) -> str:
+    req = (requested_keypair or "").strip()
+    if dry_run:
+        return req
+    if req:
+        ok = run(
+            openstack_cmd(flex_openrc, f"openstack keypair show {shell_quote(req)} -f value -c name"),
+            capture=True, check=False, dry_run=False, log_cmd=False,
+        )
+        if ok.strip():
+            log(f"[INFO] Target keypair exists: {req}")
+            return req
+        log(f"[WARN] Requested target keypair not found in this region: {req}")
+
+    kp_list = run(
+        openstack_cmd(flex_openrc, "openstack keypair list -f value -c Name"),
+        capture=True, check=False, dry_run=False, log_cmd=False,
+    )
+    first = ""
+    for line in (kp_list or "").splitlines():
+        val = line.strip()
+        if val:
+            first = val
+            break
+    if first:
+        log(f"[INFO] Auto-selected target keypair: {first}")
+        return first
+    log("[WARN] No keypairs found in target project; booting without --key-name")
+    return ""
 
 
 def ssh_base_cmd(key: str, user: str, host: str, port: int = 22) -> str:
@@ -221,6 +403,11 @@ def build_remote_export_script(
     offline_repair_method: str = "custom_os",
     # Same profile tokens as ospc2flex_glance_image_migrator / ospc2flex_repair_os_hint.py
     repair_os_type: str = "",
+    cloud_files_fallback: bool = True,
+    prefer_cloud_files_download: bool = True,
+    ospc_cloud_files_container: str = "ospc2flex-export",
+    flex_cloud_files_container: str = "ospc2flex-staging",
+    glance_bridge_path: str = "/tmp/ospc2flex_glance_bridge.sh",
 ) -> str:
     """Generate the bash script that runs on the processing host (external or origin VM)."""
 
@@ -481,306 +668,102 @@ stage_done 3
     else:
         script += f"""\
 # ── STAGE 3: Download OSPC Snapshot ──────────────────────────────────────────
-stage_start 3 'Download OSPC Snapshot' 'Export snapshot to Cloud Files then download via ServiceNet'
+stage_start 3 'Download OSPC Snapshot' 'Prefer Glance export → Cloud Files → same-region jumphost'
 log '  Sourcing OSPC credentials...'
 source {shell_quote(ospc_openrc_path)}
-OS_USERNAME="${{OS_USERNAME:-}}"
-OS_PASSWORD="${{OS_PASSWORD:-}}"
-OS_API_KEY="${{OS_API_KEY:-${{OS_PASSWORD:-}}}}"
-OS_REGION_NAME="${{OS_REGION_NAME:-IAD}}"
-export OS_USERNAME OS_PASSWORD OS_API_KEY OS_REGION_NAME
-log '  Acquiring OSPC Keystone token + service catalog...'
-SWIFT_SNET_URL=""
-SWIFT_PUB_URL=""
-GLANCE_PUB_URL=""
-# Always re-auth with RAX apikey to obtain a fresh token + full service catalog
-# (openrc may carry a stale OS_TOKEN that has no catalog → Swift URLs stay empty)
-_AUTH_RESP=""
-if [ -n "${{OS_USERNAME:-}}" ] && [ -n "${{OS_API_KEY:-}}" ]; then
-  log '  [INFO] Performing RAX apikey auth to obtain token + service catalog...'
-  _AUTH_RESP=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
-    -H "Content-Type: application/json" \
-    -d "{{\\"auth\\":{{\\"RAX-KSKEY:apiKeyCredentials\\":{{\\"username\\":\\"$OS_USERNAME\\",\\"apiKey\\":\\"$OS_API_KEY\\"}}}}}}" 2>/dev/null || true)
-elif [ -n "${{OS_USERNAME:-}}" ] && [ -n "${{OS_PASSWORD:-}}" ]; then
-  log '  [INFO] Performing RAX password auth to obtain token + service catalog...'
-  _AUTH_RESP=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
-    -H "Content-Type: application/json" \
-    -d "{{\\"auth\\":{{\\"passwordCredentials\\":{{\\"username\\":\\"$OS_USERNAME\\",\\"password\\":\\"$OS_PASSWORD\\"}}}}}}" 2>/dev/null || true)
-fi
-if [ -n "$_AUTH_RESP" ]; then
+log '  Acquiring OSPC Keystone token...'
+# Try openstack CLI first; fall back to RAX apikey curl if it fails
+OS_TOKEN=$(openstack token issue -f value -c id 2>/dev/null || true)
+if [ -z "$OS_TOKEN" ] && [ -n "${{OS_USERNAME:-}}" ] && [ -n "${{OS_PASSWORD:-}}" ]; then
+  log '  [INFO] openstack token issue failed — trying RAX apikey auth...'
+  _AUTH_RESP=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \\
+    -H "Content-Type: application/json" \\
+    -d '{{"auth":{{"RAX-KSKEY:apiKeyCredentials":{{"username":"'"${{OS_USERNAME:-}}"'","apiKey":"'"${{OS_PASSWORD:-}}"'"}}}}}}' 2>/dev/null || true)
   OS_TOKEN=$(echo "$_AUTH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
-  eval $(echo "$_AUTH_RESP" | python3 -c '
-import sys, json
-d = json.load(sys.stdin)
-region = sys.argv[1]
-for sc in d["access"]["serviceCatalog"]:
-    for ep in sc["endpoints"]:
-        if ep.get("region") != region:
-            continue
-        if sc["name"] == "cloudFiles":
-            print("SWIFT_SNET_URL=" + chr(34) + ep.get("internalURL","") + chr(34))
-            print("SWIFT_PUB_URL=" + chr(34) + ep.get("publicURL","") + chr(34))
-        if sc["name"] in ("cloudImages", "cloudImagesV2"):
-            print("GLANCE_PUB_URL=" + chr(34) + ep.get("publicURL","") + chr(34))
-' "$OS_REGION_NAME" 2>/dev/null || true)
 fi
-# Last-resort: use token from openrc if re-auth failed
-OS_TOKEN="${{OS_TOKEN:-}}"
 if [ -z "$OS_TOKEN" ]; then
   stage_fail 3 'No OSPC token — check OSPC credentials'
 fi
-_rgl=$(echo "$OS_REGION_NAME" | tr '[:upper:]' '[:lower:]' | tr -d '0-9')
-[ -z "$_rgl" ] && _rgl="iad"
-[ -z "$GLANCE_PUB_URL" ] && GLANCE_PUB_URL="https://${{_rgl}}.images.api.rackspacecloud.com/v2"
-log "  [INFO] Glance public: $GLANCE_PUB_URL"
-log "  [INFO] Swift ServiceNet: $SWIFT_SNET_URL"
-log "  [INFO] Swift public: $SWIFT_PUB_URL"
-
+# Get IAD Glance endpoint from catalog
+OS_IMAGE_URL=$(openstack catalog show image -f json 2>/dev/null | python3 -c "
+import sys,json
+data=json.load(sys.stdin)
+eps=[e for e in data.get('endpoints',[]) if e.get('interface')=='public']
+print(eps[0]['url'].rstrip('/') if eps else '')
+" 2>/dev/null || true)
+if [ -z "$OS_IMAGE_URL" ]; then
+  log '  [WARN] Catalog lookup failed — using IAD Glance endpoint'
+  OS_IMAGE_URL="https://iad.images.api.rackspacecloud.com"
+fi
+IMG_DOWNLOAD_URL="$OS_IMAGE_URL/v2/images/{snap_id}/file"
+log "  Target: $IMG_DOWNLOAD_URL"
 success=0
-DOWNLOAD_METHOD=""
-LICENSED_RESTRICTED=0
-
-# ── Early licensing check — skip Glance/Cloud Files for restricted images ──────
-# Rackspace com.rackspace__1__options bit 2 (value contains 4) = export blocked
-_IMG_PROPS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" \
-  "$GLANCE_PUB_URL/images/{snap_id}" 2>/dev/null || true)
-_RAX_OPTIONS=$(echo "$_IMG_PROPS" | python3 -c \
-  "import sys,json; d=json.load(sys.stdin); print(d.get('com.rackspace__1__options','0'))" \
-  2>/dev/null || echo '0')
-if python3 -c "opts=int('$_RAX_OPTIONS' or 0); exit(0 if opts & 4 else 1)" 2>/dev/null; then
-  log "  [WARN] Image has Rackspace licensing restriction (com.rackspace__1__options=$_RAX_OPTIONS) — skipping Glance/Cloud-Files methods, going straight to Cinder volume (Method D)"
-  LICENSED_RESTRICTED=1
-fi
-
-# ── Method A: Export to Cloud Files, download via ServiceNet ─────────────────
-# Rackspace public Glance returns HTTP 413 on image file downloads (rate limit).
-# Cloud Files has a ServiceNet endpoint that bypasses this.
-# Flow: POST export task → poll → download VHD from Cloud Files via snet.
-_EXPORT_CONTAINER="ospc2flex_exports"
-_SWIFT_DL_URL=""
-if [ -n "$SWIFT_SNET_URL" ]; then
-  _SWIFT_DL_URL="$SWIFT_SNET_URL/$_EXPORT_CONTAINER"
-  log "  [INFO] Will download via ServiceNet: $_SWIFT_DL_URL"
-elif [ -n "$SWIFT_PUB_URL" ]; then
-  _SWIFT_DL_URL="$SWIFT_PUB_URL/$_EXPORT_CONTAINER"
-  log "  [INFO] No ServiceNet — will download via public Swift: $_SWIFT_DL_URL"
-fi
-
-if [ -n "$_SWIFT_DL_URL" ] && [ "$LICENSED_RESTRICTED" = "0" ]; then
-  log "  [INFO] Creating Cloud Files container: $_EXPORT_CONTAINER"
-  _CONTAINER_CREATE_URL="$SWIFT_SNET_URL/$_EXPORT_CONTAINER"
-  [ -z "$SWIFT_SNET_URL" ] && _CONTAINER_CREATE_URL="$SWIFT_PUB_URL/$_EXPORT_CONTAINER"
-  _CC_HTTP=$(curl -s -X PUT -o /dev/null -w '%{{http_code}}' \
-    -H "X-Auth-Token: $OS_TOKEN" \
-    "$_CONTAINER_CREATE_URL" 2>/dev/null || echo '000')
-  log "  [INFO] Container create: HTTP $_CC_HTTP"
-
-  log "  [INFO] Submitting Glance export task for image {snap_id}..."
-  _TASK_RESP=$(curl -s -X POST \
-    -H "X-Auth-Token: $OS_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "{{\\"type\\":\\"export\\",\\"input\\":{{\\"image_uuid\\":\\"{snap_id}\\",\\"receiving_swift_container\\":\\"$_EXPORT_CONTAINER\\"}}}}" \
-    "$GLANCE_PUB_URL/tasks" 2>/dev/null)
-  _TASK_ID=$(echo "$_TASK_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null || true)
-  _TASK_STATUS=$(echo "$_TASK_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
-
-  if [ -n "$_TASK_ID" ] && [ "$_TASK_STATUS" != "failure" ]; then
-    log "  [INFO] Export task submitted: $_TASK_ID (status=$_TASK_STATUS)"
-    log "  [INFO] Polling export task (timeout 30 min)..."
-    _EXPORT_DEADLINE=$(($(date +%s) + 1800))
-    _EXPORT_OK=0
-    while [ $(date +%s) -lt $_EXPORT_DEADLINE ]; do
-      sleep 15
-      _POLL_RESP=$(curl -s -H "X-Auth-Token: $OS_TOKEN" \
-        "$GLANCE_PUB_URL/tasks/$_TASK_ID" 2>/dev/null)
-      _POLL_STATUS=$(echo "$_POLL_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || true)
-      _POLL_MSG=$(echo "$_POLL_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || true)
-      log "  [INFO] Export task: status=$_POLL_STATUS"
-      if [ "$_POLL_STATUS" = "success" ]; then
-        _EXPORT_OK=1
-        break
-      elif [ "$_POLL_STATUS" = "failure" ]; then
-        log "  [WARN] Export task failed: $_POLL_MSG"
-        break
-      fi
-      # Refresh token periodically (Rackspace tokens expire ~24h but better safe)
-      if [ -n "${{OS_USERNAME:-}}" ] && [ -n "${{OS_API_KEY:-}}" ]; then
-        _REFRESH=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
-          -H "Content-Type: application/json" \
-          -d "{{\\"auth\\":{{\\"RAX-KSKEY:apiKeyCredentials\\":{{\\"username\\":\\"$OS_USERNAME\\",\\"apiKey\\":\\"$OS_API_KEY\\"}}}}}}" 2>/dev/null || true)
-        _NEW_TOKEN=$(echo "$_REFRESH" | python3 -c "import sys,json; print(json.load(sys.stdin)['access']['token']['id'])" 2>/dev/null || true)
-        [ -n "$_NEW_TOKEN" ] && OS_TOKEN="$_NEW_TOKEN"
-      fi
-    done
-
-    if [ $_EXPORT_OK -eq 1 ]; then
-      _EXPORT_FILE="{snap_id}.vhd"
-      _DL_URL="$_SWIFT_DL_URL/$_EXPORT_FILE"
-      log "  [INFO] Downloading exported image: $_DL_URL"
-      curl -s -L --retry 3 --retry-delay 10 \
-        -H "X-Auth-Token: $OS_TOKEN" \
-        -o "$img_path" \
-        "$_DL_URL" 2>/dev/null
-      size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
-      log "  [INFO] Downloaded $size bytes"
-      if [ "$size" -gt 1048576 ]; then
-        log "  [OK] Download via Cloud Files export (${{_SWIFT_DL_URL}}): $size bytes"
-        success=1
-        DOWNLOAD_METHOD="cloud-files-export:$_SWIFT_DL_URL"
-        # Cleanup: delete exported file from Cloud Files
-        curl -s -X DELETE -H "X-Auth-Token: $OS_TOKEN" "$_DL_URL" 2>/dev/null || true
-        log "  [INFO] Cleaned up exported file from Cloud Files"
-      else
-        log "  [WARN] Cloud Files download too small ($size bytes)"
-        rm -f "$img_path"
-      fi
-    fi
-  else
-    _FAIL_MSG=$(echo "$_TASK_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || true)
-    log "  [WARN] Export task failed or not created: $_FAIL_MSG"
-    log "  [INFO] This can happen with Windows images (licensing restrictions). Falling back to direct Glance download..."
-  fi
-fi
-
-# ── Method B: Direct Glance download (fallback for export failures) ──────────
-if [ $success -eq 0 ] && [ "$LICENSED_RESTRICTED" = "0" ]; then
-  log "  [INFO] Trying direct Glance download as fallback..."
-  GLANCE_BASES="$GLANCE_PUB_URL"
-  LAST_HTTP="000"
-  for OS_IMAGE_URL in $GLANCE_BASES; do
-    IMG_DOWNLOAD_URL="$OS_IMAGE_URL/images/{snap_id}/file"
-    log "  Target: $IMG_DOWNLOAD_URL"
-
-    # Direct curl retry loop
-    for attempt in $(seq 1 $export_retries); do
-      log "  curl attempt $attempt/$export_retries"
-      LAST_HTTP=$(curl -s -C - -L --retry 3 --retry-delay 10 \\
-        -H 'Expect:' \\
-        -H 'Accept: application/octet-stream' \\
-        -H "X-Auth-Token: $OS_TOKEN" \\
-        -o "$img_path" \\
-        --write-out '%{{http_code}}' \\
-        "$IMG_DOWNLOAD_URL" 2>/dev/null || echo '000')
-      size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
-      log "  HTTP $LAST_HTTP | $size bytes received"
-      if [ "$size" -gt 1048576 ]; then
-        log "  [OK] Download via direct Glance curl: $size bytes"
-        success=1
-        DOWNLOAD_METHOD="curl:$OS_IMAGE_URL"
-        break
-      else
-        log "  [WARN] Incomplete (http=$LAST_HTTP size=$size) — refreshing token and retrying..."
-        if [ -n "${{OS_USERNAME:-}}" ] && [ -n "${{OS_API_KEY:-}}" ]; then
-          _AUTH_RESP=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
-            -H "Content-Type: application/json" \
-            -d "{{\\"auth\\":{{\\"RAX-KSKEY:apiKeyCredentials\\":{{\\"username\\":\\"$OS_USERNAME\\",\\"apiKey\\":\\"$OS_API_KEY\\"}}}}}}" 2>/dev/null || true)
-          OS_TOKEN=$(echo "$_AUTH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
-        fi
-        rm -f "$img_path"
-      fi
-      [ $attempt -lt $export_retries ] && {{ log "  Waiting ${{export_retry_wait}}s..."; sleep $export_retry_wait; }}
-    done
-    [ $success -eq 1 ] && break
-  done
-fi
-
-# ── Method C: openstack CLI image save (bypasses Glance 413 policy restriction) ──
-if [ $success -eq 0 ] && [ "$LICENSED_RESTRICTED" = "0" ]; then
-  log "  [INFO] Methods A+B failed — trying openstack image save (CLI auth path)..."
-  rm -f "$img_path"
-  source {shell_quote(ospc_openrc_path)} 2>/dev/null || true
-  if openstack image save --file "$img_path" "{snap_id}" 2>/tmp/glance_cli_err.txt; then
+GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
+if [ $success -eq 0 ] && [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
+  log "  Trying {'Cloud Files preferred' if prefer_cloud_files_download else 'Classic Glance first'} bridge (Glance/Cloud Files waterfall)..."
+  if bash "$GLANCE_BRIDGE" download \
+      --ospc-openrc {shell_quote(ospc_openrc_path)} \
+      --image-id {shell_quote(snap_id)} \
+      --dest "$img_path" \
+      --container {shell_quote(ospc_cloud_files_container)} \
+      {"--prefer-cloud-files" if prefer_cloud_files_download else ""} \
+      --retries "$export_retries" \
+      --retry-wait "$export_retry_wait" \
+      --min-bytes 1048576; then
     size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
-    log "  [INFO] openstack image save: $size bytes"
-    if [ "$size" -gt 1048576 ]; then
-      log "  [OK] Download via openstack CLI: $size bytes"
-      success=1
-      DOWNLOAD_METHOD="openstack-cli"
-    else
-      log "  [WARN] openstack CLI download too small ($size bytes) — $(cat /tmp/glance_cli_err.txt 2>/dev/null | head -3)"
-      rm -f "$img_path"
-    fi
+    log "  [OK] Bridge downloaded OSPC image: $size bytes"
+    success=1
   else
-    log "  [WARN] openstack image save failed: $(cat /tmp/glance_cli_err.txt 2>/dev/null | head -3)"
+    log "  [WARN] Bridge download failed — falling back to legacy public Glance loop"
     rm -f "$img_path"
   fi
+elif [ "{1 if cloud_files_fallback else 0}" = "1" ]; then
+  log "  [WARN] Glance bridge not found at $GLANCE_BRIDGE — using legacy public Glance loop"
 fi
-
-# ── Method D: Cinder volume from image → attach to this host → stream block device ──
-# Bypasses Glance licensing restrictions — Cinder uses internal Nova/storage paths
+# Try openstack image save first (avoids 413 on Rackspace OSPC Glance large files)
 if [ $success -eq 0 ]; then
-  log "  [INFO] Methods A+B+C failed — trying Method D: Cinder volume block device streaming..."
-  source {shell_quote(ospc_openrc_path)} 2>/dev/null || true
-
-  # Get image size from Glance metadata to size the volume (+10G overhead)
-  _IMG_BYTES=$(openstack image show "{snap_id}" -f value -c size 2>/dev/null || echo 0)
-  _IMG_GB=$(python3 -c "b=int('$_IMG_BYTES' or 0); print(max(60, int(b/1073741824)+15))" 2>/dev/null || echo 60)
-  log "  [INFO] Image size: $_IMG_BYTES bytes → volume size: ${{_IMG_GB}}G"
-
-  # Get this server's own Nova UUID from the metadata service
-  _THIS_SERVER_ID=$(curl -s --connect-timeout 3 http://169.254.169.254/openstack/latest/meta_data.json \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['uuid'])" 2>/dev/null || true)
-  if [ -z "$_THIS_SERVER_ID" ]; then
-    log "  [WARN] Cannot determine this host's server ID — skipping Cinder attach"
+log "  Trying openstack image save (primary method — avoids HTTP 413)..."
+rm -f "$img_path"
+if openstack image save --file "$img_path" "{snap_id}" 2>/tmp/ospc_img_save_err.txt; then
+  size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
+  if [ "$size" -gt 1048576 ]; then
+    log "  [OK] Download via openstack image save: ${{size}} bytes"
+    success=1
   else
-    log "  [INFO] This host server ID: $_THIS_SERVER_ID"
-    _VOL_NAME="ospc2flex_win_{snap_name}_vol"
-    log "  [INFO] Creating Cinder volume (size=${{_IMG_GB}}G) from image {snap_id}..."
-    _VOL_ID=$(openstack volume create \
-      --image "{snap_id}" --size "$_IMG_GB" \
-      --bootable "$_VOL_NAME" \
-      -f value -c id 2>/tmp/cinder_err.txt || true)
-    if [ -z "$_VOL_ID" ]; then
-      log "  [WARN] Cinder volume create failed: $(cat /tmp/cinder_err.txt 2>/dev/null | head -2)"
-    else
-      log "  [INFO] Volume $_VOL_ID created — waiting up to 30 min for available state..."
-      _VOL_DEADLINE=$(($(date +%s) + 1800))
-      while [ $(date +%s) -lt $_VOL_DEADLINE ]; do
-        _VOL_STATUS=$(openstack volume show "$_VOL_ID" -f value -c status 2>/dev/null || echo error)
-        log "  [INFO] Volume status: $_VOL_STATUS"
-        [ "$_VOL_STATUS" = "available" ] && break
-        [ "$_VOL_STATUS" = "error" ] && { log "  [WARN] Volume entered error state"; break; }
-        sleep 15
-      done
-      _VOL_STATUS=$(openstack volume show "$_VOL_ID" -f value -c status 2>/dev/null || echo error)
-      if [ "$_VOL_STATUS" = "available" ]; then
-        log "  [INFO] Attaching volume $_VOL_ID to this server..."
-        openstack server add volume "$_THIS_SERVER_ID" "$_VOL_ID" 2>/dev/null || true
-        sleep 10
-        # Find the attached device (typically /dev/vdb or /dev/sdb)
-        _VOL_DEV=$(openstack volume show "$_VOL_ID" -f json 2>/dev/null \
-          | python3 -c "import sys,json; a=json.load(sys.stdin).get('attachments',[]); print(a[0].get('device','') if a else '')" \
-          2>/dev/null || true)
-        log "  [INFO] Volume attached as: $_VOL_DEV"
-        if [ -n "$_VOL_DEV" ] && [ -b "$_VOL_DEV" ]; then
-          log "  [INFO] Streaming $_VOL_DEV → $img_path (dd bs=4M)..."
-          dd if="$_VOL_DEV" bs=4M 2>/dev/null > "$img_path" || true
-          size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
-          log "  [INFO] Streamed $size bytes from $_VOL_DEV"
-          if [ "$size" -gt 1073741824 ]; then
-            log "  [OK] Download via Cinder volume attach: $size bytes"
-            success=1
-            DOWNLOAD_METHOD="cinder-volume:$_VOL_DEV"
-          else
-            log "  [WARN] Cinder stream too small ($size bytes)"
-            rm -f "$img_path"
-          fi
-        else
-          log "  [WARN] Volume device not found or not a block device: '$_VOL_DEV'"
-        fi
-        # Always detach before delete
-        openstack server remove volume "$_THIS_SERVER_ID" "$_VOL_ID" 2>/dev/null || true
-        sleep 5
-      else
-        log "  [WARN] Volume not available (status=$_VOL_STATUS) — cannot attach"
-      fi
-      openstack volume delete "$_VOL_ID" 2>/dev/null || true
-      log "  [INFO] Cinder volume $_VOL_ID cleaned up"
-    fi
+    log "  [WARN] openstack image save returned small file (${{size}} bytes) — $(cat /tmp/ospc_img_save_err.txt 2>/dev/null | head -2)"
+    rm -f "$img_path"
   fi
+else
+  log "  [WARN] openstack image save failed: $(cat /tmp/ospc_img_save_err.txt 2>/dev/null | head -2) — falling back to curl"
+  rm -f "$img_path"
 fi
-
-[ $success -eq 0 ] && stage_fail 3 "Download failed — all methods exhausted (A=Cloud Files export, B=Glance curl, C=openstack CLI, D=Cinder volume). last_http=${{LAST_HTTP:-N/A}}. Check that OSPC account has Cinder access, or migrate manually using --origin-vm-ip Production Mode."
+fi
+# Curl fallback with retry loop (if openstack image save failed)
+if [ $success -eq 0 ]; then
+for attempt in $(seq 1 $export_retries); do
+  log "  curl attempt $attempt/$export_retries — large file, please wait..."
+  HTTP_STATUS=$(curl -s -C - -L --retry 3 --retry-delay 10 --retry-max-time 180 \\
+    -H "X-Auth-Token: $OS_TOKEN" \\
+    -o "$img_path" \\
+    --write-out '%{{http_code}}' \\
+    "$IMG_DOWNLOAD_URL" 2>/dev/null || echo '000')
+  size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
+  log "  HTTP $HTTP_STATUS | $size bytes received"
+  if [ "$size" -gt 1048576 ]; then
+    log "  [OK] Download complete: $size bytes"
+    success=1; break
+  else
+    log "  [WARN] Incomplete (size=$size) — refreshing token and retrying..."
+    _AUTH_RESP=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \\
+      -H "Content-Type: application/json" \\
+      -d '{{"auth":{{"RAX-KSKEY:apiKeyCredentials":{{"username":"'"${{OS_USERNAME:-}}"'","apiKey":"'"${{OS_PASSWORD:-}}"'"}}}}}}' 2>/dev/null || true)
+    OS_TOKEN=$(echo "$_AUTH_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
+    rm -f "$img_path"
+  fi
+  [ $attempt -lt $export_retries ] && {{ log "  Waiting ${{export_retry_wait}}s..."; sleep $export_retry_wait; }}
+done
+fi
+[ $success -eq 0 ] && stage_fail 3 'Download failed after all attempts (openstack image save + curl both failed)'
 stage_done 3
 
 # ── STAGE 4: Convert Image Format ────────────────────────────────────────────
@@ -936,6 +919,26 @@ fi
 stage_start '4.6' 'Per-OS Offline Repair' 'ospc2flex_offline_repair.sh (--os-type) or ospc2flex_windows_repair.sh (VirtIO)'
 STANDALONE_REPAIR=/tmp/ospc2flex_offline_repair.sh
 WIN_REPAIR=/tmp/ospc2flex_windows_repair.sh
+REPAIR_LOG="$workdir/{snap_name}.repair.log"
+verify_centos_lan_markers() {{
+  local _profile="${{REPAIR_OS_TYPE:-}}"
+  local _need=0
+  case "$_profile" in
+    centos*|rhel7*|rhel6*) _need=1 ;;
+  esac
+  [ "$_need" -eq 0 ] && return 0
+  if [ ! -f "$REPAIR_LOG" ]; then
+    log "  [ERROR] [REPAIR-LAN-E5] Repair log missing: $REPAIR_LOG"
+    return 1
+  fi
+  if grep -q "Wrote fresh ifcfg-eth0 (no HWADDR, ONBOOT=yes, DHCP, NM_CONTROLLED=no)" "$REPAIR_LOG" \
+     && grep -q "Enabled network.service" "$REPAIR_LOG"; then
+    log "  [OK] [REPAIR-LAN] CentOS/RHEL LAN markers verified"
+    return 0
+  fi
+  log "  [ERROR] [REPAIR-LAN-E5] Missing CentOS/RHEL LAN markers in $REPAIR_LOG"
+  return 1
+}}
 if [ "${{REPAIR_OS_TYPE:-}}" = "windows" ]; then
   if [ -f "$WIN_REPAIR" ]; then
     log "  [INFO] Running Windows VirtIO repair: $WIN_REPAIR"
@@ -950,31 +953,37 @@ if [ "${{REPAIR_OS_TYPE:-}}" = "windows" ]; then
   fi
 elif [ -f "$STANDALONE_REPAIR" ]; then
   log "  [INFO] Running Linux offline repair: $STANDALONE_REPAIR (method=$OFFLINE_REPAIR_METHOD)"
+  rm -f "$REPAIR_LOG"
+  log "  [INFO] Repair log: $REPAIR_LOG"
   if [ "$OFFLINE_REPAIR_METHOD" = "generic" ]; then
-    if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force; then
+    if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force 2>&1 | tee "$REPAIR_LOG"; then
       log "  [OK] Generic ospc2flex_offline_repair.sh completed"
       repair_ok=1
+      verify_centos_lan_markers || exit 1
     else
       log "  [WARN] Generic repair failed — continuing upload as-is"
     fi
   else
     if [ -n "${{REPAIR_OS_TYPE:-}}" ]; then
-      if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force --os-type "${{REPAIR_OS_TYPE}}"; then
+      if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force --os-type "${{REPAIR_OS_TYPE}}" 2>&1 | tee "$REPAIR_LOG"; then
         log "  [OK] Custom per-OS repair completed (profile=${{REPAIR_OS_TYPE}})"
         repair_ok=1
+        verify_centos_lan_markers || exit 1
       else
         log "  [WARN] Profile repair failed — retrying auto-detect (no --os-type)"
-        if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force; then
+        if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force 2>&1 | tee "$REPAIR_LOG"; then
           log "  [OK] Auto-detect repair completed"
           repair_ok=1
+          verify_centos_lan_markers || exit 1
         else
           log "  [WARN] Auto-detect repair also failed"
         fi
       fi
     else
-      if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force; then
+      if bash "$STANDALONE_REPAIR" --qcow2 "$repaired_path" --force 2>&1 | tee "$REPAIR_LOG"; then
         log "  [OK] ospc2flex_offline_repair.sh completed (auto-detect)"
         repair_ok=1
+        verify_centos_lan_markers || exit 1
       else
         log "  [WARN] Standalone repair failed"
       fi
@@ -1259,8 +1268,32 @@ _IF_EOF
             almalinux|rocky|rhel|fedora)
               _aver=$(sudo grep '^VERSION_ID=' "$_rmnt2/etc/os-release" 2>/dev/null | cut -d= -f2 | tr -d '"' || true)
               _amaj=$(echo "$_aver" | cut -d. -f1)
-              # Always write ifcfg-eth0 (works for both v8 and v9)
               sudo mkdir -p "$_rmnt2/etc/sysconfig/network-scripts"
+              if [ "${{_amaj:-0}}" -eq 7 ] && [ "$_ros2" = "rhel" ]; then
+                sudo rm -f "$_rmnt2/etc/systemd/system/network.service" 2>/dev/null || true
+                sudo mkdir -p "$_rmnt2/etc/systemd/system/multi-user.target.wants"
+                sudo ln -sf /usr/lib/systemd/system/network.service \
+                  "$_rmnt2/etc/systemd/system/multi-user.target.wants/network.service" 2>/dev/null || true
+                sudo ln -sf /dev/null "$_rmnt2/etc/systemd/system/NetworkManager-wait-online.service" 2>/dev/null || true
+                sudo rm -f "$_rmnt2/etc/systemd/system/multi-user.target.wants/NetworkManager.service" 2>/dev/null || true
+                sudo rm -f "$_rmnt2/etc/systemd/system/dbus-org.freedesktop.NetworkManager.service" 2>/dev/null || true
+                sudo rm -f "$_rmnt2/etc/systemd/system/graphical.target.wants/NetworkManager.service" 2>/dev/null || true
+                sudo ln -sf /dev/null "$_rmnt2/etc/systemd/system/NetworkManager.service" 2>/dev/null || true
+                sudo tee "$_rmnt2/etc/sysconfig/network-scripts/ifcfg-eth0" >/dev/null <<'_IC7R_EOF'
+DEVICE=eth0
+BOOTPROTO=dhcp
+ONBOOT=yes
+NM_CONTROLLED=no
+PEERDNS=yes
+DEFROUTE=yes
+IPV6INIT=no
+TYPE=Ethernet
+MTU=1500
+_IC7R_EOF
+                sudo find "$_rmnt2/etc/NetworkManager/system-connections" -name "*.nmconnection" -exec rm -f {{}} \\; 2>/dev/null || true
+                log "  [VERIFY-REPAIR] RHEL 7: ifcfg + network.service + NM masked (matches offline repair)"
+              else
+              # Always write ifcfg-eth0 (works for both v8 and v9)
               sudo tee "$_rmnt2/etc/sysconfig/network-scripts/ifcfg-eth0" >/dev/null <<'_IC2_EOF'
 # Written by ospc2flex VERIFY-REPAIR
 DEVICE=eth0
@@ -1301,19 +1334,50 @@ _NM_EOF
                 # v8: remove stale keyfiles (ifcfg only)
                 sudo find "$_rmnt2/etc/NetworkManager/system-connections" -name "*.nmconnection" -exec rm -f {{}} \\; 2>/dev/null || true
                 log "  [VERIFY-REPAIR] ${{_ros2}} v$_amaj: cleared NM keyfiles (ifcfg-only)"
+              fi
               fi ;;
             centos)
+              _cver=$(sudo grep '^VERSION_ID=' "$_rmnt2/etc/os-release" 2>/dev/null | cut -d= -f2 | tr -d '"' || true)
+              _cmaj=$(echo "$_cver" | cut -d. -f1)
               sudo mkdir -p "$_rmnt2/etc/sysconfig/network-scripts"
-              sudo tee "$_rmnt2/etc/sysconfig/network-scripts/ifcfg-eth0" >/dev/null <<'_IC_EOF'
+              if [ "${{_cmaj:-0}}" -eq 7 ]; then
+                sudo rm -f "$_rmnt2/etc/systemd/system/network.service" 2>/dev/null || true
+                sudo mkdir -p "$_rmnt2/etc/systemd/system/multi-user.target.wants"
+                sudo ln -sf /usr/lib/systemd/system/network.service \
+                  "$_rmnt2/etc/systemd/system/multi-user.target.wants/network.service" 2>/dev/null || true
+                sudo ln -sf /dev/null "$_rmnt2/etc/systemd/system/NetworkManager-wait-online.service" 2>/dev/null || true
+                sudo rm -f "$_rmnt2/etc/systemd/system/multi-user.target.wants/NetworkManager.service" 2>/dev/null || true
+                sudo rm -f "$_rmnt2/etc/systemd/system/dbus-org.freedesktop.NetworkManager.service" 2>/dev/null || true
+                sudo rm -f "$_rmnt2/etc/systemd/system/graphical.target.wants/NetworkManager.service" 2>/dev/null || true
+                sudo ln -sf /dev/null "$_rmnt2/etc/systemd/system/NetworkManager.service" 2>/dev/null || true
+                sudo tee "$_rmnt2/etc/sysconfig/network-scripts/ifcfg-eth0" >/dev/null <<'_IC7V_EOF'
+DEVICE=eth0
+BOOTPROTO=dhcp
+ONBOOT=yes
+NM_CONTROLLED=no
+PEERDNS=yes
+DEFROUTE=yes
+IPV6INIT=no
+TYPE=Ethernet
+MTU=1500
+_IC7V_EOF
+                sudo find "$_rmnt2/etc/NetworkManager/system-connections" -name "*.nmconnection" -exec rm -f {{}} \\; 2>/dev/null || true
+                log "  [VERIFY-REPAIR] CentOS 7: ifcfg + network.service + NM masked (matches offline repair)"
+              else
+                sudo tee "$_rmnt2/etc/sysconfig/network-scripts/ifcfg-eth0" >/dev/null <<'_IC_EOF'
 DEVICE=eth0
 NAME=eth0
 TYPE=Ethernet
 BOOTPROTO=dhcp
 ONBOOT=yes
-MTU=3942
+MTU=1500
 NM_CONTROLLED=yes
+DEFROUTE=yes
+PEERDNS=yes
+IPV6INIT=no
 _IC_EOF
-              log "  [VERIFY-REPAIR] CentOS: ifcfg-eth0 rewritten" ;;
+                log "  [VERIFY-REPAIR] CentOS (8+/stream): ifcfg-eth0 rewritten (MTU=1500)"
+              fi ;;
           esac
           # Fix fstab again
           if sudo test -f "$_rmnt2/etc/fstab" 2>/dev/null; then
@@ -1371,13 +1435,38 @@ IMG_ID=$(openstack image create \\
   --property visibility={visibility} \\
   --format value -c id \\
   "{flex_image_name}" 2>&1 || true)
-if echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized'; then
-  stage_fail 5 "Image upload failed: $IMG_ID"
+if echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized' || [ -z "$IMG_ID" ]; then
+  log "  [WARN] Direct openstack image create did not succeed: $IMG_ID"
+  GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
+  if [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
+    log "  [INFO] Trying Cloud Files -> FLEX Glance bridge fallback..."
+    if BRIDGE_UPLOAD_OUT=$(bash "$GLANCE_BRIDGE" upload \
+        --flex-openrc {shell_quote(flex_openrc_path)} \
+        --image-file "$repaired_path" \
+        --image-name {shell_quote(flex_image_name)} \
+        --disk-format {shell_quote(target_format)} \
+        --container-format {shell_quote(container_format)} \
+        --visibility {shell_quote(visibility)} \
+        --container {shell_quote(flex_cloud_files_container)} 2>&1); then
+      echo "$BRIDGE_UPLOAD_OUT"
+      IMG_ID=$(echo "$BRIDGE_UPLOAD_OUT" | awk -F= '/^FLEX_IMAGE_ID=/ {{print $2; exit}}')
+    else
+      _bridge_rc=$?
+      echo "$BRIDGE_UPLOAD_OUT"
+      stage_fail 5 "FLEX upload failed via direct Glance and Cloud Files bridge (rc=$_bridge_rc)"
+    fi
+  else
+    stage_fail 5 "Image upload failed and Cloud Files bridge is unavailable: $IMG_ID"
+  fi
 fi
-if [ -z "$IMG_ID" ]; then
-  stage_fail 5 'Image upload produced no image ID — check FLEX credentials and region'
+if [ -z "$IMG_ID" ] || echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized'; then
+  stage_fail 5 "Image upload produced no FLEX image ID after all methods: $IMG_ID"
 fi
 log "  [OK] Upload complete — Image ID: $IMG_ID"
+SHOW_NAME=$(openstack image show "$IMG_ID" -f value -c name 2>/dev/null || echo "{flex_image_name}")
+SHOW_VIS=$(openstack image show "$IMG_ID" -f value -c visibility 2>/dev/null || echo "unknown")
+SHOW_STAT=$(openstack image show "$IMG_ID" -f value -c status 2>/dev/null || echo "unknown")
+log "  [UPLOAD-CONFIRMED] region=${{OS_REGION_NAME:-unknown}} id=$IMG_ID name=${{SHOW_NAME:-unknown}} status=${{SHOW_STAT:-unknown}} visibility=${{SHOW_VIS:-unknown}}"
 stage_done 5
 
 # ── STAGE 5.5: Clean Workspace ───────────────────────────────────────────────
@@ -1516,6 +1605,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Optional per-instance SSH password for the origin VM when password auth is required.")
     p.add_argument("--offline-repair-method", default="custom_os", choices=["custom_os", "generic"],
                    help="Offline guest repair strategy: 'custom_os' (per-OS profile, default) or 'generic' (ospc2flex_offline_repair.sh for all VMs)")
+    p.add_argument("--no-cloud-files-fallback", action="store_true",
+                   help="Disable Cloud Files fallback for OSPC Glance download and FLEX Glance upload")
+    p.add_argument("--no-prefer-cloud-files-download", action="store_true",
+                   help="Do not start snapshot downloads with OSPC Glance export to Cloud Files; try direct Glance first")
+    p.add_argument("--ospc-cloud-files-container", default="ospc2flex-export",
+                   help="Cloud Files container for OSPC Glance export-task fallback")
+    p.add_argument("--flex-cloud-files-container", default="ospc2flex-staging",
+                   help="Cloud Files container for FLEX Glance import fallback")
     p.add_argument("--windows-admin-password", default=None,
                    help="Administrator password for Windows VMs. Used for automated SSH/WinRM post-boot verification.")
     return p
@@ -1527,11 +1624,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 def smart_copy(src: str, user: str, host: str, dest: str, *, key: str, port: int = 22, dry_run: bool = False) -> None:
     try:
-        run(f"{scp_base_cmd(key, port)} {shell_quote(src)} {user}@{host}:{shell_quote(dest)}", dry_run=dry_run)
+        run(
+            f"{scp_base_cmd(key, port)} {shell_quote(src)} {user}@{host}:{shell_quote(dest)}",
+            dry_run=dry_run,
+            log_cmd=False,
+        )
     except RuntimeError as e:
         if 'Permission denied' in str(e) or 'scp' in str(e).lower():
             log(f"[WARN] SCP blocked or failed for {host}. Falling back to SSH stdin pipe...")
-            run(f"cat {shell_quote(src)} | {ssh_base_cmd(key, user, host, port)} 'cat > {shell_quote(dest)}'", dry_run=dry_run)
+            run(
+                f"cat {shell_quote(src)} | {ssh_base_cmd(key, user, host, port)} 'cat > {shell_quote(dest)}'",
+                dry_run=dry_run,
+                log_cmd=False,
+            )
         else:
             raise
 
@@ -1732,7 +1837,6 @@ def main() -> None:
         jh_user = getattr(args, 'jumphost_user', None) or 'ubuntu'
         # use_mode3 = Production Mode: --origin-vm-ip was explicitly provided AND differs from jumphost
         use_mode3 = bool(getattr(args, 'origin_vm_ip', None) and getattr(args, 'origin_vm_ip') != external_host_ip)
-
         if use_mode3:
             log(f"[INFO] ⚡ PRODUCTION MODE — Jumphost: {processing_host} — will SSH-pipe /dev/vda from origin VM {origin_vm_ip}")
         else:
@@ -1762,7 +1866,7 @@ def main() -> None:
                        key=args.ssh_key_path, port=args.ssh_port, dry_run=args.dry_run)
             if not args.dry_run:
                 perm_repair = f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod +x {_standalone_repair_remote}"
-                run(perm_repair, capture=False, dry_run=False, check=False)
+                run(perm_repair, capture=False, dry_run=False, check=False, log_cmd=False)
             log(f"[OK] Standalone repair script staged at {_standalone_repair_remote} on processing host")
         else:
             log(f"[WARN] ospc2flex_offline_repair.sh not found locally — Stage 4.6 fallback will be unavailable")
@@ -1782,10 +1886,32 @@ def main() -> None:
             )
             if not args.dry_run:
                 perm_win = f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod +x {_win_repair_remote}"
-                run(perm_win, capture=False, dry_run=False, check=False)
+                run(perm_win, capture=False, dry_run=False, check=False, log_cmd=False)
             log(f"[OK] Windows repair script staged at {_win_repair_remote}")
         else:
             log("[WARN] ospc2flex_windows_repair.sh not found locally — Windows Stage 4.6 will be unavailable")
+
+        _glance_bridge_local = Path(__file__).resolve().parent / "ospc2flex_glance_bridge.sh"
+        _glance_bridge_remote = "/tmp/ospc2flex_glance_bridge.sh"
+        if _glance_bridge_local.exists() and not getattr(args, "no_cloud_files_fallback", False):
+            log("[INFO] Copying Glance/Cloud Files bridge helper to processing host...")
+            smart_copy(
+                str(_glance_bridge_local),
+                jh_user,
+                processing_host,
+                _glance_bridge_remote,
+                key=args.ssh_key_path,
+                port=args.ssh_port,
+                dry_run=args.dry_run,
+            )
+            if not args.dry_run:
+                perm_bridge = f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod +x {_glance_bridge_remote}"
+                run(perm_bridge, capture=False, dry_run=False, check=False, log_cmd=False)
+            log(f"[OK] Glance/Cloud Files bridge staged at {_glance_bridge_remote}")
+        elif getattr(args, "no_cloud_files_fallback", False):
+            log("[INFO] Cloud Files fallback disabled by --no-cloud-files-fallback")
+        else:
+            log("[WARN] ospc2flex_glance_bridge.sh not found locally — Cloud Files fallback will be unavailable")
 
         # ── Mode 3: copy SSH key to external host so it can reach origin VM ──
         origin_vm_key_remote_path = ""
@@ -1810,7 +1936,7 @@ def main() -> None:
                         pass
                 if not args.dry_run:
                     perm_pass_cmd = f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod 600 {origin_vm_password_remote_path}"
-                    run(perm_pass_cmd, capture=False, dry_run=False, check=False)
+                    run(perm_pass_cmd, capture=False, dry_run=False, check=False, log_cmd=False)
                 log(f"[OK] Origin VM password file staged at {origin_vm_password_remote_path}")
             else:
                 origin_vm_key_remote_path = "/tmp/ospc2flex_origin_key.pem"
@@ -1820,7 +1946,7 @@ def main() -> None:
                 # Fix permissions on key after copy
                 if not args.dry_run:
                     perm_cmd = f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod 600 {origin_vm_key_remote_path}"
-                    run(perm_cmd, capture=False, dry_run=False, check=False)
+                    run(perm_cmd, capture=False, dry_run=False, check=False, log_cmd=False)
                 log(f"[OK] SSH key copied to external host at {origin_vm_key_remote_path}")
 
         # ── SSH into origin VM to detect OS (before stream) ──
@@ -1888,48 +2014,7 @@ def main() -> None:
             f"{repair_os_type or '(auto-detect on jumphost)'}"
         )
 
-        # ── Windows auto-force Production Mode ──────────────────────────────
-        # Rackspace blocks Cloud Files export for Windows images (rax_opts=4 licensing).
-        # When Windows is detected and we're in External Offload mode (Glance download),
-        # auto-switch to Production Mode (SSH pipe /dev/vda) so the pipeline succeeds.
-        if repair_os_type == "windows" and not use_mode3 and origin_vm_ip:
-            log("[INFO] ⚡ Windows detected — auto-switching to Production Mode")
-            log("[INFO]   Cloud Files export is blocked by Rackspace licensing for Windows images.")
-            log(f"[INFO]   Will SSH-pipe /dev/vda from origin VM {origin_vm_ip} instead.")
-            use_mode3 = True
-            origin_vm_auth_key = getattr(args, 'origin_vm_ssh_key_path', None) or args.ssh_key_path
-            origin_vm_password = str(getattr(args, 'origin_vm_password', None) or '')
-            if origin_vm_password:
-                import tempfile as _tf
-                origin_vm_password_remote_path = "/tmp/ospc2flex_origin_password.txt"
-                log("[INFO] Staging origin VM password on jumphost for Windows SSH pipe...")
-                with _tf.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as _pw_f:
-                    _pw_f.write(origin_vm_password)
-                    _pw_tmp = _pw_f.name
-                try:
-                    smart_copy(_pw_tmp, jh_user, processing_host, origin_vm_password_remote_path,
-                               key=args.ssh_key_path, port=args.ssh_port, dry_run=args.dry_run)
-                finally:
-                    try:
-                        os.unlink(_pw_tmp)
-                    except OSError:
-                        pass
-                if not args.dry_run:
-                    run(f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod 600 {origin_vm_password_remote_path}",
-                        capture=False, dry_run=False, check=False)
-                log(f"[OK] Origin VM password staged at {origin_vm_password_remote_path}")
-            else:
-                origin_vm_key_remote_path = "/tmp/ospc2flex_origin_key.pem"
-                log("[INFO] Staging SSH key on jumphost for Windows SSH pipe...")
-                smart_copy(str(origin_vm_auth_key), jh_user, processing_host, origin_vm_key_remote_path,
-                           key=args.ssh_key_path, port=args.ssh_port, dry_run=args.dry_run)
-                if not args.dry_run:
-                    run(f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} chmod 600 {origin_vm_key_remote_path}",
-                        capture=False, dry_run=False, check=False)
-                log(f"[OK] SSH key staged at {origin_vm_key_remote_path}")
-        elif repair_os_type == "windows" and not use_mode3 and not origin_vm_ip:
-            log("[WARN] Windows detected but origin VM IP unknown — cannot auto-switch to Production Mode")
-            log("[WARN] Cloud Files export will fail for Windows. Pass --origin-vm-ip explicitly.")
+        # Windows snapshots download via Glance (openstack token issue path) — no auto-switch needed.
 
         # ── Generate and copy the remote export script ──
         script_content = build_remote_export_script(
@@ -1954,6 +2039,10 @@ def main() -> None:
             origin_os_ver=origin_os_ver,
             offline_repair_method=getattr(args, 'offline_repair_method', 'custom_os') or 'custom_os',
             repair_os_type=repair_os_type,
+            cloud_files_fallback=not getattr(args, "no_cloud_files_fallback", False),
+            prefer_cloud_files_download=not getattr(args, "no_prefer_cloud_files_download", False),
+            ospc_cloud_files_container=getattr(args, "ospc_cloud_files_container", "ospc2flex-export") or "ospc2flex-export",
+            flex_cloud_files_container=getattr(args, "flex_cloud_files_container", "ospc2flex-staging") or "ospc2flex-staging",
         )
 
         # Use unique filename per VM to avoid race condition when parallel jobs share workdir
@@ -2002,16 +2091,66 @@ def main() -> None:
                 log("[INFO] Migration complete!")
                 return
 
+            src_vcpus = 0
+            src_ram_mb = 0
+            src_disk_gb = 0
+            src_show = run(
+                openstack_cmd(ospc_openrc, f"openstack server show {shell_quote(args.server_name)} -f json"),
+                capture=True, dry_run=args.dry_run, check=False, log_cmd=False
+            )
+            try:
+                src_payload = json.loads(src_show or "{}")
+            except Exception:
+                src_payload = {}
+            src_flavor = src_payload.get("flavor") if isinstance(src_payload, dict) else {}
+            src_flavor_id = ""
+            if isinstance(src_flavor, dict):
+                src_flavor_id = str(src_flavor.get("id") or "").strip()
+            if src_flavor_id:
+                src_flv_show = run(
+                    openstack_cmd(ospc_openrc, f"openstack flavor show {shell_quote(src_flavor_id)} -f json"),
+                    capture=True, dry_run=args.dry_run, check=False, log_cmd=False
+                )
+                try:
+                    src_flv = json.loads(src_flv_show or "{}")
+                except Exception:
+                    src_flv = {}
+                src_vcpus = _to_int(src_flv.get("vcpus"))
+                src_ram_mb = _to_int(src_flv.get("ram"))
+                src_disk_gb = _to_int(src_flv.get("disk"))
+                if src_vcpus and src_ram_mb:
+                    log(
+                        f"[INFO] Source flavor shape: id={src_flavor_id} "
+                        f"vcpu={src_vcpus} ram={src_ram_mb} disk={src_disk_gb}"
+                    )
+            resolved_flavor = resolve_target_flavor_with_fallback(
+                flex_openrc=flex_openrc,
+                requested_flavor=args.flex_flavor,
+                source_vcpus=src_vcpus,
+                source_ram_mb=src_ram_mb,
+                source_disk_gb=src_disk_gb,
+                dry_run=args.dry_run,
+            )
+            resolved_network = resolve_target_network_with_fallback(
+                flex_openrc=flex_openrc,
+                requested_network=args.flex_network_id,
+                dry_run=args.dry_run,
+            )
+            resolved_keypair = resolve_target_keypair_with_fallback(
+                flex_openrc=flex_openrc,
+                requested_keypair=args.flex_key_name or "",
+                dry_run=args.dry_run,
+            )
             boot_cmd = (
                 f"openstack server create"
                 f" {shell_quote(test_server_name)}"
                 f" --image {shell_quote(flex_image_name)}"
-                f" --flavor {shell_quote(args.flex_flavor)}"
-                f" --network {shell_quote(args.flex_network_id)}"
+                f" --flavor {shell_quote(resolved_flavor)}"
+                f" --network {shell_quote(resolved_network)}"
             )
 
-        if args.flex_key_name:
-            boot_cmd += f" --key-name {shell_quote(args.flex_key_name)}"
+        if resolved_keypair:
+            boot_cmd += f" --key-name {shell_quote(resolved_keypair)}"
         if args.flex_security_group:
             boot_cmd += f" --security-group {shell_quote(args.flex_security_group)}"
         boot_cmd += " --config-drive true"  # Rackspace FLEX: ensures ConfigDrive for cloud-init on first boot
@@ -2041,14 +2180,32 @@ def main() -> None:
                 f"openstack floating ip create {shell_quote(args.flex_external_network)} -f json"
             ), dry_run=args.dry_run)
             try:
-                fip = json.loads(fip_resp).get("floating_ip_address", "")
-                if fip:
-                    run(openstack_cmd(
-                        flex_openrc,
-                        f"openstack server add floating ip {shell_quote(server_id)} {shell_quote(fip)}"
-                    ), dry_run=args.dry_run)
-                    test_ip = fip
-                    log(f"[OK] Floating IP: {test_ip}")
+                fip_payload = json.loads(fip_resp or "{}")
+                fip = str(fip_payload.get("floating_ip_address") or "").strip()
+                fip_id = str(fip_payload.get("id") or "").strip()
+                if fip_id:
+                    port_id = run(
+                        openstack_cmd(
+                            flex_openrc,
+                            f"openstack port list --server {shell_quote(server_id)} -f value -c ID -c Status | awk '$2==\"ACTIVE\"{{print $1; exit}}'"
+                        ),
+                        capture=True, check=False, dry_run=args.dry_run, log_cmd=False,
+                    ).strip()
+                    if not port_id:
+                        port_id = run(
+                            openstack_cmd(
+                                flex_openrc,
+                                f"openstack port list --server {shell_quote(server_id)} -f value -c ID | head -1"
+                            ),
+                            capture=True, check=False, dry_run=args.dry_run, log_cmd=False,
+                        ).strip()
+                    if port_id:
+                        run(openstack_cmd(
+                            flex_openrc,
+                            f"openstack floating ip set --port {shell_quote(port_id)} {shell_quote(fip_id)}"
+                        ), dry_run=args.dry_run)
+                        test_ip = fip
+                        log(f"[OK] Floating IP: {test_ip}")
             except Exception as e:
                 log(f"[WARN] Floating IP allocation failed: {e}")
 
@@ -2373,4 +2530,8 @@ $r | ForEach-Object { Write-Host $_ }
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:
+        log(f"[FATAL] {exc}")
+        sys.exit(1)

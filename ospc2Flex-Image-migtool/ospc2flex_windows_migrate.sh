@@ -187,7 +187,7 @@ done
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Download Snapshot
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 2: Downloading snapshot (via ServiceNet)..."
+log "Step 2: Downloading snapshot (Classic Glance / Cloud Files fallback)..."
 INFO "Large Windows disks often take 30–120+ minutes — heartbeat + size logged every 60s."
 mkdir -p "$WORK"
 IMG_PATH="$WORK/${LABEL}.img"
@@ -299,6 +299,7 @@ OS_IMAGE_URL=$(printf '%s' "$OS_IMAGE_URL" | tr -d '[:space:]')
 # the public WAF that returns HTTP 413 on image /file GETs), public last.
 SNET_BASE=$(_glance_snet_base)
 PUB_BASE=$(_glance_public_base)
+PRECHECK_SNET_DNS_FAIL=0
 # Dedup/order: catalog-resolved (if it differs from both), snet, public
 GLANCE_BASES=""
 for b in "$SNET_BASE" "$OS_IMAGE_URL" "$PUB_BASE"; do
@@ -306,8 +307,15 @@ for b in "$SNET_BASE" "$OS_IMAGE_URL" "$PUB_BASE"; do
   [ -z "$b" ] && continue
   _h=$(_url_host "$b")
   if ! _host_resolves "$_h"; then
-    WARN "Skipping unresolved Glance host: $_h (base=$b)"
-    continue
+    WARN "Glance host unresolved on jumphost: $_h (base=$b)"
+    case "$_h" in
+      snet-*.images.api.rackspacecloud.com)
+        PRECHECK_SNET_DNS_FAIL=1
+        ;;
+      *)
+        continue
+        ;;
+    esac
   fi
   case " $GLANCE_BASES " in
     *" $b "*) : ;;
@@ -464,14 +472,39 @@ _try_download_methods() {
   return 1
 }
 
+IMG_SIZE="${IMG_SIZE:-0}"
+LAST_CURL_LOG="${LAST_CURL_LOG:-}"
+DOWNLOAD_METHOD="${DOWNLOAD_METHOD:-}"
+if [ "${IMG_SIZE:-0}" -lt 1048576 ] && [ -x /tmp/ospc2flex_glance_bridge.sh ]; then
+  INFO "Trying Classic Glance + Cloud Files bridge before legacy Windows downloader..."
+  if bash /tmp/ospc2flex_glance_bridge.sh download \
+      --ospc-openrc "$OSPC_CREDS" \
+      --image-id "$SNAP_ID" \
+      --dest "$IMG_PATH" \
+      --container ospc2flex-export \
+      --prefer-cloud-files \
+      --retries 3 \
+      --retry-wait 15 \
+      --min-bytes 1048576; then
+    IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+    DOWNLOAD_METHOD="classic-glance-cloud-files-bridge"
+    PASS "Downloaded via $DOWNLOAD_METHOD: $((IMG_SIZE / 1024 / 1024))MB"
+  else
+    WARN "Classic Glance + Cloud Files bridge failed; continuing with legacy ServiceNet/public waterfall"
+    rm -f "$IMG_PATH"
+    IMG_SIZE=0
+  fi
+fi
+
 attempt=1
 max_dl=5
-IMG_SIZE=0
-LAST_CURL_LOG=""
-DOWNLOAD_METHOD=""
 SAW_SNET_DNS_FAIL=0
 SAW_PUBLIC_413=0
+if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
 while [ "$attempt" -le "$max_dl" ]; do
+  if [ "${PRECHECK_SNET_DNS_FAIL:-0}" -eq 1 ]; then
+    SAW_SNET_DNS_FAIL=1
+  fi
   if _try_download_methods "$attempt"; then
     IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
     break
@@ -490,6 +523,7 @@ while [ "$attempt" -le "$max_dl" ]; do
   attempt=$((attempt + 1))
   sleep 10
 done
+fi
 
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
   FAIL "Glance download failed after $max_dl attempts (${IMG_SIZE:-0} bytes). Last curl log: ${LAST_CURL_LOG:-none}"
@@ -518,11 +552,14 @@ INFO "qcow2 size: $((QCOW_SIZE/1024/1024))MB"
 # Step 4: Windows VirtIO Repair
 # ═══════════════════════════════════════════════════════════════════════════════
 log "Step 4: Offline VirtIO driver injection & Repair..."
+REPAIR_LOG="$WORK/${LABEL}.repair.log"
 if [ "$OS_FAMILY" = "linux" ]; then
   if [ -f "$LINUX_REPAIR" ]; then
     set +e
     # Call the v2.5 RHEL-aware linux repair script
-    bash "$LINUX_REPAIR" --qcow2 "$QCOW" --os-type "$OS_TYPE" --force --preserve-password-auth 2>&1
+    rm -f "$REPAIR_LOG"
+    INFO "Repair log: $REPAIR_LOG"
+    bash "$LINUX_REPAIR" --qcow2 "$QCOW" --os-type "$OS_TYPE" --force --preserve-password-auth 2>&1 | tee "$REPAIR_LOG"
     REPAIR_EXIT=$?
     set -e
     if [ "$REPAIR_EXIT" -eq 0 ]; then
@@ -530,6 +567,18 @@ if [ "$OS_FAMILY" = "linux" ]; then
     else
       WARN "Linux repair exited with code $REPAIR_EXIT — continuing anyway"
     fi
+    case "${OS_TYPE:-}" in
+      centos*|rhel7*|rhel6*)
+        if [ -f "$REPAIR_LOG" ] \
+           && grep -q "Wrote fresh ifcfg-eth0 (no HWADDR, ONBOOT=yes, DHCP, NM_CONTROLLED=no)" "$REPAIR_LOG" \
+           && grep -q "Enabled network.service" "$REPAIR_LOG"; then
+          PASS "[REPAIR-LAN] CentOS/RHEL LAN markers verified"
+        else
+          FAIL "[REPAIR-LAN-E5] Missing CentOS/RHEL LAN markers in $REPAIR_LOG"
+          exit 1
+        fi
+        ;;
+    esac
   else
     WARN "$LINUX_REPAIR not found — skipping Linux virtio injection!"
   fi
@@ -558,36 +607,184 @@ OSPC_TOKEN="${OS_TOKEN:-}"
 unset OS_TOKEN OS_AUTH_TYPE OS_IDENTITY_API_VERSION
 source /tmp/ospc2flex_flex.sh
 
-# Kept logic to not delete old images
-OLD_IIDS=$(openstack image list --name "$LABEL" -f value -c ID 2>/dev/null)
-if [ -n "$OLD_IIDS" ]; then
-  INFO "Old images found: $OLD_IIDS (Skipping deletion as per user request)"
-fi
+detect_virtual_size_bytes() {
+  local img="$1"
+  if ! command -v qemu-img >/dev/null 2>&1; then
+    echo 0
+    return 0
+  fi
+  qemu-img info --output json "$img" 2>/dev/null | python3 -c 'import json,sys; print(int(json.load(sys.stdin).get("virtual-size") or 0))' 2>/dev/null || echo 0
+}
 
-openstack image create "$LABEL" \
+normalize_int() {
+  local _v="${1:-}"
+  _v=$(printf '%s' "$_v" | tr -cd '0-9')
+  [ -n "$_v" ] && echo "$_v" || echo ""
+}
+
+resolve_target_flavor() {
+  local _requested="$1"
+  local _src_vcpu _src_ram _src_disk _need_disk
+  _src_vcpu=$(normalize_int "${MIG_SRC_VCPUS:-}")
+  _src_ram=$(normalize_int "${MIG_SRC_RAM_MB:-}")
+  _src_disk=$(normalize_int "${MIG_SRC_DISK_GB:-}")
+  _need_disk="$_src_disk"
+  [ -z "$_need_disk" ] && _need_disk=$(normalize_int "${QCOW_VIRTUAL_GIB:-}")
+
+  if [ -n "$_requested" ] && openstack flavor show "$_requested" >/dev/null 2>&1; then
+    INFO "Flavor resolved in target region: $_requested" >&2
+    echo "$_requested"
+    return 0
+  fi
+  [ -n "$_requested" ] && WARN "Requested flavor not found in target region: $_requested" >&2
+
+  local _rows _rows_bootable _best _fallback _chosen _cid _cname _cram _cdisk _cvcpu
+  _rows=$(openstack flavor list --long --format value -c ID -c Name -c RAM -c Disk -c VCPUs 2>/dev/null || true)
+  if [ -z "$_rows" ]; then
+    WARN "No target flavors discovered; keeping requested flavor" >&2
+    echo "$_requested"
+    return 0
+  fi
+  _rows_bootable=$(printf '%s\n' "$_rows" | awk 'NF>=5 && ($4+0) > 0')
+  if [ -n "$_rows_bootable" ]; then
+    _rows="$_rows_bootable"
+  else
+    WARN "No bootable (disk>0) flavors found; keeping zero-disk candidates" >&2
+  fi
+  if [ -n "$_need_disk" ]; then
+    local _rows_diskfit
+    _rows_diskfit=$(printf '%s\n' "$_rows" | awk -v md="$_need_disk" 'NF>=5 && ($4+0) >= md')
+    if [ -n "$_rows_diskfit" ]; then
+      _rows="$_rows_diskfit"
+    else
+      WARN "No flavor has disk >= required ${_need_disk}GiB; keeping best available disk" >&2
+    fi
+  fi
+
+  _fallback=$(printf '%s\n' "$_rows" | awk '
+    NF>=5 {
+      id=$1; name=$2; ram=$3+0; disk=$4+0; vcpu=$5+0
+      score=(vcpu*1000000000)+(ram*1000000)+disk
+      if (!seen || score < best) { seen=1; best=score; out=id"|"name"|"ram"|"disk"|"vcpu }
+    }
+    END { if (seen) print out }
+  ')
+  if [ -n "$_src_vcpu" ] && [ -n "$_src_ram" ]; then
+    _best=$(printf '%s\n' "$_rows" | awk -v sv="$_src_vcpu" -v sr="$_src_ram" '
+      NF>=5 {
+        id=$1; name=$2; ram=$3+0; disk=$4+0; vcpu=$5+0
+        if (vcpu>=sv && ram>=sr) {
+          score=((vcpu-sv)*1000000000)+((ram-sr)*1000000)+disk
+          if (!seen || score < best) { seen=1; best=score; out=id"|"name"|"ram"|"disk"|"vcpu }
+        }
+      }
+      END { if (seen) print out }
+    ')
+  fi
+
+  _chosen="${_best:-$_fallback}"
+  _cid=$(echo "$_chosen" | cut -d'|' -f1)
+  _cname=$(echo "$_chosen" | cut -d'|' -f2)
+  _cram=$(echo "$_chosen" | cut -d'|' -f3)
+  _cdisk=$(echo "$_chosen" | cut -d'|' -f4)
+  _cvcpu=$(echo "$_chosen" | cut -d'|' -f5)
+  if [ -n "$_cid" ]; then
+    INFO "Flavor auto-pick: $_cid name=${_cname:-?} vcpu=${_cvcpu:-?} ram=${_cram:-?} disk=${_cdisk:-?} src=${_src_vcpu:-?}/${_src_ram:-?}/${_src_disk:-?} req_disk=${_need_disk:-?}" >&2
+    echo "$_cid"
+    return 0
+  fi
+
+  WARN "Could not auto-pick flavor; keeping requested value" >&2
+  echo "$_requested"
+}
+resolve_target_network() {
+  local _requested="$1"
+  if [ -n "$_requested" ] && openstack network show "$_requested" >/dev/null 2>&1; then
+    INFO "Network resolved in target region: $_requested" >&2
+    echo "$_requested"
+    return 0
+  fi
+  [ -n "$_requested" ] && WARN "Requested network not found in target region: $_requested" >&2
+  local _rows _pick
+  _rows=$(openstack network list --format value -c ID -c Name 2>/dev/null || true)
+  [ -z "$_rows" ] && { echo "$_requested"; return 0; }
+  _pick=$(printf '%s\n' "$_rows" | awk 'tolower($2) ~ /(private|tenant|internal)/ {print $1; exit}')
+  [ -z "$_pick" ] && _pick=$(printf '%s\n' "$_rows" | awk 'NF>=1 {print $1; exit}')
+  [ -n "$_pick" ] && INFO "Network auto-pick: $_pick" >&2
+  echo "${_pick:-$_requested}"
+}
+resolve_target_keypair() {
+  local _requested="$1"
+  if [ -n "$_requested" ] && openstack keypair show "$_requested" >/dev/null 2>&1; then
+    INFO "Keypair resolved in target region: $_requested" >&2
+    echo "$_requested"
+    return 0
+  fi
+  [ -n "$_requested" ] && WARN "Requested keypair not found in target region: $_requested" >&2
+  local _pick
+  _pick=$(openstack keypair list --format value -c Name 2>/dev/null | awk 'NF>=1 {print $1; exit}')
+  [ -n "$_pick" ] && INFO "Keypair auto-pick: $_pick" >&2 || WARN "No keypairs found; booting without --key-name" >&2
+  echo "${_pick:-}"
+}
+
+QCOW_BYTES=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
+QCOW_MIB=$((QCOW_BYTES / 1024 / 1024))
+QCOW_VIRTUAL_BYTES=$(detect_virtual_size_bytes "$QCOW")
+QCOW_VIRTUAL_GIB=0
+if [ "$QCOW_VIRTUAL_BYTES" -gt 0 ] 2>/dev/null; then
+  QCOW_VIRTUAL_GIB=$(( (QCOW_VIRTUAL_BYTES + 1073741823) / 1073741824 ))
+fi
+IMG_OS_TYPE="windows"
+IMG_OS_DISTRO="windows"
+IMG_ARCH="x86_64"
+IMG_VM_MODE="hvm"
+IMG_DISK_BUS="virtio"
+IMG_VIF_MODEL="virtio"
+IMG_QGA="yes"
+INFO "FLEX upload source: $QCOW size=${QCOW_BYTES}B (${QCOW_MIB} MiB) virtual=${QCOW_VIRTUAL_BYTES}B (~${QCOW_VIRTUAL_GIB} GiB)"
+INFO "FLEX image metadata: architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=$IMG_OS_DISTRO hw_disk_bus=$IMG_DISK_BUS hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
+
+FLEX_IMG_ID=$(openstack image create "$LABEL" \
   --disk-format qcow2 \
   --container-format bare \
   --file "$QCOW" \
-  --private 2>&1
+  --private \
+  --property "architecture=$IMG_ARCH" \
+  --property "vm_mode=$IMG_VM_MODE" \
+  --property "os_type=$IMG_OS_TYPE" \
+  --property "os_distro=$IMG_OS_DISTRO" \
+  --property "hw_disk_bus=$IMG_DISK_BUS" \
+  --property "hw_vif_model=$IMG_VIF_MODEL" \
+  --property "hw_qemu_guest_agent=$IMG_QGA" \
+  --format value -c id 2>/dev/null || true)
 
-# Wait for image to become active
-FLEX_IMG_ID=$(openstack image list --name "$LABEL" -f value -c ID 2>/dev/null | head -1 || true)
 if [ -z "$FLEX_IMG_ID" ]; then
   FAIL "Image upload failed"
   exit 1
 fi
 
+# Wait for image to become active
 for i in $(seq 1 30); do
   STATUS=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "unknown")
   [ "$STATUS" = "active" ] && break
   sleep 5
 done
 PASS "Image uploaded: $FLEX_IMG_ID (status: $STATUS)"
+SHOW_NAME=$(openstack image show "$FLEX_IMG_ID" -f value -c name 2>/dev/null || echo "$LABEL")
+SHOW_VIS=$(openstack image show "$FLEX_IMG_ID" -f value -c visibility 2>/dev/null || echo "unknown")
+SHOW_STAT=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "${STATUS:-unknown}")
+INFO "[UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$FLEX_IMG_ID name=${SHOW_NAME:-unknown} status=${SHOW_STAT:-unknown} visibility=${SHOW_VIS:-unknown}"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 6: Boot VM on FLEX
 # ═══════════════════════════════════════════════════════════════════════════════
 log "Step 6: Booting VM on FLEX..."
+FLAVOR=$(resolve_target_flavor "${MIG_FLAVOR:-$FLAVOR}")
+NETWORK=$(resolve_target_network "${MIG_NETWORK:-$NETWORK}")
+KEYPAIR=$(resolve_target_keypair "${MIG_KEYPAIR:-$KEYPAIR}")
+INFO "Final boot flavor: $FLAVOR"
+INFO "Final boot network: $NETWORK"
+INFO "Final boot keypair: ${KEYPAIR:-<none>}"
 
 # Kept logic to not delete old VMs
 OLD_VIDS=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep -F "$LABEL" | awk '{print $1}' || true)
@@ -595,12 +792,20 @@ if [ -n "$OLD_VIDS" ]; then
   INFO "Old VMs found: $OLD_VIDS (Skipping deletion as per user request)"
 fi
 
-openstack server create "$LABEL" \
-  --image "$FLEX_IMG_ID" \
-  --flavor "$FLAVOR" \
-  --network "$NETWORK" \
-  --key-name "$KEYPAIR" \
-  --wait 2>&1
+if [ -n "$KEYPAIR" ]; then
+  openstack server create "$LABEL" \
+    --image "$FLEX_IMG_ID" \
+    --flavor "$FLAVOR" \
+    --network "$NETWORK" \
+    --key-name "$KEYPAIR" \
+    --wait 2>&1
+else
+  openstack server create "$LABEL" \
+    --image "$FLEX_IMG_ID" \
+    --flavor "$FLAVOR" \
+    --network "$NETWORK" \
+    --wait 2>&1
+fi
 
 sleep 10
 
@@ -618,19 +823,33 @@ fi
 # Step 7: Assign Floating IP
 # ═══════════════════════════════════════════════════════════════════════════════
 log "Step 7: Assigning floating IP..."
-FIP=$(openstack floating ip list --status DOWN -f value -c "Floating IP Address" 2>/dev/null | shuf | head -1 || true)
-if [ -z "$FIP" ]; then
-  WARN "No available floating IPs"
+PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID -c Status 2>/dev/null | awk '$2=="ACTIVE"{print $1; exit}')
+[ -z "$PORT_ID" ] && PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID 2>/dev/null | head -1 || true)
+if [ -z "$PORT_ID" ]; then
+  WARN "No server port found; skipping FIP attach"
 else
-  openstack server add floating ip "$VM_ID" "$FIP" 2>/dev/null || true
-  sleep 3
-  # Verify
-  ACTUAL_FIP=$(openstack server show "$VM_ID" -f value -c addresses 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+' | grep -v '^10\.' | head -1 || true)
-  if [ -n "$ACTUAL_FIP" ]; then
-    PASS "Floating IP: $ACTUAL_FIP"
-    INFO "RDP: mstsc /v:$ACTUAL_FIP"
+  FIP_JSON=$(openstack floating ip create PUBLICNET -f json 2>/dev/null || true)
+  FIP_ID=$(printf '%s' "$FIP_JSON" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("id",""))' 2>/dev/null || true)
+  FIP=$(printf '%s' "$FIP_JSON" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("floating_ip_address",""))' 2>/dev/null || true)
+  if [ -z "$FIP_ID" ]; then
+    _row=$(openstack floating ip list --status DOWN -f value -c ID -c "Floating IP Address" 2>/dev/null | shuf | head -1 || true)
+    FIP_ID=$(echo "$_row" | awk '{print $1}')
+    FIP=$(echo "$_row" | awk '{print $2}')
+  fi
+  if [ -z "$FIP_ID" ]; then
+    WARN "No available floating IPs"
   else
-    WARN "FIP assignment may have failed"
+    openstack floating ip set --port "$PORT_ID" "$FIP_ID" 2>/dev/null || true
+    sleep 3
+    # Verify
+    ACTUAL_FIP=$(openstack floating ip show "$FIP_ID" -f value -c floating_ip_address 2>/dev/null || true)
+    FIXED_IP=$(openstack floating ip show "$FIP_ID" -f value -c fixed_ip_address 2>/dev/null || true)
+    if [ -n "$ACTUAL_FIP" ] && [ -n "$FIXED_IP" ] && [ "$FIXED_IP" != "None" ]; then
+      PASS "Floating IP: $ACTUAL_FIP"
+      INFO "RDP: mstsc /v:$ACTUAL_FIP"
+    else
+      WARN "FIP assignment may have failed"
+    fi
   fi
 fi
 
