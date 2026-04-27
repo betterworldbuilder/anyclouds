@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moon Defender - Space Invaders</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            color: #0f0;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at center, #0a0a2e 0%, #000 100%);
+            overflow: hidden;
+        }
+
+        /* Starfield */
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* Moon surface at bottom */
+        #moonSurface {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background: linear-gradient(to top, #3a3a3a 0%, #2a2a2a 50%, transparent 100%);
+            border-top: 2px solid #555;
+        }
+
+        #moonSurface::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, #444 0%, transparent 15%),
+                radial-gradient(circle at 60% 50%, #3d3d3d 0%, transparent 20%),
+                radial-gradient(circle at 80% 20%, #444 0%, transparent 12%),
+                radial-gradient(circle at 40% 60%, #3d3d3d 0%, transparent 18%);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 20, 0, 0.7);
+            border-bottom: 2px solid #0f0;
+            z-index: 100;
+        }
+
+        #hud h1 {
+            font-size: 18px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            letter-spacing: 3px;
+        }
+
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .hud-label {
+            color: #0a0;
+        }
+
+        .hud-value {
+            color: #0f0;
+            font-weight: bold;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        #timer {
+            font-size: 24px;
+            color: #0f0;
+            text-shadow: 0 0 15px #0f0;
+            font-weight: bold;
+        }
+
+        #status {
+            padding: 5px 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            background: rgba(0, 50, 0, 0.5);
+        }
+
+        /* Game entities */
+        .ufo {
+            position: absolute;
+            width: 50px;
+            height: 35px;
+            z-index: 10;
+        }
+
+        .ufo svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 8px #ff00ff);
+        }
+
+        .moon-lander {
+            position: absolute;
+            width: 40px;
+            height: 50px;
+            z-index: 10;
+        }
+
+        .moon-lander svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 5px #00ffff);
+        }
+
+        .rover {
+            position: absolute;
+            width: 60px;
+            height: 45px;
+            z-index: 20;
+            transition: left 0.1s ease;
+        }
+
+        .rover svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 10px #0f0);
+        }
+
+        .bullet {
+            position: absolute;
+            width: 4px;
+            height: 12px;
+            background: #0f0;
+            border-radius: 2px;
+            box-shadow: 0 0 8px #0f0, 0 0 15px #0f0;
+            z-index: 15;
+        }
+
+        .enemy-bullet {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #ff0000;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #ff0000, 0 0 15px #ff0000;
+            z-index: 15;
+        }
+
+        .explosion {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            z-index: 25;
+            pointer-events: none;
+        }
+
+        .explosion-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            animation: explode 0.6s ease-out forwards;
+        }
+
+        @keyframes explode {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        /* Screens */
+        #startScreen, #gameOverScreen, #winScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 200;
+        }
+
+        #gameOverScreen, #winScreen {
+            display: none;
+        }
+
+        .screen-title {
+            font-size: 48px;
+            color: #0f0;
+            text-shadow: 0 0 20px #0f0;
+            margin-bottom: 20px;
+            letter-spacing: 5px;
+        }
+
+        .screen-subtitle {
+            font-size: 18px;
+            color: #0a0;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            font-family: 'Courier New', monospace;
+            background: transparent;
+            color: #0f0;
+            border: 2px solid #0f0;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        .final-score {
+            font-size: 24px;
+            color: #0f0;
+            margin: 20px 0;
+        }
+
+        /* Scanline effect */
+        #scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 0, 0.03) 2px,
+                rgba(0, 255, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Level indicator */
+        #levelIndicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            color: #0f0;
+            text-shadow: 0 0 30px #0f0;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 150;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- HUD -->
+        <div id="hud">
+            <h1>🛸 MOON DEFENDER</h1>
+            <div class="hud-item">
+                <span class="hud-label">SCORE:</span>
+                <span class="hud-value" id="score">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">LANDERS:</span>
+                <span class="hud-value" id="landersCount">5</span>
+            </div>
+            <div id="timer">5:00</div>
+            <div id="status">In Progress</div>
+            <div class="hud-item">
+                <span class="hud-label">LIVES:</span>
+                <span class="hud-value" id="lives">3</span>
+            </div>
+        </div>
+
+        <!-- Moon surface -->
+        <div id="moonSurface"></div>
+
+        <!-- Scanlines -->
+        <div id="scanlines"></div>
+
+        <!-- Level indicator -->
+        <div id="levelIndicator">LEVEL 1</div>
+
+        <!-- Start Screen -->
+        <div id="startScreen">
+            <div class="screen-title">🌙 MOON DEFENDER</div>
+            <div class="screen-subtitle">
+                Defend the moon landers from UFO invaders!<br>
+                Use <b>Arrow Keys</b> or <b>A/D</b> to move<br>
+                Press <b>Space</b> to shoot<br>
+                Protect all 5 moon landers at all costs!
+            </div>
+            <button class="btn" onclick="startGame()">Launch Mission</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen">
+            <div class="screen-title" style="color: #f00; text-shadow: 0 0 20px #f00;">MISSION FAILED</div>
+            <div class="screen-subtitle">The moon base has been overrun by UFOs...</div>
+            <div class="final-score">Final Score: <span id="finalScore">0</span></div>
+            <button class="btn" onclick="restartGame()">Retry Mission</button>
+        </div>
+
+        <!-- Win Screen -->
+        <div id="winScreen">
+            <div class="screen-title">MISSION ACCOMPLISHED</div>
+            <div class="screen-subtitle">All UFOs destroyed! The moon base is safe.</div>
+            <div class="final-score">Final Score: <span id="winScore">0</span></div>
+            <button class="btn" onclick="restartGame()">Next Mission</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = 'start'; // start, playing, gameover, win
+        let score = 0;
+        let lives = 3;
+        let level = 1;
+        let timeRemaining = 300; // 5 minutes in seconds
+        let landersRemaining = 5;
+
+        // Game objects
+        let rover = { x: 0, y: 0, width: 60, height: 45 };
+        let ufos = [];
+        let landers = [];
+        let bullets = [];
+        let enemyBullets = [];
+        let explosions = [];
+
+        // Input
+        let keys = {};
+        let lastShot = 0;
+        const SHOT_COOLDOWN = 250;
+
+        // Game loop
+        let gameLoopId;
+        let timerInterval;
+        let ufoMoveDirection = 1;
+        let ufoMoveDown = false;
+        let ufoSpeed = 0.5;
+        let lastEnemyShot = 0;
+
+        const container = document.getElementById('gameContainer');
+        const moonSurface = document.getElementById('moonSurface');
+
+        // Create starfield
+        function createStars() {
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.width = Math.random() * 3 + 1 + 'px';
+                star.style.height = star.style.width;
+                star.style.animationDelay = Math.random() * 2 + 's';
+                container.insertBefore(star, moonSurface);
+            }
+        }
+
+        // SVGs for game entities
+        const roverSVG = `
+            <svg viewBox="0 0 60 45" xmlns="http://www.w3.org/2000/svg">
+                <!-- Wheels -->
+                <circle cx="12" cy="38" r="6" fill="#0a0" stroke="#0f0" stroke-width="1.5"/>
+                <circle cx="30" cy="38" r="6" fill="#0a0" stroke="#0f0" stroke-width="1.5"/>
+                <circle cx="48" cy="38" r="6" fill="#0a0" stroke="#0f0" stroke-width="1.5"/>
+                <!-- Body -->
+                <rect x="5" y="20" width="50" height="15" rx="3" fill="#0a0" stroke="#0f0" stroke-width="1.5"/>
+                <!-- Cabin -->
+                <rect x="15" y="8" width="30" height="15" rx="2" fill="#0a0" stroke="#0f0" stroke-width="1.5"/>
+                <!-- Window -->
+                <rect x="20" y="11" width="20" height="8" rx="1" fill="#0f0" opacity="0.6"/>
+                <!-- Antenna -->
+                <line x1="30" y1="8" x2="30" y2="2" stroke="#0f0" stroke-width="1.5"/>
+                <circle cx="30" cy="2" r="2" fill="#0f0"/>
+                <!-- Cannon -->
+                <rect x="28" y="5" width="4" height="8" fill="#0f0"/>
+                <rect x="26" y="2" width="8" height="4" rx="1" fill="#0f0"/>
+            </svg>
+        `;
+
+        const ufoSVG = `
+            <svg viewBox="0 0 50 35" xmlns="http://www.w3.org/2000/svg">
+                <!-- Dome -->
+                <ellipse cx="25" cy="12" rx="12" ry="10" fill="#800080" stroke="#ff00ff" stroke-width="1.5" opacity="0.8"/>
+                <ellipse cx="25" cy="10" rx="8" ry="6" fill="#ff00ff" opacity="0.4"/>
+                <!-- Saucer body -->
+                <ellipse cx="25" cy="22" rx="22" ry="8" fill="#4a004a" stroke="#ff00ff" stroke-width="1.5"/>
+                <!-- Lights -->
+                <circle cx="10" cy="22" r="2" fill="#ff00ff" opacity="0.8">
+                    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="18" cy="25" r="2" fill="#ff00ff" opacity="0.8">
+                    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1s" begin="0.3s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="25" cy="26" r="2" fill="#ff00ff" opacity="0.8">
+                    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1s" begin="0.6s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="32" cy="25" r="2" fill="#ff00ff" opacity="0.8">
+                    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1s" begin="0.9s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="40" cy="22" r="2" fill="#ff00ff" opacity="0.8">
+                    <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1s" begin="1.2s" repeatCount="indefinite"/>
+                </circle>
+                <!-- Alien face hint -->
+                <circle cx="22" cy="10" r="1.5" fill="#0f0"/>
+                <circle cx="28" cy="10" r="1.5" fill="#0f0"/>
+                <ellipse cx="25" cy="14" rx="3" ry="1.5" fill="#0f0" opacity="0.6"/>
+            </svg>
+        `;
+
+        const landerSVG = `
+            <svg viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+                <!-- Landing legs -->
+                <line x1="8" y1="35" x2="5" y2="48" stroke="#888" stroke-width="2"/>
+                <line x1="32" y1="35" x2="35" y2="48" stroke="#888" stroke-width="2"/>
+                <line x1="20" y1="35" x2="20" y2="48" stroke="#888" stroke-width="2"/>
+                <!-- Foot pads -->
+                <ellipse cx="5" cy="48" rx="4" ry="2" fill="#666"/>
+                <ellipse cx="35" cy="48" rx="4" ry="2" fill="#666"/>
+                <ellipse cx="20" cy="48" rx="4" ry="2" fill="#666"/>
+                <!-- Body -->
+                <rect x="10" y="15" width="20" height="22" rx="3" fill="#ccc" stroke="#00ffff" stroke-width="1.5"/>
+                <!-- Top dome -->
+                <path d="M 10 15 Q 20 5 30 15" fill="#aaa" stroke="#00ffff" stroke-width="1.5"/>
+                <!-- Window -->
+                <rect x="15" y="20" width="10" height="8" rx="2" fill="#00ffff" opacity="0.5"/>
+                <!-- Panel details -->
+                <rect x="12" y="32" width="16" height="3" fill="#888"/>
+                <circle cx="14" cy="33.5" r="1" fill="#0f0"/>
+                <circle cx="18" cy="33.5" r="1" fill="#ff0"/>
+                <circle cx="22" cy="33.5" r="1" fill="#f00"/>
+                <!-- Thruster glow -->
+                <ellipse cx="20" cy="50" rx="6" ry="3" fill="#ff6600" opacity="0.6">
+                    <animate attributeName="opacity" values="0.6;0.2;0.6" dur="0.5s" repeatCount="indefinite"/>
+                </ellipse>
+            </svg>
+        `;
+
+        function createRover() {
+            const el = document.createElement('div');
+            el.className = 'rover';
+            el.innerHTML = roverSVG;
+            rover.x = window.innerWidth / 2 - 30;
+            rover.y = window.innerHeight - 130;
+            el.style.left = rover.x + 'px';
+            el.style.top = rover.y + 'px';
+            container.appendChild(el);
+            rover.element = el;
+        }
+
+        function createUFOs() {
+            ufos = [];
+            const rows = 3 + level;
+            const cols = 6 + Math.floor(level / 2);
+            const startX = 100;
+            const startY = 80;
+            const spacingX = 70;
+            const spacingY = 50;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const el = document.createElement('div');
+                    el.className = 'ufo';
+                    el.innerHTML = ufoSVG;
+                    const x = startX + c * spacingX;
+                    const y = startY + r * spacingY;
+                    el.style.left = x + 'px';
+                    el.style.top = y + 'px';
+                    container.appendChild(el);
+
+                    ufos.push({
+                        x: x,
+                        y: y,
+                        width: 50,
+                        height: 35,
+                        element: el,
+                        alive: true,
+                        row: r,
+                        col: c
+                    });
+                }
+            }
+        }
+
+        function createLanders() {
+            landers = [];
+            const positions = [0.15, 0.3, 0.5, 0.7, 0.85];
+
+            positions.forEach((pos, i) => {
+                const el = document.createElement('div');
+                el.className = 'moon-lander';
+                el.innerHTML = landerSVG;
+                const x = window.innerWidth * pos - 20;
+                const y = window.innerHeight - 130;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                container.appendChild(el);
+
+                landers.push({
+                    x: x,
+                    y: y,
+                    width: 40,
+                    height: 50,
+                    element: el,
+                    alive: true,
+                    id: i
+                });
+            });
+        }
+
+        function createExplosion(x, y, color = '#ff6600') {
+            const el = document.createElement('div');
+            el.className = 'explosion';
+            el.style.left = (x - 30) + 'px';
+            el.style.top = (y - 30) + 'px';
+
+            for (let i = 0; i < 12; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'explosion-particle';
+                particle.style.background = color;
+                const angle = (Math.PI * 2 * i) / 12;
+                const distance = 20 + Math.random() * 20;
+                particle.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
+                particle.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
+                particle.style.left = '28px';
+                particle.style.top = '28px';
+                el.appendChild(particle);
+            }
+
+            container.appendChild(el);
+
+            setTimeout(() => {
+                el.remove();
+            }, 600);
+        }
+
+        function shoot() {
+            const now = Date.now();
+            if (now - lastShot < SHOT_COOLDOWN) return;
+            lastShot = now;
+
+            const bullet = document.createElement('div');
+            bullet.className = 'bullet';
+            const bx = rover.x + 28;
+            const by = rover.y;
+            bullet.style.left = bx + 'px';
+            bullet.style.top = by + 'px';
+            container.appendChild(bullet);
+
+            bullets.push({
+                x: bx,
+                y: by,
+                width: 4,
+                height: 12,
+                element: bullet,
+                speed: 8
+            });
+        }
+
+        function enemyShoot() {
+            const now = Date.now();
+            if (now - lastEnemyShot < 1000 - (level * 50)) return;
+
+            const aliveUfos = ufos.filter(u => u.alive);
+            if (aliveUfos.length === 0) return;
+
+            // Random UFO shoots
+            const shooter = aliveUfos[Math.floor(Math.random() * aliveUfos.length)];
+            lastEnemyShot = now;
+
+            const bullet = document.createElement('div');
+            bullet.className = 'enemy-bullet';
+            const bx = shooter.x + 25;
+            const by = shooter.y + 35;
+            bullet.style.left = bx + 'px';
+            bullet.style.top = by + 'px';
+            container.appendChild(bullet);
+
+            enemyBullets.push({
+                x: bx,
+                y: by,
+                width: 6,
+                height: 6,
+                element: bullet,
+                speed: 3 + level * 0.5
+            });
+        }
+
+        function checkCollision(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+
+        function update() {
+            if (gameState !== 'playing') return;
+
+            // Move rover
+            const speed = 6;
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                rover.x = Math.max(0, rover.x - speed);
+            }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                rover.x = Math.min(window.innerWidth - rover.width, rover.x + speed);
+            }
+            rover.element.style.left = rover.x + 'px';
+
+            // Move UFOs
+            let hitEdge = false;
+            const aliveUfos = ufos.filter(u => u.alive);
+
+            if (aliveUfos.length > 0) {
+                const leftmost = Math.min(...aliveUfos.map(u => u.x));
+                const rightmost = Math.max(...aliveUfos.map(u => u.x + u.width));
+
+                if (rightmost >= window.innerWidth - 20 || leftmost <= 20) {
+                    ufoMoveDirection *= -1;
+                    ufoMoveDown = true;
+                }
+
+                aliveUfos.forEach(ufo => {
+                    ufo.x += ufoSpeed * ufoMoveDirection;
+                    if (ufoMoveDown) {
+                        ufo.y += 20;
+                    }
+                    ufo.element.style.left = ufo.x + 'px';
+                    ufo.element.style.top = ufo.y + 'px';
+
+                    // Check if UFO reached landers
+                    if (ufo.y + ufo.height >= window.innerHeight - 150) {
+                        gameOver();
+                    }
+                });
+
+                ufoMoveDown = false;
+            }
+
+            // Move bullets
+            bullets = bullets.filter(bullet => {
+                bullet.y -= bullet.speed;
+                bullet.element.style.top = bullet.y + 'px';
+
+                if (bullet.y < 60) {
+                    bullet.element.remove();
+                    return false;
+                }
+
+                // Check collision with UFOs
+                for (let ufo of ufos) {
+                    if (ufo.alive && checkCollision(bullet, ufo)) {
+                        ufo.alive = false;
+                        ufo.element.remove();
+                        createExplosion(ufo.x + 25, ufo.y + 17, '#ff00ff');
+                        score += 100 * level;
+                        updateHUD();
+                        bullet.element.remove();
+
+                        // Check win condition
+                        if (ufos.filter(u => u.alive).length === 0) {
+                            winLevel();
+                        }
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // Move enemy bullets
+            enemyBullets = enemyBullets.filter(bullet => {
+                bullet.y += bullet.speed;
+                bullet.element.style.top = bullet.y + 'px';
+
+                if (bullet.y > window.innerHeight) {
+                    bullet.element.remove();
+                    return false;
+                }
+
+                // Check collision with rover
+                if (checkCollision(bullet, rover)) {
+                    lives--;
+                    createExplosion(rover.x + 30, rover.y + 22, '#0f0');
+                    updateHUD();
+                    bullet.element.remove();
+
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                    return false;
+                }
+
+                // Check collision with landers
+                for (let lander of landers) {
+                    if (lander.alive && checkCollision(bullet, lander)) {
+                        lander.alive = false;
+                        lander.element.remove();
+                        createExplosion(lander.x + 20, lander.y + 25, '#00ffff');
+                        landersRemaining--;
+                        score -= 500;
+                        updateHUD();
+                        bullet.element.remove();
+
+                        if (landersRemaining <= 0) {
+                            gameOver();
+                        }
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // Enemy shooting
+            enemyShoot();
+        }
+
+        function updateHUD() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('landersCount').textContent = landersRemaining;
+            document.getElementById('lives').textContent = lives;
+        }
+
+        function updateTimer() {
+            if (gameState !== 'playing') return;
+
+            timeRemaining--;
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            document.getElementById('timer').textContent = 
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (timeRemaining <= 0) {
+                gameOver();
+            }
+        }
+
+        function gameLoop() {
+            update();
+            gameLoopId = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            gameState = 'playing';
+            score = 0;
+            lives = 3;
+            level = 1;
+            timeRemaining = 300;
+            landersRemaining = 5;
+            ufoSpeed = 0.5;
+
+            // Clear existing entities
+            document.querySelectorAll('.ufo, .moon-lander, .bullet, .enemy-bullet, .rover').forEach(el => el.remove());
+            bullets = [];
+            enemyBullets = [];
+
+            createRover();
+            createLanders();
+            createUFOs();
+            updateHUD();
+
+            // Show level indicator
+            const levelInd = document.getElementById('levelIndicator');
+            levelInd.textContent = 'LEVEL ' + level;
+            levelInd.style.opacity = '1';
+            setTimeout(() => {
+                levelInd.style.opacity = '0';
+            }, 2000);
+
+            timerInterval = setInterval(updateTimer, 1000);
+            gameLoop();
+        }
+
+        function winLevel() {
+            level++;
+            ufoSpeed += 0.3;
+
+            // Clear bullets
+            bullets.forEach(b => b.element.remove());
+            enemyBullets.forEach(b => b.element.remove());
+            bullets = [];
+            enemyBullets = [];
+
+            // Show level indicator
+            const levelInd = document.getElementById('levelIndicator');
+            levelInd.textContent = 'LEVEL ' + level;
+            levelInd.style.opacity = '1';
+
+            setTimeout(() => {
+                levelInd.style.opacity = '0';
+                createUFOs();
+            }, 2000);
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+            cancelAnimationFrame(gameLoopId);
+            clearInterval(timerInterval);
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        function winGame() {
+            gameState = 'win';
+            cancelAnimationFrame(gameLoopId);
+            clearInterval(timerInterval);
+            document.getElementById('winScore').textContent = score;
+            document.getElementById('winScreen').style.display = 'flex';
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('winScreen').style.display = 'none';
+            startGame();
+        }
+
+        // Input handling
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ' && gameState === 'playing') {
+                e.preventDefault();
+                shoot();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Initialize
+        createStars();
+    </script>
+</body>
+</html>

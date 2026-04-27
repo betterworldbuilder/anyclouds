@@ -4,6 +4,9 @@ set -euo pipefail
 log() { echo "$@"; }
 warn() { echo "[WARN] $*" >&2; }
 die() { echo "[ERROR] $*" >&2; exit 1; }
+die_policy_blocked() { echo "[ERROR] $*" >&2; exit 42; }
+
+CF_EXPORT_BLOCKED_REASON=""
 
 _source_openrc() {
   local openrc="$1"
@@ -21,8 +24,50 @@ _region_short() {
   printf '%s' "$r"
 }
 
+_is_flex_auth() {
+  case "$(printf '%s' "${OS_AUTH_URL:-}" | tr '[:upper:]' '[:lower:]')" in
+    *keystone.api*.rackspacecloud.com*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_flex_region_api() {
+  local r="${OS_REGION_NAME:-IAD}"
+  r=$(printf '%s' "$r" | tr '[:upper:]' '[:lower:]')
+  case "$r" in
+    *[0-9]) printf '%s' "$r" ;;
+    "") printf 'iad3' ;;
+    *) printf '%s3' "$r" ;;
+  esac
+}
+
 _normalize_glance_base() {
   printf '%s' "$1" | tr -d '[:space:]' | sed -E 's#/v2/?$##'
+}
+
+_translate_rackspace_images_base() {
+  local base host label prefix region translated_host
+  base=$(_normalize_glance_base "$1")
+  host=$(_url_host "$base")
+  case "$host" in
+    *.images.api.rackspacecloud.com)
+      label="${host%.images.api.rackspacecloud.com}"
+      prefix=""
+      region="$label"
+      if printf '%s' "$region" | grep -q '^snet-'; then
+        prefix="snet-"
+        region="${region#snet-}"
+      fi
+      if ! printf '%s' "$region" | grep -q '[0-9]'; then
+        region="${region}3"
+      fi
+      translated_host="${prefix}${region}.images.api.rackspacecloud.com"
+      printf '%s' "$base" | sed "s#${host}#${translated_host}#"
+      ;;
+    *)
+      printf '%s' "$base"
+      ;;
+  esac
 }
 
 _url_host() {
@@ -43,8 +88,9 @@ _dedup_lines() {
 }
 
 _image_bases() {
-  local region catalog_json
+  local region api_region catalog_json
   region=$(_region_short)
+  api_region=$(_flex_region_api)
   catalog_json=$(openstack catalog show image -f json 2>/dev/null || true)
   {
     if [ -n "$catalog_json" ]; then
@@ -65,11 +111,20 @@ for wanted in ("internal", "admin", "public"):
 PY
     fi
     openstack endpoint list --service image -f value -c URL 2>/dev/null || true
-    printf 'https://snet-%s.images.api.rackspacecloud.com\n' "$region"
-    printf 'https://%s.images.api.rackspacecloud.com\n' "$region"
+    if _is_flex_auth; then
+      printf 'https://snet-%s.images.api.rackspacecloud.com\n' "$api_region"
+      printf 'https://%s.images.api.rackspacecloud.com\n' "$api_region"
+    else
+      printf 'https://snet-%s.images.api.rackspacecloud.com\n' "$region"
+      printf 'https://%s.images.api.rackspacecloud.com\n' "$region"
+    fi
   } | while IFS= read -r url; do
     [ -n "$url" ] || continue
-    _normalize_glance_base "$url"
+    if _is_flex_auth; then
+      _translate_rackspace_images_base "$url"
+    else
+      _normalize_glance_base "$url"
+    fi
     printf '\n'
   done | _dedup_lines
 }
@@ -85,7 +140,13 @@ _first_resolvable_image_base() {
       return 0
     fi
   done < <(_image_bases)
-  [ -n "$fallback" ] || fallback="https://$(_region_short).images.api.rackspacecloud.com"
+  if [ -z "$fallback" ]; then
+    if _is_flex_auth; then
+      fallback="https://$(_flex_region_api).images.api.rackspacecloud.com"
+    else
+      fallback="https://$(_region_short).images.api.rackspacecloud.com"
+    fi
+  fi
   printf '%s' "$fallback"
 }
 
@@ -103,8 +164,13 @@ except Exception:
 eps = data.get("endpoints") or []
 wanted = os.environ.get("SERVICE_IFACE", "public").lower()
 region = os.environ.get("OS_REGION_NAME", "").upper()
-aliases = {"DFW3": "DFW", "IAD3": "IAD", "ORD3": "ORD"}
-region = aliases.get(region, region)
+region_candidates = []
+if region:
+    region_candidates.append(region)
+    if not any(ch.isdigit() for ch in region):
+        region_candidates.append(region + "3")
+    else:
+        region_candidates.append("".join(ch for ch in region if not ch.isdigit()))
 best = ""
 fallback = ""
 for ep in eps:
@@ -115,7 +181,7 @@ for ep in eps:
     ep_region = str(ep.get("region") or "").upper()
     if iface == wanted:
         fallback = fallback or url.rstrip("/")
-        if not region or ep_region == region:
+        if not region_candidates or ep_region in region_candidates:
             best = url.rstrip("/")
             break
 print(best or fallback)
@@ -209,6 +275,26 @@ _download_curl() {
   return 1
 }
 
+_download_cloud_files_object() {
+  local container="$1" object_name="$2" dest="$3" min_bytes="$4"
+  local rc size
+  rm -f "$dest"
+  log "[INFO] Downloading Cloud Files object to jumphost: $container/$object_name"
+  set +e
+  openstack object save "$container" "$object_name" --file "$dest" >/tmp/ospc2flex_cf_object_save.log 2>&1
+  rc=$?
+  set -e
+  size=$(stat -c%s "$dest" 2>/dev/null || echo 0)
+  if [ "$rc" -eq 0 ] && [ "$size" -ge "$min_bytes" ]; then
+    log "[OK] Cloud Files object downloaded $size bytes"
+    return 0
+  fi
+  warn "openstack object save failed rc=$rc size=${size}B"
+  tail -20 /tmp/ospc2flex_cf_object_save.log >&2 2>/dev/null || true
+  rm -f "$dest"
+  return 1
+}
+
 _download_cloud_files_export_task() {
   local image_id="$1" dest="$2" container="$3" min_bytes="$4"
   local token object_name glance_base tasks_url payload create_resp task_id status task_json elapsed start rc size
@@ -218,6 +304,11 @@ _download_cloud_files_export_task() {
 
   object_name="$(_safe_object_name "${image_id}.vhd")"
   openstack container create "$container" >/tmp/ospc2flex_cf_container.log 2>&1 || true
+  log "[INFO] Checking for existing Cloud Files object before creating export task: $container/$object_name"
+  if _download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes"; then
+    log "[OK] Reused existing Cloud Files export object: $container/$object_name"
+    return 0
+  fi
   glance_base=$(_first_resolvable_image_base)
   tasks_url="${glance_base}/v2/tasks"
   payload=$(IMAGE_ID="$image_id" CF_CONTAINER="$container" CF_OBJECT="$object_name" python3 - <<'PY'
@@ -262,6 +353,19 @@ PY
       success) break ;;
       failure|error)
         warn "$task_json"
+        if printf '%s' "$task_json" | grep -qi 'Object already exists'; then
+          log "[INFO] Export task reports object already exists; reusing existing Cloud Files object"
+          if _download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes"; then
+            log "[OK] Reused existing Cloud Files export object after task failure: $container/$object_name"
+            return 0
+          fi
+        fi
+        if printf '%s' "$task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported'; then
+          CF_EXPORT_BLOCKED_REASON=$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("message","Cloud Files export blocked by image policy"))' 2>/dev/null || true)
+          [ -n "$CF_EXPORT_BLOCKED_REASON" ] || CF_EXPORT_BLOCKED_REASON="Cloud Files export blocked by image policy"
+          warn "Cloud Files export is blocked by Rackspace image policy: $CF_EXPORT_BLOCKED_REASON"
+          return 2
+        fi
         return 1
         ;;
       *)
@@ -271,25 +375,17 @@ PY
     token=$(_refresh_rax_token || printf '%s' "$token")
   done
 
-  rm -f "$dest"
-  log "[INFO] Downloading Cloud Files object to jumphost: $container/$object_name"
-  set +e
-  openstack object save "$container" "$object_name" --file "$dest" >/tmp/ospc2flex_cf_object_save.log 2>&1
-  rc=$?
-  set -e
-  size=$(stat -c%s "$dest" 2>/dev/null || echo 0)
-  if [ "$rc" -ne 0 ] || [ "$size" -lt "$min_bytes" ]; then
-    warn "openstack object save failed rc=$rc size=${size}B"
-    tail -20 /tmp/ospc2flex_cf_object_save.log >&2 2>/dev/null || true
+  if ! _download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes"; then
     return 1
   fi
+  size=$(stat -c%s "$dest" 2>/dev/null || echo 0)
   openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
   log "[OK] Cloud Files export downloaded $size bytes"
   return 0
 }
 
 download_cloud_files_export() {
-  local openrc="" image_id="" dest="" container="ospc2flex-export" retries=4 retry_wait=15 min_bytes=1048576 prefer_cloud_files=0
+  local openrc="" image_id="" dest="" container="ospc2flex-export" retries=4 retry_wait=15 min_bytes=1048576 prefer_cloud_files=1
   while [ $# -gt 0 ]; do
     case "$1" in
       --ospc-openrc) openrc="$2"; shift 2 ;;
@@ -297,6 +393,7 @@ download_cloud_files_export() {
       --dest) dest="$2"; shift 2 ;;
       --container) container="$2"; shift 2 ;;
       --prefer-cloud-files) prefer_cloud_files=1; shift ;;
+      --classic-first|--no-prefer-cloud-files) prefer_cloud_files=0; shift ;;
       --retries) retries="$2"; shift 2 ;;
       --retry-wait) retry_wait="$2"; shift 2 ;;
       --min-bytes) min_bytes="$2"; shift 2 ;;
@@ -307,7 +404,7 @@ download_cloud_files_export() {
   _source_openrc "$openrc"
   mkdir -p "$(dirname "$dest")"
 
-  local token attempt base h log_file size
+  local token attempt base h log_file size cf_rc cloud_files_blocked=0
   token=$(_refresh_rax_token || true)
   [ -n "$token" ] || die "Could not obtain OSPC token"
 
@@ -316,10 +413,19 @@ download_cloud_files_export() {
 
   if [ "$prefer_cloud_files" = "1" ]; then
     log "[INFO] Prefer Cloud Files mode enabled: starting with Glance export to Cloud Files"
-    if _download_cloud_files_export_task "$image_id" "$dest" "$container" "$min_bytes"; then
+    set +e
+    _download_cloud_files_export_task "$image_id" "$dest" "$container" "$min_bytes"
+    cf_rc=$?
+    set -e
+    if [ "$cf_rc" -eq 0 ]; then
       return 0
     fi
-    warn "Cloud Files preferred path failed; falling back to direct Classic Glance methods"
+    if [ "$cf_rc" -eq 2 ]; then
+      cloud_files_blocked=1
+      warn "Cloud Files preferred path is not allowed for this image; trying direct Classic Glance fallback"
+    else
+      warn "Cloud Files preferred path failed; falling back to direct Classic Glance methods"
+    fi
   fi
 
   attempt=1
@@ -349,10 +455,16 @@ download_cloud_files_export() {
     attempt=$((attempt + 1))
   done
 
-  log "[INFO] Classic Glance download failed; starting Cloud Files export task fallback"
-  if _download_cloud_files_export_task "$image_id" "$dest" "$container" "$min_bytes"; then
-    return 0
+  if [ "$cloud_files_blocked" = "1" ]; then
+    die_policy_blocked "OSPC snapshot download failed: Cloud Files export is blocked for this image (${CF_EXPORT_BLOCKED_REASON:-Rackspace image policy}) and direct Glance methods failed"
   fi
+  log "[INFO] Classic Glance download failed; starting Cloud Files export task fallback"
+  set +e
+  _download_cloud_files_export_task "$image_id" "$dest" "$container" "$min_bytes"
+  cf_rc=$?
+  set -e
+  [ "$cf_rc" -eq 0 ] && return 0
+  [ "$cf_rc" -eq 2 ] && die_policy_blocked "OSPC snapshot download failed: Cloud Files export is blocked for this image (${CF_EXPORT_BLOCKED_REASON:-Rackspace image policy}) and direct Glance methods failed"
   die "OSPC snapshot download failed: Cloud Files export and direct Glance methods exhausted"
 }
 
@@ -569,17 +681,18 @@ upload_flex_image() {
   [ -f "$image_file" ] || die "image file not found: $image_file"
   _source_openrc "$openrc"
 
-  if _direct_flex_upload "$image_file" "$image_name" "$disk_format" "$container_format" "$visibility"; then
+  log "[INFO] Cloud Files -> FLEX Glance import is preferred for large image upload"
+  if _cloud_files_flex_import "$image_file" "$image_name" "$disk_format" "$container_format" "$visibility" "$container"; then
     return 0
   fi
-  log "[INFO] Direct FLEX upload failed; trying Cloud Files -> FLEX Glance import"
-  _cloud_files_flex_import "$image_file" "$image_name" "$disk_format" "$container_format" "$visibility" "$container"
+  warn "Cloud Files -> FLEX Glance import failed; falling back to direct openstack image create"
+  _direct_flex_upload "$image_file" "$image_name" "$disk_format" "$container_format" "$visibility"
 }
 
 usage() {
   cat <<'EOF'
 Usage:
-  ospc2flex_glance_bridge.sh download --ospc-openrc FILE --image-id UUID --dest FILE [--container NAME] [--prefer-cloud-files]
+  ospc2flex_glance_bridge.sh download --ospc-openrc FILE --image-id UUID --dest FILE [--container NAME] [--classic-first]
   ospc2flex_glance_bridge.sh upload --flex-openrc FILE --image-file FILE --image-name NAME [--container NAME]
 EOF
 }

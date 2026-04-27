@@ -581,6 +581,62 @@ if ! origin_ssh "echo ok" >/dev/null 2>&1; then
   stage_fail 3 "Cannot SSH to origin VM $ORIGIN_VM_IP — check key/password and connectivity"
 fi
 log "  [OK] SSH to origin VM verified"
+if [ "${{REPAIR_OS_TYPE:-}}" = "windows" ]; then
+  log "  [INFO] Windows origin detected — streaming \\\\.\\PhysicalDrive0 through PowerShell to jumphost"
+  WIN_RAW_IMG="$workdir/{snap_name}.img"
+  rm -f "$WIN_RAW_IMG" "$converted_path"
+  WIN_SIZE_B64=$(python3 - <<'PY'
+import base64
+script = r"(Get-Disk | Where-Object IsBoot -eq $true | Select-Object -First 1 -ExpandProperty Size)"
+print(base64.b64encode(script.encode("utf-16le")).decode())
+PY
+)
+  WIN_STREAM_B64=$(python3 - <<'PY'
+import base64
+script = r'''
+$ErrorActionPreference = 'Stop'
+$out = [Console]::OpenStandardOutput()
+$fs = [System.IO.File]::Open('\\\\.\\PhysicalDrive0', [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+try {{
+  $buf = New-Object byte[] 4194304
+  while (($n = $fs.Read($buf, 0, $buf.Length)) -gt 0) {{
+    $out.Write($buf, 0, $n)
+  }}
+}}
+finally {{
+  $fs.Close()
+}}
+'''
+print(base64.b64encode(script.encode("utf-16le")).decode())
+PY
+)
+  WIN_SIZE_BYTES=$(origin_ssh "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $WIN_SIZE_B64" 2>/dev/null | tr -cd '0-9' || echo 0)
+  [ -z "$WIN_SIZE_BYTES" ] && WIN_SIZE_BYTES=0
+  FREE_KB=$(df -k "$workdir" | tail -1 | awk '{{print $4}}')
+  NEEDED_KB=$(( (WIN_SIZE_BYTES / 1024) / 6 ))
+  log "  [INFO] Windows source disk: ${{WIN_SIZE_BYTES}} bytes | Estimated compressed: ~${{NEEDED_KB}}KB | Local free: ${{FREE_KB}}KB"
+  log "  [INFO] Pulling raw Windows disk stream to sparse file on jumphost..."
+  origin_ssh "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $WIN_STREAM_B64" \
+    | dd of="$WIN_RAW_IMG" bs=4M conv=sparse status=none
+  RAW_SIZE=$(stat -c%s "$WIN_RAW_IMG" 2>/dev/null || echo 0)
+  if [ "$RAW_SIZE" -lt 10485760 ]; then
+    rm -f "$WIN_RAW_IMG"
+    stage_fail 3 "Windows raw disk stream too small (${{RAW_SIZE}} bytes) — OpenSSH/Administrator disk read likely failed"
+  fi
+  SPARSE_ACTUAL=$(du -sh "$WIN_RAW_IMG" 2>/dev/null | cut -f1)
+  log "  [OK] Windows raw stream received: $WIN_RAW_IMG (apparent=$(ls -lh "$WIN_RAW_IMG" | awk '{{print $5}}') actual=$SPARSE_ACTUAL)"
+  log "  [INFO] Converting Windows raw disk → {target_format}..."
+  qemu-img convert -p -f raw -O {target_format} -c "$WIN_RAW_IMG" "$converted_path"
+  rm -f "$WIN_RAW_IMG"
+  SIZE_BYTES=$(stat -c%s "$converted_path" 2>/dev/null || echo 0)
+  if [ "$SIZE_BYTES" -lt 10485760 ]; then
+    rm -f "$converted_path"
+    stage_fail 3 "Windows converted image too small (${{SIZE_BYTES}} bytes) — conversion failed"
+  fi
+  SIZE=$(ls -lh "$converted_path" | awk '{{print $5}}')
+  log "  [OK] Windows SSH stream + convert complete: $converted_path ($SIZE)"
+  stage_done 3
+else
 # Detect root disk on origin VM (prefer vda/xvda/sda — skip loop/nbd/dm devices)
 _origin_disk_detect='for d in /dev/vda /dev/xvda /dev/sda; do [ -b "$d" ] && echo "$d" && break; done'
 # Get disk size from origin VM for space check
@@ -628,6 +684,7 @@ else
   log "  [OK] SSH stream + convert complete: $converted_path ($SIZE)"
 fi
 stage_done 3
+fi
 
 """
     elif direct_export:
@@ -701,7 +758,8 @@ success=0
 GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
 if [ $success -eq 0 ] && [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
   log "  Trying {'Cloud Files preferred' if prefer_cloud_files_download else 'Classic Glance first'} bridge (Glance/Cloud Files waterfall)..."
-  if bash "$GLANCE_BRIDGE" download \
+  set +e
+  BRIDGE_DOWNLOAD_OUT=$(bash "$GLANCE_BRIDGE" download \
       --ospc-openrc {shell_quote(ospc_openrc_path)} \
       --image-id {shell_quote(snap_id)} \
       --dest "$img_path" \
@@ -709,10 +767,17 @@ if [ $success -eq 0 ] && [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x 
       {"--prefer-cloud-files" if prefer_cloud_files_download else ""} \
       --retries "$export_retries" \
       --retry-wait "$export_retry_wait" \
-      --min-bytes 1048576; then
+      --min-bytes 1048576 2>&1)
+  BRIDGE_DOWNLOAD_RC=$?
+  set -e
+  echo "$BRIDGE_DOWNLOAD_OUT"
+  if [ "$BRIDGE_DOWNLOAD_RC" -eq 0 ]; then
     size=$(stat -c%s "$img_path" 2>/dev/null || echo 0)
     log "  [OK] Bridge downloaded OSPC image: $size bytes"
     success=1
+  elif [ "$BRIDGE_DOWNLOAD_RC" -eq 42 ]; then
+    rm -f "$img_path"
+    stage_fail 3 "Cloud Files export is blocked by Rackspace image licensing/billing policy for this snapshot; direct Glance cannot handle this large image path"
   else
     log "  [WARN] Bridge download failed — falling back to legacy public Glance loop"
     rm -f "$img_path"
@@ -1414,7 +1479,7 @@ fi  # end Windows/Linux verify branch
 stage_done '4.7'
 
 # ── STAGE 5: Upload to FLEX Glance ───────────────────────────────────────────
-stage_start 5 'Upload to FLEX Glance' 'Uploading repaired qcow2 directly from origin VM to FLEX Glance'
+stage_start 5 'Upload to FLEX Glance' 'Prefer FLEX Cloud Files staging → Glance import; fallback to direct Glance upload'
 sed -i 's/'$'\r''$//' {shell_quote(flex_openrc_path)}  # Strip Windows CR from openrc
 source {shell_quote(flex_openrc_path)}
 log '  [INFO] Authenticating to FLEX (via sourced OpenRC)...'
@@ -1423,41 +1488,39 @@ if ! openstack token issue >/dev/null 2>&1; then
 fi
 log '  [OK] OpenRC sourced and authentication verified'
 
-# Use native openstack CLI for image upload — correctly handles v3 Fernet tokens
-# The CLI auto-discovers the correct Glance endpoint from the service catalog
-log "  [INFO] Uploading image via openstack CLI..."
 UPLOAD_SIZE=$(stat -c%s "$repaired_path" 2>/dev/null || echo 0)
 log "  [INFO] Image: $repaired_path (${{UPLOAD_SIZE}} bytes)"
-IMG_ID=$(openstack image create \\
-  --disk-format {target_format} \\
-  --container-format {container_format} \\
-  --file "$repaired_path" \\
-  --property visibility={visibility} \\
-  --format value -c id \\
-  "{flex_image_name}" 2>&1 || true)
-if echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized' || [ -z "$IMG_ID" ]; then
-  log "  [WARN] Direct openstack image create did not succeed: $IMG_ID"
-  GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
-  if [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
-    log "  [INFO] Trying Cloud Files -> FLEX Glance bridge fallback..."
-    if BRIDGE_UPLOAD_OUT=$(bash "$GLANCE_BRIDGE" upload \
-        --flex-openrc {shell_quote(flex_openrc_path)} \
-        --image-file "$repaired_path" \
-        --image-name {shell_quote(flex_image_name)} \
-        --disk-format {shell_quote(target_format)} \
-        --container-format {shell_quote(container_format)} \
-        --visibility {shell_quote(visibility)} \
-        --container {shell_quote(flex_cloud_files_container)} 2>&1); then
-      echo "$BRIDGE_UPLOAD_OUT"
-      IMG_ID=$(echo "$BRIDGE_UPLOAD_OUT" | awk -F= '/^FLEX_IMAGE_ID=/ {{print $2; exit}}')
-    else
-      _bridge_rc=$?
-      echo "$BRIDGE_UPLOAD_OUT"
-      stage_fail 5 "FLEX upload failed via direct Glance and Cloud Files bridge (rc=$_bridge_rc)"
-    fi
+IMG_ID=""
+GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
+if [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
+  log "  [INFO] Uploading image via Cloud Files -> FLEX Glance bridge (preferred)..."
+  if BRIDGE_UPLOAD_OUT=$(bash "$GLANCE_BRIDGE" upload \
+      --flex-openrc {shell_quote(flex_openrc_path)} \
+      --image-file "$repaired_path" \
+      --image-name {shell_quote(flex_image_name)} \
+      --disk-format {shell_quote(target_format)} \
+      --container-format {shell_quote(container_format)} \
+      --visibility {shell_quote(visibility)} \
+      --container {shell_quote(flex_cloud_files_container)} 2>&1); then
+    echo "$BRIDGE_UPLOAD_OUT"
+    IMG_ID=$(echo "$BRIDGE_UPLOAD_OUT" | awk -F= '/^FLEX_IMAGE_ID=/ {{print $2; exit}}')
   else
-    stage_fail 5 "Image upload failed and Cloud Files bridge is unavailable: $IMG_ID"
+    _bridge_rc=$?
+    echo "$BRIDGE_UPLOAD_OUT"
+    log "  [WARN] Cloud Files bridge upload failed rc=$_bridge_rc — falling back to direct openstack image create"
   fi
+else
+  log "  [WARN] Cloud Files bridge unavailable or disabled — using direct openstack image create"
+fi
+if [ -z "$IMG_ID" ] || echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized'; then
+  log "  [INFO] Uploading image via direct openstack image create fallback..."
+  IMG_ID=$(openstack image create \\
+    --disk-format {target_format} \\
+    --container-format {container_format} \\
+    --file "$repaired_path" \\
+    --property visibility={visibility} \\
+    --format value -c id \\
+    "{flex_image_name}" 2>&1 || true)
 fi
 if [ -z "$IMG_ID" ] || echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized'; then
   stage_fail 5 "Image upload produced no FLEX image ID after all methods: $IMG_ID"

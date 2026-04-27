@@ -5238,15 +5238,30 @@ def run_image_migrator():
     cmd.extend(["--source-server-ip", process_ip])
     cmd.extend(["--origin-image-dir", req.get('workdir') or '/home/ubuntu/image'])
     cmd.extend(["--workdir", "/tmp/ospc2flex_local_orch"])
-    # origin_vm_user = per-VM OS user (rocky, almalinux, etc.) used to SSH into origin VM in Mode 3
-    origin_user = req.get('origin_vm_user') or req.get('ssh_user') or ssh_usr
+    # origin_vm_user = per-VM OS user (rocky, almalinux, Windows Administrator, etc.)
+    # used to SSH into origin VM in Mode 3.
+    _req_os_family = str(req.get('os_family') or '').strip().lower()
+    _req_os_type = str(req.get('os_type') or '').strip().lower()
+    _req_server_name = str(req.get('server_name') or '').strip().lower()
+    _is_windows_request = (
+        _req_os_family == 'windows'
+        or 'windows' in _req_os_type
+        or 'win' in _req_os_type
+        or 'windows' in _req_server_name
+        or _req_server_name.startswith('win')
+    )
+    origin_user = req.get('origin_vm_user') or req.get('ssh_user') or ('Administrator' if _is_windows_request else ssh_usr)
+    if _is_windows_request and str(origin_user or '').strip().lower() in {'', 'ubuntu'}:
+        origin_user = 'Administrator'
     cmd.extend(["--origin-vm-user", origin_user])
     origin_vm_ssh_key = os.path.expanduser((req.get('origin_vm_ssh_key') or req.get('origin_vm_key') or '').strip())
-    origin_vm_password = (req.get('origin_vm_password') or '').strip()
+    origin_vm_password = (req.get('origin_vm_password') or req.get('windows_admin_password') or '').strip()
     if origin_vm_ssh_key:
         cmd.extend(["--origin-vm-ssh-key-path", origin_vm_ssh_key])
     if origin_vm_password:
         cmd.extend(["--origin-vm-password", origin_vm_password])
+        if _is_windows_request:
+            cmd.extend(["--windows-admin-password", origin_vm_password])
 
     # Production Mode: pass the per-VM origin IP separately so migrator knows to SSH-pipe from it
     origin_vm_ip_override = (req.get('source_server_ip') or req.get('origin_vm_ip') or '').strip()
@@ -5291,7 +5306,7 @@ def run_image_migrator():
             _mask_next = False
             continue
         safe_cmd_parts.append(shlex.quote(part_s))
-        if part_s in {"--origin-vm-password"}:
+        if part_s in {"--origin-vm-password", "--windows-admin-password"}:
             _mask_next = True
     safe_cmd_str = " ".join(safe_cmd_parts)
     cwd_dir = os.path.dirname(script_path)
@@ -7060,7 +7075,7 @@ R2=$(cat /sys/class/net/eth0/statistics/rx_bytes 2>/dev/null || echo 0)
 T2=$(cat /sys/class/net/eth0/statistics/tx_bytes 2>/dev/null || echo 0)
 echo "$R1 $R2 $T1 $T2"
 echo '---PROCS---'
-ps -eo pid,etimes,cmd | grep -E 'mig_worker_v4[.]sh|qemu-img' | grep -v 'grep' || true
+ps -eo pid,etimes,cmd | grep -E 'mig_worker_v4[.]sh|ospc2flex_windows_migrate[.]sh|ospc2flex_image_migrator[.]py|ospc2flex_glance_bridge[.]sh|qemu-img|qemu-nbd|openstack image|glance task|curl .*images' | grep -v 'grep' || true
 echo '---FILES---'
 find /mnt/migration/ospc2flex_image -maxdepth 1 -type f \( -name '*.qcow2' -o -name '*.raw' \) -printf "%f|%s|%T@\n" 2>/dev/null | sort -t'|' -k3 -n || true
 echo '---LOGS---'
@@ -7119,9 +7134,15 @@ done
                     tx_mbps = (int(n_pts[3]) - int(n_pts[2])) * 8 / 1000000 / 0.5
                     res["net"] = {"rx": round(rx_mbps, 1), "tx": round(tx_mbps, 1)}
             elif section == 'PROCS':
-                m = re.search(r'mig_worker_v4(?:_.*?)*\.sh\s+([^\s]+)', line)
+                m = re.search(r'/tmp/mig_([A-Za-z0-9._-]+)\.log', line)
                 if not m:
-                    m = re.search(r'qemu-img.*?/([^\s/]+)\.(?:qcow2|raw)', line)
+                    m = re.search(r'mig_worker_v4(?:_.*?)*\.sh\s+([^\s]+)', line)
+                if not m:
+                    m = re.search(r'ospc2flex_windows_migrate[.]sh.*(?:--label|--server-name)\s+["\']?([^"\'\s]+)', line)
+                if not m:
+                    m = re.search(r'ospc2flex_image_migrator[.]py.*--server-name\s+["\']?([^"\'\s]+)', line)
+                if not m:
+                    m = re.search(r'(?:qemu-img|qemu-nbd|openstack|glance|curl).*?/([^\s/]+)\.(?:qcow2|raw|vhd)', line)
                 if m:
                     label = normalize_mig_label(m.group(1))
                     if label not in res["jobs"]:

@@ -18,6 +18,18 @@
       display: block; overflow-x: hidden; overflow-y: auto;
     }
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
+    
+    @keyframes neonPulse {
+        0%   { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
+        33%  { color: #00e5ff; text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff, 0 0 30px #00e5ff; }
+        66%  { color: #39ff14; text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, 0 0 30px #39ff14; }
+        100% { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
+    }
+    .mission-control {
+        animation: neonPulse 4s infinite linear;
+        font-weight: 900;
+        letter-spacing: 2px;
+    }
     /* ── Real neon tube: title text blinks cyan ── */
     @keyframes neon-tube-title {
       0%,17%,19%,100% {
@@ -294,7 +306,7 @@
   <div class="header-inner">
     <div class="neon-sign-outer">
       <div class="neon-sign">
-        <h1><span class="shield">🛡</span> OSPC <span class="accent">TO</span> FLEX MIGRATION FULL CYCLE CONTROL TOWER – <span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
+        <h1><span class="shield">🛡</span> OSPC <span class="accent">TO</span> FLEX MIGRATION FULL CYCLE <span class="mission-control">MISSION CONTROL</span> – <span style="font-style:italic;animation:open-2424-neon 6s linear infinite;">OPEN 24/24</span></h1>
       </div>
     </div>
   </div>
