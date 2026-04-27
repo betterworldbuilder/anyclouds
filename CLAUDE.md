@@ -1,1 +1,0 @@
-this folder containe ospc to flex migration engines for vm servers and rehost 
