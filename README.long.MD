@@ -972,7 +972,7 @@ chmod +x letsmove.sh
 ./letsmove.sh
 ```
 
-Navigate to **http://localhost:5001** (or the WSL network IP shown in terminal output).
+Navigate to **http://localhost:5002** (or the WSL network IP shown in terminal output).
 
 ---
 
