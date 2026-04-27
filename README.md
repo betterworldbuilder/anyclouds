@@ -46,6 +46,24 @@ CloudJumper turns migration into an observable workflow:
 
 The result is fewer mystery failures, faster test boots, cleaner customer updates, and a migration path that feels engineered instead of improvised.
 
+## How
+
+CloudJumper works as a full-cycle migration Mission Control. Each stage turns unknowns into artifacts: CSVs, maps, scripts, repaired images, booted test instances, verification results, and rollback paths.
+
+| Stage | What It Does | Benefit |
+|---|---|---|
+| 0. Customer Tracker | Tracks customer, estate, status, notes, stage progress, and active migration context. | Keeps multiple migrations organized without losing the human thread. |
+| 1. Discover | Scans OSPC and FLEX inventory: servers, images, flavors, volumes, networks, security groups, load balancers, and floating IPs. | Builds a factual source-of-truth before anyone starts changing infrastructure. |
+| 2. Map | Compares source and target capacity, flavors, block storage, networks, load balancer edges, and app dependencies. | Turns "what do we have?" into "where will it land?" |
+| 3. Design | Imports live topology or existing OpenStack scripts into a visual model, then validates and plans the target build. | Lets engineers see the shape of the migration before executing it. |
+| 4. Generate | Produces deployment, data migration, sync, cutover, rollback, and validation scripts from the migration map. | Makes the work repeatable, reviewable, and safer than manual command assembly. |
+| 5. Migrate Images | Moves Linux and Windows workloads through jumphost workers, Glance, Cloud Files, NBD, and `qemu-img`. | Converts old cloud images into FLEX-ready artifacts with live progress tracking. |
+| 6. Repair | Applies offline guest repair for bootloaders, initramfs, fstab, cloud-init, virtio, SSH, and network config. | Fixes the common first-boot failures before the customer has to see them. |
+| 7. Boot And Verify | Creates FLEX test instances, attaches access, checks ping/SSH, gathers host/kernel data, and streams logs. | Changes "the image uploaded" into "the workload is alive." |
+| 8. Cut Over | Uses generated cutover and rollback scripts with final validation evidence. | Gives the migration a controlled finish line instead of a nervous handoff. |
+
+The dashboard is not only a launcher. It is an evidence machine. Every scan, map, run log, repair log, manifest, and verification table becomes data that can feed the next automation layer.
+
 ## For Who
 
 CloudJumper is for:
@@ -110,6 +128,33 @@ sudo apt-get install -y \
   ntfs-3g chntpw libhivex-bin wget curl jq \
   mysql-client pulseaudio-utils mpg123 ffmpeg
 ```
+
+## What Next
+
+CloudJumper is the migration cockpit. The next step is turning its output into a durable modernization pipeline.
+
+The vision is a Full Cycle Migration Mission Control that produces structured data for GitOps workflows:
+
+- Discovery output becomes versioned infrastructure intent.
+- Topology maps become Terraform modules and environment overlays.
+- Server and repair profiles become Ansible playbooks.
+- App dependency maps become deployment order, health checks, and service ownership.
+- Validation reports become pull request evidence.
+- Rollback scripts become tested recovery automation.
+- Migration telemetry becomes optimization data for future waves.
+
+That means CloudJumper can interconnect with platforms like OpenCenter, Genestack, Magnum, and other GitOps control planes. Instead of finishing with a one-time migration script, the customer leaves with a repeatable operating model: infrastructure saved as code, repairs encoded as playbooks, topology represented as reviewable templates, and deployment state controlled through pull requests.
+
+From there, AI agents can help with the work that usually gets lost after migration day:
+
+- autorepair failed boots and broken network profiles,
+- recommend right-sized FLEX flavors and storage classes,
+- detect drift between discovered reality and Git state,
+- generate Terraform and Ansible patches from validated migration maps,
+- summarize risk before each cutover,
+- keep customer environments optimized as they scale.
+
+The goal is bigger than moving VMs. It is preserving customer infrastructure as a living system: scalable, repeatable, reviewable, and ready for the next platform shift.
 
 ## The Promise
 
