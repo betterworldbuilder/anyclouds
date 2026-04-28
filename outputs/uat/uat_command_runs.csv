@@ -1,0 +1,13 @@
+run_id,linked_system,linked_test,execution_mode,command,stdout,stderr,exit_code,duration_seconds,started_at,finished_at,status,error
+uat-run-1777356364313,,smoke,local,true,,,0,0.006,2026-04-28T06:06:04+00:00,2026-04-28T06:06:04+00:00,Passed,
+uat-run-1777356364321,,danger,local,rm -rf /,,,,,2026-04-28T06:06:04+00:00,2026-04-28T06:06:04+00:00,Blocked,Blocked dangerous command pattern: \brm\s+-rf\b
+uat-run-1777356364321,,,local,true,,,,,2026-04-28T06:06:04+00:00,2026-04-28T06:06:04+00:00,Blocked,UI confirmation is required before command execution.
+uat-run-1777356448548,,,local,true,,,0,0.002,2026-04-28T06:07:28+00:00,2026-04-28T06:07:28+00:00,Passed,
+uat-run-1777356448552,,,local,rm -rf /,,,,,2026-04-28T06:07:28+00:00,2026-04-28T06:07:28+00:00,Blocked,Blocked dangerous command pattern: \brm\s+-rf\b
+uat-run-1777356448552,,,local,true,,,,,2026-04-28T06:07:28+00:00,2026-04-28T06:07:28+00:00,Blocked,UI confirmation is required before command execution.
+uat-run-1777356454301,,,local,true,,,0,0.002,2026-04-28T06:07:34+00:00,2026-04-28T06:07:34+00:00,Passed,
+uat-run-1777356454304,,,local,rm -rf /,,,,,2026-04-28T06:07:34+00:00,2026-04-28T06:07:34+00:00,Blocked,Blocked dangerous command pattern: \brm\s+-rf\b
+uat-run-1777356454305,,,local,true,,,,,2026-04-28T06:07:34+00:00,2026-04-28T06:07:34+00:00,Blocked,UI confirmation is required before command execution.
+uat-run-1777356459970,,,local,true,,,0,0.002,2026-04-28T06:07:39+00:00,2026-04-28T06:07:39+00:00,Passed,
+uat-run-1777356459973,,,local,rm -rf /,,,,,2026-04-28T06:07:39+00:00,2026-04-28T06:07:39+00:00,Blocked,Blocked dangerous command pattern: \brm\s+-rf\b
+uat-run-1777356459974,,,local,true,,,,,2026-04-28T06:07:39+00:00,2026-04-28T06:07:39+00:00,Blocked,UI confirmation is required before command execution.

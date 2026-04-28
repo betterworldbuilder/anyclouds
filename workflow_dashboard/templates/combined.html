@@ -378,8 +378,10 @@
   <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
   <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
-  <button class="stage-btn" data-stage="s7">STAGE 6<br><small>OpenCenter</small></button>
-  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>Genestack</small></button>
+  <button class="stage-btn" data-stage="s7">STAGE 6<br><small>TCO / FinOps</small></button>
+  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>OpenCenter</small></button>
+  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>Genestack</small></button>
+  <button class="stage-btn" data-stage="s10">STAGE 9<br><small>AI Anywhere</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -890,8 +892,172 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
   <!-- STAGE 4 · Validation & UAT -->
   <div class="panel" id="panel-s4">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <link rel="stylesheet" href="/static/uat/uat.css?v={{ v }}">
+
+      <div class="uat-console" id="uat-console">
+        <div class="uat-hero">
+          <div>
+            <h2>UAT Mission Control</h2>
+            <p>Validate migrated business apps and databases after Stage 1 Discovery and Stage 2 Migration. State and reports persist under <code>./outputs/uat/</code>.</p>
+          </div>
+          <div class="uat-actions">
+            <button class="uat-btn" onclick="CloudJumperUAT.load()">Refresh</button>
+            <button class="uat-btn uat-btn-good" onclick="uatExportReports()">Export UAT Report</button>
+          </div>
+        </div>
+
+        <div id="uat-message" class="uat-note">Loading UAT state...</div>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header"><h3>1. UAT Summary</h3></div>
+          <div class="uat-panel-body"><div class="uat-grid" id="uat-summary-grid"></div></div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header">
+            <h3>2. Discovery + Migration Artifacts</h3>
+            <span class="uat-note">Loaded / Missing / Invalid with View, Download, Validate actions</span>
+          </div>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Stage</th><th>Artifact</th><th>Status</th><th>Warning</th><th>Actions</th></tr></thead>
+                <tbody id="uat-artifacts-body"></tbody>
+              </table>
+            </div>
+            <pre id="uat-artifact-preview" class="uat-preview uat-hidden"></pre>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header">
+            <h3>3. Business Apps / DBs Under Test</h3>
+            <div class="uat-actions">
+              <button class="uat-btn" onclick="uatShowScopeForm()">+ Add Business App / DB</button>
+              <button class="uat-btn uat-btn-good" onclick="uatSaveScope()">Save Scope</button>
+            </div>
+          </div>
+          <div class="uat-panel-body">
+            <div id="uat-scope-form" class="uat-form-grid uat-hidden" style="margin-bottom:14px;">
+              <label>System Type<select class="uat-select" name="system_type"><option>App</option><option>DB</option></select></label>
+              <label>Name<input class="uat-input" name="business_system_name" placeholder="business system name"></label>
+              <label>Tier<select class="uat-select" name="tier"><option>Frontend</option><option>Backend</option><option>Database</option><option>Batch</option><option>External Integration</option></select></label>
+              <label>Source Host<input class="uat-input" name="source_host"></label>
+              <label>Target Host<input class="uat-input" name="target_host"></label>
+              <label>Target IP<input class="uat-input" name="target_ip"></label>
+              <label>Owner<input class="uat-input" name="owner"></label>
+              <label>Dependencies<input class="uat-input" name="dependencies"></label>
+              <label>Criticality<select class="uat-select" name="criticality"><option>Critical</option><option>Secondary</option><option>Low</option></select></label>
+              <label>UAT Status<select class="uat-select" name="uat_status"><option>Not Started</option><option>Testing</option><option>Passed</option><option>Failed</option><option>Blocked</option></select></label>
+              <label>Execution Mode<select class="uat-select" name="execution_mode"><option>local</option><option>ssh</option></select></label>
+              <label>SSH User<input class="uat-input" name="ssh_user" value="ubuntu"></label>
+              <label>SSH Host<input class="uat-input" name="ssh_host"></label>
+              <label>SSH Key Path<input class="uat-input" name="ssh_key_path"></label>
+              <label>SSH Port<input class="uat-input" name="ssh_port" value="22"></label>
+              <label>Notes<textarea class="uat-textarea" name="notes"></textarea></label>
+              <div style="align-self:end;"><button class="uat-btn uat-btn-good" onclick="uatAddScope()">Add Row</button></div>
+            </div>
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Type</th><th>Name</th><th>Tier</th><th>Source</th><th>Target Host</th><th>Target IP</th><th>Owner</th><th>Dependencies</th><th>Criticality</th><th>Status</th><th>Exec</th><th>SSH User</th><th>SSH Host</th><th>SSH Key</th><th>SSH Port</th><th>Notes</th><th></th></tr></thead>
+                <tbody id="uat-scope-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header">
+            <h3>4. Command-Driven Test Checklist</h3>
+            <div class="uat-actions">
+              <select class="uat-select" id="uat-exec-system"></select>
+              <select class="uat-select" id="uat-exec-mode"><option>local</option><option>ssh</option></select>
+              <input class="uat-input" id="uat-timeout" value="30" style="width:70px;" title="Timeout seconds">
+              <label class="uat-note" style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="uat-stop-critical"> Stop on Critical failure</label>
+              <button class="uat-btn" onclick="uatRunSelectedTests()">Run Selected</button>
+              <button class="uat-btn" onclick="uatRunAllSafeTests()">Run All Safe</button>
+              <button class="uat-btn uat-btn-good" onclick="uatSaveChecklist()">Save Checklist</button>
+            </div>
+          </div>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Run</th><th>Done</th><th>Task</th><th>Description</th><th>Command / Instruction</th><th>Status</th><th>Actual Result</th><th>Owner</th><th>Severity</th><th>Evidence</th></tr></thead>
+                <tbody id="uat-checklist-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header">
+            <h3>5. Performance Validation</h3>
+            <button class="uat-btn uat-btn-good" onclick="uatSavePerformance()">Calculate & Save</button>
+          </div>
+          <div class="uat-panel-body">
+            <div class="uat-form-grid" id="uat-performance-grid"></div>
+            <div class="uat-grid" id="uat-performance-status" style="margin-top:12px;"></div>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header">
+            <h3>6. Issues Tracker</h3>
+            <div class="uat-actions">
+              <button class="uat-btn" onclick="uatAddIssue()">+ Add Issue</button>
+              <button class="uat-btn uat-btn-good" onclick="uatSaveIssues()">Save Issues</button>
+            </div>
+          </div>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>ID</th><th>System</th><th>Test</th><th>Severity</th><th>Owner</th><th>Status</th><th>Description</th><th>Evidence</th><th></th></tr></thead>
+                <tbody id="uat-issues-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header">
+            <h3>7. Migration Logs &amp; Findings</h3>
+            <div class="uat-actions">
+              <button class="uat-btn" onclick="uatRefreshFindings(true)">Rescan Logs</button>
+            </div>
+          </div>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Time</th><th>Source</th><th>Stage</th><th>Severity</th><th>Category</th><th>System</th><th>Message</th><th>Suggested Test</th><th>Action</th></tr></thead>
+                <tbody id="uat-findings-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header"><h3>8. Command Run History</h3></div>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Started</th><th>System</th><th>Test</th><th>Mode</th><th>Status</th><th>Exit</th><th>Duration</th><th>Command</th><th>Output</th></tr></thead>
+                <tbody id="uat-runs-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="uat-panel">
+          <div class="uat-panel-header"><h3>9. Cutover Readiness</h3></div>
+          <div class="uat-panel-body">
+            <div id="uat-readiness-panel"></div>
+            <div id="uat-export-links" class="uat-actions" style="margin-top:12px;"></div>
+          </div>
+        </section>
+      </div>
 
       <style>
+        #uatPage { display:none !important; }
         /* ── UAT Simple Page ─────────────────────────── */
         .uat-page { display:flex; flex-direction:column; gap:18px; max-width:1100px; }
         .uat-section { background:rgba(6,14,48,.7); border:1px solid rgba(79,126,248,.18); border-radius:12px; overflow:hidden; }
@@ -919,7 +1085,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         /* status badge */
         .uat-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.7rem; font-weight:700; }
         /* checklist */
-        .uat-check-row { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:10px;
+        .uat-check-row { display:grid; grid-template-columns:28px minmax(180px,.7fr) minmax(220px,1fr) minmax(280px,1.2fr); align-items:start; gap:10px;
           padding:8px 4px; border-bottom:1px solid rgba(79,126,248,.07); }
         .uat-check-row:last-child { border-bottom:none; }
         .uat-chk { width:18px; height:18px; accent-color:#22c55e; cursor:pointer; }
@@ -940,6 +1106,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         .uat-add-btn { background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.35); color:#a5b4fc;
           border-radius:6px; padding:5px 13px; font-size:0.75rem; font-weight:700; cursor:pointer; }
         .uat-add-btn:hover { background:rgba(99,102,241,.25); }
+        .uat-cmd-box { width:100%; min-height:48px; resize:vertical; background:rgba(2,6,23,.88); border:1px solid rgba(96,165,250,.22); border-radius:6px; color:#93c5fd; font-family:'JetBrains Mono',monospace; font-size:0.72rem; padding:7px 9px; box-sizing:border-box; }
+        .uat-mini-input { width:100%; box-sizing:border-box; background:rgba(255,255,255,.04); border:1px solid rgba(79,126,248,.15); border-radius:5px; color:#e2e8f0; font-size:0.78rem; padding:6px 8px; }
         /* severity badges */
         .sev-critical { background:rgba(239,68,68,.2); border:1px solid rgba(239,68,68,.4); color:#fca5a5; }
         .sev-high     { background:rgba(249,115,22,.2); border:1px solid rgba(249,115,22,.4); color:#fdba74; }
@@ -955,7 +1123,20 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
             <h2 style="margin:0 0 3px;font-size:1.1rem;color:#c8d9ff;">🛡️ UAT Sign-off — OSPC → FLEX</h2>
             <p style="margin:0;color:#6b8aad;font-size:0.76rem;">Purpose: Validate the migrated system on FLEX before cutover &nbsp;·&nbsp; All fields are editable</p>
           </div>
-          <button class="uat-export-btn" onclick="uatExport()">⬇ Export UAT report</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="uat-export-btn" onclick="generateUATInputBundle()">📦 Generate / inject UAT bundle</button>
+            <button class="uat-export-btn" onclick="uatExport()">⬇ Export UAT report</button>
+          </div>
+        </div>
+
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>0 · Migration Evidence Injection</span>
+          </div>
+          <div class="uat-sec-body">
+            <p style="margin:0 0 10px;color:#6b8aad;font-size:0.76rem;">UAT reuses the Migration Output Bundle as the source of truth. This generates a `uat-input/` view containing the evidence map, readiness checklist, and test plan needed before cutover.</p>
+            <div id="uat-bundle-status" style="padding:11px 13px;background:rgba(0,0,0,.24);border:1px solid rgba(79,126,248,.18);border-radius:8px;color:#94a3b8;font-size:0.78rem;">No UAT input bundle generated in this browser session.</div>
+          </div>
         </div>
 
         <!-- ── BLOCK 1: UAT SUMMARY ─────────────────────────────────────── -->
@@ -980,16 +1161,13 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
             <!-- Business context -->
             <div>
-              <p style="margin:0 0 8px;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Business context</p>
-              <table class="uat-tbl">
-                <thead><tr><th>Business System / App</th><th>Role / What it does</th><th>Dependencies</th><th>Input source</th><th>Outputs to</th></tr></thead>
-                <tbody><tr>
-                  <td><span class="uat-ed" contenteditable="true" data-ph="app / system name" id="uat_biz_system"></span></td>
-                  <td><span class="uat-ed" contenteditable="true" data-ph="what this system does" id="uat_biz_role"></span></td>
-                  <td><span class="uat-ed" contenteditable="true" data-ph="DB / API / LDAP / DNS" id="uat_biz_deps"></span></td>
-                  <td><span class="uat-ed" contenteditable="true" data-ph="users / API / upstream app" id="uat_biz_input"></span></td>
-                  <td><span class="uat-ed" contenteditable="true" data-ph="billing / CRM / reports" id="uat_biz_output"></span></td>
-                </tr></tbody>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                <p style="margin:0;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Business context</p>
+                <button class="uat-add-btn" onclick="uatAddBusinessApp()">＋ Add Business App / DB</button>
+              </div>
+              <table class="uat-tbl" id="uatBusinessTable">
+                <thead><tr><th>Type</th><th>Business System / App / DB</th><th>Role / What it does</th><th>Dependencies</th><th>Input source</th><th>Outputs to</th><th></th></tr></thead>
+                <tbody id="uatBusinessTbody"></tbody>
               </table>
             </div>
 
@@ -1106,23 +1284,26 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
       <script>
       // ── UAT page data ────────────────────────────────────────────────────
       const UAT_CHECKS = [
-        {id:'ck_login',   label:'Login works',                        note:'All user roles can authenticate on FLEX'},
-        {id:'ck_flows',   label:'Main business flows work',           note:'Core transactions / workflows complete end-to-end'},
-        {id:'ck_data',    label:'Data looks correct',                 note:'Records, counts, and spot-checks match OSPC'},
-        {id:'ck_api',     label:'APIs / integrations work',           note:'All external API calls and webhooks respond correctly'},
-        {id:'ck_reports', label:'Reports / emails / outputs work',    note:'Scheduled jobs, email notifications, report exports run'},
-        {id:'ck_perms',   label:'Permissions / roles work',           note:'Users have correct access — no over- or under-privilege'},
+        {id:'ck_login',   label:'Login works', note:'All user roles can authenticate on FLEX', cmd:'curl -k -I https://<app_url>/login\n# Or open the app and test each UAT user role manually.'},
+        {id:'ck_flows',   label:'Main business flows work', note:'Core transactions / workflows complete end-to-end', cmd:'# Run the customer critical path:\n# 1. create/read/update a test record\n# 2. submit one transaction\n# 3. confirm the expected success page/log entry'},
+        {id:'ck_data',    label:'Data looks correct', note:'Records, counts, and spot-checks match OSPC', cmd:'mysql -h <flex_db_ip> -e "SELECT COUNT(*) FROM <table>;"\npsql -h <flex_db_ip> -c "SELECT COUNT(*) FROM <table>;"\n# Compare against OSPC source counts.'},
+        {id:'ck_api',     label:'APIs / integrations work', note:'All external API calls and webhooks respond correctly', cmd:'curl -k -sS https://<app_url>/health\ncurl -k -sS https://<app_url>/api/status\n# Check upstream/downstream webhook logs.'},
+        {id:'ck_reports', label:'Reports / emails / outputs work', note:'Scheduled jobs, email notifications, report exports run', cmd:'ssh <user>@<flex_app_ip> "systemctl list-timers --all | head"\nssh <user>@<flex_app_ip> "tail -100 /var/log/syslog | grep -Ei \\'cron|mail|report\\'"'},
+        {id:'ck_perms',   label:'Permissions / roles work', note:'Users have correct access — no over- or under-privilege', cmd:'# Test admin, operator, readonly, and customer users.\n# Confirm each role can access only the expected screens/actions.'},
       ];
 
       const UAT_EDITABLE_IDS = [
         'uat_cust_name','uat_cust_industry','uat_cust_contact',
-        'uat_biz_system','uat_biz_role','uat_biz_deps','uat_biz_input','uat_biz_output',
         'uat_owner','uat_date','uat_progress','uat_critical_count',
         'uat_signoff_name','uat_signoff_date','uat_signoff_notes',
       ];
 
       let uatIssues = [];
+      let uatBusinessApps = [];
       let uatDecision = '';
+      const uatEsc = v => String(v || '').replace(/[&<>"']/g, ch => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      }[ch]));
 
       function uatSave() {
         const data = {};
@@ -1137,7 +1318,12 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         UAT_CHECKS.forEach(c => {
           const el = document.getElementById(c.id);
           if (el) data[c.id] = el.checked;
+          const noteEl = document.getElementById(c.id + '_note');
+          if (noteEl) data[c.id + '_note'] = noteEl.innerText;
+          const cmdEl = document.getElementById(c.id + '_cmd');
+          if (cmdEl) data[c.id + '_cmd'] = cmdEl.value;
         });
+        data._businessApps = uatBusinessApps;
         data._issues = uatIssues;
         data._decision = uatDecision;
         localStorage.setItem('uatData', JSON.stringify(data));
@@ -1159,7 +1345,12 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           UAT_CHECKS.forEach(c => {
             const el = document.getElementById(c.id);
             if (el && data[c.id] !== undefined) el.checked = data[c.id];
+            const noteEl = document.getElementById(c.id + '_note');
+            if (noteEl && data[c.id + '_note'] !== undefined) noteEl.innerText = data[c.id + '_note'];
+            const cmdEl = document.getElementById(c.id + '_cmd');
+            if (cmdEl && data[c.id + '_cmd'] !== undefined) cmdEl.value = data[c.id + '_cmd'];
           });
+          if (data._businessApps) { uatBusinessApps = data._businessApps; renderBusinessApps(); }
           if (data._issues) { uatIssues = data._issues; renderIssues(); }
           if (data._decision) uatPickDecision(data._decision, true);
         } catch(e) {}
@@ -1175,8 +1366,39 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
             <input type="checkbox" class="uat-chk" id="${c.id}" onchange="uatSave()">
             <label for="${c.id}" class="uat-check-label">${c.label}</label>
             <span class="uat-ed uat-check-note" contenteditable="true"
-              data-ph="${c.note}" id="${c.id}_note"></span>`;
+              data-ph="${c.note}" id="${c.id}_note"></span>
+            <textarea class="uat-cmd-box" id="${c.id}_cmd" oninput="uatSave()">${c.cmd}</textarea>`;
           el.appendChild(row);
+        });
+      }
+
+      function uatAddBusinessApp() {
+        uatBusinessApps.push({type:'App', name:'', role:'', deps:'', input:'', output:''});
+        renderBusinessApps();
+        uatSave();
+      }
+
+      function renderBusinessApps() {
+        const tbody = document.getElementById('uatBusinessTbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (uatBusinessApps.length === 0) {
+          uatBusinessApps.push({type:'App', name:'', role:'', deps:'', input:'', output:''});
+        }
+        uatBusinessApps.forEach((app, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><select class="uat-sel" onchange="uatBusinessApps[${i}].type=this.value;uatSave()">
+              ${['App','DB','API','Batch','Queue','Shared Files'].map(t => `<option${app.type===t?' selected':''}>${t}</option>`).join('')}
+            </select></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.name)}" placeholder="app / db name" oninput="uatBusinessApps[${i}].name=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.role)}" placeholder="what this system does" oninput="uatBusinessApps[${i}].role=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.deps)}" placeholder="DB / API / LDAP / DNS" oninput="uatBusinessApps[${i}].deps=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.input)}" placeholder="users / API / upstream app" oninput="uatBusinessApps[${i}].input=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.output)}" placeholder="billing / CRM / reports" oninput="uatBusinessApps[${i}].output=this.value;uatSave()"></td>
+            <td><button class="uat-add-btn" onclick="uatBusinessApps.splice(${i},1);renderBusinessApps();uatSave();">Remove</button></td>
+          `;
+          tbody.appendChild(tr);
         });
       }
 
@@ -1240,12 +1462,17 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         lines.push('  Industry: ' + g('uat_cust_industry'));
         lines.push('  Contact: ' + g('uat_cust_contact'));
         lines.push('');
-        lines.push('BUSINESS CONTEXT');
-        lines.push('  System: ' + g('uat_biz_system'));
-        lines.push('  Role: ' + g('uat_biz_role'));
-        lines.push('  Deps: ' + g('uat_biz_deps'));
-        lines.push('  Input: ' + g('uat_biz_input'));
-        lines.push('  Output: ' + g('uat_biz_output'));
+        lines.push('BUSINESS APPS / DATABASES');
+        if (!uatBusinessApps.length) {
+          lines.push('  None entered');
+        }
+        uatBusinessApps.forEach((app, idx) => {
+          lines.push(`  ${idx + 1}. [${app.type || 'App'}] ${app.name || 'unnamed'}`);
+          lines.push(`     Role: ${app.role || ''}`);
+          lines.push(`     Dependencies: ${app.deps || ''}`);
+          lines.push(`     Inputs: ${app.input || ''}`);
+          lines.push(`     Outputs: ${app.output || ''}`);
+        });
         lines.push('');
         lines.push('STATUS');
         lines.push('  UAT Status: ' + gs('uat_status'));
@@ -1258,7 +1485,9 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         lines.push('TEST CHECKLIST');
         UAT_CHECKS.forEach(c => {
           const chk = (document.getElementById(c.id)||{}).checked;
+          const cmd = (document.getElementById(c.id + '_cmd')||{}).value || '';
           lines.push('  [' + (chk ? 'X' : ' ') + '] ' + c.label);
+          if (cmd.trim()) lines.push('      Command / instruction: ' + cmd.replace(/\n/g, '\n      '));
         });
         lines.push('');
         lines.push('ISSUES (' + uatIssues.length + ')');
@@ -1278,12 +1507,14 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
       document.addEventListener('DOMContentLoaded', () => {
         buildChecklist();
+        renderBusinessApps();
         renderIssues();
         uatLoad();
         // auto-save on every contenteditable change inside uat page
         document.getElementById('uatPage').addEventListener('input', () => uatSave());
       });
       </script>
+      <script src="/static/uat/uat.js?v={{ v }}"></script>
 
       <!-- keep stub so old JS refs don't throw -->
       <div id="uat-terminal-box" style="display:none;"></div>
@@ -1863,11 +2094,18 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:16px; font-family:'Share Tech Mono',monospace; color:#d1d5db; font-size:13px;">
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #38bdf8;">migration_manifest.json</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #38bdf8;">discovery-output bundle</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #0ea5e9;">stage2 migration output</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #22c55e;">terraform.tfvars.json</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #a78bfa;">ansible inventory</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f59e0b;">repaired image metadata</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #fb7185;">boot/test results</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #14b8a6;">dependency graph</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #818cf8;">uat-input bundle</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f97316;">tco / finops bundle</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #22c55e;">opencenter output bundle</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #60a5fa;">genestack output bundle</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f472b6;">ai-anywhere context bundle</div>
         </div>
 
         <div id="migration-output-bundle-status" style="display:none; margin-top:16px; padding:12px; background:rgba(0,0,0,.28); border:1px solid rgba(148,163,184,.25); border-radius:8px; color:#cbd5e1; font-size:13px;"></div>
@@ -1932,11 +2170,34 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 6 · OpenCenter Integration -->
+  <!-- STAGE 6 · TCO / FinOps -->
   <div class="panel" id="panel-s7">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <div style="background:radial-gradient(circle at top left, rgba(245,158,11,.2), rgba(2,6,23,.92)); border:1px solid rgba(245,158,11,.36); border-radius:12px; padding:24px;">
+        <div style="color:#fcd34d; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 6</div>
+        <h2 style="margin:8px 0 10px; color:#fef3c7; font-family:'Orbitron',sans-serif;">TCO / FinOps Integration</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">Turns migration output into financial evidence: OSPC baseline, FLEX target run-rate, savings opportunities, right-sizing candidates, and wave-level TCO reporting.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cost Baseline</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Use source inventory, flavors, storage, IPs, and app grouping to model current OSPC spend.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">FLEX Run-Rate</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Translate target flavors, images, volumes, networks, and booted test VMs into projected monthly cost.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization Candidates</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Feed right-sizing candidates into AI Anywhere and GitOps patch review after migration waves.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #a78bfa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#c4b5fd;">Executive Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate cost comparison, wave savings, risk notes, and modernization value for stakeholders.</p></div>
+      </div>
+
+      <div style="background:rgba(15,23,42,.72); border:1px solid rgba(245,158,11,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
+        <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">FinOps chain position</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → OpenCenter operations → Genestack platform → AI Anywhere optimization loop</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 7 · OpenCenter Integration -->
+  <div class="panel" id="panel-s8">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(34,197,94,.18), rgba(2,6,23,.9)); border:1px solid rgba(34,197,94,.35); border-radius:12px; padding:24px;">
-        <div style="color:#86efac; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 6</div>
+        <div style="color:#86efac; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
         <h2 style="margin:8px 0 10px; color:#dcfce7; font-family:'Orbitron',sans-serif;">OpenCenter Integration</h2>
         <p style="color:#94a3b8; margin:0; max-width:920px;">OpenCenter consumes the Migration Output Bundle as the Day-2 operating view for the migrated customer estate.</p>
       </div>
@@ -1950,11 +2211,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 7 · Genestack Integration -->
-  <div class="panel" id="panel-s8">
+  <!-- STAGE 8 · Genestack Integration -->
+  <div class="panel" id="panel-s9">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
-        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
         <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">Genestack Integration</h2>
         <p style="color:#94a3b8; margin:0; max-width:920px;">Genestack consumes the same bundle as the repeatable FLEX/OpenStack landing-zone and component configuration handoff.</p>
       </div>
@@ -1964,6 +2225,40 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Helm/OpenStack Service Config</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Turn migration facts into service values and GitOps-controlled platform config.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">/etc/genestack Overrides</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Store customer-specific overrides without losing the upstream Genestack model.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cloud Components / Versioning</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Track image, service, Kubernetes, and OpenStack component versions for repeatable rebuilds.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 9 · AI Anywhere Integration -->
+  <div class="panel" id="panel-s10">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
+        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
+        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AI Anywhere Integration</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">AI Anywhere consumes the Cloud Jumper output bundle plus OpenCenter and Genestack outputs as a private AI context pack for repair, risk, right-sizing, GitOps, and runbook agents.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:minmax(260px,1fr) 38px minmax(260px,1fr) 38px minmax(280px,1.1fr); gap:14px; align-items:center; font-family:'Share Tech Mono',monospace;">
+        <div style="background:rgba(0,0,0,.28); border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:16px;">
+          <h3 style="margin:0 0 10px; color:#7dd3fc;">Cloud Jumper Inputs</h3>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">migration manifest<br>terraform vars<br>ansible inventory<br>repair metadata<br>boot/test results<br>dependency graph</div>
+        </div>
+        <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
+        <div style="background:rgba(0,0,0,.28); border:1px solid rgba(34,197,94,.3); border-radius:8px; padding:16px;">
+          <h3 style="margin:0 0 10px; color:#86efac;">Platform Context</h3>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">OpenCenter estate map<br>day-2 runbook<br>observability context<br>GitOps workflows<br>Genestack service config<br>Genestack overrides</div>
+        </div>
+        <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
+        <div style="background:rgba(0,0,0,.28); border:1px solid rgba(244,114,182,.35); border-radius:8px; padding:16px;">
+          <h3 style="margin:0 0 10px; color:#f9a8d4;">AI Anywhere Outputs</h3>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">risk-score.json<br>rightsize recommendations<br>autorepair plan<br>Terraform patch suggestions<br>runbook improvements<br>Genestack override suggestions</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Private AI Context</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Sensitive customer migration evidence stays packaged for private AI workflows instead of generic public prompting.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Autorepair Intelligence</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Failed boot, network, service, and dependency signals become repair plans with risk and rollback notes.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine OpenCenter/Genestack runbooks after each wave.</p></div>
       </div>
     </div>
   </div>
@@ -1985,16 +2280,69 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     box.style.borderColor = 'rgba(56,189,248,.35)';
     box.innerHTML = 'Generating Cloud Jumper output bundle...';
     try {
-      const res = await fetch('/api/migration-output-bundle/generate', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({customer: window.activeCustomerId || ''})
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'Bundle generation failed');
+      const data = await requestMigrationOutputBundle();
       const links = (data.files || []).map(f => `<a href="${f.url}" style="display:inline-block;margin:4px 8px 4px 0;padding:6px 9px;border:1px solid rgba(125,211,252,.4);border-radius:6px;color:#7dd3fc;text-decoration:none;background:rgba(14,165,233,.08);">${f.name}</a>`).join('');
       box.style.borderColor = 'rgba(34,197,94,.45)';
       box.innerHTML = `<div style="color:#86efac;font-weight:800;margin-bottom:8px;">Bundle ready: ${data.bundle} / ${data.stamp}</div><div>${links}</div>`;
+    } catch (err) {
+      box.style.borderColor = 'rgba(239,68,68,.45)';
+      box.innerHTML = `<span style="color:#fca5a5;">${err.message}</span>`;
+    }
+  }
+
+  async function requestMigrationOutputBundle() {
+    const res = await fetch('/api/migration-output-bundle/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({customer: window.activeCustomerId || ''})
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Bundle generation failed');
+    return data;
+  }
+
+  async function generateUATInputBundle() {
+    const box = document.getElementById('uat-bundle-status');
+    if (!box) return;
+    box.style.borderColor = 'rgba(96,165,250,.45)';
+    box.innerHTML = 'Generating UAT input bundle from migration evidence...';
+    try {
+      const data = await requestMigrationOutputBundle();
+      const uatNames = new Set([
+        'migration_manifest.json',
+        'terraform.tfvars.json',
+        'ansible_inventory.ini',
+        'repaired_image_metadata.json',
+        'boot_test_results.json',
+        'dependency_graph.json',
+        'discovery-output/discovery-manifest.json',
+        'discovery-output/source-inventory.json',
+        'discovery-output/target-inventory.json',
+        'discovery-output/flavor-map.json',
+        'discovery-output/image-map.json',
+        'discovery-output/network-map.json',
+        'discovery-output/security-group-map.json',
+        'discovery-output/dependency-seed.json',
+        'stage2-migration-output/stage2-migration-manifest.json',
+        'stage2-migration-output/vm-migration-results.json',
+        'stage2-migration-output/image-migration-results.json',
+        'stage2-migration-output/data-migration-results.json',
+        'stage2-migration-output/kubernetes-migration-results.json',
+        'stage2-migration-output/repair-actions.json',
+        'stage2-migration-output/rollback-artifacts.json',
+        'uat-input/uat-input-manifest.json',
+        'uat-input/uat-readiness-checklist.yaml',
+        'uat-input/uat-evidence-map.json',
+        'uat-input/uat-test-plan.yaml',
+        'uat-input/uat-bundle-index.json',
+      ]);
+      const files = (data.files || []).filter(f => uatNames.has(f.name));
+      const links = files.map(f => `<a href="${f.url}" style="display:inline-block;margin:4px 8px 4px 0;padding:5px 8px;border:1px solid rgba(147,197,253,.4);border-radius:6px;color:#93c5fd;text-decoration:none;background:rgba(37,99,235,.1);">${f.name}</a>`).join('');
+      localStorage.setItem('uat_input_bundle', JSON.stringify({bundle:data.bundle, stamp:data.stamp, files}));
+      const progress = document.getElementById('uat_progress');
+      if (progress && !progress.innerText.trim()) progress.innerText = 'Evidence bundle ready';
+      box.style.borderColor = 'rgba(34,197,94,.45)';
+      box.innerHTML = `<div style="color:#86efac;font-weight:800;margin-bottom:7px;">UAT input ready: ${data.bundle} / ${data.stamp}</div>${links}`;
     } catch (err) {
       box.style.borderColor = 'rgba(239,68,68,.45)';
       box.innerHTML = `<span style="color:#fca5a5;">${err.message}</span>`;
@@ -2075,7 +2423,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   });
 
   // Stage btn clicks
-  // Stage 6 CRM Closeout
+  // Stage 5 CRM Closeout
   function completeMigration(statusStr) {
       fetch('/api/tracker/update_status', {
           method: 'POST',
@@ -2680,8 +3028,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         {id: 'panel-s4', key: 's4', label: 'Stage 3 (Validation & UAT)'},
         {id: 'panel-s5', key: 's5', label: 'Stage 4 (Cutover & Handover)'},
         {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration Output Bundle)'},
-        {id: 'panel-s7', key: 's7', label: 'Stage 6 (OpenCenter Integration)'},
-        {id: 'panel-s8', key: 's8', label: 'Stage 7 (Genestack Integration)'}
+        {id: 'panel-s7', key: 's7', label: 'Stage 6 (TCO / FinOps)'},
+        {id: 'panel-s8', key: 's8', label: 'Stage 7 (OpenCenter Integration)'},
+        {id: 'panel-s9', key: 's9', label: 'Stage 8 (Genestack Integration)'},
+        {id: 'panel-s10', key: 's10', label: 'Stage 9 (AI Anywhere Integration)'}
       ];
       panels.forEach(p => {
           const panelEl = document.querySelector(`#${p.id}`);
@@ -2728,8 +3078,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           's4': 'Stage 3 (Validation & UAT)',
           's5': 'Stage 4 (Cutover & Handover)',
           's6': 'Stage 5 (Post-Migration Output Bundle)',
-          's7': 'Stage 6 (OpenCenter Integration)',
-          's8': 'Stage 7 (Genestack Integration)'
+          's7': 'Stage 6 (TCO / FinOps)',
+          's8': 'Stage 7 (OpenCenter Integration)',
+          's9': 'Stage 8 (Genestack Integration)',
+          's10': 'Stage 9 (AI Anywhere Integration)'
       };
       
       if(status === 'Failed') {

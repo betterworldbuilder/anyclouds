@@ -1,0 +1,5 @@
+system_id,system_type,business_system_name,tier,source_host,target_host,target_ip,owner,dependencies,criticality,uat_status,execution_mode,ssh_user,ssh_host,ssh_key_path,ssh_port,notes
+scope-001,App,customer-portal,Frontend,ospc-web-01,,10.50.0.10,app-owner,orders-db;auth-api,Critical,Passed,local,ubuntu,10.50.0.10,,22,
+scope-002,App,billing-api,Backend,ospc-api-01,,,api-owner,billing-db,Secondary,Not Started,local,ubuntu,,,22,
+scope-003,DB,orders-db,Database,ospc-db-01,,,dba-owner,customer-portal,Critical,Not Started,local,ubuntu,,,22,
+scope-004,DB,billing-db,Database,ospc-db-02,,,dba-owner,billing-api,Secondary,Not Started,local,ubuntu,,,22,

@@ -1,0 +1,8 @@
+{
+  "dependencies": [
+    {
+      "from": "customer-portal",
+      "to": "orders-db"
+    }
+  ]
+}

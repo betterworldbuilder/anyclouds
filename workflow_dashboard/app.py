@@ -32,6 +32,26 @@ DASHBOARD_DIR = BASE_DIR / "dashboard"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
+# UAT module is optional at runtime; keep dashboard bootable even if
+# uat_module dependencies (services.*) are not available in this environment.
+create_uat_blueprint = None
+_uat_import_error = None
+try:
+    from workflow_dashboard.uat_module import create_uat_blueprint as _create_uat_blueprint
+    create_uat_blueprint = _create_uat_blueprint
+except Exception as e1:
+    _uat_import_error = e1
+    try:
+        from uat_module import create_uat_blueprint as _create_uat_blueprint
+        create_uat_blueprint = _create_uat_blueprint
+    except Exception as e2:
+        _uat_import_error = e2
+
+if create_uat_blueprint:
+    app.register_blueprint(create_uat_blueprint(BASE_DIR))
+else:
+    print(f"[STARTUP] UAT module disabled (import failed): {_uat_import_error}")
+
 # ── Always serve fresh templates — flush cache on every startup ──────────────
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
@@ -3098,7 +3118,7 @@ def _simple_yaml(payload: Any, indent: int = 0) -> str:
 
 @app.post("/api/migration-output-bundle/generate")
 def generate_migration_output_bundle():
-    """Generate the post-migration handoff bundle for GitOps, OpenCenter, and Genestack."""
+    """Generate the post-migration handoff bundle for FinOps, GitOps, OpenCenter, Genestack, and AI Anywhere."""
     data = request.json or {}
     customer = data.get("customer") or get_active_customer()
     safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
@@ -3123,13 +3143,112 @@ def generate_migration_output_bundle():
         "tracker": tracker_row,
         "migration_jobs": jobs,
         "artifacts": {
+            "discovery_output": "discovery-output/discovery-manifest.json",
+            "stage2_migration_output": "stage2-migration-output/stage2-migration-manifest.json",
             "terraform_tfvars": "terraform.tfvars.json",
             "ansible_inventory": "ansible_inventory.ini",
             "repaired_image_metadata": "repaired_image_metadata.json",
             "boot_test_results": "boot_test_results.json",
             "dependency_graph": "dependency_graph.json",
+            "uat_input": "uat-input/uat-input-manifest.json",
             "opencenter": "opencenter/estate-map.json",
             "genestack": "genestack/cloud-images.yaml",
+            "ai_anywhere": "ai-anywhere-context/ai-input-manifest.json",
+        },
+        "output_chain": {
+            "stage5_cloudjumper_output_bundle": {
+                "inputs": [
+                    "migration jobs",
+                    "tracker row",
+                    "repair metadata",
+                    "boot and validation results",
+                    "dependency graph",
+                ],
+                "outputs": [
+                    "migration_manifest.json",
+                    "terraform.tfvars.json",
+                    "ansible_inventory.ini",
+                    "repaired_image_metadata.json",
+                    "boot_test_results.json",
+                    "dependency_graph.json",
+                ],
+            },
+            "stage3_uat_input": {
+                "inputs": [
+                    "discovery-output/*",
+                    "stage2-migration-output/*",
+                    "migration_manifest.json",
+                    "terraform.tfvars.json",
+                    "ansible_inventory.ini",
+                    "repaired_image_metadata.json",
+                    "boot_test_results.json",
+                    "dependency_graph.json",
+                    "raw migration and repair logs when available",
+                ],
+                "outputs": [
+                    "uat-input/uat-input-manifest.json",
+                    "uat-input/uat-readiness-checklist.yaml",
+                    "uat-input/uat-evidence-map.json",
+                    "uat-input/uat-test-plan.yaml",
+                    "uat-input/uat-bundle-index.json",
+                ],
+            },
+            "stage6_tco_finops": {
+                "inputs": [
+                    "migration_manifest.json",
+                    "terraform.tfvars.json",
+                    "boot_test_results.json",
+                    "migration telemetry",
+                ],
+                "outputs": [
+                    "finops/tco-report.json",
+                    "finops/tco-summary.csv",
+                    "finops/rightsize-candidates.json",
+                ],
+            },
+            "stage7_opencenter": {
+                "inputs": [
+                    "migration_manifest.json",
+                    "boot_test_results.json",
+                    "dependency_graph.json",
+                    "opencenter/day2-runbook.yaml",
+                ],
+                "outputs": [
+                    "opencenter/estate-map.json",
+                    "opencenter/observability-context.json",
+                    "opencenter/gitops-workflows.yaml",
+                ],
+            },
+            "stage8_genestack": {
+                "inputs": [
+                    "migration_manifest.json",
+                    "terraform.tfvars.json",
+                    "dependency_graph.json",
+                    "genestack/flavor-map.yaml",
+                    "genestack/network-map.yaml",
+                ],
+                "outputs": [
+                    "genestack/cloud-images.yaml",
+                    "genestack/service-config.yaml",
+                    "genestack/genestack-overrides.yaml",
+                    "genestack/component-versions.json",
+                ],
+            },
+            "stage9_ai_anywhere": {
+                "inputs": [
+                    "cloudjumper-output/*",
+                    "finops-output/*",
+                    "opencenter-output/*",
+                    "genestack-output/*",
+                    "raw migration logs when available",
+                ],
+                "outputs": [
+                    "ai-anywhere-context/ai-input-manifest.json",
+                    "ai-anywhere-context/ai-prompts/*.md",
+                    "ai-anywhere-context/ai-results/*.json",
+                    "ai-anywhere-context/ai-results/*.yaml",
+                ],
+            },
         },
     }
     terraform = {
@@ -3155,43 +3274,364 @@ def generate_migration_output_bundle():
         "edges": [],
         "sources": ["discovery inventory", "app dependency scanner", "migration telemetry"],
     }
+    discovery_output = {
+        "kind": "CloudJumperDiscoveryOutput",
+        "customer": customer,
+        "stage": "stage1_discovery",
+        "outputs": [
+            "discovery-manifest.json",
+            "source-inventory.json",
+            "target-inventory.json",
+            "flavor-map.json",
+            "image-map.json",
+            "network-map.json",
+            "security-group-map.json",
+            "dependency-seed.json",
+        ],
+        "sources": ["tracker", "uploaded csv maps", "OpenStack discovery scans"],
+    }
+    stage2_output = {
+        "kind": "CloudJumperStage2MigrationOutput",
+        "customer": customer,
+        "stage": "stage2_migration",
+        "outputs": [
+            "stage2-migration-manifest.json",
+            "vm-migration-results.json",
+            "image-migration-results.json",
+            "data-migration-results.json",
+            "kubernetes-migration-results.json",
+            "repair-actions.json",
+            "rollback-artifacts.json",
+        ],
+        "sources": ["migration jobs", "image jobs", "repair logs", "stage2 generated scripts"],
+    }
+    uat_input = {
+        "kind": "CloudJumperUATInput",
+        "customer": customer,
+        "purpose": "UAT injection pack generated from pre-UAT migration evidence.",
+        "reuse_strategy": "UAT reuses the Migration Output Bundle as the source of truth and reads the uat-input/ view for validation.",
+        "required_inputs": [
+            "../discovery-output/discovery-manifest.json",
+            "../discovery-output/source-inventory.json",
+            "../discovery-output/target-inventory.json",
+            "../stage2-migration-output/stage2-migration-manifest.json",
+            "../stage2-migration-output/vm-migration-results.json",
+            "../stage2-migration-output/image-migration-results.json",
+            "../stage2-migration-output/data-migration-results.json",
+            "../migration_manifest.json",
+            "../terraform.tfvars.json",
+            "../ansible_inventory.ini",
+            "../repaired_image_metadata.json",
+            "../boot_test_results.json",
+            "../dependency_graph.json",
+        ],
+        "uat_outputs": [
+            "UAT report",
+            "go/no-go decision",
+            "customer signoff",
+            "issues and mitigations",
+            "cutover readiness",
+        ],
+    }
+    finops = {
+        "kind": "CloudJumperFinOpsExport",
+        "customer": customer,
+        "inputs": [
+            "../migration_manifest.json",
+            "../terraform.tfvars.json",
+            "../boot_test_results.json",
+        ],
+        "outputs": [
+            "tco-report.json",
+            "tco-summary.csv",
+            "rightsize-candidates.json",
+        ],
+        "metrics": {
+            "ospc_baseline_monthly": None,
+            "flex_projected_monthly": None,
+            "estimated_savings_monthly": None,
+        },
+    }
     opencenter = {
         "kind": "CloudJumperOpenCenterExport",
         "customer": customer,
         "day2_platform_view": True,
+        "inputs": [
+            "../migration_manifest.json",
+            "../boot_test_results.json",
+            "../dependency_graph.json",
+            "day2-runbook.yaml",
+        ],
         "operations": ["k8s", "openstack", "gitops", "observability", "runbooks"],
+        "outputs": [
+            "estate-map.json",
+            "day2-runbook.yaml",
+            "observability-context.json",
+            "gitops-workflows.yaml",
+        ],
         "migration_manifest": "../migration_manifest.json",
     }
     genestack = {
         "kind": "CloudJumperGenestackExport",
         "customer": customer,
         "landing_zone": "openstack-flex",
+        "inputs": [
+            "../migration_manifest.json",
+            "../terraform.tfvars.json",
+            "../dependency_graph.json",
+            "flavor-map.yaml",
+            "network-map.yaml",
+        ],
         "outputs": ["cloud-images", "flavor-map", "network-map", "component-versioning"],
         "genestack_overrides_path": "/etc/genestack",
     }
+    ai_anywhere = {
+        "kind": "CloudJumperAIAnywhereContext",
+        "customer": customer,
+        "purpose": "Private AI Anywhere context pack for migration repair, risk, right-sizing, GitOps, and runbook agents.",
+        "inputs": {
+            "cloudjumper_output": [
+                "../migration_manifest.json",
+                "../terraform.tfvars.json",
+                "../ansible_inventory.ini",
+                "../repaired_image_metadata.json",
+                "../boot_test_results.json",
+                "../dependency_graph.json",
+            ],
+            "finops_output": [
+                "../finops/tco-report.json",
+                "../finops/tco-summary.csv",
+                "../finops/rightsize-candidates.json",
+            ],
+            "opencenter_output": [
+                "../opencenter/estate-map.json",
+                "../opencenter/day2-runbook.yaml",
+                "../opencenter/observability-context.json",
+                "../opencenter/gitops-workflows.yaml",
+            ],
+            "genestack_output": [
+                "../genestack/cloud-images.yaml",
+                "../genestack/flavor-map.yaml",
+                "../genestack/network-map.yaml",
+                "../genestack/service-config.yaml",
+                "../genestack/genestack-overrides.yaml",
+                "../genestack/component-versions.json",
+            ],
+        },
+        "expected_outputs": [
+            "ai-results/risk-score.json",
+            "ai-results/rightsize-recommendations.json",
+            "ai-results/autorepair-plan.yaml",
+            "ai-results/terraform-patch-suggestions.json",
+            "ai-results/runbook-improvements.yaml",
+            "ai-results/genestack-override-suggestions.yaml",
+        ],
+    }
 
     _write_json(bundle_root / "migration_manifest.json", manifest)
+    _write_json(bundle_root / "discovery-output" / "discovery-manifest.json", discovery_output)
+    _write_json(bundle_root / "discovery-output" / "source-inventory.json", {
+        "customer": customer,
+        "servers": [],
+        "images": [],
+        "volumes": [],
+        "networks": [],
+        "security_groups": [],
+        "load_balancers": [],
+    })
+    _write_json(bundle_root / "discovery-output" / "target-inventory.json", {
+        "customer": customer,
+        "flavors": [],
+        "images": [],
+        "networks": [],
+        "security_groups": [],
+        "quotas": {},
+    })
+    _write_json(bundle_root / "discovery-output" / "flavor-map.json", {"mappings": []})
+    _write_json(bundle_root / "discovery-output" / "image-map.json", {"mappings": []})
+    _write_json(bundle_root / "discovery-output" / "network-map.json", {"mappings": []})
+    _write_json(bundle_root / "discovery-output" / "security-group-map.json", {"mappings": []})
+    _write_json(bundle_root / "discovery-output" / "dependency-seed.json", {"applications": [], "databases": [], "edges": []})
+    _write_json(bundle_root / "stage2-migration-output" / "stage2-migration-manifest.json", stage2_output)
+    _write_json(bundle_root / "stage2-migration-output" / "vm-migration-results.json", {"jobs": jobs, "results": []})
+    _write_json(bundle_root / "stage2-migration-output" / "image-migration-results.json", {"results": []})
+    _write_json(bundle_root / "stage2-migration-output" / "data-migration-results.json", {"results": []})
+    _write_json(bundle_root / "stage2-migration-output" / "kubernetes-migration-results.json", {"results": []})
+    _write_json(bundle_root / "stage2-migration-output" / "repair-actions.json", repaired)
+    _write_json(bundle_root / "stage2-migration-output" / "rollback-artifacts.json", {"scripts": [], "notes": []})
     _write_json(bundle_root / "terraform.tfvars.json", terraform)
     _write_text(bundle_root / "ansible_inventory.ini", "[cloudjumper_migrated]\n# host ansible_host=<flex_ip> ansible_user=<user>\n")
     _write_json(bundle_root / "repaired_image_metadata.json", repaired)
     _write_json(bundle_root / "boot_test_results.json", boot_tests)
     _write_json(bundle_root / "dependency_graph.json", dependencies)
+    _write_json(bundle_root / "uat-input" / "uat-input-manifest.json", uat_input)
+    _write_text(bundle_root / "uat-input" / "uat-readiness-checklist.yaml", _simple_yaml({
+        "customer": customer,
+        "checks": [
+            {"id": "boot", "source": "../boot_test_results.json", "required": True},
+            {"id": "ssh_or_rdp", "source": "../boot_test_results.json", "required": True},
+            {"id": "network", "source": "../boot_test_results.json", "required": True},
+            {"id": "repair_evidence", "source": "../repaired_image_metadata.json", "required": True},
+            {"id": "dependency_review", "source": "../dependency_graph.json", "required": True},
+            {"id": "discovery_review", "source": "../discovery-output/discovery-manifest.json", "required": True},
+            {"id": "stage2_results_review", "source": "../stage2-migration-output/stage2-migration-manifest.json", "required": True},
+            {"id": "rollback_ready", "source": "../migration_manifest.json", "required": True},
+        ],
+    }) + "\n")
+    _write_json(bundle_root / "uat-input" / "uat-evidence-map.json", {
+        "customer": customer,
+        "evidence": {
+            "migration_truth": "../migration_manifest.json",
+            "discovery_outputs": "../discovery-output/",
+            "stage2_migration_outputs": "../stage2-migration-output/",
+            "target_infra": "../terraform.tfvars.json",
+            "access_inventory": "../ansible_inventory.ini",
+            "repair_evidence": "../repaired_image_metadata.json",
+            "boot_evidence": "../boot_test_results.json",
+            "dependency_evidence": "../dependency_graph.json",
+        },
+    })
+    _write_text(bundle_root / "uat-input" / "uat-test-plan.yaml", _simple_yaml({
+        "customer": customer,
+        "test_groups": [
+            "login",
+            "core_business_flows",
+            "data_validation",
+            "api_integrations",
+            "reports_and_outputs",
+            "permissions_and_roles",
+            "rollback_readiness",
+        ],
+    }) + "\n")
+    _write_json(bundle_root / "uat-input" / "uat-bundle-index.json", {
+        "customer": customer,
+        "files": [
+            "uat-input-manifest.json",
+            "uat-readiness-checklist.yaml",
+            "uat-evidence-map.json",
+            "uat-test-plan.yaml",
+        ],
+    })
+    _write_json(bundle_root / "finops" / "tco-report.json", finops)
+    _write_text(bundle_root / "finops" / "tco-summary.csv", "\n".join([
+        "category,ospc_baseline,flex_projected,delta,notes",
+        "compute,,,,",
+        "storage,,,,",
+        "network,,,,",
+        "operations,,,,",
+        "",
+    ]))
+    _write_json(bundle_root / "finops" / "rightsize-candidates.json", {
+        "customer": customer,
+        "inputs": ["../migration_manifest.json", "../boot_test_results.json"],
+        "candidates": [],
+    })
     _write_json(bundle_root / "opencenter" / "estate-map.json", opencenter)
     _write_text(bundle_root / "opencenter" / "day2-runbook.yaml", _simple_yaml({
         "runbook": "cloud-jumper-day2",
         "customer": customer,
         "workflows": ["validate", "observe", "backup", "optimize", "operate"],
     }) + "\n")
+    _write_json(bundle_root / "opencenter" / "observability-context.json", {
+        "customer": customer,
+        "inputs": ["../boot_test_results.json", "../dependency_graph.json"],
+        "dashboards": [],
+        "alerts": [],
+        "service_health_checks": [],
+    })
+    _write_text(bundle_root / "opencenter" / "gitops-workflows.yaml", _simple_yaml({
+        "customer": customer,
+        "inputs": ["estate-map.json", "day2-runbook.yaml"],
+        "workflows": ["review", "approve", "deploy", "observe", "rollback"],
+    }) + "\n")
     _write_text(bundle_root / "genestack" / "cloud-images.yaml", _simple_yaml(genestack) + "\n")
     _write_text(bundle_root / "genestack" / "flavor-map.yaml", _simple_yaml({"flavors": []}) + "\n")
     _write_text(bundle_root / "genestack" / "network-map.yaml", _simple_yaml({"networks": []}) + "\n")
+    _write_text(bundle_root / "genestack" / "service-config.yaml", _simple_yaml({
+        "customer": customer,
+        "inputs": ["cloud-images.yaml", "flavor-map.yaml", "network-map.yaml"],
+        "helm_values": {},
+        "openstack_services": {},
+    }) + "\n")
+    _write_text(bundle_root / "genestack" / "genestack-overrides.yaml", _simple_yaml({
+        "customer": customer,
+        "path": "/etc/genestack",
+        "overrides": {},
+    }) + "\n")
+    _write_json(bundle_root / "genestack" / "component-versions.json", {
+        "customer": customer,
+        "openstack": {},
+        "kubernetes": {},
+        "images": [],
+    })
+    _write_json(bundle_root / "ai-anywhere-context" / "ai-input-manifest.json", ai_anywhere)
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-prompts" / "repair-agent.md", "\n".join([
+        "# Repair Agent",
+        "",
+        "Use repaired image metadata, boot test results, and migration logs to propose safe autorepair actions.",
+        "Return structured YAML with risk, command plan, rollback, and evidence fields.",
+        "",
+    ]))
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-prompts" / "rightsize-agent.md", "\n".join([
+        "# Right-Size Agent",
+        "",
+        "Use migration manifest, flavor map, telemetry, and validation evidence to recommend FLEX flavor changes.",
+        "Prefer conservative changes and include confidence, savings reason, and rollback plan.",
+        "",
+    ]))
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-prompts" / "risk-review-agent.md", "\n".join([
+        "# Risk Review Agent",
+        "",
+        "Score migration risk from dependency graph, failed checks, OS age, repair profile, and cutover evidence.",
+        "Return JSON with score, blockers, recommended next action, and customer-safe summary.",
+        "",
+    ]))
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-prompts" / "terraform-agent.md", "\n".join([
+        "# Terraform Agent",
+        "",
+        "Use terraform.tfvars.json, Genestack outputs, and OpenCenter estate map to suggest infrastructure-as-code patches.",
+        "Return patch suggestions, not direct destructive actions.",
+        "",
+    ]))
+    _write_json(bundle_root / "ai-anywhere-context" / "ai-results" / "risk-score.json", {
+        "status": "pending_ai_anywhere_run",
+        "score": None,
+        "blockers": [],
+        "recommended_next_action": "",
+    })
+    _write_json(bundle_root / "ai-anywhere-context" / "ai-results" / "rightsize-recommendations.json", {
+        "status": "pending_ai_anywhere_run",
+        "recommendations": [],
+    })
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-results" / "autorepair-plan.yaml", _simple_yaml({
+        "status": "pending_ai_anywhere_run",
+        "actions": [],
+    }) + "\n")
+    _write_json(bundle_root / "ai-anywhere-context" / "ai-results" / "terraform-patch-suggestions.json", {
+        "status": "pending_ai_anywhere_run",
+        "patches": [],
+    })
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-results" / "runbook-improvements.yaml", _simple_yaml({
+        "status": "pending_ai_anywhere_run",
+        "improvements": [],
+    }) + "\n")
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-results" / "genestack-override-suggestions.yaml", _simple_yaml({
+        "status": "pending_ai_anywhere_run",
+        "overrides": [],
+    }) + "\n")
     _write_text(bundle_root / "README.txt", "\n".join([
         "Cloud Jumper Migration Output Bundle",
         "",
         "Use migration_manifest.json as the source of truth.",
+        "Use uat-input/ to inject migration evidence into UAT.",
         "Use terraform.tfvars.json and ansible_inventory.ini for repeatable rebuilds.",
+        "Use finops/ for TCO, cost comparison, and right-sizing handoff.",
         "Use opencenter/ for Day-2 operations import.",
         "Use genestack/ for FLEX/OpenStack landing-zone and GitOps handoff.",
+        "Use ai-anywhere-context/ as the private AI Anywhere input pack.",
+        "",
+        "Chain:",
+        "  Cloud Jumper Output Bundle -> TCO/FinOps -> OpenCenter + Genestack -> AI Anywhere",
         "",
     ]))
 

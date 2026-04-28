@@ -1,0 +1,3 @@
+db_name,engine,source_host,owner,dependencies,criticality
+orders-db,postgres,ospc-db-01,dba-owner,customer-portal,Critical
+billing-db,mysql,ospc-db-02,dba-owner,billing-api,Secondary

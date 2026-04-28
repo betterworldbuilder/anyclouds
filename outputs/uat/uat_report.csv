@@ -1,0 +1,17 @@
+section,name,status,owner,severity,notes
+checklist,Access & Login,Not Started,,Medium,
+checklist,VM Boot Health,Not Started,,Medium,
+checklist,Network Connectivity,Not Started,,Medium,
+checklist,Application Health,Passed,,Medium,
+checklist,API / Integration,Not Started,,Medium,
+checklist,Database Validation,Passed,,Medium,
+checklist,Data Comparison OSPC vs FLEX,Passed,,Medium,
+checklist,Reports / Emails / Outputs,Passed,,Medium,
+checklist,Permissions / Roles,Not Started,,Medium,
+checklist,Performance / Load / Mobile Lag,Not Started,,Medium,
+checklist,Soak / Stability,Not Started,,Medium,
+checklist,Cutover Readiness,Not Started,,Medium,
+issue,UAT-001,Fixed,qa,Low,sample fixed issue
+issue,UAT-002,Open,,High,"UAT command Failed: curl -v http://<target_ip>/health
+systemctl status <service_name> --no-pager
+journalctl -u <service_name> -n 100 --no-pager"

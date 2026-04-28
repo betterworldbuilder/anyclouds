@@ -115,26 +115,45 @@ The new handoff path is:
 ```text
 Stage 5: Migration Output Bundle
   migration_manifest.json
+  discovery-output/
+  stage2-migration-output/
   terraform.tfvars.json
   ansible_inventory.ini
   repaired_image_metadata.json
   boot_test_results.json
   dependency_graph.json
+  uat-input/
         |
-        +--> Stage 6: OpenCenter
+        +--> Stage 6: TCO / FinOps
+        |       OSPC baseline cost
+        |       FLEX projected run-rate
+        |       right-sizing candidates
+        |       executive TCO report
+        |
+        +--> Stage 7: OpenCenter
         |       Day-2 platform view
         |       K8s/OpenStack operations
         |       GitOps workflows
         |       observability/runbooks
         |
-        +--> Stage 7: Genestack
-                OpenStack/FLEX landing zone
-                Helm/OpenStack service config
-                /etc/genestack overrides
-                cloud components/versioning
+        +--> Stage 8: Genestack
+        |       OpenStack/FLEX landing zone
+        |       Helm/OpenStack service config
+        |       /etc/genestack overrides
+        |       cloud components/versioning
+        |
+        +--> Stage 9: AI Anywhere
+                private AI context pack
+                autorepair plans
+                risk and right-sizing recommendations
+                Terraform/Ansible/Genestack patch suggestions
 ```
 
-That means CloudJumper can interconnect with platforms like **OpenCenter**, **Genestack**, Magnum, and other GitOps control planes. OpenCenter becomes the Day-2 operations cockpit for migrated estates: platform view, Kubernetes/OpenStack operations, GitOps workflows, observability, and runbooks. Genestack becomes the repeatable FLEX/OpenStack foundation layer: landing-zone configuration, Helm/OpenStack service config, `/etc/genestack` overrides, and cloud component/version tracking.
+UAT does not need a separate disconnected artifact. It reuses the Migration Output Bundle through `uat-input/`, and that UAT view points back to `discovery-output/` and `stage2-migration-output/` so testers can validate what was discovered, what migrated, what was repaired, and what evidence exists before cutover.
+
+That means CloudJumper can interconnect with FinOps reporting, **OpenCenter**, **Genestack**, Magnum, and other GitOps control planes. TCO / FinOps turns the migration into financial evidence: source baseline, target run-rate, right-sizing candidates, and executive reporting. OpenCenter becomes the Day-2 operations cockpit for migrated estates: platform view, Kubernetes/OpenStack operations, GitOps workflows, observability, and runbooks. Genestack becomes the repeatable FLEX/OpenStack foundation layer: landing-zone configuration, Helm/OpenStack service config, `/etc/genestack` overrides, and cloud component/version tracking.
+
+AI Anywhere becomes the private intelligence layer over the whole chain. It reads the CloudJumper output bundle plus OpenCenter and Genestack outputs, then produces risk scores, autorepair plans, right-sizing recommendations, runbook improvements, and infrastructure patch suggestions without losing the customer-specific context.
 
 Instead of finishing with a one-time migration script, the customer leaves with a repeatable operating model: infrastructure saved as code, repairs encoded as playbooks, topology represented as reviewable templates, and deployment state controlled through pull requests.
 

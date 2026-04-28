@@ -1,0 +1,47 @@
+{
+  "checklist_count": 12,
+  "command_run_count": 0,
+  "failed_command_count": 0,
+  "issues_count": 2,
+  "log_finding_count": 0,
+  "performance": {
+    "active_sessions_tested": "",
+    "api_error_rate_percent": "0.2",
+    "db_avg_query_ms": "",
+    "delta_avg_response_percent": null,
+    "delta_p95_percent": 7.142857142857142,
+    "download_mbps": "",
+    "flex_avg_response_ms": "",
+    "flex_p95_ms": "450",
+    "mobile_app_load_seconds": "",
+    "mobile_lag_status": "Pass",
+    "mobile_tap_response_ms": "",
+    "network_latency_ms": "",
+    "ospc_avg_response_ms": "180",
+    "ospc_p95_ms": "420",
+    "overall_performance_status": "Pass",
+    "peak_concurrent_users_tested": "",
+    "report_generation_seconds": "",
+    "target_concurrent_users": "",
+    "upload_mbps": ""
+  },
+  "readiness": {
+    "accepted_risks": 0,
+    "blockers": [
+      "Not all critical systems are marked Passed."
+    ],
+    "critical_open_issues": 0,
+    "critical_systems": 2,
+    "critical_systems_tested": false,
+    "generated_at": "2026-04-28T06:39:01+00:00",
+    "performance_status": "Pass",
+    "required_tests": {
+      "app_health": true,
+      "data_validation": true,
+      "database_validation": true,
+      "reports_outputs": true
+    },
+    "status": "Not Ready"
+  },
+  "scope_count": 4
+}

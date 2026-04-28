@@ -911,6 +911,19 @@ python -m ospc_to_flex_k8.cli export \
 
 Automated testing harness for post-migration verification.
 
+- **UAT input bundle injection** — reuses the Migration Output Bundle and reads the `uat-input/` view:
+  - `discovery-output/discovery-manifest.json`
+  - `discovery-output/source-inventory.json`
+  - `discovery-output/target-inventory.json`
+  - `stage2-migration-output/stage2-migration-manifest.json`
+  - `stage2-migration-output/vm-migration-results.json`
+  - `stage2-migration-output/image-migration-results.json`
+  - `stage2-migration-output/data-migration-results.json`
+  - `uat-input/uat-input-manifest.json`
+  - `uat-input/uat-readiness-checklist.yaml`
+  - `uat-input/uat-evidence-map.json`
+  - `uat-input/uat-test-plan.yaml`
+  - `uat-input/uat-bundle-index.json`
 - **Cross-Cloud Identity Parity** — authenticates simultaneously against OSPC and FLEX; diffs RBAC roles and permission boundaries
 - **Global API Health** — evaluates FLEX compute, network router, and storage quota limits
 - **Endpoint Connectivity** — SSH, ping, and curl checks against newly-migrated IPs and Load Balancer URLs
@@ -940,11 +953,25 @@ Stability monitoring, sign-off, and the formal Cloud Jumper output bundle.
 - **48–72h stability window guidance** — OSPC kept in `read_only` as warm standby before final decommission
 - **Migration Output Bundle** — generates the durable handoff package:
   - `migration_manifest.json`
+  - `discovery-output/discovery-manifest.json`
+  - `discovery-output/source-inventory.json`
+  - `discovery-output/target-inventory.json`
+  - `discovery-output/dependency-seed.json`
+  - `stage2-migration-output/stage2-migration-manifest.json`
+  - `stage2-migration-output/vm-migration-results.json`
+  - `stage2-migration-output/image-migration-results.json`
+  - `stage2-migration-output/data-migration-results.json`
+  - `stage2-migration-output/kubernetes-migration-results.json`
   - `terraform.tfvars.json`
   - `ansible_inventory.ini`
   - `repaired_image_metadata.json`
   - `boot_test_results.json`
   - `dependency_graph.json`
+  - `uat-input/uat-input-manifest.json`
+  - `uat-input/uat-readiness-checklist.yaml`
+  - `uat-input/uat-evidence-map.json`
+  - `uat-input/uat-test-plan.yaml`
+  - `uat-input/uat-bundle-index.json`
   - `opencenter/estate-map.json`
   - `opencenter/day2-runbook.yaml`
   - `genestack/cloud-images.yaml`
@@ -952,7 +979,24 @@ Stability monitoring, sign-off, and the formal Cloud Jumper output bundle.
   - `genestack/network-map.yaml`
   - zipped download archive
 
-### Stage 6 — OpenCenter Integration
+### Stage 6 — TCO / FinOps
+
+TCO / FinOps turns the migration bundle into financial evidence and optimization actions.
+
+| FinOps lane | What Cloud Jumper provides |
+|---|---|
+| OSPC baseline | Source flavors, storage, network, workload grouping, and migration wave context |
+| FLEX projected run-rate | Target flavor map, booted target artifacts, storage/network placement, and project context |
+| Right-sizing candidates | Workload facts and validation evidence for conservative post-migration optimization |
+| Executive report | Cost comparison, wave savings, risk notes, and modernization value narrative |
+
+Generated files:
+
+- `finops/tco-report.json`
+- `finops/tco-summary.csv`
+- `finops/rightsize-candidates.json`
+
+### Stage 7 — OpenCenter Integration
 
 OpenCenter consumes the Migration Output Bundle as the Day-2 operating cockpit.
 
@@ -963,7 +1007,7 @@ OpenCenter consumes the Migration Output Bundle as the Day-2 operating cockpit.
 | GitOps workflows | Structured bundle files ready for repo import, review, and automation gates |
 | Observability/runbooks | Boot evidence, repair history, validation results, rollback notes, and day-2 tasks |
 
-### Stage 7 — Genestack Integration
+### Stage 8 — Genestack Integration
 
 Genestack consumes the same bundle as a repeatable FLEX/OpenStack landing-zone and platform configuration handoff.
 
@@ -973,6 +1017,27 @@ Genestack consumes the same bundle as a repeatable FLEX/OpenStack landing-zone a
 | Helm/OpenStack service config | Migration facts shaped for GitOps-controlled service values and deployment overlays |
 | `/etc/genestack` overrides | Customer-specific overrides separated from upstream Genestack defaults |
 | Cloud components/versioning | Image, service, Kubernetes, and OpenStack component version tracking for rebuilds |
+
+### Stage 9 — AI Anywhere Integration
+
+AI Anywhere consumes the complete chain as a private AI context pack.
+
+| AI Anywhere input | Source |
+|---|---|
+| CloudJumper output | `migration_manifest.json`, `terraform.tfvars.json`, `ansible_inventory.ini`, repaired image metadata, boot/test results, dependency graph |
+| TCO / FinOps output | TCO report, cost summary CSV, right-sizing candidates |
+| OpenCenter output | Estate map, Day-2 runbook, observability context, GitOps workflows |
+| Genestack output | Cloud images, flavor map, network map, service config, `/etc/genestack` overrides, component versions |
+| Optional raw evidence | Migration logs, repair logs, UAT logs, telemetry samples |
+
+| AI Anywhere output | Purpose |
+|---|---|
+| `risk-score.json` | Scores customer migration risk and identifies blockers |
+| `rightsize-recommendations.json` | Recommends safer FLEX flavor and capacity changes |
+| `autorepair-plan.yaml` | Proposes boot/network/service repair actions with rollback notes |
+| `terraform-patch-suggestions.json` | Suggests infrastructure-as-code changes from validated migration facts |
+| `runbook-improvements.yaml` | Improves OpenCenter Day-2 runbooks from observed migration behavior |
+| `genestack-override-suggestions.yaml` | Suggests Genestack override changes from workload and platform facts |
 
 ### What Next — Mission Control To GitOps
 
@@ -984,9 +1049,13 @@ Cloud Jumper migration telemetry
         v
 Migration Output Bundle
         |
+        +--> TCO / FinOps: baseline, run-rate, right-size, report
+        |
         +--> OpenCenter: operate, observe, runbook, GitOps
         |
         +--> Genestack: landing zone, service config, overrides, versioning
+        |
+        +--> AI Anywhere: repair, risk, right-size, patch, optimize
         |
         v
 Terraform / Ansible / AI-agent optimization loop

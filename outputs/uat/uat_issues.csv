@@ -1,0 +1,7 @@
+issue_id,linked_system,linked_test,severity,owner,status,description,evidence,created_at,updated_at
+UAT-001,customer-portal,access_login,Low,qa,Fixed,sample fixed issue,sample,2026-04-28T05:59:57+00:00,2026-04-28T05:59:57+00:00
+UAT-002,customer-portal,Application Health,High,,Open,"UAT command Failed: curl -v http://<target_ip>/health
+systemctl status <service_name> --no-pager
+journalctl -u <service_name> -n 100 --no-pager","stdout: 
+stderr: 2026-04-28 ERROR HTTP 500 app failure vm=customer-portal ip=10.50.0.10
+error:",2026-04-28T06:06:04+00:00,2026-04-28T06:06:04+00:00

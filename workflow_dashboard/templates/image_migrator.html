@@ -1498,6 +1498,11 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                             <span>🔍 Start Server Batch NBD — Dry Run</span>
                         </button>
+                        <button type="button" class="btn-danger" id="stop-batch-btn"
+                            style="display:none; background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                            ⏹ STOP VM Batch
+                        </button>
                     </div>
 
                     <script>
@@ -1903,6 +1908,12 @@
                         onclick="document.getElementById('mig_mode_value').value='dryrun';">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <span>🖼 Direct OSPC 2 Flex Image Dry run Migration</span>
+                    </button>
+                    <button type="button" id="stop-image-batch-btn"
+                        style="display:none; background: linear-gradient(135deg, #c2410c 0%, #7c2d12 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;"
+                        title="Stop the image migration pipeline only">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                        ⏹ Stop Image Batch
                     </button>
                 </div>
 
@@ -5847,34 +5858,29 @@
         let isImageBatchRunning = false;
 
         function refreshMigrationToolbar() {
-            const busy = isVmBatchRunning || isImageBatchRunning;
-            const sb = document.getElementById('stop-batch-btn');
-            const st = document.getElementById('start-batch-btn');
-            const dr = document.getElementById('start-batch-dryrun-btn');
+            const sb   = document.getElementById('stop-batch-btn');       // VM stop
+            const sibI = document.getElementById('stop-image-batch-btn'); // Image stop
+            const st   = document.getElementById('start-batch-btn');
+            const dr   = document.getElementById('start-batch-dryrun-btn');
             const addB = document.getElementById('add-batch-btn');
             const imgM = document.getElementById('start-image-migration-btn');
             const imgD = document.getElementById('start-image-migration-dryrun-btn');
             const imgOs = document.getElementById('image_os_type_override');
-            if (sb) sb.style.display = busy ? 'flex' : 'none';
+            // VM stop: only visible when VM batch is running
+            if (sb)   sb.style.display   = isVmBatchRunning    ? 'flex' : 'none';
+            // Image stop: only visible when image batch is running
+            if (sibI) sibI.style.display = isImageBatchRunning ? 'flex' : 'none';
+            // Start VM buttons: hidden while VM batch running
             if (st) st.style.display = isVmBatchRunning ? 'none' : 'flex';
             if (dr) dr.style.display = isVmBatchRunning ? 'none' : 'flex';
             if (addB) addB.style.display = (isVmBatchRunning || isImageBatchRunning) ? 'flex' : 'none';
-            // Keep image buttons visible while VM batch is running so operators can
-            // queue the next image batch in the global chain instead of "losing" the controls.
-            if (imgM) {
-                imgM.style.display = 'flex';
-                imgM.disabled = false;
-                imgM.style.opacity = '';
-                imgM.title = "Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)";
-            }
-            if (imgD) {
-                imgD.style.display = 'flex';
-                imgD.disabled = false;
-                imgD.style.opacity = '';
-                imgD.title = "Dry Run: Glance → jumphost → FLEX pipeline";
-            }
+            // Image buttons always visible
+            if (imgM) { imgM.style.display = 'flex'; imgM.disabled = false; imgM.style.opacity = ''; }
+            if (imgD) { imgD.style.display = 'flex'; imgD.disabled = false; imgD.style.opacity = ''; }
             if (imgOs) imgOs.style.display = '';
         }
+
+
 
         // ── Timer tick — updates all .vm-timer elements every second ──
         setInterval(() => {
@@ -5888,7 +5894,7 @@
         }, 1000);
 
         if (stopBtn) stopBtn.addEventListener('click', async () => {
-            if (!isVmBatchRunning && !isImageBatchRunning) return;
+            if (!isVmBatchRunning) return;
             appendLog(`[SYSTEM] Attempting to interrupt active migration stream(s)...`, 'system');
             try {
                 if (isVmBatchRunning) {
@@ -5930,6 +5936,27 @@
                 appendLog(`[ERROR] Failed to send termination kill signal: ${err}`, 'error');
             }
         });
+
+        // ── Stop Image Batch — dedicated handler ──────────────────────
+        const stopImageBtn = document.getElementById('stop-image-batch-btn');
+        if (stopImageBtn) stopImageBtn.addEventListener('click', async () => {
+            if (!isImageBatchRunning) return;
+            appendLog('[SYSTEM] Stopping image migration pipeline...', 'system');
+            try {
+                try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
+                if (window.imagePipelineAbortController) {
+                    try { window.imagePipelineAbortController.abort(); } catch (e) {}
+                    window.imagePipelineAbortController = null;
+                }
+                isImageBatchRunning = false;
+                refreshMigrationToolbar();
+                jarvisAnnounce('Image pipeline halted.');
+                appendLog('[SYSTEM] Image batch stopped.', 'error');
+            } catch (err) {
+                appendLog(`[ERROR] Failed to stop image pipeline: ${err}`, 'error');
+            }
+        });
+
 
         const dryRunBtn = document.getElementById('start-batch-dryrun-btn');
 
@@ -6862,15 +6889,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 btn.style.borderColor = '';
             }
         }
-        // ── Move pipeline block under repair options ──
-        const pipeline = document.getElementById('pipeline-block');
-        const repairBar = document.getElementById('offline_repair_method');
-        if (pipeline && repairBar) {
-            const targetParent = repairBar.closest('div[style*="margin: 0 0 16px"]') || repairBar.closest('div[style*="padding: 14px 18px"]');
-            if (targetParent && pipeline.parentNode !== targetParent.parentNode) {
-                targetParent.parentNode.insertBefore(pipeline, targetParent.nextSibling);
-            }
-        }
+        // pipeline-block stays in its fixed position in the layout
         // ── Update pipeline step 4.5 to match repair method ──
         const s45title = document.getElementById('pipeline-step-45-title');
         const s45desc  = document.getElementById('pipeline-step-45-desc');
