@@ -1,8 +1,8 @@
 <div align="center">
 
-<h1>🚀 OSPC2FLEX Mission Control</h1>
+<h1>🚀 Any Cloud: Any OpenStack Cloud to FLEX Migration Full Cycle Mission Control</h1>
 
-<p><strong>Full-cycle browser dashboard for migrating OpenStack Private Cloud (OSPC) workloads to Rackspace FLEX</strong></p>
+<p><strong>Full-cycle browser dashboard for migrating OpenStack workloads to Rackspace FLEX</strong></p>
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.12-3776ab?style=for-the-badge&logo=python&logoColor=white" alt="Python">
