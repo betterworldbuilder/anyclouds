@@ -1,1 +1,0 @@
-Sample DB migration log: row-count validation pending.

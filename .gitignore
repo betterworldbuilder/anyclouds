@@ -58,6 +58,7 @@ cred-cache.js
 # Runtime outputs
 inventory-csv/
 ospc-discovery/outputs/
+outputs/
 newimagemig-cloudfiles-regionjumphost.*/
 *_terminal_*.txt
 dashboard.log

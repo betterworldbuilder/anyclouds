@@ -1,3 +1,0 @@
-name,source_host,target_host,target_ip,status
-customer-portal,ospc-web-01,flex-web-01,10.50.0.10,booted
-orders-db,ospc-db-01,flex-db-01,10.50.0.20,booted

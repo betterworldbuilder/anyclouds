@@ -1,4 +1,0 @@
-finding_id,timestamp,source_file,stage,severity,category,linked_system,vm,db,ip,message,suggested_uat_test,suggested_command,status
-LOG-0001,2026-04-28T06:07:28+00:00,logs/uat_mock_migration.log,Runtime Logs,High,app,customer-portal,customer-portal,,10.50.0.10,2026-04-28 ERROR HTTP 500 app failure vm=customer-portal ip=10.50.0.10,Application Health,"curl -v http://<target_ip>/health
-systemctl status <service_name> --no-pager
-journalctl -u <service_name> -n 100 --no-pager",Open

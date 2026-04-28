@@ -1,3 +1,0 @@
-app_name,tier,source_host,owner,dependencies,criticality
-customer-portal,Frontend,ospc-web-01,app-owner,orders-db;auth-api,Critical
-billing-api,Backend,ospc-api-01,api-owner,billing-db,Secondary

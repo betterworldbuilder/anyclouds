@@ -1,3 +1,0 @@
-target_host,target_ip,boot_status,ssh_status,notes
-flex-web-01,10.50.0.10,Passed,Passed,sample
-flex-db-01,10.50.0.20,Passed,Passed,sample
