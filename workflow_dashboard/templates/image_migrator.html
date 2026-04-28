@@ -170,7 +170,7 @@
       }
     </style>
     <script>
-        window.LUNAR_SVG = `<img src="/static/lunar_module_sprite.png" style="width:100%; height:100%; object-fit:contain; mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));" />`;
+        window.LUNAR_SVG = `<img src="/static/lunar_module_sprite.png" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 6px rgba(56,189,248,0.8)) brightness(1.1);" />`;
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -3858,9 +3858,17 @@
                 names.forEach(n => {
                     const vm = this.vms[n];
                     const st = vm.stages[stage.key];
+
+                    // For running VMs: compute the frontier stage (first stage not 'done')
+                    // so the lunar module always shows even if 'active' was never emitted.
+                    let isFrontierStage = false;
+                    if (vm.status === 'running') {
+                        const firstNotDone = this.allStages.find(s => !vm.stages[s.key] || vm.stages[s.key].status !== 'done');
+                        isFrontierStage = firstNotDone && firstNotDone.key === stage.key;
+                    }
+
                     let cellHtml = `<span style="color:${isApollo?'#1e3a8a':'#002200'};">—</span>`;
                     if (st) {
-                        const isFailed = (vm.status === 'failed');
                         if (st.status === 'done') {
                             cellHtml = `<span style="display:inline-block; color:${isApollo?'#34d399':'#00ff41'};text-shadow:0 0 8px ${isApollo?'#34d399':'#00ff41'};font-size:16px;">●</span>`;
                         } else if (st.status === 'active') {
@@ -3880,6 +3888,11 @@
                         } else if (st.status === 'skipped') {
                             cellHtml = `<span style="color:${isApollo?'#475569':'#333'};font-size:12px;">○</span>`;
                         }
+                    } else if (isFrontierStage) {
+                        // No stage record yet but VM is running — show lunar module at frontier
+                        cellHtml = isApollo
+                            ? `<span class="lunar-module" style="display:inline-block; width:28px; height:28px; vertical-align:middle;">${window.LUNAR_SVG}</span>`
+                            : '<span style="display:inline-block; color:#ffa800;text-shadow:0 0 10px #ffa800;font-size:16px;animation:migPulse 1s infinite;">◉</span>';
                     }
                     rows += `<td style="padding:6px 10px;text-align:center;">${cellHtml}</td>`;
                 });
