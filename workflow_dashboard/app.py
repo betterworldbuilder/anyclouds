@@ -3047,6 +3047,189 @@ def download_file(filename):
     return send_from_directory(UPLOAD_DIR, safe_name, as_attachment=True)
 
 
+def get_active_customer() -> str:
+    return str(ACTIVE_CUSTOMER_ID or "default").strip() or "default"
+
+
+def _active_customer_row() -> Dict[str, Any]:
+    if not ACTIVE_CUSTOMER_ID or not TRACKER_DB.exists():
+        return {}
+    try:
+        with open(TRACKER_DB, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("customer_id") == ACTIVE_CUSTOMER_ID:
+                    return dict(row)
+    except Exception:
+        return {}
+    return {}
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    _write_text(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def _simple_yaml(payload: Any, indent: int = 0) -> str:
+    pad = " " * indent
+    if isinstance(payload, dict):
+        lines = []
+        for key, value in payload.items():
+            if isinstance(value, (dict, list)):
+                lines.append(f"{pad}{key}:")
+                lines.append(_simple_yaml(value, indent + 2))
+            else:
+                lines.append(f"{pad}{key}: {json.dumps(value) if isinstance(value, str) else value}")
+        return "\n".join(lines)
+    if isinstance(payload, list):
+        lines = []
+        for item in payload:
+            if isinstance(item, (dict, list)):
+                lines.append(f"{pad}-")
+                lines.append(_simple_yaml(item, indent + 2))
+            else:
+                lines.append(f"{pad}- {json.dumps(item) if isinstance(item, str) else item}")
+        return "\n".join(lines)
+    return f"{pad}{payload}"
+
+
+@app.post("/api/migration-output-bundle/generate")
+def generate_migration_output_bundle():
+    """Generate the post-migration handoff bundle for GitOps, OpenCenter, and Genestack."""
+    data = request.json or {}
+    customer = data.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    bundle_root = UPLOAD_DIR / "migration_output_bundles" / safe_customer / stamp
+    bundle_root.mkdir(parents=True, exist_ok=True)
+
+    tracker_row = _active_customer_row()
+    with MIGRATION_JOBS_LOCK:
+        jobs = [
+            {k: v for k, v in job.items() if k not in {"proc", "queue"}}
+            for job in MIGRATION_JOBS.values()
+        ]
+
+    manifest = {
+        "bundle_version": "1.0",
+        "generated_at": stamp,
+        "customer": customer,
+        "active_customer_id": ACTIVE_CUSTOMER_ID,
+        "source_cloud": "Any OpenStack / OSPC",
+        "target_cloud": "Rackspace FLEX",
+        "tracker": tracker_row,
+        "migration_jobs": jobs,
+        "artifacts": {
+            "terraform_tfvars": "terraform.tfvars.json",
+            "ansible_inventory": "ansible_inventory.ini",
+            "repaired_image_metadata": "repaired_image_metadata.json",
+            "boot_test_results": "boot_test_results.json",
+            "dependency_graph": "dependency_graph.json",
+            "opencenter": "opencenter/estate-map.json",
+            "genestack": "genestack/cloud-images.yaml",
+        },
+    }
+    terraform = {
+        "customer": customer,
+        "target_cloud": "flex",
+        "region": tracker_row.get("Target Region") or tracker_row.get("target_region") or "",
+        "migration_wave": tracker_row.get("Wave") or tracker_row.get("wave") or "",
+        "instances": [],
+        "networks": [],
+        "security_groups": [],
+    }
+    repaired = {
+        "images": [],
+        "repair_profiles": ["linux-cloud-init", "legacy-ifcfg", "windows-virtio"],
+        "notes": "Populated by Cloud Jumper migration and repair lanes as jobs complete.",
+    }
+    boot_tests = {
+        "results": [],
+        "checks": ["boot", "ssh_or_rdp", "network", "service_health", "customer_uat"],
+    }
+    dependencies = {
+        "nodes": [],
+        "edges": [],
+        "sources": ["discovery inventory", "app dependency scanner", "migration telemetry"],
+    }
+    opencenter = {
+        "kind": "CloudJumperOpenCenterExport",
+        "customer": customer,
+        "day2_platform_view": True,
+        "operations": ["k8s", "openstack", "gitops", "observability", "runbooks"],
+        "migration_manifest": "../migration_manifest.json",
+    }
+    genestack = {
+        "kind": "CloudJumperGenestackExport",
+        "customer": customer,
+        "landing_zone": "openstack-flex",
+        "outputs": ["cloud-images", "flavor-map", "network-map", "component-versioning"],
+        "genestack_overrides_path": "/etc/genestack",
+    }
+
+    _write_json(bundle_root / "migration_manifest.json", manifest)
+    _write_json(bundle_root / "terraform.tfvars.json", terraform)
+    _write_text(bundle_root / "ansible_inventory.ini", "[cloudjumper_migrated]\n# host ansible_host=<flex_ip> ansible_user=<user>\n")
+    _write_json(bundle_root / "repaired_image_metadata.json", repaired)
+    _write_json(bundle_root / "boot_test_results.json", boot_tests)
+    _write_json(bundle_root / "dependency_graph.json", dependencies)
+    _write_json(bundle_root / "opencenter" / "estate-map.json", opencenter)
+    _write_text(bundle_root / "opencenter" / "day2-runbook.yaml", _simple_yaml({
+        "runbook": "cloud-jumper-day2",
+        "customer": customer,
+        "workflows": ["validate", "observe", "backup", "optimize", "operate"],
+    }) + "\n")
+    _write_text(bundle_root / "genestack" / "cloud-images.yaml", _simple_yaml(genestack) + "\n")
+    _write_text(bundle_root / "genestack" / "flavor-map.yaml", _simple_yaml({"flavors": []}) + "\n")
+    _write_text(bundle_root / "genestack" / "network-map.yaml", _simple_yaml({"networks": []}) + "\n")
+    _write_text(bundle_root / "README.txt", "\n".join([
+        "Cloud Jumper Migration Output Bundle",
+        "",
+        "Use migration_manifest.json as the source of truth.",
+        "Use terraform.tfvars.json and ansible_inventory.ini for repeatable rebuilds.",
+        "Use opencenter/ for Day-2 operations import.",
+        "Use genestack/ for FLEX/OpenStack landing-zone and GitOps handoff.",
+        "",
+    ]))
+
+    import zipfile
+    zip_path = bundle_root.with_suffix(".zip")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path in bundle_root.rglob("*"):
+            if path.is_file():
+                zf.write(path, path.relative_to(bundle_root))
+
+    files = []
+    for path in sorted(bundle_root.rglob("*")):
+        if path.is_file():
+            rel = path.relative_to(bundle_root)
+            files.append({
+                "name": str(rel),
+                "url": f"/api/migration-output-bundle/download/{safe_customer}/{stamp}/{rel.as_posix()}",
+            })
+    files.insert(0, {
+        "name": f"{safe_customer}-{stamp}.zip",
+        "url": f"/api/migration-output-bundle/download/{safe_customer}/{stamp}.zip",
+    })
+
+    return jsonify({"ok": True, "bundle": safe_customer, "stamp": stamp, "files": files})
+
+
+@app.get("/api/migration-output-bundle/download/<path:bundle_path>")
+def download_migration_output_bundle(bundle_path):
+    root = (UPLOAD_DIR / "migration_output_bundles").resolve()
+    target = (root / bundle_path).resolve()
+    try:
+        if not target.is_relative_to(root) or not target.exists() or not target.is_file():
+            return jsonify({"ok": False, "error": "file not found"}), 404
+    except Exception:
+        return jsonify({"ok": False, "error": "invalid path"}), 400
+    return send_from_directory(str(target.parent), target.name, as_attachment=True)
+
+
 @app.get("/api/references/data")
 def references_data():
     try:

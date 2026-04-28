@@ -369,7 +369,7 @@
     ">--</div>
   </div>
 </div>
-<!-- ── All 5 stage buttons on one row ───────────────── -->
+<!-- ── Mission stage buttons ─────────────────────────── -->
 <div class="stage-bar" id="stageBar">
   <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 Why and When Move to FLEX<br><small>Tech stack comparison & Business value</small></button>
   <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customer List<br><small>Migration Tracker</small></button>
@@ -378,6 +378,8 @@
   <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
   <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
+  <button class="stage-btn" data-stage="s7">STAGE 6<br><small>OpenCenter</small></button>
+  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>Genestack</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -1843,11 +1845,33 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 6 · Post-Migration -->
+  <!-- STAGE 5 · Post-Migration -->
   <div class="panel" id="panel-s6">
     <div class="info-panel">
-      <h2>Stage 6 – Post-Migration Sign-off</h2>
-      <p style="color:var(--muted);margin-bottom:12px;">Review the completed migration tasks and close out the customer in the Migration Log.</p>
+      <h2>Stage 5 – Post-Migration Output Bundle &amp; Sign-off</h2>
+      <p style="color:var(--muted);margin-bottom:12px;">Generate the formal Cloud Jumper handoff package, then review the completed migration tasks and close out the customer in the Migration Log.</p>
+
+      <div style="margin:16px 0 22px; padding:20px; background:radial-gradient(circle at top left, rgba(14,165,233,.18), rgba(2,6,23,.86)); border:1px solid rgba(56,189,248,.35); border-radius:10px; box-shadow:0 0 22px rgba(14,165,233,.12);">
+        <div style="display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+          <div>
+            <div style="color:#7dd3fc; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Cloud Jumper Mission Artifact</div>
+            <h3 style="margin:7px 0 8px; color:#e0f2fe; font-family:'Orbitron',sans-serif; letter-spacing:1px;">📦 Migration Output Bundle</h3>
+            <p style="margin:0; color:#94a3b8; font-size:13px; max-width:760px;">Creates downloadable files for GitOps, OpenCenter, Genestack, Terraform, Ansible, repair evidence, boot tests, and dependency graph handoff.</p>
+          </div>
+          <button type="button" onclick="generateMigrationOutputBundle()" style="background:linear-gradient(135deg,#0ea5e9,#2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 16px; border-radius:7px; cursor:pointer; font-weight:800; box-shadow:0 0 14px rgba(56,189,248,.35);">Generate Bundle</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:16px; font-family:'Share Tech Mono',monospace; color:#d1d5db; font-size:13px;">
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #38bdf8;">migration_manifest.json</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #22c55e;">terraform.tfvars.json</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #a78bfa;">ansible inventory</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f59e0b;">repaired image metadata</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #fb7185;">boot/test results</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #14b8a6;">dependency graph</div>
+        </div>
+
+        <div id="migration-output-bundle-status" style="display:none; margin-top:16px; padding:12px; background:rgba(0,0,0,.28); border:1px solid rgba(148,163,184,.25); border-radius:8px; color:#cbd5e1; font-size:13px;"></div>
+      </div>
       
       <h3>✅ Migration Checklist</h3>
       <div style="display:flex; flex-direction:column; gap:10px;">
@@ -1908,6 +1932,42 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
+  <!-- STAGE 6 · OpenCenter Integration -->
+  <div class="panel" id="panel-s7">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <div style="background:radial-gradient(circle at top left, rgba(34,197,94,.18), rgba(2,6,23,.9)); border:1px solid rgba(34,197,94,.35); border-radius:12px; padding:24px;">
+        <div style="color:#86efac; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 6</div>
+        <h2 style="margin:8px 0 10px; color:#dcfce7; font-family:'Orbitron',sans-serif;">OpenCenter Integration</h2>
+        <p style="color:#94a3b8; margin:0; max-width:920px;">OpenCenter consumes the Migration Output Bundle as the Day-2 operating view for the migrated customer estate.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Day-2 Platform View</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Customer, apps, VMs, networks, images, test status, and cutover state.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">K8s/OpenStack Operations</h3><p style="margin:0; color:#94a3b8; font-size:13px;">FLEX OpenStack and Kubernetes workload context from the final bundle.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #a78bfa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#c4b5fd;">GitOps Workflows</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Push output bundle facts into repeatable repo workflows and review gates.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Observability / Runbooks</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Attach validation evidence, day-2 tasks, monitoring notes, and rollback history.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 7 · Genestack Integration -->
+  <div class="panel" id="panel-s8">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
+        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">Genestack Integration</h2>
+        <p style="color:#94a3b8; margin:0; max-width:920px;">Genestack consumes the same bundle as the repeatable FLEX/OpenStack landing-zone and component configuration handoff.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #60a5fa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#bfdbfe;">OpenStack/FLEX Landing Zone</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Target cloud facts, image catalog, flavor map, network map, and project model.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Helm/OpenStack Service Config</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Turn migration facts into service values and GitOps-controlled platform config.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">/etc/genestack Overrides</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Store customer-specific overrides without losing the upstream Genestack model.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cloud Components / Versioning</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Track image, service, Kubernetes, and OpenStack component versions for repeatable rebuilds.</p></div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /panel-area -->
 
 <script>
@@ -1917,6 +1977,29 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
   const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual'];
+
+  async function generateMigrationOutputBundle() {
+    const box = document.getElementById('migration-output-bundle-status');
+    if (!box) return;
+    box.style.display = 'block';
+    box.style.borderColor = 'rgba(56,189,248,.35)';
+    box.innerHTML = 'Generating Cloud Jumper output bundle...';
+    try {
+      const res = await fetch('/api/migration-output-bundle/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({customer: window.activeCustomerId || ''})
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Bundle generation failed');
+      const links = (data.files || []).map(f => `<a href="${f.url}" style="display:inline-block;margin:4px 8px 4px 0;padding:6px 9px;border:1px solid rgba(125,211,252,.4);border-radius:6px;color:#7dd3fc;text-decoration:none;background:rgba(14,165,233,.08);">${f.name}</a>`).join('');
+      box.style.borderColor = 'rgba(34,197,94,.45)';
+      box.innerHTML = `<div style="color:#86efac;font-weight:800;margin-bottom:8px;">Bundle ready: ${data.bundle} / ${data.stamp}</div><div>${links}</div>`;
+    } catch (err) {
+      box.style.borderColor = 'rgba(239,68,68,.45)';
+      box.innerHTML = `<span style="color:#fca5a5;">${err.message}</span>`;
+    }
+  }
 
   function activateSub(paneIds, activeId) {
     paneIds.forEach(id => {
@@ -2596,7 +2679,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         {id: 'panel-s2', key: 's2', label: 'Stage 2 (Migration Pipeline)'},
         {id: 'panel-s4', key: 's4', label: 'Stage 3 (Validation & UAT)'},
         {id: 'panel-s5', key: 's5', label: 'Stage 4 (Cutover & Handover)'},
-        {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration)'}
+        {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration Output Bundle)'},
+        {id: 'panel-s7', key: 's7', label: 'Stage 6 (OpenCenter Integration)'},
+        {id: 'panel-s8', key: 's8', label: 'Stage 7 (Genestack Integration)'}
       ];
       panels.forEach(p => {
           const panelEl = document.querySelector(`#${p.id}`);
@@ -2642,7 +2727,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           's2': 'Stage 2 (Migration Pipeline)',
           's4': 'Stage 3 (Validation & UAT)',
           's5': 'Stage 4 (Cutover & Handover)',
-          's6': 'Stage 5 (Post-Migration)'
+          's6': 'Stage 5 (Post-Migration Output Bundle)',
+          's7': 'Stage 6 (OpenCenter Integration)',
+          's8': 'Stage 7 (Genestack Integration)'
       };
       
       if(status === 'Failed') {
@@ -2728,6 +2815,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       .then(res => res.json())
       .then(data => {
           if (data.ok) {
+              window.activeCustomerId = customerId;
               renderGlobalStageHeaders(cName);
 
               activateStage(routeTarget);

@@ -933,11 +933,66 @@ Controlled production cutover workflow.
 
 ### Stage 5 — Post-Migration
 
-Stability monitoring and sign-off.
+Stability monitoring, sign-off, and the formal Cloud Jumper output bundle.
 
 - **Success / Failure marking** — operators mark the migration outcome per customer
 - **Status persistence** — outcome written back to the customer tracker CSV
 - **48–72h stability window guidance** — OSPC kept in `read_only` as warm standby before final decommission
+- **Migration Output Bundle** — generates the durable handoff package:
+  - `migration_manifest.json`
+  - `terraform.tfvars.json`
+  - `ansible_inventory.ini`
+  - `repaired_image_metadata.json`
+  - `boot_test_results.json`
+  - `dependency_graph.json`
+  - `opencenter/estate-map.json`
+  - `opencenter/day2-runbook.yaml`
+  - `genestack/cloud-images.yaml`
+  - `genestack/flavor-map.yaml`
+  - `genestack/network-map.yaml`
+  - zipped download archive
+
+### Stage 6 — OpenCenter Integration
+
+OpenCenter consumes the Migration Output Bundle as the Day-2 operating cockpit.
+
+| OpenCenter lane | What Cloud Jumper provides |
+|---|---|
+| Day-2 platform view | Customer, apps, VMs, images, networks, validation state, and cutover status |
+| K8s/OpenStack operations | FLEX/OpenStack and Kubernetes context from migrated estate facts |
+| GitOps workflows | Structured bundle files ready for repo import, review, and automation gates |
+| Observability/runbooks | Boot evidence, repair history, validation results, rollback notes, and day-2 tasks |
+
+### Stage 7 — Genestack Integration
+
+Genestack consumes the same bundle as a repeatable FLEX/OpenStack landing-zone and platform configuration handoff.
+
+| Genestack lane | What Cloud Jumper provides |
+|---|---|
+| OpenStack/FLEX landing zone | Image catalog facts, target flavors, networks, projects, and workload placement hints |
+| Helm/OpenStack service config | Migration facts shaped for GitOps-controlled service values and deployment overlays |
+| `/etc/genestack` overrides | Customer-specific overrides separated from upstream Genestack defaults |
+| Cloud components/versioning | Image, service, Kubernetes, and OpenStack component version tracking for rebuilds |
+
+### What Next — Mission Control To GitOps
+
+The next horizon is making Cloud Jumper the translation layer between migration execution and durable customer operations:
+
+```text
+Cloud Jumper migration telemetry
+        |
+        v
+Migration Output Bundle
+        |
+        +--> OpenCenter: operate, observe, runbook, GitOps
+        |
+        +--> Genestack: landing zone, service config, overrides, versioning
+        |
+        v
+Terraform / Ansible / AI-agent optimization loop
+```
+
+The migration does not end when a VM boots. It ends when the customer estate can be rebuilt, reviewed, repaired, observed, and optimized from source-controlled artifacts.
 
 ---
 

@@ -110,7 +110,33 @@ The vision is a **Full Cycle Migration Mission Control** that produces structure
 - Rollback scripts become tested recovery automation.
 - Migration telemetry becomes optimization data for future waves.
 
-That means CloudJumper can interconnect with platforms like OpenCenter, Genestack, Magnum, and other GitOps control planes. Instead of finishing with a one-time migration script, the customer leaves with a repeatable operating model: infrastructure saved as code, repairs encoded as playbooks, topology represented as reviewable templates, and deployment state controlled through pull requests.
+The new handoff path is:
+
+```text
+Stage 5: Migration Output Bundle
+  migration_manifest.json
+  terraform.tfvars.json
+  ansible_inventory.ini
+  repaired_image_metadata.json
+  boot_test_results.json
+  dependency_graph.json
+        |
+        +--> Stage 6: OpenCenter
+        |       Day-2 platform view
+        |       K8s/OpenStack operations
+        |       GitOps workflows
+        |       observability/runbooks
+        |
+        +--> Stage 7: Genestack
+                OpenStack/FLEX landing zone
+                Helm/OpenStack service config
+                /etc/genestack overrides
+                cloud components/versioning
+```
+
+That means CloudJumper can interconnect with platforms like **OpenCenter**, **Genestack**, Magnum, and other GitOps control planes. OpenCenter becomes the Day-2 operations cockpit for migrated estates: platform view, Kubernetes/OpenStack operations, GitOps workflows, observability, and runbooks. Genestack becomes the repeatable FLEX/OpenStack foundation layer: landing-zone configuration, Helm/OpenStack service config, `/etc/genestack` overrides, and cloud component/version tracking.
+
+Instead of finishing with a one-time migration script, the customer leaves with a repeatable operating model: infrastructure saved as code, repairs encoded as playbooks, topology represented as reviewable templates, and deployment state controlled through pull requests.
 
 From there, AI agents can help with the work that usually gets lost after migration day: autorepair failed boots, recommend right-sized FLEX flavors, generate Terraform patches from validated migration maps, summarize risk before each cutover, and keep customer environments optimized as they scale.
 

@@ -62,6 +62,7 @@ newimagemig-cloudfiles-regionjumphost.*/
 *_terminal_*.txt
 dashboard.log
 migration_log.txt
+uploads/migration_output_bundles/
 *.log
 
 # Backup files
