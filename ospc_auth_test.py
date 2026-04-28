@@ -1,29 +1,39 @@
 #!/usr/bin/env python3
-import json, subprocess, sys, os
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent
+
+# This helper intentionally relies on environment variables or an OpenRC file.
+# Do not embed API keys/tokens in source control.
 env = os.environ.copy()
-env.update({
-    "OSPC_USERNAME":  "dzng.8294",
-    "OSPC_APIKEY":    "0b6f44aad11f4c6fbaeaa159151dd316",
-    "OSPC_TENANT_ID": "1342314",
-    "OSPC_REGION":    "IAD",
-})
 
 r = subprocess.run(
     ["python3", "ospcscan.py"],
-    env=env, capture_output=True, text=True, timeout=90,
-    cwd="/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0"
+    env=env,
+    capture_output=True,
+    text=True,
+    timeout=90,
+    cwd=str(BASE_DIR),
 )
 
-if r.stderr: print("STDERR:", r.stderr[:400])
-if not r.stdout.strip(): print("No output!"); sys.exit(1)
+if r.stderr:
+    print("STDERR:", r.stderr[:400])
+if not r.stdout.strip():
+    print("No output!")
+    sys.exit(1)
 
 d = json.loads(r.stdout)
-if "error" in d: print("ERROR:", d["error"]); sys.exit(1)
+if "error" in d:
+    print("ERROR:", d["error"])
+    sys.exit(1)
 
-print(f"\n✅  Servers: {d['count']}   DBs: {d['db_count']}   Region: {d['region']}\n")
-for s in d["servers"]:
-    print(f"  {s['name']:<35} {s['external_ip']:<20} {s['os_label']}")
+print(f"\n✅  Servers: {d.get('count')}   DBs: {d.get('db_count')}   Region: {d.get('region')}\n")
+for s in d.get("servers", []):
+    print(f"  {s.get('name',''):<35} {s.get('external_ip',''):<20} {s.get('os_label','')}")
 print()
-for db in d["databases"]:
-    print(f"  [DB] {db['name']:<35} {db['os_label']}")
+for db in d.get("databases", []):
+    print(f"  [DB] {db.get('name',''):<35} {db.get('os_label','')}")

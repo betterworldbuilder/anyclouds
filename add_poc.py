@@ -1,7 +1,8 @@
 import csv
 from pathlib import Path
 
-TRACKER_DB = Path("/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/workflow_dashboard/data/migration_tracker_db.csv")
+BASE_DIR = Path(__file__).resolve().parent
+TRACKER_DB = BASE_DIR / "workflow_dashboard" / "data" / "migration_tracker_db.csv"
 
 def add_row():
     existing = []

@@ -59,6 +59,7 @@ cred-cache.js
 inventory-csv/
 ospc-discovery/outputs/
 outputs/
+uploads/1342314_topology_deploy_*.sh
 newimagemig-cloudfiles-regionjumphost.*/
 *_terminal_*.txt
 dashboard.log

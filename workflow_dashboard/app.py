@@ -9307,8 +9307,8 @@ echo "=== TASK COMPLETE ==="
                 })
 
             report_df = pd.DataFrame(report_data)
-            out_path = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/Final_Migration_TCO_Report.xlsx'
-            out_csv = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/Final_Migration_TCO_Report.csv'
+            out_path = str(BASE_DIR / 'Final_Migration_TCO_Report.xlsx')
+            out_csv = str(BASE_DIR / 'Final_Migration_TCO_Report.csv')
             report_df.to_excel(out_path, index=False)
             report_df.to_csv(out_csv, index=False)
             status_msg = f"[SUCCESS] Full Migration Report generated successfully."
@@ -9339,7 +9339,7 @@ echo "=== TASK COMPLETE ==="
             import pandas as pd
             import os
 
-            flavor_map = data.get('flavor_mapping', '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/1342314_flavormap.csv')
+            flavor_map = data.get('flavor_mapping', str(BASE_DIR / '1342314_flavormap.csv'))
             df_csv = pd.DataFrame()
             if flavor_map and os.path.exists(flavor_map):
                 try:
@@ -9390,7 +9390,7 @@ echo "=== TASK COMPLETE ==="
                 })
 
             tco_df = pd.DataFrame(tco_data)
-            out_csv = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0/TCO_Comparison_Report.csv'
+            out_csv = str(BASE_DIR / 'TCO_Comparison_Report.csv')
             tco_df.to_csv(out_csv, index=False)
             status_msg = f"[SUCCESS] OSPC vs FLEX TCO Comparison generated successfully."
 
@@ -9445,7 +9445,7 @@ echo "=== TASK COMPLETE ==="
 @app.get("/api/downloads/<path:filename>")
 def download_report_file(filename):
     from flask import send_file, jsonify
-    base_dir = '/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-3.0'
+    base_dir = str(BASE_DIR)
     safe_path = os.path.join(base_dir, filename)
     if os.path.exists(safe_path) and safe_path.startswith(base_dir):
         return send_file(safe_path, as_attachment=True)
