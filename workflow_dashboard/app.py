@@ -3216,7 +3216,7 @@ def generate_migration_output_bundle():
                     "finops/rightsize-candidates.json",
                 ],
             },
-            "stage7_iac_dr_backup_restore": {
+            "stage7_iac_backup_restore_terraform_ansible": {
                 "inputs": [
                     "migration_manifest.json",
                     "discovery-output/*",
@@ -3238,11 +3238,25 @@ def generate_migration_output_bundle():
                     "tenant-iac-dr/dr/BACKUP_SCOPE.md",
                 ],
             },
-            "stage8_ai_anywhere": {
+            "stage8_gitops_opencenter": {
                 "inputs": [
                     "cloudjumper-output/*",
                     "finops-output/*",
                     "opencenter-output/*",
+                    "tenant-iac-dr-output/*",
+                    "raw migration logs when available",
+                ],
+                "outputs": [
+                    "tenant-iac-dr/gitops-restore/*",
+                    "gitops-backup-manifest.json",
+                    "opencenter-restore-*.sh",
+                ],
+            },
+            "stage9_ai_ops": {
+                "inputs": [
+                    "cloudjumper-output/*",
+                    "finops-output/*",
+                    "gitops-opencenter-output/*",
                     "tenant-iac-dr-output/*",
                     "raw migration logs when available",
                 ],
@@ -3893,7 +3907,7 @@ def generate_migration_output_bundle():
         "Use ai-anywhere-context/ as the private AI Anywhere input pack.",
         "",
         "Chain:",
-        "  Cloud Jumper Output Bundle -> TCO/FinOps -> IAC DR Backup and Restore + GitOps -> AI Anywhere",
+        "  Cloud Jumper Output Bundle -> TCO/FinOps -> IAC Backup & Restore -> GitOps/OpenCenter -> AI OPS",
         "",
     ]))
 

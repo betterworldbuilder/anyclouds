@@ -399,8 +399,9 @@
   <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
   <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
   <button class="stage-btn" data-stage="s7">STAGE 6<br><small>TCO / FinOps</small></button>
-  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>IAC DR Backup and Restore</small></button>
-  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>AI Anywhere</small></button>
+  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>IAC Backup &amp; Restore</small></button>
+  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>GitOps / OpenCenter</small></button>
+  <button class="stage-btn" data-stage="s10">STAGE 9<br><small>AI OPS</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -2201,24 +2202,24 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cost Baseline</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Use source inventory, flavors, storage, IPs, and app grouping to model current OSPC spend.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">FLEX Run-Rate</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Translate target flavors, images, volumes, networks, and booted test VMs into projected monthly cost.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization Candidates</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Feed right-sizing candidates into AI Anywhere and GitOps patch review after migration waves.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization Candidates</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Feed right-sizing candidates into AI OPS and GitOps patch review after migration waves.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #a78bfa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#c4b5fd;">Executive Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate cost comparison, wave savings, risk notes, and modernization value for stakeholders.</p></div>
       </div>
 
       <div style="background:rgba(15,23,42,.72); border:1px solid rgba(245,158,11,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
         <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">FinOps chain position</div>
-        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → IAC DR backup and restore → AI Anywhere optimization loop</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → IAC Backup & Restore → GitOps/OpenCenter → AI OPS loop</div>
       </div>
     </div>
   </div>
 
-  <!-- STAGE 7 · IAC DR Backup and Restore -->
+  <!-- STAGE 7 · IAC Backup and Restore -->
   <div class="panel" id="panel-s8">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
         <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
-        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">IAC DR Backup and Restore</h2>
-        <p style="color:#94a3b8; margin:0; max-width:920px;">Capture the migrated tenant as Terraform-first desired state with backup policies and executable restore runbooks for same-region rebuild or cross-region redeploy.</p>
+        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">IAC Backup and Restore (Terraform + Ansible)</h2>
+        <p style="color:#94a3b8; margin:0; max-width:920px;">Capture migrated tenant state as Terraform and Ansible-ready artifacts with backup policies and executable restore runbooks for same-region rebuild or cross-region redeploy.</p>
       </div>
 
       <div style="background:rgba(15,23,42,.88); border:1px solid rgba(45,212,191,.42); border-radius:10px; padding:16px 18px;">
@@ -2358,29 +2359,29 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 8 · AI Anywhere Integration -->
+  <!-- STAGE 8 · GitOps / OpenCenter -->
   <div class="panel" id="panel-s9">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
         <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
-        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AI Anywhere Integration</h2>
-        <p style="color:#94a3b8; margin:0; max-width:940px;">AI Anywhere consumes the Cloud Jumper output bundle plus IAC DR backup/restore outputs (and optional bundle artifacts such as GitOps stubs) as a private AI context pack for repair, risk, right-sizing, and runbook agents.</p>
+        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">GitOps / OpenCenter</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">Use GitOps and OpenCenter controls to publish backup/restore artifacts, create restore stubs, and drive repeatable redeploy pipelines in another FLEX region or OpenStack cloud.</p>
       </div>
 
       <div style="display:grid; grid-template-columns:minmax(260px,1fr) 38px minmax(260px,1fr) 38px minmax(280px,1.1fr); gap:14px; align-items:center; font-family:'Share Tech Mono',monospace;">
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:16px;">
-          <h3 style="margin:0 0 10px; color:#7dd3fc;">Cloud Jumper Inputs</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">migration manifest<br>terraform vars<br>ansible inventory<br>repair metadata<br>boot/test results<br>dependency graph</div>
+          <h3 style="margin:0 0 10px; color:#7dd3fc;">Inputs</h3>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">migration manifest<br>terraform vars<br>ansible inventory<br>tenant iac-dr pack<br>backup scope</div>
         </div>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(34,197,94,.3); border-radius:8px; padding:16px;">
-          <h3 style="margin:0 0 10px; color:#86efac;">Platform Context</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">tenant-iac-dr pack<br>DR runbooks + backup policy<br>bundle GitOps / observability stubs<br>migration evidence<br>dependency graph slices</div>
+          <h3 style="margin:0 0 10px; color:#86efac;">Actions</h3>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">push backup to gitops repo<br>prepare opencenter restore stubs<br>tag + commit orchestration<br>optional remote push</div>
         </div>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(244,114,182,.35); border-radius:8px; padding:16px;">
-          <h3 style="margin:0 0 10px; color:#f9a8d4;">AI Anywhere Outputs</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">risk-score.json<br>rightsize recommendations<br>autorepair plan<br>Terraform patch suggestions<br>runbook improvements<br>DR restore improvements</div>
+          <h3 style="margin:0 0 10px; color:#f9a8d4;">Outputs</h3>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">gitops backup manifest<br>opencenter restore pack<br>restore scripts + runbooks<br>commit/tag metadata</div>
         </div>
       </div>
 
@@ -2388,6 +2389,22 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Private AI Context</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Sensitive customer migration evidence stays packaged for private AI workflows instead of generic public prompting.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Autorepair Intelligence</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Failed boot, network, service, and dependency signals become repair plans with risk and rollback notes.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine IAC DR runbooks after each wave.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 9 · AI OPS -->
+  <div class="panel" id="panel-s10">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
+        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
+        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AI OPS</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">AI OPS consumes Cloud Jumper + FinOps + IAC + GitOps/OpenCenter outputs to produce optimization and autorepair recommendations backed by GitOps-ready artifacts.</p>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;">
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #7dd3fc; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size recommendations, capacity tuning, and infra patch proposals.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f9a8d4; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Autorepair</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Boot, network, service, and runbook remediation plans with rollback hints.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #86efac; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">GitOps Delivery</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Publish AI OPS outputs as reviewable change candidates for GitOps pipelines.</p></div>
       </div>
     </div>
   </div>
@@ -3579,8 +3596,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         {id: 'panel-s5', key: 's5', label: 'Stage 4 (Cutover & Handover)'},
         {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration Output Bundle)'},
         {id: 'panel-s7', key: 's7', label: 'Stage 6 (TCO / FinOps)'},
-        {id: 'panel-s8', key: 's8', label: 'Stage 7 (IAC DR Backup and Restore)'},
-        {id: 'panel-s9', key: 's9', label: 'Stage 8 (AI Anywhere Integration)'}
+        {id: 'panel-s8', key: 's8', label: 'Stage 7 (IAC Backup & Restore - Terraform + Ansible)'},
+        {id: 'panel-s9', key: 's9', label: 'Stage 8 (GitOps / OpenCenter)'},
+        {id: 'panel-s10', key: 's10', label: 'Stage 9 (AI OPS)'}
       ];
       panels.forEach(p => {
           const panelEl = document.querySelector(`#${p.id}`);
@@ -3628,8 +3646,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           's5': 'Stage 4 (Cutover & Handover)',
           's6': 'Stage 5 (Post-Migration Output Bundle)',
           's7': 'Stage 6 (TCO / FinOps)',
-          's8': 'Stage 7 (IAC DR Backup and Restore)',
-          's9': 'Stage 8 (AI Anywhere Integration)'
+          's8': 'Stage 7 (IAC Backup & Restore - Terraform + Ansible)',
+          's9': 'Stage 8 (GitOps / OpenCenter)',
+          's10': 'Stage 9 (AI OPS)'
       };
       
       if(status === 'Failed') {

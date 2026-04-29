@@ -5,6 +5,7 @@
 <tr style="background-color: #f2f2f2;">
   <th style="width: 22%; text-align: left;">Category</th>
   <th style="text-align: left;">Details</th>
+  <th style="width: 18%; text-align: left;">Current Status</th>
 </tr>
 <tr>
   <td valign="top"><b>Workflow Stages</b></td>
@@ -14,7 +15,15 @@
     <b>Stage 2:</b> Migration Pipeline (Shift &amp; Lift Images, REHOST Apps/DBs, Kubernetes)<br>
     <b>Stage 3:</b> Validation &amp; UAT (Automated cross-cloud checks &amp; HTTP health tests)<br>
     <b>Stage 4:</b> Cutover &amp; Handover (Traffic split, DB promotion, final sync)<br>
-    <b>Stage 5:</b> Post-Migration (Stability tracking, artifact bundle generation)
+    <b>Stage 5:</b> Post-Migration (Stability tracking, artifact bundle generation)<br>
+    <b>Stage 6:</b> TCO / FinOps<br>
+    <b>Stage 7:</b> IAC DR Backup and Restore<br>
+    <b>Stage 8:</b> AI Anywhere
+  </td>
+  <td valign="top">
+    Stage 2 VM REHOST: <b>ready</b><br>
+    Windows VM migration: <b>under Test</b><br>
+    Remaining stages: <b>underconstruction</b>
   </td>
 </tr>
 <tr>
@@ -28,6 +37,7 @@
     &#8226; Kubernetes Portability: Auto-replication via Genestack/OpenCenter<br>
     &#8226; No Database Required: Stateless backend (CSV + local browser storage)
   </td>
+  <td valign="top"><b>underconstruction</b></td>
 </tr>
 <tr>
   <td valign="top"><b>Available Migration Methods</b></td>
@@ -49,6 +59,11 @@
     &nbsp;&nbsp;&#8226; OpenCenter (GitOps / FluxCD)<br>
     &nbsp;&nbsp;&#8226; OSPC K8 to Flex Magnum (8-stage SSH export &amp; transform)
   </td>
+  <td valign="top">
+    REHOST VM migration: <b>ready</b><br>
+    Windows VM migration: <b>under Test</b><br>
+    Other methods: <b>underconstruction</b>
+  </td>
 </tr>
 <tr>
   <td valign="top"><b>Supported OS Types</b></td>
@@ -60,7 +75,11 @@
     &#8226; RedHat 8<br>
     &#8226; Rocky Linux 8 / 9<br>
     &#8226; AlmaLinux 8 / 9<br>
-    &#8226; Testing Windows 2016, 2019 (via Glance snapshot + VirtIO injection)
+    &#8226; Windows Server 2016 / 2019 (via Glance snapshot + VirtIO injection)
+  </td>
+  <td valign="top">
+    Linux VM rehost set: <b>ready</b><br>
+    Windows VM set: <b>under Test</b>
   </td>
 </tr>
 <tr>
@@ -70,6 +89,7 @@
     &#8226; Stage 7 (IAC DR backup and restore): Terraform-first restore, GitOps hooks<br>
     &#8226; Stage 8 (AI Anywhere): AI auto-repair plans and risk-scoring
   </td>
+  <td valign="top"><b>underconstruction</b></td>
 </tr>
 </table>
 </body>

@@ -1,17 +1,22 @@
-"Category","Details"
+"Category","Details","Current Status"
 "Workflow Stages","Stage 0: Customer Migration Tracker (Backlog management)
 Stage 1: Discovery & Assessment (OSPC/FLEX scanning & topology import)
 Stage 2: Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)
 Stage 3: Validation & UAT (Automated cross-cloud checks & HTTP health tests)
 Stage 4: Cutover & Handover (Traffic split, DB promotion, final sync)
-Stage 5: Post-Migration (Stability tracking, artifact bundle generation)"
+Stage 5: Post-Migration (Stability tracking, artifact bundle generation)
+Stage 6: TCO / FinOps
+Stage 7: IAC DR Backup and Restore
+Stage 8: AI Anywhere","Stage 2 VM REHOST: ready
+Windows VM migration: under Test
+Remaining stages: underconstruction"
 "Current Features","Single-Tab Mission Control: No CLI required, full GUI wrapper
 Live Execution: Real-time logs streaming to browser
 Visual Topology Designer: Drag-and-drop infra cloning
 Offline Guest Repair: Pre-boot image patching for networks
 Parallel Execution: Migrate multiple DBs/Servers simultaneously
 Kubernetes Portability: Auto-replication via Genestack/OpenCenter
-No Database Required: Stateless backend (CSV + local browser storage)"
+No Database Required: Stateless backend (CSV + local browser storage)","underconstruction"
 "Available Migration Methods","1. Direct Shift & Lift (Images):
   - Production Mode (Live SSH-pipe disk without snapshot)
   - External Offload (Glance snapshot via Jump Host)
@@ -30,7 +35,9 @@ No Database Required: Stateless backend (CSV + local browser storage)"
 4. Kubernetes Migration:
   - Genestack / Kubespray (Ansible-driven)
   - OpenCenter (GitOps / FluxCD)
-  - OSPC K8 to Flex Magnum (8-stage SSH export & transform)"
+  - OSPC K8 to Flex Magnum (8-stage SSH export & transform)","REHOST VM migration: ready
+Windows VM migration: under Test
+Other methods: underconstruction"
 "Supported OS Types","Ubuntu (20.04, 22.04, 24.04)
 Debian (10, 11, 12)
 CentOS 7
@@ -38,7 +45,8 @@ RedHat 6
 RedHat 8
 Rocky Linux 8 / 9
 AlmaLinux 8 / 9
-Testing Windows 2016, 2019 (via Glance snapshot + VirtIO injection)"
+Windows Server 2016 / 2019 (via Glance snapshot + VirtIO injection)","Linux VM rehost set: ready
+Windows VM set: under Test"
 "Future / Upcoming","Stage 6 (TCO/FinOps): Right-sizing and executive cost summaries
 Stage 7 (IAC DR backup and restore): Terraform-first restore, GitOps hooks
-Stage 8 (AI Anywhere): AI auto-repair plans and risk-scoring"
+Stage 8 (AI Anywhere): AI auto-repair plans and risk-scoring","underconstruction"

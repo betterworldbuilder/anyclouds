@@ -109,7 +109,7 @@ CloudJumper works as a full-cycle migration Mission Control. Each phase turns un
 | ✂️ | **8. Cut Over** | Uses generated cutover and rollback scripts with final validation evidence to shift live traffic. | Gives the migration a controlled finish line instead of a nervous handoff. |
 | 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, IAC DR backup/restore packs, and AI context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
 
-**How this maps to the dashboard UI:** The shell uses **Customer List** (tracker) plus **Stages 1–8** in the top bar: Discovery (1), Migration (2), Validation & UAT (3), Cutover (4), Post-Migration bundle (5), TCO/FinOps (6), **IAC DR Backup and Restore** (7), **AI Anywhere** (8). Narrative phases **3–6** appear primarily under **Stage 2 (Migration)** and its subtabs; **7–8** align with post-migration handoff (FinOps, tenant DR/IaC with GitOps hooks, AI). **OpenCenter** is not a separate Mission Control stage; OpenCenter-style GitOps restore prep lives under **IAC DR** Option B, and Kubernetes migration still exposes OpenCenter/Genestack under **Stage 2** where applicable.
+**How this maps to the dashboard UI:** The shell uses **Customer List** (tracker) plus **Stages 1–9** in the top bar: Discovery (1), Migration (2), Validation & UAT (3), Cutover (4), Post-Migration bundle (5), TCO/FinOps baseline/right-size (6), **IAC Backup & Restore (Terraform + Ansible)** (7), **GitOps / OpenCenter** (8), and **AI OPS** (9). Narrative phases **3–6** appear primarily under **Stage 2 (Migration)** and its subtabs; **7–9** align with post-migration handoff and continuous operations.
 
 ---
 
@@ -117,11 +117,11 @@ CloudJumper works as a full-cycle migration Mission Control. Each phase turns un
 
 | Category                        | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Current Status                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **Workflow Stages**             | Stage 0: Customer Migration Tracker (Backlog management)<br>Stage 1: Discovery & Assessment (OSPC/FLEX scanning & topology import)<br>Stage 2: Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)<br>Stage 3: Validation & UAT (Automated cross-cloud checks & HTTP health tests)<br>Stage 4: Cutover & Handover (Traffic split, DB promotion, final sync)<br>Stage 5: Post-Migration (Stability tracking, artifact bundle generation)<br>Stage 6: TCO / FinOps<br>Stage 7: IAC DR Backup and Restore<br>Stage 8: AI Anywhere | Stage 2 VM REHOST: ready<br>Windows VM migration: under Test<br>Remaining stages: under construction |
+| **Workflow Stages**             | Stage 0: Customer Migration Tracker (Backlog management)<br>Stage 1: Discovery & Assessment (OSPC/FLEX scanning & topology import)<br>Stage 2: Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)<br>Stage 3: Validation & UAT (Automated cross-cloud checks & HTTP health tests)<br>Stage 4: Cutover & Handover (Traffic split, DB promotion, final sync)<br>Stage 5: Post-Migration (Stability tracking, artifact bundle generation)<br>Stage 6: TCO / FinOps<br>Stage 7: IAC Backup & Restore (Terraform + Ansible)<br>Stage 8: GitOps / OpenCenter<br>Stage 9: AI OPS | Stage 2 VM REHOST: ready<br>Windows VM migration: under Test<br>Remaining stages: under construction |
 | **Current Features (✅ Ready)**  | Single-Tab Mission Control: No CLI required, full GUI wrapper<br>Live Execution: Real-time logs streaming to browser<br>Visual Topology Designer: Drag-and-drop infra cloning<br>Offline Guest Repair: Pre-boot image patching for networks<br>Parallel Execution: Migrate multiple DBs/Servers simultaneously<br>No Database Required: Stateless backend (CSV + local browser storage)                                                                                                                                                          | **READY**                                                                                            |
 | **Available Migration Methods** | Direct Shift & Lift (Images): Production Mode, External Offload, Direct Export<br><br>REHOST (Apps & Servers): Infra duplication, Full Clone, Quick Install<br><br>Database Replication: Dump & Restore, DBaaS Streaming, HA Replica<br><br>Kubernetes Migration: Genestack/Kubespray, OpenCenter (GitOps), Magnum export                                                                                                                                                                                                                        | REHOST VM migration: ready<br>Windows VM migration: under Test<br>Other methods: under construction  |
 | **Supported OS Types**          | Ubuntu (20.04, 22.04, 24.04)<br>Debian (10, 11, 12)<br>CentOS 7<br>RedHat 6, 8<br>Rocky Linux 8 / 9<br>AlmaLinux 8 / 9<br>Windows Server 2016 / 2019                                                                                                                                                                                                                                                                                                                                                                                             | Linux VM rehost set: ready<br>Windows VM set: under Test                                             |
-| **Future / Upcoming**           | Stage 6: TCO / FinOps (Right-sizing + cost summary)<br>Stage 7: IAC DR backup & restore (Terraform + GitOps hooks)<br>Stage 8: AI Anywhere (auto-repair + risk scoring)                                                                                                                                                                                                                                                                                                                                                                          | under construction                                                                                   |
+| **Future / Upcoming**           | Stage 6: TCO / FinOps (Right-sizing + cost summary)<br>Stage 7: IAC Backup & Restore (Terraform + Ansible)<br>Stage 8: GitOps / OpenCenter<br>Stage 9: AI OPS (optimization + autorepair recommendations using GitOps)                                                                                                                                                                                                                                                                                                                                                                          | under construction                                                                                   |
 
 ## Current Workflow Updates
 
@@ -1031,7 +1031,7 @@ Generated files:
 - `finops/tco-summary.csv`
 - `finops/rightsize-candidates.json`
 
-### Stage 7 — IAC DR Backup and Restore (Mission Control)
+### Stage 7 — IAC Backup and Restore (Terraform + Ansible)
 
 This stage captures tenant-owned infrastructure as Terraform-first restore artifacts, validates required upstream evidence, prepares cross-region/cross-cloud overlays, and exposes **GitOps integration** (repo push, OpenCenter-oriented restore prep under Option B). The migration output bundle may still include an optional `opencenter/` directory for Day-2 stubs when generated—there is **no separate OpenCenter tab** in the shell.
 
@@ -1044,7 +1044,9 @@ This stage captures tenant-owned infrastructure as Terraform-first restore artif
 | GitOps / restore hooks | Push backup to configured GitOps tree; prepare OpenCenter-oriented restore scripts under `tenant-iac-dr/gitops-restore/` when using Option B |
 | Runbooks and validation | Same-region and cross-region restore runbooks plus restore validation checklist |
 
-### Stage 8 — AI Anywhere Integration
+### Stage 8 — GitOps / OpenCenter
+
+### Stage 9 — AI OPS Integration
 
 AI Anywhere consumes the complete chain as a private AI context pack.
 
@@ -1077,7 +1079,9 @@ Migration Output Bundle
         |
         +--> TCO / FinOps: baseline, run-rate, right-size, report
         |
-        +--> IAC DR Backup and Restore: restore scope, preflight, target profiles, GitOps backup/export, optional OpenCenter prep
+        +--> IAC Backup and Restore: Terraform/Ansible restore scope, preflight, target profiles
+        |
+        +--> GitOps/OpenCenter: repo backup/export, restore stubs, control-plane orchestration
         |
         +--> AI Anywhere: repair, risk, right-size, patch, optimize
         |
