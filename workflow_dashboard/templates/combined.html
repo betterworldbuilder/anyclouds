@@ -380,7 +380,7 @@
   <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
   <button class="stage-btn" data-stage="s7">STAGE 6<br><small>TCO / FinOps</small></button>
   <button class="stage-btn" data-stage="s8">STAGE 7<br><small>OpenCenter</small></button>
-  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>Genestack</small></button>
+  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>Tenant IaC DR Pack</small></button>
   <button class="stage-btn" data-stage="s10">STAGE 9<br><small>AI Anywhere</small></button>
 </div>
 
@@ -2087,7 +2087,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <div>
             <div style="color:#7dd3fc; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Cloud Jumper Mission Artifact</div>
             <h3 style="margin:7px 0 8px; color:#e0f2fe; font-family:'Orbitron',sans-serif; letter-spacing:1px;">📦 Migration Output Bundle</h3>
-            <p style="margin:0; color:#94a3b8; font-size:13px; max-width:760px;">Creates downloadable files for GitOps, OpenCenter, Genestack, Terraform, Ansible, repair evidence, boot tests, and dependency graph handoff.</p>
+            <p style="margin:0; color:#94a3b8; font-size:13px; max-width:760px;">Creates downloadable files for GitOps, OpenCenter, Tenant IaC DR, Terraform, Ansible, repair evidence, boot tests, and dependency graph handoff.</p>
           </div>
           <button type="button" onclick="generateMigrationOutputBundle()" style="background:linear-gradient(135deg,#0ea5e9,#2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 16px; border-radius:7px; cursor:pointer; font-weight:800; box-shadow:0 0 14px rgba(56,189,248,.35);">Generate Bundle</button>
         </div>
@@ -2104,7 +2104,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #818cf8;">uat-input bundle</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f97316;">tco / finops bundle</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #22c55e;">opencenter output bundle</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #60a5fa;">genestack output bundle</div>
+          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #60a5fa;">tenant-iac-dr output bundle</div>
           <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f472b6;">ai-anywhere context bundle</div>
         </div>
 
@@ -2188,7 +2188,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
       <div style="background:rgba(15,23,42,.72); border:1px solid rgba(245,158,11,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
         <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">FinOps chain position</div>
-        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → OpenCenter operations → Genestack platform → AI Anywhere optimization loop</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → OpenCenter operations → Tenant IaC DR pack → AI Anywhere optimization loop</div>
       </div>
     </div>
   </div>
@@ -2211,20 +2211,81 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 8 · Genestack Integration -->
+  <!-- STAGE 8 · Tenant IaC DR Pack -->
   <div class="panel" id="panel-s9">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
         <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
-        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">Genestack Integration</h2>
-        <p style="color:#94a3b8; margin:0; max-width:920px;">Genestack consumes the same bundle as the repeatable FLEX/OpenStack landing-zone and component configuration handoff.</p>
+        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">Tenant IaC DR Pack</h2>
+        <p style="color:#94a3b8; margin:0; max-width:920px;">Capture the migrated tenant as Terraform-first desired state with backup policies and executable restore runbooks for same-region rebuild or cross-region redeploy.</p>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #60a5fa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#bfdbfe;">OpenStack/FLEX Landing Zone</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Target cloud facts, image catalog, flavor map, network map, and project model.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Helm/OpenStack Service Config</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Turn migration facts into service values and GitOps-controlled platform config.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">/etc/genestack Overrides</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Store customer-specific overrides without losing the upstream Genestack model.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Tenant Restore Scope</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Back up and restore only tenant-owned resources, excluding managed control-plane internals.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cloud Components / Versioning</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Track image, service, Kubernetes, and OpenStack component versions for repeatable rebuilds.</p></div>
+      </div>
+      <div id="tenant-iac-dr-preflight-status" style="margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.24); color:#94a3b8; font-size:12px;">
+        Stage 8 readiness appears after generating a migration output bundle.
+      </div>
+      <div style="margin-top:14px; padding:16px; background:rgba(2,6,23,.72); border:1px solid rgba(96,165,250,.35); border-radius:10px;">
+        <div style="color:#bfdbfe; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Target Cloud Credentials</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:10px;">
+          <div style="background:rgba(0,0,0,.25); border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
+            <h4 style="margin:0 0 8px; color:#cbd5e1;">Source (OSPC/FLEX)</h4>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Username
+              <input id="dr_source_username" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Project ID
+              <input id="dr_source_project_id" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+          </div>
+          <div style="background:rgba(0,0,0,.25); border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
+            <h4 style="margin:0 0 8px; color:#cbd5e1;">Target Cloud (Flex/OpenStack)</h4>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Provider
+              <select id="dr_target_provider" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+                <option value="flex">FLEX</option>
+                <option value="openstack">OpenStack</option>
+              </select>
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Auth URL
+              <input id="dr_target_auth_url" type="text" placeholder="https://keystone.api.<region>.rackspacecloud.com/v3/" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Username
+              <input id="dr_target_username" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Password
+              <input id="dr_target_password" type="password" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Project ID
+              <input id="dr_target_project_id" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Domain
+              <input id="dr_target_domain" type="text" value="rackspace_cloud_domain" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Target Region
+              <input id="dr_target_region" type="text" placeholder="IAD / DFW / custom" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+            </label>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px;">
+          <input id="dr_openrc_file" type="file" accept=".sh,.rc,.openrc,text/plain">
+          <button type="button" onclick="importDrOpenRc()" style="background:#1d4ed8; border:1px solid #3b82f6; color:#fff; border-radius:6px; padding:8px 12px; cursor:pointer;">Import OpenRC File</button>
+          <button type="button" onclick="saveTargetCloudProfile()" style="background:#0f766e; border:1px solid #14b8a6; color:#fff; border-radius:6px; padding:8px 12px; cursor:pointer;">Save Target Profile</button>
+          <button type="button" onclick="generateRestorePlan()" style="background:#7c3aed; border:1px solid #a78bfa; color:#fff; border-radius:6px; padding:8px 12px; cursor:pointer;">Generate Restore Plan</button>
+        </div>
+        <div id="dr-profile-status" style="margin-top:10px; padding:10px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.2); color:#94a3b8; font-size:12px;">
+          Configure target credentials to enable cross-region / cross-cloud restore overlays.
+        </div>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button type="button" onclick="exportTenantIacDrBackup()" style="background:linear-gradient(135deg,#22c55e,#16a34a); border:1px solid #4ade80; color:#fff; padding:9px 14px; border-radius:7px; cursor:pointer; font-weight:800;">
+          Export IaC Backup
+        </button>
+        <div id="tenant-iac-dr-export-status" style="padding:10px 12px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.24); color:#94a3b8; font-size:12px; min-width:320px;">
+          Configure `IAC_BACKUP_GIT_REPO_PATH` and/or `IAC_BACKUP_S3_BUCKET`, then export.
+        </div>
       </div>
     </div>
   </div>
@@ -2235,7 +2296,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
         <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
         <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AI Anywhere Integration</h2>
-        <p style="color:#94a3b8; margin:0; max-width:940px;">AI Anywhere consumes the Cloud Jumper output bundle plus OpenCenter and Genestack outputs as a private AI context pack for repair, risk, right-sizing, GitOps, and runbook agents.</p>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">AI Anywhere consumes the Cloud Jumper output bundle plus OpenCenter and Tenant IaC DR outputs as a private AI context pack for repair, risk, right-sizing, GitOps, and runbook agents.</p>
       </div>
 
       <div style="display:grid; grid-template-columns:minmax(260px,1fr) 38px minmax(260px,1fr) 38px minmax(280px,1.1fr); gap:14px; align-items:center; font-family:'Share Tech Mono',monospace;">
@@ -2246,19 +2307,19 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(34,197,94,.3); border-radius:8px; padding:16px;">
           <h3 style="margin:0 0 10px; color:#86efac;">Platform Context</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">OpenCenter estate map<br>day-2 runbook<br>observability context<br>GitOps workflows<br>Genestack service config<br>Genestack overrides</div>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">OpenCenter estate map<br>day-2 runbook<br>observability context<br>GitOps workflows<br>tenant-iac-dr pack<br>DR runbooks + backup policy</div>
         </div>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(244,114,182,.35); border-radius:8px; padding:16px;">
           <h3 style="margin:0 0 10px; color:#f9a8d4;">AI Anywhere Outputs</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">risk-score.json<br>rightsize recommendations<br>autorepair plan<br>Terraform patch suggestions<br>runbook improvements<br>Genestack override suggestions</div>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">risk-score.json<br>rightsize recommendations<br>autorepair plan<br>Terraform patch suggestions<br>runbook improvements<br>DR restore improvements</div>
         </div>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Private AI Context</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Sensitive customer migration evidence stays packaged for private AI workflows instead of generic public prompting.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Autorepair Intelligence</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Failed boot, network, service, and dependency signals become repair plans with risk and rollback notes.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine OpenCenter/Genestack runbooks after each wave.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine OpenCenter/Tenant IaC DR runbooks after each wave.</p></div>
       </div>
     </div>
   </div>
@@ -2272,6 +2333,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
   const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual'];
+  window.lastMigrationBundle = null;
 
   async function generateMigrationOutputBundle() {
     const box = document.getElementById('migration-output-bundle-status');
@@ -2284,11 +2346,197 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       const links = (data.files || []).map(f => `<a href="${f.url}" style="display:inline-block;margin:4px 8px 4px 0;padding:6px 9px;border:1px solid rgba(125,211,252,.4);border-radius:6px;color:#7dd3fc;text-decoration:none;background:rgba(14,165,233,.08);">${f.name}</a>`).join('');
       box.style.borderColor = 'rgba(34,197,94,.45)';
       box.innerHTML = `<div style="color:#86efac;font-weight:800;margin-bottom:8px;">Bundle ready: ${data.bundle} / ${data.stamp}</div><div>${links}</div>`;
+      window.lastMigrationBundle = {bundle: data.bundle, stamp: data.stamp};
+      renderTenantIacDrPreflight(data);
     } catch (err) {
       box.style.borderColor = 'rgba(239,68,68,.45)';
       box.innerHTML = `<span style="color:#fca5a5;">${err.message}</span>`;
+      renderTenantIacDrPreflight(null, err.message || 'Bundle generation failed');
     }
   }
+
+  function renderTenantIacDrPreflight(data, errorMessage = '') {
+    const panel = document.getElementById('tenant-iac-dr-preflight-status');
+    if (!panel) return;
+    if (errorMessage) {
+      panel.style.borderColor = 'rgba(239,68,68,.45)';
+      panel.innerHTML = `<div style="color:#fca5a5;font-weight:700;">Stage 8 readiness unavailable: ${errorMessage}</div>`;
+      return;
+    }
+
+    const pre = data && data.tenant_iac_dr_preflight ? data.tenant_iac_dr_preflight : null;
+    const live = data && data.tenant_live_state ? data.tenant_live_state : null;
+    if (!pre) {
+      panel.style.borderColor = 'rgba(148,163,184,.25)';
+      panel.innerHTML = 'Stage 8 readiness appears after generating a migration output bundle.';
+      return;
+    }
+
+    const missing = Array.isArray(pre.missing_required) ? pre.missing_required : [];
+    const checks = Array.isArray(pre.checks) ? pre.checks : [];
+    const statusReady = pre.status === 'ready' && missing.length === 0;
+    panel.style.borderColor = statusReady ? 'rgba(34,197,94,.45)' : 'rgba(245,158,11,.45)';
+
+    const checksHtml = checks.map(c => {
+      const ok = !!c.ok;
+      const icon = ok ? '✅' : (c.required ? '❌' : '⚠️');
+      const color = ok ? '#86efac' : (c.required ? '#fca5a5' : '#fcd34d');
+      return `<div style="margin:3px 0;color:${color};">${icon} ${c.id}${c.hint ? ` — <span style="color:#94a3b8;">${c.hint}</span>` : ''}</div>`;
+    }).join('');
+
+    const summary = statusReady
+      ? `<div style="color:#86efac;font-weight:800;margin-bottom:6px;">Stage 8 Ready: required upstream artifacts found.</div>`
+      : `<div style="color:#fcd34d;font-weight:800;margin-bottom:6px;">Stage 8 Needs Input: missing required artifacts (${missing.join(', ') || 'unknown'}).</div>`;
+
+    let countsHtml = '';
+    if (live && live.target_inventory_counts) {
+      const t = live.target_inventory_counts;
+      countsHtml = `<div style="margin-bottom:6px;color:#cbd5e1;">Target inventory counts: instances ${t.instances || 0}, images ${t.images || 0}, volumes ${t.volumes || 0}, networks ${t.networks || 0}, security groups ${t.security_groups || 0}.</div>`;
+    }
+
+    panel.innerHTML = `${summary}${countsHtml}<div style="font-size:11px;">${checksHtml}</div>`;
+  }
+
+  async function exportTenantIacDrBackup() {
+    const box = document.getElementById('tenant-iac-dr-export-status');
+    if (!box) return;
+    box.style.borderColor = 'rgba(56,189,248,.35)';
+    box.innerHTML = 'Exporting Tenant IaC DR backup...';
+    try {
+      const payload = {
+        customer: window.activeCustomerId || '',
+        stamp: (window.lastMigrationBundle && window.lastMigrationBundle.stamp) ? window.lastMigrationBundle.stamp : ''
+      };
+      const res = await fetch('/api/tenant-iac-dr/export-backup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Export failed');
+      const ex = data.export || {};
+      const git = ex.git || {};
+      const s3 = ex.s3 || {};
+      box.style.borderColor = 'rgba(34,197,94,.45)';
+      box.innerHTML = `
+        <div style="color:#86efac;font-weight:800;margin-bottom:6px;">Export complete for ${ex.customer || ''} / ${ex.stamp || ''}</div>
+        <div>Git: <span style="color:#cbd5e1;">${git.status || 'skipped'}</span>${git.repo_path ? ` — ${git.repo_path}` : ''}</div>
+        <div>S3: <span style="color:#cbd5e1;">${s3.status || 'skipped'}</span>${s3.bucket ? ` — ${s3.bucket}` : ''}</div>
+      `;
+    } catch (err) {
+      box.style.borderColor = 'rgba(239,68,68,.45)';
+      box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+    }
+  }
+
+  async function loadTargetCloudProfile() {
+    const box = document.getElementById('dr-profile-status');
+    try {
+      const res = await fetch('/api/tenant-iac-dr/target-cloud-profile?customer=' + encodeURIComponent(window.activeCustomerId || ''));
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed loading profile');
+      const p = data.profile || {};
+      const s = p.source || {};
+      const t = p.target || {};
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      setVal('dr_source_username', s.username);
+      setVal('dr_source_project_id', s.project_id);
+      setVal('dr_target_provider', t.provider || 'flex');
+      setVal('dr_target_auth_url', t.auth_url);
+      setVal('dr_target_username', t.username);
+      setVal('dr_target_password', t.password);
+      setVal('dr_target_project_id', t.project_id);
+      setVal('dr_target_domain', t.domain || 'rackspace_cloud_domain');
+      setVal('dr_target_region', t.region);
+      if (box) box.innerHTML = '<span style="color:#86efac;">Target cloud profile loaded.</span>';
+    } catch (err) {
+      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+    }
+  }
+
+  async function saveTargetCloudProfile() {
+    const box = document.getElementById('dr-profile-status');
+    if (box) box.innerHTML = 'Saving target cloud profile...';
+    try {
+      const payload = {
+        customer: window.activeCustomerId || '',
+        source: {
+          username: document.getElementById('dr_source_username')?.value || '',
+          project_id: document.getElementById('dr_source_project_id')?.value || ''
+        },
+        target: {
+          provider: document.getElementById('dr_target_provider')?.value || 'flex',
+          auth_url: document.getElementById('dr_target_auth_url')?.value || '',
+          username: document.getElementById('dr_target_username')?.value || '',
+          password: document.getElementById('dr_target_password')?.value || '',
+          project_id: document.getElementById('dr_target_project_id')?.value || '',
+          domain: document.getElementById('dr_target_domain')?.value || 'rackspace_cloud_domain',
+          region: document.getElementById('dr_target_region')?.value || ''
+        }
+      };
+      const res = await fetch('/api/tenant-iac-dr/target-cloud-profile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Save failed');
+      if (box) box.innerHTML = '<span style="color:#86efac;">Target cloud profile saved.</span>';
+    } catch (err) {
+      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+    }
+  }
+
+  async function importDrOpenRc() {
+    const box = document.getElementById('dr-profile-status');
+    const input = document.getElementById('dr_openrc_file');
+    if (!input || !input.files || !input.files.length) {
+      if (box) box.innerHTML = '<span style="color:#fcd34d;">Select an OpenRC file first.</span>';
+      return;
+    }
+    if (box) box.innerHTML = 'Importing OpenRC file...';
+    try {
+      const fd = new FormData();
+      fd.append('customer', window.activeCustomerId || '');
+      fd.append('file', input.files[0]);
+      const res = await fetch('/api/tenant-iac-dr/import-openrc', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'OpenRC import failed');
+      await loadTargetCloudProfile();
+      if (box) box.innerHTML = '<span style="color:#86efac;">OpenRC imported and profile auto-populated.</span>';
+    } catch (err) {
+      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+    }
+  }
+
+  async function generateRestorePlan() {
+    const box = document.getElementById('dr-profile-status');
+    if (box) box.innerHTML = 'Generating restore plan...';
+    try {
+      const provider = document.getElementById('dr_target_provider')?.value || 'openstack';
+      const region = document.getElementById('dr_target_region')?.value || '';
+      const targetName = `${provider}-${region || 'target'}`;
+      const res = await fetch('/api/tenant-iac-dr/restore-plan', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ customer: window.activeCustomerId || '', target_name: targetName })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Restore plan failed');
+      if (box) {
+        box.innerHTML = `
+          <div style="color:#86efac;font-weight:700;">Restore plan generated for ${data.target_slug}</div>
+          <div style="margin-top:4px;">tfvars: <span style="color:#cbd5e1;">${data.tfvars_path}</span></div>
+          <div>report: <span style="color:#cbd5e1;">${data.translation_report}</span></div>
+          <div style="margin-top:4px;color:#93c5fd;">${data.restore_command}</div>
+        `;
+      }
+    } catch (err) {
+      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+    }
+  }
+
+  setTimeout(loadTargetCloudProfile, 600);
 
   async function requestMigrationOutputBundle() {
     const res = await fetch('/api/migration-output-bundle/generate', {
@@ -3030,7 +3278,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration Output Bundle)'},
         {id: 'panel-s7', key: 's7', label: 'Stage 6 (TCO / FinOps)'},
         {id: 'panel-s8', key: 's8', label: 'Stage 7 (OpenCenter Integration)'},
-        {id: 'panel-s9', key: 's9', label: 'Stage 8 (Genestack Integration)'},
+        {id: 'panel-s9', key: 's9', label: 'Stage 8 (Tenant IaC DR Pack)'},
         {id: 'panel-s10', key: 's10', label: 'Stage 9 (AI Anywhere Integration)'}
       ];
       panels.forEach(p => {
@@ -3080,7 +3328,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           's6': 'Stage 5 (Post-Migration Output Bundle)',
           's7': 'Stage 6 (TCO / FinOps)',
           's8': 'Stage 7 (OpenCenter Integration)',
-          's9': 'Stage 8 (Genestack Integration)',
+          's9': 'Stage 8 (Tenant IaC DR Pack)',
           's10': 'Stage 9 (AI Anywhere Integration)'
       };
       

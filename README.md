@@ -21,6 +21,7 @@ CloudJumper is a browser-based control room for OSPC to FLEX migration. It bring
 - **In-Flight Pod Repair**: Linux offline repair (Ubuntu, Debian, CentOS, RHEL, Rocky, AlmaLinux) and Windows offline VirtIO repair/snapshot-based migration.
 - **Mission Telemetry**: Batch job telemetry in the MBUX/Apollo dashboard.
 - **Atmospheric Re-entry**: SSH/UAT verification, reports, and J.A.R.V.I.S. audio alerts.
+- **Stage 8 Tenant IaC DR Pack**: Preflight checks, target cloud credential profile, OpenRC import, restore-plan overlays, and Git/S3 backup export for cross-region or cross-cloud restore.
 
 ## 🌌 The "Why" and "So What"
 
@@ -78,15 +79,39 @@ Run the dashboard from a Linux or WSL2 operator workstation. Run heavy image wor
 | `ospc2Flex-Image-migtool/ospc2flex_windows_repair.sh` | Windows VirtIO repair engine |
 | `ospc2Flex-Image-migtool/setup_jumphost.sh` | Jumphost bootstrap |
 
-## 🛠️ Liftoff Sequence (What Now)
+## 🛠️ Easy Install + Launch
+
+### Fast path (recommended)
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements/requirements.txt
+git clone <your-repo-url> cloudjumper
+cd cloudjumper
+chmod +x ./letsmove.sh
+./letsmove.sh
+```
+
+This script handles dependency install, syntax check, app startup, and opens the dashboard at:
+
+`https://127.0.0.1:5002`
+
+Logs are written to:
+
+`./dashboard.log`
+
+### What `./letsmove.sh` does
+
+- Cleans old app processes and frees conflicting ports.
+- Installs Python requirements from `requirements/requirements.txt`.
+- Validates `workflow_dashboard/app.py` syntax before launch.
+- Starts the Flask dashboard and waits for health.
+- Opens the dashboard URL automatically when possible.
+
+### Manual fallback (if needed)
+
+```bash
+pip3 install -r requirements/requirements.txt
 python3 workflow_dashboard/app.py
 ```
-*Mission Control will print your local orbital dashboard URL.*
 
 **Jumphost Outfitting (System Packages):**
 ```bash
@@ -109,6 +134,7 @@ The vision is a **Full Cycle Migration Mission Control** that produces structure
 - Validation reports become pull request evidence.
 - Rollback scripts become tested recovery automation.
 - Migration telemetry becomes optimization data for future waves.
+- Tenant IaC DR outputs become restore-ready overlays for another FLEX region or another OpenStack cloud.
 
 The new handoff path is:
 
@@ -136,24 +162,26 @@ Stage 5: Migration Output Bundle
         |       GitOps workflows
         |       observability/runbooks
         |
-        +--> Stage 8: Genestack
-        |       OpenStack/FLEX landing zone
-        |       Helm/OpenStack service config
-        |       /etc/genestack overrides
-        |       cloud components/versioning
+        +--> Stage 8: Tenant IaC DR Pack
+        |       Terraform-first tenant restore pack
+        |       target cloud profile + OpenRC import
+        |       region mapping and backup policy
+        |       same-region and cross-region DR runbooks
+        |       Git/S3 backup export and restore overlays
+        |       restore validation checklist
         |
         +--> Stage 9: AI Anywhere
                 private AI context pack
                 autorepair plans
                 risk and right-sizing recommendations
-                Terraform/Ansible/Genestack patch suggestions
+                Terraform/Ansible/DR patch suggestions
 ```
 
 UAT does not need a separate disconnected artifact. It reuses the Migration Output Bundle through `uat-input/`, and that UAT view points back to `discovery-output/` and `stage2-migration-output/` so testers can validate what was discovered, what migrated, what was repaired, and what evidence exists before cutover.
 
-That means CloudJumper can interconnect with FinOps reporting, **OpenCenter**, **Genestack**, Magnum, and other GitOps control planes. TCO / FinOps turns the migration into financial evidence: source baseline, target run-rate, right-sizing candidates, and executive reporting. OpenCenter becomes the Day-2 operations cockpit for migrated estates: platform view, Kubernetes/OpenStack operations, GitOps workflows, observability, and runbooks. Genestack becomes the repeatable FLEX/OpenStack foundation layer: landing-zone configuration, Helm/OpenStack service config, `/etc/genestack` overrides, and cloud component/version tracking.
+That means CloudJumper can interconnect with FinOps reporting, **OpenCenter**, and other GitOps control planes. TCO / FinOps turns the migration into financial evidence: source baseline, target run-rate, right-sizing candidates, and executive reporting. OpenCenter becomes the Day-2 operations cockpit for migrated estates: platform view, Kubernetes/OpenStack operations, GitOps workflows, observability, and runbooks. Tenant IaC DR Pack becomes the repeatable customer handoff layer: Terraform-first desired state, region mapping, backup policy, and tested restore runbooks.
 
-AI Anywhere becomes the private intelligence layer over the whole chain. It reads the CloudJumper output bundle plus OpenCenter and Genestack outputs, then produces risk scores, autorepair plans, right-sizing recommendations, runbook improvements, and infrastructure patch suggestions without losing the customer-specific context.
+AI Anywhere becomes the private intelligence layer over the whole chain. It reads the CloudJumper output bundle plus OpenCenter and Tenant IaC DR outputs, then produces risk scores, autorepair plans, right-sizing recommendations, runbook improvements, and infrastructure patch suggestions without losing the customer-specific context.
 
 Instead of finishing with a one-time migration script, the customer leaves with a repeatable operating model: infrastructure saved as code, repairs encoded as playbooks, topology represented as reviewable templates, and deployment state controlled through pull requests.
 

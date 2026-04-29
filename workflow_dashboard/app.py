@@ -23,6 +23,10 @@ from werkzeug.utils import secure_filename
 BASE_DIR = Path(__file__).resolve().parents[1]
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
+VOICE_PREFS_FILE = UPLOAD_DIR / "voice_prefs.json"
+DEFAULT_VOICE_PREFS = {"enabled": True, "gender": "male"}
+TARGET_PROFILE_DIR = UPLOAD_DIR / "tenant_iac_dr_profiles"
+TARGET_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 FLAVOR_UPLOAD_DIR = UPLOAD_DIR / "flavors"
 FLAVOR_UPLOAD_DIR.mkdir(exist_ok=True)
 TOPOLOGY_UPLOAD_DIR = UPLOAD_DIR / "topologies"
@@ -139,6 +143,79 @@ def list_workspace_files() -> List[str]:
         if p.is_file() and p.suffix.lower() in {".csv", ".sh", ".txt", ".log"}:
             out.append(f"uploads/{p.name}")
     return sorted(out)
+
+
+def _load_voice_prefs() -> Dict[str, Any]:
+    prefs = dict(DEFAULT_VOICE_PREFS)
+    try:
+        if VOICE_PREFS_FILE.exists():
+            raw = json.loads(VOICE_PREFS_FILE.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                prefs["enabled"] = bool(raw.get("enabled", prefs["enabled"]))
+                gender = str(raw.get("gender", prefs["gender"])).strip().lower()
+                prefs["gender"] = gender if gender in {"male", "female"} else "male"
+    except Exception:
+        pass
+    return prefs
+
+
+def _save_voice_prefs(enabled: bool, gender: str) -> Dict[str, Any]:
+    payload = {
+        "enabled": bool(enabled),
+        "gender": (gender or "male").strip().lower() if isinstance(gender, str) else "male",
+    }
+    if payload["gender"] not in {"male", "female"}:
+        payload["gender"] = "male"
+    VOICE_PREFS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    VOICE_PREFS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return payload
+
+
+@app.get("/api/preferences/voice")
+def get_voice_preferences():
+    return jsonify({"ok": True, "prefs": _load_voice_prefs()})
+
+
+@app.post("/api/preferences/voice")
+def set_voice_preferences():
+    data = request.json or {}
+    enabled = bool(data.get("enabled", True))
+    gender = str(data.get("gender", "male"))
+    prefs = _save_voice_prefs(enabled=enabled, gender=gender)
+    return jsonify({"ok": True, "prefs": prefs})
+
+
+@app.post("/api/announce")
+def announce_text():
+    data = request.json or {}
+    text = str(data.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "missing text"}), 400
+
+    prefs = _load_voice_prefs()
+    enabled = bool(data.get("enabled", prefs.get("enabled", True)))
+    gender = str(data.get("gender", prefs.get("gender", "male"))).strip().lower()
+    if gender not in {"male", "female"}:
+        gender = "male"
+
+    if not enabled:
+        return jsonify({"ok": True, "status": "skipped", "reason": "voice_disabled"})
+
+    announce_script = BASE_DIR / "announce.py"
+    if not announce_script.exists():
+        return jsonify({"ok": False, "error": "announce script not found"}), 404
+
+    try:
+        subprocess.Popen(
+            ["python3", str(announce_script), "--voice", gender, text],
+            cwd=str(BASE_DIR),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"announce launch failed: {exc}"}), 500
+
+    return jsonify({"ok": True, "status": "launched", "voice": gender})
 
 
 def load_reference_data() -> Dict[str, Any]:
@@ -3118,7 +3195,7 @@ def _simple_yaml(payload: Any, indent: int = 0) -> str:
 
 @app.post("/api/migration-output-bundle/generate")
 def generate_migration_output_bundle():
-    """Generate the post-migration handoff bundle for FinOps, GitOps, OpenCenter, Genestack, and AI Anywhere."""
+    """Generate the post-migration handoff bundle for FinOps, GitOps, Tenant IaC DR, and AI Anywhere."""
     data = request.json or {}
     customer = data.get("customer") or get_active_customer()
     safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
@@ -3152,7 +3229,7 @@ def generate_migration_output_bundle():
             "dependency_graph": "dependency_graph.json",
             "uat_input": "uat-input/uat-input-manifest.json",
             "opencenter": "opencenter/estate-map.json",
-            "genestack": "genestack/cloud-images.yaml",
+            "tenant_iac_dr": "tenant-iac-dr/tenant-iac-dr-pack.json",
             "ai_anywhere": "ai-anywhere-context/ai-input-manifest.json",
         },
         "output_chain": {
@@ -3219,19 +3296,25 @@ def generate_migration_output_bundle():
                     "opencenter/gitops-workflows.yaml",
                 ],
             },
-            "stage8_genestack": {
+            "stage8_tenant_iac_dr_pack": {
                 "inputs": [
                     "migration_manifest.json",
+                    "discovery-output/*",
                     "terraform.tfvars.json",
+                    "ansible_inventory.ini",
                     "dependency_graph.json",
-                    "genestack/flavor-map.yaml",
-                    "genestack/network-map.yaml",
+                    "final Flex tenant inventory",
                 ],
                 "outputs": [
-                    "genestack/cloud-images.yaml",
-                    "genestack/service-config.yaml",
-                    "genestack/genestack-overrides.yaml",
-                    "genestack/component-versions.json",
+                    "tenant-iac-dr/tenant-iac-dr-pack.json",
+                    "tenant-iac-dr/restore-scope.yaml",
+                    "tenant-iac-dr/terraform/README.md",
+                    "tenant-iac-dr/terraform/envs/<region>/terraform.tfvars.json",
+                    "tenant-iac-dr/region-map.yaml",
+                    "tenant-iac-dr/backup-policy.yaml",
+                    "tenant-iac-dr/runbooks/dr-same-region.md",
+                    "tenant-iac-dr/runbooks/dr-cross-region.md",
+                    "tenant-iac-dr/restore-validation-checklist.yaml",
                 ],
             },
             "stage9_ai_anywhere": {
@@ -3239,7 +3322,7 @@ def generate_migration_output_bundle():
                     "cloudjumper-output/*",
                     "finops-output/*",
                     "opencenter-output/*",
-                    "genestack-output/*",
+                    "tenant-iac-dr-output/*",
                     "raw migration logs when available",
                 ],
                 "outputs": [
@@ -3371,19 +3454,41 @@ def generate_migration_output_bundle():
         ],
         "migration_manifest": "../migration_manifest.json",
     }
-    genestack = {
-        "kind": "CloudJumperGenestackExport",
+    tenant_iac_dr = {
+        "kind": "CloudJumperTenantIaCDRPack",
         "customer": customer,
-        "landing_zone": "openstack-flex",
+        "target_cloud": "openstack-flex-tenant",
         "inputs": [
             "../migration_manifest.json",
+            "../discovery-output/discovery-manifest.json",
+            "../discovery-output/target-inventory.json",
             "../terraform.tfvars.json",
+            "../ansible_inventory.ini",
             "../dependency_graph.json",
-            "flavor-map.yaml",
-            "network-map.yaml",
         ],
-        "outputs": ["cloud-images", "flavor-map", "network-map", "component-versioning"],
-        "genestack_overrides_path": "/etc/genestack",
+        "restore_scope": {
+            "tenant_layer_only": True,
+            "include": [
+                "projects_users_roles",
+                "networks_subnets_routers_ports",
+                "security_groups_and_fips",
+                "custom_flavors_and_keypairs_public_only",
+                "images_and_metadata",
+                "instances_and_attached_volumes",
+                "load_balancers_and_listeners",
+                "dns_zones_records",
+                "quotas_and_policy_settings",
+            ],
+            "exclude": ["control_plane_internals"],
+        },
+        "outputs": [
+            "terraform_module_skeleton",
+            "region_mapping",
+            "ansible_post_config_pack",
+            "backup_policy_manifest",
+            "dr_runbooks",
+            "restore_validation_checklist",
+        ],
     }
     ai_anywhere = {
         "kind": "CloudJumperAIAnywhereContext",
@@ -3409,13 +3514,14 @@ def generate_migration_output_bundle():
                 "../opencenter/observability-context.json",
                 "../opencenter/gitops-workflows.yaml",
             ],
-            "genestack_output": [
-                "../genestack/cloud-images.yaml",
-                "../genestack/flavor-map.yaml",
-                "../genestack/network-map.yaml",
-                "../genestack/service-config.yaml",
-                "../genestack/genestack-overrides.yaml",
-                "../genestack/component-versions.json",
+            "tenant_iac_dr_output": [
+                "../tenant-iac-dr/tenant-iac-dr-pack.json",
+                "../tenant-iac-dr/restore-scope.yaml",
+                "../tenant-iac-dr/region-map.yaml",
+                "../tenant-iac-dr/backup-policy.yaml",
+                "../tenant-iac-dr/restore-validation-checklist.yaml",
+                "../tenant-iac-dr/runbooks/dr-same-region.md",
+                "../tenant-iac-dr/runbooks/dr-cross-region.md",
             ],
         },
         "expected_outputs": [
@@ -3424,46 +3530,90 @@ def generate_migration_output_bundle():
             "ai-results/autorepair-plan.yaml",
             "ai-results/terraform-patch-suggestions.json",
             "ai-results/runbook-improvements.yaml",
-            "ai-results/genestack-override-suggestions.yaml",
+            "ai-results/dr-restore-improvements.yaml",
         ],
     }
 
+    def _load_json_if_exists(path: Path) -> Optional[Dict[str, Any]]:
+        if not path.exists() or not path.is_file():
+            return None
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            return payload if isinstance(payload, dict) else None
+        except Exception:
+            return None
+
+    def _find_previous_bundle_root() -> Optional[Path]:
+        customer_root = UPLOAD_DIR / "migration_output_bundles" / safe_customer
+        if not customer_root.exists():
+            return None
+        candidates = sorted([p for p in customer_root.iterdir() if p.is_dir()], reverse=True)
+        for candidate in candidates:
+            if candidate == bundle_root:
+                continue
+            if (candidate / "migration_manifest.json").exists():
+                return candidate
+        return None
+
+    previous_bundle_root = _find_previous_bundle_root()
+    previous_lookup = lambda rel: _load_json_if_exists(previous_bundle_root / rel) if previous_bundle_root else None
+
+    source_inventory = previous_lookup(Path("discovery-output/source-inventory.json")) or {
+        "customer": customer, "servers": [], "images": [], "volumes": [], "networks": [], "security_groups": [], "load_balancers": []
+    }
+    target_inventory = previous_lookup(Path("discovery-output/target-inventory.json")) or {
+        "customer": customer, "flavors": [], "images": [], "networks": [], "security_groups": [], "quotas": {}, "instances": [], "volumes": []
+    }
+    flavor_map = previous_lookup(Path("discovery-output/flavor-map.json")) or {"mappings": []}
+    image_map = previous_lookup(Path("discovery-output/image-map.json")) or {"mappings": []}
+    network_map = previous_lookup(Path("discovery-output/network-map.json")) or {"mappings": []}
+    security_group_map = previous_lookup(Path("discovery-output/security-group-map.json")) or {"mappings": []}
+    dependency_seed = previous_lookup(Path("discovery-output/dependency-seed.json")) or {"applications": [], "databases": [], "edges": []}
+    vm_results = previous_lookup(Path("stage2-migration-output/vm-migration-results.json")) or {"jobs": jobs, "results": []}
+    image_results = previous_lookup(Path("stage2-migration-output/image-migration-results.json")) or {"results": []}
+    data_results = previous_lookup(Path("stage2-migration-output/data-migration-results.json")) or {"results": []}
+    k8s_results = previous_lookup(Path("stage2-migration-output/kubernetes-migration-results.json")) or {"results": []}
+    rollback_artifacts = previous_lookup(Path("stage2-migration-output/rollback-artifacts.json")) or {"scripts": [], "notes": []}
+    repaired_payload = previous_lookup(Path("repaired_image_metadata.json")) or repaired
+    terraform_payload = previous_lookup(Path("terraform.tfvars.json")) or terraform
+    boot_tests_payload = previous_lookup(Path("boot_test_results.json")) or boot_tests
+    dependencies_payload = previous_lookup(Path("dependency_graph.json")) or dependencies
+
+    if not isinstance(vm_results.get("jobs"), list):
+        vm_results["jobs"] = []
+    if not vm_results["jobs"] and jobs:
+        vm_results["jobs"] = jobs
+
+    ansible_inventory_text = "[cloudjumper_migrated]\n# host ansible_host=<flex_ip> ansible_user=<user>\n"
+    if previous_bundle_root:
+        prev_ansible = previous_bundle_root / "ansible_inventory.ini"
+        if prev_ansible.exists():
+            try:
+                ansible_inventory_text = prev_ansible.read_text(encoding="utf-8")
+            except Exception:
+                pass
+
     _write_json(bundle_root / "migration_manifest.json", manifest)
     _write_json(bundle_root / "discovery-output" / "discovery-manifest.json", discovery_output)
-    _write_json(bundle_root / "discovery-output" / "source-inventory.json", {
-        "customer": customer,
-        "servers": [],
-        "images": [],
-        "volumes": [],
-        "networks": [],
-        "security_groups": [],
-        "load_balancers": [],
-    })
-    _write_json(bundle_root / "discovery-output" / "target-inventory.json", {
-        "customer": customer,
-        "flavors": [],
-        "images": [],
-        "networks": [],
-        "security_groups": [],
-        "quotas": {},
-    })
-    _write_json(bundle_root / "discovery-output" / "flavor-map.json", {"mappings": []})
-    _write_json(bundle_root / "discovery-output" / "image-map.json", {"mappings": []})
-    _write_json(bundle_root / "discovery-output" / "network-map.json", {"mappings": []})
-    _write_json(bundle_root / "discovery-output" / "security-group-map.json", {"mappings": []})
-    _write_json(bundle_root / "discovery-output" / "dependency-seed.json", {"applications": [], "databases": [], "edges": []})
+    _write_json(bundle_root / "discovery-output" / "source-inventory.json", source_inventory)
+    _write_json(bundle_root / "discovery-output" / "target-inventory.json", target_inventory)
+    _write_json(bundle_root / "discovery-output" / "flavor-map.json", flavor_map)
+    _write_json(bundle_root / "discovery-output" / "image-map.json", image_map)
+    _write_json(bundle_root / "discovery-output" / "network-map.json", network_map)
+    _write_json(bundle_root / "discovery-output" / "security-group-map.json", security_group_map)
+    _write_json(bundle_root / "discovery-output" / "dependency-seed.json", dependency_seed)
     _write_json(bundle_root / "stage2-migration-output" / "stage2-migration-manifest.json", stage2_output)
-    _write_json(bundle_root / "stage2-migration-output" / "vm-migration-results.json", {"jobs": jobs, "results": []})
-    _write_json(bundle_root / "stage2-migration-output" / "image-migration-results.json", {"results": []})
-    _write_json(bundle_root / "stage2-migration-output" / "data-migration-results.json", {"results": []})
-    _write_json(bundle_root / "stage2-migration-output" / "kubernetes-migration-results.json", {"results": []})
-    _write_json(bundle_root / "stage2-migration-output" / "repair-actions.json", repaired)
-    _write_json(bundle_root / "stage2-migration-output" / "rollback-artifacts.json", {"scripts": [], "notes": []})
-    _write_json(bundle_root / "terraform.tfvars.json", terraform)
-    _write_text(bundle_root / "ansible_inventory.ini", "[cloudjumper_migrated]\n# host ansible_host=<flex_ip> ansible_user=<user>\n")
-    _write_json(bundle_root / "repaired_image_metadata.json", repaired)
-    _write_json(bundle_root / "boot_test_results.json", boot_tests)
-    _write_json(bundle_root / "dependency_graph.json", dependencies)
+    _write_json(bundle_root / "stage2-migration-output" / "vm-migration-results.json", vm_results)
+    _write_json(bundle_root / "stage2-migration-output" / "image-migration-results.json", image_results)
+    _write_json(bundle_root / "stage2-migration-output" / "data-migration-results.json", data_results)
+    _write_json(bundle_root / "stage2-migration-output" / "kubernetes-migration-results.json", k8s_results)
+    _write_json(bundle_root / "stage2-migration-output" / "repair-actions.json", repaired_payload)
+    _write_json(bundle_root / "stage2-migration-output" / "rollback-artifacts.json", rollback_artifacts)
+    _write_json(bundle_root / "terraform.tfvars.json", terraform_payload)
+    _write_text(bundle_root / "ansible_inventory.ini", ansible_inventory_text)
+    _write_json(bundle_root / "repaired_image_metadata.json", repaired_payload)
+    _write_json(bundle_root / "boot_test_results.json", boot_tests_payload)
+    _write_json(bundle_root / "dependency_graph.json", dependencies_payload)
     _write_json(bundle_root / "uat-input" / "uat-input-manifest.json", uat_input)
     _write_text(bundle_root / "uat-input" / "uat-readiness-checklist.yaml", _simple_yaml({
         "customer": customer,
@@ -3544,25 +3694,211 @@ def generate_migration_output_bundle():
         "inputs": ["estate-map.json", "day2-runbook.yaml"],
         "workflows": ["review", "approve", "deploy", "observe", "rollback"],
     }) + "\n")
-    _write_text(bundle_root / "genestack" / "cloud-images.yaml", _simple_yaml(genestack) + "\n")
-    _write_text(bundle_root / "genestack" / "flavor-map.yaml", _simple_yaml({"flavors": []}) + "\n")
-    _write_text(bundle_root / "genestack" / "network-map.yaml", _simple_yaml({"networks": []}) + "\n")
-    _write_text(bundle_root / "genestack" / "service-config.yaml", _simple_yaml({
+    def _safe_len_list(payload: Any, key: str) -> int:
+        if isinstance(payload, dict) and isinstance(payload.get(key), list):
+            return len(payload.get(key) or [])
+        return 0
+
+    tenant_live_state = {
         "customer": customer,
-        "inputs": ["cloud-images.yaml", "flavor-map.yaml", "network-map.yaml"],
-        "helm_values": {},
-        "openstack_services": {},
+        "source_inventory_counts": {
+            "servers": _safe_len_list(source_inventory, "servers"),
+            "images": _safe_len_list(source_inventory, "images"),
+            "volumes": _safe_len_list(source_inventory, "volumes"),
+            "networks": _safe_len_list(source_inventory, "networks"),
+            "security_groups": _safe_len_list(source_inventory, "security_groups"),
+            "load_balancers": _safe_len_list(source_inventory, "load_balancers"),
+        },
+        "target_inventory_counts": {
+            "instances": _safe_len_list(target_inventory, "instances"),
+            "servers": _safe_len_list(target_inventory, "servers"),
+            "images": _safe_len_list(target_inventory, "images"),
+            "volumes": _safe_len_list(target_inventory, "volumes"),
+            "flavors": _safe_len_list(target_inventory, "flavors"),
+            "networks": _safe_len_list(target_inventory, "networks"),
+            "security_groups": _safe_len_list(target_inventory, "security_groups"),
+            "load_balancers": _safe_len_list(target_inventory, "load_balancers"),
+        },
+        "migration_counts": {
+            "vm_results": _safe_len_list(vm_results, "results"),
+            "vm_jobs": _safe_len_list(vm_results, "jobs"),
+            "image_results": _safe_len_list(image_results, "results"),
+            "data_results": _safe_len_list(data_results, "results"),
+            "k8s_results": _safe_len_list(k8s_results, "results"),
+            "boot_checks": _safe_len_list(boot_tests_payload, "results"),
+        },
+    }
+
+    preflight_checks = [
+        {
+            "id": "target_inventory_present",
+            "ok": sum(tenant_live_state["target_inventory_counts"].values()) > 0,
+            "required": True,
+            "hint": "Run Stage 1 discovery and post-cutover inventory export.",
+        },
+        {
+            "id": "migration_results_present",
+            "ok": tenant_live_state["migration_counts"]["vm_results"] > 0 or tenant_live_state["migration_counts"]["vm_jobs"] > 0,
+            "required": True,
+            "hint": "Run Stage 2 migration jobs and persist outputs.",
+        },
+        {
+            "id": "boot_validation_present",
+            "ok": tenant_live_state["migration_counts"]["boot_checks"] > 0,
+            "required": True,
+            "hint": "Run Stage 3 validation/UAT before DR pack generation.",
+        },
+        {
+            "id": "terraform_region_present",
+            "ok": bool((terraform_payload or {}).get("region")),
+            "required": True,
+            "hint": "Set region in terraform.tfvars.json.",
+        },
+        {
+            "id": "mapping_data_present",
+            "ok": _safe_len_list(flavor_map, "mappings") + _safe_len_list(image_map, "mappings") + _safe_len_list(network_map, "mappings") > 0,
+            "required": False,
+            "hint": "Provide flavor/image/network maps for cross-region portability.",
+        },
+    ]
+    preflight_missing = [c["id"] for c in preflight_checks if c["required"] and not c["ok"]]
+
+    tenant_iac_dr["tenant_live_state"] = tenant_live_state
+    tenant_iac_dr["preflight"] = {
+        "status": "ready" if not preflight_missing else "needs_input",
+        "missing_required": preflight_missing,
+        "checks": preflight_checks,
+    }
+
+    _write_json(bundle_root / "tenant-iac-dr" / "tenant-iac-dr-pack.json", tenant_iac_dr)
+    _write_json(bundle_root / "tenant-iac-dr" / "artifacts" / "state-metadata" / "tenant-live-state.json", tenant_live_state)
+    _write_json(bundle_root / "tenant-iac-dr" / "artifacts" / "state-metadata" / "preflight-report.json", tenant_iac_dr["preflight"])
+    _write_text(bundle_root / "tenant-iac-dr" / "restore-scope.yaml", _simple_yaml({
+        "customer": customer,
+        "scope": "tenant-layer-only",
+        "include": tenant_iac_dr["restore_scope"]["include"],
+        "exclude": tenant_iac_dr["restore_scope"]["exclude"],
     }) + "\n")
-    _write_text(bundle_root / "genestack" / "genestack-overrides.yaml", _simple_yaml({
+    _write_text(bundle_root / "tenant-iac-dr" / "region-map.yaml", _simple_yaml({
         "customer": customer,
-        "path": "/etc/genestack",
-        "overrides": {},
+        "source_region": (terraform_payload or {}).get("region") or "",
+        "target_regions": [tracker_row.get("Target Region") or tracker_row.get("flex_target_region") or ""],
+        "flavor_map": (flavor_map or {}).get("mappings", []),
+        "image_map": (image_map or {}).get("mappings", []),
+        "network_cidr_map": (network_map or {}).get("mappings", []),
+        "capability_fallbacks": [],
     }) + "\n")
-    _write_json(bundle_root / "genestack" / "component-versions.json", {
+    _write_text(bundle_root / "tenant-iac-dr" / "backup-policy.yaml", _simple_yaml({
         "customer": customer,
-        "openstack": {},
-        "kubernetes": {},
-        "images": [],
+        "tiers": ["gold", "silver", "bronze"],
+        "volume_snapshots": {"enabled": True, "cross_region_copy": False},
+        "glance_images": {"export_catalog": True, "checksum_required": True},
+        "databases": {"native_backups_required": True, "pitr_required_for_gold": True},
+        "object_storage": {"replication": "policy_defined", "versioning": True},
+        "kubernetes_workloads": {"etcd_backup": "when_applicable", "pv_snapshots": "when_applicable"},
+    }) + "\n")
+    _write_text(bundle_root / "tenant-iac-dr" / "restore-validation-checklist.yaml", _simple_yaml({
+        "customer": customer,
+        "checks": [
+            "terraform_plan_clean_or_expected",
+            "api_reachability",
+            "network_connectivity",
+            "security_group_policy_validation",
+            "volume_attach_and_mount",
+            "loadbalancer_health",
+            "application_health_checks",
+            "rollback_plan_verified",
+        ],
+    }) + "\n")
+    _write_text(bundle_root / "tenant-iac-dr" / "terraform" / "README.md", "\n".join([
+        "# Tenant IaC DR Terraform Pack",
+        "",
+        "This folder is the Terraform-first desired-state pack for customer tenant rebuild.",
+        "Use env-specific tfvars files under envs/<region>/ and keep state in encrypted remote backends.",
+        "",
+    ]))
+    _write_json(bundle_root / "tenant-iac-dr" / "terraform" / "envs" / "default" / "terraform.tfvars.json", terraform_payload)
+
+    hosts_lines = ["[flex_post_config]"]
+    host_entries = []
+    for item in (target_inventory.get("instances") or []) + (target_inventory.get("servers") or []):
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name") or item.get("server_name") or item.get("hostname")
+        ip = item.get("floating_ip") or item.get("ip") or item.get("access_ip")
+        if name and ip:
+            host_entries.append((str(name).strip(), str(ip).strip()))
+    if not host_entries:
+        for job in vm_results.get("jobs", []):
+            if not isinstance(job, dict):
+                continue
+            name = job.get("label") or job.get("id")
+            if name:
+                hosts_lines.append(f"{name} ansible_host=<flex_ip> ansible_user=ubuntu")
+    else:
+        for name, ip in host_entries:
+            hosts_lines.append(f"{name} ansible_host={ip} ansible_user=ubuntu")
+    if len(hosts_lines) == 1:
+        hosts_lines.append("# host ansible_host=<flex_ip> ansible_user=<user>")
+    _write_text(bundle_root / "tenant-iac-dr" / "ansible" / "inventory" / "hosts.ini", "\n".join(hosts_lines) + "\n")
+    _write_text(bundle_root / "tenant-iac-dr" / "ansible" / "playbooks" / "post-provision.yml", "\n".join([
+        "---",
+        "- name: Post-provision baseline",
+        "  hosts: flex_post_config",
+        "  gather_facts: false",
+        "  tasks:",
+        "    - name: Placeholder for in-guest bootstrap and hardening",
+        "      ansible.builtin.debug:",
+        "        msg: Replace with customer-specific post-provision tasks.",
+        "",
+    ]))
+    _write_text(bundle_root / "tenant-iac-dr" / "runbooks" / "dr-same-region.md", "\n".join([
+        "# DR Runbook: Same-Region Rebuild",
+        "",
+        "## Preconditions",
+        "- Tenant credentials and API access verified.",
+        "- Terraform backend and state lock available.",
+        "",
+        "## Apply Order",
+        "1. Network",
+        "2. Security controls",
+        "3. Compute and storage",
+        "4. Load balancers",
+        "5. DNS cutover",
+        "",
+        "## Validation",
+        "- API, connectivity, and application health checks pass.",
+        "",
+        "## Rollback",
+        "- Reapply last known good Terraform baseline and DNS rollback plan.",
+        "",
+    ]))
+    _write_text(bundle_root / "tenant-iac-dr" / "runbooks" / "dr-cross-region.md", "\n".join([
+        "# DR Runbook: Cross-Region Clone/Failover",
+        "",
+        "## Preconditions",
+        "- Region map and capability fallback matrix approved.",
+        "- Required backups replicated to target region.",
+        "",
+        "## Apply Order",
+        "1. Region parameters and network foundations",
+        "2. Security controls",
+        "3. Compute, images, and volumes",
+        "4. Load balancers and DNS updates",
+        "",
+        "## Validation",
+        "- Endpoint reachability, app checks, and data restore checks pass.",
+        "",
+        "## Rollback",
+        "- Reverse DNS and retain source region as active.",
+        "",
+    ]))
+    _write_json(bundle_root / "tenant-iac-dr" / "artifacts" / "state-metadata" / "capture-manifest.json", {
+        "customer": customer,
+        "captured_at": stamp,
+        "drift_detection": {"terraform_plan_schedule": "weekly", "status": "pending"},
+        "git_baseline_tag": f"{safe_customer}-flex-baseline-{stamp[:8]}",
+        "immutable_archive": {"enabled": True, "bucket": "", "object_versioning": True},
     })
     _write_json(bundle_root / "ai-anywhere-context" / "ai-input-manifest.json", ai_anywhere)
     _write_text(bundle_root / "ai-anywhere-context" / "ai-prompts" / "repair-agent.md", "\n".join([
@@ -3589,7 +3925,7 @@ def generate_migration_output_bundle():
     _write_text(bundle_root / "ai-anywhere-context" / "ai-prompts" / "terraform-agent.md", "\n".join([
         "# Terraform Agent",
         "",
-        "Use terraform.tfvars.json, Genestack outputs, and OpenCenter estate map to suggest infrastructure-as-code patches.",
+        "Use terraform.tfvars.json, tenant-iac-dr outputs, and OpenCenter estate map to suggest infrastructure-as-code patches.",
         "Return patch suggestions, not direct destructive actions.",
         "",
     ]))
@@ -3615,9 +3951,9 @@ def generate_migration_output_bundle():
         "status": "pending_ai_anywhere_run",
         "improvements": [],
     }) + "\n")
-    _write_text(bundle_root / "ai-anywhere-context" / "ai-results" / "genestack-override-suggestions.yaml", _simple_yaml({
+    _write_text(bundle_root / "ai-anywhere-context" / "ai-results" / "dr-restore-improvements.yaml", _simple_yaml({
         "status": "pending_ai_anywhere_run",
-        "overrides": [],
+        "improvements": [],
     }) + "\n")
     _write_text(bundle_root / "README.txt", "\n".join([
         "Cloud Jumper Migration Output Bundle",
@@ -3627,11 +3963,11 @@ def generate_migration_output_bundle():
         "Use terraform.tfvars.json and ansible_inventory.ini for repeatable rebuilds.",
         "Use finops/ for TCO, cost comparison, and right-sizing handoff.",
         "Use opencenter/ for Day-2 operations import.",
-        "Use genestack/ for FLEX/OpenStack landing-zone and GitOps handoff.",
+        "Use tenant-iac-dr/ for Terraform-first tenant backup and restore runbooks.",
         "Use ai-anywhere-context/ as the private AI Anywhere input pack.",
         "",
         "Chain:",
-        "  Cloud Jumper Output Bundle -> TCO/FinOps -> OpenCenter + Genestack -> AI Anywhere",
+        "  Cloud Jumper Output Bundle -> TCO/FinOps -> OpenCenter + Tenant IaC DR Pack -> AI Anywhere",
         "",
     ]))
 
@@ -3655,7 +3991,14 @@ def generate_migration_output_bundle():
         "url": f"/api/migration-output-bundle/download/{safe_customer}/{stamp}.zip",
     })
 
-    return jsonify({"ok": True, "bundle": safe_customer, "stamp": stamp, "files": files})
+    return jsonify({
+        "ok": True,
+        "bundle": safe_customer,
+        "stamp": stamp,
+        "files": files,
+        "tenant_iac_dr_preflight": tenant_iac_dr.get("preflight", {}),
+        "tenant_live_state": tenant_live_state,
+    })
 
 
 @app.get("/api/migration-output-bundle/download/<path:bundle_path>")
@@ -3668,6 +4011,347 @@ def download_migration_output_bundle(bundle_path):
     except Exception:
         return jsonify({"ok": False, "error": "invalid path"}), 400
     return send_from_directory(str(target.parent), target.name, as_attachment=True)
+
+
+@app.post("/api/tenant-iac-dr/export-backup")
+def export_tenant_iac_dr_backup():
+    data = request.json or {}
+    customer = data.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    requested_stamp = str(data.get("stamp") or "").strip()
+
+    customer_root = (UPLOAD_DIR / "migration_output_bundles" / safe_customer)
+    if not customer_root.exists():
+        return jsonify({"ok": False, "error": "No bundles found for customer"}), 404
+
+    bundle_root: Optional[Path] = None
+    if requested_stamp:
+        candidate = customer_root / requested_stamp
+        if candidate.exists() and candidate.is_dir():
+            bundle_root = candidate
+        else:
+            return jsonify({"ok": False, "error": f"Bundle stamp not found: {requested_stamp}"}), 404
+    else:
+        candidates = sorted([p for p in customer_root.iterdir() if p.is_dir()], reverse=True)
+        bundle_root = candidates[0] if candidates else None
+    if not bundle_root:
+        return jsonify({"ok": False, "error": "No bundle directory found"}), 404
+
+    stamp = bundle_root.name
+    tenant_dir = bundle_root / "tenant-iac-dr"
+    if not tenant_dir.exists():
+        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in selected bundle"}), 404
+
+    summary: Dict[str, Any] = {
+        "customer": safe_customer,
+        "stamp": stamp,
+        "bundle_root": str(bundle_root),
+        "git": {"enabled": False, "status": "skipped"},
+        "s3": {"enabled": False, "status": "skipped"},
+    }
+
+    # Git export (optional): mirror tenant-iac-dr into configured repo path.
+    git_repo_path = str(os.environ.get("IAC_BACKUP_GIT_REPO_PATH", "")).strip()
+    git_branch = str(os.environ.get("IAC_BACKUP_GIT_BRANCH", "main")).strip() or "main"
+    if git_repo_path:
+        summary["git"]["enabled"] = True
+        repo_path = Path(git_repo_path).expanduser().resolve()
+        target_dir = repo_path / "customers" / safe_customer / "tenant-iac-dr"
+        try:
+            repo_path.mkdir(parents=True, exist_ok=True)
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+            if target_dir.exists():
+                _shutil.rmtree(target_dir)
+            _shutil.copytree(tenant_dir, target_dir)
+
+            subprocess.run(["git", "-C", str(repo_path), "checkout", git_branch], check=False, capture_output=True, text=True)
+            subprocess.run(["git", "-C", str(repo_path), "add", str(target_dir.relative_to(repo_path))], check=False, capture_output=True, text=True)
+            commit_body = f"Backup tenant IaC DR pack for {safe_customer} at {stamp}"
+            commit_proc = subprocess.run(
+                ["git", "-C", str(repo_path), "commit", "-m", commit_body],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if commit_proc.returncode == 0:
+                tag_name = f"{safe_customer}-flex-baseline-{stamp[:8]}"
+                subprocess.run(["git", "-C", str(repo_path), "tag", "-f", tag_name], check=False, capture_output=True, text=True)
+                summary["git"].update({
+                    "status": "committed",
+                    "repo_path": str(repo_path),
+                    "branch": git_branch,
+                    "target_dir": str(target_dir),
+                    "tag": tag_name,
+                })
+            else:
+                summary["git"].update({
+                    "status": "copied_not_committed",
+                    "repo_path": str(repo_path),
+                    "branch": git_branch,
+                    "target_dir": str(target_dir),
+                    "error": (commit_proc.stderr or commit_proc.stdout or "").strip()[:800],
+                })
+        except Exception as exc:
+            summary["git"].update({
+                "status": "failed",
+                "repo_path": str(repo_path),
+                "error": str(exc),
+            })
+
+    # S3 export (optional): upload bundle zip and tenant dir zip.
+    s3_bucket = str(os.environ.get("IAC_BACKUP_S3_BUCKET", "")).strip()
+    if s3_bucket:
+        summary["s3"]["enabled"] = True
+        try:
+            import boto3  # type: ignore
+
+            s3_prefix = str(os.environ.get("IAC_BACKUP_S3_PREFIX", "cloudjumper/tenant-iac-dr")).strip().strip("/")
+            endpoint_url = str(os.environ.get("IAC_BACKUP_S3_ENDPOINT_URL", "")).strip() or None
+            s3_client = boto3.client("s3", endpoint_url=endpoint_url)
+
+            bundle_zip = bundle_root.with_suffix(".zip")
+            if not bundle_zip.exists():
+                import zipfile
+                with zipfile.ZipFile(bundle_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                    for path in bundle_root.rglob("*"):
+                        if path.is_file():
+                            zf.write(path, path.relative_to(bundle_root))
+
+            tenant_zip = bundle_root / "tenant-iac-dr.zip"
+            import zipfile
+            with zipfile.ZipFile(tenant_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for path in tenant_dir.rglob("*"):
+                    if path.is_file():
+                        zf.write(path, path.relative_to(tenant_dir))
+
+            key_bundle = f"{s3_prefix}/{safe_customer}/{stamp}/bundle.zip"
+            key_tenant = f"{s3_prefix}/{safe_customer}/{stamp}/tenant-iac-dr.zip"
+            s3_client.upload_file(str(bundle_zip), s3_bucket, key_bundle)
+            s3_client.upload_file(str(tenant_zip), s3_bucket, key_tenant)
+            summary["s3"].update({
+                "status": "uploaded",
+                "bucket": s3_bucket,
+                "prefix": s3_prefix,
+                "bundle_key": key_bundle,
+                "tenant_iac_dr_key": key_tenant,
+            })
+        except Exception as exc:
+            summary["s3"].update({
+                "status": "failed",
+                "bucket": s3_bucket,
+                "error": str(exc),
+            })
+
+    # Persist backup locations into capture-manifest for auditability.
+    capture_manifest_path = tenant_dir / "artifacts" / "state-metadata" / "capture-manifest.json"
+    try:
+        capture_manifest = {}
+        if capture_manifest_path.exists():
+            capture_manifest = json.loads(capture_manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(capture_manifest, dict):
+            capture_manifest = {}
+        capture_manifest["backup_export"] = {
+            "exported_at": datetime.utcnow().isoformat() + "Z",
+            "git": summary.get("git"),
+            "s3": summary.get("s3"),
+        }
+        capture_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        capture_manifest_path.write_text(json.dumps(capture_manifest, indent=2), encoding="utf-8")
+    except Exception as exc:
+        summary["capture_manifest_update_error"] = str(exc)
+
+    return jsonify({"ok": True, "export": summary})
+
+
+def _target_profile_path(customer: str) -> Path:
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    return TARGET_PROFILE_DIR / f"{safe_customer}.json"
+
+
+@app.get("/api/tenant-iac-dr/target-cloud-profile")
+def get_target_cloud_profile():
+    customer = request.args.get("customer") or get_active_customer()
+    path = _target_profile_path(customer)
+    profile: Dict[str, Any] = {
+        "customer": customer,
+        "source": {"username": "", "project_id": "", "auth_url": "", "region": "", "domain": "rackspace_cloud_domain"},
+        "target": {"provider": "flex", "auth_url": "", "username": "", "password": "", "project_id": "", "domain": "rackspace_cloud_domain", "region": ""},
+        "openrc_file": "",
+        "updated_at": "",
+    }
+    if path.exists():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                profile.update(raw)
+        except Exception:
+            pass
+    return jsonify({"ok": True, "profile": profile})
+
+
+@app.post("/api/tenant-iac-dr/target-cloud-profile")
+def save_target_cloud_profile():
+    data = request.json or {}
+    customer = data.get("customer") or get_active_customer()
+    path = _target_profile_path(customer)
+    current: Dict[str, Any] = {}
+    if path.exists():
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                current = payload
+        except Exception:
+            current = {}
+
+    source = data.get("source") if isinstance(data.get("source"), dict) else {}
+    target = data.get("target") if isinstance(data.get("target"), dict) else {}
+    profile = {
+        "customer": customer,
+        "source": {
+            "username": str(source.get("username", current.get("source", {}).get("username", ""))).strip(),
+            "project_id": str(source.get("project_id", current.get("source", {}).get("project_id", ""))).strip(),
+            "auth_url": str(source.get("auth_url", current.get("source", {}).get("auth_url", ""))).strip(),
+            "region": str(source.get("region", current.get("source", {}).get("region", ""))).strip(),
+            "domain": str(source.get("domain", current.get("source", {}).get("domain", "rackspace_cloud_domain"))).strip(),
+        },
+        "target": {
+            "provider": str(target.get("provider", current.get("target", {}).get("provider", "flex"))).strip().lower() or "flex",
+            "auth_url": str(target.get("auth_url", current.get("target", {}).get("auth_url", ""))).strip(),
+            "username": str(target.get("username", current.get("target", {}).get("username", ""))).strip(),
+            "password": str(target.get("password", current.get("target", {}).get("password", ""))).strip(),
+            "project_id": str(target.get("project_id", current.get("target", {}).get("project_id", ""))).strip(),
+            "domain": str(target.get("domain", current.get("target", {}).get("domain", "rackspace_cloud_domain"))).strip(),
+            "region": str(target.get("region", current.get("target", {}).get("region", ""))).strip(),
+        },
+        "openrc_file": str(data.get("openrc_file", current.get("openrc_file", ""))).strip(),
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+    return jsonify({"ok": True, "profile": profile})
+
+
+@app.post("/api/tenant-iac-dr/import-openrc")
+def import_target_openrc():
+    customer = request.form.get("customer") or get_active_customer()
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "No OpenRC file uploaded"}), 400
+
+    filename = secure_filename(file.filename)
+    content = file.read().decode("utf-8", errors="ignore")
+    exports = parse_openrc_exports(content)
+    if not exports:
+        return jsonify({"ok": False, "error": "Could not parse OpenRC exports"}), 400
+
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    openrc_path = TARGET_PROFILE_DIR / f"{safe_customer}-{filename}"
+    openrc_path.write_text(content, encoding="utf-8")
+
+    source = {
+        "username": exports.get("OS_USERNAME", ""),
+        "project_id": exports.get("OS_PROJECT_ID", "") or exports.get("OS_TENANT_ID", ""),
+        "auth_url": exports.get("OS_AUTH_URL", ""),
+        "region": exports.get("OS_REGION_NAME", ""),
+        "domain": exports.get("OS_USER_DOMAIN_NAME", "") or exports.get("OS_PROJECT_DOMAIN_NAME", "rackspace_cloud_domain"),
+    }
+    target = {
+        "provider": "flex" if "rackspacecloud.com" in str(source.get("auth_url", "")).lower() else "openstack",
+        "auth_url": source["auth_url"],
+        "username": source["username"],
+        "password": exports.get("OS_PASSWORD", ""),
+        "project_id": source["project_id"],
+        "domain": source["domain"],
+        "region": source["region"],
+    }
+    profile = {
+        "customer": customer,
+        "source": source,
+        "target": target,
+        "openrc_file": str(openrc_path),
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    _target_profile_path(customer).write_text(json.dumps(profile, indent=2), encoding="utf-8")
+    return jsonify({"ok": True, "profile": profile, "parsed": exports})
+
+
+@app.post("/api/tenant-iac-dr/restore-plan")
+def generate_restore_plan():
+    data = request.json or {}
+    customer = data.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    target_name = str(data.get("target_name") or "").strip() or "target-openstack"
+    target_slug = re.sub(r"[^a-zA-Z0-9_.-]+", "-", target_name).strip("-").lower() or "target-openstack"
+
+    customer_root = UPLOAD_DIR / "migration_output_bundles" / safe_customer
+    if not customer_root.exists():
+        return jsonify({"ok": False, "error": "No bundles found for customer"}), 404
+    candidates = sorted([p for p in customer_root.iterdir() if p.is_dir()], reverse=True)
+    bundle_root = candidates[0] if candidates else None
+    if not bundle_root:
+        return jsonify({"ok": False, "error": "No bundle directory found"}), 404
+
+    tenant_dir = bundle_root / "tenant-iac-dr"
+    if not tenant_dir.exists():
+        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in latest bundle"}), 404
+
+    profile_path = _target_profile_path(customer)
+    if not profile_path.exists():
+        return jsonify({"ok": False, "error": "Target cloud profile not configured"}), 400
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    target = profile.get("target", {}) if isinstance(profile, dict) else {}
+
+    tfvars_default_path = tenant_dir / "terraform" / "envs" / "default" / "terraform.tfvars.json"
+    tfvars_payload = {"customer": customer, "target_cloud": "openstack", "instances": [], "networks": [], "security_groups": []}
+    if tfvars_default_path.exists():
+        try:
+            base = json.loads(tfvars_default_path.read_text(encoding="utf-8"))
+            if isinstance(base, dict):
+                tfvars_payload.update(base)
+        except Exception:
+            pass
+
+    tfvars_payload["region"] = target.get("region", "") or tfvars_payload.get("region", "")
+    tfvars_payload["target_cloud"] = "flex" if str(target.get("provider", "")).lower() == "flex" else "openstack"
+    tfvars_payload["auth_url"] = target.get("auth_url", "")
+    tfvars_payload["project_id"] = target.get("project_id", "")
+    tfvars_payload["domain"] = target.get("domain", "")
+
+    env_dir = tenant_dir / "terraform" / "envs" / target_slug
+    env_dir.mkdir(parents=True, exist_ok=True)
+    tfvars_path = env_dir / "terraform.tfvars.json"
+    tfvars_path.write_text(json.dumps(tfvars_payload, indent=2), encoding="utf-8")
+
+    translation_report = {
+        "customer": customer,
+        "source_bundle": bundle_root.name,
+        "target_name": target_name,
+        "target_slug": target_slug,
+        "target_provider": target.get("provider", "openstack"),
+        "target_region": target.get("region", ""),
+        "target_auth_url": target.get("auth_url", ""),
+        "applied_transforms": [
+            "region_override",
+            "target_auth_profile_overlay",
+            "provider_switch",
+        ],
+        "notes": [
+            "Flavor/image/network mappings are sourced from tenant-iac-dr/region-map.yaml when available.",
+            "Run terraform plan before apply and validate capability gaps manually for cross-cloud moves.",
+        ],
+    }
+    report_path = tenant_dir / f"translation-report-{target_slug}.json"
+    report_path.write_text(json.dumps(translation_report, indent=2), encoding="utf-8")
+
+    restore_cmd = f"cd {env_dir} && terraform init && terraform plan && terraform apply"
+    return jsonify({
+        "ok": True,
+        "bundle": bundle_root.name,
+        "target_slug": target_slug,
+        "tfvars_path": str(tfvars_path),
+        "translation_report": str(report_path),
+        "restore_command": restore_cmd,
+    })
 
 
 @app.get("/api/references/data")

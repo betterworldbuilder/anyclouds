@@ -1,4 +1,4 @@
-# Source: 1 selected node pairs
+# Source: 2 selected node pairs
 
 ##############################################################
 #  NODE : rh6

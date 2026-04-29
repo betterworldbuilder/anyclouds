@@ -1,0 +1,107 @@
+<html>
+<head>
+<style>
+  table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
+  th, td { border: 1px solid black; padding: 10px; vertical-align: top; }
+  th { background-color: #f2f2f2; text-align: left; }
+  ul { margin-top: 0; margin-bottom: 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+
+<h2>OSPC2FLEX Mission Control Summary</h2>
+
+<table>
+  <tr>
+    <th width="25%">Category</th>
+    <th>Details</th>
+  </tr>
+  <tr>
+    <td><b>Workflow Stages</b></td>
+    <td>
+      <ul>
+        <li><b>Stage 0:</b> Customer Migration Tracker (Backlog management)</li>
+        <li><b>Stage 1:</b> Discovery & Assessment (OSPC/FLEX scanning & topology import)</li>
+        <li><b>Stage 2:</b> Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)</li>
+        <li><b>Stage 3:</b> Validation & UAT (Automated cross-cloud checks & HTTP health tests)</li>
+        <li><b>Stage 4:</b> Cutover & Handover (Traffic split, DB promotion, final sync)</li>
+        <li><b>Stage 5:</b> Post-Migration (Stability tracking, artifact bundle generation)</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><b>Current Features</b></td>
+    <td>
+      <ul>
+        <li><b>Single-Tab Mission Control:</b> No CLI required, full GUI wrapper</li>
+        <li><b>Live Execution:</b> Real-time logs streaming to browser</li>
+        <li><b>Visual Topology Designer:</b> Drag-and-drop infra cloning</li>
+        <li><b>Offline Guest Repair:</b> Pre-boot image patching for networks</li>
+        <li><b>Parallel Execution:</b> Migrate multiple DBs/Servers simultaneously</li>
+        <li><b>Kubernetes Portability:</b> Auto-replication via Genestack/OpenCenter</li>
+        <li><b>No Database Required:</b> Stateless backend (CSV + local browser storage)</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><b>Available Migration Methods</b></td>
+    <td>
+      <b>1. Direct Shift & Lift (Images):</b>
+      <ul>
+        <li>Production Mode (Live SSH-pipe disk without snapshot)</li>
+        <li>External Offload (Glance snapshot via Jump Host)</li>
+        <li>Direct Export (Direct read of live disk on Jump Host)</li>
+      </ul>
+      <br>
+      <b>2. REHOST (Apps & Servers):</b>
+      <ul>
+        <li>OSPC Infra Duplication on FLEX (using Brian's osflex tool)</li>
+        <li>Full Clone (13-layer sync: Users, Packages, Code, Cron, etc.)</li>
+        <li>Quick Install (Package-only mirror)</li>
+      </ul>
+      <br>
+      <b>3. Database Replication:</b>
+      <ul>
+        <li>Standard VM (Dump & Restore)</li>
+        <li>DBaaS Streaming (Direct memory pipe without local disk)</li>
+        <li>DBaaS + Replica / HA (GTID streaming & auto-pairing)</li>
+      </ul>
+      <br>
+      <b>4. Kubernetes Migration:</b>
+      <ul>
+        <li>Genestack / Kubespray (Ansible-driven)</li>
+        <li>OpenCenter (GitOps / FluxCD)</li>
+        <li>OSPC K8 to Flex Magnum (8-stage SSH export & transform)</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><b>Supported OS Types</b></td>
+    <td>
+      <ul>
+        <li>Ubuntu (20.04, 22.04, 24.04)</li>
+        <li>Debian (10, 11, 12)</li>
+        <li>CentOS 7</li>
+        <li>RedHat 6</li>
+        <li>RedHat 8</li>
+        <li>Rocky Linux 8 / 9</li>
+        <li>AlmaLinux 8 / 9</li>
+        <li>Testing Windows 2016, 2019 (via Glance snapshot + VirtIO injection)</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><b>Future / Upcoming</b></td>
+    <td>
+      <ul>
+        <li><b>Stage 6 (TCO/FinOps):</b> Right-sizing and executive cost summaries</li>
+        <li><b>Stage 7 (OpenCenter):</b> Day-2 GitOps workflows and K8s runbooks</li>
+        <li><b>Stage 8 (Genestack):</b> Reusable FLEX landing zones and cluster overrides</li>
+        <li><b>Stage 9 (AI Anywhere):</b> AI auto-repair plans and risk-scoring</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

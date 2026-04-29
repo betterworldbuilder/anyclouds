@@ -1,10 +1,14 @@
 flask
+werkzeug
 requests
-python-openstackclient
-python-octaviaclient
 pandas
 openpyxl
 xlrd
+openstacksdk
+python-openstackclient
+python-octaviaclient
+PyYAML
+boto3
 edge-tts
 gTTS
 openai-whisper
@@ -12,8 +16,11 @@ openai-whisper
 # ── System packages (install via apt, not pip) ────────────────────────────────
 # sudo apt-get install -y mysql-client     # required on jumphost for DBaaS migration
 #                                          # (mysqldump + mysql CLI to reach OSPC DBaaS via Cloud LB)
-# sudo apt-get install -y pulseaudio-utils # parec/paplay for local voice helper + TTS playback
+# sudo apt-get install -y pulseaudio-utils # paplay playback for announce.py
 # sudo apt-get install -y mpg123 ffmpeg    # mp3 playback fallback for announce.py (ffplay ships with ffmpeg)
+#                                          # announce.py supports British voices:
+#                                          #   male   -> en-GB-RyanNeural
+#                                          #   female -> en-GB-SoniaNeural
 #
 # ── Jumphost: Linux VM offline repair (ospc2flex_offline_repair.sh) ───────────
 # sudo apt-get install -y qemu-utils       # qemu-nbd, qemu-img (NBD export + qcow2 convert)

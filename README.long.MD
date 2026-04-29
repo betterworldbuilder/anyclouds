@@ -98,7 +98,7 @@ The restored Apollo-style README remains the base operator manual. These are the
 | **Linux Image Repair** | Uses per-OS offline repair for Ubuntu, Debian, AlmaLinux, Rocky, CentOS, and RHEL, including CentOS 7 legacy `ifcfg` / `network.service` handling. | Migrated images are repaired before first FLEX boot instead of being debugged VM by VM. |
 | **Windows Image Path** | Uses snapshot-based Glance migration plus offline VirtIO driver injection. | Windows workloads have a dedicated path instead of pretending they can use Linux NBD SSH streaming. |
 | **Cloud Files / Glance Bridge** | Falls back to Rackspace image export/import and Cloud Files paths when direct Glance transfer is unreliable. | Large image moves keep progressing even when a direct endpoint path fails. |
-| **GitOps Future Output** | Discovery, topology maps, repair profiles, validation reports, and rollback artifacts are structured for later Terraform, Ansible, OpenCenter, Genestack, and AI-agent workflows. | Migration output can become durable customer infrastructure-as-code rather than one-time scripts. |
+| **GitOps Future Output** | Discovery, topology maps, repair profiles, validation reports, and rollback artifacts are structured for later Terraform, Ansible, OpenCenter, Tenant IaC DR Pack, and AI-agent workflows. | Migration output can become durable customer infrastructure-as-code rather than one-time scripts. |
 
 ---
 
@@ -1007,16 +1007,17 @@ OpenCenter consumes the Migration Output Bundle as the Day-2 operating cockpit.
 | GitOps workflows | Structured bundle files ready for repo import, review, and automation gates |
 | Observability/runbooks | Boot evidence, repair history, validation results, rollback notes, and day-2 tasks |
 
-### Stage 8 — Genestack Integration
+### Stage 8 — Tenant IaC DR Pack
 
-Genestack consumes the same bundle as a repeatable FLEX/OpenStack landing-zone and platform configuration handoff.
+Stage 8 captures tenant-owned infrastructure as Terraform-first restore artifacts, validates required upstream evidence, and prepares cross-region/cross-cloud overlays.
 
-| Genestack lane | What Cloud Jumper provides |
+| Tenant IaC DR lane | What Cloud Jumper provides |
 |---|---|
-| OpenStack/FLEX landing zone | Image catalog facts, target flavors, networks, projects, and workload placement hints |
-| Helm/OpenStack service config | Migration facts shaped for GitOps-controlled service values and deployment overlays |
-| `/etc/genestack` overrides | Customer-specific overrides separated from upstream Genestack defaults |
-| Cloud components/versioning | Image, service, Kubernetes, and OpenStack component version tracking for rebuilds |
+| Stage 8 readiness preflight | Required checks for target inventory, migration results, boot/UAT evidence, and Terraform region values |
+| Target cloud credential profile | Source/target credential capture, OpenRC import, provider selection (FLEX/OpenStack), and target region settings |
+| Terraform-first restore pack | `tenant-iac-dr/terraform/envs/default/terraform.tfvars.json`, generated target env overlays, and translation reports |
+| Backup and export | Export IaC pack to configured Git backup repo path and/or S3-compatible object storage |
+| Runbooks and validation | Same-region and cross-region restore runbooks plus restore validation checklist |
 
 ### Stage 9 — AI Anywhere Integration
 
@@ -1027,7 +1028,7 @@ AI Anywhere consumes the complete chain as a private AI context pack.
 | CloudJumper output | `migration_manifest.json`, `terraform.tfvars.json`, `ansible_inventory.ini`, repaired image metadata, boot/test results, dependency graph |
 | TCO / FinOps output | TCO report, cost summary CSV, right-sizing candidates |
 | OpenCenter output | Estate map, Day-2 runbook, observability context, GitOps workflows |
-| Genestack output | Cloud images, flavor map, network map, service config, `/etc/genestack` overrides, component versions |
+| Tenant IaC DR output | Tenant IaC DR pack, restore scope, backup policy, region map, target overlays, runbooks, and preflight/live-state reports |
 | Optional raw evidence | Migration logs, repair logs, UAT logs, telemetry samples |
 
 | AI Anywhere output | Purpose |
@@ -1037,7 +1038,7 @@ AI Anywhere consumes the complete chain as a private AI context pack.
 | `autorepair-plan.yaml` | Proposes boot/network/service repair actions with rollback notes |
 | `terraform-patch-suggestions.json` | Suggests infrastructure-as-code changes from validated migration facts |
 | `runbook-improvements.yaml` | Improves OpenCenter Day-2 runbooks from observed migration behavior |
-| `genestack-override-suggestions.yaml` | Suggests Genestack override changes from workload and platform facts |
+| `dr-restore-improvements.yaml` | Suggests DR and restore process improvements from workload and platform facts |
 
 ### What Next — Mission Control To GitOps
 
@@ -1053,7 +1054,7 @@ Migration Output Bundle
         |
         +--> OpenCenter: operate, observe, runbook, GitOps
         |
-        +--> Genestack: landing zone, service config, overrides, versioning
+        +--> Tenant IaC DR Pack: restore scope, preflight, target profiles, backup export
         |
         +--> AI Anywhere: repair, risk, right-size, patch, optimize
         |
@@ -1110,7 +1111,7 @@ chmod +x letsmove.sh
 ./letsmove.sh
 ```
 
-Navigate to **http://localhost:5001** (or the WSL network IP shown in terminal output).
+Navigate to **https://127.0.0.1:5002** (or the WSL network IP shown in terminal output).
 
 ---
 
