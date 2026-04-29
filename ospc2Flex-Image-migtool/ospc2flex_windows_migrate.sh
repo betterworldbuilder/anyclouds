@@ -56,6 +56,39 @@ FAIL() { echo "  ❌ $*" >&2; }
 WARN() { echo "  ⚠️  $*" >&2; }
 INFO() { echo "  ℹ️  $*" >&2; }
 
+# ── Step tracking (for aligned progress output) ────────────────────────────────
+_STEP_NUM=""
+_STEP_NAME=""
+_STEP_START_TIME=""
+_STEP_STEPS_COMPLETED=0
+
+step_start() {
+  local num="$1" name="$2"
+  _STEP_NUM="$num"
+  _STEP_NAME="$name"
+  _STEP_START_TIME=$(date +%s)
+  _STEP_STEPS_COMPLETED=$((num - 1))
+  echo "" >&2
+  echo "╔════════════════════════════════════════════════════════════════════════════╗" >&2
+  printf "║ STEP %s: %-66s ║\n" "$num" "$name" >&2
+  echo "╚════════════════════════════════════════════════════════════════════════════╝" >&2
+  log "Step $num of 7 started: $name"
+}
+
+step_progress() {
+  local msg="$1"
+  local elapsed=$(($(date +%s) - _STEP_START_TIME))
+  log "  [$((elapsed))s] $msg"
+}
+
+step_done() {
+  local status="${1:-OK}"
+  local elapsed=$(($(date +%s) - _STEP_START_TIME))
+  _STEP_STEPS_COMPLETED=$(($_STEP_STEPS_COMPLETED + 1))
+  log "Step $_STEP_NUM completed ($status) in ${elapsed}s"
+  echo "  └─ [${elapsed}s elapsed] $status" >&2
+}
+
 # ── Parse args ────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -88,8 +121,9 @@ LOG="/tmp/mig_${LABEL}.log"
 exec > >(tee -a "$LOG") 2>&1
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo " OSPC→FLEX Windows Migration (Glance Snapshot Method)"
+echo " OSPC→FLEX Windows Migration Workflow"
 echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
 echo "  Server    : $SERVER_NAME ($SERVER_IP)"
 echo "  Label     : $LABEL"
 echo "  Flavor    : $FLAVOR"
@@ -97,23 +131,33 @@ echo "  Network   : $NETWORK"
 echo "  Keypair   : $KEYPAIR"
 echo "  OS Family : $OS_FAMILY"
 echo "  OS Type   : $OS_TYPE"
+echo ""
+echo "  Steps: 1 (OSPC auth/snapshot) → 1b (SSH check) → 2 (disk read) → 3 (qcow2) →"
+echo "         4 (VirtIO repair) → 5 (upload) → 6 (boot) → 7 (floating IP)"
+echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1b: Check SSH first — skip snapshot entirely if SSH is reachable
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 1b: Checking Windows SSH availability..."
+step_start "1b" "Checking Windows SSH availability (public IP + ServiceNet)"
 _ssh_check_ip=""
 if nc -z -w 8 "$SERVER_IP" 22 2>/dev/null; then
   _ssh_check_ip="$SERVER_IP"
 elif [ -n "$WIN_SNET_IP" ] && nc -z -w 8 "$WIN_SNET_IP" 22 2>/dev/null; then
   _ssh_check_ip="$WIN_SNET_IP"
-  INFO "SSH accessible via ServiceNet ($WIN_SNET_IP)"
+  step_progress "SSH accessible via ServiceNet ($WIN_SNET_IP)"
 fi
 if [ -n "$_ssh_check_ip" ]; then
   WIN_SSH_IP="$_ssh_check_ip"
-  PASS "SSH port 22 open on $WIN_SSH_IP — skipping OSPC snapshot"
+  PASS "SSH port 22 open on $WIN_SSH_IP"
   SSH_DISK_METHOD=1
+  step_done "OK — SSH available, will skip OSPC snapshot"
+else
+  step_progress "SSH not reachable — will create OSPC snapshot"
+  step_done "DONE"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -124,15 +168,16 @@ _NOVA_URL=""
 _GLANCE_URL=""
 OS_TOKEN=""
 if [ "${SSH_DISK_METHOD:-0}" -eq 0 ]; then
-log "Step 1: SSH unavailable — authenticating to OSPC and creating snapshot of '$SERVER_NAME'..."
-source /tmp/ospc2flex_ospc.sh
+  step_start "1" "OSPC authentication + server discovery + snapshot creation"
+  step_progress "Authenticating to OSPC..."
+  source /tmp/ospc2flex_ospc.sh
 
-# Auth via RAX Identity v2 curl (same method as ospcscan.py — no openstack CLI needed)
-_OSPC_AUTH=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
-  -H "Content-Type: application/json" \
-  -d "{\"auth\":{\"RAX-KSKEY:apiKeyCredentials\":{\"username\":\"${OS_USERNAME}\",\"apiKey\":\"${OS_API_KEY:-$OS_PASSWORD}\"},\"tenantId\":\"${OS_TENANT_ID:-$OS_PROJECT_ID}\"}}" 2>/dev/null)
-OS_TOKEN=$(echo "$_OSPC_AUTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
-_NOVA_URL=$(echo "$_OSPC_AUTH" | python3 -c "
+  # Auth via RAX Identity v2 curl (same method as ospcscan.py — no openstack CLI needed)
+  _OSPC_AUTH=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
+    -H "Content-Type: application/json" \
+    -d "{\"auth\":{\"RAX-KSKEY:apiKeyCredentials\":{\"username\":\"${OS_USERNAME}\",\"apiKey\":\"${OS_API_KEY:-$OS_PASSWORD}\"},\"tenantId\":\"${OS_TENANT_ID:-$OS_PROJECT_ID}\"}}" 2>/dev/null)
+  OS_TOKEN=$(echo "$_OSPC_AUTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
+  _NOVA_URL=$(echo "$_OSPC_AUTH" | python3 -c "
 import sys,json; d=json.load(sys.stdin)
 region='${OS_REGION_NAME:-IAD}'.upper()
 for s in d['access']['serviceCatalog']:
@@ -140,20 +185,22 @@ for s in d['access']['serviceCatalog']:
         for e in s['endpoints']:
             if e.get('region','').upper()==region: print(e['publicURL']); break
 " 2>/dev/null || true)
-export OS_TOKEN
-export OS_AUTH_TYPE=token
+  export OS_TOKEN
+  export OS_AUTH_TYPE=token
 
-if [ -z "$OS_TOKEN" ] || [ -z "$_NOVA_URL" ]; then
-  FAIL "OSPC auth failed — check OS_USERNAME/OS_API_KEY/OS_TENANT_ID in /tmp/ospc2flex_ospc.sh"
-  exit 1
-fi
-INFO "OSPC auth OK — Nova: $_NOVA_URL"
+  if [ -z "$OS_TOKEN" ] || [ -z "$_NOVA_URL" ]; then
+    FAIL "OSPC auth failed — check OS_USERNAME/OS_API_KEY/OS_TENANT_ID in /tmp/ospc2flex_ospc.sh"
+    step_done "FAILED"
+    exit 1
+  fi
+  step_progress "OSPC auth OK — Nova: $_NOVA_URL"
 
-SNAP_NAME="${LABEL}-snap-$(date +%Y%m%d%H%M)"
+  SNAP_NAME="${LABEL}-snap-$(date +%Y%m%d%H%M)"
 
-# Find server via Nova API directly (same as ospcscan.py)
-_SERVERS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_NOVA_URL/servers/detail?limit=1000" 2>/dev/null)
-SERVER_ID=$(echo "$_SERVERS" | python3 -c "
+  # Find server via Nova API directly (same as ospcscan.py)
+  step_progress "Discovering server: $SERVER_NAME ($SERVER_IP)"
+  _SERVERS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_NOVA_URL/servers/detail?limit=1000" 2>/dev/null)
+  SERVER_ID=$(echo "$_SERVERS" | python3 -c "
 import sys,json,os
 d=json.load(sys.stdin)
 ip='${SERVER_IP}'; nm='${SERVER_NAME}'.lower()
@@ -165,24 +212,26 @@ for s in d.get('servers',[]):
     if s.get('name','').lower()==nm: print(s['id']); sys.exit(0)
 " 2>/dev/null || true)
 
-if [ -z "$SERVER_ID" ]; then
-  FAIL "No server found for IP $SERVER_IP / name $SERVER_NAME in OSPC region ${OS_REGION_NAME:-IAD}"
-  exit 1
-fi
-INFO "Server ID: $SERVER_ID"
+  if [ -z "$SERVER_ID" ]; then
+    FAIL "No server found for IP $SERVER_IP / name $SERVER_NAME in OSPC region ${OS_REGION_NAME:-IAD}"
+    step_done "FAILED"
+    exit 1
+  fi
+  step_progress "Server found: $SERVER_ID"
 
-# Wait for any in-progress task to finish
-log "  Checking server task state..."
-for i in $(seq 1 30); do
-  _SDETAIL=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_NOVA_URL/servers/$SERVER_ID" 2>/dev/null)
-  TASK_STATE=$(echo "$_SDETAIL" | python3 -c "import sys,json; print(json.load(sys.stdin).get('server',{}).get('OS-EXT-STS:task_state') or 'none')" 2>/dev/null || echo "none")
-  [ "$TASK_STATE" = "None" ] || [ "$TASK_STATE" = "none" ] && break
-  WARN "Server task_state: $TASK_STATE — waiting 30s... ($i/30)"
-  sleep 30
-done
+  # Wait for any in-progress task to finish
+  step_progress "Checking server task state..."
+  for i in $(seq 1 30); do
+    _SDETAIL=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_NOVA_URL/servers/$SERVER_ID" 2>/dev/null)
+    TASK_STATE=$(echo "$_SDETAIL" | python3 -c "import sys,json; print(json.load(sys.stdin).get('server',{}).get('OS-EXT-STS:task_state') or 'none')" 2>/dev/null || echo "none")
+    [ "$TASK_STATE" = "None" ] || [ "$TASK_STATE" = "none" ] && break
+    step_progress "  Task state: $TASK_STATE (attempt $i/30)"
+    sleep 30
+  done
 
-# Check for existing usable snapshot via Glance API
-_GLANCE_URL=$(echo "$_OSPC_AUTH" | python3 -c "
+  # Check for existing usable snapshot via Glance API
+  step_progress "Checking Glance for existing snapshots..."
+  _GLANCE_URL=$(echo "$_OSPC_AUTH" | python3 -c "
 import sys,json; d=json.load(sys.stdin)
 region='${OS_REGION_NAME:-IAD}'.upper()
 for s in d['access']['serviceCatalog']:
@@ -190,39 +239,42 @@ for s in d['access']['serviceCatalog']:
         for e in s['endpoints']:
             if e.get('region','').upper()==region: print(e.get('publicURL','')); break
 " 2>/dev/null || true)
-SNAP_ID=""
-if [ -n "$_GLANCE_URL" ]; then
-  SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${LABEL}-snap&limit=5" 2>/dev/null \
-    | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
-fi
-if [ -n "$SNAP_ID" ]; then
-  PASS "Reusing existing active snapshot: $SNAP_ID"
-else
-  # Create snapshot via Nova createImage action
-  log "  Creating snapshot $SNAP_NAME ..."
-  curl -s -X POST -H "X-Auth-Token: $OS_TOKEN" -H "Content-Type: application/json" \
-    "$_NOVA_URL/servers/$SERVER_ID/action" \
-    -d "{\"createImage\":{\"name\":\"$SNAP_NAME\",\"metadata\":{}}}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin))" 2>/dev/null || true
+  SNAP_ID=""
+  if [ -n "$_GLANCE_URL" ]; then
+    SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${LABEL}-snap&limit=5" 2>/dev/null \
+      | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
+  fi
+  if [ -n "$SNAP_ID" ]; then
+    PASS "Reusing existing active snapshot: $SNAP_ID"
+    step_done "OK"
+  else
+    # Create snapshot via Nova createImage action
+    step_progress "Creating snapshot $SNAP_NAME..."
+    curl -s -X POST -H "X-Auth-Token: $OS_TOKEN" -H "Content-Type: application/json" \
+      "$_NOVA_URL/servers/$SERVER_ID/action" \
+      -d "{\"createImage\":{\"name\":\"$SNAP_NAME\",\"metadata\":{}}}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin))" 2>/dev/null || true
 
-  # Poll Glance until active
-  log "  Waiting for snapshot to become active..."
-  for i in $(seq 1 90); do
-    sleep 10
-    if [ -n "$_GLANCE_URL" ]; then
-      SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
-        | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
-      [ -n "$SNAP_ID" ] && { PASS "Snapshot active: $SNAP_ID"; break; }
-      _SNAP_STATUS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
-        | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('status','waiting') if imgs else 'waiting')" 2>/dev/null || echo "waiting")
-      INFO "  snapshot status: $_SNAP_STATUS ($((i*10))s)"
-    fi
-  done
-fi
+    # Poll Glance until active
+    step_progress "Waiting for snapshot to become active..."
+    for i in $(seq 1 90); do
+      sleep 10
+      if [ -n "$_GLANCE_URL" ]; then
+        SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
+          | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
+        [ -n "$SNAP_ID" ] && { step_progress "Snapshot active: $SNAP_ID"; break; }
+        _SNAP_STATUS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
+          | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('status','waiting') if imgs else 'waiting')" 2>/dev/null || echo "waiting")
+        step_progress "  Snapshot status: $_SNAP_STATUS ($((i*10))s elapsed)"
+      fi
+    done
+    step_done "OK"
+  fi
 
-if [ -z "$SNAP_ID" ]; then
-  FAIL "Failed to create/find snapshot for '$SERVER_NAME'"
-  exit 1
-fi
+  if [ -z "$SNAP_ID" ]; then
+    FAIL "Failed to create/find snapshot for '$SERVER_NAME'"
+    step_done "FAILED"
+    exit 1
+  fi
 fi  # end SSH_DISK_METHOD==0 block
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -401,6 +453,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Download Windows disk image
 # ═══════════════════════════════════════════════════════════════════════════════
+step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
 mkdir -p "$WORK"
 IMG_PATH="$WORK/${LABEL}.img"
 rm -f "$IMG_PATH"
@@ -408,11 +461,11 @@ IMG_SIZE=0
 DOWNLOAD_METHOD=""
 
 if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
-  log "Step 2 [SSH]: Reading PhysicalDrive0 via SSH+PowerShell (direct disk read)..."
+  step_progress "Using SSH direct disk read via PowerShell"
   INFO "Large Windows disks: 30–120+ minutes. Progress logged every 60s."
   # Use the SSH IP resolved in Step 1b (ServiceNet preferred when public port 22 is blocked)
   _SSH_TARGET="${WIN_USER}@${WIN_SSH_IP:-$SERVER_IP}"
-  INFO "SSH target: $_SSH_TARGET"
+  step_progress "SSH target: $_SSH_TARGET"
 
   WIN_DISK_BYTES=$(ssh -i ~/.ssh/id_rsa \
       -o StrictHostKeyChecking=no -o BatchMode=yes \
@@ -426,7 +479,7 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
   (while [ -f "/tmp/winmig_hb_active_${LABEL}" ]; do
      sleep 60
      _sz=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
-     log "  … SSH download heartbeat — $((${_sz} / 1024 / 1024)) MiB on disk"
+     step_progress "SSH transfer progress: $((${_sz} / 1024 / 1024)) MB on disk"
    done) &
   _HB_PID=$!
   : > "/tmp/winmig_hb_active_${LABEL}"
@@ -449,15 +502,17 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
   if [ "$_SSH_RC" -eq 0 ] && [ "${IMG_SIZE:-0}" -ge 1048576 ]; then
     PASS "Downloaded via SSH/PowerShell: $((IMG_SIZE / 1024 / 1024)) MB"
     DOWNLOAD_METHOD="ssh-powershell-disk-read"
+    step_done "OK"
   else
     WARN "SSH disk read failed (rc=$_SSH_RC size=${IMG_SIZE}B) — falling back to Glance"
     rm -f "$IMG_PATH"
     IMG_SIZE=0
+    step_progress "SSH failed, trying Glance fallback..."
   fi
 fi
 
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
-  log "Step 2 [Glance]: Downloading snapshot (Cloud Files bridge / ServiceNet / public)..."
+  step_progress "Using Glance snapshot download (Cloud Files bridge / ServiceNet / public)"
   INFO "Large Windows disks often take 30–120+ minutes — heartbeat + size logged every 60s."
   rm -f "$IMG_PATH"
 
@@ -802,37 +857,46 @@ fi  # end Glance fallback block
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
   FAIL "All download methods failed (SSH disk read + Glance). Image size: ${IMG_SIZE:-0} bytes."
   FAIL "SSH rc=${_SSH_RC:-n/a}. Last curl log: ${LAST_CURL_LOG:-none}"
+  step_done "FAILED"
   exit 1
 fi
+
+PASS "Step 2 complete: Image downloaded ($((IMG_SIZE / 1024 / 1024)) MB via $DOWNLOAD_METHOD)"
+step_done "OK"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 3: Convert to qcow2
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 3: Converting to qcow2..."
+step_start "3" "Converting disk image to qcow2 format"
+step_progress "Detecting image format..."
 DETECTED_FMT=$(qemu-img info --output=json "$IMG_PATH" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('format','raw'))" 2>/dev/null || echo "raw")
 INFO "Detected format: $DETECTED_FMT"
 
 if [ "$DETECTED_FMT" = "qcow2" ]; then
+  step_progress "Already qcow2 format — renaming"
   mv "$IMG_PATH" "$QCOW"
   PASS "Already qcow2 — renamed"
 else
-  qemu-img convert -p -f "$DETECTED_FMT" -O qcow2 "$IMG_PATH" "$QCOW" 2>&1 || { FAIL "qemu-img convert failed"; exit 1; }
+  step_progress "Converting raw → qcow2 (this may take 5-10 minutes)..."
+  qemu-img convert -p -f "$DETECTED_FMT" -O qcow2 "$IMG_PATH" "$QCOW" 2>&1 || { FAIL "qemu-img convert failed"; step_done "FAILED"; exit 1; }
   rm -f "$IMG_PATH"
   PASS "Converted to qcow2"
 fi
 QCOW_SIZE=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
 INFO "qcow2 size: $((QCOW_SIZE/1024/1024))MB"
+step_done "OK"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 4: Windows VirtIO Repair
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 4: Offline VirtIO driver injection & Repair..."
+step_start "4" "Offline VirtIO driver injection & Windows guest repair"
 REPAIR_LOG="$WORK/${LABEL}.repair.log"
 if [ "$OS_FAMILY" = "linux" ]; then
   if [ -f "$LINUX_REPAIR" ]; then
     set +e
     # Call the v2.5 RHEL-aware linux repair script
     rm -f "$REPAIR_LOG"
+    step_progress "Running Linux repair script..."
     INFO "Repair log: $REPAIR_LOG"
     bash "$LINUX_REPAIR" --qcow2 "$QCOW" --os-type "$OS_TYPE" --force --preserve-password-auth 2>&1 | tee "$REPAIR_LOG"
     REPAIR_EXIT=$?
@@ -865,19 +929,23 @@ else
     set -e
     if [ "$REPAIR_EXIT" -eq 0 ]; then
       PASS "Windows repair completed successfully"
+      step_done "OK"
     else
       WARN "Windows repair exited with code $REPAIR_EXIT — continuing anyway"
+      step_done "DONE (with warnings)"
     fi
   else
     WARN "$WIN_REPAIR not found — skipping VirtIO injection"
     WARN "Windows VM may not boot without VirtIO drivers!"
+    step_done "SKIPPED"
   fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 5: Upload to FLEX
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 5: Uploading to FLEX..."
+step_start "5" "Uploading qcow2 image to FLEX Glance"
+step_progress "Switching to FLEX credentials..."
 OSPC_TOKEN="${OS_TOKEN:-}"
 unset OS_TOKEN OS_AUTH_TYPE OS_IDENTITY_API_VERSION
 source /tmp/ospc2flex_flex.sh
@@ -1016,7 +1084,7 @@ IMG_VM_MODE="hvm"
 IMG_DISK_BUS="virtio"
 IMG_VIF_MODEL="virtio"
 IMG_QGA="yes"
-INFO "FLEX upload source: $QCOW size=${QCOW_BYTES}B (${QCOW_MIB} MiB) virtual=${QCOW_VIRTUAL_BYTES}B (~${QCOW_VIRTUAL_GIB} GiB)"
+step_progress "Uploading: $QCOW_BYTES bytes (${QCOW_MIB} MiB) to FLEX Glance..."
 INFO "FLEX image metadata: architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=$IMG_OS_DISTRO hw_disk_bus=$IMG_DISK_BUS hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
 
 FLEX_IMG_ID=$(openstack image create "$LABEL" \
@@ -1035,13 +1103,16 @@ FLEX_IMG_ID=$(openstack image create "$LABEL" \
 
 if [ -z "$FLEX_IMG_ID" ]; then
   FAIL "Image upload failed"
+  step_done "FAILED"
   exit 1
 fi
 
 # Wait for image to become active
+step_progress "Waiting for image to become active in Glance..."
 for i in $(seq 1 30); do
   STATUS=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "unknown")
   [ "$STATUS" = "active" ] && break
+  step_progress "  Image status: $STATUS (attempt $i/30)"
   sleep 5
 done
 PASS "Image uploaded: $FLEX_IMG_ID (status: $STATUS)"
@@ -1049,11 +1120,13 @@ SHOW_NAME=$(openstack image show "$FLEX_IMG_ID" -f value -c name 2>/dev/null || 
 SHOW_VIS=$(openstack image show "$FLEX_IMG_ID" -f value -c visibility 2>/dev/null || echo "unknown")
 SHOW_STAT=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "${STATUS:-unknown}")
 INFO "[UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$FLEX_IMG_ID name=${SHOW_NAME:-unknown} status=${SHOW_STAT:-unknown} visibility=${SHOW_VIS:-unknown}"
+step_done "OK"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 6: Boot VM on FLEX
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 6: Booting VM on FLEX..."
+step_start "6" "Booting Windows VM on FLEX from uploaded image"
+step_progress "Resolving target flavor, network, and keypair..."
 FLAVOR=$(resolve_target_flavor "${MIG_FLAVOR:-$FLAVOR}")
 NETWORK=$(resolve_target_network "${MIG_NETWORK:-$NETWORK}")
 KEYPAIR=$(resolve_target_keypair "${MIG_KEYPAIR:-$KEYPAIR}")
@@ -1090,19 +1163,24 @@ VM_STATUS=$(openstack server show "$VM_ID" -f value -c status 2>/dev/null || ech
 
 if [ "$VM_STATUS" = "ACTIVE" ]; then
   PASS "VM booted: $VM_ID (ACTIVE)"
+  step_done "OK"
 else
   WARN "VM status: $VM_STATUS (may need console check)"
+  step_done "DONE"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 7: Assign Floating IP
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 7: Assigning floating IP..."
+step_start "7" "Assigning floating IP address"
+step_progress "Looking for server port..."
 PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID -c Status 2>/dev/null | awk '$2=="ACTIVE"{print $1; exit}')
 [ -z "$PORT_ID" ] && PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID 2>/dev/null | head -1 || true)
 if [ -z "$PORT_ID" ]; then
   WARN "No server port found; skipping FIP attach"
+  step_done "SKIPPED"
 else
+  step_progress "Creating or finding floating IP..."
   FIP_JSON=$(openstack floating ip create PUBLICNET -f json 2>/dev/null || true)
   FIP_ID=$(printf '%s' "$FIP_JSON" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("id",""))' 2>/dev/null || true)
   FIP=$(printf '%s' "$FIP_JSON" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("floating_ip_address",""))' 2>/dev/null || true)
@@ -1113,7 +1191,9 @@ else
   fi
   if [ -z "$FIP_ID" ]; then
     WARN "No available floating IPs"
+    step_done "SKIPPED"
   else
+    step_progress "Assigning FIP $FIP to port $PORT_ID..."
     openstack floating ip set --port "$PORT_ID" "$FIP_ID" 2>/dev/null || true
     sleep 3
     # Verify
@@ -1122,23 +1202,29 @@ else
     if [ -n "$ACTUAL_FIP" ] && [ -n "$FIXED_IP" ] && [ "$FIXED_IP" != "None" ]; then
       PASS "Floating IP: $ACTUAL_FIP"
       INFO "RDP: mstsc /v:$ACTUAL_FIP"
+      step_done "OK"
     else
       WARN "FIP assignment may have failed"
+      step_done "DONE"
     fi
   fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Done
+# Workflow Complete
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════════"
-log "=== DONE ==="
-echo "  Server:   $LABEL"
-echo "  Image:    $FLEX_IMG_ID"
-echo "  VM:       $VM_ID ($VM_STATUS)"
-echo "  RDP:      mstsc /v:${ACTUAL_FIP:-unknown}"
-echo "  Download: ${DOWNLOAD_METHOD:-unknown} (Step 2: OSPC Glance → jumphost)"
+echo "╔════════════════════════════════════════════════════════════════════════════╗"
+echo "║                     MIGRATION WORKFLOW COMPLETE                            ║"
+echo "╚════════════════════════════════════════════════════════════════════════════╝"
+echo ""
+echo "  Server:       $LABEL"
+echo "  Image ID:     $FLEX_IMG_ID"
+echo "  VM ID:        $VM_ID ($VM_STATUS)"
+echo "  Floating IP:  ${ACTUAL_FIP:-not assigned}"
+echo "  RDP Connect:  mstsc /v:${ACTUAL_FIP:-unknown}"
+echo "  Download:     ${DOWNLOAD_METHOD:-unknown} (Step 2)"
+echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 # Cleanup OSPC snapshot
