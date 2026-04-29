@@ -39,6 +39,7 @@
 - [Why This Tool Exists](#why-this-tool-exists)
 - [Architecture](#architecture)
 - [Full-Cycle Migration Phases](#full-cycle-migration-phases-mission-control-narrative)
+- [Current Status](#current-status)
 - [Full Stage Breakdown](#full-stage-breakdown)
   - [Stage 0 — Customer Migration Tracker](#stage-0--customer-migration-tracker)
   - [Stage 1 — Discovery & Assessment](#stage-1--discovery--assessment)
@@ -109,6 +110,18 @@ CloudJumper works as a full-cycle migration Mission Control. Each phase turns un
 | 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, IAC DR backup/restore packs, and AI context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
 
 **How this maps to the dashboard UI:** The shell uses **Customer List** (tracker) plus **Stages 1–8** in the top bar: Discovery (1), Migration (2), Validation & UAT (3), Cutover (4), Post-Migration bundle (5), TCO/FinOps (6), **IAC DR Backup and Restore** (7), **AI Anywhere** (8). Narrative phases **3–6** appear primarily under **Stage 2 (Migration)** and its subtabs; **7–8** align with post-migration handoff (FinOps, tenant DR/IaC with GitOps hooks, AI). **OpenCenter** is not a separate Mission Control stage; OpenCenter-style GitOps restore prep lives under **IAC DR** Option B, and Kubernetes migration still exposes OpenCenter/Genestack under **Stage 2** where applicable.
+
+---
+
+## Current Status
+
+| Category | Details | Current Status |
+|---|---|---|
+| Workflow Stages | Stage 0: Customer Migration Tracker (Backlog management)<br>Stage 1: Discovery & Assessment (OSPC/FLEX scanning & topology import)<br>Stage 2: Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)<br>Stage 3: Validation & UAT (Automated cross-cloud checks & HTTP health tests)<br>Stage 4: Cutover & Handover (Traffic split, DB promotion, final sync)<br>Stage 5: Post-Migration (Stability tracking, artifact bundle generation)<br>Stage 6: TCO / FinOps<br>Stage 7: IAC DR Backup and Restore<br>Stage 8: AI Anywhere | Stage 2 VM REHOST: **ready**<br>Windows VM migration: **under Test**<br>Remaining stages: **underconstruction** |
+| Current Features | - Single-Tab Mission Control: No CLI required, full GUI wrapper<br>- Live Execution: Real-time logs streaming to browser<br>- Visual Topology Designer: Drag-and-drop infra cloning<br>- Offline Guest Repair: Pre-boot image patching for networks<br>- Parallel Execution: Migrate multiple DBs/Servers simultaneously<br>- Kubernetes Portability: Auto-replication via Genestack/OpenCenter<br>- No Database Required: Stateless backend (CSV + local browser storage) | **underconstruction** |
+| Available Migration Methods | 1. Direct Shift & Lift (Images):<br>- Production Mode (Live SSH-pipe disk without snapshot)<br>- External Offload (Glance snapshot via Jump Host)<br>- Direct Export (Direct read of live disk on Jump Host)<br><br>2. REHOST (Apps & Servers):<br>- OSPC Infra Duplication on FLEX (using Brian's osflex tool)<br>- Full Clone (13-layer sync: Users, Packages, Code, Cron, etc.)<br>- Quick Install (Package-only mirror)<br><br>3. Database Replication:<br>- Standard VM (Dump & Restore)<br>- DBaaS Streaming (Direct memory pipe without local disk)<br>- DBaaS + Replica / HA (GTID streaming & auto-pairing)<br><br>4. Kubernetes Migration:<br>- Genestack / Kubespray (Ansible-driven)<br>- OpenCenter (GitOps / FluxCD)<br>- OSPC K8 to Flex Magnum (8-stage SSH export & transform) | REHOST VM migration: **ready**<br>Windows VM migration: **under Test**<br>Other methods: **underconstruction** |
+| Supported OS Types | - Ubuntu (20.04, 22.04, 24.04)<br>- Debian (10, 11, 12)<br>- CentOS 7<br>- RedHat 6<br>- RedHat 8<br>- Rocky Linux 8 / 9<br>- AlmaLinux 8 / 9<br>- Windows Server 2016 / 2019 (via Glance snapshot + VirtIO injection) | Linux VM rehost set: **ready**<br>Windows VM set: **under Test** |
+| Future / Upcoming | Stage 6 (TCO/FinOps): Right-sizing and executive cost summaries<br>Stage 7 (IAC DR backup and restore): Terraform-first restore, GitOps hooks<br>Stage 8 (AI Anywhere): AI auto-repair plans and risk-scoring | **underconstruction** |
 
 ---
 
