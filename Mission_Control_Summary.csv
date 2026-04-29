@@ -11,7 +11,7 @@ Stage 8: GitOps / OpenCenter
 Stage 9: AI OPS","Stage 2 VM shift and lift: ready
 Server and DB rehost: ready
 Windows VM migration: WIP
-K8 migration: under construction"
+Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build"
 "Current Features (✅ Ready)","Single-Tab Mission Control: No CLI required, full GUI wrapper
 Live Execution: Real-time logs streaming to browser
 Visual Topology Designer: Drag-and-drop infra cloning
@@ -26,7 +26,7 @@ Database Replication: Dump & Restore, DBaaS Streaming, HA Replica
 
 Kubernetes Migration: Genestack/Kubespray, OpenCenter (GitOps), Magnum export","All Shift and rehost READY
 Windows VM migration: under Test
-k8: under construction"
+Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build"
 "Supported OS Types","Ubuntu (20.04, 22.04, 24.04)
 Debian (10, 11, 12)
 CentOS 7

@@ -38,7 +38,8 @@
         <li><b>Stage 2 VM shift and lift:</b> ready</li>
         <li><b>Server and DB rehost:</b> ready</li>
         <li><b>Windows VM migration:</b> WIP</li>
-        <li><b>K8 migration:</b> under construction</li>
+        <li><b>Stage 3 to 5:</b> under construction</li>
+        <li><b>Stage 6 to 9:</b> to be validated and build</li>
       </ul>
     </td>
   </tr>
@@ -91,7 +92,8 @@
       <ul>
         <li><b>All Shift and rehost:</b> READY</li>
         <li><b>Windows VM migration:</b> under Test</li>
-        <li><b>k8:</b> under construction</li>
+        <li><b>Stage 3 to 5:</b> under construction</li>
+        <li><b>Stage 6 to 9:</b> to be validated and build</li>
       </ul>
     </td>
   </tr>
