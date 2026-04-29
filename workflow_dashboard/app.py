@@ -23,8 +23,6 @@ from werkzeug.utils import secure_filename
 BASE_DIR = Path(__file__).resolve().parents[1]
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
-VOICE_PREFS_FILE = UPLOAD_DIR / "voice_prefs.json"
-DEFAULT_VOICE_PREFS = {"enabled": True, "gender": "male"}
 TARGET_PROFILE_DIR = UPLOAD_DIR / "tenant_iac_dr_profiles"
 TARGET_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 FLAVOR_UPLOAD_DIR = UPLOAD_DIR / "flavors"
@@ -143,79 +141,6 @@ def list_workspace_files() -> List[str]:
         if p.is_file() and p.suffix.lower() in {".csv", ".sh", ".txt", ".log"}:
             out.append(f"uploads/{p.name}")
     return sorted(out)
-
-
-def _load_voice_prefs() -> Dict[str, Any]:
-    prefs = dict(DEFAULT_VOICE_PREFS)
-    try:
-        if VOICE_PREFS_FILE.exists():
-            raw = json.loads(VOICE_PREFS_FILE.read_text(encoding="utf-8"))
-            if isinstance(raw, dict):
-                prefs["enabled"] = bool(raw.get("enabled", prefs["enabled"]))
-                gender = str(raw.get("gender", prefs["gender"])).strip().lower()
-                prefs["gender"] = gender if gender in {"male", "female"} else "male"
-    except Exception:
-        pass
-    return prefs
-
-
-def _save_voice_prefs(enabled: bool, gender: str) -> Dict[str, Any]:
-    payload = {
-        "enabled": bool(enabled),
-        "gender": (gender or "male").strip().lower() if isinstance(gender, str) else "male",
-    }
-    if payload["gender"] not in {"male", "female"}:
-        payload["gender"] = "male"
-    VOICE_PREFS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    VOICE_PREFS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return payload
-
-
-@app.get("/api/preferences/voice")
-def get_voice_preferences():
-    return jsonify({"ok": True, "prefs": _load_voice_prefs()})
-
-
-@app.post("/api/preferences/voice")
-def set_voice_preferences():
-    data = request.json or {}
-    enabled = bool(data.get("enabled", True))
-    gender = str(data.get("gender", "male"))
-    prefs = _save_voice_prefs(enabled=enabled, gender=gender)
-    return jsonify({"ok": True, "prefs": prefs})
-
-
-@app.post("/api/announce")
-def announce_text():
-    data = request.json or {}
-    text = str(data.get("text") or "").strip()
-    if not text:
-        return jsonify({"ok": False, "error": "missing text"}), 400
-
-    prefs = _load_voice_prefs()
-    enabled = bool(data.get("enabled", prefs.get("enabled", True)))
-    gender = str(data.get("gender", prefs.get("gender", "male"))).strip().lower()
-    if gender not in {"male", "female"}:
-        gender = "male"
-
-    if not enabled:
-        return jsonify({"ok": True, "status": "skipped", "reason": "voice_disabled"})
-
-    announce_script = BASE_DIR / "announce.py"
-    if not announce_script.exists():
-        return jsonify({"ok": False, "error": "announce script not found"}), 404
-
-    try:
-        subprocess.Popen(
-            ["python3", str(announce_script), "--voice", gender, text],
-            cwd=str(BASE_DIR),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception as exc:
-        return jsonify({"ok": False, "error": f"announce launch failed: {exc}"}), 500
-
-    return jsonify({"ok": True, "status": "launched", "voice": gender})
 
 
 def load_reference_data() -> Dict[str, Any]:
@@ -1029,18 +954,26 @@ def verify_keypairs_via_openstack(
 
 def parse_openrc_exports(text: str) -> Dict[str, str]:
     exports: Dict[str, str] = {}
-    for raw_line in (text or "").splitlines():
+    text = (text or "").lstrip("\ufeff")
+    for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
-        m = re.match(r"^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$", line)
-        if not m:
+        m = re.match(r"^export\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", line)
+        if m:
+            key = m.group(1).strip()
+            value = m.group(2).strip()
+            if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                value = value[1:-1]
+            exports[key] = value
             continue
-        key = m.group(1).strip()
-        value = m.group(2).strip()
-        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-            value = value[1:-1]
-        exports[key] = value
+        m2 = re.match(r"^(OS_[A-Z0-9_]+)\s*=\s*(.*)$", line)
+        if m2:
+            key = m2.group(1)
+            value = m2.group(2).strip()
+            if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+                value = value[1:-1]
+            exports[key] = value
     return exports
 
 

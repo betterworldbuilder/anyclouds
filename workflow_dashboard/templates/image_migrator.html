@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <style>
       @keyframes neonPulse {
@@ -1506,57 +1507,6 @@
                     </div>
 
                     <script>
-                    async function syncVoicePrefsToServer() {
-                        const voiceToggle = document.getElementById('enable_jarvis_voice');
-                        const genderToggle = document.getElementById('jarvis_voice_gender');
-                        if (!voiceToggle || !genderToggle) return;
-                        try {
-                            await fetch('/api/preferences/voice', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({
-                                    enabled: !!voiceToggle.checked,
-                                    gender: genderToggle.value || 'male'
-                                })
-                            });
-                        } catch (_) {}
-                    }
-
-                    async function loadVoicePrefsFromServer() {
-                        try {
-                            const resp = await fetch('/api/preferences/voice');
-                            const data = await resp.json();
-                            if (!data || !data.ok || !data.prefs) return;
-                            const voiceToggle = document.getElementById('enable_jarvis_voice');
-                            const genderToggle = document.getElementById('jarvis_voice_gender');
-                            if (voiceToggle && typeof data.prefs.enabled === 'boolean') {
-                                voiceToggle.checked = data.prefs.enabled;
-                                localStorage.setItem('mig_jarvis_voice', String(data.prefs.enabled));
-                            }
-                            if (genderToggle && data.prefs.gender) {
-                                genderToggle.value = data.prefs.gender;
-                                localStorage.setItem('mig_jarvis_gender', data.prefs.gender);
-                            }
-                        } catch (_) {}
-                    }
-
-                    async function backendAnnounce(text) {
-                        const voiceToggle = document.getElementById('enable_jarvis_voice');
-                        const genderToggle = document.getElementById('jarvis_voice_gender');
-                        if (!voiceToggle || !genderToggle || !voiceToggle.checked) return;
-                        try {
-                            await fetch('/api/announce', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({
-                                    text: text,
-                                    enabled: !!voiceToggle.checked,
-                                    gender: genderToggle.value || 'male'
-                                })
-                            });
-                        } catch (_) {}
-                    }
-
                     window.addEventListener('DOMContentLoaded', () => {
                         const voiceToggle = document.getElementById('enable_jarvis_voice');
                         if (voiceToggle && localStorage.getItem('mig_jarvis_voice') === 'false') {
@@ -1566,42 +1516,7 @@
                         if (genderToggle && localStorage.getItem('mig_jarvis_gender')) {
                             genderToggle.value = localStorage.getItem('mig_jarvis_gender');
                         }
-                        loadVoicePrefsFromServer();
                     });
-
-                    function jarvisAnnounce(text) {
-                        const voiceToggle = document.getElementById('enable_jarvis_voice');
-                        if (!voiceToggle || !voiceToggle.checked) return;
-                        if (!('speechSynthesis' in window)) return;
-
-                        window.speechSynthesis.cancel();
-                        const msg = new SpeechSynthesisUtterance(text);
-
-                        function setVoiceAndSpeak() {
-                            const gender = document.getElementById('jarvis_voice_gender').value;
-                            const voices = window.speechSynthesis.getVoices();
-                            let preferred;
-
-                            if (gender === 'female') {
-                                preferred = voices.find(v => v.name.includes('Google UK English Female') || v.name.includes('Hazel') || v.name.includes('Serena') || v.name.includes('Fiona') || v.name.includes('Susan') || (v.lang === 'en-GB' && v.name.includes('Female')));
-                            } else {
-                                preferred = voices.find(v => v.name.includes('Google UK English Male') || v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('Arthur') || (v.lang === 'en-GB' && v.name.includes('Male')));
-                            }
-
-                            if (!preferred) preferred = voices.find(v => v.lang === 'en-GB') || voices[0];
-                            if (preferred) msg.voice = preferred;
-
-                            msg.rate = 1.0;
-                            msg.pitch = gender === 'female' ? 1.15 : 0.95;
-                            window.speechSynthesis.speak(msg);
-                        }
-
-                        if (window.speechSynthesis.getVoices().length === 0) {
-                            window.speechSynthesis.addEventListener('voiceschanged', setVoiceAndSpeak, {once: true});
-                        } else {
-                            setVoiceAndSpeak();
-                        }
-                    }
                     </script>
 
             <!-- NBD INLINE REPAIR PANEL -->
@@ -2207,14 +2122,14 @@
                     <!-- 🎙️ Jarvis Audio Alerts (moved here so it sits directly above the batch-action buttons) -->
                     <div style="margin: 0 auto 16px auto; padding: 10px 18px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: fit-content;">
                         <label style="color:#c4b5fd; font-size:0.9rem; font-weight:600; display:flex; align-items:center; gap:10px; cursor:pointer;">
-                            <input type="checkbox" id="enable_jarvis_voice" checked style="width:16px; height:16px; accent-color:#8b5cf6; cursor:pointer;" onchange="localStorage.setItem('mig_jarvis_voice', this.checked); syncVoicePrefsToServer();">
+                            <input type="checkbox" id="enable_jarvis_voice" checked style="width:16px; height:16px; accent-color:#8b5cf6; cursor:pointer;" onchange="localStorage.setItem('mig_jarvis_voice', this.checked);">
                             🎙️ Jarvis Pipeline Audio Alerts
                         </label>
-                        <select id="jarvis_voice_gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;cursor:pointer;" onchange="localStorage.setItem('mig_jarvis_gender', this.value); syncVoicePrefsToServer();">
+                        <select id="jarvis_voice_gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;cursor:pointer;" onchange="localStorage.setItem('mig_jarvis_gender', this.value)">
                             <option value="female">British Female Voice</option>
                             <option value="male">British Male Voice</option>
                         </select>
-                        <button type="button" onclick="jarvisAnnounce('Audio sub-systems on-line and standing by.'); backendAnnounce('Audio sub-systems on-line and standing by.');" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.75rem; padding:3px 10px; border-radius:4px; cursor:pointer; transition:0.2s;">Test Voice</button>
+                        <button type="button" onclick="jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.75rem; padding:3px 10px; border-radius:4px; cursor:pointer; transition:0.2s;">Test Voice</button>
                     </div>
 
                     <!-- Max Concurrent Jobs — below voice block -->
@@ -5898,11 +5813,7 @@
 
             if (typeof jarvisAnnounce === 'function') {
                 jarvisAnnounce(speakText);
-            } else if ('speechSynthesis' in window) {
-                const msg = new SpeechSynthesisUtterance(speakText);
-                window.speechSynthesis.speak(msg);
             }
-            backendAnnounce(speakText);
         }
 
         function parseRemoteLine(raw, vmName) {
