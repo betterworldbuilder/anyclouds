@@ -3315,6 +3315,7 @@ def generate_migration_output_bundle():
                     "tenant-iac-dr/runbooks/dr-same-region.md",
                     "tenant-iac-dr/runbooks/dr-cross-region.md",
                     "tenant-iac-dr/restore-validation-checklist.yaml",
+                    "tenant-iac-dr/dr/BACKUP_SCOPE.md",
                 ],
             },
             "stage9_ai_anywhere": {
@@ -3810,6 +3811,11 @@ def generate_migration_output_bundle():
             "rollback_plan_verified",
         ],
     }) + "\n")
+    (bundle_root / "tenant-iac-dr" / "dr").mkdir(parents=True, exist_ok=True)
+    _write_text(
+        bundle_root / "tenant-iac-dr" / "dr" / "BACKUP_SCOPE.md",
+        _tenant_backup_scope_markdown(safe_customer, stamp),
+    )
     _write_text(bundle_root / "tenant-iac-dr" / "terraform" / "README.md", "\n".join([
         "# Tenant IaC DR Terraform Pack",
         "",
@@ -4001,6 +4007,186 @@ def generate_migration_output_bundle():
     })
 
 
+def _tenant_backup_scope_markdown(customer: str, stamp: str) -> str:
+    """Human-readable scope for GitOps backup / restore (tenant Flex layer)."""
+    return "\n".join(
+        [
+            f"# Tenant Flex backup and restore scope",
+            "",
+            f"- **Customer (sanitized):** `{customer}`",
+            f"- **Bundle stamp:** `{stamp}`",
+            "",
+            "## What we back up",
+            "",
+            "We capture **tenant-owned infrastructure metadata and IaC-shaped desired state** from the Flex/OpenStack project (via migration/discovery outputs and the Tenant IaC DR pack), not the provider control plane:",
+            "",
+            "- **Compute:** instance definitions (flavor, image, networks, metadata, attachments)—not live RAM, CPU, or process state.",
+            "- **Networking:** tenant networks, subnets, routers, floating IPs, security group rules **as modeled** in discovery and Terraform variables.",
+            "- **Storage:** volume **inventory** (size, type, attachment)—not **volume contents** unless you use snapshots or a separate backup product.",
+            "- **Load balancers, DNS, and similar** when they appear in captured inventories and tfvars.",
+            "- **Whole migration bundle slice:** `tenant-iac-dr/` (Terraform envs, Ansible snippets, region maps, runbooks), plus linked artifacts such as `discovery-output/`, `terraform.tfvars.json`, and `migration_manifest.json` when present.",
+            "",
+            "## What restore recreates",
+            "",
+            "Restore means **reprovisioning** resources in a **target region or cloud** using Terraform, runbooks, and optionally OpenCenter orchestration:",
+            "",
+            "- **New** VMs from mapped images/flavors, with networks and security groups as declared.",
+            "- Tenant networks, routers, and FIPs **as the IaC and APIs allow** in the target (IDs and addresses may differ).",
+            "- Volume **shells** from IaC after you restore data from snapshots or backup where applicable.",
+            "",
+            "## What this pack does *not* backup or restore by itself",
+            "",
+            "- **Rackspace/shared control plane** or anything outside the tenant project.",
+            "- **Secrets** (passwords, application keys); keep them in vault or OpenRC—do not commit secrets to Git.",
+            "- **Ephemeral runtime:** caches, in-memory state, live queues.",
+            "- **Application and file data** inside VMs, databases, and object storage **bytes**—use native DB backup, volume snapshots, object replication, or customer backup tooling aligned with `backup-policy.yaml`.",
+            "- **Global quotas, billing, org policies**, and **catalog guarantees** (if the target lacks an image or flavor, mapping must be fixed manually).",
+            "",
+            "Pair this GitOps baseline with **data** backup and restore runbooks for production DR.",
+            "",
+        ]
+    )
+
+
+def _resolve_migration_bundle_root(safe_customer: str, requested_stamp: str) -> Tuple[Path, str]:
+    customer_root = UPLOAD_DIR / "migration_output_bundles" / safe_customer
+    if not customer_root.exists():
+        raise FileNotFoundError("No bundles found for customer")
+    bundle_root: Optional[Path] = None
+    if requested_stamp:
+        candidate = customer_root / requested_stamp
+        if candidate.exists() and candidate.is_dir():
+            bundle_root = candidate
+        else:
+            raise FileNotFoundError(f"Bundle stamp not found: {requested_stamp}")
+    else:
+        candidates = sorted([p for p in customer_root.iterdir() if p.is_dir()], reverse=True)
+        bundle_root = candidates[0] if candidates else None
+    if not bundle_root:
+        raise FileNotFoundError("No bundle directory found")
+    return bundle_root, bundle_root.name
+
+
+def _gitops_repo_from_env() -> Optional[Path]:
+    raw = str(os.environ.get("GITOPS_REPO_PATH", "")).strip() or str(os.environ.get("IAC_BACKUP_GIT_REPO_PATH", "")).strip()
+    if not raw:
+        return None
+    return Path(raw).expanduser().resolve()
+
+
+def _copytree_replace(src: Path, dst: Path) -> None:
+    if not src.exists() or not src.is_dir():
+        return
+    if dst.exists():
+        _shutil.rmtree(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    _shutil.copytree(src, dst)
+
+
+def _sync_gitops_customer_stamp(repo_path: Path, bundle_root: Path, safe_customer: str, stamp: str) -> Dict[str, Any]:
+    """Mirror bundle artifacts into a GitOps repo under customers/<customer>/bundles/<stamp>/."""
+    cust_root = repo_path / "customers" / safe_customer
+    stamp_dir = cust_root / "bundles" / stamp
+    stamp_dir.mkdir(parents=True, exist_ok=True)
+    rel_paths: List[str] = []
+
+    scope_md = _tenant_backup_scope_markdown(safe_customer, stamp)
+    (cust_root / "BACKUP_SCOPE.md").write_text(scope_md, encoding="utf-8")
+    (stamp_dir / "BACKUP_SCOPE.md").write_text(scope_md, encoding="utf-8")
+    rel_paths.append(str((stamp_dir / "BACKUP_SCOPE.md").relative_to(repo_path)))
+
+    for name in ("tenant-iac-dr", "discovery-output", "stage2-migration-output", "terraform", "opencenter"):
+        src = bundle_root / name
+        if src.is_dir():
+            dst = stamp_dir / name
+            _copytree_replace(src, dst)
+            rel_paths.append(str(dst.relative_to(repo_path)))
+
+    for fname in ("migration_manifest.json", "terraform.tfvars.json", "ansible_inventory.ini"):
+        src = bundle_root / fname
+        if src.is_file():
+            _shutil.copy2(src, stamp_dir / fname)
+            rel_paths.append(str((stamp_dir / fname).relative_to(repo_path)))
+
+    manifest = {
+        "customer": safe_customer,
+        "stamp": stamp,
+        "synced_at_utc": datetime.utcnow().isoformat() + "Z",
+        "paths": rel_paths,
+    }
+    man_path = stamp_dir / "gitops-backup-manifest.json"
+    man_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    rel_paths.append(str(man_path.relative_to(repo_path)))
+
+    (cust_root / "LATEST_STAMP.txt").write_text(stamp + "\n", encoding="utf-8")
+
+    ti = bundle_root / "tenant-iac-dr"
+    if ti.is_dir():
+        legacy = cust_root / "tenant-iac-dr"
+        _copytree_replace(ti, legacy)
+
+    return {
+        "customer": safe_customer,
+        "stamp": stamp,
+        "stamp_dir": str(stamp_dir),
+        "relative_paths": rel_paths,
+        "manifest_path": str(man_path),
+    }
+
+
+def _gitops_git_branch() -> str:
+    b = str(os.environ.get("GITOPS_BRANCH", "") or os.environ.get("IAC_BACKUP_GIT_BRANCH", "main")).strip()
+    return b or "main"
+
+
+def _git_commit_tag_push(
+    repo_path: Path,
+    add_paths: List[str],
+    message: str,
+    tag_name: str,
+    branch: str,
+    remote: str,
+    do_push: bool,
+) -> Dict[str, Any]:
+    out: Dict[str, Any] = {"branch": branch, "tag": tag_name, "push": None}
+    subprocess.run(["git", "-C", str(repo_path), "checkout", branch], check=False, capture_output=True, text=True)
+    for rel in add_paths:
+        subprocess.run(["git", "-C", str(repo_path), "add", rel], check=False, capture_output=True, text=True)
+    commit_proc = subprocess.run(
+        ["git", "-C", str(repo_path), "commit", "-m", message],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if commit_proc.returncode != 0:
+        out["commit"] = "skipped_or_failed"
+        out["commit_detail"] = (commit_proc.stderr or commit_proc.stdout or "").strip()[:1200]
+        return out
+    out["commit"] = "ok"
+    subprocess.run(["git", "-C", str(repo_path), "tag", "-f", tag_name], check=False, capture_output=True, text=True)
+    out["tag_applied"] = True
+    if do_push:
+        pb = subprocess.run(
+            ["git", "-C", str(repo_path), "push", remote, branch],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        pt = subprocess.run(
+            ["git", "-C", str(repo_path), "push", remote, tag_name, "--force"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        out["push"] = {
+            "branch_rc": pb.returncode,
+            "tag_rc": pt.returncode,
+            "branch_err": (pb.stderr or pb.stdout or "").strip()[:600],
+            "tag_err": (pt.stderr or pt.stdout or "").strip()[:600],
+        }
+    return out
+
+
 @app.get("/api/migration-output-bundle/download/<path:bundle_path>")
 def download_migration_output_bundle(bundle_path):
     root = (UPLOAD_DIR / "migration_output_bundles").resolve()
@@ -4020,24 +4206,11 @@ def export_tenant_iac_dr_backup():
     safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
     requested_stamp = str(data.get("stamp") or "").strip()
 
-    customer_root = (UPLOAD_DIR / "migration_output_bundles" / safe_customer)
-    if not customer_root.exists():
-        return jsonify({"ok": False, "error": "No bundles found for customer"}), 404
+    try:
+        bundle_root, stamp = _resolve_migration_bundle_root(safe_customer, requested_stamp)
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
 
-    bundle_root: Optional[Path] = None
-    if requested_stamp:
-        candidate = customer_root / requested_stamp
-        if candidate.exists() and candidate.is_dir():
-            bundle_root = candidate
-        else:
-            return jsonify({"ok": False, "error": f"Bundle stamp not found: {requested_stamp}"}), 404
-    else:
-        candidates = sorted([p for p in customer_root.iterdir() if p.is_dir()], reverse=True)
-        bundle_root = candidates[0] if candidates else None
-    if not bundle_root:
-        return jsonify({"ok": False, "error": "No bundle directory found"}), 404
-
-    stamp = bundle_root.name
     tenant_dir = bundle_root / "tenant-iac-dr"
     if not tenant_dir.exists():
         return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in selected bundle"}), 404
@@ -4051,11 +4224,10 @@ def export_tenant_iac_dr_backup():
     }
 
     # Git export (optional): mirror tenant-iac-dr into configured repo path.
-    git_repo_path = str(os.environ.get("IAC_BACKUP_GIT_REPO_PATH", "")).strip()
-    git_branch = str(os.environ.get("IAC_BACKUP_GIT_BRANCH", "main")).strip() or "main"
-    if git_repo_path:
+    repo_path = _gitops_repo_from_env()
+    git_branch = _gitops_git_branch()
+    if repo_path:
         summary["git"]["enabled"] = True
-        repo_path = Path(git_repo_path).expanduser().resolve()
         target_dir = repo_path / "customers" / safe_customer / "tenant-iac-dr"
         try:
             repo_path.mkdir(parents=True, exist_ok=True)
@@ -4352,6 +4524,188 @@ def generate_restore_plan():
         "translation_report": str(report_path),
         "restore_command": restore_cmd,
     })
+
+
+@app.post("/api/gitops/push-backup")
+def gitops_push_backup():
+    """Sync full tenant GitOps layout to GITOPS_REPO_PATH (or IAC_BACKUP_GIT_REPO_PATH), commit, tag, optional push."""
+    data = request.json or {}
+    customer = data.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    requested_stamp = str(data.get("stamp") or "").strip()
+    remote = str(data.get("remote") or os.environ.get("GITOPS_PUSH_REMOTE", "origin")).strip() or "origin"
+    env_push = str(os.environ.get("GITOPS_PUSH_AFTER_COMMIT", "")).strip().lower() in ("1", "true", "yes")
+    do_push = bool(data["push"]) if "push" in data else env_push
+
+    repo_path = _gitops_repo_from_env()
+    if not repo_path or not repo_path.is_dir():
+        return jsonify(
+            {"ok": False, "error": "Set GITOPS_REPO_PATH or IAC_BACKUP_GIT_REPO_PATH to an existing git working tree."}
+        ), 400
+    if not (repo_path / ".git").exists():
+        return jsonify({"ok": False, "error": "Configured path is not a git repository root (.git missing)."}), 400
+
+    try:
+        bundle_root, stamp = _resolve_migration_bundle_root(safe_customer, requested_stamp)
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    if not (bundle_root / "tenant-iac-dr").is_dir():
+        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in selected bundle"}), 404
+
+    try:
+        sync_info = _sync_gitops_customer_stamp(repo_path, bundle_root, safe_customer, stamp)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"GitOps sync failed: {exc}"}), 500
+
+    branch = _gitops_git_branch()
+    tag_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", f"gitops-{safe_customer}-{stamp}").strip("-") or f"gitops-{safe_customer}"
+    add_rel = f"customers/{safe_customer}"
+    message = f"GitOps tenant backup {safe_customer} bundle {stamp}"
+    git_result = _git_commit_tag_push(repo_path, [add_rel], message, tag_name, branch, remote, do_push)
+
+    return jsonify(
+        {
+            "ok": True,
+            "customer": safe_customer,
+            "stamp": stamp,
+            "sync": sync_info,
+            "git": git_result,
+        }
+    )
+
+
+@app.post("/api/gitops/restore-opencenter")
+def gitops_restore_opencenter():
+    """Emit OpenCenter-oriented restore scripts under tenant-iac-dr/gitops-restore/ (no secrets)."""
+    data = request.json or {}
+    customer = data.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    requested_stamp = str(data.get("stamp") or "").strip()
+    git_ref = str(data.get("git_ref") or "main").strip() or "main"
+    cluster_name = str(data.get("cluster_name") or "tenant-restore").strip() or "tenant-restore"
+    cluster_slug = re.sub(r"[^a-zA-Z0-9_.-]+", "-", cluster_name).strip("-").lower() or "tenant-restore"
+
+    try:
+        bundle_root, stamp = _resolve_migration_bundle_root(safe_customer, requested_stamp)
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+
+    tenant_dir = bundle_root / "tenant-iac-dr"
+    if not tenant_dir.is_dir():
+        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing"}), 404
+
+    profile_path = _target_profile_path(customer)
+    if not profile_path.exists():
+        return jsonify({"ok": False, "error": "Target cloud profile not configured"}), 400
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    target = profile.get("target", {}) if isinstance(profile, dict) else {}
+
+    restore_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    out_dir = tenant_dir / "gitops-restore" / restore_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    bundle_subpath = f"customers/{safe_customer}/bundles/{stamp}"
+    opencenter_bin = str(os.environ.get("OPENCENTER_CLI", "opencenter")).strip() or "opencenter"
+
+    context = {
+        "git_ref": git_ref,
+        "customer_sanitized": safe_customer,
+        "bundle_stamp": stamp,
+        "bundle_path_in_gitops_repo": bundle_subpath,
+        "cluster_name": cluster_slug,
+        "target": {
+            "provider": target.get("provider", ""),
+            "region": target.get("region", ""),
+            "auth_url": target.get("auth_url", ""),
+            "project_id": target.get("project_id", ""),
+            "domain": target.get("domain", ""),
+            "username": target.get("username", ""),
+        },
+        "generated_at_utc": datetime.utcnow().isoformat() + "Z",
+        "notes": [
+            "Do not commit secrets. Source an OpenRC or cloud credentials on the restore runner.",
+            "Align OpenCenter CLI flags with your Rackspace OpenCenter deployment; this script is a portable stub.",
+        ],
+    }
+    (out_dir / "opencenter-context.json").write_text(json.dumps(context, indent=2), encoding="utf-8")
+
+    readme = "\n".join(
+        [
+            "# OpenCenter restore prep",
+            "",
+            f"- Git ref to checkout in GitOps repo: `{git_ref}`",
+            f"- Customer folder: `{bundle_subpath}`",
+            f"- Cluster label: `{cluster_slug}`",
+            "",
+            "1. Clone the GitOps repo and `git checkout` the ref above.",
+            "2. `source` your **target** Flex/OpenStack OpenRC (credentials are not stored in this pack).",
+            "3. Run `opencenter-restore.sh` from this directory, or adapt commands to your site OpenCenter CLI.",
+            "4. Run Terraform from `tenant-iac-dr/terraform/envs/<target>/` after `Generate Restore Plan` in the dashboard.",
+            "",
+            "See `tenant-iac-dr/dr/BACKUP_SCOPE.md` for what is and is not covered by IaC-only restore.",
+            "",
+        ]
+    )
+    (out_dir / "README.md").write_text(readme, encoding="utf-8")
+
+    script = f"""#!/usr/bin/env bash
+# OpenCenter-oriented tenant restore stub — customize for your OpenCenter installation.
+set -euo pipefail
+GIT_REF={shlex.quote(git_ref)}
+CUSTOMER={shlex.quote(safe_customer)}
+STAMP={shlex.quote(stamp)}
+BUNDLE_SUBPATH={shlex.quote(bundle_subpath)}
+CLUSTER={shlex.quote(cluster_slug)}
+OPENCENTER={shlex.quote(opencenter_bin)}
+REPO_ROOT="${{GITOPS_REPO_ROOT:-$(pwd)}}"
+
+echo "==> Using repo root: $REPO_ROOT (set GITOPS_REPO_ROOT if wrong)"
+echo "==> Expect bundle at: $REPO_ROOT/$BUNDLE_SUBPATH"
+echo "==> Git ref: $GIT_REF"
+echo ""
+echo "1) git -C \"$REPO_ROOT\" fetch --tags && git -C \"$REPO_ROOT\" checkout \"$GIT_REF\""
+echo "2) source your target OpenRC (Flex/OpenStack)."
+echo "3) cd \"$REPO_ROOT/$BUNDLE_SUBPATH/tenant-iac-dr/terraform/envs\" && ls"
+echo "4) Pick the env overlay from Cloud Jumper (Generate Restore Plan), then:"
+echo "     terraform init && terraform plan"
+echo ""
+echo "OpenCenter hook (placeholder — replace with your org's CLI/API):"
+echo "  $OPENCENTER --help   # discover cluster/estate sync commands for your version"
+echo "  # Example intent: register cluster \"$CLUSTER\" and attach this bundle path as context."
+echo ""
+echo "Cluster name for operators: $CLUSTER"
+"""
+    sh_path = out_dir / "opencenter-restore.sh"
+    sh_path.write_text(script, encoding="utf-8")
+    try:
+        sh_path.chmod(sh_path.stat().st_mode | 0o111)
+    except Exception:
+        pass
+
+    ran = None
+    if str(os.environ.get("OPENCENTER_AUTO_RUN", "")).strip().lower() in ("1", "true", "yes"):
+        ran = subprocess.run(
+            [opencenter_bin, "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        ran = {"returncode": ran.returncode, "stdout_head": (ran.stdout or "")[:400]}
+
+    return jsonify(
+        {
+            "ok": True,
+            "restore_id": restore_id,
+            "out_dir": str(out_dir),
+            "files": {
+                "readme": str(out_dir / "README.md"),
+                "script": str(sh_path),
+                "context": str(out_dir / "opencenter-context.json"),
+            },
+            "opencenter_probe": ran,
+        }
+    )
 
 
 @app.get("/api/references/data")
