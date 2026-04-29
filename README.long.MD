@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Verification_Checks-14%2B-a855f7?style=flat-square" alt="Verification Checks">
   <img src="https://img.shields.io/badge/Live_Streaming-SSE-a855f7?style=flat-square" alt="SSE">
   <img src="https://img.shields.io/badge/No_DB-CSV_%2B_localStorage-3b82f6?style=flat-square" alt="No DB">
-  <img src="https://img.shields.io/badge/Tenant_IaC_DR-GitOps_OpenCenter-0ea5e9?style=flat-square" alt="Tenant DR">
+  <img src="https://img.shields.io/badge/IaC_DR_Backup_Restore-GitOps-0ea5e9?style=flat-square" alt="IAC DR">
   <img src="https://img.shields.io/badge/K8s_Migration_Methods-3-fb923c?style=flat-square" alt="K8s Methods">
   <img src="https://img.shields.io/badge/Magnum_Pipeline_Stages-8-ef4444?style=flat-square" alt="Magnum Stages">
 </p>
@@ -106,9 +106,9 @@ CloudJumper works as a full-cycle migration Mission Control. Each phase turns un
 | ☸️ | **6. Kubernetes Mig (WIP)** | Translates Magnum OSPC clusters or raw k8s nodes into modern FLEX Kubernetes deployment models. | Containerized workloads jump alongside legacy VMs. |
 | 🔬 | **7. UAT (Boot & Verify)** | Creates FLEX test instances, attaches access, checks ping/SSH, gathers host/kernel data, and streams logs. | Changes "the image uploaded" into "the workload is alive." |
 | ✂️ | **8. Cut Over** | Uses generated cutover and rollback scripts with final validation evidence to shift live traffic. | Gives the migration a controlled finish line instead of a nervous handoff. |
-| 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, OpenCenter context, Tenant IaC DR, and AI context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
+| 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, IAC DR backup/restore packs, and AI context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
 
-**How this maps to the dashboard UI:** The shell uses **Customer List** (tracker) plus **Stages 1–9** in the top bar: Discovery (1), Migration (2), Validation & UAT (3), Cutover (4), Post-Migration bundle (5), TCO/FinOps (6), OpenCenter (7), Tenant IaC DR Pack (8), AI Anywhere (9). Narrative phases **3–6** appear primarily under **Stage 2 (Migration)** and its subtabs; **7–9** align with UAT, cutover, and extended handoff tabs.
+**How this maps to the dashboard UI:** The shell uses **Customer List** (tracker) plus **Stages 1–8** in the top bar: Discovery (1), Migration (2), Validation & UAT (3), Cutover (4), Post-Migration bundle (5), TCO/FinOps (6), **IAC DR Backup and Restore** (7), **AI Anywhere** (8). Narrative phases **3–6** appear primarily under **Stage 2 (Migration)** and its subtabs; **7–8** align with post-migration handoff (FinOps, tenant DR/IaC with GitOps hooks, AI). **OpenCenter** is not a separate Mission Control stage; OpenCenter-style GitOps restore prep lives under **IAC DR** Option B, and Kubernetes migration still exposes OpenCenter/Genestack under **Stage 2** where applicable.
 
 ---
 
@@ -122,7 +122,7 @@ The restored Apollo-style README remains the base operator manual. These are the
 | **Linux Image Repair** | Uses per-OS offline repair for Ubuntu, Debian, AlmaLinux, Rocky, CentOS, and RHEL, including CentOS 7 legacy `ifcfg` / `network.service` handling. | Migrated images are repaired before first FLEX boot instead of being debugged VM by VM. |
 | **Windows Image Path** | Uses snapshot-based Glance migration plus offline VirtIO driver injection. | Windows workloads have a dedicated path instead of pretending they can use Linux NBD SSH streaming. |
 | **Cloud Files / Glance Bridge** | Falls back to Rackspace image export/import and Cloud Files paths when direct Glance transfer is unreliable. | Large image moves keep progressing even when a direct endpoint path fails. |
-| **GitOps Future Output** | Discovery, topology maps, repair profiles, validation reports, and rollback artifacts are structured for later Terraform, Ansible, OpenCenter, Tenant IaC DR Pack, and AI-agent workflows. | Migration output can become durable customer infrastructure-as-code rather than one-time scripts. |
+| **GitOps Future Output** | Discovery, topology maps, repair profiles, validation reports, and rollback artifacts are structured for later Terraform, Ansible, IAC DR / GitOps workflows, and AI-agent automation. | Migration output can become durable customer infrastructure-as-code rather than one-time scripts. |
 
 ---
 
@@ -1020,30 +1020,20 @@ Generated files:
 - `finops/tco-summary.csv`
 - `finops/rightsize-candidates.json`
 
-### Stage 7 — OpenCenter Integration
+### Stage 7 — IAC DR Backup and Restore (Mission Control)
 
-OpenCenter consumes the Migration Output Bundle as the Day-2 operating cockpit.
+This stage captures tenant-owned infrastructure as Terraform-first restore artifacts, validates required upstream evidence, prepares cross-region/cross-cloud overlays, and exposes **GitOps integration** (repo push, OpenCenter-oriented restore prep under Option B). The migration output bundle may still include an optional `opencenter/` directory for Day-2 stubs when generated—there is **no separate OpenCenter tab** in the shell.
 
-| OpenCenter lane | What Cloud Jumper provides |
+| IAC DR lane | What Cloud Jumper provides |
 |---|---|
-| Day-2 platform view | Customer, apps, VMs, images, networks, validation state, and cutover status |
-| K8s/OpenStack operations | FLEX/OpenStack and Kubernetes context from migrated estate facts |
-| GitOps workflows | Structured bundle files ready for repo import, review, and automation gates |
-| Observability/runbooks | Boot evidence, repair history, validation results, rollback notes, and day-2 tasks |
-
-### Stage 8 — Tenant IaC DR Pack
-
-Stage 8 captures tenant-owned infrastructure as Terraform-first restore artifacts, validates required upstream evidence, and prepares cross-region/cross-cloud overlays.
-
-| Tenant IaC DR lane | What Cloud Jumper provides |
-|---|---|
-| Stage 8 readiness preflight | Required checks for target inventory, migration results, boot/UAT evidence, and Terraform region values |
+| Stage 7 readiness preflight | Required checks for target inventory, migration results, boot/UAT evidence, and Terraform region values |
 | Target cloud credential profile | Source/target credential capture, OpenRC import, provider selection (FLEX/OpenStack), and target region settings |
 | Terraform-first restore pack | `tenant-iac-dr/terraform/envs/default/terraform.tfvars.json`, generated target env overlays, and translation reports |
 | Backup and export | Export IaC pack to configured Git backup repo path and/or S3-compatible object storage |
+| GitOps / restore hooks | Push backup to configured GitOps tree; prepare OpenCenter-oriented restore scripts under `tenant-iac-dr/gitops-restore/` when using Option B |
 | Runbooks and validation | Same-region and cross-region restore runbooks plus restore validation checklist |
 
-### Stage 9 — AI Anywhere Integration
+### Stage 8 — AI Anywhere Integration
 
 AI Anywhere consumes the complete chain as a private AI context pack.
 
@@ -1051,7 +1041,7 @@ AI Anywhere consumes the complete chain as a private AI context pack.
 |---|---|
 | CloudJumper output | `migration_manifest.json`, `terraform.tfvars.json`, `ansible_inventory.ini`, repaired image metadata, boot/test results, dependency graph |
 | TCO / FinOps output | TCO report, cost summary CSV, right-sizing candidates |
-| OpenCenter output | Estate map, Day-2 runbook, observability context, GitOps workflows |
+| Optional bundle slices | When present: `opencenter/` estate map, runbook, observability, GitOps workflow stubs alongside `tenant-iac-dr/` |
 | Tenant IaC DR output | Tenant IaC DR pack, restore scope, backup policy, region map, target overlays, runbooks, and preflight/live-state reports |
 | Optional raw evidence | Migration logs, repair logs, UAT logs, telemetry samples |
 
@@ -1061,7 +1051,7 @@ AI Anywhere consumes the complete chain as a private AI context pack.
 | `rightsize-recommendations.json` | Recommends safer FLEX flavor and capacity changes |
 | `autorepair-plan.yaml` | Proposes boot/network/service repair actions with rollback notes |
 | `terraform-patch-suggestions.json` | Suggests infrastructure-as-code changes from validated migration facts |
-| `runbook-improvements.yaml` | Improves OpenCenter Day-2 runbooks from observed migration behavior |
+| `runbook-improvements.yaml` | Improves Day-2 runbooks from observed migration behavior |
 | `dr-restore-improvements.yaml` | Suggests DR and restore process improvements from workload and platform facts |
 
 ### What Next — Mission Control To GitOps
@@ -1076,9 +1066,7 @@ Migration Output Bundle
         |
         +--> TCO / FinOps: baseline, run-rate, right-size, report
         |
-        +--> OpenCenter: operate, observe, runbook, GitOps
-        |
-        +--> Tenant IaC DR Pack: restore scope, preflight, target profiles, backup export
+        +--> IAC DR Backup and Restore: restore scope, preflight, target profiles, GitOps backup/export, optional OpenCenter prep
         |
         +--> AI Anywhere: repair, risk, right-size, patch, optimize
         |

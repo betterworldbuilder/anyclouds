@@ -280,6 +280,25 @@
     }
     .sub-btn.active { background: var(--primary); border-color: #8ea2cc; }
 
+    .dr-restore-tab {
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      background: rgba(15, 23, 42, 0.65);
+      color: #cbd5e1;
+      padding: 10px 16px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: -2px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .dr-restore-tab.active {
+      background: rgba(30, 58, 138, 0.5);
+      border-bottom-color: transparent;
+      color: #f1f5f9;
+      box-shadow: 0 -2px 14px rgba(59, 130, 246, 0.18);
+    }
+
     /* Panel area */
     .panel-area { overflow: visible; position: relative; }
     .panel { display: none; width: 100%; height: auto; min-height: calc(100vh - 260px); }
@@ -379,9 +398,8 @@
   <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
   <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
   <button class="stage-btn" data-stage="s7">STAGE 6<br><small>TCO / FinOps</small></button>
-  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>OpenCenter</small></button>
-  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>Tenant IaC DR Pack</small></button>
-  <button class="stage-btn" data-stage="s10">STAGE 9<br><small>AI Anywhere</small></button>
+  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>IAC DR Backup and Restore</small></button>
+  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>AI Anywhere</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -2087,7 +2105,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <div>
             <div style="color:#7dd3fc; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Cloud Jumper Mission Artifact</div>
             <h3 style="margin:7px 0 8px; color:#e0f2fe; font-family:'Orbitron',sans-serif; letter-spacing:1px;">📦 Migration Output Bundle</h3>
-            <p style="margin:0; color:#94a3b8; font-size:13px; max-width:760px;">Creates downloadable files for GitOps, OpenCenter, Tenant IaC DR, Terraform, Ansible, repair evidence, boot tests, and dependency graph handoff.</p>
+            <p style="margin:0; color:#94a3b8; font-size:13px; max-width:760px;">Creates downloadable files for GitOps, IAC DR backup/restore, Terraform, Ansible, repair evidence, boot tests, and dependency graph handoff.</p>
           </div>
           <button type="button" onclick="generateMigrationOutputBundle()" style="background:linear-gradient(135deg,#0ea5e9,#2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 16px; border-radius:7px; cursor:pointer; font-weight:800; box-shadow:0 0 14px rgba(56,189,248,.35);">Generate Bundle</button>
         </div>
@@ -2188,36 +2206,27 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
       <div style="background:rgba(15,23,42,.72); border:1px solid rgba(245,158,11,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
         <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">FinOps chain position</div>
-        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → OpenCenter operations → Tenant IaC DR pack → AI Anywhere optimization loop</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → IAC DR backup and restore → AI Anywhere optimization loop</div>
       </div>
     </div>
   </div>
 
-  <!-- STAGE 7 · OpenCenter Integration -->
+  <!-- STAGE 7 · IAC DR Backup and Restore -->
   <div class="panel" id="panel-s8">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
-      <div style="background:radial-gradient(circle at top left, rgba(34,197,94,.18), rgba(2,6,23,.9)); border:1px solid rgba(34,197,94,.35); border-radius:12px; padding:24px;">
-        <div style="color:#86efac; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
-        <h2 style="margin:8px 0 10px; color:#dcfce7; font-family:'Orbitron',sans-serif;">OpenCenter Integration</h2>
-        <p style="color:#94a3b8; margin:0; max-width:920px;">OpenCenter consumes the Migration Output Bundle as the Day-2 operating view for the migrated customer estate.</p>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Day-2 Platform View</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Customer, apps, VMs, networks, images, test status, and cutover state.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">K8s/OpenStack Operations</h3><p style="margin:0; color:#94a3b8; font-size:13px;">FLEX OpenStack and Kubernetes workload context from the final bundle.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #a78bfa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#c4b5fd;">GitOps Workflows</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Push output bundle facts into repeatable repo workflows and review gates.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Observability / Runbooks</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Attach validation evidence, day-2 tasks, monitoring notes, and rollback history.</p></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- STAGE 8 · Tenant IaC DR Pack -->
-  <div class="panel" id="panel-s9">
-    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
-        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
-        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">Tenant IaC DR Pack</h2>
+        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">IAC DR Backup and Restore</h2>
         <p style="color:#94a3b8; margin:0; max-width:920px;">Capture the migrated tenant as Terraform-first desired state with backup policies and executable restore runbooks for same-region rebuild or cross-region redeploy.</p>
+      </div>
+
+      <div style="background:rgba(15,23,42,.88); border:1px solid rgba(45,212,191,.42); border-radius:10px; padding:16px 18px;">
+        <div style="color:#5eead4; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">GitOps integration</div>
+        <p style="color:#94a3b8; font-size:13px; margin:8px 0 0; line-height:1.65; max-width:960px;">Wire this stage to your control plane: <code style="color:#7dd3fc;">/api/gitops/push-backup</code> mirrors <code style="color:#7dd3fc;">tenant-iac-dr/</code> into <code style="color:#7dd3fc;">GITOPS_REPO_PATH</code> or <code style="color:#7dd3fc;">IAC_BACKUP_GIT_REPO_PATH</code>; <code style="color:#7dd3fc;">/api/gitops/restore-opencenter</code> writes OpenCenter-oriented restore stubs under <code style="color:#7dd3fc;">tenant-iac-dr/gitops-restore/</code>. Use <strong style="color:#e2e8f0;">Option B — OpenCenter + GitOps</strong> below for commit, tag, and optional remote push so FluxCD, Argo CD, or CI gates can reconcile the pack.</p>
+        <ul style="color:#94a3b8; font-size:12px; margin:10px 0 0; padding-left:18px; line-height:1.55;">
+          <li>Optional <code style="color:#7dd3fc;">GITOPS_PUSH_AFTER_COMMIT=true</code> after local commit</li>
+          <li>Output bundle may still include optional <code style="color:#7dd3fc;">opencenter/</code> stubs for Day-2 tooling when generated</li>
+        </ul>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
@@ -2227,7 +2236,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cloud Components / Versioning</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Track image, service, Kubernetes, and OpenStack component versions for repeatable rebuilds.</p></div>
       </div>
       <div id="tenant-iac-dr-preflight-status" style="margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.24); color:#94a3b8; font-size:12px;">
-        Stage 8 readiness appears after generating a migration output bundle.
+        Stage 7 readiness appears after generating a migration output bundle.
       </div>
       <div style="margin-top:14px; padding:16px; background:rgba(2,6,23,.72); border:1px solid rgba(96,165,250,.35); border-radius:10px;">
         <div style="color:#bfdbfe; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Target Cloud Credentials</div>
@@ -2244,13 +2253,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <div style="background:rgba(0,0,0,.25); border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
             <h4 style="margin:0 0 8px; color:#cbd5e1;">Target Cloud (Flex/OpenStack)</h4>
             <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Provider
-              <select id="dr_target_provider" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+              <select id="dr_target_provider" onchange="updateDrRestoreUi()" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
                 <option value="flex">FLEX</option>
                 <option value="openstack">OpenStack</option>
               </select>
             </label>
             <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Auth URL
-              <input id="dr_target_auth_url" type="text" placeholder="https://keystone.api.<region>.rackspacecloud.com/v3/" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+              <input id="dr_target_auth_url" type="text" placeholder="https://keystone.api.<region>.rackspacecloud.com/v3/" oninput="updateDrRestoreUi()" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
             </label>
             <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Username
               <input id="dr_target_username" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
@@ -2265,7 +2274,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <input id="dr_target_domain" type="text" value="rackspace_cloud_domain" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
             </label>
             <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px; margin-top:8px;">Target Region
-              <input id="dr_target_region" type="text" placeholder="IAD / DFW / custom" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
+              <input id="dr_target_region" type="text" placeholder="IAD / DFW / custom" oninput="updateDrRestoreUi()" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
             </label>
           </div>
         </div>
@@ -2281,65 +2290,59 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
       <div style="margin-top:16px; padding:18px; background:rgba(15,23,42,.85); border:1px solid rgba(99,102,241,.35); border-radius:12px;">
         <div style="color:#a5b4fc; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Cross-region / cross-cloud restore</div>
-        <p style="color:#94a3b8; font-size:13px; margin:10px 0 14px; max-width:980px; line-height:1.55;">
+        <p style="color:#94a3b8; font-size:13px; margin:10px 0 12px; max-width:980px; line-height:1.55;">
           <span style="color:#cbd5e1;">Backup scope (both paths):</span> tenant-project metadata and IaC—VM/network/SG/volume <em>definitions</em>, not app binaries or DB row data. Full detail: <code style="color:#7dd3fc;">tenant-iac-dr/dr/BACKUP_SCOPE.md</code>.
-          <span style="color:#cbd5e1;">Choose the path</span> that matches <em>what</em> you are rebuilding; use radios to mark intent for operators (optional).
+          Pick one tab below; <strong style="color:#e2e8f0;">Start Restoration</strong> runs the primary action once readiness checks pass.
         </p>
-        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; align-items:center;">
-          <label style="display:inline-flex; align-items:center; gap:8px; color:#cbd5e1; font-size:13px; cursor:pointer;">
-            <input type="radio" name="dr_restore_path" id="dr_restore_path_direct" value="direct" checked onchange="highlightDrRestorePath()">
-            <span>Intent: tenant infra via Terraform / OpenStack APIs</span>
-          </label>
-          <label style="display:inline-flex; align-items:center; gap:8px; color:#cbd5e1; font-size:13px; cursor:pointer;">
-            <input type="radio" name="dr_restore_path" id="dr_restore_path_opencenter" value="opencenter" onchange="highlightDrRestorePath()">
-            <span>Intent: GitOps + OpenCenter orchestration</span>
-          </label>
+        <div id="dr-restore-readiness-banner" style="margin-bottom:12px;"></div>
+        <div id="dr-restore-activity-log" style="max-height:118px; overflow-y:auto; font-family:'Share Tech Mono',monospace; font-size:11px; padding:10px 12px; background:rgba(0,0,0,.38); border-radius:8px; border:1px solid rgba(148,163,184,.22); margin-bottom:14px; line-height:1.45;">
+          <div class="dr-act-placeholder" style="color:#64748b;">Activity log (latest first, last 5 entries).</div>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px;">
-          <div id="dr-path-direct" style="padding:16px; border-radius:10px; border:2px solid rgba(59,130,246,.55); background:rgba(30,58,138,.18); transition:border-color .2s, box-shadow .2s;">
-            <div style="color:#93c5fd; font-weight:800; font-size:14px; margin-bottom:8px;">Option A — Direct Terraform / OpenStack</div>
-            <p style="color:#94a3b8; font-size:12px; margin:0 0 10px; line-height:1.55;"><strong style="color:#e2e8f0;">When to use:</strong> You only need to <strong>replay tenant-shaped Flex/OpenStack infra</strong> in another region or another OpenStack (networks, VMs, volumes as resources, SGs). You or your pipeline will run Terraform/OpenStack APIs directly—no full platform cluster lifecycle.</p>
-            <ul style="color:#94a3b8; font-size:12px; margin:0 0 12px; padding-left:18px; line-height:1.5;">
-              <li>Cross-region Flex DR for a <em>single project</em></li>
-              <li>Lift-and-shift style rebuild with <code style="color:#7dd3fc;">terraform plan/apply</code></li>
-              <li>Minimal moving parts; OpenCenter not required</li>
-            </ul>
-            <p style="color:#64748b; font-size:11px; margin:0 0 12px;"><strong style="color:#94a3b8;">Does not replace:</strong> OpenCenter phases for HA K8s, Flux platform stack, air-gap factory, or org-wide GitOps policy—use Option B if that is the deliverable.</p>
-            <button type="button" onclick="generateRestorePlan(); highlightDrRestorePath('direct');" style="background:linear-gradient(135deg,#4f46e5,#4338ca); border:1px solid #a5b4fc; color:#fff; border-radius:7px; padding:9px 14px; cursor:pointer; font-weight:800;">
-              Generate Terraform restore plan
-            </button>
-            <div id="dr-direct-restore-status" style="margin-top:10px; padding:10px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.22); color:#94a3b8; font-size:12px;">
-              Writes env-specific <code style="color:#7dd3fc;">terraform.tfvars.json</code> and translation report under <code style="color:#7dd3fc;">tenant-iac-dr/terraform/envs/</code>. Then run <code style="color:#7dd3fc;">terraform init &amp;&amp; plan</code> on the runner with target OpenRC.
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; border-bottom:2px solid rgba(99,102,241,.28); margin-bottom:0;">
+          <button type="button" id="tab-dr-opt-a" class="dr-restore-tab active" onclick="selectDrRestoreTab('a')">Option A — Terraform / OpenStack</button>
+          <button type="button" id="tab-dr-opt-b" class="dr-restore-tab" onclick="selectDrRestoreTab('b')">Option B — OpenCenter + GitOps</button>
+        </div>
+        <div id="dr-tab-panel-a" style="display:block; padding:16px; border-radius:0 10px 10px 10px; border:1px solid rgba(59,130,246,.45); border-top:none; background:rgba(30,58,138,.14);">
+          <p style="color:#94a3b8; font-size:12px; margin:0 0 10px; line-height:1.55;"><strong style="color:#e2e8f0;">When to use:</strong> Replay tenant-shaped Flex/OpenStack infra in another region or cloud with Terraform / APIs—no OpenCenter cluster lifecycle.</p>
+          <ul style="color:#94a3b8; font-size:12px; margin:0 0 12px; padding-left:18px; line-height:1.5;">
+            <li>Cross-region DR for a single project</li>
+            <li><code style="color:#7dd3fc;">terraform plan/apply</code> on generated env tfvars</li>
+          </ul>
+          <button type="button" id="btn-dr-start-direct" disabled onclick="startRestorationDirect()" style="background:linear-gradient(135deg,#15803d,#166534); border:1px solid #4ade80; color:#fff; border-radius:7px; padding:11px 20px; cursor:not-allowed; font-weight:800; opacity:0.45;">
+            Start Restoration
+          </button>
+          <details style="margin-top:14px; color:#94a3b8; font-size:12px;">
+            <summary style="cursor:pointer; color:#7dd3fc; font-weight:600;">Advanced — regenerate Terraform plan only</summary>
+            <div style="margin-top:10px;">
+              <button type="button" onclick="generateRestorePlan()" style="background:#4338ca; border:1px solid #818cf8; color:#fff; border-radius:6px; padding:7px 12px; cursor:pointer; font-size:12px;">Regenerate restore plan</button>
             </div>
+          </details>
+          <div id="dr-direct-restore-status" style="margin-top:12px; padding:10px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.22); color:#94a3b8; font-size:12px;">
+            After restoration starts, latest Terraform paths and commands appear here. Default: writes <code style="color:#7dd3fc;">tenant-iac-dr/terraform/envs/&lt;target&gt;/terraform.tfvars.json</code> and a translation report.
           </div>
-          <div id="dr-path-opencenter" style="padding:16px; border-radius:10px; border:2px solid rgba(45,212,191,.35); background:rgba(15,118,110,.12); transition:border-color .2s, box-shadow .2s;">
-            <div style="color:#5eead4; font-weight:800; font-size:14px; margin-bottom:8px;">Option B — OpenCenter + GitOps</div>
-            <p style="color:#94a3b8; font-size:12px; margin:0 0 10px; line-height:1.55;"><strong style="color:#e2e8f0;">When to use:</strong> Your standard is <strong>OpenCenter (or equivalent) as control plane</strong> for declarative clusters, GitOps repos, schema validation, SOPS, air-gap packaging, or you are rebuilding a <strong>landing zone + K8s platform</strong>—not only a flat tenant tfvars replay.</p>
-            <ul style="color:#94a3b8; font-size:12px; margin:0 0 12px; padding-left:18px; line-height:1.5;">
-              <li>Single-YAML / multi-provider <em>platform</em> generation workflows</li>
-              <li>Push tenant pack into a repo OpenCenter/CI reconciles</li>
-              <li>Still pair with snapshots/DB backup for <em>data</em></li>
-            </ul>
-            <p style="color:#64748b; font-size:11px; margin:0 0 12px;"><strong style="color:#94a3b8;">Not required</strong> for simple tenant-only cross-region rebuild—Option A is enough if you only apply Terraform to the target project.</p>
-            <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:10px;">
-              <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Git ref
-                <input id="dr_git_ref" type="text" value="main" placeholder="main or tag" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px; min-width:140px;">
-              </label>
-              <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Cluster label
-                <input id="dr_cluster_name" type="text" value="tenant-restore" placeholder="tenant-restore" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px; min-width:160px;">
-              </label>
+        </div>
+        <div id="dr-tab-panel-b" style="display:none; padding:16px; border-radius:0 10px 10px 10px; border:1px solid rgba(45,212,191,.4); border-top:none; background:rgba(15,118,110,.1);">
+          <p style="color:#94a3b8; font-size:12px; margin:0 0 10px; line-height:1.55;"><strong style="color:#e2e8f0;">When to use:</strong> OpenCenter (or equivalent) as control plane for GitOps repos, platform stacks, and landing-zone rebuilds—not only flat tfvars replay.</p>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:12px;">
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Git ref
+              <input id="dr_git_ref" type="text" value="main" placeholder="main or tag" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px; min-width:140px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Cluster label
+              <input id="dr_cluster_name" type="text" value="tenant-restore" placeholder="tenant-restore" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px; min-width:160px;">
+            </label>
+          </div>
+          <button type="button" id="btn-dr-start-opencenter" disabled onclick="startRestorationOpenCenter()" style="background:linear-gradient(135deg,#15803d,#166534); border:1px solid #4ade80; color:#fff; padding:11px 20px; border-radius:7px; cursor:not-allowed; font-weight:800; opacity:0.45;">
+            Start Restoration
+          </button>
+          <details style="margin-top:14px; color:#94a3b8; font-size:12px;">
+            <summary style="cursor:pointer; color:#5eead4; font-weight:600;">Advanced — GitOps push / prepare only</summary>
+            <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+              <button type="button" onclick="gitopsPushBackup()" style="background:#0f766e; border:1px solid #2dd4bf; color:#fff; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Push backup to GitOps repo</button>
+              <button type="button" onclick="gitopsRestoreOpencenter()" style="background:#4f46e5; border:1px solid #a5b4fc; color:#fff; padding:7px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Prepare OpenCenter restore</button>
             </div>
-            <div style="display:flex; flex-wrap:wrap; gap:10px;">
-              <button type="button" onclick="gitopsPushBackup(); highlightDrRestorePath('opencenter');" style="background:linear-gradient(135deg,#0d9488,#0f766e); border:1px solid #2dd4bf; color:#fff; padding:9px 14px; border-radius:7px; cursor:pointer; font-weight:800;">
-                Push backup to GitOps repo
-              </button>
-              <button type="button" onclick="gitopsRestoreOpencenter(); highlightDrRestorePath('opencenter');" style="background:linear-gradient(135deg,#6366f1,#4f46e5); border:1px solid #a5b4fc; color:#fff; padding:9px 14px; border-radius:7px; cursor:pointer; font-weight:800;">
-                Prepare OpenCenter restore
-              </button>
-            </div>
-            <div id="gitops-two-button-status" style="margin-top:10px; padding:10px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.22); color:#94a3b8; font-size:12px;">
-              Set <code style="color:#7dd3fc;">GITOPS_REPO_PATH</code> (or <code style="color:#7dd3fc;">IAC_BACKUP_GIT_REPO_PATH</code>) for push. Optional <code style="color:#7dd3fc;">GITOPS_PUSH_AFTER_COMMIT=true</code>. Restore prep writes <code style="color:#7dd3fc;">tenant-iac-dr/gitops-restore/&lt;id&gt;/</code>—adapt script to your site OpenCenter CLI.
-            </div>
+          </details>
+          <div id="gitops-two-button-status" style="margin-top:12px; padding:10px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.22); color:#94a3b8; font-size:12px;">
+            Latest OpenCenter / GitOps action result. Configure <code style="color:#7dd3fc;">GITOPS_REPO_PATH</code> for push. Restore prep writes <code style="color:#7dd3fc;">tenant-iac-dr/gitops-restore/&lt;id&gt;/</code>.
           </div>
         </div>
       </div>
@@ -2354,13 +2357,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 9 · AI Anywhere Integration -->
-  <div class="panel" id="panel-s10">
+  <!-- STAGE 8 · AI Anywhere Integration -->
+  <div class="panel" id="panel-s9">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
-        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
+        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
         <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AI Anywhere Integration</h2>
-        <p style="color:#94a3b8; margin:0; max-width:940px;">AI Anywhere consumes the Cloud Jumper output bundle plus OpenCenter and Tenant IaC DR outputs as a private AI context pack for repair, risk, right-sizing, GitOps, and runbook agents.</p>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">AI Anywhere consumes the Cloud Jumper output bundle plus IAC DR backup/restore outputs (and optional bundle artifacts such as GitOps stubs) as a private AI context pack for repair, risk, right-sizing, and runbook agents.</p>
       </div>
 
       <div style="display:grid; grid-template-columns:minmax(260px,1fr) 38px minmax(260px,1fr) 38px minmax(280px,1.1fr); gap:14px; align-items:center; font-family:'Share Tech Mono',monospace;">
@@ -2371,7 +2374,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(34,197,94,.3); border-radius:8px; padding:16px;">
           <h3 style="margin:0 0 10px; color:#86efac;">Platform Context</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">OpenCenter estate map<br>day-2 runbook<br>observability context<br>GitOps workflows<br>tenant-iac-dr pack<br>DR runbooks + backup policy</div>
+          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">tenant-iac-dr pack<br>DR runbooks + backup policy<br>bundle GitOps / observability stubs<br>migration evidence<br>dependency graph slices</div>
         </div>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
         <div style="background:rgba(0,0,0,.28); border:1px solid rgba(244,114,182,.35); border-radius:8px; padding:16px;">
@@ -2383,7 +2386,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Private AI Context</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Sensitive customer migration evidence stays packaged for private AI workflows instead of generic public prompting.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Autorepair Intelligence</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Failed boot, network, service, and dependency signals become repair plans with risk and rollback notes.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine OpenCenter/Tenant IaC DR runbooks after each wave.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine IAC DR runbooks after each wave.</p></div>
       </div>
     </div>
   </div>
@@ -2398,6 +2401,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
   const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual'];
   window.lastMigrationBundle = null;
+  window._drReadiness = { profile_persisted: false, migration_bundle: {} };
+  window._drRestoreBusy = false;
 
   async function generateMigrationOutputBundle() {
     const box = document.getElementById('migration-output-bundle-status');
@@ -2412,6 +2417,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       box.innerHTML = `<div style="color:#86efac;font-weight:800;margin-bottom:8px;">Bundle ready: ${data.bundle} / ${data.stamp}</div><div>${links}</div>`;
       window.lastMigrationBundle = {bundle: data.bundle, stamp: data.stamp};
       renderTenantIacDrPreflight(data);
+      loadTargetCloudProfile().finally(updateDrRestoreUi);
     } catch (err) {
       box.style.borderColor = 'rgba(239,68,68,.45)';
       box.innerHTML = `<span style="color:#fca5a5;">${err.message}</span>`;
@@ -2424,7 +2430,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     if (!panel) return;
     if (errorMessage) {
       panel.style.borderColor = 'rgba(239,68,68,.45)';
-      panel.innerHTML = `<div style="color:#fca5a5;font-weight:700;">Stage 8 readiness unavailable: ${errorMessage}</div>`;
+      panel.innerHTML = `<div style="color:#fca5a5;font-weight:700;">Stage 7 readiness unavailable: ${errorMessage}</div>`;
       return;
     }
 
@@ -2432,7 +2438,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     const live = data && data.tenant_live_state ? data.tenant_live_state : null;
     if (!pre) {
       panel.style.borderColor = 'rgba(148,163,184,.25)';
-      panel.innerHTML = 'Stage 8 readiness appears after generating a migration output bundle.';
+      panel.innerHTML = 'Stage 7 readiness appears after generating a migration output bundle.';
       return;
     }
 
@@ -2449,8 +2455,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     }).join('');
 
     const summary = statusReady
-      ? `<div style="color:#86efac;font-weight:800;margin-bottom:6px;">Stage 8 Ready: required upstream artifacts found.</div>`
-      : `<div style="color:#fcd34d;font-weight:800;margin-bottom:6px;">Stage 8 Needs Input: missing required artifacts (${missing.join(', ') || 'unknown'}).</div>`;
+      ? `<div style="color:#86efac;font-weight:800;margin-bottom:6px;">Stage 7 Ready: required upstream artifacts found.</div>`
+      : `<div style="color:#fcd34d;font-weight:800;margin-bottom:6px;">Stage 7 Needs Input: missing required artifacts (${missing.join(', ') || 'unknown'}).</div>`;
 
     let countsHtml = '';
     if (live && live.target_inventory_counts) {
@@ -2465,7 +2471,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     const box = document.getElementById('tenant-iac-dr-export-status');
     if (!box) return;
     box.style.borderColor = 'rgba(56,189,248,.35)';
-    box.innerHTML = 'Exporting Tenant IaC DR backup...';
+    box.innerHTML = 'Exporting IAC DR backup...';
     try {
       const payload = {
         customer: window.activeCustomerId || '',
@@ -2493,11 +2499,109 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     }
   }
 
+  function escapeHtmlDr(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function appendDrActivity(message, level) {
+    const log = document.getElementById('dr-restore-activity-log');
+    if (!log) return;
+    const ph = log.querySelector('.dr-act-placeholder');
+    if (ph) ph.remove();
+    const ts = new Date().toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, 'Z');
+    const colors = { info: '#94a3b8', ok: '#86efac', err: '#fca5a5' };
+    const line = document.createElement('div');
+    line.className = 'dr-act-line';
+    line.style.color = colors[level] || colors.info;
+    line.style.marginBottom = '4px';
+    line.textContent = '[' + ts + '] ' + message;
+    log.insertBefore(line, log.firstChild);
+    const lines = log.querySelectorAll('.dr-act-line');
+    if (lines.length > 5) lines[lines.length - 1].remove();
+  }
+
+  function drRestoreTargetReady() {
+    const region = (document.getElementById('dr_target_region') && document.getElementById('dr_target_region').value || '').trim();
+    const authUrl = (document.getElementById('dr_target_auth_url') && document.getElementById('dr_target_auth_url').value || '').trim();
+    return region.length > 0 || authUrl.length > 0;
+  }
+
+  function collectDrReadinessBlockers() {
+    const r = window._drReadiness || { profile_persisted: false, migration_bundle: {} };
+    const out = [];
+    if (!r.profile_persisted) {
+      out.push('Save target cloud profile (or import OpenRC) so the server has persisted credentials for restore.');
+    }
+    const mb = r.migration_bundle || {};
+    if (!mb.tenant_iac_dr_present) {
+      out.push('Generate a migration output bundle that includes the tenant-iac-dr pack for this customer.');
+    }
+    if (!drRestoreTargetReady()) {
+      out.push('Enter a target region and/or target Keystone auth URL (where to restore).');
+    }
+    return out;
+  }
+
+  function renderDrRestoreReadinessBanner() {
+    const el = document.getElementById('dr-restore-readiness-banner');
+    if (!el) return;
+    const blockers = collectDrReadinessBlockers();
+    const mb = (window._drReadiness && window._drReadiness.migration_bundle) || {};
+    const stamp = mb.stamp ? escapeHtmlDr(mb.stamp) : '';
+    if (blockers.length) {
+      el.innerHTML =
+        '<div style="border:1px solid rgba(251,191,36,.45);background:rgba(120,53,15,.22);border-radius:8px;padding:12px 14px;color:#fde68a;">' +
+        '<strong style="color:#fcd34d;display:block;margin-bottom:6px;">Resolve before restoration</strong>' +
+        '<ul style="margin:0;padding-left:18px;line-height:1.5;font-size:12px;">' +
+        blockers.map(function (b) { return '<li>' + escapeHtmlDr(b) + '</li>'; }).join('') +
+        '</ul></div>';
+    } else {
+      el.innerHTML =
+        '<div style="border:1px solid rgba(34,197,94,.4);background:rgba(22,101,52,.18);border-radius:8px;padding:10px 14px;color:#86efac;font-size:12px;">' +
+        '<strong>Ready to restore</strong> — profile saved, bundle includes <code style="color:#bbf7d0;">tenant-iac-dr</code>, target region/auth set.' +
+        (stamp ? '<span style="color:#a7f3d0;margin-left:8px;">Bundle: <code>' + stamp + '</code></span>' : '') +
+        '</div>';
+    }
+  }
+
+  function updateDrRestoreUi() {
+    renderDrRestoreReadinessBanner();
+    const blockers = collectDrReadinessBlockers();
+    const canStart = blockers.length === 0 && !window._drRestoreBusy;
+    ['btn-dr-start-direct', 'btn-dr-start-opencenter'].forEach(function (id) {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = !canStart;
+      b.style.opacity = canStart ? '1' : '0.45';
+      b.style.cursor = canStart ? 'pointer' : 'not-allowed';
+    });
+  }
+
+  function selectDrRestoreTab(tab) {
+    const a = document.getElementById('dr-tab-panel-a');
+    const b = document.getElementById('dr-tab-panel-b');
+    const ta = document.getElementById('tab-dr-opt-a');
+    const tb = document.getElementById('tab-dr-opt-b');
+    if (!a || !b) return;
+    const isA = tab === 'a';
+    a.style.display = isA ? 'block' : 'none';
+    b.style.display = isA ? 'none' : 'block';
+    if (ta) ta.classList.toggle('active', isA);
+    if (tb) tb.classList.toggle('active', !isA);
+  }
+
   async function gitopsPushBackup() {
+    if (window._drRestoreBusy) {
+      appendDrActivity('GitOps push skipped — another restore action is in progress', 'err');
+      return;
+    }
+    window._drRestoreBusy = true;
+    updateDrRestoreUi();
     const box = document.getElementById('gitops-two-button-status');
-    if (!box) return;
+    if (!box) { window._drRestoreBusy = false; updateDrRestoreUi(); return; }
     box.style.borderColor = 'rgba(45,212,191,.4)';
     box.innerHTML = 'Pushing GitOps backup (sync + commit + tag)...';
+    appendDrActivity('GitOps: push backup started', 'info');
     try {
       const payload = {
         customer: window.activeCustomerId || '',
@@ -2515,29 +2619,40 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       const push = g.push;
       let pushLine = '';
       if (push) {
-        pushLine = `<div>Push branch rc=${push.branch_rc}, tag rc=${push.tag_rc}</div>`;
-        if (push.branch_err) pushLine += `<div style="color:#94a3b8;font-size:11px;">${push.branch_err}</div>`;
+        pushLine = '<div>Push branch rc=' + push.branch_rc + ', tag rc=' + push.tag_rc + '</div>';
+        if (push.branch_err) pushLine += '<div style="color:#94a3b8;font-size:11px;">' + push.branch_err + '</div>';
       } else {
-        pushLine = '<div>Push skipped (pass <code>push:true</code> in API body or set GITOPS_PUSH_AFTER_COMMIT=true).</div>';
+        pushLine = '<div>Push skipped (set GITOPS_PUSH_AFTER_COMMIT=true or pass push:true).</div>';
       }
       box.style.borderColor = 'rgba(34,197,94,.45)';
-      box.innerHTML = `
-        <div style="color:#86efac;font-weight:800;margin-bottom:6px;">GitOps backup recorded for ${data.customer} / ${data.stamp}</div>
-        <div style="color:#cbd5e1;">Stamp dir: ${sync.stamp_dir || ''}</div>
-        <div style="margin-top:6px;">Git commit: <span style="color:#cbd5e1;">${g.commit || ''}</span> branch ${g.branch || ''} tag ${g.tag || ''}</div>
-        ${pushLine}
-      `;
+      box.innerHTML =
+        '<div style="color:#86efac;font-weight:800;margin-bottom:6px;">GitOps backup recorded for ' + escapeHtmlDr(data.customer) + ' / ' + escapeHtmlDr(data.stamp) + '</div>' +
+        '<div style="color:#cbd5e1;">Stamp dir: ' + escapeHtmlDr(sync.stamp_dir || '') + '</div>' +
+        '<div style="margin-top:6px;">Git commit: <span style="color:#cbd5e1;">' + escapeHtmlDr(g.commit || '') + '</span> branch ' + escapeHtmlDr(g.branch || '') + ' tag ' + escapeHtmlDr(g.tag || '') + '</div>' +
+        pushLine;
+      appendDrActivity('GitOps: push backup OK — ' + (data.stamp || ''), 'ok');
     } catch (err) {
       box.style.borderColor = 'rgba(239,68,68,.45)';
-      box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+      box.innerHTML = '<span style="color:#fca5a5;">' + escapeHtmlDr(err.message || err) + '</span>';
+      appendDrActivity('GitOps push failed: ' + (err.message || err), 'err');
+    } finally {
+      window._drRestoreBusy = false;
+      updateDrRestoreUi();
     }
   }
 
   async function gitopsRestoreOpencenter() {
+    if (window._drRestoreBusy) {
+      appendDrActivity('OpenCenter restore prep skipped — another restore action is in progress', 'err');
+      return;
+    }
+    window._drRestoreBusy = true;
+    updateDrRestoreUi();
     const box = document.getElementById('gitops-two-button-status');
-    if (!box) return;
+    if (!box) { window._drRestoreBusy = false; updateDrRestoreUi(); return; }
     box.style.borderColor = 'rgba(129,140,248,.45)';
     box.innerHTML = 'Preparing OpenCenter restore artifacts...';
+    appendDrActivity('OpenCenter: restore prep started', 'info');
     try {
       const payload = {
         customer: window.activeCustomerId || '',
@@ -2554,14 +2669,18 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       if (!data.ok) throw new Error(data.error || 'Restore prep failed');
       const f = data.files || {};
       box.style.borderColor = 'rgba(34,197,94,.45)';
-      box.innerHTML = `
-        <div style="color:#86efac;font-weight:800;margin-bottom:6px;">OpenCenter restore pack: ${data.restore_id}</div>
-        <div style="color:#cbd5e1;font-size:11px;word-break:break-all;">${f.script || ''}</div>
-        <div style="color:#94a3b8;margin-top:6px;">Run the script after cloning the GitOps repo at the chosen git ref; source target OpenRC first.</div>
-      `;
+      box.innerHTML =
+        '<div style="color:#86efac;font-weight:800;margin-bottom:6px;">OpenCenter restore pack: ' + escapeHtmlDr(data.restore_id) + '</div>' +
+        '<div style="color:#cbd5e1;font-size:11px;word-break:break-all;">' + escapeHtmlDr(f.script || '') + '</div>' +
+        '<div style="color:#94a3b8;margin-top:6px;">Run the script after cloning the GitOps repo at the chosen git ref; source target OpenRC first.</div>';
+      appendDrActivity('OpenCenter: restore pack ' + (data.restore_id || '') + ' ready', 'ok');
     } catch (err) {
       box.style.borderColor = 'rgba(239,68,68,.45)';
-      box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+      box.innerHTML = '<span style="color:#fca5a5;">' + escapeHtmlDr(err.message || err) + '</span>';
+      appendDrActivity('OpenCenter restore prep failed: ' + (err.message || err), 'err');
+    } finally {
+      window._drRestoreBusy = false;
+      updateDrRestoreUi();
     }
   }
 
@@ -2571,10 +2690,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       const res = await fetch('/api/tenant-iac-dr/target-cloud-profile?customer=' + encodeURIComponent(window.activeCustomerId || ''));
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Failed loading profile');
+      window._drReadiness = window._drReadiness || {};
+      window._drReadiness.profile_persisted = !!data.profile_persisted;
+      window._drReadiness.migration_bundle = data.migration_bundle || { stamp: null, tenant_iac_dr_present: false };
       const p = data.profile || {};
       const s = p.source || {};
       const t = p.target || {};
-      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      const setVal = function (id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; };
       setVal('dr_source_username', s.username);
       setVal('dr_source_project_id', s.project_id);
       setVal('dr_target_provider', t.provider || 'flex');
@@ -2586,8 +2708,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       setVal('dr_target_region', t.region);
       if (box) box.innerHTML = '<span style="color:#86efac;">Target cloud profile loaded.</span>';
     } catch (err) {
-      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+      window._drReadiness = window._drReadiness || {};
+      window._drReadiness.profile_persisted = false;
+      window._drReadiness.migration_bundle = {};
+      if (box) box.innerHTML = '<span style="color:#fca5a5;">' + (err.message || err) + '</span>';
     }
+    updateDrRestoreUi();
   }
 
   async function saveTargetCloudProfile() {
@@ -2618,8 +2744,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Save failed');
       if (box) box.innerHTML = '<span style="color:#86efac;">Target cloud profile saved.</span>';
+      await loadTargetCloudProfile();
     } catch (err) {
-      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+      if (box) box.innerHTML = '<span style="color:#fca5a5;">' + (err.message || err) + '</span>';
+      updateDrRestoreUi();
     }
   }
 
@@ -2641,43 +2769,45 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       await loadTargetCloudProfile();
       if (box) box.innerHTML = '<span style="color:#86efac;">OpenRC imported and profile auto-populated.</span>';
     } catch (err) {
-      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+      if (box) box.innerHTML = '<span style="color:#fca5a5;">' + (err.message || err) + '</span>';
+      updateDrRestoreUi();
     }
   }
 
-  function highlightDrRestorePath(which) {
-    if (which === 'direct') {
-      const r = document.getElementById('dr_restore_path_direct');
-      if (r) r.checked = true;
-    } else if (which === 'opencenter') {
-      const r = document.getElementById('dr_restore_path_opencenter');
-      if (r) r.checked = true;
+  async function startRestorationDirect() {
+    const blockers = collectDrReadinessBlockers();
+    if (blockers.length) {
+      appendDrActivity('Option A blocked — ' + blockers[0], 'err');
+      return;
     }
-    const el = document.querySelector('input[name="dr_restore_path"]:checked');
-    const checked = el ? el.value : 'direct';
-    const direct = document.getElementById('dr-path-direct');
-    const oc = document.getElementById('dr-path-opencenter');
-    if (!direct || !oc) return;
-    if (checked === 'opencenter') {
-      oc.style.border = '2px solid rgba(45,212,191,.85)';
-      oc.style.boxShadow = '0 0 22px rgba(45,212,191,.15)';
-      direct.style.border = '2px solid rgba(59,130,246,.28)';
-      direct.style.boxShadow = 'none';
-    } else {
-      direct.style.border = '2px solid rgba(59,130,246,.85)';
-      direct.style.boxShadow = '0 0 22px rgba(59,130,246,.15)';
-      oc.style.border = '2px solid rgba(45,212,191,.28)';
-      oc.style.boxShadow = 'none';
+    selectDrRestoreTab('a');
+    await generateRestorePlan();
+  }
+
+  async function startRestorationOpenCenter() {
+    const blockers = collectDrReadinessBlockers();
+    if (blockers.length) {
+      appendDrActivity('Option B blocked — ' + blockers[0], 'err');
+      return;
     }
+    selectDrRestoreTab('b');
+    await gitopsRestoreOpencenter();
   }
 
   async function generateRestorePlan() {
+    if (window._drRestoreBusy) {
+      appendDrActivity('Terraform plan skipped — another restore action is in progress', 'err');
+      return;
+    }
+    window._drRestoreBusy = true;
+    updateDrRestoreUi();
+    appendDrActivity('Terraform: generating restore plan…', 'info');
     const box = document.getElementById('dr-direct-restore-status') || document.getElementById('dr-profile-status');
     if (box) box.innerHTML = 'Generating restore plan...';
     try {
       const provider = document.getElementById('dr_target_provider')?.value || 'openstack';
       const region = document.getElementById('dr_target_region')?.value || '';
-      const targetName = `${provider}-${region || 'target'}`;
+      const targetName = provider + '-' + (region || 'target');
       const res = await fetch('/api/tenant-iac-dr/restore-plan', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -2686,19 +2816,28 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Restore plan failed');
       if (box) {
-        box.innerHTML = `
-          <div style="color:#86efac;font-weight:700;">Restore plan generated for ${data.target_slug}</div>
-          <div style="margin-top:4px;">tfvars: <span style="color:#cbd5e1;">${data.tfvars_path}</span></div>
-          <div>report: <span style="color:#cbd5e1;">${data.translation_report}</span></div>
-          <div style="margin-top:4px;color:#93c5fd;">${data.restore_command}</div>
-        `;
+        box.innerHTML =
+          '<div style="color:#86efac;font-weight:700;">Restore plan generated for ' + escapeHtmlDr(data.target_slug) + '</div>' +
+          '<div style="margin-top:4px;">tfvars: <span style="color:#cbd5e1;">' + escapeHtmlDr(data.tfvars_path) + '</span></div>' +
+          '<div>report: <span style="color:#cbd5e1;">' + escapeHtmlDr(data.translation_report) + '</span></div>' +
+          '<div style="margin-top:4px;color:#93c5fd;">' + escapeHtmlDr(data.restore_command) + '</div>';
       }
+      appendDrActivity('Terraform: plan OK — ' + (data.target_slug || '') + ' / bundle ' + (data.bundle || ''), 'ok');
     } catch (err) {
-      if (box) box.innerHTML = `<span style="color:#fca5a5;">${err.message || err}</span>`;
+      if (box) box.innerHTML = '<span style="color:#fca5a5;">' + escapeHtmlDr(err.message || err) + '</span>';
+      appendDrActivity('Terraform restore plan failed: ' + (err.message || err), 'err');
+    } finally {
+      window._drRestoreBusy = false;
+      updateDrRestoreUi();
     }
   }
 
-  setTimeout(function () { loadTargetCloudProfile(); highlightDrRestorePath(); }, 600);
+  updateDrRestoreUi();
+  setTimeout(function () {
+    loadTargetCloudProfile()
+      .then(function () { selectDrRestoreTab('a'); })
+      .catch(function () { selectDrRestoreTab('a'); });
+  }, 600);
 
   async function requestMigrationOutputBundle() {
     const res = await fetch('/api/migration-output-bundle/generate', {
@@ -3439,9 +3578,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         {id: 'panel-s5', key: 's5', label: 'Stage 4 (Cutover & Handover)'},
         {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration Output Bundle)'},
         {id: 'panel-s7', key: 's7', label: 'Stage 6 (TCO / FinOps)'},
-        {id: 'panel-s8', key: 's8', label: 'Stage 7 (OpenCenter Integration)'},
-        {id: 'panel-s9', key: 's9', label: 'Stage 8 (Tenant IaC DR Pack)'},
-        {id: 'panel-s10', key: 's10', label: 'Stage 9 (AI Anywhere Integration)'}
+        {id: 'panel-s8', key: 's8', label: 'Stage 7 (IAC DR Backup and Restore)'},
+        {id: 'panel-s9', key: 's9', label: 'Stage 8 (AI Anywhere Integration)'}
       ];
       panels.forEach(p => {
           const panelEl = document.querySelector(`#${p.id}`);
@@ -3489,9 +3627,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           's5': 'Stage 4 (Cutover & Handover)',
           's6': 'Stage 5 (Post-Migration Output Bundle)',
           's7': 'Stage 6 (TCO / FinOps)',
-          's8': 'Stage 7 (OpenCenter Integration)',
-          's9': 'Stage 8 (Tenant IaC DR Pack)',
-          's10': 'Stage 9 (AI Anywhere Integration)'
+          's8': 'Stage 7 (IAC DR Backup and Restore)',
+          's9': 'Stage 8 (AI Anywhere Integration)'
       };
       
       if(status === 'Failed') {
@@ -3579,6 +3716,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           if (data.ok) {
               window.activeCustomerId = customerId;
               renderGlobalStageHeaders(cName);
+              loadTargetCloudProfile().finally(function () { selectDrRestoreTab('a'); updateDrRestoreUi(); });
 
               activateStage(routeTarget);
               let SubBtn = document.querySelector(`[data-sub="${routeTarget}ospc"]`) || document.querySelector('[data-sub="s1ospc"]');

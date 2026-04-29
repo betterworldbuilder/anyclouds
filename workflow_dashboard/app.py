@@ -3283,20 +3283,7 @@ def generate_migration_output_bundle():
                     "finops/rightsize-candidates.json",
                 ],
             },
-            "stage7_opencenter": {
-                "inputs": [
-                    "migration_manifest.json",
-                    "boot_test_results.json",
-                    "dependency_graph.json",
-                    "opencenter/day2-runbook.yaml",
-                ],
-                "outputs": [
-                    "opencenter/estate-map.json",
-                    "opencenter/observability-context.json",
-                    "opencenter/gitops-workflows.yaml",
-                ],
-            },
-            "stage8_tenant_iac_dr_pack": {
+            "stage7_iac_dr_backup_restore": {
                 "inputs": [
                     "migration_manifest.json",
                     "discovery-output/*",
@@ -3318,7 +3305,7 @@ def generate_migration_output_bundle():
                     "tenant-iac-dr/dr/BACKUP_SCOPE.md",
                 ],
             },
-            "stage9_ai_anywhere": {
+            "stage8_ai_anywhere": {
                 "inputs": [
                     "cloudjumper-output/*",
                     "finops-output/*",
@@ -3973,7 +3960,7 @@ def generate_migration_output_bundle():
         "Use ai-anywhere-context/ as the private AI Anywhere input pack.",
         "",
         "Chain:",
-        "  Cloud Jumper Output Bundle -> TCO/FinOps -> OpenCenter + Tenant IaC DR Pack -> AI Anywhere",
+        "  Cloud Jumper Output Bundle -> TCO/FinOps -> IAC DR Backup and Restore + GitOps -> AI Anywhere",
         "",
     ]))
 
@@ -4343,6 +4330,7 @@ def _target_profile_path(customer: str) -> Path:
 @app.get("/api/tenant-iac-dr/target-cloud-profile")
 def get_target_cloud_profile():
     customer = request.args.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
     path = _target_profile_path(customer)
     profile: Dict[str, Any] = {
         "customer": customer,
@@ -4358,7 +4346,27 @@ def get_target_cloud_profile():
                 profile.update(raw)
         except Exception:
             pass
-    return jsonify({"ok": True, "profile": profile})
+    profile_persisted = path.exists()
+    migration_bundle: Dict[str, Any] = {"stamp": None, "tenant_iac_dr_present": False}
+    customer_root = UPLOAD_DIR / "migration_output_bundles" / safe_customer
+    if customer_root.exists():
+        candidates = sorted([p for p in customer_root.iterdir() if p.is_dir()], reverse=True)
+        if candidates:
+            br = candidates[0]
+            migration_bundle["stamp"] = br.name
+            migration_bundle["tenant_iac_dr_present"] = (br / "tenant-iac-dr").is_dir()
+    tgt = profile.get("target", {}) if isinstance(profile.get("target"), dict) else {}
+    migration_bundle["target_has_region_or_auth"] = bool(
+        str(tgt.get("region", "")).strip() or str(tgt.get("auth_url", "")).strip()
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "profile": profile,
+            "profile_persisted": profile_persisted,
+            "migration_bundle": migration_bundle,
+        }
+    )
 
 
 @app.post("/api/tenant-iac-dr/target-cloud-profile")

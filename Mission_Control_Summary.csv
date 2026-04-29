@@ -40,6 +40,5 @@ Rocky Linux 8 / 9
 AlmaLinux 8 / 9
 Testing Windows 2016, 2019 (via Glance snapshot + VirtIO injection)"
 "Future / Upcoming","Stage 6 (TCO/FinOps): Right-sizing and executive cost summaries
-Stage 7 (OpenCenter): Day-2 GitOps workflows and K8s runbooks
-Stage 8 (Genestack): Reusable FLEX landing zones and cluster overrides
-Stage 9 (AI Anywhere): AI auto-repair plans and risk-scoring"
+Stage 7 (IAC DR backup and restore): Terraform-first restore, GitOps hooks
+Stage 8 (AI Anywhere): AI auto-repair plans and risk-scoring"

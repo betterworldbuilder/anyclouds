@@ -95,9 +95,8 @@
     <td>
       <ul>
         <li><b>Stage 6 (TCO/FinOps):</b> Right-sizing and executive cost summaries</li>
-        <li><b>Stage 7 (OpenCenter):</b> Day-2 GitOps workflows and K8s runbooks</li>
-        <li><b>Stage 8 (Genestack):</b> Reusable FLEX landing zones and cluster overrides</li>
-        <li><b>Stage 9 (AI Anywhere):</b> AI auto-repair plans and risk-scoring</li>
+        <li><b>Stage 7 (IAC DR backup and restore):</b> Terraform-first restore, GitOps hooks</li>
+        <li><b>Stage 8 (AI Anywhere):</b> AI auto-repair plans and risk-scoring</li>
       </ul>
     </td>
   </tr>
