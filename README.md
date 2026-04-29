@@ -52,7 +52,11 @@ CloudJumper works as a full-cycle migration Mission Control. Each stage turns un
 | ☸️ | **6. Kubernetes Mig (WIP)** | Translates Magnum OSPC clusters or raw k8s nodes into modern FLEX Kubernetes deployment models. | Containerized workloads jump alongside legacy VMs. |
 | 🔬 | **7. UAT (Boot & Verify)** | Creates FLEX test instances, attaches access, checks ping/SSH, gathers host/kernel data, and streams logs. | Changes "the image uploaded" into "the workload is alive." |
 | ✂️ | **8. Cut Over** | Uses generated cutover and rollback scripts with final validation evidence to shift live traffic. | Gives the migration a controlled finish line instead of a nervous handoff. |
-| 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, and optimization telemetry. | Hands off a modernized, GitOps-ready environment to the customer. |
+| 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, OpenCenter context, Tenant IaC DR, and AI Anywhere context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
+
+### How narrative phases map to the Mission Control UI
+
+The top bar uses **Customer List** (tracker) plus **Stages 1–9**: Discovery, Migration, Validation & UAT, Cutover, Post-Migration output bundle, TCO/FinOps, OpenCenter, Tenant IaC DR Pack, and AI Anywhere. The **0–9** table above is the *full lifecycle story*; phases **3–6** (generate, rehost, image repair, Kubernetes) surface mainly inside **Stage 2 (Migration)** and its subtabs, while **7–9** line up with UAT, cutover, and post-migration handoff (including GitOps-style outputs, FinOps, OpenCenter context, tenant DR, and AI packs).
 
 The dashboard is not only a launcher. It is an evidence machine. Every scan, map, run log, repair log, manifest, and verification table becomes data that can feed the next automation layer.
 

@@ -12,21 +12,23 @@
 </p>
 
 <p>
-  <img src="https://img.shields.io/badge/Lifecycle_Stages-6-22c55e?style=flat-square" alt="Stages">
+  <img src="https://img.shields.io/badge/Mission_Phases-0--9-22c55e?style=flat-square" alt="Phases">
   <img src="https://img.shields.io/badge/Migration_Strategies-6-f59e0b?style=flat-square" alt="Strategies">
   <img src="https://img.shields.io/badge/DB_Scenarios-4-22d3ee?style=flat-square" alt="DB Scenarios">
   <img src="https://img.shields.io/badge/Verification_Checks-14%2B-a855f7?style=flat-square" alt="Verification Checks">
   <img src="https://img.shields.io/badge/Live_Streaming-SSE-a855f7?style=flat-square" alt="SSE">
   <img src="https://img.shields.io/badge/No_DB-CSV_%2B_localStorage-3b82f6?style=flat-square" alt="No DB">
-  <img src="https://img.shields.io/badge/Genestack-K8s_Integration-0ea5e9?style=flat-square" alt="Genestack">
+  <img src="https://img.shields.io/badge/Tenant_IaC_DR-GitOps_OpenCenter-0ea5e9?style=flat-square" alt="Tenant DR">
   <img src="https://img.shields.io/badge/K8s_Migration_Methods-3-fb923c?style=flat-square" alt="K8s Methods">
   <img src="https://img.shields.io/badge/Magnum_Pipeline_Stages-8-ef4444?style=flat-square" alt="Magnum Stages">
 </p>
 
 <br>
 
-> **One tab. Six stages. Zero spreadsheets.**
-> Discovery → Topology Design → Script Generation → Live Execution → UAT Sign-off → Cutover
+> **One Mission Control tab. Full-cycle phases 0–9. Zero spreadsheets.**
+> Tracker → Discover → Map & Design → Generate → Rehost & Data → Images & Repair → K8s (WIP) → UAT → Cutover → Post-migration handoff
+>
+> The result is fewer mystery failures, faster test boots, cleaner customer updates, and a migration path that feels engineered instead of improvised.
 
 </div>
 
@@ -36,6 +38,7 @@
 
 - [Why This Tool Exists](#why-this-tool-exists)
 - [Architecture](#architecture)
+- [Full-Cycle Migration Phases](#full-cycle-migration-phases-mission-control-narrative)
 - [Full Stage Breakdown](#full-stage-breakdown)
   - [Stage 0 — Customer Migration Tracker](#stage-0--customer-migration-tracker)
   - [Stage 1 — Discovery & Assessment](#stage-1--discovery--assessment)
@@ -85,6 +88,27 @@ OSPC (Rackspace OpenStack Private Cloud) customers migrating to FLEX face a mult
 | VM image conversion | `qemu-img` (raw → qcow2 → FLEX-compatible) |
 
 The Flask backend serves all pages as iframes within a single unified shell (`combined.html`), providing tab-based navigation across all migration stages without page reloads. Each page streams live execution output via SSE.
+
+---
+
+## Full-Cycle Migration Phases (Mission Control narrative)
+
+CloudJumper works as a full-cycle migration Mission Control. Each phase turns unknowns into artifacts: CSVs, maps, scripts, repaired images, booted test instances, verification results, and rollback paths.
+
+| Phase | Stage | Mission Control Function | Benefit |
+|:---:|:---:|---|---|
+| 📡 | **0. Customer Tracker** | Tracks customer, estate, status, notes, stage progress, and active migration context. | Keeps multiple migrations organized without losing the human thread. |
+| 🔭 | **1. Discover** | Scans OSPC and FLEX inventory: servers, images, flavors, volumes, networks, security groups, load balancers, and floating IPs. | Builds a factual source-of-truth before anyone starts changing infrastructure. |
+| 🗺️ | **2. Map & Design** | Compares source/target capacity, edges, and imports topology into a visual model to plan the target build. | Turns "what do we have?" into "where will it land?" and lets engineers see the shape of the migration. |
+| ⚙️ | **3. Generate** | Produces deployment, data migration, sync, cutover, rollback, and validation scripts from the migration map. | Makes the work repeatable, reviewable, and safer than manual command assembly. |
+| 💾 | **4. Database & Server Rehost** | Provisions target FLEX servers and orchestrates the database migration/sync (MySQL, PostgreSQL, block syncs). | Ensures data gravity is handled seamlessly alongside compute. |
+| 📦 | **5. Image Migration & Repair** | Moves Linux/Windows workloads via NBD/Glance and applies offline guest repair (bootloaders, fstab, virtio, network config). | Converts old cloud images into FLEX-ready artifacts and fixes common first-boot failures offline. |
+| ☸️ | **6. Kubernetes Mig (WIP)** | Translates Magnum OSPC clusters or raw k8s nodes into modern FLEX Kubernetes deployment models. | Containerized workloads jump alongside legacy VMs. |
+| 🔬 | **7. UAT (Boot & Verify)** | Creates FLEX test instances, attaches access, checks ping/SSH, gathers host/kernel data, and streams logs. | Changes "the image uploaded" into "the workload is alive." |
+| ✂️ | **8. Cut Over** | Uses generated cutover and rollback scripts with final validation evidence to shift live traffic. | Gives the migration a controlled finish line instead of a nervous handoff. |
+| 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, OpenCenter context, Tenant IaC DR, and AI context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
+
+**How this maps to the dashboard UI:** The shell uses **Customer List** (tracker) plus **Stages 1–9** in the top bar: Discovery (1), Migration (2), Validation & UAT (3), Cutover (4), Post-Migration bundle (5), TCO/FinOps (6), OpenCenter (7), Tenant IaC DR Pack (8), AI Anywhere (9). Narrative phases **3–6** appear primarily under **Stage 2 (Migration)** and its subtabs; **7–9** align with UAT, cutover, and extended handoff tabs.
 
 ---
 
