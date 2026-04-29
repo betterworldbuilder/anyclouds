@@ -212,14 +212,34 @@ Made with Love by Dzoan.nguyen@Rackspace.com using brian.abshier@RACKSPACE.COM a
 
 ---
 
-## Windows VM Migration Process
+## Full-Cycle Migration Phases (How) — VM Migration Detail
+
+### 1. Linux VM Migration Process
+
+`mig_worker_v4.sh` handles Linux VMs via NBD/DD direct disk read over SSH.
+
+| Stage | What Happens | Where | Estimated Time (80 GB) |
+|-------|-------------|-------|----------------------|
+| **Step 1** | OSPC auth → find VM → check disk size | Jumphost → OSPC API | < 1 min |
+| **Step 2** | SSH tunnel → `qemu-nbd` exposes remote disk as local NBD device | Jumphost ↔ Linux VM | < 1 min |
+| **Step 3** | `dd` reads NBD device to `.img` at ~50–80 MB/s | Linux VM → Jumphost | ~20–30 min |
+| **Step 4** | `qemu-img convert` raw → qcow2 | Jumphost (local) | 5–10 min |
+| **Step 5** | Offline guest repair: bootloader, fstab, virtio drivers, network config | Jumphost (local) | 3–5 min |
+| **Step 6** | Upload qcow2 to FLEX Glance | Jumphost → FLEX cloud | 10–20 min |
+| **Step 7** | Boot VM from image | FLEX cloud (server-side) | 2–3 min |
+| **Step 8** | Assign floating IP | FLEX cloud (server-side) | < 1 min |
+| **TOTAL** | | | ~45–70 min |
+
+---
+
+### 2. Windows VM Migration Process
 
 `ospc2flex_windows_migrate.sh` handles full end-to-end Windows VM migration via SSH direct disk read (no agent, no WinRM during transfer).
 
 | Stage | What Happens | Where | Estimated Time (80 GB) |
 |-------|-------------|-------|----------------------|
-| **Step 1** | OSPC auth (curl) → Nova API find server → create Glance snapshot | OSPC cloud (server-side) | 10–20 min |
 | **Step 1b** | Check SSH port 22 (public → ServiceNet fallback) → WinRM bootstrap if needed | Jumphost → Windows VM | < 1 min |
+| **Step 1** | OSPC auth (curl) → Nova API find server → create Glance snapshot *(fallback only, skipped if SSH reachable)* | OSPC cloud (server-side) | 10–20 min |
 | **Step 2** | SSH → PowerShell disk dump → `dd` to `.img` at ~20 MB/s | Windows VM → Jumphost | ~70 min |
 | **Step 3** | `qemu-img convert` raw → qcow2 | Jumphost (local) | 5–10 min |
 | **Step 4** | Offline VirtIO driver injection into qcow2 | Jumphost (local) | 3–5 min |
@@ -229,6 +249,6 @@ Made with Love by Dzoan.nguyen@Rackspace.com using brian.abshier@RACKSPACE.COM a
 | **TOTAL** | | | ~105–130 min |
 
 **Key design points:**
-- Step 1 snapshot is a fallback only — if SSH is reachable on port 22 (ServiceNet `10.x.x.x` preferred when public IP is firewalled), Step 2 reads the disk directly at ~20 MB/s via `powershell -NonInteractive -File ospc2flex_diskdump.ps1`
-- Pass `--server-snet-ip 10.x.x.x` to reach Windows VMs whose port 22 is blocked on the public interface
-- WinRM bootstrap (Step 1b) installs Win32-OpenSSH from jumphost HTTP server (`python3 -m http.server 8080` on ServiceNet) when `Add-WindowsCapability` has no internet access
+- SSH check runs first — if port 22 is open, Glance snapshot is skipped entirely
+- Pass `--server-snet-ip 10.x.x.x` when Windows Firewall blocks port 22 on the public IP
+- WinRM bootstrap installs Win32-OpenSSH from jumphost HTTP server on ServiceNet when internet is unavailable on the Windows VM
