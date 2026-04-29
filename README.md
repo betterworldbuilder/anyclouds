@@ -21,7 +21,7 @@ CloudJumper is a browser-based control room for OSPC to FLEX migration. It bring
 - **In-Flight Pod Repair**: Linux offline repair (Ubuntu, Debian, CentOS, RHEL, Rocky, AlmaLinux) and Windows offline VirtIO repair/snapshot-based migration.
 - **Mission Telemetry**: Batch job telemetry in the MBUX/Apollo dashboard.
 - **Atmospheric Re-entry**: SSH/UAT verification, reports, and J.A.R.V.I.S. audio alerts.
-- **Stage 8 Tenant IaC DR Pack**: Preflight checks, target cloud credential profile, OpenRC import, restore-plan overlays, and Git/S3 backup export for cross-region or cross-cloud restore.
+- **Tenant IaC DR Pack**: Preflight checks, target cloud credential profile, OpenRC import, restore-plan overlays, and Git/S3 backup export for cross-region or cross-cloud restore.
 
 ## 🌌 The "Why" and "So What"
 
