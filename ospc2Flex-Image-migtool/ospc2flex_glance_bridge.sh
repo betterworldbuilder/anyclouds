@@ -348,11 +348,17 @@ PY
     fi
     task_json=$(curl -sS "$tasks_url/$task_id" -H "X-Auth-Token: $token" 2>/dev/null || true)
     status=$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null || echo unknown)
+    if [ -z "$task_json" ]; then
+      warn "Cloud Files export task poll returned empty body (token expired or network error) — will retry"
+      status="unknown"
+    fi
     log "[INFO] Cloud Files export task status=$status elapsed=${elapsed}s"
     case "$status" in
       success) break ;;
       failure|error)
-        warn "$task_json"
+        local task_msg
+        task_msg=$(printf '%s' "$task_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("result") or "")' 2>/dev/null || true)
+        warn "Cloud Files export task FAILED: ${task_msg:-<no message>} (full response: $task_json)"
         if printf '%s' "$task_json" | grep -qi 'Object already exists'; then
           log "[INFO] Export task reports object already exists; reusing existing Cloud Files object"
           if _download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes"; then
