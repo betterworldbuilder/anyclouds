@@ -8458,6 +8458,9 @@ def nbd_run_single():
                     yield f"data: [WARN] ServiceNet Glance host {_snet_host} does not resolve on jumphost {jumphost_ip}.\n\n"
                     yield "data: [WARN] Continuing anyway: Windows Glance pipeline will try Classic Glance, then Cloud Files export/import fallback.\n\n"
 
+                _win_user = src_user or "Administrator"
+                _win_pass = vm_password or str(vm.get('admin_password') or vm.get('instance_password') or '').strip()
+                _win_snet_ip = str(vm.get('server_snet_ip') or vm.get('snet_ip') or '').strip()
                 cmd_remote = (
                     f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
                     f"MIG_SRC_VCPUS={shlex.quote(mig_src_vcpus)} "
@@ -8467,14 +8470,18 @@ def nbd_run_single():
                     f"--server-name {shlex.quote(label)} "
                     f"--server-ip {shlex.quote(src_ip)} "
                     f"--label {shlex.quote(label)} "
+                    f"--windows-user {shlex.quote(_win_user)} "
+                    f"{('--windows-password ' + shlex.quote(_win_pass) + ' ') if _win_pass else ''}"
+                    f"{('--server-snet-ip ' + shlex.quote(_win_snet_ip) + ' ') if _win_snet_ip else ''}"
                     f"{('--flavor ' + shlex.quote(mig_flavor)) if mig_flavor else ''} "
                     f"{('--network ' + shlex.quote(mig_net)) if mig_net else ''} "
                     f"{('--keypair ' + shlex.quote(mig_key)) if mig_key else ''} "
                     f"</dev/null >{log_path} 2>&1 &"
                 )
                 subprocess.run(ssh_base + [cmd_remote], check=True, timeout=30)
-                yield f"data: [REMOTE WORKER] Windows VM detected — NBD/DD label uses Windows Glance snapshot pipeline\n\n"
-                yield f"data: [REMOTE WORKER] Worker launched: {label} (Glance mode)\n\n"
+                _launch_mode = "SSH+WinRM" if _win_pass else "Glance-only (no password)"
+                yield f"data: [REMOTE WORKER] Windows VM detected — launch mode: {_launch_mode}\n\n"
+                yield f"data: [REMOTE WORKER] Worker launched: {label} (win_user={_win_user} pass={'***' if _win_pass else 'none'})\n\n"
             else:
                 _force_sync = vm.get('force_sync') == True
                 _force_dd = '1' if vm.get('force_dd') else '0'

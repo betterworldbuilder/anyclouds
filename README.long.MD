@@ -1155,3 +1155,26 @@ Navigate to **https://127.0.0.1:5002** (or the WSL network IP shown in terminal 
 <div align="center">
 <sub>Built for OpenStack Zen → OpenStack KVM migrations · Python 3.12 · Flask · SSE · WSL2</sub>
 </div>
+
+---
+
+## Windows VM Migration Process
+
+`ospc2flex_windows_migrate.sh` handles full end-to-end Windows VM migration via SSH direct disk read.
+
+| Stage | What Happens | Where | Estimated Time (80 GB) |
+|-------|-------------|-------|----------------------|
+| **Step 1** | OSPC auth (curl) → Nova API find server → create Glance snapshot | OSPC cloud (server-side) | 10–20 min |
+| **Step 1b** | Check SSH port 22 (public → ServiceNet fallback) → WinRM bootstrap if needed | Jumphost → Windows VM | < 1 min |
+| **Step 2** | SSH → PowerShell disk dump → `dd` to `.img` at ~20 MB/s | Windows VM → Jumphost | ~70 min |
+| **Step 3** | `qemu-img convert` raw → qcow2 | Jumphost (local) | 5–10 min |
+| **Step 4** | Offline VirtIO driver injection into qcow2 | Jumphost (local) | 3–5 min |
+| **Step 5** | Upload qcow2 to FLEX Glance | Jumphost → FLEX cloud | 10–20 min |
+| **Step 6** | Boot VM from image | FLEX cloud (server-side) | 2–3 min |
+| **Step 7** | Assign floating IP | FLEX cloud (server-side) | < 1 min |
+| **TOTAL** | | | ~105–130 min |
+
+**Key design points:**
+- SSH disk read (~20 MB/s) is the primary path — Glance snapshot is fallback only
+- Pass `--server-snet-ip 10.x.x.x` when Windows Firewall blocks port 22 on the public IP
+- WinRM bootstrap installs Win32-OpenSSH from jumphost HTTP server on ServiceNet when internet is unavailable on the Windows VM

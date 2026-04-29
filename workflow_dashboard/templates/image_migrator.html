@@ -4529,6 +4529,7 @@
                 thead += `<th style="color:#fbbf24;min-width:90px;background:#23315e;cursor:pointer;" onclick="window._sortAdvTable('${isBlock?'block':'flavor'}','SSH User')">SSH User${state._sortCol==='SSH User'?(state._sortDir==='asc'?' ↑':' ↓'):''}</th>`;
                 thead += `<th style="color:#38bdf8;min-width:150px;background:#23315e;cursor:pointer;" onclick="window._sortAdvTable('${isBlock?'block':'flavor'}','ssh_key')">SSH Key Path${state._sortCol==='ssh_key'?(state._sortDir==='asc'?' ↑':' ↓'):''}</th>`;
                 thead += `<th style="color:#f472b6;min-width:130px;background:#23315e;cursor:pointer;" onclick="window._sortAdvTable('${isBlock?'block':'flavor'}','password')">Instance Password${state._sortCol==='password'?(state._sortDir==='asc'?' ↑':' ↓'):''}</th>`;
+                thead += `<th style="color:#6ee7b7;min-width:120px;background:#23315e;cursor:pointer;" onclick="window._sortAdvTable('${isBlock?'block':'flavor'}','snet_ip')">SNET IP${state._sortCol==='snet_ip'?(state._sortDir==='asc'?' ↑':' ↓'):''}</th>`;
             }
             thead += '</tr></thead>';
 
@@ -4572,6 +4573,7 @@
                 let sshUser = row.ssh_user || row.ssh_login || '';
                 const sshKeyPath = row.ssh_key || row.ssh_key_path || '';
                 const instancePassword = row.password || row.instance_password || row.origin_vm_password || '';
+                const snetIp = row.snet_ip || row.servicenet_ip || row.private_ip || '';
                 if (!sshUser) {
                     if (osF === 'windows')            sshUser = 'Administrator';
                     else if (snLower.includes('rocky'))   sshUser = 'root';  // migrated OSPC Rocky8: no 'rocky' OS user, Nova injects key into root
@@ -4583,7 +4585,7 @@
                     else                                  sshUser = 'ubuntu';
                 }
 
-                tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-source-name="${escapeHTML(sname)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
+                tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-source-name="${escapeHTML(sname)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-snet-ip="${escapeHTML(snetIp)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
 
                 // Row cells — Source & Fresh Sync first, then CSV cols, then Target Flavor, then OS/SSH cols
                 if (!isBlock) {
@@ -4679,6 +4681,16 @@
                             placeholder="optional"
                             title="Source VM password if this VM uses password auth instead of SSH key"
                             oninput="const cb=document.querySelector('.vm-checkbox[data-source-name=\'${escapeHTML(sname)}\']'); if(cb) cb.dataset.password=this.value; updateVmRowAuthData('${escapeHTML(sname)}','password',this.value);"
+                        >
+                    </td>`;
+                    // SNET IP — TENTH (Windows ServiceNet IP for WinRM/SSH — bypasses public Firewall)
+                    tbody += `<td style="background:rgba(110,231,183,0.06);border-right:1px solid rgba(184,196,255,0.1);">
+                        <input type="text" class="snet-ip-cell" value="${escapeHTML(snetIp)}"
+                            data-source-name="${escapeHTML(sname)}"
+                            style="background:transparent;border:none;color:#6ee7b7;font-family:monospace;font-size:0.78rem;width:108px;outline:none;cursor:pointer;"
+                            placeholder="10.x.x.x"
+                            title="ServiceNet IP (10.x.x.x) — used for WinRM/SSH on Windows VMs when public IP is firewalled"
+                            oninput="const cb=document.querySelector('.vm-checkbox[data-source-name=\'${escapeHTML(sname)}\']'); if(cb) cb.dataset.snetIp=this.value; updateVmRowAuthData('${escapeHTML(sname)}','snet_ip',this.value);"
                         >
                     </td>`;
                 }
@@ -6165,6 +6177,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     const vmSshUser = cb.dataset.sshUser || '';
                     const vmSshKey = cb.dataset.sshKey || '';
                     const vmPassword = cb.dataset.password || '';
+                    const vmSnetIpNbd = cb.dataset.snetIp || '';
                     const osType = cb.dataset.osType || guessOsType(sName);
                     const defaults = NBD_OS_DEFAULTS[osType] || NBD_OS_DEFAULTS.ubuntu24;
 
@@ -6191,6 +6204,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             flex_user: defaults.flex_user,
                             ssh_key:   vmSshKey || '',
                             password:  vmPassword || '',
+                            server_snet_ip: vmSnetIpNbd,
                             nbd_idx:   idx,
                             src_port:  10811 + idx,
                             tun_port:  10821 + idx,
@@ -6310,6 +6324,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const vmSshUser = cb.dataset.sshUser || null;
                 const vmSshKey = cb.dataset.sshKey || null;
                 const vmPassword = cb.dataset.password || null;
+                const vmSnetIp = cb.dataset.snetIp || null;
 
                 appendLog(`► BATCH [${i+1}/${checkedVMs.length}]: Dispatching VM '${sName}' -> FLEX '${tName}' with flavor '${flavor}'...`, 'system');
 
@@ -6331,6 +6346,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     payload.origin_vm_password = vmPassword;
                     if (isWindowsVm) payload.windows_admin_password = vmPassword;
                 }
+                if (vmSnetIp) payload.server_snet_ip = vmSnetIp;
                 if (isWindowsVm && sourceIpOverride) {
                     appendLog(`  ↳ Windows disk capture: ${effectiveOriginUser}@${sourceIpOverride} via jumphost`, 'system');
                 } else if (isWindowsVm) {
@@ -7541,7 +7557,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
     </script>
 
 <!-- ── Add VM to Migrate Modal ─────────────────────────────────────── -->
-<div id="addVmModal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+<div id="addVmModal" style="display:none;position:absolute;top:0;left:0;width:100%;z-index:10000;background:rgba(0,0,0,0.8);align-items:flex-start;justify-content:center;backdrop-filter:blur(3px);">
   <div style="background:#0f172a;border:1px solid rgba(99,102,241,0.4);border-radius:12px;padding:28px 32px;width:480px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.6);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;position:sticky;top:0;background:#0f172a;z-index:2;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.05);">
       <h3 style="color:#a5b4fc;margin:0;font-size:1rem;">+ Add VM to Migrate</h3>
@@ -7581,6 +7597,10 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
       <div>
         <label style="color:#f472b6;font-size:.8rem;display:block;margin-bottom:4px;">Instance Password <span style="color:#64748b;font-weight:normal;">(optional, for password auth)</span></label>
         <input id="addVm_password" type="password" placeholder="Only fill if this VM uses password login" style="width:100%;box-sizing:border-box;background:rgba(244,114,182,0.05);border:1px solid rgba(244,114,182,0.3);border-radius:6px;color:#fbcfe8;padding:8px 10px;font-size:.9rem;">
+      </div>
+      <div>
+        <label style="color:#6ee7b7;font-size:.8rem;display:block;margin-bottom:4px;">ServiceNet IP <span style="color:#64748b;font-weight:normal;">(optional, Windows WinRM/SSH via 10.x.x.x)</span></label>
+        <input id="addVm_snet_ip" type="text" placeholder="10.x.x.x — leave blank for Linux VMs" style="width:100%;box-sizing:border-box;background:rgba(110,231,183,0.05);border:1px solid rgba(110,231,183,0.3);border-radius:6px;color:#6ee7b7;padding:8px 10px;font-size:.9rem;font-family:monospace;">
       </div>
       <div>
         <label style="color:#94a3b8;font-size:.8rem;display:block;margin-bottom:4px;">Service Type</label>
@@ -7637,7 +7657,7 @@ function openAddVmModal() {
             document.getElementById('advFlavorContainer').style.display = 'block';
         }
     }
-    ['addVm_name','addVm_ip','addVm_user','addVm_flavor','addVm_password'].forEach(id => {
+    ['addVm_name','addVm_ip','addVm_user','addVm_flavor','addVm_password','addVm_snet_ip'].forEach(id => {
         const el = document.getElementById(id);
         if (el && id !== 'addVm_user' && id !== 'addVm_service') el.value = '';
     });
@@ -7649,9 +7669,23 @@ function openAddVmModal() {
     document.getElementById('addVmError').style.display = 'none';
     const modal = document.getElementById('addVmModal');
     modal.setAttribute('data-lock-iframe-resize', 'true');
-    modal.style.alignItems = 'center';
-    modal.style.paddingTop = '0';
+
+    // Position the modal overlay to cover the full document (absolute, not fixed)
+    // so it works correctly inside dynamically-resized iframes
+    modal.style.position = 'absolute';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = document.documentElement.scrollHeight + 'px';
+    modal.style.alignItems = 'flex-start';
+    modal.style.paddingTop = Math.max(window.scrollY + 80, 80) + 'px';
     modal.style.display = 'flex';
+
+    // Scroll the modal dialog into view
+    requestAnimationFrame(() => {
+        const dialog = modal.querySelector('div');
+        if (dialog) dialog.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
 
     notifyParentModalLock(true);
 }
@@ -7669,6 +7703,7 @@ function confirmAddVm() {
     const user    = document.getElementById('addVm_user').value.trim();
     const sshKey  = document.getElementById('addVm_ssh_key').value.trim();
     const password = document.getElementById('addVm_password').value;
+    const snetIpVal = (document.getElementById('addVm_snet_ip')?.value || '').trim();
     const authMode = document.querySelector('input[name="addVm_auth_mode"]:checked')?.value || 'key';
     const service = document.getElementById('addVm_service').value.trim() || 'cloud_server';
     const flavor  = document.getElementById('addVm_flavor').value.trim();
@@ -7699,6 +7734,7 @@ function confirmAddVm() {
         ssh_user: user,
         ssh_key: authMode === 'password' ? '' : sshKey,
         password: password || '',
+        snet_ip: snetIpVal,
         auth_mode: authMode,
         _manually_added: true
     };

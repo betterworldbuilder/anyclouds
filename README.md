@@ -209,3 +209,26 @@ CloudJumper is the bridge: part scanner, part repair bench, part launch console,
 Need the full operator notes, workflow history, script map, and deeper telemetry? Read the extended mission manual: [README.long.MD](README.long.MD).
 
 Made with Love by Dzoan.nguyen@Rackspace.com using brian.abshier@RACKSPACE.COM awesome flexos tool.
+
+---
+
+## Windows VM Migration Process
+
+`ospc2flex_windows_migrate.sh` handles full end-to-end Windows VM migration via SSH direct disk read (no agent, no WinRM during transfer).
+
+| Stage | What Happens | Where | Estimated Time (80 GB) |
+|-------|-------------|-------|----------------------|
+| **Step 1** | OSPC auth (curl) → Nova API find server → create Glance snapshot | OSPC cloud (server-side) | 10–20 min |
+| **Step 1b** | Check SSH port 22 (public → ServiceNet fallback) → WinRM bootstrap if needed | Jumphost → Windows VM | < 1 min |
+| **Step 2** | SSH → PowerShell disk dump → `dd` to `.img` at ~20 MB/s | Windows VM → Jumphost | ~70 min |
+| **Step 3** | `qemu-img convert` raw → qcow2 | Jumphost (local) | 5–10 min |
+| **Step 4** | Offline VirtIO driver injection into qcow2 | Jumphost (local) | 3–5 min |
+| **Step 5** | Upload qcow2 to FLEX Glance | Jumphost → FLEX cloud | 10–20 min |
+| **Step 6** | Boot VM from image | FLEX cloud (server-side) | 2–3 min |
+| **Step 7** | Assign floating IP | FLEX cloud (server-side) | < 1 min |
+| **TOTAL** | | | ~105–130 min |
+
+**Key design points:**
+- Step 1 snapshot is a fallback only — if SSH is reachable on port 22 (ServiceNet `10.x.x.x` preferred when public IP is firewalled), Step 2 reads the disk directly at ~20 MB/s via `powershell -NonInteractive -File ospc2flex_diskdump.ps1`
+- Pass `--server-snet-ip 10.x.x.x` to reach Windows VMs whose port 22 is blocked on the public interface
+- WinRM bootstrap (Step 1b) installs Win32-OpenSSH from jumphost HTTP server (`python3 -m http.server 8080` on ServiceNet) when `Add-WindowsCapability` has no internet access

@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-# ospc2flex_windows_migrate.sh — Windows VM Migration via OSPC Glance Snapshot
+# ospc2flex_windows_migrate.sh — Windows VM Migration (SSH disk read + Glance fallback)
 # ═══════════════════════════════════════════════════════════════════════════════
-# Windows VMs cannot use NBD (no SSH/qemu-nbd on Windows).
-# This script uses the OSPC API to snapshot → download → repair → upload.
+# Primary path  (Step 1b+2): WinRM → installs OpenSSH on Windows → SSH+PowerShell
+#               reads PhysicalDrive0 directly to jumphost (same as Linux NBD flow).
+# Fallback path (Step 2):    Glance snapshot → Cloud Files bridge → download.
 #
 # Usage:
 #   bash ospc2flex_windows_migrate.sh \
 #     --server-name "win2019websql2019" \
 #     --server-ip "104.130.26.6" \
 #     --label "ospc2flex-win2019" \
+#     --windows-password "MyAdminPass" \
+#     [--windows-user "Administrator"] \
 #     [--flavor "gp.5.4.4"] [--network "tenant-net"] [--keypair "laptopubuntu24"]
 #
 # Requires: /tmp/ospc2flex_ospc.sh (OSPC creds) and /tmp/ospc2flex_flex.sh (FLEX creds)
@@ -34,6 +37,11 @@ DRY_RUN=0
 OS_FAMILY="windows"
 OS_TYPE="win2019"
 LINUX_REPAIR="/tmp/ospc2flex_offline_repair.sh"
+WIN_USER="Administrator"
+WIN_PASSWORD=""
+WIN_SNET_IP=""
+WIN_SSH_IP=""
+SSH_DISK_METHOD=0
 
 # ── Color helpers ─────────────────────────────────────────────────────────────
 # Log helpers write to STDERR (not stdout) so they never contaminate captured
@@ -57,9 +65,12 @@ while [[ $# -gt 0 ]]; do
     --flavor)      FLAVOR="$2"; shift 2 ;;
     --network)     NETWORK="$2"; shift 2 ;;
     --keypair)     KEYPAIR="$2"; shift 2 ;;
-    --os-family)   OS_FAMILY="$2"; shift 2 ;;
-    --os-type)     OS_TYPE="$2"; shift 2 ;;
-    --dry-run)     DRY_RUN=1; shift ;;
+    --os-family)        OS_FAMILY="$2"; shift 2 ;;
+    --os-type)          OS_TYPE="$2"; shift 2 ;;
+    --windows-user)     WIN_USER="$2"; shift 2 ;;
+    --windows-password) WIN_PASSWORD="$2"; shift 2 ;;
+    --server-snet-ip)   WIN_SNET_IP="$2"; shift 2 ;;
+    --dry-run)          DRY_RUN=1; shift ;;
     -h|--help)
       echo "Usage: $0 --server-name <name> --server-ip <ip> --label <label> [--flavor <f>] [--network <n>] [--keypair <k>]"
       exit 0 ;;
@@ -89,109 +100,366 @@ echo "  OS Type   : $OS_TYPE"
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 1: Create OSPC Snapshot
+# Step 1b: Check SSH first — skip snapshot entirely if SSH is reachable
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 1: Creating OSPC snapshot of '$SERVER_NAME'..."
+log "Step 1b: Checking Windows SSH availability..."
+_ssh_check_ip=""
+if nc -z -w 8 "$SERVER_IP" 22 2>/dev/null; then
+  _ssh_check_ip="$SERVER_IP"
+elif [ -n "$WIN_SNET_IP" ] && nc -z -w 8 "$WIN_SNET_IP" 22 2>/dev/null; then
+  _ssh_check_ip="$WIN_SNET_IP"
+  INFO "SSH accessible via ServiceNet ($WIN_SNET_IP)"
+fi
+if [ -n "$_ssh_check_ip" ]; then
+  WIN_SSH_IP="$_ssh_check_ip"
+  PASS "SSH port 22 open on $WIN_SSH_IP — skipping OSPC snapshot"
+  SSH_DISK_METHOD=1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 1: Create OSPC Snapshot (only if SSH not available — Glance fallback path)
+# ═══════════════════════════════════════════════════════════════════════════════
+SNAP_ID=""
+_NOVA_URL=""
+_GLANCE_URL=""
+OS_TOKEN=""
+if [ "${SSH_DISK_METHOD:-0}" -eq 0 ]; then
+log "Step 1: SSH unavailable — authenticating to OSPC and creating snapshot of '$SERVER_NAME'..."
 source /tmp/ospc2flex_ospc.sh
 
-export OS_IDENTITY_API_VERSION=2
-OS_TOKEN=$(openstack token issue -f value -c id 2>/dev/null || true)
-if [ -z "$OS_TOKEN" ] && [ -n "${OS_USERNAME:-}" ] && [ -n "${OS_PASSWORD:-}" ]; then
-  # RAX apikey auth via curl fallback for openstack CLI
-  _AUTH=$(curl -s -X POST "${OS_AUTH_URL:-https://identity.api.rackspacecloud.com/v2.0/}tokens" \
-    -H "Content-Type: application/json" \
-    -d "{\"auth\":{\"RAX-KSKEY:apiKeyCredentials\":{\"username\":\"$OS_USERNAME\",\"apiKey\":\"$OS_PASSWORD\"}}}" 2>/dev/null || true)
-  OS_TOKEN=$(echo "$_AUTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
-  if [ -n "$OS_TOKEN" ]; then
-    export OS_TOKEN
-    export OS_AUTH_TYPE=token
-  fi
+# Auth via RAX Identity v2 curl (same method as ospcscan.py — no openstack CLI needed)
+_OSPC_AUTH=$(curl -s -X POST "https://identity.api.rackspacecloud.com/v2.0/tokens" \
+  -H "Content-Type: application/json" \
+  -d "{\"auth\":{\"RAX-KSKEY:apiKeyCredentials\":{\"username\":\"${OS_USERNAME}\",\"apiKey\":\"${OS_API_KEY:-$OS_PASSWORD}\"},\"tenantId\":\"${OS_TENANT_ID:-$OS_PROJECT_ID}\"}}" 2>/dev/null)
+OS_TOKEN=$(echo "$_OSPC_AUTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access']['token']['id'])" 2>/dev/null || true)
+_NOVA_URL=$(echo "$_OSPC_AUTH" | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+region='${OS_REGION_NAME:-IAD}'.upper()
+for s in d['access']['serviceCatalog']:
+    if s['type']=='compute':
+        for e in s['endpoints']:
+            if e.get('region','').upper()==region: print(e['publicURL']); break
+" 2>/dev/null || true)
+export OS_TOKEN
+export OS_AUTH_TYPE=token
+
+if [ -z "$OS_TOKEN" ] || [ -z "$_NOVA_URL" ]; then
+  FAIL "OSPC auth failed — check OS_USERNAME/OS_API_KEY/OS_TENANT_ID in /tmp/ospc2flex_ospc.sh"
+  exit 1
 fi
+INFO "OSPC auth OK — Nova: $_NOVA_URL"
 
 SNAP_NAME="${LABEL}-snap-$(date +%Y%m%d%H%M)"
 
-# Get SERVER_ID using openstack CLI. Try searching by IP first.
-# If that fails, fallback to name parsing.
-SERVER_ID=$(openstack server list -f value -c ID -c Networks 2>/dev/null | grep -F "$SERVER_IP" | head -1 | awk '{print $1}' || true)
-if [ -z "$SERVER_ID" ]; then
-  INFO "Could not find server by IP $SERVER_IP. Falling back to SERVER_NAME '$SERVER_NAME'..."
-  SERVER_ID=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep -F "$SERVER_NAME" | head -1 | awk '{print $1}' || true)
-fi
+# Find server via Nova API directly (same as ospcscan.py)
+_SERVERS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_NOVA_URL/servers/detail?limit=1000" 2>/dev/null)
+SERVER_ID=$(echo "$_SERVERS" | python3 -c "
+import sys,json,os
+d=json.load(sys.stdin)
+ip='${SERVER_IP}'; nm='${SERVER_NAME}'.lower()
+for s in d.get('servers',[]):
+    for nets in s.get('addresses',{}).values():
+        for a in nets:
+            if a.get('addr','')==ip: print(s['id']); sys.exit(0)
+for s in d.get('servers',[]):
+    if s.get('name','').lower()==nm: print(s['id']); sys.exit(0)
+" 2>/dev/null || true)
 
 if [ -z "$SERVER_ID" ]; then
-  FAIL "No Server found for $SERVER_NAME or IP $SERVER_IP. (Is OSPC authentication working?)"
+  FAIL "No server found for IP $SERVER_IP / name $SERVER_NAME in OSPC region ${OS_REGION_NAME:-IAD}"
   exit 1
 fi
+INFO "Server ID: $SERVER_ID"
 
-
-# Check if server is in image_uploading state (from a previous run) — wait for it
+# Wait for any in-progress task to finish
 log "  Checking server task state..."
 for i in $(seq 1 30); do
-  TASK_STATE=$(openstack server show "$SERVER_ID" -f value -c OS-EXT-STS:task_state 2>/dev/null || echo "none")
-  if [ "$TASK_STATE" = "None" ] || [ "$TASK_STATE" = "none" ] || [ -z "$TASK_STATE" ]; then
-    break
-  fi
-  WARN "Server is in task_state: $TASK_STATE — waiting 30s... ($i/30)"
+  _SDETAIL=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_NOVA_URL/servers/$SERVER_ID" 2>/dev/null)
+  TASK_STATE=$(echo "$_SDETAIL" | python3 -c "import sys,json; print(json.load(sys.stdin).get('server',{}).get('OS-EXT-STS:task_state') or 'none')" 2>/dev/null || echo "none")
+  [ "$TASK_STATE" = "None" ] || [ "$TASK_STATE" = "none" ] && break
+  WARN "Server task_state: $TASK_STATE — waiting 30s... ($i/30)"
   sleep 30
 done
 
-# Check if a usable snapshot already exists for this label (from a previous run)
-SNAP_ID=$(openstack image list --name "${LABEL}-snap" -f value -c ID 2>/dev/null | head -1 || true)
-if [ -z "$SNAP_ID" ]; then
-  # Look for any snap with our label prefix
-  SNAP_ID=$(openstack image list -f value -c ID -c Name 2>/dev/null | grep -F "${LABEL}-snap" | head -1 | awk '{print $1}' || true)
+# Check for existing usable snapshot via Glance API
+_GLANCE_URL=$(echo "$_OSPC_AUTH" | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+region='${OS_REGION_NAME:-IAD}'.upper()
+for s in d['access']['serviceCatalog']:
+    if s['type']=='image':
+        for e in s['endpoints']:
+            if e.get('region','').upper()==region: print(e.get('publicURL','')); break
+" 2>/dev/null || true)
+SNAP_ID=""
+if [ -n "$_GLANCE_URL" ]; then
+  SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${LABEL}-snap&limit=5" 2>/dev/null \
+    | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
 fi
-
 if [ -n "$SNAP_ID" ]; then
-  SNAP_STATUS=$(openstack image show "$SNAP_ID" -f value -c status 2>/dev/null || echo "unknown")
-  if [ "$SNAP_STATUS" = "active" ]; then
-    PASS "Reusing existing snapshot: $SNAP_ID (status: active)"
-  else
-    INFO "Existing snapshot $SNAP_ID is in state: $SNAP_STATUS — creating fresh one"
-    SNAP_ID=""
-  fi
+  PASS "Reusing existing active snapshot: $SNAP_ID"
+else
+  # Create snapshot via Nova createImage action
+  log "  Creating snapshot $SNAP_NAME ..."
+  curl -s -X POST -H "X-Auth-Token: $OS_TOKEN" -H "Content-Type: application/json" \
+    "$_NOVA_URL/servers/$SERVER_ID/action" \
+    -d "{\"createImage\":{\"name\":\"$SNAP_NAME\",\"metadata\":{}}}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin))" 2>/dev/null || true
+
+  # Poll Glance until active
+  log "  Waiting for snapshot to become active..."
+  for i in $(seq 1 90); do
+    sleep 10
+    if [ -n "$_GLANCE_URL" ]; then
+      SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
+        | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
+      [ -n "$SNAP_ID" ] && { PASS "Snapshot active: $SNAP_ID"; break; }
+      _SNAP_STATUS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
+        | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('status','waiting') if imgs else 'waiting')" 2>/dev/null || echo "waiting")
+      INFO "  snapshot status: $_SNAP_STATUS ($((i*10))s)"
+    fi
+  done
 fi
 
 if [ -z "$SNAP_ID" ]; then
-  # Create fresh snapshot
-  openstack server image create --name "$SNAP_NAME" "$SERVER_ID" --wait 2>&1 || true
-  sleep 5
-  SNAP_ID=$(openstack image list --name "$SNAP_NAME" -f value -c ID 2>/dev/null | head -1 || true)
-  if [ -z "$SNAP_ID" ]; then
-    SNAP_ID=$(openstack image show "$SNAP_NAME" -f value -c id 2>/dev/null || true)
-  fi
-fi
-
-if [ -z "$SNAP_ID" ]; then
-  FAIL "Failed to create snapshot for '$SERVER_NAME'"
+  FAIL "Failed to create/find snapshot for '$SERVER_NAME'"
   exit 1
 fi
-PASS "Snapshot ready: $SNAP_ID"
-
-# Wait for snapshot to become active
-log "  Waiting for snapshot to become active..."
-for i in $(seq 1 60); do
-  STATUS=$(openstack image show "$SNAP_ID" -f value -c status 2>/dev/null || echo "unknown")
-  if [ "$STATUS" = "active" ]; then
-    PASS "Snapshot active after $((i * 10)) seconds"
-    break
-  fi
-  if [ "$STATUS" = "error" ] || [ "$STATUS" = "killed" ]; then
-    FAIL "Snapshot entered $STATUS state"
-    exit 1
-  fi
-  INFO "Status: $STATUS (waiting 10s...)"
-  sleep 10
-done
+fi  # end SSH_DISK_METHOD==0 block
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 2: Download Snapshot
+# Step 1b (continued): WinRM bootstrap if SSH still not available
 # ═══════════════════════════════════════════════════════════════════════════════
-log "Step 2: Downloading snapshot (Classic Glance / Cloud Files fallback)..."
-INFO "Large Windows disks often take 30–120+ minutes — heartbeat + size logged every 60s."
+if [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ -n "$WIN_PASSWORD" ]; then
+  # Probe for WinRM — prefer ServiceNet IP (always accessible from OSPC network),
+  # fall back to public IP. Try HTTP (5985) then HTTPS (5986).
+  _WINRM_IP=""
+  _WINRM_PORT=""
+  _WINRM_SCHEME="http"
+  for _candidate_ip in ${WIN_SNET_IP:-} "$SERVER_IP"; do
+    [ -z "$_candidate_ip" ] && continue
+    for _candidate_port in 5985 5986; do
+      if nc -z -w 8 "$_candidate_ip" "$_candidate_port" 2>/dev/null; then
+        _WINRM_IP="$_candidate_ip"
+        _WINRM_PORT="$_candidate_port"
+        [ "$_candidate_port" -eq 5986 ] && _WINRM_SCHEME="https"
+        break 2
+      fi
+    done
+  done
+
+  if [ -z "$_WINRM_IP" ]; then
+    WARN "WinRM (5985/5986) not reachable on ${WIN_SNET_IP:+$WIN_SNET_IP or }$SERVER_IP — cannot bootstrap OpenSSH; will use Glance fallback"
+  else
+    INFO "SSH not open; bootstrapping OpenSSH via WinRM ${_WINRM_SCHEME}://${_WINRM_IP}:${_WINRM_PORT}..."
+    python3 -c "import winrm" 2>/dev/null \
+      || python3 -m pip install --quiet pywinrm requests_ntlm 2>/dev/null \
+      || WARN "pywinrm install failed — WinRM bootstrap may fail"
+
+    JH_PUBKEY=""
+    for _kf in ~/.ssh/id_rsa.pub ~/.ssh/id_ed25519.pub ~/.ssh/id_ecdsa.pub; do
+      [ -f "$_kf" ] && { JH_PUBKEY=$(cat "$_kf"); break; }
+    done
+
+    _WINRM_PY=$(mktemp /tmp/ospc2flex_winrm_XXXXXX.py)
+    cat > "$_WINRM_PY" <<'WINRM_SCRIPT'
+import sys, winrm
+
+ip, port, scheme, user, password = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+pubkey = sys.argv[6] if len(sys.argv) > 6 else ""
+
+# PowerShell heredoc — use @'...'@ (here-string) to avoid all escaping issues
+PS_BOOTSTRAP = r"""
+$ErrorActionPreference = 'Stop'
+$pub = "PUBKEY_PLACEHOLDER"
+
+# Install OpenSSH if missing (try built-in capability, then GitHub release from jumphost HTTP)
+if (-not (Get-Service sshd -ErrorAction SilentlyContinue)) {
+    $cap = Get-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
+    if ($cap -and $cap.State -eq 'NotPresent') {
+        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
+    }
+}
+if (-not (Get-Service sshd -ErrorAction SilentlyContinue)) {
+    # Fallback: download from jumphost HTTP server (ServiceNet)
+    $jh = "JUMPHOST_SNET_IP"
+    Invoke-WebRequest -Uri "http://${jh}:8080/OpenSSH-Win64.zip" -OutFile 'C:\Windows\Temp\OpenSSH-Win64.zip' -UseBasicParsing
+    Expand-Archive -Path 'C:\Windows\Temp\OpenSSH-Win64.zip' -DestinationPath 'C:\Program Files\' -Force
+    & 'C:\Program Files\OpenSSH-Win64\install-sshd.ps1'
+    Write-Output "[WinRM] OpenSSH installed from jumphost"
+}
+
+# Start and persist sshd
+$attempts = 0
+while ($attempts -lt 6) {
+    try { Start-Service sshd; Set-Service -Name sshd -StartupType Automatic; break }
+    catch { $attempts++; Start-Sleep 5 }
+}
+Write-Output "[WinRM] sshd started"
+
+# Firewall rule for port 22
+if (-not (Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH (ospc2flex)' `
+        -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
+    Write-Output "[WinRM] Firewall rule added"
+}
+
+# Set PowerShell as default SSH shell (with correct path)
+$psExe = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+if (Test-Path $psExe) {
+    if (-not (Test-Path 'HKLM:\SOFTWARE\OpenSSH')) { New-Item -Path 'HKLM:\SOFTWARE\OpenSSH' -Force | Out-Null }
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -Name DefaultShell -Value $psExe
+    Write-Output "[WinRM] Default shell = PowerShell"
+}
+
+# Write disk dump script (here-string avoids all escaping)
+$dumpScript = @'
+$drive = [IO.File]::OpenRead('\\.\PhysicalDrive0')
+$stdout = [Console]::OpenStandardOutput()
+$buf = New-Object byte[] 4194304
+while (($n = $drive.Read($buf, 0, $buf.Length)) -gt 0) { $stdout.Write($buf, 0, $n) }
+$drive.Close()
+$stdout.Flush()
+'@
+Set-Content -Path 'C:\Windows\Temp\ospc2flex_diskdump.ps1' -Value $dumpScript -Encoding ascii
+Write-Output "[WinRM] Disk dump script written"
+
+# Install SSH authorized key in home dir with strict ACL
+if ($pub -ne '') {
+    $homeSSH = 'C:\Users\Administrator\.ssh'
+    if (-not (Test-Path $homeSSH)) { New-Item -ItemType Directory -Path $homeSSH | Out-Null }
+    Set-Content -Path "$homeSSH\authorized_keys" -Value $pub -Encoding ascii
+    $fa = New-Object Security.AccessControl.FileSecurity
+    $fa.SetAccessRuleProtection($true,$false)
+    $fa.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule('NT AUTHORITY\SYSTEM','FullControl','None','None','Allow')))
+    $fa.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule('BUILTIN\Administrators','FullControl','None','None','Allow')))
+    Set-Acl "$homeSSH\authorized_keys" $fa
+    Write-Output "[WinRM] Authorized key installed"
+}
+Write-Output "[WinRM] Bootstrap complete"
+"""
+
+try:
+    s = winrm.Session(
+        f"{scheme}://{ip}:{port}/wsman",
+        auth=(user, password),
+        transport="ntlm",
+        server_cert_validation="ignore",
+        read_timeout_sec=360,
+        operation_timeout_sec=300,
+    )
+    import socket
+    jh_snet = ""
+    try:
+        jh_snet = socket.gethostbyname(socket.gethostname())
+    except Exception:
+        pass
+    ps = PS_BOOTSTRAP.replace("PUBKEY_PLACEHOLDER", pubkey).replace("JUMPHOST_SNET_IP", jh_snet)
+    r = s.run_ps(ps)
+    out = r.std_out.decode("utf-8", errors="replace").strip()
+    err = r.std_err.decode("utf-8", errors="replace").strip()
+    for line in out.splitlines(): print(line)
+    if err and "CLIXML" not in err:
+        for line in err.splitlines(): print(f"[STDERR] {line}", file=sys.stderr)
+    if r.status_code != 0:
+        print(f"[ERROR] WinRM PS exit {r.status_code}", file=sys.stderr); sys.exit(1)
+    sys.exit(0)
+except Exception as e:
+    print(f"[ERROR] WinRM: {e}", file=sys.stderr); sys.exit(1)
+WINRM_SCRIPT
+
+    set +e
+    python3 "$_WINRM_PY" "$_WINRM_IP" "$_WINRM_PORT" "$_WINRM_SCHEME" "$WIN_USER" "$WIN_PASSWORD" "$JH_PUBKEY"
+    _WINRM_RC=$?
+    set -e
+    rm -f "$_WINRM_PY"
+
+    if [ "$_WINRM_RC" -eq 0 ]; then
+      PASS "WinRM OpenSSH bootstrap complete"
+      log "  Waiting for SSH port 22 (up to 120s)..."
+      _SSH_UP=0
+      for _i in $(seq 1 24); do
+        if nc -z -w 5 "$SERVER_IP" 22 2>/dev/null; then
+          WIN_SSH_IP="$SERVER_IP"
+          PASS "SSH port 22 open after $((_i * 5))s"
+          _SSH_UP=1; break
+        elif [ -n "$WIN_SNET_IP" ] && nc -z -w 5 "$WIN_SNET_IP" 22 2>/dev/null; then
+          WIN_SSH_IP="$WIN_SNET_IP"
+          PASS "SSH port 22 open via ServiceNet after $((_i * 5))s"
+          _SSH_UP=1; break
+        fi
+        sleep 5
+      done
+      [ "$_SSH_UP" -eq 1 ] && SSH_DISK_METHOD=1 \
+        || WARN "SSH port 22 did not open within 120s — will use Glance fallback"
+    else
+      WARN "WinRM bootstrap failed (rc=$_WINRM_RC) — will use Glance fallback"
+    fi
+  fi
+else
+  WARN "SSH not available and --windows-password not provided — using Glance fallback only"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 2: Download Windows disk image
+# ═══════════════════════════════════════════════════════════════════════════════
 mkdir -p "$WORK"
 IMG_PATH="$WORK/${LABEL}.img"
 rm -f "$IMG_PATH"
+IMG_SIZE=0
+DOWNLOAD_METHOD=""
+
+if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
+  log "Step 2 [SSH]: Reading PhysicalDrive0 via SSH+PowerShell (direct disk read)..."
+  INFO "Large Windows disks: 30–120+ minutes. Progress logged every 60s."
+  # Use the SSH IP resolved in Step 1b (ServiceNet preferred when public port 22 is blocked)
+  _SSH_TARGET="${WIN_USER}@${WIN_SSH_IP:-$SERVER_IP}"
+  INFO "SSH target: $_SSH_TARGET"
+
+  WIN_DISK_BYTES=$(ssh -i ~/.ssh/id_rsa \
+      -o StrictHostKeyChecking=no -o BatchMode=yes \
+      -o LogLevel=ERROR -o ConnectTimeout=30 \
+      "$_SSH_TARGET" \
+      'powershell -NonInteractive -Command "(Get-Disk -Number 0).Size"' 2>/dev/null \
+    | tr -d '[:space:]' || echo 0)
+  INFO "PhysicalDrive0: $((WIN_DISK_BYTES / 1024 / 1024 / 1024)) GiB reported by Windows"
+
+  # Heartbeat while SSH dd runs
+  (while [ -f "/tmp/winmig_hb_active_${LABEL}" ]; do
+     sleep 60
+     _sz=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+     log "  … SSH download heartbeat — $((${_sz} / 1024 / 1024)) MiB on disk"
+   done) &
+  _HB_PID=$!
+  : > "/tmp/winmig_hb_active_${LABEL}"
+
+  set +e
+  ssh -i ~/.ssh/id_rsa \
+      -o StrictHostKeyChecking=no -o BatchMode=yes \
+      -o LogLevel=ERROR \
+      -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+      "$_SSH_TARGET" \
+      'powershell -NonInteractive -File C:\Windows\Temp\ospc2flex_diskdump.ps1' \
+  | dd of="$IMG_PATH" bs=4M iflag=fullblock 2>&1
+  _SSH_RC=${PIPESTATUS[0]}
+  set -e
+
+  rm -f "/tmp/winmig_hb_active_${LABEL}"
+  kill "$_HB_PID" 2>/dev/null || true
+
+  IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+  if [ "$_SSH_RC" -eq 0 ] && [ "${IMG_SIZE:-0}" -ge 1048576 ]; then
+    PASS "Downloaded via SSH/PowerShell: $((IMG_SIZE / 1024 / 1024)) MB"
+    DOWNLOAD_METHOD="ssh-powershell-disk-read"
+  else
+    WARN "SSH disk read failed (rc=$_SSH_RC size=${IMG_SIZE}B) — falling back to Glance"
+    rm -f "$IMG_PATH"
+    IMG_SIZE=0
+  fi
+fi
+
+if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
+  log "Step 2 [Glance]: Downloading snapshot (Cloud Files bridge / ServiceNet / public)..."
+  INFO "Large Windows disks often take 30–120+ minutes — heartbeat + size logged every 60s."
+  rm -f "$IMG_PATH"
 
 # OSPC Rackspace Public Cloud only exposes PUBLIC Glance endpoints per region.
 # Using OS_INTERFACE=internal causes `openstack image save` to error with
@@ -472,12 +740,11 @@ _try_download_methods() {
   return 1
 }
 
-IMG_SIZE="${IMG_SIZE:-0}"
 LAST_CURL_LOG="${LAST_CURL_LOG:-}"
-DOWNLOAD_METHOD="${DOWNLOAD_METHOD:-}"
 if [ "${IMG_SIZE:-0}" -lt 1048576 ] && [ -x /tmp/ospc2flex_glance_bridge.sh ]; then
   INFO "Trying Classic Glance + Cloud Files bridge before legacy Windows downloader..."
-  if bash /tmp/ospc2flex_glance_bridge.sh download \
+  BRIDGE_RC=0
+  bash /tmp/ospc2flex_glance_bridge.sh download \
       --ospc-openrc "$OSPC_CREDS" \
       --image-id "$SNAP_ID" \
       --dest "$IMG_PATH" \
@@ -485,12 +752,17 @@ if [ "${IMG_SIZE:-0}" -lt 1048576 ] && [ -x /tmp/ospc2flex_glance_bridge.sh ]; t
       --prefer-cloud-files \
       --retries 3 \
       --retry-wait 15 \
-      --min-bytes 1048576; then
+      --min-bytes 1048576 || BRIDGE_RC=$?
+  if [ "$BRIDGE_RC" -eq 0 ]; then
     IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
     DOWNLOAD_METHOD="classic-glance-cloud-files-bridge"
     PASS "Downloaded via $DOWNLOAD_METHOD: $((IMG_SIZE / 1024 / 1024))MB"
+  elif [ "$BRIDGE_RC" -eq 42 ]; then
+    FAIL "Windows image export blocked by Rackspace licensing policy — Cloud Files export not permitted for this snapshot."
+    FAIL "Contact Rackspace support to enable export for image $SNAP_ID, or migrate data at the application layer."
+    exit 1
   else
-    WARN "Classic Glance + Cloud Files bridge failed; continuing with legacy ServiceNet/public waterfall"
+    WARN "Glance bridge failed (rc=$BRIDGE_RC); attempting legacy ServiceNet/public waterfall as last resort"
     rm -f "$IMG_PATH"
     IMG_SIZE=0
   fi
@@ -510,9 +782,9 @@ while [ "$attempt" -le "$max_dl" ]; do
     break
   fi
   if [ "$SAW_SNET_DNS_FAIL" -eq 1 ] && [ "$SAW_PUBLIC_413" -eq 1 ]; then
-    FAIL "Glance download blocked: ServiceNet endpoint is unresolved on jumphost and public endpoint is returning HTTP 413."
-    FAIL "Use a jumphost with working ServiceNet DNS/routing (snet-<region>.images.api.rackspacecloud.com) or request Rackspace to remove public /file 413 limit."
-    exit 1
+    WARN "All Glance paths exhausted: ServiceNet DNS unresolvable + public endpoint returning HTTP 413."
+    WARN "Cloud Files bridge also failed (see above). No further Glance retries will succeed — stopping waterfall."
+    break
   fi
   WARN "All download methods failed on attempt $attempt/$max_dl — refreshing token and retrying..."
   _refresh_ospc_token
@@ -525,8 +797,11 @@ while [ "$attempt" -le "$max_dl" ]; do
 done
 fi
 
+fi  # end Glance fallback block
+
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
-  FAIL "Glance download failed after $max_dl attempts (${IMG_SIZE:-0} bytes). Last curl log: ${LAST_CURL_LOG:-none}"
+  FAIL "All download methods failed (SSH disk read + Glance). Image size: ${IMG_SIZE:-0} bytes."
+  FAIL "SSH rc=${_SSH_RC:-n/a}. Last curl log: ${LAST_CURL_LOG:-none}"
   exit 1
 fi
 
