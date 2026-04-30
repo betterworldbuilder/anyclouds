@@ -1041,12 +1041,16 @@ normalize_int() {
 
 resolve_target_flavor() {
   local _requested="$1"
-  local _src_vcpu _src_ram _src_disk _need_disk
+  local _src_vcpu _src_ram _src_disk _need_disk _eff_vcpu _eff_ram
   _src_vcpu=$(normalize_int "${MIG_SRC_VCPUS:-}")
   _src_ram=$(normalize_int "${MIG_SRC_RAM_MB:-}")
   _src_disk=$(normalize_int "${MIG_SRC_DISK_GB:-}")
   _need_disk="$_src_disk"
   [ -z "$_need_disk" ] && _need_disk=$(normalize_int "${QCOW_VIRTUAL_GIB:-}")
+  _eff_vcpu="${_src_vcpu:-2}"
+  _eff_ram="${_src_ram:-4096}"
+  [ -n "$_src_vcpu" ] && [ "$_src_vcpu" -lt 2 ] && _eff_vcpu=2
+  [ -n "$_src_ram" ] && [ "$_src_ram" -lt 4096 ] && _eff_ram=4096
 
   if [ -n "$_requested" ] && openstack flavor show "$_requested" >/dev/null 2>&1; then
     INFO "Flavor resolved in target region: $_requested" >&2
@@ -1086,18 +1090,16 @@ resolve_target_flavor() {
     }
     END { if (seen) print out }
   ')
-  if [ -n "$_src_vcpu" ] && [ -n "$_src_ram" ]; then
-    _best=$(printf '%s\n' "$_rows" | awk -v sv="$_src_vcpu" -v sr="$_src_ram" '
-      NF>=5 {
-        id=$1; name=$2; ram=$3+0; disk=$4+0; vcpu=$5+0
-        if (vcpu>=sv && ram>=sr) {
-          score=((vcpu-sv)*1000000000)+((ram-sr)*1000000)+disk
-          if (!seen || score < best) { seen=1; best=score; out=id"|"name"|"ram"|"disk"|"vcpu }
-        }
+  _best=$(printf '%s\n' "$_rows" | awk -v sv="$_eff_vcpu" -v sr="$_eff_ram" '
+    NF>=5 {
+      id=$1; name=$2; ram=$3+0; disk=$4+0; vcpu=$5+0
+      if (vcpu>=sv && ram>=sr) {
+        score=((vcpu-sv)*1000000000)+((ram-sr)*1000000)+disk
+        if (!seen || score < best) { seen=1; best=score; out=id"|"name"|"ram"|"disk"|"vcpu }
       }
-      END { if (seen) print out }
-    ')
-  fi
+    }
+    END { if (seen) print out }
+  ')
 
   _chosen="${_best:-$_fallback}"
   _cid=$(echo "$_chosen" | cut -d'|' -f1)
@@ -1106,7 +1108,7 @@ resolve_target_flavor() {
   _cdisk=$(echo "$_chosen" | cut -d'|' -f4)
   _cvcpu=$(echo "$_chosen" | cut -d'|' -f5)
   if [ -n "$_cid" ]; then
-    INFO "Flavor auto-pick: $_cid name=${_cname:-?} vcpu=${_cvcpu:-?} ram=${_cram:-?} disk=${_cdisk:-?} src=${_src_vcpu:-?}/${_src_ram:-?}/${_src_disk:-?} req_disk=${_need_disk:-?}" >&2
+    INFO "Flavor auto-pick: $_cid name=${_cname:-?} vcpu=${_cvcpu:-?} ram=${_cram:-?} disk=${_cdisk:-?} src=${_src_vcpu:-?}/${_src_ram:-?}/${_src_disk:-?} req=${_eff_vcpu:-?}/${_eff_ram:-?}/${_need_disk:-?}" >&2
     echo "$_cid"
     return 0
   fi

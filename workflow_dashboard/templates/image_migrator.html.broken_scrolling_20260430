@@ -1441,6 +1441,34 @@
                             });
                             const data = await resp.json();
 
+                            const loadScanCsvIntoTable = async () => {
+                                try {
+                                    const cr = await fetch('/api/agent1/results/discovery_csv?t=' + Date.now());
+                                    if (!cr.ok) {
+                                        logEl.textContent += '\n[WARN] CSV fetch failed: ' + cr.status;
+                                        return;
+                                    }
+                                    const csvText = await cr.text();
+                                    Papa.parse(csvText, {
+                                        header: true,
+                                        skipEmptyLines: true,
+                                        complete: function(r) {
+                                            const fields = Array.isArray(r.meta?.fields) ? [...r.meta.fields] : [];
+                                            if (!fields.includes('Source')) fields.unshift('Source');
+                                            const rows = (r.data || []).map(row => ({ ...row, Source: 'scan' }));
+                                            flavorState.headers = fields;
+                                            flavorState.rows = rows;
+                                            flavorState.filtered = [...rows];
+                                            document.getElementById('advFlavorContainer').style.display = 'block';
+                                            window._renderAdvTable(flavorState, 'flavor-table', 'mapperRowCount', false);
+                                            logEl.textContent += `\n✅ ${rows.length} rows loaded from scan.`;
+                                        }
+                                    });
+                                } catch (e) {
+                                    logEl.textContent += '\n[ERROR] Table load failed: ' + e.message;
+                                }
+                            };
+
                             if (data.status === 'started') {
                                 let pollInterval = setInterval(async () => {
                                     try {
@@ -1448,59 +1476,17 @@
                                         if (logReq.ok) {
                                             let text = await logReq.text();
                                             logEl.textContent = text;
-                                            logEl.parentElement.scrollTop = logEl.parentElement.scrollHeight;
 
                                             if (text.includes('Discovery complete!') || text.includes('Error:') || text.includes('Stopped')) {
                                                 clearInterval(pollInterval);
                                                 spinner.style.display = 'none';
                                                 btn.disabled = false; btn.textContent = '🔍 Start OSPC Server Scan';
-                                                // Load results CSV into VM table — same as agent1.html topology import
-                                                try {
-                                                    const cr = await fetch('/api/agent1/results/discovery_csv?t=' + Date.now());
-                                                    if (cr.ok) {
-                                                        const csvText = await cr.text();
-                                                        // Push full scan results into table — no filtering
-                                                        Papa.parse(csvText, { header: true, skipEmptyLines: true, complete: function(r) {
-                                                            const keyOf = (row) => String(
-                                                                row.source_server_name || row.server_name || row.name || row.public_ips || row.source_volume_id || ''
-                                                            ).trim().toLowerCase();
-
-                                                            const scannedRows = (r.data || []).map((row) => ({ ...row, Source: 'scan' }));
-                                                            const existingRows = Array.isArray(flavorState.rows) ? flavorState.rows : [];
-                                                            const manualRows = existingRows.filter((row) => row && row._manually_added);
-                                                            const existingNonManual = existingRows.filter((row) => !(row && row._manually_added));
-
-                                                            const scannedKeys = new Set(scannedRows.map(keyOf).filter(Boolean));
-                                                            const carryForwardRows = existingNonManual.filter((row) => {
-                                                                const key = keyOf(row);
-                                                                return key ? !scannedKeys.has(key) : true;
-                                                            });
-
-                                                            const mergedRows = [...manualRows, ...scannedRows, ...carryForwardRows];
-                                                            const mergedHeaders = Array.from(new Set([
-                                                                'Source',
-                                                                ...(Array.isArray(flavorState.headers) ? flavorState.headers : []),
-                                                                ...(r.meta.fields || []),
-                                                            ]));
-
-                                                            flavorState.headers = mergedHeaders;
-                                                            flavorState.rows = mergedRows;
-                                                            flavorState.filtered = [...mergedRows];
-                                                            document.getElementById('advFlavorContainer').style.display = 'block';
-                                                            window._renderAdvTable(flavorState, 'flavor-table', 'mapperRowCount', false);
-                                                            if (typeof saveManualVms === 'function') saveManualVms();
-                                                            logEl.textContent += `\n✅ ${scannedRows.length} scan row(s) merged. Manual entries preserved: ${manualRows.length}.`;
-                                                        }});
-                                                        logEl.textContent += '\n✅ VM table loaded from scan results.';
-                                                    } else {
-                                                        logEl.textContent += '\n[WARN] CSV fetch failed: ' + cr.status;
-                                                    }
-                                                } catch(e) {
-                                                    logEl.textContent += '\n[ERROR] Table load failed: ' + e.message;
-                                                }
+                                                await loadScanCsvIntoTable();
                                             }
                                         }
-                                    } catch(err) {}
+                                    } catch(err) {
+                                        logEl.textContent += '\n[WARN] Polling error: ' + (err && err.message ? err.message : String(err));
+                                    }
                                 }, 1000);
                             } else {
                                 logEl.textContent += 'Status: ' + data.message;
@@ -4991,7 +4977,19 @@
 
         async function autoLoadLatestMaps() {
             // 1) Server-injected maps (fastest — zero fetch, baked into HTML at render time)
-            const serverMaps = window._SERVER_MAPS || {};
+            let serverMaps = window._SERVER_MAPS || {};
+            // If page scripts executed before injected map script, pull from API fallback.
+            if (!serverMaps.overviewmap && !serverMaps.flavormap && !serverMaps.blockmap) {
+                try {
+                    const r = await fetch('/api/image_migrator/latest-maps?t=' + Date.now());
+                    if (r.ok) {
+                        const payload = await r.json();
+                        if (payload && typeof payload === 'object') {
+                            serverMaps = payload;
+                        }
+                    }
+                } catch (_) {}
+            }
             if (serverMaps.overviewmap) {
                 applyOverview(serverMaps.overviewmap.filename + ' ✨ auto', serverMaps.overviewmap.content);
                 saveToLS(LS_KEYS.overviewmap, serverMaps.overviewmap.filename, serverMaps.overviewmap.content);
@@ -5340,11 +5338,6 @@
             window._fullOneLinerCmd = cmd;
 
             const btn = document.getElementById('gen-oneliner-btn');
-            btn.textContent = '✅ Generated!';
-            setTimeout(() => btn.textContent = '⚡ Generate Command', 2000);
-            el.closest('div[style]').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-
         function copyFullOneLiner() {
             const cmd = window._fullOneLinerCmd || document.getElementById('full-oneliner-display').textContent;
             navigator.clipboard.writeText(cmd.trim()).then(() => {
@@ -5354,14 +5347,12 @@
         }
 
         function appendLog(text, type='info') {
-
-            // __MANUAL_REPAIR_JSON__ sentinel removed — online repair replaced by Stage 4.5/4.6 offline repair
-            if (text.includes('__MANUAL_REPAIR_JSON__')) return;
+            const consoleOut = document.getElementById('console-output');
             if (!consoleOut) return;
 
+            const ts = new Date().toLocaleTimeString();
             const el = document.createElement('div');
             el.className = `log-line ${type}`;
-            const ts = new Date().toLocaleTimeString();
 
             // Detect stage banner (### lines)
             if (text.startsWith('###') || text.startsWith('# ===')) {
@@ -5401,7 +5392,6 @@
             }
 
             consoleOut.appendChild(el);
-            consoleOut.scrollTop = consoleOut.scrollHeight;
         }
 
         function vmSafeId(name) { return 'vm_' + name.replace(/[^a-zA-Z0-9]/g, '_'); }
@@ -5526,7 +5516,6 @@
                 line.style.cssText = 'color:#ffaa00;font-style:italic;';
                 line.textContent = '[SYSTEM] Kill signal requested by operator...';
                 panel.appendChild(line);
-                panel.scrollTop = panel.scrollHeight;
             }
             try {
                 const resp = await fetch('/api/image_migrator/kill_one', {
@@ -5540,7 +5529,6 @@
                     line2.style.cssText = data.error ? 'color:#ff4444;' : 'color:#ffaa00;font-style:italic;';
                     line2.textContent = data.error ? `[ERROR] ${data.error}` : '[SYSTEM] Kill signal sent.';
                     panel.appendChild(line2);
-                    panel.scrollTop = panel.scrollHeight;
                 }
             } catch (err) {
                 if (panel) {
@@ -5596,10 +5584,10 @@
 
             const panel = getOrCreateImagePanel(id, title);
             if (!panel) return;
-            const lineEl = buildJobTerminalLineElement('image', text);
+            const lineEl = typeof buildJobTerminalLineElement === 'function' ? buildJobTerminalLineElement('image', text) : null;
             if (!lineEl) return;
+            
             panel.appendChild(lineEl);
-            panel.scrollTop = panel.scrollHeight;
         }
 
         function getOrCreateVmPanel(vmName, ipHint, flavorHint) {
@@ -5818,10 +5806,10 @@
             syncJobTerminalFromLog('vm', vmName, text);
             const panel = getOrCreateVmPanel(vmName);
             if (!panel) { appendLog('[' + vmName + '] ' + text, 'info'); return; }
-            const lineEl = buildJobTerminalLineElement('vm', text);
+            const lineEl = typeof buildJobTerminalLineElement === 'function' ? buildJobTerminalLineElement('vm', text) : null;
             if (!lineEl) return;
+            
             panel.appendChild(lineEl);
-            panel.scrollTop = panel.scrollHeight;
         }
 
         function setVmStatus(vmName, status) {
@@ -6682,7 +6670,9 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             const line = chunk.replace(/^data:\s?/, '').trim();
                             if (!line) continue;
                             appendImageLog(iid, line);
-                            if (logEl) { logEl.textContent += line + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+                            if (logEl) { 
+                                logEl.textContent += line + '\n'; 
+                            }
                         }
                     }
                 } catch (e) {
@@ -7342,7 +7332,6 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         else
             el.innerHTML = `<span style="color:#00e838;">${s}</span>`;
         body.appendChild(el);
-        body.scrollTop = body.scrollHeight;
     }
 
     function nbdStreamLog(label, jumphostIp, jumphostUser, sshKey) {

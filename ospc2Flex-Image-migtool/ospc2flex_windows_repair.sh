@@ -28,6 +28,7 @@ FORCE=0
 DEBUG=0
 DEBUG_TRACE=0
 DEBUG_LOG_FILE=""
+REPAIR_REPORT_FILE=""
 VIRTIO_ISO_URL="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso"
 VIRTIO_ISO="/tmp/virtio-win.iso"
 VIRTIO_MNT="/tmp/virtio_iso_mnt"
@@ -228,6 +229,61 @@ check_hive_dword_zero() {
   local hive="$1" key="$2" value="$3" raw
   raw=$(hive_value "$hive" "$key" "$value")
   echo "$raw" | is_reg_dword_zero
+}
+
+_ensure_netkvm_service_via_hivex() {
+  local hive="$1"
+  if ! sudo python3 -c "import hivex" 2>/dev/null; then
+    if command -v apt-get >/dev/null 2>&1; then
+      INFO "Installing python3-hivex (required to create netkvm service key)..."
+      DEBIAN_FRONTEND=noninteractive sudo apt-get install -y -qq python3-hivex >/dev/null 2>&1 || true
+    fi
+  fi
+  sudo python3 - "$hive" <<'PY'
+import struct
+import sys
+
+try:
+    import hivex
+except ImportError:
+    sys.stderr.write("ospc2flex: python3-hivex not available — cannot create netkvm service key\n")
+    sys.exit(2)
+
+path = sys.argv[1]
+REG_SZ = 1
+REG_DWORD = 4
+
+def dword(v):
+    return struct.pack("<I", v)
+
+def regsz(s):
+    return (s + "\0").encode("utf-16le")
+
+def child_or_add(h, parent, name):
+    ch = h.node_get_child(parent, name)
+    return ch if ch else h.node_add_child(parent, name)
+
+h = hivex.Hivex(path, write=True)
+root = h.root()
+for cs in ("ControlSet001", "ControlSet002"):
+    csn = child_or_add(h, root, cs)
+    services = child_or_add(h, csn, "Services")
+    netkvm = child_or_add(h, services, "netkvm")
+    h.node_set_value(netkvm, {"key": "Type", "t": REG_DWORD, "value": dword(1)})
+    h.node_set_value(netkvm, {"key": "Start", "t": REG_DWORD, "value": dword(3)})
+    h.node_set_value(netkvm, {"key": "ErrorControl", "t": REG_DWORD, "value": dword(1)})
+    h.node_set_value(netkvm, {"key": "ImagePath", "t": REG_SZ, "value": regsz(r"system32\drivers\netkvm.sys")})
+    h.node_set_value(netkvm, {"key": "Group", "t": REG_SZ, "value": regsz("NDIS")})
+    h.node_set_value(netkvm, {"key": "DisplayName", "t": REG_SZ, "value": regsz("Red Hat VirtIO Ethernet Adapter")})
+h.commit(path)
+sys.exit(0)
+PY
+}
+
+append_repair_report() {
+  local line="$1"
+  [ -n "${REPAIR_REPORT_FILE:-}" ] || return 0
+  printf '%s\n' "$line" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
 }
 
 # ── Cleanup function ──────────────────────────────────────────────────────────
@@ -444,8 +500,19 @@ echo "── Step 4: Copy VirtIO Drivers ─────────────
 
 DRIVERS_DIR="$MNT/Windows/System32/drivers"
 DRIVERSTORE="$MNT/Windows/System32/DriverStore/FileRepository"
+DRIVER_STAGE="$MNT/ospc2flex_driver_stage"
+NETKVM_STAGE="$DRIVER_STAGE/NetKVM"
 
 if [ $DRY_RUN -eq 0 ]; then
+  REPAIR_REPORT_FILE="$MNT/ospc2flex_offline_repair_report.txt"
+  sudo tee "$REPAIR_REPORT_FILE" >/dev/null <<EOF
+=== ospc2flex offline repair report ===
+Timestamp: $(date -u +"%Y-%m-%d %H:%M:%SZ")
+Image: $QCOW2
+Windows partition: $WIN_PART
+Driver source dir: $WIN_DRIVER_DIR
+Step4.DriverCopy=START
+EOF
   # --- viostor (block/disk — CRITICAL) ---
   if [ -f "$VIOSTOR_SRC/viostor.sys" ]; then
     sudo cp -f "$VIOSTOR_SRC/viostor.sys" "$DRIVERS_DIR/"
@@ -454,6 +521,7 @@ if [ $DRY_RUN -eq 0 ]; then
     sudo mkdir -p "$DRIVERSTORE/viostor.inf_amd64"
     sudo cp -f "$VIOSTOR_SRC/"* "$DRIVERSTORE/viostor.inf_amd64/" 2>/dev/null || true
     PASS "viostor (disk driver) → drivers/ + DriverStore"
+    printf '%s\n' "Driver.viostor.copy=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   fi
 
   # --- vioscsi (SCSI disk — CRITICAL when FLEX presents virtio-scsi) ---
@@ -464,48 +532,57 @@ if [ $DRY_RUN -eq 0 ]; then
     sudo mkdir -p "$DRIVERSTORE/vioscsi.inf_amd64"
     sudo cp -f "$VIOSCSI_SRC/"* "$DRIVERSTORE/vioscsi.inf_amd64/" 2>/dev/null || true
     PASS "vioscsi (SCSI disk driver) -> drivers/ + DriverStore"
+    printf '%s\n' "Driver.vioscsi.copy=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   else
     WARN "vioscsi not found — image may fail if FLEX attaches disk as virtio-scsi"
+    printf '%s\n' "Driver.vioscsi.copy=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   fi
 
   # --- netkvm (network) ---
   if [ -d "$NETKVM_SRC" ] && [ -f "$NETKVM_SRC/netkvm.sys" ]; then
+    sudo mkdir -p "$NETKVM_STAGE"
+    sudo cp -f "$NETKVM_SRC/"* "$NETKVM_STAGE/" 2>/dev/null || true
     sudo cp -f "$NETKVM_SRC/netkvm.sys" "$DRIVERS_DIR/"
     sudo cp -f "$NETKVM_SRC/netkvm.inf" "$DRIVERS_DIR/" 2>/dev/null || true
     sudo mkdir -p "$DRIVERSTORE/netkvm.inf_amd64"
     sudo cp -f "$NETKVM_SRC/"* "$DRIVERSTORE/netkvm.inf_amd64/" 2>/dev/null || true
-    PASS "netkvm (network driver) → drivers/ + DriverStore"
+    PASS "netkvm copied for normal PnP install and staged as first-boot fallback"
+    printf '%s\n' "Driver.netkvm.stage=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   else
     WARN "netkvm not found — network may not work on first boot"
+    printf '%s\n' "Driver.netkvm.stage=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   fi
 
-  # --- vioserial (serial/console) ---
-  if [ -d "$VIOSERIAL_SRC" ] && [ -f "$VIOSERIAL_SRC/vioser.sys" ]; then
-    sudo cp -f "$VIOSERIAL_SRC/vioser.sys" "$DRIVERS_DIR/"
-    sudo mkdir -p "$DRIVERSTORE/vioser.inf_amd64"
-    sudo cp -f "$VIOSERIAL_SRC/"* "$DRIVERSTORE/vioser.inf_amd64/" 2>/dev/null || true
-    PASS "vioserial (console driver) → drivers/ + DriverStore"
-  fi
+  # Do not pre-install non-storage VirtIO drivers offline. We have seen
+  # first-boot BSODs after importing OSPC guests when Windows binds extra
+  # VirtIO devices too early. Keep first boot to the minimum storage path,
+  # then let first-boot PowerShell install what is needed locally.
+  sudo rm -f \
+    "$DRIVERS_DIR/vioser.sys" \
+    "$DRIVERS_DIR/balloon.sys" \
+    "$DRIVERS_DIR/qxldod.sys" 2>/dev/null || true
+  sudo rm -rf \
+    "$DRIVERSTORE/vioser.inf_amd64" \
+    "$DRIVERSTORE/balloon.inf_amd64" \
+    "$DRIVERSTORE/qxldod.inf_amd64" 2>/dev/null || true
+  PASS "Deferred only non-network auxiliary VirtIO drivers until first boot (vioser/balloon/qxldod)"
 
-  # --- balloon (memory) ---
-  if [ -d "$BALLOON_SRC" ] && [ -f "$BALLOON_SRC/balloon.sys" ]; then
-    sudo cp -f "$BALLOON_SRC/balloon.sys" "$DRIVERS_DIR/"
-    sudo mkdir -p "$DRIVERSTORE/balloon.inf_amd64"
-    sudo cp -f "$BALLOON_SRC/"* "$DRIVERSTORE/balloon.inf_amd64/" 2>/dev/null || true
-    PASS "balloon (memory driver) → drivers/ + DriverStore"
+  if [ ! -f "$DRIVERS_DIR/viostor.sys" ]; then
+    FAIL "Post-copy check failed: missing $DRIVERS_DIR/viostor.sys"
+    printf '%s\n' "Driver.viostor.presence=FAIL" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    exit 1
   fi
-
-  # --- qxldod (display) ---
-  if [ -d "$QXLDOD_SRC" ]; then
-    sudo mkdir -p "$DRIVERSTORE/qxldod.inf_amd64"
-    sudo cp -f "$QXLDOD_SRC/"* "$DRIVERSTORE/qxldod.inf_amd64/" 2>/dev/null || true
-    if [ -f "$QXLDOD_SRC/qxldod.sys" ]; then
-      sudo cp -f "$QXLDOD_SRC/qxldod.sys" "$DRIVERS_DIR/"
-    fi
-    PASS "qxldod (display driver) → drivers/ + DriverStore"
+  printf '%s\n' "Driver.viostor.presence=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  if [ -f "$DRIVERS_DIR/vioscsi.sys" ]; then
+    printf '%s\n' "Driver.vioscsi.presence=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  else
+    WARN "Post-copy check: $DRIVERS_DIR/vioscsi.sys missing (bus-dependent risk)"
+    printf '%s\n' "Driver.vioscsi.presence=WARN_MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   fi
 else
-  INFO "[DRY-RUN] Would copy viostor, vioscsi, netkvm, vioserial, balloon, qxldod"
+  INFO "[DRY-RUN] Would copy viostor + vioscsi for boot-critical storage"
+  INFO "[DRY-RUN] Would copy netkvm normally and stage it as a first-boot fallback"
+  INFO "[DRY-RUN] Would defer vioser/balloon/qxldod"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -573,6 +650,8 @@ Windows Registry Editor Version 5.00
 
 ; ═══════════════════════════════════════════════
 ; VirtIO Network Driver (netkvm)
+; Keep as a normal PnP-installed service for first boot reachability, but do
+; not force early binding via CriticalDeviceDatabase.
 ; ═══════════════════════════════════════════════
 "ControlSet001\Services\netkvm\Type"=dword:00000001
 "ControlSet001\Services\netkvm\Start"=dword:00000003
@@ -586,14 +665,6 @@ Windows Registry Editor Version 5.00
 "ControlSet002\Services\netkvm\ErrorControl"=dword:00000001
 "ControlSet002\Services\netkvm\ImagePath"="system32\\drivers\\netkvm.sys"
 "ControlSet002\Services\netkvm\Group"="NDIS"
-
-; CriticalDeviceDatabase for network
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1000\ClassGUID"="{4D36E972-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1000\Service"="netkvm"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1041\ClassGUID"="{4D36E972-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1041\Service"="netkvm"
-"ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1000\ClassGUID"="{4D36E972-E325-11CE-BFC1-08002BE10318}"
-"ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1000\Service"="netkvm"
 
 ; ═══════════════════════════════════════════════
 ; VirtIO SCSI Driver (vioscsi) — CRITICAL
@@ -628,23 +699,6 @@ Windows Registry Editor Version 5.00
 "ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
 "ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048\Service"="vioscsi"
 
-; ═══════════════════════════════════════════════
-; VirtIO Serial Driver (vioserial)
-; ═══════════════════════════════════════════════
-"ControlSet001\Services\vioser\Type"=dword:00000001
-"ControlSet001\Services\vioser\Start"=dword:00000003
-"ControlSet001\Services\vioser\ErrorControl"=dword:00000001
-"ControlSet001\Services\vioser\ImagePath"="system32\\drivers\\vioser.sys"
-"ControlSet001\Services\vioser\Group"="Extended Base"
-
-; ═══════════════════════════════════════════════
-; VirtIO Balloon Driver
-; ═══════════════════════════════════════════════
-"ControlSet001\Services\balloon\Type"=dword:00000001
-"ControlSet001\Services\balloon\Start"=dword:00000003
-"ControlSet001\Services\balloon\ErrorControl"=dword:00000001
-"ControlSet001\Services\balloon\ImagePath"="system32\\drivers\\balloon.sys"
-"ControlSet001\Services\balloon\Group"="Extended Base"
 REGEOF
 
   # Apply registry changes using reged (from chntpw). Ubuntu 24.04's
@@ -654,11 +708,16 @@ REGEOF
   rm -f "$REG_FILE"
 
   if [ $REG_RC -eq 0 ]; then
+    if ! _ensure_netkvm_service_via_hivex "$HIVE_SYSTEM"; then
+      FAIL "Registry: could not create/repair netkvm service key"
+      WARN "Restoring backup..."
+      sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
+      exit 1
+    fi
     PASS "Registry: viostor service (Start=0, Group=SCSI miniport)"
     PASS "Registry: vioscsi service (Start=0, Group=SCSI miniport)"
     PASS "Registry: netkvm service (Start=3, Group=NDIS)"
-    PASS "Registry: vioserial + balloon services"
-    PASS "Registry: CriticalDeviceDatabase PCI entries (1AF4:{1001,1042,1004,1048,1000,1041})"
+    PASS "Registry: CriticalDeviceDatabase PCI entries (1AF4:{1001,1042,1004,1048})"
   else
     FAIL "Registry merge failed (rc=$REG_RC)"
     WARN "Restoring backup..."
@@ -672,13 +731,26 @@ REGEOF
   echo "  Checking viostor service in registry..."
   VIO_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Services\viostor' 'Start')
   SCSI_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Services\vioscsi' 'Start')
+  NETKVM_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Services\netkvm' 'Start')
   if echo "$VIO_CHK" | is_reg_dword_zero && echo "$SCSI_CHK" | is_reg_dword_zero; then
     PASS "Registry verification: viostor Start=0 confirmed"
     PASS "Registry verification: vioscsi Start=0 confirmed"
+    printf '%s\n' "Registry.viostor.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    printf '%s\n' "Registry.vioscsi.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   else
     FAIL "Registry verification failed: VirtIO disk services not correctly registered"
     INFO "viostor Start raw: ${VIO_CHK:-<missing>}"
     INFO "vioscsi Start raw: ${SCSI_CHK:-<missing>}"
+    WARN "Restoring backup..."
+    sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
+    exit 1
+  fi
+  if echo "$NETKVM_CHK" | grep -Eiq '(^|[^0-9a-f])(3|0x3|0x00000003|00000003)([^0-9a-f]|$)'; then
+    PASS "Registry verification: netkvm Start=3 confirmed"
+    printf '%s\n' "Registry.netkvm.Start=3" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  else
+    FAIL "Registry verification failed: netkvm service not correctly registered"
+    INFO "netkvm Start raw: ${NETKVM_CHK:-<missing>}"
     WARN "Restoring backup..."
     sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
     exit 1
@@ -719,8 +791,43 @@ EOF
   fi
 
 else
-  INFO "[DRY-RUN] Would inject viostor, vioscsi, netkvm, vioserial, balloon service entries"
-  INFO "[DRY-RUN] Would add CriticalDeviceDatabase PCI mappings"
+  INFO "[DRY-RUN] Would inject viostor + vioscsi service entries"
+  INFO "[DRY-RUN] Would add storage CriticalDeviceDatabase PCI mappings"
+fi
+
+# Keep first boot conservative: disable only the non-network auxiliary VirtIO
+# services offline and remove stale NetKVM CriticalDeviceDatabase entries left
+# by prior repair runs.
+echo ""
+echo "── Step 5b: Neutralize Non-Storage VirtIO For First Boot ─────────────────"
+
+if [ $DRY_RUN -eq 0 ]; then
+  AUX_REG="/tmp/aux_virtio_off_$$.reg"
+  cat > "$AUX_REG" <<'AUXEOF'
+Windows Registry Editor Version 5.00
+
+"ControlSet001\Services\vioser\Start"=dword:00000004
+"ControlSet002\Services\vioser\Start"=dword:00000004
+"ControlSet001\Services\balloon\Start"=dword:00000004
+"ControlSet002\Services\balloon\Start"=dword:00000004
+"ControlSet001\Services\qxldod\Start"=dword:00000004
+"ControlSet002\Services\qxldod\Start"=dword:00000004
+AUXEOF
+  merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$AUX_REG" >/dev/null 2>&1 || true
+  rm -f "$AUX_REG"
+  sudo hivexsh -w "$HIVE_SYSTEM" <<'EOF' 2>/dev/null || true
+cd \ControlSet001\Control\CriticalDeviceDatabase
+del pci#ven_1af4&dev_1000
+del pci#ven_1af4&dev_1041
+cd \ControlSet002\Control\CriticalDeviceDatabase
+del pci#ven_1af4&dev_1000
+del pci#ven_1af4&dev_1041
+commit
+EOF
+  PASS "Disabled vioser/balloon/qxldod for first boot and removed stale NetKVM CDD entries"
+else
+  INFO "[DRY-RUN] Would disable vioser/balloon/qxldod until first boot"
+  INFO "[DRY-RUN] Would remove stale NetKVM CriticalDeviceDatabase entries"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -741,20 +848,47 @@ Windows Registry Editor Version 5.00
 "ControlSet001\Services\xenvif\Start"=dword:00000004
 "ControlSet001\Services\xeniface\Start"=dword:00000004
 "ControlSet001\Services\xenbus\Start"=dword:00000004
+"ControlSet001\Services\xendisk\Start"=dword:00000004
+"ControlSet001\Services\xenfilt\Start"=dword:00000004
+"ControlSet001\Services\xenagent\Start"=dword:00000004
+"ControlSet001\Services\xenbus_monitor\Start"=dword:00000004
+"ControlSet001\Services\XenSvc\Start"=dword:00000004
 "ControlSet002\Services\xenvbd\Start"=dword:00000004
 "ControlSet002\Services\xennet\Start"=dword:00000004
 "ControlSet002\Services\xenvif\Start"=dword:00000004
 "ControlSet002\Services\xeniface\Start"=dword:00000004
 "ControlSet002\Services\xenbus\Start"=dword:00000004
+"ControlSet002\Services\xendisk\Start"=dword:00000004
+"ControlSet002\Services\xenfilt\Start"=dword:00000004
+"ControlSet002\Services\xenagent\Start"=dword:00000004
+"ControlSet002\Services\xenbus_monitor\Start"=dword:00000004
+"ControlSet002\Services\XenSvc\Start"=dword:00000004
 XENEOF
 
+  _xen_rc=0
   if [ "${DEBUG:-0}" -eq 1 ]; then
-    merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$XEN_REG" 2>&1 || true
+    merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$XEN_REG" 2>&1 || _xen_rc=$?
   else
-    merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$XEN_REG" >/dev/null 2>&1 || true
+    merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$XEN_REG" >/dev/null 2>&1 || _xen_rc=$?
   fi
   rm -f "$XEN_REG"
-  PASS "Xen PV drivers disabled (xenvbd, xennet, xenvif, xeniface, xenbus → Start=4)"
+  [ "$_xen_rc" -eq 0 ] || WARN "Xen disable merge returned rc=$_xen_rc"
+  _xen_verify_fail=0
+  for _xsvc in xenvbd xennet xenvif xeniface xenbus xendisk xenfilt xenagent xenbus_monitor XenSvc; do
+    _xraw="$(hive_value "$HIVE_SYSTEM" "\\ControlSet001\\Services\\$_xsvc" "Start")"
+    if [ -n "${_xraw:-}" ] && ! echo "$_xraw" | grep -Eiq '(^|[^0-9a-f])(4|0x4|0x00000004|00000004)([^0-9a-f]|$)'; then
+      WARN "Xen service $_xsvc still enabled in ControlSet001"
+      printf '%s\n' "Xen.$_xsvc=STILL_ENABLED" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+      _xen_verify_fail=1
+    else
+      printf '%s\n' "Xen.$_xsvc=NEUTRALIZED_OR_ABSENT" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    fi
+  done
+  if [ "$_xen_verify_fail" -eq 0 ]; then
+    PASS "Xen PV drivers neutralized (non-boot-start or absent)"
+  else
+    WARN "Some Xen services still boot-start; boot risk remains"
+  fi
 else
   INFO "[DRY-RUN] Would disable Xen PV drivers"
 fi
@@ -835,6 +969,7 @@ if [ $DRY_RUN -eq 0 ]; then
     exit 1
   fi
   PASS "Standard storage drivers verified (disk, volmgr, volsnap, partmgr, mountmgr)"
+  printf '%s\n' "Registry.ms_storage.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
 else
   INFO "[DRY-RUN] Would verify standard storage stack"
 fi
@@ -1090,6 +1225,10 @@ else
   INFO "[DRY-RUN] Would write C:\\ospc2flex_winre_boot_repair.cmd"
 fi
 
+if [ "$DRY_RUN" -eq 0 ]; then
+  printf '%s\n' "BCD.offline_recovery_suppression=ATTEMPTED" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 8: First-Boot Network + Firewall Script (RunOnce)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1145,7 +1284,23 @@ try {
     Write-Host "[ospc2flex] BCD reinforcement skipped: $_"
 }
 
-# ── 1. Remove ghost/disconnected network adapters (old Xen NICs) ──
+# ── 1. Install staged NetKVM locally after Windows reaches userland ──
+try {
+    $netkvmStage = 'C:\ospc2flex_driver_stage\NetKVM'
+    if (Test-Path $netkvmStage) {
+        Write-Host "[ospc2flex] Installing staged NetKVM driver from $netkvmStage"
+        & pnputil /add-driver "$netkvmStage\*.inf" /subdirs /install 2>&1 | ForEach-Object { Write-Host "[ospc2flex] pnputil: $_" }
+        Start-Sleep -Seconds 3
+        & pnputil /scan-devices 2>&1 | Out-Null
+        Write-Host "[ospc2flex] NetKVM staging install complete"
+    } else {
+        Write-Host "[ospc2flex] NetKVM stage folder not present; skipping"
+    }
+} catch {
+    Write-Host "[ospc2flex] NetKVM staging install error: $_"
+}
+
+# ── 2. Remove ghost/disconnected network adapters (old Xen NICs) ──
 try {
     $ghost = Get-PnpDevice -Class Net -Status Unknown -ErrorAction SilentlyContinue
     foreach ($dev in $ghost) {
@@ -1157,7 +1312,7 @@ try {
     Write-Host "[ospc2flex] Ghost adapter cleanup skipped: $_"
 }
 
-# ── 2. Clear stale static IP bindings and enable DHCP on all adapters ──
+# ── 3. Clear stale static IP bindings and enable DHCP on all adapters ──
 try {
     $adapters = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' -or $_.InterfaceDescription -match 'VirtIO|Red Hat' }
     foreach ($nic in $adapters) {
@@ -1182,7 +1337,7 @@ try {
     Write-Host "[ospc2flex] DHCP config error: $_"
 }
 
-# ── 3. Open firewall for RDP + ICMP on all profiles ──
+# ── 4. Open firewall for RDP + ICMP on all profiles ──
 try {
     # Allow RDP
     Set-NetFirewallRule -DisplayGroup "Remote Desktop" -Enabled True -ErrorAction SilentlyContinue
@@ -1199,7 +1354,7 @@ try {
     Write-Host "[ospc2flex] Firewall config error: $_"
 }
 
-# ── 4. Ensure RDP is enabled in registry ──
+# ── 5. Ensure RDP is enabled in registry ──
 try {
     Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0 -ErrorAction SilentlyContinue
     Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name 'UserAuthentication' -Value 0 -ErrorAction SilentlyContinue
@@ -1208,7 +1363,7 @@ try {
     Write-Host "[ospc2flex] RDP registry error: $_"
 }
 
-# ── 5. Enable OpenSSH Server (Windows Server 2019+ built-in) ──
+# ── 6. Enable OpenSSH Server (Windows Server 2019+ built-in) ──
 try {
     $sshCapability = Get-WindowsCapability -Online -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'OpenSSH.Server*' }
     if ($sshCapability) {
@@ -1231,7 +1386,7 @@ try {
     Write-Host "[ospc2flex] OpenSSH setup error (non-fatal): $_"
 }
 
-# ── 6. Enable WinRM (works on all Windows Server versions) ──
+# ── 7. Enable WinRM (works on all Windows Server versions) ──
 try {
     # Enable WinRM service
     Set-Service -Name WinRM -StartupType Automatic -ErrorAction SilentlyContinue
@@ -1248,7 +1403,7 @@ try {
     Write-Host "[ospc2flex] WinRM setup error (non-fatal): $_"
 }
 
-# ── 7. Run verification and write results ──
+# ── 8. Run verification and write results ──
 try {
     $report = @()
     $report += "=== ospc2flex post-boot verification ==="
@@ -1369,6 +1524,13 @@ SWRUNONCEEOF
     PASS "SOFTWARE RunOnce fallback: HKLM\\...\\RunOnce\\ospc2flex_firstboot"
   fi
 
+  printf '%s\n' "" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  printf '%s\n' "Dynamic BCD note:" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  printf '%s\n' "- Offline repair patches detected BCD objects directly (no blind partition=C: assumption)." | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  printf '%s\n' "- WinRE helper script uses partition=C: only as emergency manual operator fallback." | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  printf '%s\n' "Report status: COMPLETE" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  PASS "Offline validation report: C:\\ospc2flex_offline_repair_report.txt"
+
 else
   INFO "[DRY-RUN] Would write first-boot PowerShell script for DHCP + firewall repair"
   INFO "[DRY-RUN] Would inject RunOnce registry entries in SYSTEM + SOFTWARE hives"
@@ -1392,7 +1554,7 @@ else
 echo " ✅ Windows VirtIO injection complete!"
 fi
 echo "    Product: $PROD_NAME"
-echo "    Drivers: viostor (block), vioscsi (SCSI), netkvm (net), vioserial, balloon, qxldod"
+echo "    Drivers: viostor (block) + vioscsi (SCSI) offline; NetKVM preinstalled and also staged"
 if [ "$DRY_RUN" -eq 1 ]; then
 echo "    Registry: Services + CriticalDeviceDatabase entries would be injected"
 echo "    Xen: PV drivers would be disabled (xenvbd, xennet, xenvif, xeniface, xenbus)"
@@ -1405,7 +1567,7 @@ echo "    Storage: Core MS drivers verified (disk, volmgr, partmgr, volsnap, mou
 echo "    First-boot auto-repair (RunOnce):"
 fi
 echo "      - BCD: bcdedit on {current} + recoverysequence scrub on all BCD entries (incl. winresume)"
-echo "      - Ghost Xen NIC removal + DHCP enable"
+echo "      - Install staged NetKVM, then remove ghost Xen NICs and enable DHCP"
 echo "      - Firewall: RDP (3389) + ICMP + SSH (22) + WinRM (5985)"
 echo "      - OpenSSH Server enabled (2019+) — allows automated SSH verification"
 echo "      - WinRM enabled (all versions) — allows remote PowerShell"

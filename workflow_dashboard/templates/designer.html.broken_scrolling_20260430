@@ -23,7 +23,6 @@
       font-size: 14px;
       color: var(--text);
       background: linear-gradient(120deg, #2a4e8d 0%, #374a86 45%, #5a4b72 100%);
-      min-height: 0;
       display: grid;
       grid-template-rows: auto 1fr;
     }
@@ -276,7 +275,8 @@
         center;
       overflow: hidden;
       height: 700px;
-      flex: 0 0 700px;
+      min-height: 500px;
+      flex: 1 1 auto;
     }
 
     .scene {
@@ -623,10 +623,10 @@
       <section id="deployAuthCard" class="card stack">
       <h2>Deploy Auth</h2>
       <label>Account ID (for script filename)
-        <input id="scriptAccountId" type="text" placeholder="123456" value="1342314" />
+        <input id="scriptAccountId" type="text" placeholder="123456" />
       </label>
       <label>OpenRC File (workspace path)
-        <input id="openrcFile" type="text" placeholder="uploads/my-openrc.sh" value="openrcpassnew.sh" />
+        <input id="openrcFile" type="text" placeholder="uploads/my-openrc.sh" />
       </label>
       <label>Detected OpenRC Files
         <select id="openrcSelect">
@@ -634,6 +634,9 @@
         </select>
       </label>
       <button id="refreshOpenrcBtn">Refresh OpenRC List</button>
+      <label>Or Paste OpenRC Content
+        <textarea id="openrcContent" placeholder="export OS_AUTH_URL=...\nexport OS_USERNAME=..."></textarea>
+      </label>
       <label>API Key / Password (optional override)
         <input id="authSecret" type="password" placeholder="Used as OS_PASSWORD when required by auth" />
       </label>
@@ -685,7 +688,7 @@
       <button id="importLiveBtn">Import From Project</button>
       <p class="hint">Import uses the same OpenRC credentials and discovers resources currently in your project.</p>
       <label>Deployment Script File (workspace path)
-        <input id="scriptFile" type="text" placeholder="uploads/project_123_deploy.sh" value="1342314_tenant_deploy.sh" />
+        <input id="scriptFile" type="text" placeholder="uploads/project_123_deploy.sh" />
       </label>
       <label>Or Paste Deployment Script
         <textarea id="scriptContent" placeholder="#!/usr/bin/env bash\nopenstack network create tenant-net\n..."></textarea>

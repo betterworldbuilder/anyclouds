@@ -3046,7 +3046,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     });
   });
   window.addEventListener('resize', syncVisibleIframeHeights);
-  setInterval(syncVisibleIframeHeights, 1500);
+  // setInterval(syncVisibleIframeHeights, 1500); // Disabled to prevent layout growth loop
 
   // ========== Tracker Logic ==========
   const trackerTbody = document.getElementById("trackerBody");
