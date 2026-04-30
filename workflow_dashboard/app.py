@@ -758,6 +758,21 @@ def validate_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, obje
     return findings, summary
 
 
+def _topology_ignore_validation_errors(payload: Optional[Dict[str, object]] = None) -> bool:
+    """
+    Topology validation errors are non-blocking by default.
+    Override per-request with ignore_validation_errors=false,
+    or globally via OSPC2FLEX_TOPOLOGY_IGNORE_VALIDATION_ERRORS.
+    """
+    payload = payload or {}
+    raw = payload.get("ignore_validation_errors", None)
+    if raw is None:
+        raw = os.getenv("OSPC2FLEX_TOPOLOGY_IGNORE_VALIDATION_ERRORS", "1")
+    if isinstance(raw, bool):
+        return raw
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 def plan_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, object]]) -> List[Dict[str, str]]:
     actions: List[Dict[str, str]] = []
 
@@ -1279,7 +1294,9 @@ def import_live_topology(env: Dict[str, str]) -> Dict[str, Any]:
     map_by_openstack_id: Dict[str, str] = {}
     net_name_to_node: Dict[str, str] = {}
     server_id_to_node: Dict[str, str] = {}
+    volume_id_to_node: Dict[str, str] = {}
     ip_to_instance_node: Dict[str, str] = {}
+    server_detail_by_id: Dict[str, Dict[str, Any]] = {}
 
     def place(node_type: str) -> Tuple[int, int]:
         c = type_count.get(node_type, 0)
@@ -1392,6 +1409,8 @@ def import_live_topology(env: Dict[str, str]) -> Dict[str, Any]:
         sid = _value_from_row(s, ["ID"])
         sname = _value_from_row(s, ["Name"]) or sid
         detail = openstack_json(env, ["server", "show", sid]) if sid else {}
+        if sid and isinstance(detail, dict):
+            server_detail_by_id[sid] = detail
         flavor = ""
         image = ""
         imported_key_name = ""
@@ -1475,14 +1494,33 @@ def import_live_topology(env: Dict[str, str]) -> Dict[str, Any]:
         vtype = _value_from_row(v, ["Type"])
         detail = openstack_json(env, ["volume", "show", vid]) if vid else {}
         v_node = add_node("volume", vname, {"name": vname, "size_gb": size, "volume_type": vtype}, vid)
+        if vid:
+            volume_id_to_node[vid] = v_node
         attachments = detail.get("attachments") if isinstance(detail, dict) else []
         if isinstance(attachments, list):
             for att in attachments:
                 if not isinstance(att, dict):
                     continue
-                sid = str(att.get("server_id") or "")
+                sid = str(att.get("server_id") or att.get("serverId") or att.get("instance_uuid") or "")
                 if sid and sid in server_id_to_node:
                     add_edge(v_node, server_id_to_node[sid], "attach")
+
+    # Fallback source: some clouds expose attached volume IDs more reliably under
+    # server show (volumes_attached) than volume show (attachments).
+    for sid, detail in server_detail_by_id.items():
+        inst_node = server_id_to_node.get(sid)
+        if not inst_node or not isinstance(detail, dict):
+            continue
+        attached = detail.get("volumes_attached")
+        if not isinstance(attached, list):
+            continue
+        for entry in attached:
+            if not isinstance(entry, dict):
+                continue
+            vol_id = str(entry.get("id") or entry.get("volume_id") or "")
+            vol_node = volume_id_to_node.get(vol_id)
+            if vol_node:
+                add_edge(vol_node, inst_node, "attach")
 
     try:
         lbs = openstack_json(env, ["loadbalancer", "list"])
@@ -4994,9 +5032,11 @@ def validate_topology_api():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     findings, summary = validate_topology(nodes, edges)
+    ignore_errors = _topology_ignore_validation_errors(payload)
     return jsonify(
         {
-            "ok": summary["ERROR"] == 0,
+            "ok": (summary["ERROR"] == 0) or ignore_errors,
+            "validation_blocking": not ignore_errors,
             "validation_findings": findings,
             "validation_summary": summary,
         }
@@ -5011,11 +5051,13 @@ def topology_plan_api():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     findings, summary = validate_topology(nodes, edges)
+    ignore_errors = _topology_ignore_validation_errors(payload)
     actions = plan_topology(nodes, edges)
     script_text = topology_to_script(nodes, edges)
     return jsonify(
         {
-            "ok": summary["ERROR"] == 0,
+            "ok": (summary["ERROR"] == 0) or ignore_errors,
+            "validation_blocking": not ignore_errors,
             "validation_findings": findings,
             "validation_summary": summary,
             "planned_actions": actions,
@@ -5109,7 +5151,8 @@ def generate_topology_script():
     if not nodes:
         return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
     findings, summary = validate_topology(nodes, edges)
-    if summary["ERROR"] > 0:
+    ignore_errors = _topology_ignore_validation_errors(payload)
+    if summary["ERROR"] > 0 and not ignore_errors:
         return jsonify(
             {
                 "ok": False,
@@ -5131,6 +5174,7 @@ def generate_topology_script():
             "script_content": script_text,
             "node_count": len(nodes),
             "edge_count": len(edges),
+            "validation_blocking": not ignore_errors,
             "validation_summary": summary,
         }
     )
@@ -5256,7 +5300,8 @@ def deploy_topology_async():
     if not nodes:
         return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
     findings, summary = validate_topology(nodes, edges)
-    if summary["ERROR"] > 0:
+    ignore_errors = _topology_ignore_validation_errors(payload)
+    if summary["ERROR"] > 0 and not ignore_errors:
         return jsonify(
             {
                 "ok": False,
@@ -5603,7 +5648,8 @@ def deploy_topology():
     if not nodes:
         return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
     findings, summary = validate_topology(nodes, edges)
-    if summary["ERROR"] > 0:
+    ignore_errors = _topology_ignore_validation_errors(payload)
+    if summary["ERROR"] > 0 and not ignore_errors:
         return jsonify(
             {
                 "ok": False,
@@ -5980,14 +6026,43 @@ def run_validate():
             )
             summary["ERROR"] += 1
 
+    # Non-blocking validation mode (default): downgrade ERROR findings to WARN so
+    # Stage 3 does not block artifact generation/deploy for noisy source data.
+    ignore_validation_errors_raw = payload.get(
+        "ignore_validation_errors",
+        os.getenv("OSPC2FLEX_IGNORE_VALIDATION_ERRORS", "1"),
+    )
+    ignore_validation_errors = (
+        str(ignore_validation_errors_raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+    )
+    if ignore_validation_errors and summary["ERROR"] > 0:
+        downgraded = 0
+        for entry in findings:
+            if (entry.get("severity") or "").upper() == "ERROR":
+                entry["severity"] = "WARN"
+                downgraded += 1
+        if downgraded:
+            findings.append(
+                {
+                    "severity": "INFO",
+                    "code": "validation_errors_ignored",
+                    "scope": "validator",
+                    "message": f"Downgraded {downgraded} validation ERROR findings to WARN (non-blocking mode).",
+                }
+            )
+            summary["WARN"] += downgraded
+            summary["INFO"] += 1
+            summary["ERROR"] = 0
+
     return jsonify(
         {
-            "ok": rc == 0 and summary["ERROR"] == 0,
+            "ok": (rc == 0 and summary["ERROR"] == 0) or ignore_validation_errors,
             "return_code": rc,
             "log": out,
             "created": created,
             "validation_findings": findings,
             "validation_summary": summary,
+            "validation_blocking": not ignore_validation_errors,
             "validation_report_path": str(report_path) if report_path is not None else "",
             "validation_flavor_mapping": str(flavor_map) if flavor_map is not None else "",
             "validation_block_mapping": str(block_map) if block_map is not None else "",
@@ -8283,7 +8358,6 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         safe_run(ssh_base + ["chmod +x /tmp/mig_worker_v4.sh"], check=True, timeout=15)
 
         # 3. Repair script — only if hash changed (they share the flag)
-        # 3. Repair script — only if hash changed (they share the flag)
         if os.path.isfile(_repair_path):
             msgs.append("[STAGE] Uploading repair script (changed)")
             safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
@@ -8319,6 +8393,33 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
     else:
         msgs.append("[STAGE] Worker + repair scripts unchanged (skipped)")
 
+    msgs.append("[STAGE] Verifying Windows repair dependencies on jumphost")
+    dep_cmd = (
+        "missing=0; "
+        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do command -v \"$c\" >/dev/null 2>&1 || missing=1; done; "
+        "if [ \"$missing\" = 1 ]; then "
+        "sudo apt-get update -qq || true; "
+        "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y qemu-utils ntfs-3g libhivex-bin chntpw wget jq python3-openstackclient software-properties-common || true; "
+        "fi; "
+        "if { ! command -v hivexsh >/dev/null 2>&1 || ! command -v reged >/dev/null 2>&1; } && command -v add-apt-repository >/dev/null 2>&1; then "
+        "sudo add-apt-repository -y universe || true; "
+        "sudo apt-get update -qq || true; "
+        "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y libhivex-bin chntpw || true; "
+        "fi; "
+        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do "
+        "if command -v \"$c\" >/dev/null 2>&1; then echo \"OK:$c=$(command -v \"$c\")\"; else echo \"MISSING:$c\"; fi; "
+        "done; "
+        "exit 0"
+    )
+    dep_proc = safe_run(ssh_base + [dep_cmd], check=False, timeout=300, capture_output=True, text=True)
+    dep_out = ((dep_proc.stdout or "") + (dep_proc.stderr or "")).strip()
+    if dep_out:
+        for line in dep_out.splitlines()[-12:]:
+            if line.startswith("MISSING:"):
+                msgs.append(f"[STAGE][WARN] Windows repair dependency still missing: {line.split(':', 1)[1]}")
+            elif line.startswith("OK:"):
+                msgs.append(f"[STAGE] {line}")
+
     # 4. One-time init: SSH key, modprobe, workspace dir
     if not init_done:
         msgs.append("[STAGE] First-run init: modprobe nbd, workspace, SSH key")
@@ -8326,7 +8427,7 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
             "sudo modprobe nbd max_part=16 2>/dev/null || true; "
             "if ! command -v qemu-nbd &>/dev/null || ! command -v sshpass &>/dev/null; then "
             "sudo apt-get update -qq >/dev/null 2>&1 || true; "
-            "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y sshpass qemu-utils gdisk xfsprogs jq python3-openstackclient >/dev/null 2>&1 || true; "
+            "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y sshpass qemu-utils gdisk xfsprogs jq python3-openstackclient ntfs-3g libhivex-bin chntpw wget >/dev/null 2>&1 || true; "
             "fi; "
             "mkdir -p /mnt/migration/ospc2flex_image"
         ], check=True, timeout=180)
@@ -8387,6 +8488,39 @@ def nbd_run_single():
                 "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
     log_path = f"/tmp/mig_{label}.log"
 
+    def fresh_sync_cleanup_cmd() -> str:
+        return (
+            f"OSPC2FLEX_CLEAN_LABEL={shlex.quote(label)} "
+            f"OSPC2FLEX_CLEAN_IP={shlex.quote(src_ip)} "
+            "python3 - <<'PY'\n"
+            "import os\n"
+            "base = '/mnt/migration/ospc2flex_image'\n"
+            "label = os.environ.get('OSPC2FLEX_CLEAN_LABEL', '')\n"
+            "src_ip = os.environ.get('OSPC2FLEX_CLEAN_IP', '')\n"
+            "tokens = [t for t in (label, src_ip) if t]\n"
+            "image_suffixes = (\n"
+            "    '.qcow2', '.qcow2.win_repaired', '.qcow2.repaired', '.qcow2.converted', '.qcow2.image_id',\n"
+            "    '.img', '.raw', '.vhd', '.vhdx'\n"
+            ")\n"
+            "removed = []\n"
+            "if os.path.isdir(base):\n"
+            "    for name in os.listdir(base):\n"
+            "        path = os.path.join(base, name)\n"
+            "        if not os.path.isfile(path):\n"
+            "            continue\n"
+            "        if not any(t in name for t in tokens):\n"
+            "            continue\n"
+            "        if not name.endswith(image_suffixes):\n"
+            "            continue\n"
+            "        try:\n"
+            "            os.remove(path)\n"
+            "            removed.append(name)\n"
+            "        except FileNotFoundError:\n"
+            "            pass\n"
+            "print('\\n'.join(removed))\n"
+            "PY"
+        )
+
     def generate():
         yield f"data: === NBD Worker: {label} ({os_type}) src={src_ip} nbd={nbd_dev} ===\n\n"
 
@@ -8445,18 +8579,27 @@ def nbd_run_single():
         mig_key = req.get('flex_key_name', '')
         try:
             if _is_windows:
-                _ospc_region = str(ospc_creds.get('region') or 'IAD').strip().lower() or 'iad'
-                _snet_region = re.sub(r'\d+', '', _ospc_region) or 'iad'
-                _snet_host = f"snet-{_snet_region}.images.api.rackspacecloud.com"
-                _dns_check = subprocess.run(
-                    ssh_base + [f"getent hosts {shlex.quote(_snet_host)} >/dev/null 2>&1"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=15,
+                _force_sync = vm.get('force_sync') == True
+                if _force_sync:
+                    try:
+                        clean = subprocess.run(ssh_base + [fresh_sync_cleanup_cmd()], capture_output=True, text=True, check=True, timeout=30)
+                        removed = [x for x in clean.stdout.splitlines() if x.strip()]
+                        yield f"data: [CLEANUP] Fresh Sync enabled: removed {len(removed)} jump-host OSPC image artifact(s) for {label}\n\n"
+                        for item in removed[:20]:
+                            yield f"data: [CLEANUP]   - {item}\n\n"
+                    except Exception as e:
+                        yield f"data: [WARN] Force Fresh Sync cleanup failed for {label}: {e}\n\n"
+
+                # Kill stale workers for this label before launching a fresh Windows migration.
+                kill_stale_cmd = (
+                    f"pkill -f 'ospc2flex_windows_migrate.sh.*{label}' 2>/dev/null || true; "
+                    f"sleep 1; "
+                    f"> {log_path}"
                 )
-                if _dns_check.returncode != 0:
-                    yield f"data: [WARN] ServiceNet Glance host {_snet_host} does not resolve on jumphost {jumphost_ip}.\n\n"
-                    yield "data: [WARN] Continuing anyway: Windows Glance pipeline will try Classic Glance, then Cloud Files export/import fallback.\n\n"
+                try:
+                    subprocess.run(ssh_base + [kill_stale_cmd], timeout=15)
+                except Exception:
+                    pass
 
                 _win_user = src_user or "Administrator"
                 _win_pass = vm_password or str(vm.get('admin_password') or vm.get('instance_password') or '').strip()
@@ -8466,10 +8609,13 @@ def nbd_run_single():
                     f"MIG_SRC_VCPUS={shlex.quote(mig_src_vcpus)} "
                     f"MIG_SRC_RAM_MB={shlex.quote(mig_src_ram_mb)} "
                     f"MIG_SRC_DISK_GB={shlex.quote(mig_src_disk_gb)} "
+                    f"OSPC2FLEX_SELF_TEE=0 "
                     f"bash /tmp/ospc2flex_windows_migrate.sh "
                     f"--server-name {shlex.quote(label)} "
                     f"--server-ip {shlex.quote(src_ip)} "
                     f"--label {shlex.quote(label)} "
+                    f"--os-family windows "
+                    f"--os-type {shlex.quote(os_type or 'windows')} "
                     f"--windows-user {shlex.quote(_win_user)} "
                     f"{('--windows-password ' + shlex.quote(_win_pass) + ' ') if _win_pass else ''}"
                     f"{('--server-snet-ip ' + shlex.quote(_win_snet_ip) + ' ') if _win_snet_ip else ''}"
@@ -8487,10 +8633,13 @@ def nbd_run_single():
                 _force_dd = '1' if vm.get('force_dd') else '0'
                 if _force_sync:
                     try:
-                        subprocess.run(ssh_base + [f"rm -f /mnt/migration/ospc2flex_image/{label}.qcow2*"], check=True, timeout=30)
-                        yield f"data: [CLEANUP] Force Fresh Sync enabled: wiped existing {label}.qcow2 data\n\n"
-                    except Exception:
-                        pass
+                        clean = subprocess.run(ssh_base + [fresh_sync_cleanup_cmd()], capture_output=True, text=True, check=True, timeout=30)
+                        removed = [x for x in clean.stdout.splitlines() if x.strip()]
+                        yield f"data: [CLEANUP] Fresh Sync enabled: removed {len(removed)} jump-host OSPC image artifact(s) for {label}\n\n"
+                        for item in removed[:20]:
+                            yield f"data: [CLEANUP]   - {item}\n\n"
+                    except Exception as e:
+                        yield f"data: [WARN] Force Fresh Sync cleanup failed for {label}: {e}\n\n"
 
                 # Kill any stale workers for this label before launching a fresh one
                 kill_stale_cmd = (
@@ -8733,6 +8882,8 @@ done
         def normalize_mig_label(name: str) -> str:
             label = re.sub(r'\.(qcow2|raw|vhd)$', '', str(name or ""))
             label = re.sub(r'\.qcow2\.image_id$', '', label)
+            # Timestamped Windows artifacts: <base>-YYYYMMDD-HHMMSS (from ospc2flex_windows_migrate.sh)
+            label = re.sub(r'-\d{8}-\d{6}$', '', label)
             return re.sub(r'-\d{1,3}(?:\.\d{1,3}){3}$', '', label)
 
         section = None

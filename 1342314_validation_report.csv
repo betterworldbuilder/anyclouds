@@ -1,2 +1,4 @@
 severity,code,scope,message
-INFO,validation_passed,all,No issues found
+ERROR,missing_target_image,flavormap:row:3,server_id=f2110fde-3890-464c-b35c-8ee1dc0bbf24 missing recommended_target_image_name
+WARN,boot_volume_below_image_min_disk,flavormap:row:9,server_id=aaabe292-762c-4847-b249-b181ead4737c boot_from_volume_size_gb=50 is below image minimum 80 for 'Windows Server 2019'
+WARN,duplicate_server_name,flavormap,"Included server_name 'win2019' appears multiple times at rows [9, 10]; name collisions can break deployment"

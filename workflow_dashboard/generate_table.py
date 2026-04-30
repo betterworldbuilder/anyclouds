@@ -166,18 +166,6 @@ end_idx = content.find(end_tag, start_idx)
 
 new_content = content[:start_idx + len(start_tag)] + "\n" + html_body.strip() + "\n" + content[end_idx:]
 
-# Also update the div right below it
-search_div = '<strong style="color:#a5b4fc;">Version-specific repair differences:</strong><br>'
-div_idx = new_content.find(search_div)
-if div_idx != -1:
-    div_end_idx = new_content.find('</div>', div_idx)
-    new_div = """<strong style="color:#a5b4fc;">Version-specific repair differences:</strong><br>
-                                    · <span style="color:#f0abfc">Ubuntu</span>: NIC=enp3s0 (20/22) vs ens3 (24) — wildcard netplan covers both<br>
-                                    · <span style="color:#6ee7b7">Debian 12</span>: dropped ifupdown → uses <b>netplan + systemd-networkd</b>. ALL Debian gets grub.cfg xvda→vda+sgdisk patch.<br>
-                                    · <span style="color:#fbbf24">Alma/Rocky 9</span>: NM keyfile (<code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;">eth0.nmconnection</code>) alongside ifcfg-eth0. ALL RHEL gets grubenv+BLS and GPT fixes.<br>
-                                    · <span style="color:#fb923c">CentOS 7</span>: Missing virtio modules injected directly into initramfs via dracut."""
-    new_content = new_content[:div_idx] + new_div + new_content[div_end_idx:]
-
 with open('templates/image_migrator.html', 'w', encoding='utf-8') as f:
     f.write(new_content)
 

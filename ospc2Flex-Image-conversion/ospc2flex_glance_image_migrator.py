@@ -1263,7 +1263,12 @@ def main() -> int:
         log("[STAGE-START] 3 · Offline repair")
         try:
             if os_type_hint == "windows":
-                run(f"sudo bash {shell_quote(windows_repair_script)} --qcow2 {shell_quote(str(converted_path))} --force", check=True)
+                _win_dbg = f"{converted_path}.repair.debug.log"
+                run(
+                    f"sudo bash {shell_quote(windows_repair_script)} --qcow2 {shell_quote(str(converted_path))} "
+                    f"--force --debug --debug-log {shell_quote(_win_dbg)}",
+                    check=True,
+                )
                 log("[STAGE-OK] 3 · Windows offline repair completed")
             else:
                 repair_cmd = f"sudo bash {shell_quote(repair_script)} --qcow2 {shell_quote(str(converted_path))} --force"

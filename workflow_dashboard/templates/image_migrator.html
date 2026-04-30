@@ -12,6 +12,7 @@
     <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <style>
+      .collapsed { display: none !important; }
       @keyframes neonPulse {
           0%   { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
           33%  { color: #00e5ff; text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff, 0 0 30px #00e5ff; }
@@ -438,8 +439,397 @@
      // Users must explicitly provide their own credentials.
                 </script>
 
+
+                <!-- Jumphost connection fields (hidden — used by batch migration JS) -->
+                <input type="hidden" id="processing_location_type" value="production">
+                <input type="hidden" id="process_host_ip" name="process_host_ip" value="{{ default_jh_ip }}">
+                <input type="hidden" id="workdir" name="workdir" value="/mnt/migration/ospc2flex_image">
+                <input type="hidden" id="process_ssh_user" name="process_ssh_user" value="{{ default_jh_user }}">
+                <input type="hidden" id="process_ssh_key" name="process_ssh_key" value="{{ default_jh_key }}">
+
+                <!-- JUMPHOST CONNECTION — Per-Region -->
+                <div class="config-group" style="margin-top: 16px;">
+                    <div class="group-header">
+                        <h3>🖥 Jumphost Connection <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:8px;">Per-Region Configuration</span></h3>
+                        <label class="toggle-switch accent-blue">
+                            <input type="checkbox" checked onchange="document.getElementById('jumphost-fields').classList.toggle('collapsed')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="jumphost-fields" class="collapsable">
+                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.1);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
+                            <strong style="color:#fed7aa;">⚡ Tip:</strong> Deploy your jumphost in the <strong>same OSPC region</strong> as the source VMs/snapshots for maximum transfer speed.
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+                            <label for="jh_region_select" style="color:#94a3b8;font-size:12px;font-weight:600;white-space:nowrap;">OSPC Region</label>
+                            <select id="jh_region_select"
+                                style="background:#0f172a;border:1px solid rgba(59,130,246,0.5);border-radius:7px;color:#e2e8f0;font-size:13px;padding:8px 12px;cursor:pointer;min-width:120px;font-weight:600;"
+                                onchange="window._jhSelectRegion(this.value)">
+                                <option value="IAD">IAD — Northern Virginia</option>
+                                <option value="DFW">DFW — Dallas Fort Worth</option>
+                                <option value="ORD">ORD — Chicago</option>
+                                <option value="LON">LON — London</option>
+                                <option value="SYD">SYD — Sydney</option>
+                                <option value="HKG">HKG — Hong Kong</option>
+                            </select>
+                            <button type="button" id="jh-sync-region-btn"
+                                style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;padding:7px 10px;cursor:pointer;white-space:nowrap;"
+                                title="Copy region from OSPC Snapshot Scanner"
+                                onclick="const sr=document.getElementById('image_scan_region'); if(sr && sr.value!=='ALL'){document.getElementById('jh_region_select').value=sr.value; window._jhSelectRegion(sr.value);} else {alert('Set a specific region in Snapshot Scanner first.');}">
+                                ⇄ Match Snapshot Scanner
+                            </button>
+                            <span id="jh-region-status" style="color:#4ade80;font-size:11px;font-weight:600;"></span>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-control">
+                                <label for="nbd_jumphost_ip">Jumphost IP</label>
+                                <input type="text" id="nbd_jumphost_ip" placeholder="e.g. 104.239.169.89" value="{{ default_jh_ip }}" oninput="document.getElementById('process_host_ip').value=this.value; window._jhSaveField('ip', this.value);">
+                            </div>
+                            <div class="form-control">
+                                <label for="nbd_jumphost_user">SSH User</label>
+                                <input type="text" id="nbd_jumphost_user" placeholder="ubuntu" value="{{ default_jh_user }}" oninput="document.getElementById('process_ssh_user').value=this.value; window._jhSaveField('user', this.value);">
+                            </div>
+                            <div class="form-control">
+                                <label for="nbd_jumphost_key">SSH Key Path</label>
+                                <input type="text" id="nbd_jumphost_key" placeholder="~/.ssh/id_rsa" value="{{ default_jh_key }}" oninput="document.getElementById('process_ssh_key').value=this.value; window._jhSaveField('key', this.value);">
+                            </div>
+                        </div>
+
+                        <!-- Per-region config summary table -->
+                        <div style="margin-top:14px;border:1px solid #1e293b;border-radius:8px;overflow:hidden;">
+                            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                                <thead>
+                                    <tr style="background:#0f172a;">
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Region</th>
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Jumphost IP</th>
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">SSH User</th>
+                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Key Path</th>
+                                        <th style="padding:6px 10px;text-align:center;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="jh-region-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                (function() {
+                    const REGIONS = ['IAD', 'DFW', 'ORD', 'LON', 'SYD', 'HKG'];
+                    const STORAGE_KEY = 'jh_region_configs';
+                    const defaultIp = '{{ default_jh_ip }}';
+                    const defaultUser = '{{ default_jh_user }}' || 'ubuntu';
+                    const defaultKey = '{{ default_jh_key }}' || '~/.ssh/id_rsa';
+
+                    function loadConfigs() {
+                        try {
+                            const raw = localStorage.getItem(STORAGE_KEY);
+                            if (raw) return JSON.parse(raw);
+                        } catch(e) {}
+                        // Initialize with defaults — only first region gets the server-side default IP
+                        const configs = {};
+                        REGIONS.forEach((r, i) => {
+                            configs[r] = {
+                                ip: i === 0 ? defaultIp : '',
+                                user: defaultUser,
+                                key: defaultKey
+                            };
+                        });
+                        return configs;
+                    }
+
+                    function saveConfigs(configs) {
+                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(configs)); } catch(e) {}
+                    }
+
+                    const configs = loadConfigs();
+
+                    function applyRegion(region) {
+                        const cfg = configs[region] || { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
+                        const ipEl = document.getElementById('nbd_jumphost_ip');
+                        const userEl = document.getElementById('nbd_jumphost_user');
+                        const keyEl = document.getElementById('nbd_jumphost_key');
+                        if (ipEl)   { ipEl.value = cfg.ip;   document.getElementById('process_host_ip').value = cfg.ip; }
+                        if (userEl) { userEl.value = cfg.user; document.getElementById('process_ssh_user').value = cfg.user; }
+                        if (keyEl)  { keyEl.value = cfg.key;  document.getElementById('process_ssh_key').value = cfg.key; }
+                        const status = document.getElementById('jh-region-status');
+                        if (status) status.textContent = cfg.ip ? `✅ ${region} jumphost loaded` : `⚠ ${region} — no IP configured`;
+                        renderTable(region);
+                    }
+
+                    function renderTable(activeRegion) {
+                        const tbody = document.getElementById('jh-region-table-body');
+                        if (!tbody) return;
+                        let html = '';
+                        REGIONS.forEach(r => {
+                            const cfg = configs[r] || {};
+                            const isActive = r === activeRegion;
+                            const hasIp = !!(cfg.ip && cfg.ip.trim());
+                            const rowBg = isActive ? 'background:rgba(59,130,246,0.12);' : '';
+                            const statusIcon = hasIp ? '<span style="color:#4ade80;">✅</span>' : '<span style="color:#475569;">—</span>';
+                            const regionColor = isActive ? '#60a5fa' : '#94a3b8';
+                            const ipColor = hasIp ? '#e2e8f0' : '#475569';
+                            html += `<tr style="${rowBg}border-bottom:1px solid #1e293b;cursor:pointer;" onclick="document.getElementById('jh_region_select').value='${r}'; window._jhSelectRegion('${r}');" title="Click to switch to ${r}">`;
+                            html += `<td style="padding:5px 10px;color:${regionColor};font-weight:${isActive?'700':'400'};">${isActive ? '▸ ' : ''}${r}</td>`;
+                            html += `<td style="padding:5px 10px;color:${ipColor};font-family:monospace;font-size:11px;">${cfg.ip || '—'}</td>`;
+                            html += `<td style="padding:5px 10px;color:#94a3b8;">${cfg.user || '—'}</td>`;
+                            html += `<td style="padding:5px 10px;color:#94a3b8;font-family:monospace;font-size:10px;">${cfg.key || '—'}</td>`;
+                            html += `<td style="padding:5px 10px;text-align:center;">${statusIcon}</td>`;
+                            html += '</tr>';
+                        });
+                        tbody.innerHTML = html;
+                    }
+
+                    window._jhSelectRegion = function(region) {
+                        applyRegion(region);
+                    };
+
+                    window._jhSaveField = function(field, value) {
+                        const region = document.getElementById('jh_region_select').value;
+                        if (!configs[region]) configs[region] = { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
+                        configs[region][field] = value;
+                        saveConfigs(configs);
+                        renderTable(region);
+                    };
+
+                    // Initialize on page load
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Determine initial region: try to match default IP to a stored config
+                        let initRegion = 'IAD';
+                        if (defaultIp) {
+                            for (const r of REGIONS) {
+                                if (configs[r] && configs[r].ip === defaultIp) { initRegion = r; break; }
+                            }
+                        }
+                        document.getElementById('jh_region_select').value = initRegion;
+                        applyRegion(initRegion);
+                        saveConfigs(configs);
+                    });
+                })();
+                </script>
+
+                <!-- 3. GLOBAL MIGRATION SETTINGS -->
+                <form id="batch-mig-form" novalidate onsubmit="return false;">
+                    <div class="config-group" style="margin-top: 16px;">
+                        <div class="group-header">
+                            <h3>Global Migration Settings</h3>
+                        </div>
+
+                        <div class="form-grid mb-3">
+                            <div class="form-control">
+                                <label for="target_format">Target Format</label>
+                                <select id="target_format" name="target_format">
+                                    <option value="qcow2">qcow2</option>
+                                    <option value="raw">raw</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="visibility">Visibility</label>
+                                <select id="visibility" name="visibility">
+                                    <option value="private">Private</option>
+                                    <option value="public">Public</option>
+                                    <option value="shared">Shared</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TEST VM OPTIONS -->
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>Global Test VM Deploy Options</h3>
+                        </div>
+                        <input type="hidden" id="boot_test_vm" name="boot_test_vm" value="on">
+
+                        <div id="test-vm-fields" class="collapsable">
+                            <div class="form-grid">
+                                <div class="form-control">
+                                    <label>FLEX Flavor</label>
+                                    <input type="text" id="flex_flavor_fallback" placeholder="UUID (or leave for auto-map)">
+                                </div>
+                                <div class="form-control">
+                                    <label>Test Server Name</label>
+                                    <input type="text" disabled placeholder="[AUTO: &lt;flex-name&gt;-lift-test or OSPC2FLEX-TEST-VM]">
+                                </div>
+                                <div class="form-control">
+                                    <label for="flex_network_id">FLEX Network ID *</label>
+                                    <input type="text" id="flex_network_id" name="flex_network_id" placeholder="UUID">
+                                </div>
+                                <div class="form-control">
+                                    <label for="flex_key_name">FLEX Keypair Name *</label>
+                                    <input type="text" id="flex_key_name" name="flex_key_name" value="laptopubuntu24" placeholder="my-key">
+                                </div>
+                                <div class="form-control">
+                                    <label for="flex_external_network_name">FLEX External Network Name *</label>
+                                    <input type="text" id="flex_external_network_name" name="flex_external_network_name" value="PUBLICNET" placeholder="PUBLICNET"
+                                        oninput="const q=document.getElementById('flex_external_network_input'); if(q) q.value=this.value; localStorage.setItem('mig_flex_ext_net',this.value);">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+
+
+
+                    <input type="hidden" id="mig_mode_value" value="live">
+                    <div class="form-actions" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; align-items: flex-start;">
+
+                        <!-- NBD buttons moved to bottom of Live Server VM Migration section above -->
+
+                    </div>
+                </form>
                 <hr class="divider">
 
+
+                <style>
+                    @keyframes neonBlueTextPulse {
+                        0% { text-shadow: 0 0 4px #0284c7, 0 0 10px #0284c7; }
+                        50% { text-shadow: 0 0 8px #38bdf8, 0 0 20px #38bdf8; }
+                        100% { text-shadow: 0 0 4px #0284c7, 0 0 10px #0284c7; }
+                    }
+                    @keyframes frameBluePulse {
+                        0%, 100% { box-shadow: 0 0 4px #fff, 0 0 10px #00cfff, 0 0 20px #00cfff, inset 0 0 10px rgba(0,207,255,.2); border-color: #00cfff; }
+                        50% { box-shadow: 0 0 6px #fff, 0 0 15px #7dd3fc, 0 0 35px #7dd3fc, inset 0 0 15px rgba(0,207,255,.4); border-color: #7dd3fc; }
+                    }
+                </style>
+                <div style="margin-top: 40px; margin-bottom: 25px;">
+                    <div style="cursor: pointer; display: inline-block; padding: 12px 28px; border: 4px solid #00cfff; border-radius: 16px; background: rgba(0,8,20,.9); animation: frameBluePulse 3s infinite ease-in-out;" onclick="(function(btn){var b=document.getElementById('coldMigrationMethodBody');b.classList.toggle('collapsed');var h=btn.querySelector('.cold-mig-toggle-hint');if(h)h.textContent=b.classList.contains('collapsed')?'▶ Toggle':'▼ Toggle';})(this);">
+                        <span style="font-family: 'Orbitron', monospace; font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; animation: neonBlueTextPulse 2s infinite ease-in-out;">
+                            Cold VM snapshot migration ( under test ) <span class="cold-mig-toggle-hint" style="font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; text-transform: none; animation: none; text-shadow: none; vertical-align: middle; margin-left: 10px;">▶ Toggle</span>
+                        </span>
+                    </div>
+                </div>
+                <div id="coldMigrationMethodBody" class="collapsed">
+                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(0,207,255,0.4);border-radius:12px;padding:20px;margin-top:20px;margin-bottom:25px;display:grid;grid-template-columns:minmax(180px, 1fr) 2fr 1fr 1fr;gap:20px;align-items:start;">
+                    <div>
+                        <div style="color:#a855f7;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🖼 OSPC Snapshot Discovery &amp; Cold Migration</div>
+                        <span style="font-size:0.75rem;color:#64748b;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px;">Cold Migration (Fastest)</span>
+                    </div>
+                    <div>
+                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.12);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
+                            <strong style="color:#fed7aa;">⚡ Recommended:</strong> Use a Jumphost deployed in the <strong>same region</strong> as the origin OSPC VMs or snapshots for fastest transfer speeds and lowest latency.
+                        </div>
+                        <ol style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.85rem;line-height:1.6;">
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Scan Private Snapshots:</strong> Discovers all private tenant snapshot images in the selected OSPC region via Glance API.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Download Image:</strong> Jumphost streams the raw image bit-stream from OSPC Glance using regional auth tokens.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Convert to QCOW2:</strong> Converts the downloaded image to FLEX-compatible <code>qcow2</code> format using <code>qemu-img convert</code>.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Offline Disk Repair:</strong> Auto-detects OS type and applies chroot-based fixes (fstab, initramfs, network config, virtio drivers) without booting the VM.</li>
+                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Upload to FLEX Glance:</strong> Pushes the repaired image into FLEX Glance with auto-injected <code>os_type</code> and <code>hw_qemu_guest_agent=yes</code> metadata.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <ul style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.85rem;line-height:1.6;">
+                            <li style="margin-bottom:8px;">Extremely fast (no live snapshot wait).</li>
+                            <li style="margin-bottom:8px;">Fully offline repair — no VM boot required.</li>
+                            <li style="margin-bottom:8px;">Preserves golden baseline integrity.</li>
+                            <li style="margin-bottom:8px;">Same-region jumphost minimizes transfer time.</li>
+                        </ul>
+                    </div>
+                    <div style="font-size:0.85rem;color:#94a3b8;line-height:1.6;">
+                        The absolute fastest and safest <strong>cold migration method</strong>. Perfect for porting golden server templates, exact point-in-time static backups, or bulk snapshot migrations.
+                    </div>
+                </div>
+
+
+                <section class="adv-panel" id="imageScannerPanel" style="margin-top: 16px;">
+                        <!-- ── Private OSPC Snapshot Scanner ── -->
+                        <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
+                            <div style="font-size:0.82rem;font-weight:700;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">
+                                <span>🖼 Private OSPC Snapshot Discovery Tool</span>
+                            </div>
+                            <div id="privateSnapshotBody">
+                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                                <label for="image_scan_region" style="color:#94a3b8;font-size:11px;white-space:nowrap;">Region</label>
+                                <select id="image_scan_region" name="image_scan_region" title="OpenStack region for image list (same options as VM scanner)"
+                                    style="background:#0f172a;border:1px solid rgba(16,185,129,0.4);border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;cursor:pointer;">
+                                    <option value="ALL">ALL Regions</option>
+                                    <option value="DFW">DFW</option>
+                                    <option value="IAD">IAD</option>
+                                    <option value="ORD">ORD</option>
+                                    <option value="LON">LON</option>
+                                    <option value="SYD">SYD</option>
+                                    <option value="HKG">HKG</option>
+                                </select>
+                                <button type="button" id="image-scan-sync-region-btn"
+                                    style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;padding:7px 10px;cursor:pointer;white-space:nowrap;"
+                                    title="Copy region from OSPC Server Scanner">
+                                    ⇄ Match VM scanner region
+                                </button>
+                                <button id="image-scan-btn" type="button"
+                                    style="background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;padding:8px 16px;cursor:pointer;white-space:nowrap;">
+                                    🔍 Start Private Snapshot Scan
+                                </button>
+                                <span style="color:#64748b;font-size:11px;">Scans private tenant snapshots only · region sets <code style="font-size:10px;">OS_REGION_NAME</code></span>
+                            </div>
+                            <div id="image-scan-console-wrap" style="display:none;margin-top:12px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                                    <span style="color:#6ee7b7;font-size:11px;font-weight:600;">Live Image Scan Console <span id="image-scan-spinner">⚙</span></span>
+                                    <button type="button" onclick="document.getElementById('image-scan-console-wrap').style.display='none'"
+                                        style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;">✕</button>
+                                </div>
+                                <pre id="image-scan-log" style="background:#060a10;border:1px solid #065f46;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#94a3b8;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;">Waiting to start…</pre>
+                            </div>
+                            </div>
+                        </div>
+
+                        <div id="ospcImageContainer" style="display:none;margin-top:10px;">
+                            <div class="table-header">
+                                <h2>Private Snapshot Migration List</h2>
+                                <span id="imageRowCount" class="pill">0 rows</span>
+                            </div>
+                            <div id="privateSnapshotListBody">
+                            <div id="imageScanSummary" style="margin:8px 0 10px;color:#86efac;font-size:12px;">Private images found: 0 | Migratable snapshots: 0 | Excluded private images: 0 | Skipped provider/public images: 0</div>
+                            <div class="mapper-search">
+                                <input id="imageTableSearch" type="text" placeholder="Search snapshots by name, ID, or source VM…" />
+                                <select id="imageFilterMode" style="margin-left:8px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;">
+                                    <option value="migratable" selected>Migratable only</option>
+                                    <option value="all">All private</option>
+                                    <option value="rejected">Rejected only</option>
+                                </select>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
+                                <button type="button" id="refresh-private-snapshots-btn" style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#cbd5e1;font-size:12px;padding:7px 12px;cursor:pointer;">Refresh Private Snapshots</button>
+                                <button type="button" id="select-all-migratable-btn" style="background:#052e1d;border:1px solid #065f46;border-radius:7px;color:#6ee7b7;font-size:12px;padding:7px 12px;cursor:pointer;">Select All Migratable</button>
+                                <button type="button" id="clear-snapshot-selection-btn" style="background:#1f2937;border:1px solid #475569;border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 12px;cursor:pointer;">Clear Selection</button>
+                                <button type="button" id="download-selected-snapshots-btn" style="background:#0b5ed7;border:1px solid #3b82f6;border-radius:7px;color:#fff;font-size:12px;padding:7px 12px;cursor:pointer;">Download Selected Snapshots</button>
+                                <button type="button" id="generate-snapshot-manifest-btn" style="background:#3f1d7a;border:1px solid #8b5cf6;border-radius:7px;color:#f5f3ff;font-size:12px;padding:7px 12px;cursor:pointer;">Generate Migration Manifest</button>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="adv-table" id="ospc-image-table"></table>
+                            </div>
+                            </div>
+                        </div>
+                </section>
+
+                <!-- Cold Image Migration Action Buttons -->
+                <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:18px 0 24px;">
+                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
+                        style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start;"
+                        title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
+                        onclick="document.getElementById('mig_mode_value').value='live';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        <span>🖼 Cold Direct Snapshot migration</span>
+                    </button>
+                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-dryrun-btn"
+                        style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); border-color: #a855f7; justify-content: flex-start;"
+                        title="Dry Run: Glance → jumphost → FLEX pipeline"
+                        onclick="document.getElementById('mig_mode_value').value='dryrun';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <span>🖼 Direct OSPC 2 Flex Image Dry run Migration</span>
+                    </button>
+                    <button type="button" id="stop-image-batch-btn"
+                        style="display:none; background: linear-gradient(135deg, #c2410c 0%, #7c2d12 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;"
+                        title="Stop the image migration pipeline only">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                        ⏹ Stop Image Batch
+                    </button>
+                </div>
+                </div>
 
                     <style>
                         @keyframes neonPinkTextPulse {
@@ -453,12 +843,13 @@
                         }
                     </style>
                     <div style="margin-top: 35px; margin-bottom: 25px;">
-                        <div style="display: inline-block; padding: 12px 28px; border: 4px solid #ff2d78; border-radius: 16px; background: rgba(0,2,12,.7); animation: framePinkPulse 3s infinite ease-in-out;">
+                        <div style="cursor: pointer; display: inline-block; padding: 12px 28px; border: 4px solid #ff2d78; border-radius: 16px; background: rgba(0,2,12,.7); animation: framePinkPulse 3s infinite ease-in-out;" onclick="(function(btn){var b=document.getElementById('liveMigrationMethodBody');b.classList.toggle('collapsed');var h=btn.querySelector('.live-mig-toggle-hint');if(h)h.textContent=b.classList.contains('collapsed')?'▶ Toggle':'▼ Toggle';})(this);">
                             <span style="font-family: 'Orbitron', monospace; font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; animation: neonPinkTextPulse 2s infinite ease-in-out;">
-                                Live Server VM Migration method
+                                Live Server VM Migration method <span class="live-mig-toggle-hint" style="font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; text-transform: none; animation: none; text-shadow: none; vertical-align: middle; margin-left: 10px;">▼ Toggle</span>
                             </span>
                         </div>
                     </div>
+                    <div id="liveMigrationMethodBody">
                     <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,45,120,0.3);border-radius:12px;padding:20px;margin-top:20px;margin-bottom:25px;display:grid;grid-template-columns:minmax(180px, 1fr) 2fr 1fr 1fr;gap:20px;align-items:start;">
                         <div>
                             <div style="color:#22c55e;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🚀 OSPC Server Batch NBD</div>
@@ -650,7 +1041,7 @@
                                     </div>
 
 
-                                <details open style="margin-top:10px;background:rgba(15,23,42,0.6);border:1px solid rgba(99,102,241,0.3);border-radius:6px;overflow:hidden;">
+                                <details style="margin-top:10px;background:rgba(15,23,42,0.6);border:1px solid rgba(99,102,241,0.3);border-radius:6px;overflow:hidden;">
                                     <summary style="padding:10px 15px;cursor:pointer;font-size:0.85rem;font-weight:700;color:#a5b4fc;letter-spacing:0.06em;text-transform:uppercase;user-select:none;background:rgba(99,102,241,0.1);">
                                         🔧 FLEX LINUX Repair Profiles
                                     </summary>
@@ -800,7 +1191,7 @@
                                 </div>
                                 </details>
 
-                                <details open style="margin-top:12px;background:rgba(15,23,42,0.6);border:1px solid rgba(16,185,129,0.3);border-radius:6px;overflow:hidden;">
+                                <details style="margin-top:12px;background:rgba(15,23,42,0.6);border:1px solid rgba(16,185,129,0.3);border-radius:6px;overflow:hidden;">
                                     <summary style="padding:10px 15px;cursor:pointer;font-size:0.85rem;font-weight:700;color:#34d399;letter-spacing:0.06em;text-transform:uppercase;user-select:none;background:rgba(16,185,129,0.1);">
                                         🔧 FLEX Windows Repair Profiles
                                     </summary>
@@ -876,18 +1267,18 @@
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">Firmware/Boot Mode</td><td style="padding:6px 10px;">BIOS/MBR-style observed (winload.exe)</td><td style="padding:6px 10px;">Should stay BIOS-compatible unless you explicitly convert to UEFI</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep boot mode</td><td style="padding:6px 10px;">Do not force UEFI conversion during migration; preserve BIOS/MBR boot chain for these VMs.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">BCD Loader Path</td><td style="padding:6px 10px;">\Windows\System32\winload.exe</td><td style="padding:6px 10px;">Must remain valid for migrated disk</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Verify bcdedit /enum all still points OS loader to winload.exe and correct partition after repair.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">Disk Partition Style</td><td style="padding:6px 10px;">MBR (OSPC 2016/2019 collected)</td><td style="padding:6px 10px;">FLEX should boot same style for these images</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Avoid repartitioning/GPT conversion in repair script unless deliberate with full BCD rewrite.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">System/Boot Partition</td><td style="padding:6px 10px;">Single C: partition marked Boot+System in OSPC samples</td><td style="padding:6px 10px;">FLEX 2016 screenshot shows C: Boot,System too</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Preserve existing boot/system mapping; only repair if boot flags/BCD break.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">Storage Controller Driver</td><td style="padding:6px 10px;">Xen-era stack on source image</td><td style="padding:6px 10px;">VirtIO storage on FLEX (viostor / optionally vioscsi)</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;">Inject VirtIO storage drivers offline (DriverStore + service registry). Set boot-critical start for storage path.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Network Driver</td><td style="padding:6px 10px;">Xen NIC driver profile</td><td style="padding:6px 10px;">VirtIO NIC (netkvm) on FLEX</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;">Inject netkvm offline so NIC appears on first boot.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">Xen Guest Services</td><td style="padding:6px 10px;">May exist in source image</td><td style="padding:6px 10px;">Not needed on FLEX</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;">Disable/remove Xen PV services (xenvbd, xennet, etc.) to avoid boot/device conflicts.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Microsoft Core Storage Services</td><td style="padding:6px 10px;">disk, partmgr, volmgr, volsnap, mountmgr</td><td style="padding:6px 10px;">Must remain healthy</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Ensure these services are present and boot/auto as required; do not disable them.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">IP Configuration Binding</td><td style="padding:6px 10px;">Often tied to old NIC/MAC profile</td><td style="padding:6px 10px;">New FLEX MAC/interface</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;">On first boot, clear stale static profile / ghost adapter and enable DHCP for new interface.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Windows Firewall Profile</td><td style="padding:6px 10px;">Often permissive/known profile in source</td><td style="padding:6px 10px;">New NIC often lands in Public profile</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;">Add first-boot rule/script to allow management access (RDP/ICMP) or temporarily relax firewall profile, then harden later.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">Recovery/WinRE Entries</td><td style="padding:6px 10px;">Present in OSPC image</td><td style="padding:6px 10px;">Usually migrates intact</td><td style="padding:6px 10px;color:#cbd5e1;font-weight:700;">Keep (verify)</td><td style="padding:6px 10px;">Keep WinRE entries unless broken; only rebuild BCD/WinRE links if boot recovery fails.</td></tr>
-                                                <tr><td style="padding:6px 10px;font-weight:700;">Boot Diagnostics Visibility</td><td style="padding:6px 10px;">Console output + BCD available</td><td style="padding:6px 10px;">Needed for post-migration verification</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Always capture bcdedit, disk/partition, volume, and key service state before/after migration.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">OS Family</td><td style="padding:6px 10px;">Windows Server 2016</td><td style="padding:6px 10px;">Windows Server 2016 Datacenter</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Same Family</td><td style="padding:6px 10px;">Ensure OS-specific repair profile matches target edition (Datacenter).</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Disk Bus</td><td style="padding:6px 10px;">OSPC/Xen-style originally</td><td style="padding:6px 10px;">Red Hat VirtIO SCSI</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;"><b>Critical:</b> FLEX expects VirtIO SCSI. Inject vioscsi + viostor offline.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Partition Style</td><td style="padding:6px 10px;">MBR</td><td style="padding:6px 10px;">MBR</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">No UEFI conversion needed. Preserve MBR boot sector.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Boot Mode</td><td style="padding:6px 10px;">BIOS/MBR style</td><td style="padding:6px 10px;">BIOS/MBR style</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Use winload.exe path in BCD; do not switch to winload.efi.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Windows Partition</td><td style="padding:6px 10px;">Single C: partition</td><td style="padding:6px 10px;">C: is Boot/System</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Ensure BCD device/osdevice points to partition=C:</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Recovery Partition</td><td style="padding:6px 10px;">Not clearly separated</td><td style="padding:6px 10px;">Separate 1 GB Recovery</td><td style="padding:6px 10px;color:#cbd5e1;font-weight:700;">FLEX-Specific</td><td style="padding:6px 10px;">FLEX reference has recovery partition; migration should preserve C: as primary boot.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">BCD Loader Path</td><td style="padding:6px 10px;">\windows\system32\winload.exe</td><td style="padding:6px 10px;">\Windows\system32\winload.exe</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Verify loader path case-insensitive match.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Storage Drivers</td><td style="padding:6px 10px;">Not present (Xen)</td><td style="padding:6px 10px;">Present (Start=0)</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Inject</td><td style="padding:6px 10px;"><b>vioscsi</b> is the missing critical FLEX boot driver. Injection required.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Core Storage Stack</td><td style="padding:6px 10px;">disk, partmgr, volmgr...</td><td style="padding:6px 10px;">All boot-start</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Ensure standard Windows storage services are NOT disabled.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Old Xen Drivers</td><td style="padding:6px 10px;">Xen/PV style</td><td style="padding:6px 10px;">Not used on FLEX</td><td style="padding:6px 10px;color:#cbd5e1;font-weight:700;">Disable</td><td style="padding:6px 10px;">Disable xenvbd, xennet etc. to prevent STOP 0x7B conflicts.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Drive Mapping</td><td style="padding:6px 10px;">OSPC specific identity</td><td style="padding:6px 10px;">FLEX clean C:</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Reset</td><td style="padding:6px 10px;"><b>Critical:</b> Clear <code>MountedDevices</code> registry key to fix Inaccessible Boot Device.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Active MBR Flag</td><td style="padding:6px 10px;">Bootable MBR</td><td style="padding:6px 10px;">Bootable MBR path</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Mark Windows partition active in the MBR partition table.</td></tr>
                                             </tbody>
                                         </table>
 
@@ -895,8 +1286,9 @@
                                             <h4 style="margin:0 0 8px 0;color:#fbcfe8;font-size:0.8rem;">Minimum Safe Default Profile (Repair Script Summary)</h4>
                                             <ul style="margin:0;padding-left:18px;color:#cbd5e1;line-height:1.6;">
                                                 <li>Inject: <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">viostor</code>, <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">vioscsi</code> (if using VirtIO SCSI), <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">netkvm</code></li>
-                                                <li>Disable Xen PV services</li>
-                                                <li>Preserve BIOS/MBR + existing BCD style (<code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">winload.exe</code>)</li>
+                                                 <li>Disable Xen PV services</li>
+                                                 <li><b>Registry:</b> Clear <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">MountedDevices</code> to fix Inaccessible Boot Device</li>
+                                                 <li>Preserve BIOS/MBR + existing BCD style (<code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">winload.exe</code>)</li>
                                                 <li>Add first-boot network cleanup + DHCP enable + firewall management access</li>
                                                 <li>Validate after boot: <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">bcdedit</code>, <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">Get-Disk</code>, <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">Get-Partition</code>, <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">Get-Volume</code>, <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">Get-Service viostor,netkvm</code></li>
                                             </ul>
@@ -905,14 +1297,6 @@
                                 </details>
                                     </div>
                                 </details>
-                                <div style="margin-top:10px;padding:8px 12px;background:rgba(99,102,241,0.06);border-left:3px solid #6366f1;border-radius:0 4px 4px 0;font-size:0.72rem;color:#94a3b8;line-height:1.7;">
-                                    <strong style="color:#a5b4fc;">Version-specific repair differences:</strong><br>
-                                    · <span style="color:#f0abfc">Ubuntu</span>: NIC=enp3s0 (20/22) vs ens3 (24) — wildcard netplan covers both<br>
-                                    · <span style="color:#6ee7b7">Debian 12</span>: dropped ifupdown → uses <b>netplan + systemd-networkd</b><br>
-                                    · <span style="color:#fbbf24">Alma/Rocky 9</span>: NM keyfile (<code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;">eth0.nmconnection</code>) alongside ifcfg-eth0<br>
-                                    · <span style="color:#fb923c">RHEL 7</span>: Missing virtio → dracut rebuild. Grub: monolithic grub2-mkconfig<br>
-                                    · <span style="color:#fb923c">RHEL 8</span>: FS can be ext4 or xfs — auto-detected via blkid (v2.5). BLS + grubenv<br>
-                                    · <span style="color:#fb923c">RHEL 9</span>: NM keyfile default (ifcfg deprecated). BLS + grubenv</div>
                                 </div>
 
                 <!-- 2. DATA IMPORT & SELECTION -->
@@ -1064,12 +1448,13 @@
                                         if (logReq.ok) {
                                             let text = await logReq.text();
                                             logEl.textContent = text;
-                                            logEl.parentElement.scrollTop = logEl.parentElement.scrollHeight;
 
                                             if (text.includes('Discovery complete!') || text.includes('Error:') || text.includes('Stopped')) {
                                                 clearInterval(pollInterval);
                                                 spinner.style.display = 'none';
                                                 btn.disabled = false; btn.textContent = '🔍 Start OSPC Server Scan';
+                                            }
+                                        }
                                                 // Load results CSV into VM table — same as agent1.html topology import
                                                 try {
                                                     const cr = await fetch('/api/agent1/results/discovery_csv?t=' + Date.now());
@@ -1443,82 +1828,6 @@
                     <input type="hidden" id="repair_guest"  name="repair_guest" value="1">
                     <input type="hidden" id="systemd_services" name="systemd_services" value="">
 
-                    <div style="margin: 0 0 16px 0; padding: 14px 18px; background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-                        <label for="flex_key_name_quick" style="color:#7dd3fc; font-size:0.9rem; font-weight:600; white-space:nowrap; min-width:120px;">🔑 FLEX Key Pair</label>
-                        <input type="text" id="flex_key_name_quick"
-                            placeholder="e.g. laptopubuntu24"
-                            value="laptopubuntu24"
-                            style="flex:1; min-width:180px; padding:9px 14px; background:#0f172a; border:1px solid #334155; border-radius:8px; color:#e2e8f0; font-size:0.9rem; font-family:monospace;"
-                            oninput="document.getElementById('flex_key_name').value=this.value; localStorage.setItem('mig_flex_key_name', this.value);">
-                        <span style="color:#64748b; font-size:0.8rem;">FLEX keypair used to create the test VM</span>
-                    </div>
-
-                    <div style="margin: 0 0 16px 0; padding: 14px 18px; background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.2); border-radius: 10px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
-                        <label style="color:#4ade80; font-size:0.9rem; font-weight:600; white-space:nowrap; display:flex; align-items:center; gap:10px; cursor:pointer;">
-                            <input type="checkbox" id="auto_floating_ip" checked
-                                style="width:16px; height:16px; accent-color:#4ade80; cursor:pointer;">
-                            🌐 Auto-Assign Floating IP
-                        </label>
-
-                        <!-- OFFLINE REPAIR METHOD -->
-                        <div style="flex:1; display:flex; justify-content:center;">
-                            <div style="display:flex; align-items:center; gap:10px; background:rgba(245,158,11,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.35);"
-                                 title="Generic: runs ospc2flex_offline_repair.sh on every VM regardless of OS type.&#10;Custom OS Type: applies per-OS repair profile (Ubuntu 24 / Ubuntu / Debian / AlmaLinux / Rocky / RHEL / CentOS / Fedora / openSUSE).">
-                                <span style="color:#f59e0b; font-size:1rem;">🔧</span>
-                                <label for="offline_repair_method" style="color:#fcd34d; font-weight:700; font-size:0.82rem; white-space:nowrap;">Offline VM Boot Repair:</label>
-                                <select id="offline_repair_method" name="offline_repair_method"
-                                    style="background:#1e293b; border:1px solid #f59e0b; border-radius:6px; color:#fcd34d; font-size:0.82rem; font-weight:600; padding:4px 10px; cursor:pointer; outline:none;"
-                                    onchange="localStorage.setItem('mig_offline_repair_method', this.value); toggleNbdPanel();">
-                                    <option value="custom_os">✦ Native API Snapshot (NO SSH/Password Required)</option>
-                                    <option value="generic">⚙ Generic Offline Snapshot (NO SSH/Password Required)</option>
-                                    <option value="nbd_inline">🚀 NBD Live Stream (SSH Config Auth Required)</option>
-                                    <option value="nbd_dd">📦 NBD Live DD (SSH Config Auth Required)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <label for="flex_external_network_input" style="color:#64748b; font-size:0.8rem; white-space:nowrap;">Pool:</label>
-                            <input type="text" id="flex_external_network_input" value="PUBLICNET"
-                                style="width:100px; padding:6px 10px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:0.85rem; font-family:monospace;"
-                                oninput="localStorage.setItem('mig_flex_ext_net', this.value);">
-                        </div>
-                    </div>
-
-                    <!-- NBD Batch Action Buttons -->
-                    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:flex-end; margin:16px 0 0;">
-                        <button type="button" class="btn-primary" id="start-batch-btn"
-                            style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-color: #22c55e; justify-content: flex-start;"
-                            onclick="document.getElementById('mig_mode_value').value='live';">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                            <span id="start-btn-label">🚀 Start Server Batch NBD — Live</span>
-                        </button>
-                        <button type="button" class="btn-primary" id="start-batch-dryrun-btn"
-                            style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-color: #f59e0b; justify-content: flex-start;"
-                            onclick="document.getElementById('mig_mode_value').value='dryrun';">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                            <span>🔍 Start Server Batch NBD — Dry Run</span>
-                        </button>
-                        <button type="button" class="btn-danger" id="stop-batch-btn"
-                            style="display:none; background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                            ⏹ STOP VM Batch
-                        </button>
-                    </div>
-
-                    <script>
-                    window.addEventListener('DOMContentLoaded', () => {
-                        const voiceToggle = document.getElementById('enable_jarvis_voice');
-                        if (voiceToggle && localStorage.getItem('mig_jarvis_voice') === 'false') {
-                            voiceToggle.checked = false;
-                        }
-                        const genderToggle = document.getElementById('jarvis_voice_gender');
-                        if (genderToggle && localStorage.getItem('mig_jarvis_gender')) {
-                            genderToggle.value = localStorage.getItem('mig_jarvis_gender');
-                        }
-                    });
-                    </script>
-
             <!-- NBD INLINE REPAIR PANEL -->
             <div id="nbd-panel" style="display:none; background:#0b0f19; border:1px solid rgba(56,189,248,0.35); border-radius:14px; padding:18px 20px; margin-bottom:12px; font-family:system-ui,sans-serif;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
@@ -1538,14 +1847,19 @@
 
             <!-- PIPELINE REFERENCE -->
             <div id="pipeline-block" style="background:#0b0f19; border:1px solid #1e293b; border-radius:14px; padding:18px 20px; font-family:system-ui,sans-serif; font-size:12px; line-height:1.5; margin-bottom:8px;">
-                <!-- Header -->
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-                    <div>
+                <!-- Toggle Header -->
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0; flex-wrap:wrap; gap:8px; cursor:pointer;" onclick="const c=document.getElementById('pipeline-content'); c.classList.toggle('collapsed'); this.style.marginBottom = c.classList.contains('collapsed') ? '0' : '14px'; this.querySelector('.toggle-hint').textContent = c.classList.contains('collapsed') ? '▶ Show Pipeline' : '▼ Hide Pipeline';">
+                    <div style="display:flex; align-items:center; gap:10px;">
                         <div id="pipeline-title" style="color:#38bdf8; font-weight:700; font-size:13px; letter-spacing:0.5px;">📋 Migration Pipeline</div>
-                        <div id="pipeline-subtitle" style="color:#475569; font-size:11px; margin-top:2px;">All heavy work runs on the Jumphost · Your machine only orchestrates via SSH</div>
+                        <span class="toggle-hint" style="color:#475569; font-size:10px; font-family:sans-serif;">▶ Show Pipeline</span>
                     </div>
-                    <div style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); border-radius:20px; padding:4px 12px; color:#4ade80; font-size:11px; font-weight:600; white-space:nowrap;">⏱ ~1h30 – 2h00 per VM batch</div>
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <div id="pipeline-subtitle" style="color:#475569; font-size:11px; display:none;">All heavy work runs on the Jumphost · Your machine only orchestrates via SSH</div>
+                        <div style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); border-radius:20px; padding:4px 12px; color:#4ade80; font-size:11px; font-weight:600; white-space:nowrap;">⏱ ~1h30 – 2h00 per VM batch</div>
+                    </div>
                 </div>
+
+                <div id="pipeline-content" class="collapsed" style="margin-top:10px;">
 
                 <!-- PRE-STAGE pill -->
                 <div style="background:rgba(52,211,153,0.07); border:1px solid rgba(52,211,153,0.25); border-radius:8px; padding:8px 12px; margin-bottom:10px; display:flex; align-items:center; gap:10px;">
@@ -1739,385 +2053,18 @@
                     </div>
                     <div style="margin-top:6px; color:#334155; font-size:10px;">💡 chroot apt runs only for Debian-family (Ubuntu + Debian) · RPM/SUSE rely on Stage 4.6 if needed</div>
                 </div>
+                </div>
             </div>
 
-
-
-                <hr class="divider">
-
-                <style>
-                    @keyframes neonBlueTextPulse {
-                        0% { text-shadow: 0 0 4px #0284c7, 0 0 10px #0284c7; }
-                        50% { text-shadow: 0 0 8px #38bdf8, 0 0 20px #38bdf8; }
-                        100% { text-shadow: 0 0 4px #0284c7, 0 0 10px #0284c7; }
-                    }
-                    @keyframes frameBluePulse {
-                        0%, 100% { box-shadow: 0 0 4px #fff, 0 0 10px #00cfff, 0 0 20px #00cfff, inset 0 0 10px rgba(0,207,255,.2); border-color: #00cfff; }
-                        50% { box-shadow: 0 0 6px #fff, 0 0 15px #7dd3fc, 0 0 35px #7dd3fc, inset 0 0 15px rgba(0,207,255,.4); border-color: #7dd3fc; }
-                    }
-                </style>
-                <div style="margin-top: 40px; margin-bottom: 25px;">
-                    <div style="display: inline-block; padding: 12px 28px; border: 4px solid #00cfff; border-radius: 16px; background: rgba(0,8,20,.9); animation: frameBluePulse 3s infinite ease-in-out;">
-                        <span style="font-family: 'Orbitron', monospace; font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; animation: neonBlueTextPulse 2s infinite ease-in-out;">
-                            Cold Direct Image VM migration method
-                        </span>
+                    <div style="margin: 0 0 16px 0; padding: 14px 18px; background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                        <label for="flex_key_name_quick" style="color:#7dd3fc; font-size:0.9rem; font-weight:600; white-space:nowrap; min-width:120px;">🔑 FLEX Key Pair</label>
+                        <input type="text" id="flex_key_name_quick"
+                            placeholder="e.g. laptopubuntu24"
+                            value="laptopubuntu24"
+                            style="flex:1; min-width:180px; padding:9px 14px; background:#0f172a; border:1px solid #334155; border-radius:8px; color:#e2e8f0; font-size:0.9rem; font-family:monospace;"
+                            oninput="document.getElementById('flex_key_name').value=this.value; localStorage.setItem('mig_flex_key_name', this.value);">
+                        <span style="color:#64748b; font-size:0.8rem;">FLEX keypair used to create the test VM</span>
                     </div>
-                </div>
-                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(0,207,255,0.4);border-radius:12px;padding:20px;margin-top:20px;margin-bottom:25px;display:grid;grid-template-columns:minmax(180px, 1fr) 2fr 1fr 1fr;gap:20px;align-items:start;">
-                    <div>
-                        <div style="color:#a855f7;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🖼 OSPC Snapshot Discovery &amp; Cold Migration</div>
-                        <span style="font-size:0.75rem;color:#64748b;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:4px;">Cold Migration (Fastest)</span>
-                    </div>
-                    <div>
-                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.12);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
-                            <strong style="color:#fed7aa;">⚡ Recommended:</strong> Use a Jumphost deployed in the <strong>same region</strong> as the origin OSPC VMs or snapshots for fastest transfer speeds and lowest latency.
-                        </div>
-                        <ol style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.85rem;line-height:1.6;">
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Scan Private Snapshots:</strong> Discovers all private tenant snapshot images in the selected OSPC region via Glance API.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Download Image:</strong> Jumphost streams the raw image bit-stream from OSPC Glance using regional auth tokens.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Convert to QCOW2:</strong> Converts the downloaded image to FLEX-compatible <code>qcow2</code> format using <code>qemu-img convert</code>.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Offline Disk Repair:</strong> Auto-detects OS type and applies chroot-based fixes (fstab, initramfs, network config, virtio drivers) without booting the VM.</li>
-                            <li style="margin-bottom:6px;"><strong style="color:#e2e8f0;">Upload to FLEX Glance:</strong> Pushes the repaired image into FLEX Glance with auto-injected <code>os_type</code> and <code>hw_qemu_guest_agent=yes</code> metadata.</li>
-                        </ol>
-                    </div>
-                    <div>
-                        <ul style="margin:0;padding-left:18px;color:#94a3b8;font-size:0.85rem;line-height:1.6;">
-                            <li style="margin-bottom:8px;">Extremely fast (no live snapshot wait).</li>
-                            <li style="margin-bottom:8px;">Fully offline repair — no VM boot required.</li>
-                            <li style="margin-bottom:8px;">Preserves golden baseline integrity.</li>
-                            <li style="margin-bottom:8px;">Same-region jumphost minimizes transfer time.</li>
-                        </ul>
-                    </div>
-                    <div style="font-size:0.85rem;color:#94a3b8;line-height:1.6;">
-                        The absolute fastest and safest <strong>cold migration method</strong>. Perfect for porting golden server templates, exact point-in-time static backups, or bulk snapshot migrations.
-                    </div>
-                </div>
-
-
-                <section class="adv-panel" id="imageScannerPanel" style="margin-top: 16px;">
-                        <!-- ── Private OSPC Snapshot Scanner ── -->
-                        <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
-                            <div style="font-size:0.82rem;font-weight:700;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">
-                                🖼 Private OSPC Snapshot Discovery Tool
-                            </div>
-                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                                <label for="image_scan_region" style="color:#94a3b8;font-size:11px;white-space:nowrap;">Region</label>
-                                <select id="image_scan_region" name="image_scan_region" title="OpenStack region for image list (same options as VM scanner)"
-                                    style="background:#0f172a;border:1px solid rgba(16,185,129,0.4);border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;cursor:pointer;">
-                                    <option value="ALL">ALL Regions</option>
-                                    <option value="DFW">DFW</option>
-                                    <option value="IAD">IAD</option>
-                                    <option value="ORD">ORD</option>
-                                    <option value="LON">LON</option>
-                                    <option value="SYD">SYD</option>
-                                    <option value="HKG">HKG</option>
-                                </select>
-                                <button type="button" id="image-scan-sync-region-btn"
-                                    style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;padding:7px 10px;cursor:pointer;white-space:nowrap;"
-                                    title="Copy region from OSPC Server Scanner">
-                                    ⇄ Match VM scanner region
-                                </button>
-                                <button id="image-scan-btn" type="button"
-                                    style="background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;padding:8px 16px;cursor:pointer;white-space:nowrap;">
-                                    🔍 Start Private Snapshot Scan
-                                </button>
-                                <span style="color:#64748b;font-size:11px;">Scans private tenant snapshots only · region sets <code style="font-size:10px;">OS_REGION_NAME</code></span>
-                            </div>
-                            <div id="image-scan-console-wrap" style="display:none;margin-top:12px;">
-                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                                    <span style="color:#6ee7b7;font-size:11px;font-weight:600;">Live Image Scan Console <span id="image-scan-spinner">⚙</span></span>
-                                    <button type="button" onclick="document.getElementById('image-scan-console-wrap').style.display='none'"
-                                        style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;">✕</button>
-                                </div>
-                                <pre id="image-scan-log" style="background:#060a10;border:1px solid #065f46;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#94a3b8;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;">Waiting to start…</pre>
-                            </div>
-                        </div>
-
-                        <div id="ospcImageContainer" style="display:none;margin-top:10px;">
-                            <div class="table-header">
-                                <h2>Private Snapshot Migration List</h2>
-                                <span id="imageRowCount" class="pill">0 rows</span>
-                            </div>
-                            <div id="imageScanSummary" style="margin:8px 0 10px;color:#86efac;font-size:12px;">Private images found: 0 | Migratable snapshots: 0 | Excluded private images: 0 | Skipped provider/public images: 0</div>
-                            <div class="mapper-search">
-                                <input id="imageTableSearch" type="text" placeholder="Search snapshots by name, ID, or source VM…" />
-                                <select id="imageFilterMode" style="margin-left:8px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;">
-                                    <option value="migratable" selected>Migratable only</option>
-                                    <option value="all">All private</option>
-                                    <option value="rejected">Rejected only</option>
-                                </select>
-                            </div>
-                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
-                                <button type="button" id="refresh-private-snapshots-btn" style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#cbd5e1;font-size:12px;padding:7px 12px;cursor:pointer;">Refresh Private Snapshots</button>
-                                <button type="button" id="select-all-migratable-btn" style="background:#052e1d;border:1px solid #065f46;border-radius:7px;color:#6ee7b7;font-size:12px;padding:7px 12px;cursor:pointer;">Select All Migratable</button>
-                                <button type="button" id="clear-snapshot-selection-btn" style="background:#1f2937;border:1px solid #475569;border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 12px;cursor:pointer;">Clear Selection</button>
-                                <button type="button" id="download-selected-snapshots-btn" style="background:#0b5ed7;border:1px solid #3b82f6;border-radius:7px;color:#fff;font-size:12px;padding:7px 12px;cursor:pointer;">Download Selected Snapshots</button>
-                                <button type="button" id="generate-snapshot-manifest-btn" style="background:#3f1d7a;border:1px solid #8b5cf6;border-radius:7px;color:#f5f3ff;font-size:12px;padding:7px 12px;cursor:pointer;">Generate Migration Manifest</button>
-                            </div>
-                            <div class="table-wrap">
-                                <table class="adv-table" id="ospc-image-table"></table>
-                            </div>
-                        </div>
-                </section>
-
-                <!-- Cold Image Migration Action Buttons -->
-                <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:18px 0 24px;">
-                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
-                        style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start;"
-                        title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
-                        onclick="document.getElementById('mig_mode_value').value='live';">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                        <span>🖼 Direct OSPC 2 Flex Image Live Migration (Fastest)</span>
-                    </button>
-                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-dryrun-btn"
-                        style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); border-color: #a855f7; justify-content: flex-start;"
-                        title="Dry Run: Glance → jumphost → FLEX pipeline"
-                        onclick="document.getElementById('mig_mode_value').value='dryrun';">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <span>🖼 Direct OSPC 2 Flex Image Dry run Migration</span>
-                    </button>
-                    <button type="button" id="stop-image-batch-btn"
-                        style="display:none; background: linear-gradient(135deg, #c2410c 0%, #7c2d12 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;"
-                        title="Stop the image migration pipeline only">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                        ⏹ Stop Image Batch
-                    </button>
-                </div>
-
-                <!-- Jumphost connection fields (hidden — used by batch migration JS) -->
-                <input type="hidden" id="processing_location_type" value="production">
-                <input type="hidden" id="process_host_ip" name="process_host_ip" value="{{ default_jh_ip }}">
-                <input type="hidden" id="workdir" name="workdir" value="/mnt/migration/ospc2flex_image">
-                <input type="hidden" id="process_ssh_user" name="process_ssh_user" value="{{ default_jh_user }}">
-                <input type="hidden" id="process_ssh_key" name="process_ssh_key" value="{{ default_jh_key }}">
-
-                <!-- JUMPHOST CONNECTION — Per-Region -->
-                <div class="config-group" style="margin-top: 16px;">
-                    <div class="group-header">
-                        <h3>🖥 Jumphost Connection <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:8px;">Per-Region Configuration</span></h3>
-                        <label class="toggle-switch accent-blue">
-                            <input type="checkbox" checked onchange="document.getElementById('jumphost-fields').classList.toggle('collapsed')">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-
-                    <div id="jumphost-fields" class="collapsable">
-                        <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.1);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
-                            <strong style="color:#fed7aa;">⚡ Tip:</strong> Deploy your jumphost in the <strong>same OSPC region</strong> as the source VMs/snapshots for maximum transfer speed.
-                        </div>
-
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-                            <label for="jh_region_select" style="color:#94a3b8;font-size:12px;font-weight:600;white-space:nowrap;">OSPC Region</label>
-                            <select id="jh_region_select"
-                                style="background:#0f172a;border:1px solid rgba(59,130,246,0.5);border-radius:7px;color:#e2e8f0;font-size:13px;padding:8px 12px;cursor:pointer;min-width:120px;font-weight:600;"
-                                onchange="window._jhSelectRegion(this.value)">
-                                <option value="IAD">IAD — Northern Virginia</option>
-                                <option value="DFW">DFW — Dallas Fort Worth</option>
-                                <option value="ORD">ORD — Chicago</option>
-                                <option value="LON">LON — London</option>
-                                <option value="SYD">SYD — Sydney</option>
-                                <option value="HKG">HKG — Hong Kong</option>
-                            </select>
-                            <button type="button" id="jh-sync-region-btn"
-                                style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;padding:7px 10px;cursor:pointer;white-space:nowrap;"
-                                title="Copy region from OSPC Snapshot Scanner"
-                                onclick="const sr=document.getElementById('image_scan_region'); if(sr && sr.value!=='ALL'){document.getElementById('jh_region_select').value=sr.value; window._jhSelectRegion(sr.value);} else {alert('Set a specific region in Snapshot Scanner first.');}">
-                                ⇄ Match Snapshot Scanner
-                            </button>
-                            <span id="jh-region-status" style="color:#4ade80;font-size:11px;font-weight:600;"></span>
-                        </div>
-
-                        <div class="form-grid">
-                            <div class="form-control">
-                                <label for="nbd_jumphost_ip">Jumphost IP</label>
-                                <input type="text" id="nbd_jumphost_ip" placeholder="e.g. 104.239.169.89" value="{{ default_jh_ip }}" oninput="document.getElementById('process_host_ip').value=this.value; window._jhSaveField('ip', this.value);">
-                            </div>
-                            <div class="form-control">
-                                <label for="nbd_jumphost_user">SSH User</label>
-                                <input type="text" id="nbd_jumphost_user" placeholder="ubuntu" value="{{ default_jh_user }}" oninput="document.getElementById('process_ssh_user').value=this.value; window._jhSaveField('user', this.value);">
-                            </div>
-                            <div class="form-control">
-                                <label for="nbd_jumphost_key">SSH Key Path</label>
-                                <input type="text" id="nbd_jumphost_key" placeholder="~/.ssh/id_rsa" value="{{ default_jh_key }}" oninput="document.getElementById('process_ssh_key').value=this.value; window._jhSaveField('key', this.value);">
-                            </div>
-                        </div>
-
-                        <!-- Per-region config summary table -->
-                        <div style="margin-top:14px;border:1px solid #1e293b;border-radius:8px;overflow:hidden;">
-                            <table style="width:100%;border-collapse:collapse;font-size:11px;">
-                                <thead>
-                                    <tr style="background:#0f172a;">
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Region</th>
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Jumphost IP</th>
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">SSH User</th>
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Key Path</th>
-                                        <th style="padding:6px 10px;text-align:center;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="jh-region-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <script>
-                (function() {
-                    const REGIONS = ['IAD', 'DFW', 'ORD', 'LON', 'SYD', 'HKG'];
-                    const STORAGE_KEY = 'jh_region_configs';
-                    const defaultIp = '{{ default_jh_ip }}';
-                    const defaultUser = '{{ default_jh_user }}' || 'ubuntu';
-                    const defaultKey = '{{ default_jh_key }}' || '~/.ssh/id_rsa';
-
-                    function loadConfigs() {
-                        try {
-                            const raw = localStorage.getItem(STORAGE_KEY);
-                            if (raw) return JSON.parse(raw);
-                        } catch(e) {}
-                        // Initialize with defaults — only first region gets the server-side default IP
-                        const configs = {};
-                        REGIONS.forEach((r, i) => {
-                            configs[r] = {
-                                ip: i === 0 ? defaultIp : '',
-                                user: defaultUser,
-                                key: defaultKey
-                            };
-                        });
-                        return configs;
-                    }
-
-                    function saveConfigs(configs) {
-                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(configs)); } catch(e) {}
-                    }
-
-                    const configs = loadConfigs();
-
-                    function applyRegion(region) {
-                        const cfg = configs[region] || { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
-                        const ipEl = document.getElementById('nbd_jumphost_ip');
-                        const userEl = document.getElementById('nbd_jumphost_user');
-                        const keyEl = document.getElementById('nbd_jumphost_key');
-                        if (ipEl)   { ipEl.value = cfg.ip;   document.getElementById('process_host_ip').value = cfg.ip; }
-                        if (userEl) { userEl.value = cfg.user; document.getElementById('process_ssh_user').value = cfg.user; }
-                        if (keyEl)  { keyEl.value = cfg.key;  document.getElementById('process_ssh_key').value = cfg.key; }
-                        const status = document.getElementById('jh-region-status');
-                        if (status) status.textContent = cfg.ip ? `✅ ${region} jumphost loaded` : `⚠ ${region} — no IP configured`;
-                        renderTable(region);
-                    }
-
-                    function renderTable(activeRegion) {
-                        const tbody = document.getElementById('jh-region-table-body');
-                        if (!tbody) return;
-                        let html = '';
-                        REGIONS.forEach(r => {
-                            const cfg = configs[r] || {};
-                            const isActive = r === activeRegion;
-                            const hasIp = !!(cfg.ip && cfg.ip.trim());
-                            const rowBg = isActive ? 'background:rgba(59,130,246,0.12);' : '';
-                            const statusIcon = hasIp ? '<span style="color:#4ade80;">✅</span>' : '<span style="color:#475569;">—</span>';
-                            const regionColor = isActive ? '#60a5fa' : '#94a3b8';
-                            const ipColor = hasIp ? '#e2e8f0' : '#475569';
-                            html += `<tr style="${rowBg}border-bottom:1px solid #1e293b;cursor:pointer;" onclick="document.getElementById('jh_region_select').value='${r}'; window._jhSelectRegion('${r}');" title="Click to switch to ${r}">`;
-                            html += `<td style="padding:5px 10px;color:${regionColor};font-weight:${isActive?'700':'400'};">${isActive ? '▸ ' : ''}${r}</td>`;
-                            html += `<td style="padding:5px 10px;color:${ipColor};font-family:monospace;font-size:11px;">${cfg.ip || '—'}</td>`;
-                            html += `<td style="padding:5px 10px;color:#94a3b8;">${cfg.user || '—'}</td>`;
-                            html += `<td style="padding:5px 10px;color:#94a3b8;font-family:monospace;font-size:10px;">${cfg.key || '—'}</td>`;
-                            html += `<td style="padding:5px 10px;text-align:center;">${statusIcon}</td>`;
-                            html += '</tr>';
-                        });
-                        tbody.innerHTML = html;
-                    }
-
-                    window._jhSelectRegion = function(region) {
-                        applyRegion(region);
-                    };
-
-                    window._jhSaveField = function(field, value) {
-                        const region = document.getElementById('jh_region_select').value;
-                        if (!configs[region]) configs[region] = { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
-                        configs[region][field] = value;
-                        saveConfigs(configs);
-                        renderTable(region);
-                    };
-
-                    // Initialize on page load
-                    document.addEventListener('DOMContentLoaded', function() {
-                        // Determine initial region: try to match default IP to a stored config
-                        let initRegion = 'IAD';
-                        if (defaultIp) {
-                            for (const r of REGIONS) {
-                                if (configs[r] && configs[r].ip === defaultIp) { initRegion = r; break; }
-                            }
-                        }
-                        document.getElementById('jh_region_select').value = initRegion;
-                        applyRegion(initRegion);
-                        saveConfigs(configs);
-                    });
-                })();
-                </script>
-
-
-                <!-- 3. GLOBAL MIGRATION SETTINGS -->
-                <form id="batch-mig-form" novalidate onsubmit="return false;">
-                    <div class="config-group" style="margin-top: 16px;">
-                        <div class="group-header">
-                            <h3>Global Migration Settings</h3>
-                        </div>
-
-                        <div class="form-grid mb-3">
-                            <div class="form-control">
-                                <label for="target_format">Target Format</label>
-                                <select id="target_format" name="target_format">
-                                    <option value="qcow2">qcow2</option>
-                                    <option value="raw">raw</option>
-                                </select>
-                            </div>
-                            <div class="form-control">
-                                <label for="visibility">Visibility</label>
-                                <select id="visibility" name="visibility">
-                                    <option value="private">Private</option>
-                                    <option value="public">Public</option>
-                                    <option value="shared">Shared</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TEST VM OPTIONS -->
-                    <div class="config-group">
-                        <div class="group-header">
-                            <h3>Global Test VM Deploy Options</h3>
-                        </div>
-                        <input type="hidden" id="boot_test_vm" name="boot_test_vm" value="on">
-
-                        <div id="test-vm-fields" class="collapsable">
-                            <div class="form-grid">
-                                <div class="form-control">
-                                    <label>FLEX Flavor</label>
-                                    <input type="text" id="flex_flavor_fallback" placeholder="UUID (or leave for auto-map)">
-                                </div>
-                                <div class="form-control">
-                                    <label>Test Server Name</label>
-                                    <input type="text" disabled placeholder="[AUTO: &lt;flex-name&gt;-lift-test or OSPC2FLEX-TEST-VM]">
-                                </div>
-                                <div class="form-control">
-                                    <label for="flex_network_id">FLEX Network ID *</label>
-                                    <input type="text" id="flex_network_id" name="flex_network_id" placeholder="UUID">
-                                </div>
-                                <div class="form-control">
-                                    <label for="flex_key_name">FLEX Keypair Name *</label>
-                                    <input type="text" id="flex_key_name" name="flex_key_name" value="laptopubuntu24" placeholder="my-key">
-                                </div>
-                                <div class="form-control">
-                                    <label for="flex_external_network_name">FLEX External Network Name *</label>
-                                    <input type="text" id="flex_external_network_name" name="flex_external_network_name" value="PUBLICNET" placeholder="PUBLICNET"
-                                        oninput="const q=document.getElementById('flex_external_network_input'); if(q) q.value=this.value; localStorage.setItem('mig_flex_ext_net',this.value);">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="divider">
-
 
                     <!-- 🎙️ Jarvis Audio Alerts (moved here so it sits directly above the batch-action buttons) -->
                     <div style="margin: 0 auto 16px auto; padding: 10px 18px; background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: fit-content;">
@@ -2138,11 +2085,6 @@
                         <input type="number" id="max_concurrent_input" min="1" max="50" value="20" style="width:76px;background:#111;border:2px solid #4b5563;color:#f9fafb;border-radius:6px;padding:7px 10px;font-size:18px;font-family:monospace;text-align:center;font-weight:700;">
                     </div>
 
-                    <input type="hidden" id="mig_mode_value" value="live">
-                    <div class="form-actions" style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; align-items: flex-start;">
-
-                        <!-- NBD buttons moved to bottom of Live Server VM Migration section above -->
-
                         <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; align-items: center; justify-content: center; margin-top: 10px;">
 
                             <button type="button" id="add-batch-btn" style="display: none; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none; border-radius: 6px; padding: 10px 20px; color: white; font-weight: 600; cursor: pointer; align-items: center; gap: 8px;">
@@ -2150,8 +2092,83 @@
                                 Add to Running Batch
                             </button>
                         </div>
+
+
+                    <div style="margin: 0 0 16px 0; padding: 14px 18px; background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.2); border-radius: 10px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+                        <label style="color:#4ade80; font-size:0.9rem; font-weight:600; white-space:nowrap; display:flex; align-items:center; gap:10px; cursor:pointer;">
+                            <input type="checkbox" id="auto_floating_ip" checked
+                                style="width:16px; height:16px; accent-color:#4ade80; cursor:pointer;">
+                            🌐 Auto-Assign Floating IP
+                        </label>
+
+                        <!-- OFFLINE REPAIR METHOD -->
+                        <div style="flex:1; display:flex; justify-content:center;">
+                            <div style="display:flex; align-items:center; gap:10px; background:rgba(245,158,11,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.35);"
+                                 title="Generic: runs ospc2flex_offline_repair.sh on every VM regardless of OS type.&#10;Custom OS Type: applies per-OS repair profile (Ubuntu 24 / Ubuntu / Debian / AlmaLinux / Rocky / RHEL / CentOS / Fedora / openSUSE).">
+                                <span style="color:#f59e0b; font-size:1rem;">🔧</span>
+                                <label for="offline_repair_method" style="color:#fcd34d; font-weight:700; font-size:0.82rem; white-space:nowrap;">Offline VM Boot Repair:</label>
+                                <select id="offline_repair_method" name="offline_repair_method"
+                                    style="background:#1e293b; border:1px solid #f59e0b; border-radius:6px; color:#fcd34d; font-size:0.82rem; font-weight:600; padding:4px 10px; cursor:pointer; outline:none;"
+                                    onchange="localStorage.setItem('mig_offline_repair_method', this.value); toggleNbdPanel();">
+                                    <option value="custom_os">✦ Native API Snapshot (NO SSH/Password Required)</option>
+                                    <option value="generic">⚙ Generic Offline Snapshot (NO SSH/Password Required)</option>
+                                    <option value="nbd_inline">🚀 NBD Live Stream (SSH Config Auth Required)</option>
+                                    <option value="nbd_dd">📦 NBD Live DD (SSH Config Auth Required)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <label for="flex_external_network_input" style="color:#64748b; font-size:0.8rem; white-space:nowrap;">Pool:</label>
+                            <input type="text" id="flex_external_network_input" value="PUBLICNET"
+                                style="width:100px; padding:6px 10px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:0.85rem; font-family:monospace;"
+                                oninput="localStorage.setItem('mig_flex_ext_net', this.value);">
+                        </div>
                     </div>
-                </form>
+
+                    <!-- NBD Batch Action Buttons -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:flex-end; margin:16px 0 0;">
+                        <button type="button" class="btn-primary" id="start-batch-btn"
+                            style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-color: #22c55e; justify-content: flex-start;"
+                            onclick="document.getElementById('mig_mode_value').value='live';">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            <span id="start-btn-label">🚀 Start Server Batch NBD — Live</span>
+                        </button>
+                        <button type="button" class="btn-primary" id="start-batch-dryrun-btn"
+                            style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-color: #f59e0b; justify-content: flex-start;"
+                            onclick="document.getElementById('mig_mode_value').value='dryrun';">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>🔍 Start Server Batch NBD — Dry Run</span>
+                        </button>
+                        <button type="button" class="btn-danger" id="stop-batch-btn"
+                            style="display:none; background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                            ⏹ STOP VM Batch
+                        </button>
+                    </div>
+
+                    <script>
+                    window.addEventListener('DOMContentLoaded', () => {
+                        const voiceToggle = document.getElementById('enable_jarvis_voice');
+                        if (voiceToggle && localStorage.getItem('mig_jarvis_voice') === 'false') {
+                            voiceToggle.checked = false;
+                        }
+                        const genderToggle = document.getElementById('jarvis_voice_gender');
+                        if (genderToggle && localStorage.getItem('mig_jarvis_gender')) {
+                            genderToggle.value = localStorage.getItem('mig_jarvis_gender');
+                        }
+                    });
+                    </script>
+
+
+
+
+                    </div>
+                <hr class="divider">
+
+
+
+
             </div>
 
             <!-- EXECUTION TERMINAL -->
@@ -2585,6 +2602,12 @@
                     else if (action === 'kill') { url = '/api/vm_migrator/nbd/job_control'; body.action = 'kill'; }
                 } else {
                     body.id = idOrLabel;
+                    const imgBlock = (typeof imagePanelSafeId === 'function')
+                        ? document.getElementById('img-block-' + imagePanelSafeId(idOrLabel))
+                        : null;
+                    body.server_name = (imgBlock && imgBlock.dataset && imgBlock.dataset.serverName)
+                        ? imgBlock.dataset.serverName
+                        : idOrLabel;
                     if (action === 'pause' || action === 'stop' || action === 'kill') url = '/api/image_migrator/kill_one';
                     else if (action === 'restart') url = '/api/image_migrator/run_single';
                 }
@@ -3218,7 +3241,7 @@
                                 <div style="display:flex; justify-content:flex-end; gap:5px; padding-top:4px; border-top:1px solid #0f172a;">
                                     <span style="color:#334155;font-family:'Share Tech Mono';font-size:9px;align-self:center;margin-right:auto;">CMD UPLINK</span>
                                     <button onclick="mbuxCtrlJob('nbd','pause','${label}')" style="background:#0f172a;color:#fbbf24;border:1px solid #78350f;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">PAUSE</button>
-                                    <button onclick="mbuxCtrlJob('nbd','restart','${label}')" style="background:#0f172a;color:#4ade80;border:1px solid #166534;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">RESUME</button>
+                                    <button onclick="mbuxCtrlJob('nbd','stop','${label}')" style="background:#0f172a;color:#f87171;border:1px solid #7f1d1d;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">STOP</button>
                                 </div>` : `
                                 <div style="padding-top:4px;border-top:1px solid #0f172a;color:#1e293b;font-family:'Share Tech Mono';font-size:9px;text-align:right;letter-spacing:1px;">
                                     UPLINK OFFLINE · ${job.converted ? 'MISSION COMPLETE' : 'TERMINATED'}
@@ -3410,7 +3433,6 @@
                                 <div style="display:flex; justify-content:flex-end; gap:5px; padding-top:4px; border-top:1px solid #0f172a;">
                                     <span style="color:#334155;font-family:'Share Tech Mono';font-size:9px;align-self:center;margin-right:auto;">CMD UPLINK</span>
                                     <button onclick="mbuxCtrlJob('image','pause','${id}')" style="background:#0f172a;color:#fbbf24;border:1px solid #78350f;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">PAUSE</button>
-                                    <button onclick="mbuxCtrlJob('image','restart','${id}')" style="background:#0f172a;color:#c084fc;border:1px solid #4c1d95;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">RESUME</button>
                                     <button onclick="mbuxCtrlJob('image','stop','${id}')" style="background:#0f172a;color:#f87171;border:1px solid #7f1d1d;border-radius:3px;font-family:'Share Tech Mono';font-size:9px;padding:3px 8px;cursor:pointer;">STOP</button>
                                 </div>` : `
                                 <div style="padding-top:4px;border-top:1px solid #0f172a;color:#1e293b;font-family:'Share Tech Mono';font-size:9px;text-align:right;letter-spacing:1px;">
@@ -5298,11 +5320,6 @@
             window._fullOneLinerCmd = cmd;
 
             const btn = document.getElementById('gen-oneliner-btn');
-            btn.textContent = '✅ Generated!';
-            setTimeout(() => btn.textContent = '⚡ Generate Command', 2000);
-            el.closest('div[style]').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-
         function copyFullOneLiner() {
             const cmd = window._fullOneLinerCmd || document.getElementById('full-oneliner-display').textContent;
             navigator.clipboard.writeText(cmd.trim()).then(() => {
@@ -5312,14 +5329,12 @@
         }
 
         function appendLog(text, type='info') {
-
-            // __MANUAL_REPAIR_JSON__ sentinel removed — online repair replaced by Stage 4.5/4.6 offline repair
-            if (text.includes('__MANUAL_REPAIR_JSON__')) return;
+            const consoleOut = document.getElementById('console-output');
             if (!consoleOut) return;
 
+            const ts = new Date().toLocaleTimeString();
             const el = document.createElement('div');
             el.className = `log-line ${type}`;
-            const ts = new Date().toLocaleTimeString();
 
             // Detect stage banner (### lines)
             if (text.startsWith('###') || text.startsWith('# ===')) {
@@ -5359,7 +5374,6 @@
             }
 
             consoleOut.appendChild(el);
-            consoleOut.scrollTop = consoleOut.scrollHeight;
         }
 
         function vmSafeId(name) { return 'vm_' + name.replace(/[^a-zA-Z0-9]/g, '_'); }
@@ -5368,12 +5382,16 @@
             return 'img_' + String(imageId || '').replace(/[^a-zA-Z0-9]/g, '_');
         }
 
-        function getOrCreateImagePanel(imageId, titleLabel) {
+        function getOrCreateImagePanel(imageId, titleLabel, jobServerName) {
             const id = String(imageId || '').trim();
             if (!id) return null;
             const safeId = imagePanelSafeId(id);
             const existing = document.getElementById('img-panel-' + safeId);
-            if (existing) return existing;
+            if (existing) {
+                const existingBlock = document.getElementById('img-block-' + safeId);
+                if (existingBlock && jobServerName) existingBlock.dataset.serverName = String(jobServerName);
+                return existing;
+            }
             const outer = document.getElementById('image-panels-outer');
             const container = document.getElementById('image-panels-container');
             if (!container) return null;
@@ -5389,6 +5407,7 @@
 
             const block = document.createElement('div');
             block.id = 'img-block-' + safeId;
+            if (jobServerName) block.dataset.serverName = String(jobServerName);
             block.style.cssText = `
                 background: linear-gradient(135deg, #2d3748 0%, #111827 50%, #0f172a 100%);
                 border: 2px solid #374151;
@@ -5448,7 +5467,7 @@
 
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearImagePanelLog(id), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadImagePanelLog === 'function' ? downloadImagePanelLog(id) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
-            actions.appendChild(mkHwBtn('RESUME', 'Resume job', () => window.mbuxCtrlJob ? window.mbuxCtrlJob('image', 'resume', id) : null, '#1a2e05', '#4ade80', '#22c55e'));
+            actions.appendChild(mkHwBtn('STOP', 'Stop only this image migration job', () => typeof killImageJob === 'function' ? killImageJob(id) : null, '#3f0f0f', '#f87171', '#ef4444'));
 
             actions.appendChild(mkHwBtn('CLOSE', 'Close panel', () => closeImageTerminal && closeImageTerminal(id), '#1f2937', '#94a3b8', '#64748b'));
 
@@ -5471,19 +5490,20 @@
 
         async function killImageJob(imageId) {
             const safeId = imagePanelSafeId(imageId);
+            const block = document.getElementById('img-block-' + safeId);
+            const serverName = (block && block.dataset && block.dataset.serverName) ? block.dataset.serverName : imageId;
             const panel = document.getElementById('img-panel-' + safeId);
             if (panel) {
                 const line = document.createElement('div');
                 line.style.cssText = 'color:#ffaa00;font-style:italic;';
                 line.textContent = '[SYSTEM] Kill signal requested by operator...';
                 panel.appendChild(line);
-                panel.scrollTop = panel.scrollHeight;
             }
             try {
                 const resp = await fetch('/api/image_migrator/kill_one', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_id: imageId })
+                    body: JSON.stringify({ server_name: serverName })
                 });
                 const data = await resp.json();
                 if (panel) {
@@ -5491,7 +5511,6 @@
                     line2.style.cssText = data.error ? 'color:#ff4444;' : 'color:#ffaa00;font-style:italic;';
                     line2.textContent = data.error ? `[ERROR] ${data.error}` : '[SYSTEM] Kill signal sent.';
                     panel.appendChild(line2);
-                    panel.scrollTop = panel.scrollHeight;
                 }
             } catch (err) {
                 if (panel) {
@@ -5547,10 +5566,10 @@
 
             const panel = getOrCreateImagePanel(id, title);
             if (!panel) return;
-            const lineEl = buildJobTerminalLineElement('image', text);
+            const lineEl = typeof buildJobTerminalLineElement === 'function' ? buildJobTerminalLineElement('image', text) : null;
             if (!lineEl) return;
+            
             panel.appendChild(lineEl);
-            panel.scrollTop = panel.scrollHeight;
         }
 
         function getOrCreateVmPanel(vmName, ipHint, flavorHint) {
@@ -5634,7 +5653,7 @@
 
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearVmPanelLog(vmName), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadVmPanelLog === 'function' ? downloadVmPanelLog(vmName) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
-            actions.appendChild(mkHwBtn('RESUME', 'Resume paused worker (SIGCONT)', () => window.mbuxCtrlJob && window.mbuxCtrlJob('vm', 'resume', vmName), '#1a2e05', '#4ade80', '#22c55e'));
+            actions.appendChild(mkHwBtn('STOP', 'Stop only this VM migration job', () => typeof killVmJob === 'function' ? killVmJob(vmName) : null, '#3f0f0f', '#f87171', '#ef4444'));
 
             actions.appendChild(mkHwBtn('CLOSE',  'Close panel (job keeps running)',() => closeVmTerminal && closeVmTerminal(vmName),                        '#1f2937', '#94a3b8', '#64748b'));
 
@@ -5769,10 +5788,10 @@
             syncJobTerminalFromLog('vm', vmName, text);
             const panel = getOrCreateVmPanel(vmName);
             if (!panel) { appendLog('[' + vmName + '] ' + text, 'info'); return; }
-            const lineEl = buildJobTerminalLineElement('vm', text);
+            const lineEl = typeof buildJobTerminalLineElement === 'function' ? buildJobTerminalLineElement('vm', text) : null;
             if (!lineEl) return;
+            
             panel.appendChild(lineEl);
-            panel.scrollTop = panel.scrollHeight;
         }
 
         function setVmStatus(vmName, status) {
@@ -6558,7 +6577,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             // Create a terminal panel for each image upfront
             selected.forEach(r => {
                 const iid = String(r.snapshot_id || '').trim();
-                if (iid) getOrCreateImagePanel(iid, r.snapshot_name || iid);
+                if (iid) getOrCreateImagePanel(iid, r.snapshot_name || iid, r.source_vm_name || r.snapshot_name || iid);
             });
 
             if (typeof migTracker !== 'undefined' && migTracker.initImages) {
@@ -6633,7 +6652,9 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             const line = chunk.replace(/^data:\s?/, '').trim();
                             if (!line) continue;
                             appendImageLog(iid, line);
-                            if (logEl) { logEl.textContent += line + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+                            if (logEl) { 
+                                logEl.textContent += line + '\n'; 
+                            }
                         }
                     }
                 } catch (e) {
@@ -7293,7 +7314,6 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         else
             el.innerHTML = `<span style="color:#00e838;">${s}</span>`;
         body.appendChild(el);
-        body.scrollTop = body.scrollHeight;
     }
 
     function nbdStreamLog(label, jumphostIp, jumphostUser, sshKey) {

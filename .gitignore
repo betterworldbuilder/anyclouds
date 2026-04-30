@@ -75,3 +75,12 @@ backups/
 # Python cache
 __pycache__/
 *.pyc
+
+# Local virtualenvs
+venv/
+*/venv/
+ospc2Flex-Image-migtool/web_ui_python/venv/
+
+# Local scratch backups
+*.bak_
+*.bak_*

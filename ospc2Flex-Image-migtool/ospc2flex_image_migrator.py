@@ -248,7 +248,8 @@ def ssh_base_cmd(key: str, user: str, host: str, port: int = 22) -> str:
         f"ssh -i {shell_quote(key)}"
         f" -o BatchMode=yes"
         f" -o StrictHostKeyChecking=accept-new"
-        f" -o ConnectTimeout=10"
+        f" -o ConnectTimeout=30"
+        f" -o ConnectionAttempts=3"
         f" -o ServerAliveInterval=30"
         f" -o ServerAliveCountMax=10"
         f" -p {port}"
@@ -262,7 +263,8 @@ def ssh_password_cmd(password: str, user: str, host: str, port: int = 22) -> str
         f" -o PreferredAuthentications=password,keyboard-interactive"
         f" -o PubkeyAuthentication=no"
         f" -o StrictHostKeyChecking=accept-new"
-        f" -o ConnectTimeout=10"
+        f" -o ConnectTimeout=30"
+        f" -o ConnectionAttempts=3"
         f" -o ServerAliveInterval=30"
         f" -o ServerAliveCountMax=10"
         f" -p {port}"
@@ -275,7 +277,8 @@ def scp_base_cmd(key: str, port: int = 22) -> str:
         f"scp -i {shell_quote(key)}"
         f" -o BatchMode=yes"
         f" -o StrictHostKeyChecking=accept-new"
-        f" -o ConnectTimeout=10"
+        f" -o ConnectTimeout=30"
+        f" -o ConnectionAttempts=3"
         f" -P {port}"
     )
 
@@ -1686,22 +1689,45 @@ def build_parser() -> argparse.ArgumentParser:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def smart_copy(src: str, user: str, host: str, dest: str, *, key: str, port: int = 22, dry_run: bool = False) -> None:
-    try:
-        run(
-            f"{scp_base_cmd(key, port)} {shell_quote(src)} {user}@{host}:{shell_quote(dest)}",
-            dry_run=dry_run,
-            log_cmd=False,
+    if dry_run:
+        log(f"[DRY-RUN] Would copy {src} to {user}@{host}:{dest}")
+        return
+
+    last_error = ""
+    for attempt in range(1, 6):
+        if attempt > 1:
+            wait = min(10 * attempt, 30)
+            log(f"[INFO] Copy retry {attempt}/5 for {host}:{dest} after {wait}s...")
+            time.sleep(wait)
+            try:
+                wait_for_ssh(key=key, user=user, host=host, port=port, retries=3, wait=5, dry_run=False)
+            except Exception as e:
+                last_error = str(e)
+                log(f"[WARN] SSH not stable before retry {attempt}/5: {last_error}")
+                continue
+
+        scp_cmd = f"{scp_base_cmd(key, port)} {shell_quote(src)} {user}@{host}:{shell_quote(dest)}"
+        result = subprocess.run(scp_cmd, shell=True, capture_output=True, text=True, errors="replace")
+        if result.returncode == 0:
+            return
+
+        last_error = ((result.stderr or result.stdout or "").strip()) or f"scp exited {result.returncode}"
+        log(f"[WARN] SCP failed for {host} on attempt {attempt}/5: {last_error[:240]}")
+        log(f"[WARN] Falling back to SSH stdin pipe for {host} on attempt {attempt}/5...")
+
+        pipe_cmd = (
+            f"{ssh_base_cmd(key, user, host, port)} "
+            f"'umask 077; tmp={shell_quote(dest)}.tmp.$$; cat > \"$tmp\" && mv \"$tmp\" {shell_quote(dest)}' "
+            f"< {shell_quote(src)}"
         )
-    except RuntimeError as e:
-        if 'Permission denied' in str(e) or 'scp' in str(e).lower():
-            log(f"[WARN] SCP blocked or failed for {host}. Falling back to SSH stdin pipe...")
-            run(
-                f"cat {shell_quote(src)} | {ssh_base_cmd(key, user, host, port)} 'cat > {shell_quote(dest)}'",
-                dry_run=dry_run,
-                log_cmd=False,
-            )
-        else:
-            raise
+        result = subprocess.run(pipe_cmd, shell=True, capture_output=True, text=True, errors="replace")
+        if result.returncode == 0:
+            return
+
+        last_error = ((result.stderr or result.stdout or "").strip()) or f"ssh stdin pipe exited {result.returncode}"
+        log(f"[WARN] SSH stdin copy failed for {host} on attempt {attempt}/5: {last_error[:240]}")
+
+    raise RuntimeError(f"Failed to copy {src} to {user}@{host}:{dest} after 5 attempts. Last error: {last_error}")
 
 
 def main() -> None:

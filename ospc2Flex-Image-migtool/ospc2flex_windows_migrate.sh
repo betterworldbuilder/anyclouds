@@ -17,6 +17,11 @@
 #
 # Requires: /tmp/ospc2flex_ospc.sh (OSPC creds) and /tmp/ospc2flex_flex.sh (FLEX creds)
 #           /tmp/ospc2flex_windows_repair.sh (VirtIO driver injection script)
+#
+# On-disk qcow2/img: <base-label>-YYYYMMDD-HHMMSS on fresh run, or existing file stem
+# when resuming. FLEX Glance + VM name (CLOUD_LABEL): always <base>-YYYYMMDD-HHMMSS
+# when resuming plain base qcow2, else same as on-disk label. Override with:
+#   OSPC2FLEX_LEGACY_IMAGE_NAME=1  → no timestamp suffix on qcow2 stem (Glance/VM still timed).
 # ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -27,9 +32,7 @@ LABEL=""
 FLAVOR="gp.5.4.4"
 NETWORK="tenant-net"
 KEYPAIR="laptopubuntu24"
-WORK="/mnt/migration/ospc2flex_image"
-DATE_STR=$(date +%Y%m%d-%H%M)
-LOG_FILE="/tmp/winmig_${LABEL}.log"
+WORK="${WORK:-/mnt/migration/ospc2flex_image}"
 OSPC_CREDS="/tmp/ospc2flex_ospc.sh"
 FLEX_CREDS="/tmp/ospc2flex_flex.sh"
 WIN_REPAIR="/tmp/ospc2flex_windows_repair.sh"
@@ -67,7 +70,9 @@ step_start() {
   _STEP_NUM="$num"
   _STEP_NAME="$name"
   _STEP_START_TIME=$(date +%s)
-  _STEP_STEPS_COMPLETED=$((num - 1))
+  if [[ "$num" =~ ^[0-9]+$ ]]; then
+    _STEP_STEPS_COMPLETED=$((num - 1))
+  fi
   echo "" >&2
   echo "╔════════════════════════════════════════════════════════════════════════════╗" >&2
   printf "║ STEP %s: %-66s ║\n" "$num" "$name" >&2
@@ -114,18 +119,66 @@ done
 [ -z "$SERVER_NAME" ] && { echo "ERROR: --server-name required"; exit 1; }
 [ -z "$LABEL" ] && LABEL="ospc2flex-$(echo "$SERVER_NAME" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')"
 
+# Dashboard/job identity vs names:
+#   BASE_LABEL   — value from --label (e.g. windows_2016-104.130.26.194)
+#   LABEL        — qcow2/img/repair paths; BASE_LABEL-YYYYMMDD-HHMMSS on fresh download,
+#                  or existing stem when resuming a qcow2 on disk.
+#   CLOUD_LABEL  — Glance image + FLEX VM name; always BASE_LABEL-YYYYMMDD-HHMMSS when
+#                  LABEL equals BASE (resume), else same as LABEL.
+BASE_LABEL="$LABEL"
+_ts=$(date +%Y%m%d-%H%M%S)
+_resume_qcow=""
+if [ "${OSPC2FLEX_LEGACY_IMAGE_NAME:-0}" != "1" ]; then
+  _plain="$WORK/${BASE_LABEL}.qcow2"
+  if [ -f "$_plain" ] && qemu-img info "$_plain" >/dev/null 2>&1; then
+    _sz=$(stat -c%s "$_plain" 2>/dev/null || echo 0)
+    if [ "${_sz:-0}" -ge 1048576 ]; then
+      _resume_qcow="$_plain"
+    fi
+  fi
+  if [ -z "$_resume_qcow" ]; then
+    for _c in $(ls -t "$WORK/${BASE_LABEL}"-*.qcow2 2>/dev/null || true); do
+      [ -f "$_c" ] || continue
+      qemu-img info "$_c" >/dev/null 2>&1 || continue
+      _sz=$(stat -c%s "$_c" 2>/dev/null || echo 0)
+      if [ "${_sz:-0}" -ge 1048576 ]; then
+        _resume_qcow="$_c"
+        break
+      fi
+    done
+  fi
+  if [ -n "$_resume_qcow" ]; then
+    LABEL=$(basename "$_resume_qcow" .qcow2)
+  else
+    LABEL="${BASE_LABEL}-${_ts}"
+  fi
+fi
 
+_cloud_ts=$(date +%Y%m%d-%H%M%S)
+if [ "$LABEL" = "$BASE_LABEL" ]; then
+  CLOUD_LABEL="${BASE_LABEL}-${_cloud_ts}"
+else
+  CLOUD_LABEL="$LABEL"
+fi
 
 QCOW="$WORK/${LABEL}.qcow2"
+IMG_PATH="$WORK/${LABEL}.img"
+IMG_SIZE=0
+DOWNLOAD_METHOD=""
+RESUME_FROM_QCOW=0
 LOG="/tmp/mig_${LABEL}.log"
-exec > >(tee -a "$LOG") 2>&1
+if [ "${OSPC2FLEX_SELF_TEE:-auto}" != "0" ]; then
+  exec > >(tee -a "$LOG") 2>&1
+fi
 
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo " OSPC→FLEX Windows Migration Workflow"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Server    : $SERVER_NAME ($SERVER_IP)"
-echo "  Label     : $LABEL"
+echo "  Label      : $LABEL  (on-disk qcow2/img)"
+echo "  Base label : $BASE_LABEL  (dashboard / job id)"
+echo "  Cloud name : $CLOUD_LABEL  (FLEX Glance image + server create)"
 echo "  Flavor    : $FLAVOR"
 echo "  Network   : $NETWORK"
 echo "  Keypair   : $KEYPAIR"
@@ -138,10 +191,21 @@ echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 
+mkdir -p "$WORK"
+if [ -s "$QCOW" ] && qemu-img info "$QCOW" >/dev/null 2>&1; then
+  QCOW_EXISTING_BYTES=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
+  if [ "${QCOW_EXISTING_BYTES:-0}" -ge 1048576 ]; then
+    RESUME_FROM_QCOW=1
+    DOWNLOAD_METHOD="existing-qcow2-resume"
+    PASS "Resume point found: $QCOW ($((QCOW_EXISTING_BYTES / 1024 / 1024)) MB)"
+    INFO "Skipping SSH/Glance download and raw->qcow2 conversion; resuming at Windows repair stage."
+  fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1b: Check SSH first — skip snapshot entirely if SSH is reachable
 # ═══════════════════════════════════════════════════════════════════════════════
+if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
 step_start "1b" "Checking Windows SSH availability (public IP + ServiceNet)"
 _ssh_check_ip=""
 if nc -z -w 8 "$SERVER_IP" 22 2>/dev/null; then
@@ -446,19 +510,19 @@ WINRM_SCRIPT
       WARN "WinRM bootstrap failed (rc=$_WINRM_RC) — will use Glance fallback"
     fi
   fi
-else
+elif [ "${SSH_DISK_METHOD:-0}" -eq 0 ]; then
   WARN "SSH not available and --windows-password not provided — using Glance fallback only"
+fi
+else
+  INFO "Resume mode: SSH/WinRM/snapshot discovery skipped because qcow2 already exists."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Download Windows disk image
 # ═══════════════════════════════════════════════════════════════════════════════
+if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
 step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
-mkdir -p "$WORK"
-IMG_PATH="$WORK/${LABEL}.img"
 rm -f "$IMG_PATH"
-IMG_SIZE=0
-DOWNLOAD_METHOD=""
 
 if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
   step_progress "Using SSH direct disk read via PowerShell"
@@ -512,7 +576,7 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
 fi
 
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
-  step_progress "Using Glance snapshot download (Cloud Files bridge / ServiceNet / public)"
+  step_progress "Using Glance snapshot download (Cloud Files bridge / Classic Glance)"
   INFO "Large Windows disks often take 30–120+ minutes — heartbeat + size logged every 60s."
   rm -f "$IMG_PATH"
 
@@ -547,22 +611,12 @@ _region_short() {
 }
 
 _glance_public_base() {
-  # Public (internet) Glance endpoint — subject to the WAF that has been
-  # returning HTTP 413 on large image /file downloads from OSPC PubCloud.
+  # Classic (public internet) Glance: https://<region>.images.api.rackspacecloud.com
   printf 'https://%s.images.api.rackspacecloud.com' "$(_region_short)"
 }
 
-_glance_snet_base() {
-  # ServiceNet (10/8) Glance endpoint — bypasses the public WAF. Reachable
-  # from any OSPC jumphost and is the correct path for bulk image downloads.
-  printf 'https://snet-%s.images.api.rackspacecloud.com' "$(_region_short)"
-}
-
 _resolve_glance_base() {
-  # Prefer the catalog's "internal" (ServiceNet) URL when present; fall back
-  # to our predictable snet-<region> hostname; then public catalog URL; then
-  # public predictable hostname. ServiceNet is strongly preferred because the
-  # public endpoint's load-balancer returns HTTP 413 on image file GETs.
+  # Classic Glance only — public catalog URL, then predictable public hostname.
   local out u
   u=""
   if out=$(openstack catalog show image -f json 2>/dev/null); then
@@ -570,24 +624,20 @@ _resolve_glance_base() {
 import json, os
 d = json.loads(os.environ["OPENSTACK_JSON"])
 eps = d.get("endpoints") or []
-for w in ("internal", "admin", "public"):
-    for e in eps:
-        if str(e.get("interface", "")).lower() == w and e.get("url"):
-            print(str(e["url"]).rstrip("/"))
-            raise SystemExit(0)
+for e in eps:
+    if str(e.get("interface", "")).lower() == "public" and e.get("url"):
+        print(str(e["url"]).rstrip("/"))
+        raise SystemExit(0)
 print("")
 PY
 )
   fi
   if [ -z "$u" ]; then
-    u=$(openstack endpoint list --service image --interface internal -f value -c URL 2>/dev/null | head -1 | sed 's|/$||' || true)
-  fi
-  if [ -z "$u" ]; then
     u=$(openstack endpoint list --service image --interface public -f value -c URL 2>/dev/null | head -1 | sed 's|/$||' || true)
   fi
   if [ -z "$u" ]; then
-    u=$(_glance_snet_base)
-    WARN "Catalog/endpoints empty — ServiceNet fallback: $u (OS_REGION_NAME=$OS_REGION_NAME)"
+    u=$(_glance_public_base)
+    WARN "Catalog/endpoints empty — using public Glance base: $u (OS_REGION_NAME=$OS_REGION_NAME)"
   fi
   printf '%s' "$u"
 }
@@ -618,27 +668,16 @@ OS_IMAGE_URL=$(_resolve_glance_base)
 # sees a malformed URL (curl ≥7.85 rejects URLs with whitespace).
 OS_IMAGE_URL=$(printf '%s' "$OS_IMAGE_URL" | tr -d '[:space:]')
 
-# Build ordered list of Glance base URLs to try. ServiceNet first (bypasses
-# the public WAF that returns HTTP 413 on image /file GETs), public last.
-SNET_BASE=$(_glance_snet_base)
+# Build ordered list of Glance base URLs to try (Classic / public only).
 PUB_BASE=$(_glance_public_base)
-PRECHECK_SNET_DNS_FAIL=0
-# Dedup/order: catalog-resolved (if it differs from both), snet, public
 GLANCE_BASES=""
-for b in "$SNET_BASE" "$OS_IMAGE_URL" "$PUB_BASE"; do
+for b in "$OS_IMAGE_URL" "$PUB_BASE"; do
   b=$(printf '%s' "$b" | tr -d '[:space:]')
   [ -z "$b" ] && continue
   _h=$(_url_host "$b")
   if ! _host_resolves "$_h"; then
     WARN "Glance host unresolved on jumphost: $_h (base=$b)"
-    case "$_h" in
-      snet-*.images.api.rackspacecloud.com)
-        PRECHECK_SNET_DNS_FAIL=1
-        ;;
-      *)
-        continue
-        ;;
-    esac
+    continue
   fi
   case " $GLANCE_BASES " in
     *" $b "*) : ;;
@@ -653,7 +692,7 @@ if [ -z "$GLANCE_BASES" ]; then
 fi
 DL_URL="$OS_IMAGE_URL/v2/images/$SNAP_ID/file"
 DL_URL=$(printf '%s' "$DL_URL" | tr -d '[:space:]')
-INFO "Catalog-resolved Glance GET: $DL_URL"
+INFO "Glance GET (Classic): $DL_URL"
 
 # Start a heartbeat watcher that monitors $IMG_PATH size while any download
 # method is running. This replaces the per-method heartbeat loops.
@@ -717,7 +756,7 @@ _curl_download_from() {
   fi
   # Track root-cause signals so the outer loop can fail fast with a useful message.
   if grep -qi "Could not resolve host" "$log" 2>/dev/null; then
-    SAW_SNET_DNS_FAIL=1
+    SAW_GLANCE_DNS_FAIL=1
   fi
   if grep -qiE "HTTP_CODE=413|returned error: 413|Unable to download image: InvalidResponse" "$log" 2>/dev/null; then
     SAW_PUBLIC_413=1
@@ -779,7 +818,7 @@ _try_download_methods() {
         SAW_PUBLIC_413=1
       fi
       if grep -qi "Could not resolve host" "$_oslog" 2>/dev/null; then
-        SAW_SNET_DNS_FAIL=1
+        SAW_GLANCE_DNS_FAIL=1
       fi
     fi
 
@@ -817,7 +856,7 @@ if [ "${IMG_SIZE:-0}" -lt 1048576 ] && [ -x /tmp/ospc2flex_glance_bridge.sh ]; t
     FAIL "Contact Rackspace support to enable export for image $SNAP_ID, or migrate data at the application layer."
     exit 1
   else
-    WARN "Glance bridge failed (rc=$BRIDGE_RC); attempting legacy ServiceNet/public waterfall as last resort"
+    WARN "Glance bridge failed (rc=$BRIDGE_RC); attempting legacy Classic Glance waterfall as last resort"
     rm -f "$IMG_PATH"
     IMG_SIZE=0
   fi
@@ -825,20 +864,20 @@ fi
 
 attempt=1
 max_dl=5
-SAW_SNET_DNS_FAIL=0
-SAW_PUBLIC_413=0
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
 while [ "$attempt" -le "$max_dl" ]; do
-  if [ "${PRECHECK_SNET_DNS_FAIL:-0}" -eq 1 ]; then
-    SAW_SNET_DNS_FAIL=1
-  fi
+  SAW_GLANCE_DNS_FAIL=0
+  SAW_PUBLIC_413=0
   if _try_download_methods "$attempt"; then
     IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
     break
   fi
-  if [ "$SAW_SNET_DNS_FAIL" -eq 1 ] && [ "$SAW_PUBLIC_413" -eq 1 ]; then
-    WARN "All Glance paths exhausted: ServiceNet DNS unresolvable + public endpoint returning HTTP 413."
-    WARN "Cloud Files bridge also failed (see above). No further Glance retries will succeed — stopping waterfall."
+  if [ "$SAW_PUBLIC_413" -eq 1 ]; then
+    WARN "Classic Glance returned HTTP 413; Cloud Files bridge also failed (see above). Stopping waterfall retries."
+    break
+  fi
+  if [ "$SAW_GLANCE_DNS_FAIL" -eq 1 ]; then
+    WARN "Classic Glance host could not be resolved; stopping waterfall retries."
     break
   fi
   WARN "All download methods failed on attempt $attempt/$max_dl — refreshing token and retrying..."
@@ -863,10 +902,16 @@ fi
 
 PASS "Step 2 complete: Image downloaded ($((IMG_SIZE / 1024 / 1024)) MB via $DOWNLOAD_METHOD)"
 step_done "OK"
+else
+step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
+step_progress "Existing qcow2 image present; download skipped."
+step_done "SKIPPED (resume from qcow2)"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 3: Convert to qcow2
 # ═══════════════════════════════════════════════════════════════════════════════
+if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
 step_start "3" "Converting disk image to qcow2 format"
 step_progress "Detecting image format..."
 DETECTED_FMT=$(qemu-img info --output=json "$IMG_PATH" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('format','raw'))" 2>/dev/null || echo "raw")
@@ -885,6 +930,12 @@ fi
 QCOW_SIZE=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
 INFO "qcow2 size: $((QCOW_SIZE/1024/1024))MB"
 step_done "OK"
+else
+step_start "3" "Converting disk image to qcow2 format"
+QCOW_SIZE=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
+INFO "Reusing existing qcow2 size: $((QCOW_SIZE/1024/1024))MB"
+step_done "SKIPPED (resume from qcow2)"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 4: Windows VirtIO Repair
@@ -924,26 +975,49 @@ if [ "$OS_FAMILY" = "linux" ]; then
 else
   if [ -f "$WIN_REPAIR" ]; then
     set +e  # temporarily disable abort on error
-    bash "$WIN_REPAIR" --qcow2 "$QCOW" --force 2>&1
+    REPAIR_ARGS=(--qcow2 "$QCOW" --force)
+    [ "$DRY_RUN" -eq 1 ] && REPAIR_ARGS+=(--dry-run)
+    # Full repair transcript (default on): OSPC2FLEX_WIN_REPAIR_DEBUG=0 to disable
+    if [ "${OSPC2FLEX_WIN_REPAIR_DEBUG:-1}" != "0" ]; then
+      _win_dbg="$WORK/${LABEL}.repair.debug.log"
+      REPAIR_ARGS+=(--debug --debug-log "$_win_dbg")
+      INFO "Windows repair debug: ${_win_dbg} (set OSPC2FLEX_WIN_REPAIR_DEBUG=0 to skip)"
+    fi
+    bash "$WIN_REPAIR" "${REPAIR_ARGS[@]}" 2>&1
     REPAIR_EXIT=$?
     set -e
     if [ "$REPAIR_EXIT" -eq 0 ]; then
       PASS "Windows repair completed successfully"
       step_done "OK"
     else
-      WARN "Windows repair exited with code $REPAIR_EXIT — continuing anyway"
-      step_done "DONE (with warnings)"
+      FAIL "Windows repair exited with code $REPAIR_EXIT - refusing to upload an unrepaired Windows image"
+      FAIL "A VM booted from an unrepaired image commonly lands in WinRE with no fixed disks visible."
+      step_done "FAILED"
+      exit 1
     fi
   else
-    WARN "$WIN_REPAIR not found — skipping VirtIO injection"
-    WARN "Windows VM may not boot without VirtIO drivers!"
-    step_done "SKIPPED"
+    WARN "$WIN_REPAIR not found - skipping VirtIO injection"
+    FAIL "Windows VM will not boot reliably on FLEX without VirtIO storage drivers."
+    step_done "FAILED"
+    exit 1
   fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 5: Upload to FLEX
 # ═══════════════════════════════════════════════════════════════════════════════
+if [ "$DRY_RUN" -eq 1 ]; then
+  step_start "5" "Dry-run stop before FLEX upload"
+  INFO "[DRY-RUN] Would upload qcow2 to FLEX Glance: $QCOW"
+  INFO "[DRY-RUN] Would boot FLEX VM, assign floating IP, and run first-boot verification"
+  step_done "SKIPPED (dry-run)"
+  echo ""
+  echo "╔════════════════════════════════════════════════════════════════════════════╗"
+  echo "║                         DRY-RUN WORKFLOW COMPLETE                         ║"
+  echo "╚════════════════════════════════════════════════════════════════════════════╝"
+  exit 0
+fi
+
 step_start "5" "Uploading qcow2 image to FLEX Glance"
 step_progress "Switching to FLEX credentials..."
 OSPC_TOKEN="${OS_TOKEN:-}"
@@ -1081,13 +1155,14 @@ IMG_OS_TYPE="windows"
 IMG_OS_DISTRO="windows"
 IMG_ARCH="x86_64"
 IMG_VM_MODE="hvm"
-IMG_DISK_BUS="virtio"
+IMG_DISK_BUS="scsi"
 IMG_VIF_MODEL="virtio"
 IMG_QGA="yes"
+IMG_SCSI_MODEL="virtio-scsi"
 step_progress "Uploading: $QCOW_BYTES bytes (${QCOW_MIB} MiB) to FLEX Glance..."
-INFO "FLEX image metadata: architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=$IMG_OS_DISTRO hw_disk_bus=$IMG_DISK_BUS hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
+INFO "FLEX image metadata: architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=$IMG_OS_DISTRO hw_disk_bus=$IMG_DISK_BUS hw_scsi_model=$IMG_SCSI_MODEL hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
 
-FLEX_IMG_ID=$(openstack image create "$LABEL" \
+FLEX_IMG_ID=$(openstack image create "$CLOUD_LABEL" \
   --disk-format qcow2 \
   --container-format bare \
   --file "$QCOW" \
@@ -1097,6 +1172,7 @@ FLEX_IMG_ID=$(openstack image create "$LABEL" \
   --property "os_type=$IMG_OS_TYPE" \
   --property "os_distro=$IMG_OS_DISTRO" \
   --property "hw_disk_bus=$IMG_DISK_BUS" \
+  --property "hw_scsi_model=$IMG_SCSI_MODEL" \
   --property "hw_vif_model=$IMG_VIF_MODEL" \
   --property "hw_qemu_guest_agent=$IMG_QGA" \
   --format value -c id 2>/dev/null || true)
@@ -1116,7 +1192,7 @@ for i in $(seq 1 30); do
   sleep 5
 done
 PASS "Image uploaded: $FLEX_IMG_ID (status: $STATUS)"
-SHOW_NAME=$(openstack image show "$FLEX_IMG_ID" -f value -c name 2>/dev/null || echo "$LABEL")
+SHOW_NAME=$(openstack image show "$FLEX_IMG_ID" -f value -c name 2>/dev/null || echo "$CLOUD_LABEL")
 SHOW_VIS=$(openstack image show "$FLEX_IMG_ID" -f value -c visibility 2>/dev/null || echo "unknown")
 SHOW_STAT=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "${STATUS:-unknown}")
 INFO "[UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$FLEX_IMG_ID name=${SHOW_NAME:-unknown} status=${SHOW_STAT:-unknown} visibility=${SHOW_VIS:-unknown}"
@@ -1135,30 +1211,42 @@ INFO "Final boot network: $NETWORK"
 INFO "Final boot keypair: ${KEYPAIR:-<none>}"
 
 # Kept logic to not delete old VMs
-OLD_VIDS=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep -F "$LABEL" | awk '{print $1}' || true)
+OLD_VIDS=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep -F "$BASE_LABEL" | awk '{print $1}' || true)
 if [ -n "$OLD_VIDS" ]; then
   INFO "Old VMs found: $OLD_VIDS (Skipping deletion as per user request)"
 fi
 
 if [ -n "$KEYPAIR" ]; then
-  openstack server create "$LABEL" \
+  VM_ID=$(openstack server create "$CLOUD_LABEL" \
     --image "$FLEX_IMG_ID" \
     --flavor "$FLAVOR" \
     --network "$NETWORK" \
     --key-name "$KEYPAIR" \
-    --wait 2>&1
+    --wait \
+    --format value -c id 2>/tmp/winmig_server_create_${LABEL}.err || true)
 else
-  openstack server create "$LABEL" \
+  VM_ID=$(openstack server create "$CLOUD_LABEL" \
     --image "$FLEX_IMG_ID" \
     --flavor "$FLAVOR" \
     --network "$NETWORK" \
-    --wait 2>&1
+    --wait \
+    --format value -c id 2>/tmp/winmig_server_create_${LABEL}.err || true)
 fi
 
 sleep 10
 
 # Get VM status
-VM_ID=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep -F "$LABEL" | head -1 | awk '{print $1}' || true)
+if [ -z "${VM_ID:-}" ]; then
+  WARN "server create did not return an ID: $(tr '\n' ' ' </tmp/winmig_server_create_${LABEL}.err 2>/dev/null | cut -c 1-240)"
+  VM_ID=$(openstack server list -f value -c ID -c Name 2>/dev/null | grep -F "$CLOUD_LABEL" | head -1 | awk '{print $1}' || true)
+fi
+VM_ID=$(printf '%s' "${VM_ID:-}" | awk 'NF {print $1; exit}')
+rm -f "/tmp/winmig_server_create_${LABEL}.err"
+if [ -z "${VM_ID:-}" ]; then
+  FAIL "Unable to determine created VM ID for $CLOUD_LABEL"
+  step_done "FAILED"
+  exit 1
+fi
 VM_STATUS=$(openstack server show "$VM_ID" -f value -c status 2>/dev/null || echo "unknown")
 
 if [ "$VM_STATUS" = "ACTIVE" ]; then
@@ -1174,11 +1262,26 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 step_start "7" "Assigning floating IP address"
 step_progress "Looking for server port..."
-PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID -c Status 2>/dev/null | awk '$2=="ACTIVE"{print $1; exit}')
+PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID -c Status 2>/dev/null | awk '$2=="ACTIVE"{print $1; exit}' || true)
 [ -z "$PORT_ID" ] && PORT_ID=$(openstack port list --server "$VM_ID" -f value -c ID 2>/dev/null | head -1 || true)
 if [ -z "$PORT_ID" ]; then
-  WARN "No server port found; skipping FIP attach"
-  step_done "SKIPPED"
+  FIXED_IP_CANDIDATE=$(openstack server show "$VM_ID" -f value -c addresses 2>/dev/null | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -E '^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.' | head -1 || true)
+  if [ -n "$FIXED_IP_CANDIDATE" ]; then
+    PORT_ID=$(openstack port list --fixed-ip "ip-address=$FIXED_IP_CANDIDATE" -f value -c ID 2>/dev/null | head -1 || true)
+    [ -n "$PORT_ID" ] && step_progress "Found port by fixed IP $FIXED_IP_CANDIDATE: $PORT_ID"
+  fi
+fi
+if [ -z "$PORT_ID" ]; then
+  EXISTING_FIP=$(openstack server show "$VM_ID" -f value -c addresses 2>/dev/null | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -Ev '^10\.|^192\.168\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.' | head -1 || true)
+  if [ -n "$EXISTING_FIP" ]; then
+    ACTUAL_FIP="$EXISTING_FIP"
+    WARN "No server port found, but server already has floating IP $ACTUAL_FIP"
+    INFO "RDP: mstsc /v:$ACTUAL_FIP"
+    step_done "OK (existing FIP)"
+  else
+    WARN "No server port found; skipping FIP attach"
+    step_done "SKIPPED"
+  fi
 else
   step_progress "Creating or finding floating IP..."
   FIP_JSON=$(openstack floating ip create PUBLICNET -f json 2>/dev/null || true)
@@ -1218,7 +1321,7 @@ echo "╔═══════════════════════�
 echo "║                     MIGRATION WORKFLOW COMPLETE                            ║"
 echo "╚════════════════════════════════════════════════════════════════════════════╝"
 echo ""
-echo "  Server:       $LABEL"
+echo "  Server:       $CLOUD_LABEL"
 echo "  Image ID:     $FLEX_IMG_ID"
 echo "  VM ID:        $VM_ID ($VM_STATUS)"
 echo "  Floating IP:  ${ACTUAL_FIP:-not assigned}"
@@ -1228,12 +1331,16 @@ echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 # Cleanup OSPC snapshot
-log "Cleaning up OSPC snapshot $SNAP_NAME..."
-source /tmp/ospc2flex_ospc.sh
-if [ -n "${OSPC_TOKEN:-}" ]; then
-  export OS_TOKEN="$OSPC_TOKEN"
-  export OS_AUTH_TYPE=token
-  export OS_IDENTITY_API_VERSION=2
+if [ -n "${SNAP_ID:-}" ]; then
+  log "Cleaning up OSPC snapshot ${SNAP_NAME:-$SNAP_ID}..."
+  source /tmp/ospc2flex_ospc.sh
+  if [ -n "${OSPC_TOKEN:-}" ]; then
+    export OS_TOKEN="$OSPC_TOKEN"
+    export OS_AUTH_TYPE=token
+    export OS_IDENTITY_API_VERSION=2
+  fi
+  openstack image delete "$SNAP_ID" 2>/dev/null || true
+  PASS "OSPC snapshot deleted"
+else
+  INFO "No OSPC snapshot was created; cleanup skipped"
 fi
-openstack image delete "$SNAP_ID" 2>/dev/null || true
-PASS "OSPC snapshot deleted"

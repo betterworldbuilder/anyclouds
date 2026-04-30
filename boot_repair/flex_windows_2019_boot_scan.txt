@@ -1,0 +1,161 @@
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+PS C:\Users\Administrator> "===== OS ====="; Get-CimInstance Win32_OperatingSystem | fl Caption,Version,BuildNumber,OSArchitecture; "===== BOOT CFG ====="; bcdedit /enum all; "===== DISKS ====="; Get-Disk | ft Number,FriendlyName,BusType,PartitionStyle,OperationalStatus,IsBoot,IsSystem,Size -Auto; "===== PARTITIONS ====="; Get-Partition | ft DiskNumber,PartitionNumber,DriveLetter,Type,IsActive,IsBoot,IsSystem,Size -Auto; "===== DRIVERS ====="; 'viostor','vioscsi','netkvm','disk','partmgr','volmgr','volsnap','mountmgr' | % { Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$_" -ErrorAction SilentlyContinue | select PSChildName,Start,Group,ImagePath } | ft -Auto
+===== OS =====
+
+
+Caption        : Microsoft Windows Server 2019 Datacenter
+Version        : 10.0.17763
+BuildNumber    : 17763
+OSArchitecture : 64-bit
+
+
+
+===== BOOT CFG =====
+
+Windows Boot Manager
+--------------------
+identifier              {bootmgr}
+device                  partition=C:
+description             Windows Boot Manager
+locale                  en-US
+inherit                 {globalsettings}
+bootshutdowndisabled    Yes
+default                 {current}
+resumeobject            {6c1de867-3465-11f1-9597-8d1bb6eac652}
+displayorder            {current}
+toolsdisplayorder       {memdiag}
+timeout                 30
+
+Windows Boot Loader
+-------------------
+identifier              {current}
+device                  partition=C:
+path                    \Windows\system32\winload.exe
+description             Windows Server
+locale                  en-US
+inherit                 {bootloadersettings}
+recoverysequence        {6c1de86f-3465-11f1-9597-8d1bb6eac652}
+displaymessageoverride  Recovery
+recoveryenabled         Yes
+allowedinmemorysettings 0x15000075
+osdevice                partition=C:
+systemroot              \Windows
+resumeobject            {6c1de867-3465-11f1-9597-8d1bb6eac652}
+nx                      OptOut
+
+Windows Boot Loader
+-------------------
+identifier              {6c1de86f-3465-11f1-9597-8d1bb6eac652}
+device                  ramdisk=[\Device\HarddiskVolume1]\Recovery\WindowsRE\Winre.wim,{6c1de870-3465-11f1-9597-8d1bb6eac652}
+path                    \windows\system32\winload.exe
+description             Windows Recovery Environment
+locale                  en-US
+inherit                 {bootloadersettings}
+displaymessage          Recovery
+osdevice                ramdisk=[\Device\HarddiskVolume1]\Recovery\WindowsRE\Winre.wim,{6c1de870-3465-11f1-9597-8d1bb6eac652}
+systemroot              \windows
+nx                      OptIn
+bootmenupolicy          Standard
+winpe                   Yes
+
+Resume from Hibernate
+---------------------
+identifier              {6c1de867-3465-11f1-9597-8d1bb6eac652}
+device                  partition=C:
+path                    \Windows\system32\winresume.exe
+description             Windows Resume Application
+locale                  en-US
+inherit                 {resumeloadersettings}
+recoverysequence        {6c1de86f-3465-11f1-9597-8d1bb6eac652}
+recoveryenabled         Yes
+allowedinmemorysettings 0x15000075
+filedevice              partition=C:
+filepath                \hiberfil.sys
+debugoptionenabled      No
+
+Windows Memory Tester
+---------------------
+identifier              {memdiag}
+device                  partition=C:
+path                    \boot\memtest.exe
+description             Windows Memory Diagnostic
+locale                  en-US
+inherit                 {globalsettings}
+badmemoryaccess         Yes
+
+EMS Settings
+------------
+identifier              {emssettings}
+bootems                 Yes
+
+Debugger Settings
+-----------------
+identifier              {dbgsettings}
+debugtype               Local
+
+RAM Defects
+-----------
+identifier              {badmemory}
+
+Global Settings
+---------------
+identifier              {globalsettings}
+inherit                 {dbgsettings}
+                        {emssettings}
+                        {badmemory}
+
+Boot Loader Settings
+--------------------
+identifier              {bootloadersettings}
+inherit                 {globalsettings}
+                        {hypervisorsettings}
+
+Hypervisor Settings
+-------------------
+identifier              {hypervisorsettings}
+hypervisordebugtype     Serial
+hypervisordebugport     1
+hypervisorbaudrate      115200
+
+Resume Loader Settings
+----------------------
+identifier              {resumeloadersettings}
+inherit                 {globalsettings}
+
+Device options
+--------------
+identifier              {6c1de870-3465-11f1-9597-8d1bb6eac652}
+description             Windows Recovery
+ramdisksdidevice        partition=\Device\HarddiskVolume1
+ramdisksdipath          \Recovery\WindowsRE\boot.sdi
+===== DISKS =====
+
+Number FriendlyName   BusType PartitionStyle OperationalStatus IsBoot IsSystem        Size
+------ ------------   ------- -------------- ----------------- ------ --------        ----
+     2 Red Hat VirtIO SCSI    RAW            Offline            False    False  4294967296
+     0 Red Hat VirtIO SCSI    MBR            Online              True     True 85899345920
+     1 Red Hat VirtIO SCSI    RAW            Offline            False    False 68719476736
+
+
+===== PARTITIONS =====
+
+DiskNumber PartitionNumber DriveLetter Type    IsActive IsBoot IsSystem        Size
+---------- --------------- ----------- ----    -------- ------ --------        ----
+         0               1             Unknown    False  False    False  1048576000
+         0               2           C IFS         True   True     True 84848672768
+
+
+===== DRIVERS =====
+
+PSChildName Start Group               ImagePath
+----------- ----- -----               ---------
+viostor         0 SCSI miniport       System32\drivers\viostor.sys
+vioscsi         0 SCSI miniport       System32\drivers\vioscsi.sys
+netkvm          3 NDIS                \SystemRoot\System32\drivers\netkvm.sys
+disk            0                     System32\drivers\disk.sys
+partmgr         0 Boot Bus Extender   System32\drivers\partmgr.sys
+volmgr          0 System Bus Extender System32\drivers\volmgr.sys
+volsnap         0                     System32\drivers\volsnap.sys
+mountmgr        0 System Bus Extender System32\drivers\mountmgr.sys

@@ -30,7 +30,6 @@ const openrcSelect = document.getElementById('openrcSelect');
 function log(msg) {
   const ts = new Date().toLocaleTimeString();
   logBox.textContent += `\n[${ts}] ${msg}`;
-  logBox.scrollTop = logBox.scrollHeight;
 }
 
 function appendRawLog(text) {
@@ -38,7 +37,6 @@ function appendRawLog(text) {
   if (!chunk) return;
   if (!logBox.textContent.endsWith('\n')) logBox.textContent += '\n';
   logBox.textContent += chunk;
-  logBox.scrollTop = logBox.scrollHeight;
 }
 
 async function withButtonBusy(buttonId, actionName, fn) {
@@ -870,13 +868,18 @@ function buildTopologyScriptName() {
 function renderValidation(data) {
   const summary = data?.validation_summary || { ERROR: 0, WARN: 0, INFO: 0 };
   const findings = Array.isArray(data?.validation_findings) ? data.validation_findings : [];
+  const nonBlocking = data?.validation_blocking === false;
+  const okValue = (typeof data?.ok === 'boolean') ? data.ok : (summary.ERROR === 0 || nonBlocking);
   const head = [
-    `ok=${summary.ERROR === 0}`,
+    `ok=${okValue}`,
     `errors=${summary.ERROR || 0}`,
     `warnings=${summary.WARN || 0}`,
     `info=${summary.INFO || 0}`,
   ].join(' | ');
   const lines = [head];
+  if (nonBlocking) {
+    lines.push('[INFO] validation_non_blocking :: validator :: Validation errors are configured as non-blocking for this flow.');
+  }
   for (const f of findings) {
     lines.push(`[${f.severity}] ${f.code} :: ${f.scope} :: ${f.message}`);
   }

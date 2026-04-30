@@ -101,7 +101,7 @@ try:
 except Exception:
     data = {}
 eps = data.get("endpoints") or []
-for wanted in ("internal", "admin", "public"):
+for wanted in ("public",):
     for ep in eps:
         iface = str(ep.get("interface") or "").lower()
         if iface == wanted:
@@ -110,12 +110,10 @@ for wanted in ("internal", "admin", "public"):
                 print(str(url).rstrip("/"))
 PY
     fi
-    openstack endpoint list --service image -f value -c URL 2>/dev/null || true
+    openstack endpoint list --service image --interface public -f value -c URL 2>/dev/null || true
     if _is_flex_auth; then
-      printf 'https://snet-%s.images.api.rackspacecloud.com\n' "$api_region"
       printf 'https://%s.images.api.rackspacecloud.com\n' "$api_region"
     else
-      printf 'https://snet-%s.images.api.rackspacecloud.com\n' "$region"
       printf 'https://%s.images.api.rackspacecloud.com\n' "$region"
     fi
   } | while IFS= read -r url; do

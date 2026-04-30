@@ -145,7 +145,8 @@ ok "qcow2 ready: $QCOW"
 log "Step 4/6: Run Windows offline repair"
 if [ -f "$WIN_REPAIR" ]; then
   set +e
-  bash "$WIN_REPAIR" --qcow2 "$QCOW" --force
+  _win_dbg="${QCOW%.qcow2}.repair.debug.log"
+  bash "$WIN_REPAIR" --qcow2 "$QCOW" --force --debug --debug-log "$_win_dbg"
   _repair_rc=$?
   set -e
   if [ "$_repair_rc" -eq 0 ]; then

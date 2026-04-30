@@ -1,8 +1,10 @@
 resource_type,source_server_id,source_name,reason
+server,f2110fde-3890-464c-b35c-8ee1dc0bbf24,test-c7hwfix-iad-1,missing_recommended_target_image_name
 load_balancer_member,,10.176.193.161,no_private_ip_match
 load_balancer_member,,10.209.224.7,no_private_ip_match
 load_balancer_member,,50.56.158.36,no_private_ip_match
 load_balancer_member,,50.56.159.90,no_private_ip_match
+load_balancer_member,,10.176.192.220,no_private_ip_match
 load_balancer_member,,e75424eee282ddf3f71030a1f3805e741493097b.rackspaceclouddb.com,no_private_ip_match
 load_balancer_member,,039ff84fbfa5ba804b581decf28de42c6b152e6d.rackspaceclouddb.com,no_private_ip_match
 load_balancer_member,,1c1bdeab3c6d7e395923205396ca897b97742689.rackspaceclouddb.com,no_private_ip_match
