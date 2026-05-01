@@ -251,8 +251,11 @@
         font-size: 12px; font-weight: normal; text-shadow: none; opacity: 0.8;
     }
     .stage-btn.active {
-      background: rgba(0, 243, 255, 0.2); border-color: #00f3ff;
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.8), inset 0 0 15px rgba(0, 243, 255, 0.5);
+      background: rgba(0, 243, 255, 0.25); border-color: #00f3ff;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.9), inset 0 0 18px rgba(0, 243, 255, 0.6);
+      transform: scale(1.02);
+      z-index: 10;
+      text-shadow: 0 0 10px rgba(0, 243, 255, 1);
     }
     .stage-tracker-btn {
       flex: 1 1 0; min-width: 0; border: 2px solid #00f3ff !important;
@@ -268,15 +271,15 @@
 
     /* Sub-tab bar */
     .sub-bar {
-      display: none; gap: 6px; padding: 5px 10px;
-      background: #0f1e3e55; border-bottom: 1px solid var(--border);
+      display: none; gap: 8px; padding: 10px 14px;
+      background: #0f1e3e55; border-bottom: 2px solid var(--border);
       flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto;
     }
     .sub-bar.visible { display: flex; }
     .sub-btn {
       border: 1px solid var(--border); background: var(--card);
-      color: var(--text); border-radius: 6px; padding: 5px 12px;
-      cursor: pointer; font-weight: 600; font-size: 12px; white-space: nowrap;
+      color: var(--text); border-radius: 6px; padding: 8px 18px;
+      cursor: pointer; font-weight: 700; font-size: 14px; white-space: nowrap;
     }
     .sub-btn.active { background: var(--primary); border-color: #8ea2cc; }
 
@@ -317,6 +320,52 @@
     .matrix-table td { padding: 7px 10px; border-bottom: 1px solid #ffffff15; color: var(--muted); vertical-align: top; }
     .matrix-table tr:hover td { background: #ffffff08; }
     .notice { display: inline-flex; align-items: center; gap: 8px; background: #1a3a5c; border: 1px solid #4b6fa0; border-radius: 6px; padding: 9px 14px; color: #a8d8ff; font-size: 13px; margin-top: 12px; }
+
+    /* 7R Governance Styling */
+    .gov-page { display: flex; flex-direction: column; gap: 20px; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; height: 100%; overflow: auto; padding: 20px; }
+    .gov-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+    .gov-title-area h2 { margin: 0; font-size: 24px; color: #7ecfff; font-family: 'Orbitron', sans-serif; }
+    .gov-title-area p { margin: 5px 0 0; color: #94a3b8; font-size: 14px; }
+    .gov-status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; font-family: 'Share Tech Mono', monospace; text-transform: uppercase; border: 1px solid currentColor; }
+    .status-pending { color: #94a3b8; background: rgba(148,163,184,0.1); }
+    .status-done { color: #4ade80; background: rgba(74,222,128,0.1); }
+    
+    /* Unified Cyan Path Coloring */
+    #subBar2 .sub-btn.active { 
+      border-color: #00d4ff !important; 
+      color: #fff !important; 
+      background: rgba(0, 212, 255, 0.25) !important; 
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.8), inset 0 0 10px rgba(0, 212, 255, 0.4) !important; 
+    }
+
+    .gov-page .gov-title-area h2, .gov-page .gov-section h3 { color: #00d4ff; }
+    .gov-page .gov-section h3 { border-color: #00d4ff; }
+    .gov-page .gov-table th { border-bottom-color: rgba(0, 212, 255, 0.5); color: #00d4ff; text-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
+
+    .gov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .gov-section { background: rgba(15,23,42,0.4); border: 1px solid rgba(148,163,184,0.15); border-radius: 10px; padding: 15px; }
+    .gov-section h3 { font-size: 14px; color: #7ecfff; margin: 0 0 15px; text-transform: uppercase; letter-spacing: 1px; border-left: 3px solid #7ecfff; padding-left: 10px; }
+    
+    .gov-form-group { margin-bottom: 12px; }
+    .gov-label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
+    .gov-input, .gov-select { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(148,163,184,0.3); color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; outline: none; }
+    .gov-input:focus { border-color: #7ecfff; box-shadow: 0 0 5px rgba(126,207,255,0.3); }
+    
+    .gov-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .gov-table th { text-align: left; padding: 8px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; }
+    .gov-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    
+    .gov-actions { display: flex; gap: 10px; margin-top: 10px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .gov-btn { padding: 8px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+    .btn-example { background: rgba(147,197,253,0.15); color: #93c5fd; border-color: rgba(147,197,253,0.3); }
+    .btn-example:hover { background: rgba(147,197,253,0.25); }
+    .btn-save { background: #27ae60; color: #fff; }
+    .btn-save:hover { background: #219150; }
+    .btn-export { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.2); }
+    
+    .artifact-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .artifact-link { font-size: 11px; padding: 4px 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(148,163,184,0.3); border-radius: 4px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 4px; }
+    .artifact-link:hover { border-color: #7ecfff; color: #fff; }
   </style>
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
 </head>
@@ -394,7 +443,7 @@
   <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 Why and When Move to FLEX<br><small>Tech stack comparison & Business value</small></button>
   <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customer List<br><small>Migration Tracker</small></button>
   <button class="stage-btn" data-stage="s1">STAGE 1<br><small>Discovery</small></button>
-  <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Migration</small></button>
+  <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Select & Execute R-Path</small></button>
   <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
   <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
@@ -415,11 +464,19 @@
 
 <!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
 <div class="sub-bar" id="subBar2">
-  <button class="sub-btn active" data-sub="s2image">🚀 Option 1: Direct Shift and Lift of VM OSPC 2 FLEX</button>
-  <button class="sub-btn" data-sub="s2rehost_p1">🛠 Option 2: REHOST / Phase 1: OSPC 2FLEX infra cloning</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ Apps Servers and DB Replication</button>
-  <button class="sub-btn" data-sub="s2rehost_manual">📋 REHOST option 3 Data migration full manual mode</button>
-  <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ Kubernetes migration options</button>
+  <button class="sub-btn" data-sub="s2retain" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">⏸ R1 Retain — Keep on OSPC</button>
+  <button class="sub-btn" data-sub="s2retire" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">🗑 R2 Retire — Decommission</button>
+  
+  <button class="sub-btn active" data-sub="s2image">🚀 R3 Rehost / Relocate — VM Lift & Shift</button>
+  <button class="sub-btn" data-sub="s2rehost_p1" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">🛠 R5 Replatform — Infra Clone & Adapt</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_1" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">⚙️ R5 Replatform — App & DB Replication</button>
+  <button class="sub-btn" data-sub="s2rehost_manual" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">📋 R5 Data Replatform — Full Data Move</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">☸️ R6 Refactor / Rearchitect — K8s Modernization</button>
+
+  <button class="sub-btn" data-sub="s2repurchase" style="background:rgba(0, 212, 255, 0.15); border-color:#00d4ff;">🛒 R7 Repurchase — Replace with SaaS/Product</button>
+  
+  <!-- Global Example Loader -->
+  <button class="sub-btn" style="background:rgba(234,179,8,0.1); border-color:rgba(234,179,8,0.3); color:#fbbf24; margin-left:auto;" onclick="loadAll7RExamples()">🧬 Load All 7R Examples</button>
 </div>
 
 <!-- ── Panels ─────────────────────────────────────────── -->
@@ -902,11 +959,236 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
   <!-- STAGE 2 · Migration Options -->
   <div class="panel" id="panel-s2">
+    <!-- R1 Retain -->
+    <div id="s2retain-pane" class="gov-page path-retain" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>⏸ R1 Retain — Keep on OSPC for Now</h2>
+          <p>Governance workflow for workloads staying on OSPC temporarily due to blockers or business cycles.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r1-status">Status: Pending</div>
+      </div>
+
+      <div class="gov-grid">
+        <div class="gov-section">
+          <h3>1. Business System Selector</h3>
+          <div class="gov-form-group"><span class="gov-label">Customer Name</span><input type="text" class="gov-input" id="r1-customer" placeholder="e.g. Acme Financial"></div>
+          <div class="gov-form-group"><span class="gov-label">Business System</span><input type="text" class="gov-input" id="r1-system" placeholder="e.g. Legacy Loan Reporting"></div>
+          <div class="gov-form-group"><span class="gov-label">Retain Reason</span>
+            <select class="gov-select" id="r1-reason">
+              <option>Business freeze</option>
+              <option>Vendor certification not ready</option>
+              <option>Technical blocker</option>
+              <option>Compliance blocker</option>
+              <option>Dependency blocker</option>
+              <option>Cost decision</option>
+              <option>End-of-life pending</option>
+            </select>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">Risk Level</span>
+            <select class="gov-select" id="r1-risk">
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+              <option>Critical</option>
+            </select>
+          </div>
+        </div>
+        <div class="gov-section">
+          <h3>2. Related Workloads (Inventory)</h3>
+          <table class="gov-table">
+            <thead><tr><th>Type</th><th>Name</th><th>Notes</th></tr></thead>
+            <tbody id="r1-workloads-body">
+              <tr><td><span class="badge">App</span></td><td><input type="text" class="gov-input" value="loan-report-web"></td><td>Web UI</td></tr>
+              <tr><td><span class="badge">DB</span></td><td><input type="text" class="gov-input" value="loan_reporting_mysql8"></td><td>DBaaS</td></tr>
+            </tbody>
+          </table>
+          <button class="gov-btn btn-example" style="margin-top:10px; width:100%;" onclick="addWorkloadRow('r1-workloads-body')">+ Add Workload Item</button>
+        </div>
+        <div class="gov-section">
+          <h3>3. Dates & Owners</h3>
+          <div class="gov-grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="gov-form-group"><span class="gov-label">Review Date</span><input type="date" class="gov-input" id="r1-review-date"></div>
+            <div class="gov-form-group"><span class="gov-label">Expiry Date</span><input type="date" class="gov-input" id="r1-expiry-date"></div>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">Business Owner</span><input type="text" class="gov-input" id="r1-b-owner"></div>
+          <div class="gov-form-group"><span class="gov-label">Technical Owner</span><input type="text" class="gov-input" id="r1-t-owner"></div>
+        </div>
+        <div class="gov-section">
+          <h3>4. Required Actions Checklist</h3>
+          <table class="gov-table">
+            <thead><tr><th>Step</th><th>Action</th><th>Status</th></tr></thead>
+            <tbody id="r1-actions-body">
+              <tr><td>1</td><td>Confirm business reason</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>2</td><td>Capture dependency blockers</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>3</td><td>Record OSPC cost</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>4</td><td>Approve decision</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>5. Output Artifacts</h3>
+        <div class="artifact-list">
+          <a href="#" class="artifact-link">📄 retain_register.csv</a>
+          <a href="#" class="artifact-link">📄 retain_decisions.json</a>
+          <a href="#" class="artifact-link">📄 retain_review_schedule.csv</a>
+        </div>
+      </div>
+
+      <div class="gov-actions">
+        <button class="gov-btn btn-example" onclick="loadR1Example()">🧬 Load Retain Example</button>
+        <button class="gov-btn btn-save" onclick="saveGov('R1')">💾 Save Retain Register</button>
+        <button class="gov-btn btn-export">📊 Export Retain Report</button>
+        <button class="gov-btn btn-export" style="background:rgba(255,255,255,0.05); border-color:rgba(126,207,255,0.3); color:#7ecfff;">🚀 Convert to Migration Path</button>
+      </div>
+    </div>
+
+    <!-- R2 Retire -->
+    <div id="s2retire-pane" class="gov-page path-retire" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🗑 R2 Retire / Decommission — Shut Down Safely</h2>
+          <p>Controlled shutdown workflow for obsolete workloads that should be removed instead of migrated.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r2-status">Status: Pending</div>
+      </div>
+
+      <div class="gov-grid">
+        <div class="gov-section">
+          <h3>1. Business System Selector</h3>
+          <div class="gov-form-group"><span class="gov-label">Customer Name</span><input type="text" class="gov-input" id="r2-customer"></div>
+          <div class="gov-form-group"><span class="gov-label">Business System</span><input type="text" class="gov-input" id="r2-system"></div>
+          <div class="gov-form-group"><span class="gov-label">Decommission Reason</span>
+            <select class="gov-select" id="r2-reason">
+              <option>Replaced by new platform</option>
+              <option>No longer used</option>
+              <option>Duplicate system</option>
+              <option>End of life</option>
+              <option>Cost reduction</option>
+              <option>Security risk</option>
+            </select>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">Usage Status</span><input type="text" class="gov-input" id="r2-usage" placeholder="e.g. No login in 180 days"></div>
+        </div>
+        <div class="gov-section">
+          <h3>2. Safety & Backup Controls</h3>
+          <div class="gov-form-group"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="r2-backup" checked> Final DB Backup Required</label></div>
+          <div class="gov-form-group"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="r2-archive" checked> Archive Required (7 Years Retention)</label></div>
+          <div class="gov-form-group"><span class="gov-label">Planned Shutdown</span><input type="date" class="gov-input" id="r2-shutdown-date"></div>
+          <div class="gov-form-group"><span class="gov-label">Rollback Window (Days)</span><input type="number" class="gov-input" id="r2-rollback" value="30"></div>
+        </div>
+        <div class="gov-section">
+          <h3>3. Related Workloads</h3>
+          <table class="gov-table">
+            <thead><tr><th>Type</th><th>Name</th><th>Notes</th></tr></thead>
+            <tbody id="r2-workloads-body"></tbody>
+          </table>
+          <button class="gov-btn btn-example" style="margin-top:10px; width:100%;" onclick="addWorkloadRow('r2-workloads-body')">+ Add Workload Item</button>
+        </div>
+        <div class="gov-section">
+          <h3>4. Decommission Checklist</h3>
+          <table class="gov-table">
+            <thead><tr><th>Step</th><th>Action</th><th>Status</th></tr></thead>
+            <tbody id="r2-actions-body">
+              <tr><td>1</td><td>No active usage confirmed</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>2</td><td>Final DB backup created</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>3</td><td>Approve decommission window</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>4</td><td>Power off systems</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>5. Output Artifacts</h3>
+        <div class="artifact-list">
+          <a href="#" class="artifact-link">📄 decommission_register.csv</a>
+          <a href="#" class="artifact-link">📄 archive_manifest.json</a>
+          <a href="#" class="artifact-link">📄 shutdown_schedule.csv</a>
+        </div>
+      </div>
+
+      <div class="gov-actions">
+        <button class="gov-btn btn-example" onclick="loadR2Example()">🧬 Load Decommission Example</button>
+        <button class="gov-btn btn-save" onclick="saveGov('R2')">💾 Approve Decommission</button>
+        <button class="gov-btn btn-export">📉 Run Dependency Check</button>
+        <button class="gov-btn btn-export">🗑 Mark Powered Off</button>
+      </div>
+    </div>
+
     <iframe id="s2image-pane" src="/image_migrator/" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p1-pane" src="/designer/" title="REHOST Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_manual-pane" src="/rehost_manual/" title="REHOST Full Manual Runbook" style="display:none; width:100%; height:100%; border:none;"></iframe>
+
+    <!-- R7 Repurchase -->
+    <div id="s2repurchase-pane" class="gov-page path-repurchase" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🛒 R7 Repurchase — Replace with SaaS or New Product</h2>
+          <p>Workflow for replacing legacy OSPC workloads with SaaS, managed services, or modern products.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r7-status">Status: Pending</div>
+      </div>
+
+      <div class="gov-grid">
+        <div class="gov-section">
+          <h3>1. Replacement Strategy</h3>
+          <div class="gov-form-group"><span class="gov-label">Customer Name</span><input type="text" class="gov-input" id="r7-customer"></div>
+          <div class="gov-form-group"><span class="gov-label">Legacy System</span><input type="text" class="gov-input" id="r7-system"></div>
+          <div class="gov-form-group"><span class="gov-label">Replacement Product</span><input type="text" class="gov-input" id="r7-product" placeholder="e.g. Salesforce / ServiceNow"></div>
+          <div class="gov-form-group"><span class="gov-label">Replacement Type</span>
+            <select class="gov-select" id="r7-type">
+              <option>SaaS</option>
+              <option>Commercial off-the-shelf</option>
+              <option>Managed service</option>
+              <option>New internal platform</option>
+            </select>
+          </div>
+        </div>
+        <div class="gov-section">
+          <h3>2. Transition Planning</h3>
+          <div class="gov-form-group"><span class="gov-label">Contract Status</span>
+            <select class="gov-select" id="r7-contract">
+              <option>In evaluation</option>
+              <option>In negotiation</option>
+              <option>Signed</option>
+              <option>Live</option>
+            </select>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">SaaS Go-Live Date</span><input type="date" class="gov-input" id="r7-golive-date"></div>
+          <div class="gov-form-group"><span class="gov-label">Legacy Shutdown Date</span><input type="date" class="gov-input" id="r7-shutdown-date"></div>
+          <div class="gov-form-group"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="r7-datamig" checked> Data Migration Required</label></div>
+        </div>
+        <div class="gov-section" style="grid-column: span 2;">
+          <h3>3. Capabilities & Mapping</h3>
+          <table class="gov-table">
+            <thead><tr><th>Legacy Feature</th><th>SaaS Equivalent</th><th>Migration Method</th><th>Status</th></tr></thead>
+            <tbody id="r7-mapping-body"></tbody>
+          </table>
+          <button class="gov-btn btn-example" style="margin-top:10px; width:100%;" onclick="addMappingRow('r7-mapping-body')">+ Add Mapping Item</button>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>4. Output Artifacts</h3>
+        <div class="artifact-list">
+          <a href="#" class="artifact-link">📄 repurchase_candidates.csv</a>
+          <a href="#" class="artifact-link">📄 capability_mapping.csv</a>
+          <a href="#" class="artifact-link">📄 integration_tracker.csv</a>
+        </div>
+      </div>
+
+      <div class="gov-actions">
+        <button class="gov-btn btn-example" onclick="loadR7Example()">🧬 Load Repurchase Example</button>
+        <button class="gov-btn btn-save" onclick="saveGov('R7')">💾 Approve Replacement</button>
+        <button class="gov-btn btn-export">⚖️ Compare Vendors</button>
+        <button class="gov-btn btn-export">📅 Plan Legacy Shutdown</button>
+      </div>
+    </div>
   </div>
 
   <!-- STAGE 4 · Validation & UAT -->
@@ -2417,7 +2699,91 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
-  const s2Panes = ['s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual'];
+  const s2Panes = ['s2retain','s2retire','s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual','s2repurchase'];
+  
+  function addWorkloadRow(bodyId) {
+    const body = document.getElementById(bodyId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><span class="badge">Item</span></td><td><input type="text" class="gov-input"></td><td><input type="text" class="gov-input"></td>`;
+    body.appendChild(tr);
+  }
+  
+  function addMappingRow(bodyId) {
+    const body = document.getElementById(bodyId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="text" class="gov-input"></td><td><input type="text" class="gov-input"></td><td><input type="text" class="gov-input"></td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td>`;
+    body.appendChild(tr);
+  }
+
+  function loadR1Example() {
+    document.getElementById('r1-customer').value = 'Acme Financial Services';
+    document.getElementById('r1-system').value = 'Legacy Loan Reporting';
+    document.getElementById('r1-reason').value = 'Vendor certification not ready';
+    document.getElementById('r1-risk').value = 'Medium';
+    document.getElementById('r1-review-date').value = '2026-07-15';
+    document.getElementById('r1-expiry-date').value = '2026-10-01';
+    document.getElementById('r1-b-owner').value = 'Head of Lending Operations';
+    document.getElementById('r1-t-owner').value = 'loan-platform-team@acme.example';
+    
+    const body = document.getElementById('r1-workloads-body');
+    body.innerHTML = `
+      <tr><td><span class="badge">App</span></td><td><input type="text" class="gov-input" value="loan-report-web"></td><td>Internal reporting UI</td></tr>
+      <tr><td><span class="badge">App</span></td><td><input type="text" class="gov-input" value="loan-report-worker"></td><td>Batch report generator</td></tr>
+      <tr><td><span class="badge">DB</span></td><td><input type="text" class="gov-input" value="loan_reporting_mysql8"></td><td>OSPC DBaaS</td></tr>
+      <tr><td><span class="badge">VM</span></td><td><input type="text" class="gov-input" value="ospc-loan-report-web-01"></td><td>Ubuntu 20.04</td></tr>
+    `;
+    JarvisBritishSpeak?.speak("Retain example loaded for Acme Financial Services.");
+  }
+
+  function loadR2Example() {
+    document.getElementById('r2-customer').value = 'Acme Financial Services';
+    document.getElementById('r2-system').value = 'Old Claims Portal';
+    document.getElementById('r2-reason').value = 'Replaced by new Claims SaaS platform';
+    document.getElementById('r2-usage').value = 'No active user login in 180 days';
+    document.getElementById('r2-shutdown-date').value = '2026-08-31';
+    document.getElementById('r2-rollback').value = '30';
+    
+    const body = document.getElementById('r2-workloads-body');
+    body.innerHTML = `
+      <tr><td><span class="badge">App</span></td><td><input type="text" class="gov-input" value="claims-legacy-web"></td><td>Legacy web portal</td></tr>
+      <tr><td><span class="badge">DB</span></td><td><input type="text" class="gov-input" value="claims_legacy_mysql"></td><td>Archive required</td></tr>
+      <tr><td><span class="badge">VM</span></td><td><input type="text" class="gov-input" value="ospc-claims-web-01"></td><td>CentOS 7</td></tr>
+    `;
+    JarvisBritishSpeak?.speak("Decommission example loaded for Acme Financial Services.");
+  }
+
+  function loadR7Example() {
+    document.getElementById('r7-customer').value = 'Acme Financial Services';
+    document.getElementById('r7-system').value = 'Legacy CRM';
+    document.getElementById('r7-product').value = 'Salesforce Sales Cloud';
+    document.getElementById('r7-type').value = 'SaaS';
+    document.getElementById('r7-contract').value = 'In negotiation';
+    document.getElementById('r7-golive-date').value = '2026-09-15';
+    document.getElementById('r7-shutdown-date').value = '2026-10-15';
+    
+    const body = document.getElementById('r7-mapping-body');
+    body.innerHTML = `
+      <tr><td><input type="text" class="gov-input" value="Customers"></td><td><input type="text" class="gov-input" value="Salesforce Account"></td><td><input type="text" class="gov-input" value="CSV/API Import"></td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+      <tr><td><input type="text" class="gov-input" value="Opportunities"></td><td><input type="text" class="gov-input" value="Salesforce Opportunity"></td><td><input type="text" class="gov-input" value="API Import"></td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+      <tr><td><input type="text" class="gov-input" value="SSO"></td><td><input type="text" class="gov-input" value="SAML SSO"></td><td><input type="text" class="gov-input" value="Config"></td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+    `;
+    JarvisBritishSpeak?.speak("Repurchase example loaded for Acme Financial Services.");
+  }
+
+  function saveGov(path) {
+    const statusEl = document.getElementById(path.toLowerCase() + '-status');
+    statusEl.className = 'gov-status-badge status-done';
+    statusEl.innerText = 'Status: Approved';
+    JarvisBritishSpeak?.speak(`${path} governance record has been saved and approved.`);
+  }
+
+  function loadAll7RExamples() {
+    loadR1Example();
+    loadR2Example();
+    loadR7Example();
+    JarvisBritishSpeak?.speak("Successfully loaded all 7R Governance examples for Acme Financial Services.");
+    // Show a small notification toast if we had one, otherwise speak is enough
+  }
   window.lastMigrationBundle = null;
   window._drReadiness = { profile_persisted: false, migration_bundle: {} };
   window._drRestoreBusy = false;
