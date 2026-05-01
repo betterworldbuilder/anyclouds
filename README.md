@@ -39,20 +39,20 @@ The result is fewer mystery failures, faster test boots, cleaner customer update
 
 ## 🚀 Full-Cycle Migration Phases (How)
 
-CloudJumper works as a full-cycle migration Mission Control. Each stage turns unknowns into artifacts: CSVs, maps, scripts, repaired images, booted test instances, verification results, and rollback paths.
+CloudJumper works as a full-cycle migration Mission Control. Each stage turns unknowns into artifacts: CSVs, maps, scripts, repaired images, booted test instances, verification results, and rollback path
 
 | Phase | Stage | Mission Control Function | Benefit |
 |:---:|---|---|---|
-| 📡 | **0. Customer Tracker** | Tracks customer, estate, status, notes, stage progress, and active migration context. | Keeps multiple migrations organized without losing the human thread. |
-| 🔭 | **1. Discover** | Scans OSPC and FLEX inventory: servers, images, flavors, volumes, networks, security groups, load balancers, and floating IPs. | Builds a factual source-of-truth before anyone starts changing infrastructure. |
-| 🗺️ | **2. Map & Design** | Compares source/target capacity, edges, and imports topology into a visual model to plan the target build. | Turns "what do we have?" into "where will it land?" and lets engineers see the shape of the migration. |
-| ⚙️ | **3. Generate** | Produces deployment, data migration, sync, cutover, rollback, and validation scripts from the migration map. | Makes the work repeatable, reviewable, and safer than manual command assembly. |
-| 💾 | **4. Database & Server Rehost** | Provisions target FLEX servers and orchestrates the database migration/sync (MySQL, PostgreSQL, block syncs). | Ensures data gravity is handled seamlessly alongside compute. |
-| 📦 | **5. Image Migration & Repair** | Moves Linux/Windows workloads via NBD/Glance and applies offline guest repair (bootloaders, fstab, virtio, network config). | Converts old cloud images into FLEX-ready artifacts and fixes common first-boot failures offline. |
-| ☸️ | **6. Kubernetes Mig (WIP)** | Translates Magnum OSPC clusters or raw k8s nodes into modern FLEX Kubernetes deployment models. | Containerized workloads jump alongside legacy VMs. |
-| 🔬 | **7. UAT (Boot & Verify)** | Creates FLEX test instances, attaches access, checks ping/SSH, gathers host/kernel data, and streams logs. | Changes "the image uploaded" into "the workload is alive." |
-| ✂️ | **8. Cut Over** | Uses generated cutover and rollback scripts with final validation evidence to shift live traffic. | Gives the migration a controlled finish line instead of a nervous handoff. |
-| 🏁 | **9. Post Migration** | Generates infrastructure-as-code manifests, documentation, optimization telemetry, FinOps, IAC DR backup/restore packs, and AI Anywhere context packs. | Hands off a modernized, GitOps-ready environment to the customer. |
+| 📡 | 0. Customer Tracker | Tracks customer, estate, status, and active migration context. | Keeps multiple migrations organized without losing the human thread. |
+| 🔭 | 1. Discovery | Scans OSPC and FLEX inventory: servers, images, networks, etc. | Builds a factual source-of-truth before anyone starts changing infrastructure. |
+| 🗺️ | 2. Select & Execute R-Path | **Gartner 7R Governance**: Strategic selection of Retain, Retire, Rehost, Replatform, or Refactor paths. | Turns "what do we have?" into a strategic "where should it go?" decision based on business value. |
+| 🧪 | 3. Validation & UAT | Creates FLEX test instances, checks connectivity, and streams logs. | Changes "the image uploaded" into "the workload is alive." |
+| ✂️ | 4. Cutover | Final validation and live traffic shift using cutover scripts. | Gives the migration a controlled finish line instead of a nervous handoff. |
+| 🏁 | 5. Post-Migration | Final documentation, infrastructure clean-up, and handoff. | Delivers a modernized, production-ready environment. |
+| 💰 | 6. TCO / FinOps | Cost tracking and cloud optimization telemetry for the new environment. | Provides immediate visibility into cost savings and resource utilization. |
+| 🛡️ | 7. IAC Backup & Restore | Automated generation of IAC backup and DR restore packs. | Ensures the new environment is protected and recoverable from day one. |
+| 🚀 | 8. GitOps / OpenCenter | Integration with OpenCenter and GitOps-driven deployment models. | Moves from manual management to automated, version-controlled operations. |
+| 🤖 | 9. AI OPS | Context pack generation for AI-driven predictive maintenance. | Prepares the platform for advanced automation and AI-assisted troubleshooting. |
 
 ### How narrative phases map to the Mission Control UI
 
