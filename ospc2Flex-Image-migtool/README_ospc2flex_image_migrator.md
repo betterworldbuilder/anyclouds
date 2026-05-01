@@ -530,3 +530,8 @@ This tool is less ideal for:
 - applying the most common Linux guest repairs automatically
 
 Use it to accelerate portability testing and recovery workflows, then follow with proper application-aware migration decisions.
+
+ - - - 
+ 
+ d'ў  M a d e   w i t h   L o v e   b y   =иdм  * * D z o a n . n g u y e n @ R a c k s p a c e . c o m * *   u s i n g   =иdм  * * b r i a n . a b s h i e r @ R A C K S P A C E . C O M * *   a w e s o m e   =ироў  * * O S F L E X   T o p o l o g y   B u i l d e r * *   t o o l .  
+ 

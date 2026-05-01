@@ -240,4 +240,4 @@ CloudJumper is the bridge: part scanner, part repair bench, part launch console,
 
 Need the full operator notes, workflow history, script map, and deeper telemetry? Read the extended mission manual: [README.long.MD](README.long.MD).
 
-Made with Love by Dzoan.nguyen@Rackspace.com using brian.abshier@RACKSPACE.COM awesome flexos tool.
+❤️ Made with Love by 👤 **Dzoan.nguyen@Rackspace.com** using 👤 **brian.abshier@RACKSPACE.COM** awesome 🛠️ **OSFLEX Topology Builder** tool.
