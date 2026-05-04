@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSPC2FLEX Image Migrator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+        <header class="app-header glass-panel">
+            <h1>OSPC &rarr; FLEX <span>Migrator</span></h1>
+            <p>Bridge tool for image portability and first-boot remediation.</p>
+        </header>
+
+        <main class="app-main">
+            <section class="config-section glass-panel">
+                <h2>Migration Configuration</h2>
+                
+                <form id="migration-form">
+                    
+                    <div class="config-group">
+                        <h3>Core Image Options</h3>
+                        <div class="form-grid">
+                            <div class="form-control">
+                                <label for="ospc_openrc">OSPC OpenRC Path *</label>
+                                <input type="text" id="ospc_openrc" name="ospc_openrc" required placeholder="~/ospc-openrc.sh" value="~/ospc-openrc.sh">
+                            </div>
+                            <div class="form-control">
+                                <label for="flex_openrc">FLEX OpenRC Path *</label>
+                                <input type="text" id="flex_openrc" name="flex_openrc" required placeholder="~/flex-openrc.sh" value="~/flex-openrc.sh">
+                            </div>
+                            <div class="form-control">
+                                <label for="server_name">Source Server Name *</label>
+                                <input type="text" id="server_name" name="server_name" required placeholder="web-01">
+                            </div>
+                            <div class="form-control">
+                                <label for="snapshot_name">Snapshot Name (Optional)</label>
+                                <input type="text" id="snapshot_name" name="snapshot_name" placeholder="Auto-generated if empty">
+                            </div>
+                            <div class="form-control">
+                                <label for="target_format">Target Format</label>
+                                <select id="target_format" name="target_format">
+                                    <option value="qcow2">qcow2</option>
+                                    <option value="raw">raw</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="visibility">Visibility</label>
+                                <select id="visibility" name="visibility">
+                                    <option value="private">Private</option>
+                                    <option value="public">Public</option>
+                                    <option value="shared">Shared</option>
+                                    <option value="community">Community</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-group mt-3">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="dry_run" name="dry_run" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span class="toggle-label">Dry Run <span>(Print actions without executing)</span></span>
+                        </div>
+                        <div class="checkbox-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="cleanup_snapshot" name="cleanup_snapshot">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="toggle-label">Cleanup OSPC Snapshot <span>(Delete OSPC snapshot image after export)</span></span>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>Test VM Options</h3>
+                            <label class="toggle-switch accent">
+                                <input type="checkbox" id="boot_test_vm" name="boot_test_vm">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="test-vm-fields" class="form-grid collapsable collapsed">
+                            <div class="form-control">
+                                <label for="test_server_name">Test Server Name</label>
+                                <input type="text" id="test_server_name" name="test_server_name" placeholder="<server-name>-lift-test">
+                            </div>
+                            <div class="form-control">
+                                <label for="flex_flavor">FLEX Flavor *</label>
+                                <input type="text" id="flex_flavor" name="flex_flavor" placeholder="gp.7.1.2">
+                            </div>
+                            <div class="form-control">
+                                <label for="flex_network_id">FLEX Network ID *</label>
+                                <input type="text" id="flex_network_id" name="flex_network_id" placeholder="UUID">
+                            </div>
+                            <div class="form-control">
+                                <label for="flex_key_name">FLEX Keypair Name *</label>
+                                <input type="text" id="flex_key_name" name="flex_key_name" placeholder="my-key">
+                            </div>
+                            <div class="form-control">
+                                <label for="floating_ip">Floating IP</label>
+                                <input type="text" id="floating_ip" name="floating_ip" placeholder="e.g. 203.0.113.25">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="divider">
+
+                    <div class="config-group">
+                        <div class="group-header">
+                            <h3>Guest Repair Options</h3>
+                            <label class="toggle-switch accent-purple">
+                                <input type="checkbox" id="repair_guest" name="repair_guest">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        
+                        <div id="guest-repair-fields" class="collapsable collapsed">
+                            <div class="form-grid mb-3">
+                                <div class="form-control">
+                                    <label for="ssh_key_path">SSH Key Path *</label>
+                                    <input type="text" id="ssh_key_path" name="ssh_key_path" placeholder="~/.ssh/id_rsa">
+                                </div>
+                                <div class="form-control">
+                                    <label for="ssh_user">SSH User</label>
+                                    <input type="text" id="ssh_user" name="ssh_user" value="ubuntu">
+                                </div>
+                                <div class="form-control">
+                                    <label for="new_hostname">New Hostname</label>
+                                    <input type="text" id="new_hostname" name="new_hostname" placeholder="Set inside guest">
+                                </div>
+                                <div class="form-control">
+                                    <label for="flex_net_iface">FLEX Net Interface</label>
+                                    <input type="text" id="flex_net_iface" name="flex_net_iface" placeholder="e.g. ens3">
+                                </div>
+                                <div class="form-control full-width">
+                                    <label for="systemd_services">Systemd Services to Restart</label>
+                                    <input type="text" id="systemd_services" name="systemd_services" placeholder="nginx,myapp.service">
+                                </div>
+                                <div class="form-control full-width">
+                                    <label for="app_endpoint_map_file">Endpoint Map File Path</label>
+                                    <input type="text" id="app_endpoint_map_file" name="app_endpoint_map_file" placeholder="./app_endpoint_map.txt">
+                                </div>
+                            </div>
+                            
+                            <div class="checkbox-grid">
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="fix_fstab" name="fix_fstab">
+                                    <label for="fix_fstab">Fix /etc/fstab</label>
+                                </div>
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="fix_netplan" name="fix_netplan">
+                                    <label for="fix_netplan">Write Simple Netplan</label>
+                                </div>
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="clean_hosts_file" name="clean_hosts_file">
+                                    <label for="clean_hosts_file">Clean /etc/hosts</label>
+                                </div>
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="skip_cloud_init_clean" name="skip_cloud_init_clean">
+                                    <label for="skip_cloud_init_clean">Skip Cloud-init Clean</label>
+                                </div>
+                                <div class="checkbox-group compact">
+                                    <input type="checkbox" id="skip_qemu_guest_agent" name="skip_qemu_guest_agent">
+                                    <label for="skip_qemu_guest_agent">Skip Qemu Agent</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="start-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            Start Migration Task
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="console-section glass-panel">
+                <div class="console-header">
+                    <div class="window-controls">
+                        <span class="control red"></span>
+                        <span class="control yellow"></span>
+                        <span class="control green"></span>
+                    </div>
+                    <span class="console-title">Execution Terminal</span>
+                    <button class="icon-btn" id="clear-log-btn" title="Clear Console">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+                <div class="console-body" id="console-output">
+                    <div class="log-line system">Waiting for execution...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

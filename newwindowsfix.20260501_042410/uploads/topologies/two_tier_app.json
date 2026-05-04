@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {"id": "net_1", "type": "network", "label": "AppNet", "x": 80, "y": 80, "props": {"name": "app-net"}},
+    {"id": "subnet_1", "type": "subnet", "label": "AppSubnet", "x": 260, "y": 80, "props": {"name": "app-subnet", "cidr": "10.80.0.0/24", "gateway_ip": "", "dns_nameserver": "8.8.4.4"}},
+    {"id": "router_1", "type": "router", "label": "AppRouter", "x": 440, "y": 80, "props": {"name": "app-router", "external_network": "PUBLICNET"}},
+    {"id": "sg_web", "type": "security_group", "label": "WebSG", "x": 620, "y": 80, "props": {"name": "web-sg", "rules_text": "tcp 22 0.0.0.0/0\ntcp 80 0.0.0.0/0\ntcp 443 0.0.0.0/0"}},
+    {"id": "sg_app", "type": "security_group", "label": "AppSG", "x": 620, "y": 220, "props": {"name": "app-sg", "rules_text": "tcp 22 10.80.0.0/24\ntcp 8080 10.80.0.0/24"}},
+    {"id": "vm_web", "type": "instance", "label": "WebVM", "x": 260, "y": 220, "props": {"name": "app-web-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "vm_app", "type": "instance", "label": "AppVM", "x": 260, "y": 320, "props": {"name": "app-backend-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vol_app", "type": "volume", "label": "AppData", "x": 440, "y": 320, "props": {"name": "app-data-1", "size_gb": "100", "volume_type": "Performance"}}
+  ],
+  "edges": [
+    {"from": "net_1", "to": "subnet_1", "type": "member"},
+    {"from": "router_1", "to": "subnet_1", "type": "route"},
+    {"from": "router_1", "to": "net_1", "type": "gateway"},
+    {"from": "vm_web", "to": "net_1", "type": "member"},
+    {"from": "vm_app", "to": "net_1", "type": "member"},
+    {"from": "vm_web", "to": "sg_web", "type": "member"},
+    {"from": "vm_app", "to": "sg_app", "type": "member"},
+    {"from": "vol_app", "to": "vm_app", "type": "attach"}
+  ]
+}

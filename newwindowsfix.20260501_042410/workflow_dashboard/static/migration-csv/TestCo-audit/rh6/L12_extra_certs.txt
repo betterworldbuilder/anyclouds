@@ -1,0 +1,1 @@
+[STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@104.239.142.102 sudo find /opt /srv /var/www /etc/nginx /etc/apache2 -name '*.pem' -o -name '*.crt' -o -name '*.key' 2>/dev/null | grep -v letsencrypt | head -20

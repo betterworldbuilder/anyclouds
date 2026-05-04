@@ -1,0 +1,26 @@
+NAME     FSTYPE   LABEL           UUID                                 FSAVAIL FSUSE% MOUNTPOINT
+loop0    squashfs                                                            0   100% /snap/core20/1081
+loop1    squashfs                                                                     
+loop2    squashfs                                                            0   100% /snap/lxd/21545
+loop3    squashfs                                                            0   100% /snap/snapd/26382
+loop4    squashfs                                                            0   100% /snap/core20/2769
+xvda                                                                                  
+├─xvda1  ext4     cloudimg-rootfs 9dea37c4-8016-43a6-8886-6923741c9e1b   46.6G     4% /
+├─xvda14                                                                              
+└─xvda15 vfat     UEFI            DA49-F180                              99.2M     5% /boot/efi
+xvdd     iso9660  config-2        2026-04-05-08-51-51-00                              
+Filesystem     Type      Size  Used Avail Use% Mounted on
+udev           devtmpfs  3.7G     0  3.7G   0% /dev
+tmpfs          tmpfs     746M  1.1M  745M   1% /run
+/dev/xvda1     ext4       49G  1.7G   47G   4% /
+tmpfs          tmpfs     3.7G     0  3.7G   0% /dev/shm
+tmpfs          tmpfs     5.0M     0  5.0M   0% /run/lock
+tmpfs          tmpfs     3.7G     0  3.7G   0% /sys/fs/cgroup
+/dev/loop0     squashfs   62M   62M     0 100% /snap/core20/1081
+/dev/loop2     squashfs   68M   68M     0 100% /snap/lxd/21545
+/dev/xvda15    vfat      105M  5.2M  100M   5% /boot/efi
+/dev/loop3     squashfs   49M   49M     0 100% /snap/snapd/26382
+/dev/loop4     squashfs   64M   64M     0 100% /snap/core20/2769
+tmpfs          tmpfs     746M     0  746M   0% /run/user/1000
+LABEL=cloudimg-rootfs	/	 ext4	defaults	0 1
+LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1

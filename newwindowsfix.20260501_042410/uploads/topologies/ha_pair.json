@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {"id": "net_1", "type": "network", "label": "HANet", "x": 80, "y": 80, "props": {"name": "ha-net"}},
+    {"id": "subnet_1", "type": "subnet", "label": "HASubnet", "x": 260, "y": 80, "props": {"name": "ha-subnet", "cidr": "10.90.0.0/24", "gateway_ip": "", "dns_nameserver": "1.1.1.1"}},
+    {"id": "router_1", "type": "router", "label": "HARouter", "x": 440, "y": 80, "props": {"name": "ha-router", "external_network": "PUBLICNET"}},
+    {"id": "sg_1", "type": "security_group", "label": "HASG", "x": 620, "y": 80, "props": {"name": "ha-sg", "rules_text": "tcp 22 0.0.0.0/0\ntcp 443 0.0.0.0/0"}},
+    {"id": "vm_1", "type": "instance", "label": "NodeA", "x": 260, "y": 220, "props": {"name": "ha-node-a", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "vm_2", "type": "instance", "label": "NodeB", "x": 260, "y": 320, "props": {"name": "ha-node-b", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vol_1", "type": "volume", "label": "DataA", "x": 440, "y": 220, "props": {"name": "ha-data-a", "size_gb": "80", "volume_type": "Performance"}},
+    {"id": "vol_2", "type": "volume", "label": "DataB", "x": 440, "y": 320, "props": {"name": "ha-data-b", "size_gb": "80", "volume_type": "Performance"}}
+  ],
+  "edges": [
+    {"from": "net_1", "to": "subnet_1", "type": "member"},
+    {"from": "router_1", "to": "subnet_1", "type": "route"},
+    {"from": "router_1", "to": "net_1", "type": "gateway"},
+    {"from": "vm_1", "to": "net_1", "type": "member"},
+    {"from": "vm_2", "to": "net_1", "type": "member"},
+    {"from": "vm_1", "to": "sg_1", "type": "member"},
+    {"from": "vm_2", "to": "sg_1", "type": "member"},
+    {"from": "vol_1", "to": "vm_1", "type": "attach"},
+    {"from": "vol_2", "to": "vm_2", "type": "attach"}
+  ]
+}

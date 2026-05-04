@@ -1,0 +1,24 @@
+{
+  "nodes": [
+    {"id": "net_1", "type": "network", "label": "AppDBNet", "x": 80, "y": 80, "props": {"name": "appdb-net"}},
+    {"id": "subnet_1", "type": "subnet", "label": "AppDBSubnet", "x": 250, "y": 80, "props": {"name": "appdb-subnet", "cidr": "10.120.0.0/24", "gateway_ip": "", "dns_nameserver": "1.1.1.1"}},
+    {"id": "router_1", "type": "router", "label": "AppDBRouter", "x": 420, "y": 80, "props": {"name": "appdb-router", "external_network": "PUBLICNET"}},
+    {"id": "sg_app", "type": "security_group", "label": "AppSG", "x": 620, "y": 80, "props": {"name": "app-sg", "rules_text": "tcp 22 10.120.0.0/24\ntcp 8080 10.120.0.0/24"}},
+    {"id": "sg_db", "type": "security_group", "label": "DbSG", "x": 620, "y": 200, "props": {"name": "db-sg", "rules_text": "tcp 22 10.120.0.0/24\ntcp 3306 10.120.0.0/24"}},
+    {"id": "vm_app", "type": "instance", "label": "AppVM", "x": 250, "y": 240, "props": {"name": "app-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "vm_db", "type": "instance", "label": "DbVM", "x": 420, "y": 240, "props": {"name": "db-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vol_app", "type": "volume", "label": "AppData", "x": 250, "y": 360, "props": {"name": "app-data-1", "size_gb": "80", "volume_type": "Performance"}},
+    {"id": "vol_db", "type": "volume", "label": "DbData", "x": 420, "y": 360, "props": {"name": "db-data-1", "size_gb": "200", "volume_type": "Performance"}}
+  ],
+  "edges": [
+    {"from": "net_1", "to": "subnet_1", "type": "member"},
+    {"from": "router_1", "to": "subnet_1", "type": "route"},
+    {"from": "router_1", "to": "net_1", "type": "gateway"},
+    {"from": "vm_app", "to": "net_1", "type": "member"},
+    {"from": "vm_db", "to": "net_1", "type": "member"},
+    {"from": "vm_app", "to": "sg_app", "type": "member"},
+    {"from": "vm_db", "to": "sg_db", "type": "member"},
+    {"from": "vol_app", "to": "vm_app", "type": "attach"},
+    {"from": "vol_db", "to": "vm_db", "type": "attach"}
+  ]
+}

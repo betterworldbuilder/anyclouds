@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {"id": "net_1", "type": "network", "label": "StorageNet", "x": 80, "y": 80, "props": {"name": "storage-net"}},
+    {"id": "subnet_1", "type": "subnet", "label": "StorageSubnet", "x": 250, "y": 80, "props": {"name": "storage-subnet", "cidr": "10.160.0.0/24", "gateway_ip": "", "dns_nameserver": "1.1.1.1"}},
+    {"id": "router_1", "type": "router", "label": "StorageRouter", "x": 420, "y": 80, "props": {"name": "storage-router", "external_network": "PUBLICNET"}},
+    {"id": "sg_1", "type": "security_group", "label": "StorageSG", "x": 620, "y": 80, "props": {"name": "storage-sg", "rules_text": "tcp 22 0.0.0.0/0\ntcp 443 0.0.0.0/0"}},
+    {"id": "vm_1", "type": "instance", "label": "StorageVM", "x": 250, "y": 240, "props": {"name": "storage-app-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "vol_1", "type": "volume", "label": "Data01", "x": 420, "y": 220, "props": {"name": "storage-data-01", "size_gb": "100", "volume_type": "Performance"}},
+    {"id": "vol_2", "type": "volume", "label": "Data02", "x": 420, "y": 300, "props": {"name": "storage-data-02", "size_gb": "200", "volume_type": "Performance"}},
+    {"id": "vol_3", "type": "volume", "label": "Logs", "x": 420, "y": 380, "props": {"name": "storage-logs-01", "size_gb": "80", "volume_type": "Performance"}}
+  ],
+  "edges": [
+    {"from": "net_1", "to": "subnet_1", "type": "member"},
+    {"from": "router_1", "to": "subnet_1", "type": "route"},
+    {"from": "router_1", "to": "net_1", "type": "gateway"},
+    {"from": "vm_1", "to": "net_1", "type": "member"},
+    {"from": "vm_1", "to": "sg_1", "type": "member"},
+    {"from": "vol_1", "to": "vm_1", "type": "attach"},
+    {"from": "vol_2", "to": "vm_1", "type": "attach"},
+    {"from": "vol_3", "to": "vm_1", "type": "attach"}
+  ]
+}

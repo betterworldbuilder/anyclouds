@@ -1,0 +1,14 @@
+# Smoke test report -- Fri Apr 24 20:20:43 +07 2026
+  ✅ [PASS] SSH access -- 50.56.158.179
+  ❌ [FAIL] No IP address found
+  ❌ [FAIL] No default route
+  ❌ [FAIL] DNS not resolving
+  ❌ [FAIL] No disk mounts
+  ❌ [FAIL] No listening ports
+    [STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@50.56.158.179 ss -ltnp | grep LISTEN
+  ❌ [FAIL] [STUB-SSH]-i/home/dzoan/.ssh/id_rsa-oStrictHostKeyChecking=no-oConnectTimeout=15-oBatchMode=yesubuntu@50.56.158.179systemctl--failed--no-pager2>/dev/null|grep-c'failed' failed systemd units -- check: systemctl --failed
+    [STUB-SSH] -i /home/dzoan/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=15 -o BatchMode=yes ubuntu@50.56.158.179 systemctl --failed --no-pager 2>/dev/null
+  ⏭  [SKIP] HTTP checks skipped -- port 80 closed on 50.56.158.179
+  ❌ [FAIL] DB connectivity (PostgreSQL) -- cannot list databases
+  ⏭  [SKIP] Background jobs -- no crontab entries (manual check needed)
+  ⏭  [SKIP] TLS / HTTPS  (port 443 not open)

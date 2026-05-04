@@ -1,0 +1,2 @@
+step_id,phase,resource_type,resource_name,action,status,exit_code,error
+"step-0002","compute","floating_ip","ospc-jumpHost","assign_floating_ip","FAIL","1","Failed to allocate floating IP on network PUBLICNET for ospc-jumpHost "

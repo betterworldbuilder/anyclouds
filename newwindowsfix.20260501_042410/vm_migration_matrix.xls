@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+<Styles>
+<Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#D9EAF7" ss:Pattern="Solid"/></Style>
+<Style ss:ID="Wrap"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+<Style ss:ID="HeaderWrap"><Font ss:Bold="1"/><Interior ss:Color="#D9EAF7" ss:Pattern="Solid"/><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+</Styles>
+<Worksheet ss:Name="VM OS Matrix">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">OS family</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Versions</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Status today</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ubuntu</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">20, 22, 24</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Debian</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">10, 11, 12</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">AlmaLinux</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">8, 9</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Rocky Linux</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">8, 9</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Windows Server</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">2016, 2019</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">CentOS</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">7, 8</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">RHEL</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">8, other RHEL family versions</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+<Worksheet ss:Name="VM Migration Stages">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Stage</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Name</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">What happens</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">1</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Discovery / Source Check</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Identify source VM, OS, disk layout, network, boot mode</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">2</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Snapshot / Export Prep</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Prepare source image export path or NBD path</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">3</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Disk Copy / Convert</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Copy disk from OSPC and convert to qcow2</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">4</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Offline Repair</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Mount image and fix boot, fstab, grub, initramfs, NIC config</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">4.5</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">OS-specific Adjustments</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Apply per-OS fixes for Ubuntu, Debian, Alma, Rocky, CentOS, RHEL</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">5</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Upload to FLEX</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Upload repaired image to FLEX Glance</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">6</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Boot Test VM</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Create FLEX VM from uploaded image</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">7</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Validation</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Check console, SSH, NIC naming, cloud-init, services</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">8</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Cutover / Finalize</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Confirm ready for production use and close migration</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+</Workbook>

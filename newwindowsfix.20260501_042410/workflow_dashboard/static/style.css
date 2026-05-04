@@ -1,0 +1,146 @@
+:root {
+  --bg: #080d1a;
+  --card: #0a1020cc;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --border: #1e3a5f99;
+  --primary: #1e40af;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  font-size: 14px;
+  background: linear-gradient(135deg, #060b14 0%, #0a1020 50%, #0d1628 100%);
+  color: var(--text);
+  position: relative;
+  min-height: 100vh;
+}
+
+header {
+  background: #080e1c;
+  color: #e2e8f0;
+  padding: 14px 16px;
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid #1e3a5f66;
+}
+
+header h1 { margin: 0 0 6px; font-size: 20px; }
+header p  { margin: 0; opacity: 0.8; }
+
+main {
+  max-width: 1100px;
+  margin: 12px auto;
+  padding: 0 10px 14px;
+  display: grid;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  backdrop-filter: blur(8px);
+}
+
+.summary-card { position: sticky; top: 8px; z-index: 8; }
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 10px;
+  font-size: 12px;
+}
+
+.summary-grid span { color: var(--text); }
+.card h2 { margin: 0 0 8px; font-size: 16px; }
+
+.status-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+.status-chip.idle    { background: #0f1e3a33; color: #93c5fd; border-color: #1e3a8a66; }
+.status-chip.running { background: #1a2a1a44; color: #86efac; border-color: #16a34a66; }
+.status-chip.success { background: #0a2a1a44; color: #6ee7b7; border-color: #059669aa; }
+.status-chip.failed  { background: #2a0a0a44; color: #fca5a5; border-color: #dc262666; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+
+input, select, button { font: inherit; }
+
+input:not([type="checkbox"]), select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  background: #0a1428;
+  color: var(--text);
+}
+
+input.input-invalid, select.input-invalid {
+  border-color: #f87171;
+  box-shadow: 0 0 0 1px #ef444488;
+}
+
+.hint-check { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
+.hint-check input[type="checkbox"] { width: 16px; height: 16px; margin: 0; padding: 0; accent-color: #3b82f6; }
+
+button {
+  border: 1px solid #1e3a8a;
+  border-radius: 6px;
+  background: #1e3a8a;
+  color: #e2e8f0;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+button:hover    { background: #2563eb; border-color: #3b82f6; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.file-list { margin: 6px 0 0; max-height: 150px; overflow: auto; padding-left: 18px; }
+.hint      { margin: 6px 0; color: var(--muted); font-size: 12px; }
+.log-tools { margin-bottom: 8px; }
+.log-tools button.active { background: #1d4ed8; border-color: #3b82f6; }
+
+.findings-wrap { overflow-x: auto; }
+.findings-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.findings-table th, .findings-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+.findings-table th { background: #0a1428; color: #93c5fd; }
+
+.sev-pill  { display: inline-block; border-radius: 999px; font-size: 11px; padding: 2px 8px; border: 1px solid transparent; font-weight: 700; }
+.sev-error { background: #2a0a0a44; border-color: #dc262666; color: #fca5a5; }
+.sev-warn  { background: #1a150044; border-color: #92400e66; color: #fcd34d; }
+.sev-info  { background: #0a1a2a44; border-color: #1e3a8a66; color: #93c5fd; }
+
+#logBox {
+  margin: 0;
+  border: 1px solid #1e3a5f66;
+  border-radius: 8px;
+  background: #020509;
+  color: #bfdbfe;
+  padding: 10px;
+  min-height: 180px;
+  max-height: 340px;
+  font-size: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+}

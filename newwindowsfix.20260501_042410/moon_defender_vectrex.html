@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOON DEFENDER - Vectrex Style</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'VT323', monospace;
+            color: #33ff33;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        /* Vectrex-style CRT overlay effects */
+        #crtOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            background: 
+                radial-gradient(ellipse at center, transparent 50%, rgba(0,20,0,0.4) 100%);
+        }
+
+        #scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 3px,
+                rgba(51, 255, 51, 0.08) 3px,
+                rgba(51, 255, 51, 0.08) 6px
+            );
+            pointer-events: none;
+            z-index: 101;
+        }
+
+        #glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 100px rgba(51, 255, 51, 0.1);
+            pointer-events: none;
+            z-index: 102;
+        }
+
+        /* HUD overlay */
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 50;
+            font-size: 24px;
+            text-shadow: 0 0 10px #33ff33;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            display: flex;
+            gap: 8px;
+        }
+
+        .hud-label {
+            opacity: 0.7;
+        }
+
+        .hud-value {
+            color: #33ff33;
+        }
+
+        /* Screens */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 200;
+            font-family: 'VT323', monospace;
+        }
+
+        .screen-title {
+            font-size: 72px;
+            color: #33ff33;
+            text-shadow: 0 0 20px #33ff33, 0 0 40px #33ff33;
+            margin-bottom: 20px;
+            letter-spacing: 8px;
+            animation: flicker 3s infinite;
+        }
+
+        .screen-subtitle {
+            font-size: 28px;
+            color: #22aa22;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 700px;
+            line-height: 1.4;
+            text-shadow: 0 0 5px #22aa22;
+        }
+
+        .btn {
+            padding: 15px 50px;
+            font-size: 32px;
+            font-family: 'VT323', monospace;
+            background: transparent;
+            color: #33ff33;
+            border: 3px solid #33ff33;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            margin: 15px;
+            text-shadow: 0 0 10px #33ff33;
+            box-shadow: 0 0 10px rgba(51, 255, 51, 0.3);
+        }
+
+        .btn:hover {
+            background: #33ff33;
+            color: #000;
+            box-shadow: 0 0 30px #33ff33, 0 0 60px #33ff33;
+        }
+
+        .final-score {
+            font-size: 36px;
+            color: #33ff33;
+            margin: 20px 0;
+            text-shadow: 0 0 10px #33ff33;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            5% { opacity: 0.8; }
+            10% { opacity: 1; }
+            15% { opacity: 0.9; }
+            20% { opacity: 1; }
+            50% { opacity: 0.95; }
+            52% { opacity: 0.7; }
+            54% { opacity: 0.95; }
+        }
+
+        #gameOverScreen, #winScreen {
+            display: none;
+        }
+
+        .controls-info {
+            font-size: 22px;
+            color: #1a881a;
+            margin-top: 30px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        .controls-info span {
+            color: #33ff33;
+            text-shadow: 0 0 5px #33ff33;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Vectrex CRT effects -->
+        <div id="crtOverlay"></div>
+        <div id="scanlines"></div>
+        <div id="glow"></div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div class="hud-item">
+                <span class="hud-label">SCORE</span>
+                <span class="hud-value" id="scoreDisplay">000000</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">LANDERS</span>
+                <span class="hud-value" id="landersDisplay">10</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">WAVE</span>
+                <span class="hud-value" id="waveDisplay">1</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">LIVES</span>
+                <span class="hud-value" id="livesDisplay">3</span>
+            </div>
+        </div>
+
+        <!-- Start Screen -->
+        <div id="startScreen" class="screen">
+            <div class="screen-title">MOON DEFENDER</div>
+            <div class="screen-subtitle">
+                DEFEND THE LUNAR MODULES FROM UFO INVADERS<br>
+                10 MODULES MUST SURVIVE
+            </div>
+            <button class="btn" onclick="startGame()">INSERT COIN</button>
+            <div class="controls-info">
+                <span>← →</span> or <span>A D</span> to move rover<br>
+                <span>SPACE</span> to fire<br>
+                Protect all lunar modules!
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="screen">
+            <div class="screen-title" style="color: #ff3333; text-shadow: 0 0 20px #ff3333;">GAME OVER</div>
+            <div class="screen-subtitle">ALL LUNAR MODULES DESTROYED</div>
+            <div class="final-score">SCORE: <span id="finalScore">0</span></div>
+            <div class="final-score">WAVE: <span id="finalWave">1</span></div>
+            <button class="btn" onclick="restartGame()">TRY AGAIN</button>
+        </div>
+
+        <!-- Win Screen -->
+        <div id="winScreen" class="screen">
+            <div class="screen-title">MISSION COMPLETE</div>
+            <div class="screen-subtitle">ALL WAVES CLEARED</div>
+            <div class="final-score">FINAL SCORE: <span id="winScore">0</span></div>
+            <button class="btn" onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== AUDIO ENGINE ====================
+        const AudioEngine = {
+            ctx: null,
+            initialized: false,
+
+            init() {
+                if (this.initialized) return;
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.initialized = true;
+            },
+
+            // Vectrex-style square wave tones
+            playTone(freq, duration, type = 'square', volume = 0.1) {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+
+            // Shoot sound - high pitch descending
+            playShoot() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            },
+
+            // Explosion - noise burst
+            playExplosion() {
+                if (!this.ctx) return;
+                const bufferSize = this.ctx.sampleRate * 0.3;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+                }
+                const source = this.ctx.createBufferSource();
+                source.buffer = buffer;
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+                source.connect(gain);
+                gain.connect(this.ctx.destination);
+                source.start();
+            },
+
+            // UFO hit - descending tone
+            playHit() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            },
+
+            // Lander destroyed - sad descending
+            playLanderDestroyed() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.5);
+            },
+
+            // Game over - descending sequence
+            playGameOver() {
+                if (!this.ctx) return;
+                [400, 350, 300, 250, 200, 150, 100].forEach((freq, i) => {
+                    setTimeout(() => this.playTone(freq, 0.3, 'square', 0.15), i * 150);
+                });
+            },
+
+            // Wave start - ascending arpeggio
+            playWaveStart() {
+                if (!this.ctx) return;
+                [200, 300, 400, 500, 600].forEach((freq, i) => {
+                    setTimeout(() => this.playTone(freq, 0.15, 'square', 0.1), i * 100);
+                });
+            },
+
+            // Background hum - low drone
+            startBackgroundHum() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(60, this.ctx.currentTime);
+                gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                this.humOsc = osc;
+                this.humGain = gain;
+            },
+
+            stopBackgroundHum() {
+                if (this.humOsc) {
+                    this.humGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.5);
+                    setTimeout(() => {
+                        this.humOsc.stop();
+                        this.humOsc = null;
+                    }, 500);
+                }
+            }
+        };
+
+        // ==================== GAME ENGINE ====================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game state
+        let gameState = 'start';
+        let score = 0;
+        let lives = 3;
+        let wave = 1;
+        let landersAlive = 10;
+
+        // Entities
+        let rover = null;
+        let ufos = [];
+        let landers = [];
+        let bullets = [];
+        let enemyBullets = [];
+        let particles = [];
+        let stars = [];
+
+        // Input
+        let keys = {};
+        let lastShot = 0;
+        const SHOT_COOLDOWN = 300;
+
+        // UFO formation
+        let ufoDirection = 1;
+        let ufoMoveTimer = 0;
+        let ufoMoveInterval = 60;
+        let ufoDescent = 0;
+
+        // ==================== VECTOR GRAPHICS DRAWING ====================
+        function drawLine(x1, y1, x2, y2, color = '#33ff33', width = 2) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            // Vectrex glow effect
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width + 2;
+            ctx.globalAlpha = 0.3;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawCircle(x, y, radius, color = '#33ff33', width = 2) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width + 2;
+            ctx.globalAlpha = 0.3;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        function drawPolygon(points, color = '#33ff33', width = 2) {
+            if (points.length < 2) return;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width + 2;
+            ctx.globalAlpha = 0.3;
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
+        // ==================== ENTITY DRAWING ====================
+        function drawRover(x, y) {
+            const c = '#33ff33';
+            // Wheels
+            drawCircle(x - 20, y + 15, 6, c, 2);
+            drawCircle(x, y + 15, 6, c, 2);
+            drawCircle(x + 20, y + 15, 6, c, 2);
+            // Body
+            drawLine(x - 25, y + 5, x + 25, y + 5, c, 2);
+            drawLine(x + 25, y + 5, x + 25, y - 5, c, 2);
+            drawLine(x + 25, y - 5, x - 25, y - 5, c, 2);
+            drawLine(x - 25, y - 5, x - 25, y + 5, c, 2);
+            // Cabin
+            drawLine(x - 15, y - 5, x + 15, y - 5, c, 2);
+            drawLine(x + 15, y - 5, x + 12, y - 18, c, 2);
+            drawLine(x + 12, y - 18, x - 12, y - 18, c, 2);
+            drawLine(x - 12, y - 18, x - 15, y - 5, c, 2);
+            // Window
+            drawLine(x - 8, y - 10, x + 8, y - 10, c, 1);
+            drawLine(x + 8, y - 10, x + 6, y - 15, c, 1);
+            drawLine(x + 6, y - 15, x - 6, y - 15, c, 1);
+            drawLine(x - 6, y - 15, x - 8, y - 10, c, 1);
+            // Cannon
+            drawLine(x - 2, y - 18, x - 2, y - 25, c, 2);
+            drawLine(x + 2, y - 18, x + 2, y - 25, c, 2);
+            drawLine(x - 4, y - 25, x + 4, y - 25, c, 2);
+            // Antenna
+            drawLine(x, y - 18, x, y - 28, c, 1);
+            drawCircle(x, y - 28, 2, c, 1);
+        }
+
+        function drawUFO(x, y, frame) {
+            const c = '#ff33ff';
+            // Saucer body
+            drawLine(x - 25, y, x + 25, y, c, 2);
+            drawLine(x + 25, y, x + 20, y + 8, c, 2);
+            drawLine(x + 20, y + 8, x - 20, y + 8, c, 2);
+            drawLine(x - 20, y + 8, x - 25, y, c, 2);
+            // Dome
+            drawLine(x - 12, y, x - 8, y - 12, c, 2);
+            drawLine(x - 8, y - 12, x + 8, y - 12, c, 2);
+            drawLine(x + 8, y - 12, x + 12, y, c, 2);
+            // Alien eyes
+            const eyeOffset = Math.sin(frame * 0.1) * 2;
+            drawCircle(x - 5 + eyeOffset, y - 8, 1.5, '#33ff33', 1);
+            drawCircle(x + 5 + eyeOffset, y - 8, 1.5, '#33ff33', 1);
+            // Lights (animated)
+            const lightPhase = (frame % 20) / 20;
+            [-15, -5, 5, 15].forEach((offset, i) => {
+                const alpha = Math.abs(Math.sin(lightPhase * Math.PI + i * 0.5));
+                ctx.globalAlpha = alpha;
+                drawCircle(x + offset, y + 4, 2, c, 1);
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function drawLander(x, y, landing) {
+            const c = '#33ffff';
+            // Landing legs
+            drawLine(x - 15, y + 10, x - 20, y + 25, c, 2);
+            drawLine(x + 15, y + 10, x + 20, y + 25, c, 2);
+            drawLine(x, y + 10, x, y + 25, c, 2);
+            // Foot pads
+            drawLine(x - 23, y + 25, x - 17, y + 25, c, 2);
+            drawLine(x + 17, y + 25, x + 23, y + 25, c, 2);
+            drawLine(x - 3, y + 25, x + 3, y + 25, c, 2);
+            // Body
+            drawLine(x - 12, y + 10, x + 12, y + 10, c, 2);
+            drawLine(x + 12, y + 10, x + 10, y - 5, c, 2);
+            drawLine(x + 10, y - 5, x - 10, y - 5, c, 2);
+            drawLine(x - 10, y - 5, x - 12, y + 10, c, 2);
+            // Top dome
+            drawLine(x - 10, y - 5, x, y - 15, c, 2);
+            drawLine(x, y - 15, x + 10, y - 5, c, 2);
+            // Window
+            drawLine(x - 6, y - 2, x + 6, y - 2, c, 1);
+            drawLine(x + 6, y - 2, x + 5, y - 8, c, 1);
+            drawLine(x + 5, y - 8, x - 5, y - 8, c, 1);
+            drawLine(x - 5, y - 8, x - 6, y - 2, c, 1);
+            // Thruster flame (if landing)
+            if (landing) {
+                const flameHeight = 8 + Math.sin(Date.now() * 0.01) * 4;
+                drawLine(x - 5, y + 25, x - 3, y + 25 + flameHeight, '#ff6600', 2);
+                drawLine(x + 5, y + 25, x + 3, y + 25 + flameHeight, '#ff6600', 2);
+                drawLine(x, y + 25, x, y + 25 + flameHeight * 1.2, '#ffaa00', 2);
+            }
+        }
+
+        function drawBullet(x, y, isEnemy = false) {
+            const c = isEnemy ? '#ff3333' : '#33ff33';
+            drawLine(x, y - 6, x, y + 6, c, 3);
+            // Glow
+            ctx.shadowColor = c;
+            ctx.shadowBlur = 10;
+            drawLine(x, y - 6, x, y + 6, c, 3);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawParticle(p) {
+            ctx.globalAlpha = p.life;
+            drawLine(p.x, p.y, p.x + p.vx * 3, p.y + p.vy * 3, p.color, 2);
+            ctx.globalAlpha = 1;
+        }
+
+        function drawStar(s) {
+            ctx.globalAlpha = s.brightness;
+            drawCircle(s.x, s.y, s.size, '#33ff33', 1);
+            ctx.globalAlpha = 1;
+        }
+
+        // ==================== GAME LOGIC ====================
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 80; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.5,
+                    brightness: Math.random() * 0.5 + 0.3,
+                    twinkleSpeed: Math.random() * 0.02 + 0.01
+                });
+            }
+        }
+
+        function createRover() {
+            rover = {
+                x: canvas.width / 2,
+                y: canvas.height - 80,
+                width: 50,
+                height: 30,
+                speed: 5
+            };
+        }
+
+        function createLanders() {
+            landers = [];
+            landersAlive = 10;
+            const spacing = canvas.width / 11;
+            for (let i = 0; i < 10; i++) {
+                landers.push({
+                    x: spacing * (i + 1),
+                    y: canvas.height - 60,
+                    width: 40,
+                    height: 30,
+                    alive: true,
+                    landing: true,
+                    id: i
+                });
+            }
+        }
+
+        function createUFOs() {
+            ufos = [];
+            const rows = 2 + Math.floor(wave / 2);
+            const cols = 5 + wave;
+            const startX = 80;
+            const startY = 80;
+            const spacingX = 60;
+            const spacingY = 45;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    ufos.push({
+                        x: startX + c * spacingX,
+                        y: startY + r * spacingY,
+                        baseX: startX + c * spacingX,
+                        baseY: startY + r * spacingY,
+                        width: 50,
+                        height: 25,
+                        alive: true,
+                        row: r,
+                        col: c,
+                        shootTimer: Math.random() * 200
+                    });
+                }
+            }
+            ufoMoveInterval = Math.max(20, 60 - wave * 3);
+        }
+
+        function createExplosion(x, y, color = '#33ff33') {
+            AudioEngine.playExplosion();
+            for (let i = 0; i < 15; i++) {
+                const angle = (Math.PI * 2 * i) / 15 + Math.random() * 0.3;
+                const speed = 2 + Math.random() * 4;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: 0.02 + Math.random() * 0.02,
+                    color: color
+                });
+            }
+        }
+
+        function shoot() {
+            const now = Date.now();
+            if (now - lastShot < SHOT_COOLDOWN) return;
+            lastShot = now;
+
+            bullets.push({
+                x: rover.x,
+                y: rover.y - 30,
+                width: 4,
+                height: 12,
+                speed: 8,
+                alive: true
+            });
+
+            AudioEngine.playShoot();
+        }
+
+        function enemyShoot() {
+            const aliveUfos = ufos.filter(u => u.alive);
+            if (aliveUfos.length === 0) return;
+
+            aliveUfos.forEach(ufo => {
+                ufo.shootTimer++;
+                if (ufo.shootTimer > 150 + Math.random() * 100) {
+                    ufo.shootTimer = 0;
+
+                    // Target nearest lander
+                    const aliveLanders = landers.filter(l => l.alive);
+                    if (aliveLanders.length === 0) return;
+
+                    const target = aliveLanders[Math.floor(Math.random() * aliveLanders.length)];
+                    const dx = target.x - ufo.x;
+                    const dy = target.y - ufo.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const speed = 2 + wave * 0.3;
+
+                    enemyBullets.push({
+                        x: ufo.x,
+                        y: ufo.y + 15,
+                        vx: (dx / dist) * speed,
+                        vy: (dy / dist) * speed,
+                        width: 6,
+                        height: 6,
+                        alive: true
+                    });
+
+                    AudioEngine.playTone(200, 0.1, 'sawtooth', 0.05);
+                }
+            });
+        }
+
+        function checkCollision(a, b) {
+            return Math.abs(a.x - b.x) < (a.width + b.width) / 2 &&
+                   Math.abs(a.y - b.y) < (a.height + b.height) / 2;
+        }
+
+        function update() {
+            if (gameState !== 'playing') return;
+
+            // Move rover
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                rover.x = Math.max(30, rover.x - rover.speed);
+            }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                rover.x = Math.min(canvas.width - 30, rover.x + rover.speed);
+            }
+
+            // Move UFO formation
+            ufoMoveTimer++;
+            if (ufoMoveTimer >= ufoMoveInterval) {
+                ufoMoveTimer = 0;
+
+                const aliveUfos = ufos.filter(u => u.alive);
+                if (aliveUfos.length > 0) {
+                    const leftmost = Math.min(...aliveUfos.map(u => u.x));
+                    const rightmost = Math.max(...aliveUfos.map(u => u.x));
+
+                    if (rightmost >= canvas.width - 50 || leftmost <= 50) {
+                        ufoDirection *= -1;
+                        ufoDescent += 10;
+                    }
+
+                    aliveUfos.forEach(ufo => {
+                        ufo.x += 8 * ufoDirection;
+                        ufo.y = ufo.baseY + ufoDescent;
+
+                        // Check if reached landers
+                        if (ufo.y >= canvas.height - 120) {
+                            gameOver();
+                        }
+                    });
+                }
+            }
+
+            // Move bullets
+            bullets = bullets.filter(b => {
+                b.y -= b.speed;
+
+                if (b.y < 60) return false;
+
+                // Check UFO collision
+                for (let ufo of ufos) {
+                    if (ufo.alive && checkCollision(b, ufo)) {
+                        ufo.alive = false;
+                        createExplosion(ufo.x, ufo.y, '#ff33ff');
+                        AudioEngine.playHit();
+                        score += 100 * wave;
+                        updateHUD();
+
+                        if (ufos.filter(u => u.alive).length === 0) {
+                            nextWave();
+                        }
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // Move enemy bullets
+            enemyBullets = enemyBullets.filter(b => {
+                b.x += b.vx;
+                b.y += b.vy;
+
+                if (b.y > canvas.height || b.x < 0 || b.x > canvas.width) return false;
+
+                // Check rover collision
+                if (checkCollision(b, rover)) {
+                    lives--;
+                    createExplosion(rover.x, rover.y, '#33ff33');
+                    AudioEngine.playExplosion();
+                    updateHUD();
+
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                    return false;
+                }
+
+                // Check lander collision
+                for (let lander of landers) {
+                    if (lander.alive && checkCollision(b, lander)) {
+                        lander.alive = false;
+                        landersAlive--;
+                        createExplosion(lander.x, lander.y, '#33ffff');
+                        AudioEngine.playLanderDestroyed();
+                        score = Math.max(0, score - 500);
+                        updateHUD();
+
+                        if (landersAlive <= 0) {
+                            gameOver();
+                        }
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // Update particles
+            particles = particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+                return p.life > 0;
+            });
+
+            // Update stars
+            stars.forEach(s => {
+                s.brightness = 0.3 + Math.abs(Math.sin(Date.now() * s.twinkleSpeed)) * 0.5;
+            });
+
+            // Enemy shooting
+            enemyShoot();
+        }
+
+        function draw() {
+            // Clear with fade for trail effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw stars
+            stars.forEach(s => drawStar(s));
+
+            // Draw ground line
+            drawLine(0, canvas.height - 40, canvas.width, canvas.height - 40, '#33ff33', 2);
+
+            // Draw ground details (vector craters)
+            for (let i = 0; i < canvas.width; i += 150) {
+                const craterX = i + 50;
+                const craterY = canvas.height - 40;
+                drawLine(craterX - 20, craterY, craterX + 20, craterY, '#1a881a', 1);
+                drawLine(craterX - 15, craterY + 5, craterX + 15, craterY + 5, '#1a881a', 1);
+            }
+
+            // Draw landers
+            landers.forEach(l => {
+                if (l.alive) {
+                    drawLander(l.x, l.y, l.landing);
+                }
+            });
+
+            // Draw rover
+            if (lives > 0) {
+                drawRover(rover.x, rover.y);
+            }
+
+            // Draw UFOs
+            ufos.forEach(u => {
+                if (u.alive) {
+                    drawUFO(u.x, u.y, ufoMoveTimer);
+                }
+            });
+
+            // Draw bullets
+            bullets.forEach(b => drawBullet(b.x, b.y, false));
+            enemyBullets.forEach(b => drawBullet(b.x, b.y, true));
+
+            // Draw particles
+            particles.forEach(p => drawParticle(p));
+
+            // Draw wave announcement
+            if (waveAnnounceTimer > 0) {
+                waveAnnounceTimer--;
+                ctx.font = '48px VT323';
+                ctx.fillStyle = '#33ff33';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = waveAnnounceTimer / 60;
+                ctx.fillText(`WAVE ${wave}`, canvas.width / 2, canvas.height / 2);
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        let waveAnnounceTimer = 0;
+
+        function updateHUD() {
+            document.getElementById('scoreDisplay').textContent = score.toString().padStart(6, '0');
+            document.getElementById('landersDisplay').textContent = landersAlive;
+            document.getElementById('waveDisplay').textContent = wave;
+            document.getElementById('livesDisplay').textContent = lives;
+        }
+
+        function nextWave() {
+            wave++;
+            ufoDescent = 0;
+            waveAnnounceTimer = 120;
+            AudioEngine.playWaveStart();
+
+            setTimeout(() => {
+                createUFOs();
+            }, 1000);
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+            AudioEngine.stopBackgroundHum();
+            AudioEngine.playGameOver();
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalWave').textContent = wave;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        function winGame() {
+            gameState = 'win';
+            AudioEngine.stopBackgroundHum();
+            document.getElementById('winScore').textContent = score;
+            document.getElementById('winScreen').style.display = 'flex';
+        }
+
+        function startGame() {
+            AudioEngine.init();
+            AudioEngine.startBackgroundHum();
+
+            document.getElementById('startScreen').style.display = 'none';
+            gameState = 'playing';
+            score = 0;
+            lives = 3;
+            wave = 1;
+            landersAlive = 10;
+            ufoDescent = 0;
+            bullets = [];
+            enemyBullets = [];
+            particles = [];
+
+            initStars();
+            createRover();
+            createLanders();
+            createUFOs();
+            updateHUD();
+
+            waveAnnounceTimer = 120;
+            AudioEngine.playWaveStart();
+        }
+
+        function restartGame() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('winScreen').style.display = 'none';
+            startGame();
+        }
+
+        // Input
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (e.key === ' ' && gameState === 'playing') {
+                e.preventDefault();
+                shoot();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Game loop
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start
+        initStars();
+        gameLoop();
+    </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# ingress-map.example.yaml
+# Maps OSPC Ingress class names to Rackspace Flex Magnum target class names.
+# Applied to both spec.ingressClassName and the legacy annotation
+# kubernetes.io/ingress.class during the transform stage.
+
+old_to_new_ingressclass:
+  nginx:    nginx
+  traefik:  nginx
+  haproxy:  nginx
+  contour:  nginx
+  istio:    nginx
+
+# Fallback for any unmapped IngressClass
+default: nginx
+
+# Notes:
+# - The Flex Magnum default Ingress controller is nginx-ingress.
+# - If you use Istio Gateway, deploy it separately on Flex before restoring.
+# - Traefik-specific annotations (e.g. traefik.ingress.kubernetes.io/*) are
+#   NOT automatically translated — add them to endpoint-map.example.yaml
+#   or strip them manually in the transform stage.

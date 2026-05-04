@@ -1,0 +1,29 @@
+# endpoint-map.example.yaml
+# String replacement rules applied to ALL manifest values during transform.
+# Applied recursively inside dicts, lists, and strings (ConfigMap data,
+# env vars, Ingress host rules, Service annotations, etc.).
+
+replacements:
+  # Internal cluster DNS FQDNs
+  - old: postgres.ospc.local
+    new: postgres.flex.local
+  - old: redis.ospc.local
+    new: redis.flex.local
+  - old: rabbitmq.ospc.svc.cluster.local
+    new: rabbitmq.flex.svc.cluster.local
+
+  # External-facing hostnames
+  - old: app.old-domain.com
+    new: app.new-flex-domain.com
+  - old: api.old-domain.com
+    new: api.new-flex-domain.com
+
+  # Internal service URLs
+  - old: http://internal-service.ospc
+    new: http://internal-service.flex
+
+# Notes:
+# - Replacements are applied in order — earlier rules run first.
+# - Replacements are case-sensitive.
+# - Avoid short/generic strings (e.g. "local") that could match unintended values.
+# - Test transforms with --dry-run before applying to the cluster.

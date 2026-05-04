@@ -1,0 +1,43 @@
+--- Hostname ---
+   Static hostname: u24-backend-2
+         Icon name: computer-vm
+           Chassis: vm
+        Machine ID: d9e4e8de706c42949c5a896450c2ddc6
+           Boot ID: 01b22a0705bc4074a1f08f9be74219bb
+--- Disk ---
+Filesystem     Type      Size  Used Avail Use% Mounted on
+udev           devtmpfs  3.9G     0  3.9G   0% /dev
+tmpfs          tmpfs     794M  1.2M  793M   1% /run
+/dev/vda1      ext4       78G  2.4G   75G   4% /
+tmpfs          tmpfs     3.9G     0  3.9G   0% /dev/shm
+tmpfs          tmpfs     5.0M     0  5.0M   0% /run/lock
+tmpfs          tmpfs     3.9G     0  3.9G   0% /sys/fs/cgroup
+/dev/loop0     squashfs   64M   64M     0 100% /snap/core20/2434
+/dev/vda15     vfat      105M  6.1M   99M   6% /boot/efi
+/dev/loop1     squashfs   92M   92M     0 100% /snap/lxd/29619
+/dev/loop2     squashfs   45M   45M     0 100% /snap/snapd/23545
+/dev/vdb       ext4       63G   24K   60G   1% /mnt
+tmpfs          tmpfs     794M     0  794M   0% /run/user/1000
+--- Listening ports ---
+State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port  Process  
+LISTEN   0        4096       127.0.0.53%lo:53            0.0.0.0:*              
+LISTEN   0        128              0.0.0.0:22            0.0.0.0:*              
+LISTEN   0        128                 [::]:22               [::]:*              
+--- Running services ---
+  UNIT                        LOAD   ACTIVE SUB     DESCRIPTION                                 
+  accounts-daemon.service     loaded active running Accounts Service                            
+  amazon-ssm-agent.service    loaded active running amazon-ssm-agent                            
+  atd.service                 loaded active running Deferred execution scheduler                
+  cron.service                loaded active running Regular background program processing daemon
+  dbus.service                loaded active running D-Bus System Message Bus                    
+  getty@tty1.service          loaded active running Getty on tty1                               
+  irqbalance.service          loaded active running irqbalance daemon                           
+  ModemManager.service        loaded active running Modem Manager                               
+  multipathd.service          loaded active running Device-Mapper Multipath Device Controller   
+  networkd-dispatcher.service loaded active running Dispatcher daemon for systemd-networkd      
+  polkit.service              loaded active running Authorization Manager                       
+  qemu-guest-agent.service    loaded active running QEMU Guest Agent                            
+  rsyslog.service             loaded active running System Logging Service                      
+  serial-getty@ttyS0.service  loaded active running Serial Getty on ttyS0                       
+--- sshd config test ---
+sshd OK

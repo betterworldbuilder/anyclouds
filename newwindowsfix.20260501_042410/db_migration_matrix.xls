@@ -1,0 +1,329 @@
+<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+<Styles>
+<Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#D9EAF7" ss:Pattern="Solid"/></Style>
+<Style ss:ID="Wrap"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+<Style ss:ID="HeaderWrap"><Font ss:Bold="1"/><Interior ss:Color="#D9EAF7" ss:Pattern="Solid"/><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+</Styles>
+<Worksheet ss:Name="DBaaS Matrix">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">DB engine</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Versions</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Single DBaaS</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">DBaaS + Replica</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">HA DBaaS</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Status today</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MySQL</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">5.7, 8.0</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MariaDB</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">10.x</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Percona</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">5.7, 8.0</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Yes</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">PostgreSQL</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">12, 13, 14</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MongoDB</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">4, 5, 6</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">SQL Server</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">2016, 2019</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Planned</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+<Worksheet ss:Name="DBaaS Flow">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Scenario</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Migration path</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Single DB VM</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">SSH to source DB VM -&gt; dump -&gt; transfer -&gt; restore on FLEX DB VM</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Single DBaaS</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Cloud LB VIP -&gt; dump from runner/jumphost -&gt; restore on FLEX</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">DBaaS + Replica</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Cloud LB VIP -&gt; restore to FLEX primary -&gt; seed FLEX replicas</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">HA DBaaS</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">OSPC HA VIP -&gt; seed FLEX primary -&gt; build FLEX internal replication</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+<Worksheet ss:Name="DB Migration Summary">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Area</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Summary</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">DB migration scenarios</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Single DB VM, Single DBaaS, DBaaS+Replica, HA DBaaS</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Single DB VM flow</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">SSH to OSPC DB VM -&gt; dump on source -&gt; transfer/stream -&gt; restore on FLEX DB VM -&gt; validate -&gt; cutover</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Single DBaaS flow</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Connect via OSPC Cloud LB VIP -&gt; dump from runner/jumphost -&gt; restore to single FLEX DB VM -&gt; validate -&gt; cutover</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">DBaaS+Replica flow</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Connect via OSPC Cloud LB VIP -&gt; restore to FLEX primary -&gt; seed FLEX replicas -&gt; validate replication -&gt; cutover</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">HA DBaaS flow</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Seed FLEX primary from OSPC HA VIP -&gt; build FLEX internal replication -&gt; validate health/failover posture -&gt; cutover</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Pre-checks</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Source reachability, DB port detection, DB authentication, SSH to FLEX, disk space</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Engine detection</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Auto-detect source DB engine and version before restore steps</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Target prep</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Install matching DB engine on FLEX target nodes</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Data movement</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Dump, stream/copy, restore, optional replica seeding</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Validation</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Row counts, object/schema checks, sample checks, parity/comparison reporting</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Replication features</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Replica setup, standby sync, lag checks, health checks</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Cutover features</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Write freeze/read-only handoff, app endpoint repoint, final verification</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Reporting</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Live job logs, exportable logs, comparison/parity report output</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Dry-run</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Supported for planning, but some source connectivity checks may still run</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Engines ready now</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MySQL 5.7/8.0, MariaDB 10.x, Percona 5.7/8.0</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Engines to be tested</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">PostgreSQL 12/13/14, MongoDB 4/5/6, SQL Server 2016/2019</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+<Worksheet ss:Name="Common DB Steps">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Step</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">What happens</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">1</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Pre-check source connectivity, DB auth, SSH access, disk space</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">2</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Auto-detect DB engine and version</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">3</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Discover databases, users, schema inventory</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">4</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Install matching DB engine on FLEX target</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">5</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Dump source databases</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">6</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Stream or copy dumps to FLEX</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">7</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Restore databases on FLEX</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">8</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Validate row counts / objects / sample data</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">9</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">For replica or HA: configure replication and seed replicas</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">10</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Check replica lag and health</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">11</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Cut over application DB endpoint to FLEX</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="Number">12</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Post-check, report, and cleanup</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+<Worksheet ss:Name="DB Features">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Feature</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Summary</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Multi-scenario support</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Handles Single DB VM, Single DBaaS, DBaaS+Replica, and HA DBaaS</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Engine detection</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Auto-detects source engine/version before migration</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MySQL-family ready now</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Best-supported today for MySQL, MariaDB, Percona</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">DBaaS via LB</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Works with managed OSPC DBaaS using Cloud Load Balancer VIP, no SSH to DBaaS host required</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">SSH streaming</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Can stream dumps directly over SSH without keeping large local temp files</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Matching target install</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Installs or aligns the proper DB engine on FLEX before restore</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Replica build-out</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Can seed FLEX replicas from FLEX primary after restore</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Validation</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Row-count checks, object checks, parity checks, and comparison reports</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Dry-run mode</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Lets you preview the migration path, though some source checks may still probe connectivity</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Job board / logs</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Live job cards, exportable logs, stop controls, status display</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Cutover support</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Supports final write freeze / endpoint repoint / validation after migration</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Comparison reporting</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Generates DB comparison output for OSPC vs FLEX parity review</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+<Worksheet ss:Name="DB Support Matrix">
+<Table>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Column ss:AutoFitWidth="0" ss:Width="180"/>
+<Row>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Engine</Data></Cell>
+<Cell ss:StyleID="HeaderWrap"><Data ss:Type="String">Status today</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MySQL 5.7 / 8.0</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MariaDB 10.x</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Percona 5.7 / 8.0</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">Ready now</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">PostgreSQL 12 / 13 / 14</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">MongoDB 4 / 5 / 6</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+<Row>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">SQL Server 2016 / 2019</Data></Cell>
+<Cell ss:StyleID="Wrap"><Data ss:Type="String">To be tested</Data></Cell>
+</Row>
+</Table>
+</Worksheet>
+</Workbook>

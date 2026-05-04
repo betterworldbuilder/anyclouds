@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OSPC Scanner and Deployment Script Generator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
+</head>
+<body>
+  <header>
+    <h1>OSPC Scanner and Deployment Script Generator</h1>
+    <p>Connects to your OSPC Rackspace account, scans your existing server inventory, maps legacy OSPC flavors to equivalent FLEX flavors, validates your target environment, then auto-generates ready-to-run deployment shell scripts to clone your entire OSPC infrastructure into the Flex OpenStack cloud.</p>
+    <ul style="max-width: 900px; margin: 10px auto; text-align: left; background: rgba(0, 0, 0, 0.2); color: #fff; padding: 15px 35px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); line-height: 1.6;">
+      <li><strong>File Manager (Upload/View)</strong>: Visually tracks all generated shell scripts and allows you to manually inject external CSV lists (if bypassing Step 1).</li>
+      <li><strong>Step 1 (Overview)</strong>: Securely connects to Rackspace APIs to discover and download your legacy OSPC server inventory.</li>
+      <li><strong>Step 1.5 (App Mapping)</strong>: Actively scans instances to map live application and database dependencies via SSH.</li>
+      <li><strong>Step 2 (Flavor Mapping)</strong>: Computes your legacy OSPC server sizes into modern OpenStack FLEX flavor equivalents.</li>
+      <li><strong>Step 3 (Validation)</strong>: Pre-flights your mappings against the live FLEX environment to ensure quotas and networks are valid before deploying.</li>
+      <li><strong>Step 4 (Deploy Generation)</strong>: Builds the infrastructure-as-code scripts (Networks, Keypairs, LBs, VMs) to spawn your FLEX clones.</li>
+      <li><strong>Next Step</strong>: Paste the generated deploy script into the FLEX Deployment Dashboard (Stage 2).</li>
+    </ul>
+  </header>
+
+  <main>
+    <section id="runSummaryCard" class="card summary-card">
+      <h2>Run Summary</h2>
+      <div class="summary-grid">
+        <div><strong>Region:</strong> <span id="sumRegion">-</span></div>
+        <div><strong>Overview CSV:</strong> <span id="sumOverview">-</span></div>
+        <div><strong>Flavor Map:</strong> <span id="sumFlavorMap">-</span></div>
+        <div><strong>Block Map:</strong> <span id="sumBlockMap">-</span></div>
+        <div><strong>LB Map:</strong> <span id="sumLbMap">-</span></div>
+        <div><strong>Private Net / Subnet:</strong> <span id="sumNet">tenant-net / tenant-subnet</span></div>
+        <div><strong>Router:</strong> <span id="sumRouter">tenant-router</span></div>
+        <div><strong>Key Name:</strong> <span id="sumKey">-</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>File Manager & Uploads</h2>
+      <p class="hint">For most typical migrations, you will execute <strong>Step 1</strong> to automatically generate your Server Inventory lists by pointing it directly at your Rackspace Account API.<br>
+      However, sometimes you will be given a massive spreadsheet list of servers manually by a client, or you will already have a <code>servers_to_migrate.csv</code> file created from a different tool.<br>
+      You can upload those files here so they appear in dropdowns across the dashboard! <em>(Uploaded files are stored in the <code>uploads/</code> directory)</em></p>
+      <div class="row">
+        <input type="file" id="uploadFile" />
+        <button id="uploadBtn">Upload</button>
+        <button id="refreshFilesBtn">Refresh Files</button>
+      </div>
+      <ul id="fileList" class="file-list"></ul>
+    </section>
+
+    <!-- ══ CLOUD CREDENTIALS ══════════════════════════════════════════════ -->
+    <section class="card" id="cloudCredentialsCard" style="padding:24px 28px;">
+      <h2 style="margin-bottom:18px;display:flex;align-items:center;gap:10px;">
+        <span style="width:4px;height:22px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:2px;display:inline-block;"></span>
+        Cloud Credentials
+      </h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
+
+        <!-- OSPC -->
+        <div>
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
+              <input id="credOspcUsername" type="text" placeholder="e.g. dzng.8294" value="dzng.8294"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">API Key / Password
+              <input id="credOspcApiKey" type="password" placeholder="Rackspace API key"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Account / Project ID
+              <input id="credOspcAccountId" type="text" placeholder="e.g. 1342314"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+          </div>
+        </div>
+
+        <!-- FLEX -->
+        <div>
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Auth URL
+              <input id="credFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
+              <input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
+              <input id="credFlexPassword" type="password" placeholder="FLEX password"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
+              <input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain
+              <input id="credFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Import OpenRC File
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="credOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;font-size:.8rem;color:#94a3b8;" />
+                <button id="credOpenrcImportBtn" type="button"
+                  style="padding:6px 14px;background:linear-gradient(135deg,#4f46e5,#6366f1);border:none;border-radius:6px;color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                  📂 Import OpenRC File
+                </button>
+              </div>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Auto-propagate hint -->
+      <p style="margin:14px 0 0;font-size:.75rem;color:#64748b;font-style:italic;">
+        ✦ OSPC credentials auto-fill the scanner fields below. FLEX credentials are available to Validation (Step 3) and Deploy Generation (Step 4).
+      </p>
+    </section>
+
+    <script>
+    // ── Credential localStorage keys ──────────────────────────────────────────
+    const CRED_KEYS = {
+      credOspcUsername:  'cred_ospc_username',
+      credOspcApiKey:    'cred_ospc_apikey',
+      credOspcAccountId: 'cred_ospc_accountid',
+      credFlexAuthUrl:   'cred_flex_auth_url',
+      credFlexUsername:  'cred_flex_username',
+      credFlexPassword:  'cred_flex_password',
+      credFlexProjectId: 'cred_flex_project_id',
+      credFlexDomain:    'cred_flex_domain',
+    };
+
+    // Load saved values on page init
+    Object.entries(CRED_KEYS).forEach(([elId, lsKey]) => {
+      const el = document.getElementById(elId);
+      const saved = localStorage.getItem(lsKey);
+      if (el && saved) el.value = saved;
+    });
+
+    // Persist on every change
+    Object.entries(CRED_KEYS).forEach(([elId, lsKey]) => {
+      document.getElementById(elId)?.addEventListener('input', function () {
+        localStorage.setItem(lsKey, this.value);
+      });
+    });
+
+    // ── Auto-propagate OSPC credentials → scanner Step 1 fields ──────────────
+    (function () {
+      function syncOspc() {
+        const u = document.getElementById('credOspcUsername')?.value || '';
+        const k = document.getElementById('credOspcApiKey')?.value || '';
+        const a = document.getElementById('credOspcAccountId')?.value || '';
+        const fu = document.getElementById('ovUsername');  if (fu && !fu._manuallyEdited) fu.value = u;
+        const fk = document.getElementById('ovApiKey');    if (fk && !fk._manuallyEdited) fk.value = k;
+        const fa = document.getElementById('ovAccountId'); if (fa && !fa._manuallyEdited) fa.value = a;
+      }
+      ['credOspcUsername','credOspcApiKey','credOspcAccountId'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', syncOspc);
+      });
+      // Mark a field as manually edited so we stop overwriting it
+      ['ovUsername','ovApiKey','ovAccountId'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', function(){ this._manuallyEdited = true; });
+      });
+      syncOspc(); // run once on load with restored values
+    })();
+
+    // ── OpenRC file parser → FLEX fields + localStorage ───────────────────────
+    document.getElementById('credOpenrcImportBtn')?.addEventListener('click', function() {
+      const file = document.getElementById('credOpenrcFile')?.files?.[0];
+      if (!file) { alert('Please select an OpenRC file first.'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result.replace(/\r\n/g, '\n');  // normalise CRLF
+
+        // Robust line-by-line parser — handles quoted/unquoted, with or without 'export'
+        function parseOpenrc(src) {
+          const map = {};
+          src.split('\n').forEach(line => {
+            // Strip leading whitespace and ignore comments
+            const l = line.trim();
+            if (!l || l.startsWith('#')) return;
+            // Match:  [export] KEY=VALUE  (value may be quoted or bare, may have trailing comment)
+            const m = l.match(/^(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)(?:\s+#.*)?$/);
+            if (!m) return;
+            let val = m[2].trim();
+            // Strip wrapping single or double quotes
+            if ((val.startsWith('"') && val.endsWith('"')) ||
+                (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            // Skip shell subshell values like $(...)
+            if (val.startsWith('$(')) return;
+            if (val) map[m[1]] = val;
+          });
+          return map;
+        }
+
+        const env = parseOpenrc(text);
+
+        const vals = {
+          credFlexAuthUrl:   env['OS_AUTH_URL']          || '',
+          credFlexUsername:  env['OS_USERNAME']           || '',
+          credFlexPassword:  env['OS_PASSWORD']           || '',
+          credFlexProjectId: env['OS_PROJECT_ID']         || env['OS_TENANT_ID'] || '',
+          credFlexDomain:    env['OS_USER_DOMAIN_NAME']   || env['OS_DOMAIN_NAME'] || env['OS_PROJECT_DOMAIN_NAME'] || 'rackspace_cloud_domain',
+        };
+
+        let filled = 0;
+        Object.entries(vals).forEach(([id, val]) => {
+          if (!val) return;
+          const el = document.getElementById(id);
+          if (el) { el.value = val; el.dispatchEvent(new Event('input')); filled++; }
+          if (CRED_KEYS[id]) localStorage.setItem(CRED_KEYS[id], val);
+        });
+
+        // Show a quick toast
+        const btn = document.getElementById('credOpenrcImportBtn');
+        const orig = btn.textContent;
+        btn.textContent = filled > 0 ? `✅ Filled ${filled} fields` : '⚠️ No values found';
+        btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#b45309,#f59e0b)';
+        setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 3000);
+      };
+      reader.readAsText(file);
+    });
+    </script>
+
+    <section class="card">
+      <h2>1) OSPC Account Inventory <span id="statusOverview" class="status-chip idle">Idle</span></h2>
+      <p class="hint">Authenticate with your Rackspace OSPC Credentials and click the Run Account Scanning button below.</p>
+      <div class="grid">
+        <label>OSPC Username <input id="ovUsername" type="text" value="dzng.8294" /></label>
+        <label>OSPC API Key <input id="ovApiKey" type="password" /></label>
+        <label>OSPC Account ID <input id="ovAccountId" type="text" /></label>
+        <div style="grid-column: span 2;">
+          <label style="margin-bottom: 5px;">OSPC Regions to Scan</label>
+          <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="ord" checked> ord</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="hkg" checked> hkg</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="syd" checked> syd</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="lon"> lon</label>
+          </div>
+        </div>
+      </div>
+      <button id="runOverviewBtn">Run Account Scanning</button>
+    </section>
+
+    <!-- SG Rule Detail Cards (populated after Step 1 or CSV upload) -->
+    <section id="sgRulesCard" class="card" style="display:none;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        <h2 style="margin:0">🛡️ Security Group Rules <span id="sgRulesCount" class="status-chip idle">0</span></h2>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <span id="sgImportStatus" class="status-chip idle" style="font-size:.8rem"></span>
+          <button id="sgImportAllBtn" class="btn" style="padding:5px 16px;font-size:.82rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none"
+            onclick="importAllSGsToFlex()">⬆️ Import ALL SGs to FLEX</button>
+        </div>
+      </div>
+      <p class="hint">Detailed firewall rules discovered from OSPC Neutron Security Groups. Each card shows ingress/egress rules with protocol, port range and CIDR. Use the per-SG or bulk import button to push groups directly into FLEX via the OpenStack CLI.</p>
+      <div id="sgRulesContainer" style="display:flex; flex-direction:column; gap:16px;"></div>
+    </section>
+
+    <style>
+      .sg-card{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;transition:border-color .2s}
+      .sg-card:hover{border-color:rgba(136,192,208,.4)}
+      .sg-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;user-select:none}
+      .sg-card-header h3{margin:0;font-size:1.05rem;color:#88c0d0;flex:1}
+      .sg-card-header .sg-badge{background:rgba(136,192,208,.15);color:#88c0d0;font-size:.75rem;padding:2px 10px;border-radius:12px;white-space:nowrap}
+      .sg-card-header .sg-toggle{color:#d8dee9;font-size:.9rem;transition:transform .2s}
+      .sg-card-header .sg-toggle.open{transform:rotate(90deg)}
+      .sg-rules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:6px}
+      .sg-rule{background:rgba(46,52,64,.6);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:.85rem;transition:background .15s,border-color .15s}
+      .sg-rule:hover{background:rgba(59,66,82,.8);border-color:rgba(136,192,208,.25)}
+      .sg-rule-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+      .sg-pill{padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;letter-spacing:.03em}
+      .sg-pill.ingress{background:rgba(163,190,140,.2);color:#a3be8c}
+      .sg-pill.egress{background:rgba(208,135,112,.2);color:#d08770}
+      .sg-pill.proto{background:rgba(180,142,173,.2);color:#b48ead}
+      .sg-pill.port{background:rgba(235,203,139,.2);color:#ebcb8b;font-family:monospace}
+      .sg-pill.cidr{background:rgba(136,192,208,.12);color:#88c0d0;font-family:monospace}
+      .sg-pill.ether{background:rgba(216,222,233,.1);color:#8a90a0;font-size:.7rem}
+      .sg-arrow{color:#616e88;font-size:.9rem}
+    </style>
+
+    <!-- STAGE 1.5 -->
+    <section class="card">
+      <h2>1.5) Application Dependency Mapping <span id="statusAppDeps" class="status-chip idle">Idle</span></h2>
+      <p class="hint">Map application relationships using deep Active Scanning or intelligent Metadata Inference.</p>
+      <div class="grid">
+        <label>Select Overview CSV
+          <select id="admInventory"></select>
+        </label>
+      </div>
+      <div class="row" style="margin-top: 10px;">
+        <button id="runAdmOptCBtn" class="btn">Option C: Generate Inference Plan</button>
+        <button id="runAdmOptABtn" class="btn" style="background-color: var(--nord14); color: var(--nord1);">Option A: Generate Active SSH Scanner</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) Flavor + Block + LB Mapping <span id="statusMapper" class="status-chip idle">Idle</span></h2>
+      <p class="hint">Select your deployment region, then select your Account Overview file, choose any optional DB/Floating IP behaviors, and press <code>Run Flavor Mapper</code>.</p>
+      <p class="hint">Regional target flavor catalogs are loaded from <code>uploads/flavors/</code>.</p>
+      <div class="grid">
+        <label>Deployment Region
+          <select id="mapTargetRegion">
+            <option value="">-- select region --</option>
+            <option value="DFW">DFW</option>
+            <option value="SJC">SJC</option>
+            <option value="IAD">IAD</option>
+          </select>
+        </label>
+        <label>Overview CSV
+          <select id="mapInventory"></select>
+        </label>
+      </div>
+      <p class="hint"><label class="hint-check"><input id="mapIncludeDbAsServers" type="checkbox" /> Include <code>database_instance</code> rows as compute instance targets (opt-in).</label></p>
+      <p class="hint">Creates similar spec Compute Instances as targeted replacements for Cloud Database Instances.</p>
+      <p class="hint"><label class="hint-check"><input id="mapIncludeFloatingIps" type="checkbox" checked /> Include Floating IPs</label></p>
+      <p class="hint">Floating IPs will be assigned for every VM by default.</p>
+      <button id="runMapperBtn">Run Flavor Mapper</button>
+    </section>
+
+    <section class="card">
+      <h2>3) Pre-Deploy Validation <span id="statusValidate" class="status-chip idle">Idle</span></h2>
+      <p class="hint">Load your Flavor Mapping, Block Mapping, and optional LB Mapping files then click the <code>Validate Inputs</code> button.</p>
+      <div class="grid">
+        <label>Flavor Map CSV
+          <select id="valFlavorMap"></select>
+        </label>
+        <label>Block Map CSV
+          <select id="valBlockMap"></select>
+        </label>
+        <label>LB Map CSV (optional)
+          <select id="valLbMap"></select>
+        </label>
+      </div>
+      <button id="runValidateBtn">Validate Inputs</button>
+    </section>
+
+    <section id="validationFindingsCard" class="card" style="display:none;">
+      <h2>Validation Findings</h2>
+      <p id="validationFindingsSummary" class="hint"></p>
+      <p id="validationFindingsSource" class="hint"></p>
+      <div class="findings-wrap">
+        <table id="validationFindingsTable" class="findings-table"></table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4) Generate Deploy Artifacts <span id="statusDeployGen" class="status-chip idle">Idle</span></h2>
+      <p class="hint">If duplicate server names exist, generation auto-suffixes names (for example <code>linux-server-1-2</code>). This step can still run even if validation failed.</p>
+      <p class="hint">Generated deploy scripts continue on per-step errors by default and write a results CSV. Enable fail-fast to stop on first failed step.</p>
+      <p class="hint">Linux instances use <code>Key Name</code> and that keypair must already exist in the target project. Windows instances can auto-generate random admin passwords (12-16 chars, alphanumeric) and export them to a credentials CSV.</p>
+      <div class="grid">
+        <label>Flavor Map CSV
+          <select id="depFlavorMap"></select>
+        </label>
+        <label>Block Map CSV (optional)
+          <select id="depBlockMap"></select>
+        </label>
+        <label>LB Map CSV (optional)
+          <select id="depLbMap"></select>
+        </label>
+        <label>Public Network <input id="depPublicNet" type="text" value="PUBLICNET" /></label>
+        <label>Private Network <input id="depPrivateNet" type="text" value="tenant-net" /></label>
+        <label>Subnet Name <input id="depSubnetName" type="text" value="tenant-subnet" /></label>
+        <label>Subnet CIDR <input id="depSubnetCidr" type="text" value="10.60.0.0/24" /></label>
+        <label>Router Name <input id="depRouterName" type="text" value="tenant-router" /></label>
+        <label>Security Group (auto-create if missing) <input id="depSecGroup" type="text" value="default" /></label>
+        <label>Volume Type
+          <select id="depVolumeType">
+            <option value="Performance" selected>Performance</option>
+            <option value="Standard">Standard</option>
+            <option value="Capacity">Capacity</option>
+            <option value="HA-Performance">HA-Performance</option>
+            <option value="HA-Standard">HA-Standard</option>
+          </select>
+        </label>
+        <label>Key Name (must already exist or be provided below for Linux VMs) <input id="depKeyName" type="text" /></label>
+        <label>SSH Public Key (Optional: Auto-import if Key Name is missing) <textarea id="depSshPubKey" rows="2" placeholder="ssh-rsa AAAAB3N..."></textarea></label>
+        <label>Windows Admin User <input id="depWindowsAdminUser" type="text" value="Administrator" /></label>
+        <label>Windows Password Length
+          <select id="depWindowsPasswordLength">
+            <option value="12">12</option>
+            <option value="13">13</option>
+            <option value="14" selected>14</option>
+            <option value="15">15</option>
+            <option value="16">16</option>
+          </select>
+        </label>
+        <label>Output Prefix (optional) <input id="depOutputPrefix" type="text" /></label>
+      </div>
+      <p class="hint"><label class="hint-check"><input id="depGenerateWindowsPasswords" type="checkbox" checked /> Auto-generate Windows passwords and write <code>*_windows_credentials.csv</code>.</label></p>
+      <p class="hint"><label class="hint-check"><input id="depFailFast" type="checkbox" /> Fail fast (stop at first failed step).</label></p>
+      <button id="runDeployGenBtn">Generate Deployment Script</button>
+    </section>
+
+    <section class="card">
+      <h2>Next Step</h2>
+      <p class="hint">Take the generated <strong>&lt;account_id&gt;_tenant_deploy.sh</strong> script and paste it into <strong>Stage 2</strong> &raquo; <strong>Or Paste Deployment Script</strong> box in the FLEX Deployment Dashboard, which is already authenticated with your Rackspace OpenStack Flex project.</p>
+    </section>
+
+
+
+    <section class="card">
+      <h2>Execution Output</h2>
+      <div class="row log-tools">
+        <button id="logFilterAll" class="active" type="button">All</button>
+        <button id="logFilterInfo" type="button">Info</button>
+        <button id="logFilterWarn" type="button">Warn</button>
+        <button id="logFilterError" type="button">Error</button>
+        <button id="copyLogBtn" type="button">Copy Log</button>
+        <button id="clearLogBtn" type="button">Clear</button>
+      </div>
+      <pre id="logBox">Ready.</pre>
+    </section>
+
+    <section class="card">
+      <a href="/readme" target="_blank" rel="noopener noreferrer">Open README (Plain Text)</a>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
+</body>
+</html>

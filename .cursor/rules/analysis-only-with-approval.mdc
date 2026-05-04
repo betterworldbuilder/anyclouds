@@ -1,0 +1,11 @@
+---
+description: Analysis-only mode; require explicit approval before making changes
+alwaysApply: true
+---
+
+# Analysis-Only by Default
+
+- Operate in analysis mode unless the user explicitly says "action mode".
+- Do not edit files, run write operations, or execute mutating commands until "action mode" is stated in the current chat.
+- Outside "action mode", provide analysis, findings, and patch plans only.
+- If "action mode" is missing or ambiguous, ask a clarifying question and do not proceed with changes.

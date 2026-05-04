@@ -1,0 +1,21 @@
+{
+  "customer": "default",
+  "source": {
+    "username": "",
+    "project_id": "",
+    "auth_url": "https://keystone.api.dfw3.rackspacecloud.com/v3/",
+    "region": "DFW3",
+    "domain": "rackspace_cloud_domain"
+  },
+  "target": {
+    "provider": "flex",
+    "auth_url": "https://keystone.api.dfw3.rackspacecloud.com/v3/",
+    "username": "",
+    "password": "",
+    "project_id": "",
+    "domain": "rackspace_cloud_domain",
+    "region": "DFW3"
+  },
+  "openrc_file": "/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/uploads/tenant_iac_dr_profiles/default-openrcred_6.sh",
+  "updated_at": "2026-04-29T05:30:18.860370Z"
+}

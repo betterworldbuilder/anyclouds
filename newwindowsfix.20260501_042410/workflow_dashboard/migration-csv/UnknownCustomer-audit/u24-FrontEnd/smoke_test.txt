@@ -1,0 +1,21 @@
+# Smoke test report -- Tue Apr  7 00:41:00 +07 2026
+  ✅ [PASS] SSH access -- 50.56.158.36
+  ✅ [PASS] IP address present (2 interfaces)
+  ✅ [PASS] Default route present
+  ✅ [PASS] DNS resolution working
+  ✅ [PASS] Disk mounts present (3 devices)
+  ✅ [PASS] Listening ports present (5)
+    LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*          
+    LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*          
+    LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*          
+    LISTEN 0      511          0.0.0.0:80        0.0.0.0:*          
+    LISTEN 0      4096            [::]:22           [::]:*          
+  ❌ [FAIL] 00 failed systemd units -- check: systemctl --failed
+      UNIT LOAD ACTIVE SUB DESCRIPTION
+    0 loaded units listed.
+  ✅ [PASS] Homepage  :80  HTTP 302
+  ⏭  [SKIP] Health endpoint  :80/health  HTTP 404 (route not found)
+  ⏭  [SKIP] API endpoint  :80/api/  HTTP 000000 (route not found)
+  ⏭  [SKIP] DB connectivity (no psql or mysql found)
+  ⏭  [SKIP] Background jobs -- no crontab entries (manual check needed)
+  ❌ [FAIL] TLS / HTTPS  HTTP 000000

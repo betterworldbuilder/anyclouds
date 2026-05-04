@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {"id": "net_prod", "type": "network", "label": "ProdNet", "x": 80, "y": 100, "props": {"name": "seg-prod-net"}},
+    {"id": "sub_prod", "type": "subnet", "label": "ProdSubnet", "x": 260, "y": 100, "props": {"name": "seg-prod-subnet", "cidr": "10.130.10.0/24", "gateway_ip": "", "dns_nameserver": ""}},
+    {"id": "rt_prod", "type": "router", "label": "ProdRouter", "x": 440, "y": 100, "props": {"name": "seg-prod-router", "external_network": "PUBLICNET"}},
+
+    {"id": "net_dev", "type": "network", "label": "DevNet", "x": 80, "y": 260, "props": {"name": "seg-dev-net"}},
+    {"id": "sub_dev", "type": "subnet", "label": "DevSubnet", "x": 260, "y": 260, "props": {"name": "seg-dev-subnet", "cidr": "10.130.20.0/24", "gateway_ip": "", "dns_nameserver": ""}},
+    {"id": "rt_dev", "type": "router", "label": "DevRouter", "x": 440, "y": 260, "props": {"name": "seg-dev-router", "external_network": "PUBLICNET"}},
+
+    {"id": "net_shared", "type": "network", "label": "SharedNet", "x": 80, "y": 420, "props": {"name": "seg-shared-net"}},
+    {"id": "sub_shared", "type": "subnet", "label": "SharedSubnet", "x": 260, "y": 420, "props": {"name": "seg-shared-subnet", "cidr": "10.130.30.0/24", "gateway_ip": "", "dns_nameserver": ""}},
+
+    {"id": "sg_prod", "type": "security_group", "label": "ProdSG", "x": 960, "y": 100, "props": {"name": "seg-prod-sg", "rules_text": "tcp 22 10.130.30.0/24\ntcp 443 0.0.0.0/0"}},
+    {"id": "sg_dev", "type": "security_group", "label": "DevSG", "x": 960, "y": 260, "props": {"name": "seg-dev-sg", "rules_text": "tcp 22 10.130.30.0/24\ntcp 8080 10.130.20.0/24"}},
+    {"id": "sg_shared", "type": "security_group", "label": "SharedSG", "x": 960, "y": 420, "props": {"name": "seg-shared-sg", "rules_text": "tcp 22 10.130.10.0/24\ntcp 22 10.130.20.0/24"}},
+
+    {"id": "vm_prod", "type": "instance", "label": "ProdVM", "x": 700, "y": 100, "props": {"name": "seg-prod-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "vm_dev", "type": "instance", "label": "DevVM", "x": 700, "y": 260, "props": {"name": "seg-dev-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_bastion", "type": "instance", "label": "SharedBastion", "x": 700, "y": 420, "props": {"name": "seg-shared-bastion", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}}
+  ],
+  "edges": [
+    {"from": "net_prod", "to": "sub_prod", "type": "member"},
+    {"from": "rt_prod", "to": "sub_prod", "type": "route"},
+    {"from": "rt_prod", "to": "net_prod", "type": "gateway"},
+
+    {"from": "net_dev", "to": "sub_dev", "type": "member"},
+    {"from": "rt_dev", "to": "sub_dev", "type": "route"},
+    {"from": "rt_dev", "to": "net_dev", "type": "gateway"},
+
+    {"from": "net_shared", "to": "sub_shared", "type": "member"},
+
+    {"from": "vm_prod", "to": "net_prod", "type": "member"},
+    {"from": "vm_dev", "to": "net_dev", "type": "member"},
+    {"from": "vm_bastion", "to": "net_shared", "type": "member"},
+
+    {"from": "vm_prod", "to": "sg_prod", "type": "member"},
+    {"from": "vm_dev", "to": "sg_dev", "type": "member"},
+    {"from": "vm_bastion", "to": "sg_shared", "type": "member"}
+  ]
+}

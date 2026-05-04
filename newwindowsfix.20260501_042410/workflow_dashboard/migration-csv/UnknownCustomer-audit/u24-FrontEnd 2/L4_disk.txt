@@ -1,0 +1,18 @@
+NAME     FSTYPE  FSVER            LABEL           UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+xvda                                                                                                  
+├─xvda1  ext4    1.0              cloudimg-rootfs 21f08275-91e8-4a2a-85f9-9a52f3ea034b   45.2G     5% /
+├─xvda14                                                                                              
+├─xvda15 vfat    FAT32            UEFI            B26C-AC4D                              98.2M     6% /boot/efi
+└─xvda16 ext4    1.0              BOOT            5922ac07-180c-49b7-bb8e-a15e5b318385  704.8M    13% /boot
+xvdd     iso9660 Joliet Extension config-2        2026-04-05-08-51-35-00                              
+Filesystem     Type   Size  Used Avail Use% Mounted on
+tmpfs          tmpfs  743M  2.7M  741M   1% /run
+/dev/xvda1     ext4    48G  2.2G   46G   5% /
+tmpfs          tmpfs  3.7G     0  3.7G   0% /dev/shm
+tmpfs          tmpfs  5.0M     0  5.0M   0% /run/lock
+/dev/xvda16    ext4   881M  114M  705M  14% /boot
+/dev/xvda15    vfat   105M  6.2M   99M   6% /boot/efi
+tmpfs          tmpfs  743M   12K  743M   1% /run/user/1000
+LABEL=cloudimg-rootfs	/	 ext4	discard,commit=30,errors=remount-ro	0 1
+LABEL=BOOT	/boot	ext4	defaults	0 2
+LABEL=UEFI	/boot/efi	vfat	umask=0077	0 1

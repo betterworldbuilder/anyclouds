@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <g fill="none" stroke="#000000" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    
+    <path d="M160,110 L145,140 L145,180 L255,180 L255,140 L240,110 Z" />
+    <path d="M160,110 L200,95 L240,110" />
+    <path d="M175,120 L195,120 L190,135 Z" />
+    <path d="M225,120 L205,120 L210,135 Z" />
+    <circle cx="200" cy="80" r="8" />
+    <path d="M200,80 V95 M185,85 L215,85" />
+    <path d="M150,100 L165,115 M250,100 L235,115" />
+
+    <path d="M140,180 L115,205 L115,245 L140,270 H260 L285,245 L285,205 L260,180 Z" />
+    <path d="M140,180 V270 M260,180 V270" />
+    <path d="M185,270 L180,285 H220 L215,270" />
+
+    <path d="M115,225 L60,280" /> <path d="M115,245 L60,330" /> <path d="M60,280 L60,335" />  <ellipse cx="60" cy="340" rx="22" ry="6" /> <path d="M285,225 L340,280" />
+    <path d="M285,245 L340,330" />
+    <path d="M340,280 L340,335" />
+    <ellipse cx="340" cy="340" rx="22" ry="6" />
+
+    <path d="M200,270 V335" />
+    <ellipse cx="200" cy="340" rx="18" ry="5" />
+    <path d="M192,185 V335 M208,185 V335" />
+    <g stroke-width="0.8">
+      <path d="M192,200 H208 M192,215 H208 M192,230 H208 M192,245 H208 M192,260 H208 M192,275 H208 M192,290 H208 M192,305 H208 M192,320 H208" />
+    </g>
+
+    <g stroke-width="1">
+      <path d="M145,150 H130 M130,145 V155" /> <path d="M255,150 H270 M270,145 V155" /> </g>
+  </g>
+</svg>

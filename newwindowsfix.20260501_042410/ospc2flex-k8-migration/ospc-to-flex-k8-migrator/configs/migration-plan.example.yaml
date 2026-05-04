@@ -1,0 +1,97 @@
+# migration-plan.example.yaml
+# Copy this file to migration-plan.yaml and edit for your environment.
+# Pass it to the CLI via: --plan migration-plan.yaml
+
+# ── Namespace filtering ───────────────────────────────────────────────────────
+# Leave include_namespaces empty ([]) to export all non-excluded namespaces.
+include_namespaces: []
+
+exclude_namespaces:
+  - kube-system
+  - kube-public
+  - kube-node-lease
+  - cattle-system          # Rancher management namespace
+
+# ── Resource kind exclusions ──────────────────────────────────────────────────
+exclude_kinds:
+  - Event
+  - Lease
+  - EndpointSlice          # Regenerated automatically by kube-proxy
+
+# ── Field stripping ───────────────────────────────────────────────────────────
+# These server-managed fields must be removed before applying to a new cluster.
+strip_fields:
+  - metadata.uid
+  - metadata.resourceVersion
+  - metadata.generation
+  - metadata.creationTimestamp
+  - metadata.managedFields
+  - status
+
+# ── Scheduling ────────────────────────────────────────────────────────────────
+# Remove OSPC-specific node labels that do not exist on Flex nodes.
+remove_node_selectors: true
+remove_affinity: false    # Set true if your affinity rules reference OSPC zones
+remove_tolerations: false
+
+# ── Storage class mapping ─────────────────────────────────────────────────────
+storage_mapping:
+  default: cinder-standard   # Flex default StorageClass
+  mappings:
+    local-path:  cinder-standard
+    nfs-client:  cinder-nfs
+    longhorn:    cinder-fast
+    rook-ceph:   cinder-fast
+
+# ── Ingress class mapping ─────────────────────────────────────────────────────
+ingress_mapping:
+  default: nginx
+  mappings:
+    traefik:  nginx
+    haproxy:  nginx
+    contour:  nginx
+
+# ── Endpoint replacements ─────────────────────────────────────────────────────
+# Replace old cluster internal hostnames everywhere they appear in manifests
+# (env vars, ConfigMap data, Ingress rules, etc.).
+endpoint_replacements:
+  - old: old-cluster.internal
+    new: new-cluster.flex.cloud
+  - old: postgres.ospc.svc.cluster.local
+    new: postgres.flex.svc.cluster.local
+  - old: redis.ospc.svc.cluster.local
+    new: redis.flex.svc.cluster.local
+
+# ── Secret exclusions ─────────────────────────────────────────────────────────
+# These secrets will NOT be migrated (re-create them manually on Flex).
+exclude_secret_names:
+  - regcred              # Container registry credentials (re-create on Flex)
+  - tls-wildcard-cert    # TLS cert for old domain (use cert-manager on Flex)
+
+# ── Stage 2: Design and validate Flex Magnum ClusterTemplate ──────────────────
+stage2_design:
+  # Name of the ClusterTemplate to validate (must already exist in Flex Magnum)
+  cluster_template_name: flex-k8s-1-29-coreos
+
+  # Expected ClusterTemplate field values (used by 'design-template' CLI command)
+  expected_coe: kubernetes
+  expected_network_driver: calico   # flannel or calico
+  expected_volume_driver: cinder
+  expected_os_distro: fedora-coreos  # Required for Kubernetes COE in Magnum 2025.2
+
+  # master_lb_enabled is informational — no fail if false
+  master_lb_enabled: true
+
+  # Optional node group definitions (leave empty for single default nodegroup)
+  node_groups: []
+
+# ── Stage 7: Test and validate ────────────────────────────────────────────────
+stage7_validation:
+  # Deploy a test LoadBalancer Service to confirm Octavia integration works
+  run_loadbalancer_test: true
+
+  # Check openstack coe cluster show status == CREATE_COMPLETE
+  check_magnum_health: true
+
+  # Check that all node groups (if any) are healthy
+  check_node_groups: false

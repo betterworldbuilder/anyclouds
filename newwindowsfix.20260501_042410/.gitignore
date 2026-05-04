@@ -1,0 +1,86 @@
+# Credential, OpenRC, token, and secret material
+ospc2flecredential.txt
+*credential*
+*credentials*
+*creds*
+*secret*
+*secrets*
+*token*
+*tokens*
+*openrc*
+*openrac*
+*.openrc
+.env
+.env.*
+*.env
+*.env.*
+!env.example
+!*.example
+*_windows_credentials.csv
+*credential*.csv
+*credentials*.csv
+*creds*.csv
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+
+# Specific credential files found in project
+"openrclast(cred).sh"
+openrclast*.sh
+"openrcred (6).sh"
+openrcred*.sh
+
+# OpenRC credential files — all variants
+openrc*.sh
+*openrc*.sh
+*openrc*
+ospc-openrc.sh
+ospc-iad-openrc.sh
+flex-openrc*.sh
+flexopenrc*.sh
+appcredopenrc.sh
+goodopenrc.sh
+01bestopenrc.sh
+openrcfixed.sh
+
+# Zone.Identifier files (Windows WSL artefacts)
+*Zone.Identifier
+
+# Credential and secret files
+ospc2flexlast.json
+cred-cache.js
+
+# Runtime outputs
+inventory-csv/
+ospc-discovery/outputs/
+outputs/
+uploads/1342314_topology_deploy_*.sh
+newimagemig-cloudfiles-regionjumphost.*/
+*_terminal_*.txt
+dashboard.log
+migration_log.txt
+uploads/migration_output_bundles/
+*.log
+
+# Backup files
+*.bak
+*.bak.*
+backups/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local virtualenvs
+venv/
+*/venv/
+ospc2Flex-Image-migtool/web_ui_python/venv/
+
+# Local scratch backups
+*.bak_
+*.bak_*

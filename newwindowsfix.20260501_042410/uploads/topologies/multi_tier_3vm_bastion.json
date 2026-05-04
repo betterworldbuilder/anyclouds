@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {"id": "net_1", "type": "network", "label": "TierNet", "x": 80, "y": 80, "props": {"name": "tier-net"}},
+    {"id": "subnet_1", "type": "subnet", "label": "TierSubnet", "x": 250, "y": 80, "props": {"name": "tier-subnet", "cidr": "10.130.0.0/24", "gateway_ip": "", "dns_nameserver": "8.8.4.4"}},
+    {"id": "router_1", "type": "router", "label": "TierRouter", "x": 420, "y": 80, "props": {"name": "tier-router", "external_network": "PUBLICNET"}},
+    {"id": "sg_bastion", "type": "security_group", "label": "BastionSG", "x": 620, "y": 80, "props": {"name": "bastion-sg", "rules_text": "tcp 22 0.0.0.0/0"}},
+    {"id": "sg_app", "type": "security_group", "label": "AppSG", "x": 620, "y": 200, "props": {"name": "private-app-sg", "rules_text": "tcp 22 10.130.0.0/24\ntcp 8080 10.130.0.0/24"}},
+    {"id": "vm_bastion", "type": "instance", "label": "Bastion", "x": 250, "y": 220, "props": {"name": "bastion-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": true, "floating_network": "PUBLICNET"}},
+    {"id": "vm_app1", "type": "instance", "label": "App1", "x": 420, "y": 220, "props": {"name": "private-app-1", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}},
+    {"id": "vm_app2", "type": "instance", "label": "App2", "x": 420, "y": 320, "props": {"name": "private-app-2", "flavor": "gp.5.4.4", "image": "Ubuntu 22.04", "key_name": "my-keypair", "needs_floating_ip": false, "floating_network": "PUBLICNET"}}
+  ],
+  "edges": [
+    {"from": "net_1", "to": "subnet_1", "type": "member"},
+    {"from": "router_1", "to": "subnet_1", "type": "route"},
+    {"from": "router_1", "to": "net_1", "type": "gateway"},
+    {"from": "vm_bastion", "to": "net_1", "type": "member"},
+    {"from": "vm_app1", "to": "net_1", "type": "member"},
+    {"from": "vm_app2", "to": "net_1", "type": "member"},
+    {"from": "vm_bastion", "to": "sg_bastion", "type": "member"},
+    {"from": "vm_app1", "to": "sg_app", "type": "member"},
+    {"from": "vm_app2", "to": "sg_app", "type": "member"}
+  ]
+}
