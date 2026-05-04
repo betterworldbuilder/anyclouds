@@ -450,17 +450,17 @@
 </div>
 <!-- ── Mission stage buttons ─────────────────────────── -->
 <div class="stage-bar" id="stageBar">
-  <button class="stage-btn stage-promo-btn active" data-stage="s_why">🚀 Why and When Move to FLEX<br><small>Tech stack comparison & Business value</small></button>
-  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customer List<br><small>Migration Tracker</small></button>
-  <button class="stage-btn" data-stage="s1">STAGE 1<br><small>Discovery</small></button>
-  <button class="stage-btn" data-stage="s2">STAGE 2<br><small>Select & Execute R-Path</small></button>
-  <button class="stage-btn" data-stage="s4">STAGE 3<br><small>Validation &amp; UAT</small></button>
-  <button class="stage-btn" data-stage="s5">STAGE 4<br><small>Cutover</small></button>
-  <button class="stage-btn" data-stage="s6">STAGE 5<br><small>Post-Migration</small></button>
-  <button class="stage-btn" data-stage="s7">STAGE 6<br><small>TCO / FinOps</small></button>
-  <button class="stage-btn" data-stage="s8">STAGE 7<br><small>IAC Backup &amp; Restore</small></button>
-  <button class="stage-btn" data-stage="s9">STAGE 8<br><small>GitOps / OpenCenter</small></button>
-  <button class="stage-btn" data-stage="s10">STAGE 9<br><small>AI OPS</small></button>
+  <button class="stage-btn stage-promo-btn active" data-stage="s_why">Stage 0 — Strategy &amp; Business Case<br><small>Justification, scope &amp; business drivers</small></button>
+  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customer Migration Tracker<br><small>Customer &amp; project selector</small></button>
+  <button class="stage-btn" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
+  <button class="stage-btn" data-stage="s2">Stage 2<br><small>R-Path Execution</small></button>
+  <button class="stage-btn" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
+  <button class="stage-btn" data-stage="s5">Stage 4<br><small>Cutover &amp; Traffic Transition</small></button>
+  <button class="stage-btn" data-stage="s6">Stage 5<br><small>Stabilization &amp; Handover</small></button>
+  <button class="stage-btn" data-stage="s7">Stage 6<br><small>FinOps &amp; Cost Optimization</small></button>
+  <button class="stage-btn" data-stage="s8">Stage 7<br><small>IaC Backup &amp; Restore</small></button>
+  <button class="stage-btn" data-stage="s9">Stage 8<br><small>GitOps &amp; OpenCenter Modernization</small></button>
+  <button class="stage-btn" data-stage="s10">Stage 9<br><small>AIOps &amp; Continuous Operations</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -477,25 +477,23 @@
   <button class="sub-btn" data-sub="s2retain">⏸ R1 Retain — Keep on OSPC</button>
   <button class="sub-btn" data-sub="s2retire">🗑 R2 Retire — Decommission</button>
   
-  <button class="sub-btn active" data-sub="s2image">🚀 R3 Rehost / Relocate — VM Lift & Shift</button>
   <button class="sub-btn" data-sub="s2rehost_p1">🛠 R5 Replatform — Infra Clone & Adapt</button>
+  <button class="sub-btn" data-sub="s2cloudboot">🪟 R3 Windows boot conversion</button>
+  <button class="sub-btn active" data-sub="s2image">🚀 R3 Rehost / Relocate — VM Lift & Shift</button>
   <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
   <button class="sub-btn" data-sub="s2rehost_manual">📋 R5 Data Replatform — Full Data Move</button>
   <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ R6 Refactor / Rearchitect — K8s Modernization</button>
 
   <button class="sub-btn" data-sub="s2repurchase">🛒 R7 Repurchase — Replace with SaaS/Product</button>
-  
-  <!-- Global Example Loader -->
-  <button class="sub-btn" style="background:rgba(234,179,8,0.1); border-color:rgba(234,179,8,0.3); color:#fbbf24; margin-left:auto;" onclick="loadAll7RExamples()">🧬 Load All 7R Examples</button>
 </div>
 
 <!-- ── Panels ─────────────────────────────────────────── -->
 <div class="panel-area">
 
-  <!-- WHY MOVE TO FLEX PROMO PAGE -->
+  <!-- Stage 0 — Strategy & Business Case -->
   <div class="panel active" id="panel-s_why">
     <div style="padding:40px; max-width:1000px; margin:0 auto; overflow:auto; height:100%;">
-      <h1 style="color:#7ecfff; font-size:36px; margin-bottom:10px; text-align:center;">Why and When Move to FLEX?</h1>
+      <h1 style="color:#7ecfff; font-size:36px; margin-bottom:10px; text-align:center;">Stage 0 — Strategy &amp; Business Case</h1>
       <p style="color:#a8d8ff; font-size:18px; text-align:center; margin-bottom:40px;">Rackspace encourages OSPC (OpenStack Public Cloud) customers to upgrade to FLEX for its superior performance, cost savings, and modern capabilities.</p>
       
       <div style="display:flex; flex-direction:column; gap:25px;">
@@ -657,12 +655,12 @@
     </div>
   </div>
 
-  <!-- STAGE 0 · Customer Migration Log -->
+  <!-- Customer Migration Tracker -->
   <div class="panel" id="panel-s0">
     <div style="padding:20px 40px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <div>
-          <h1 style="color:#7ecfff; margin:0; font-size:28px;">Customer FLEX migration readiness and backlog</h1>
+          <h1 style="color:#7ecfff; margin:0; font-size:28px;">Customer Migration Tracker</h1>
           <p style="color:#a8d8ff; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
         </div>
         <div style="flex:1; display:flex; justify-content:center; padding:0 24px;">
@@ -875,13 +873,13 @@
   </div>
   </div>
 
-  <!-- STAGE 1 panels -->
+  <!-- Stage 1 — Discovery & Assessment -->
   <div class="panel" id="panel-s1">
 
     <!-- 1a: Info description -->
     <div id="s1info-pane" style="width:100%;height:100%;">
       <div class="info-panel">
-        <h2>Stage 1 – Discovery &amp; Assessment</h2>
+        <h2>Stage 1 — Discovery &amp; Assessment</h2>
         <p style="color:var(--muted);margin-bottom:12px;">Collect a full picture of the current OSPC environment before any migration work begins. The outputs of this stage feed directly into Stage 2.</p>
         <h3>📋 Tasks</h3>
         <ul>
@@ -967,7 +965,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
   </div>
 
-  <!-- STAGE 2 · Migration Options -->
+  <!-- Stage 2 — R-Path Execution -->
   <div class="panel" id="panel-s2">
     <!-- R1 Retain -->
     <div id="s2retain-pane" class="gov-page path-retain" style="display:none;">
@@ -1128,8 +1126,9 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
       </div>
     </div>
 
-    <iframe id="s2image-pane" src="/image_migrator/" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p1-pane" src="/designer/" title="REHOST Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2cloudboot-pane" src="/cloudboot_migrator/" title="R3 Windows boot conversion" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2image-pane" src="/image_migrator/" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_manual-pane" src="/rehost_manual/" title="REHOST Full Manual Runbook" style="display:none; width:100%; height:100%; border:none;"></iframe>
@@ -1201,7 +1200,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     </div>
   </div>
 
-  <!-- STAGE 4 · Validation & UAT -->
+  <!-- Stage 3 — Validation & UAT -->
   <div class="panel" id="panel-s4">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <link rel="stylesheet" href="/static/uat/uat.css?v={{ v }}">
@@ -1209,8 +1208,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
       <div class="uat-console" id="uat-console">
         <div class="uat-hero">
           <div>
-            <h2>UAT Mission Control</h2>
-            <p>Validate migrated business apps and databases after Stage 1 Discovery and Stage 2 Migration. State and reports persist under <code>./outputs/uat/</code>.</p>
+            <h2>Stage 3 — Validation &amp; UAT</h2>
+            <p>Mission control for migrated apps and databases. Run after Stage 1 — Discovery &amp; Assessment and Stage 2 — R-Path execution. State and reports persist under <code>./outputs/uat/</code>.</p>
           </div>
           <div class="uat-actions">
             <button class="uat-btn" onclick="CloudJumperUAT.load()">Refresh</button>
@@ -2123,12 +2122,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 5 · Cutover -->
+  <!-- Stage 4 — Cutover & Traffic Transition -->
   <div class="panel" id="panel-s5">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       
       <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(46,204,113,.2); padding:20px; border-radius:8px;">
-        <h2 style="font-size: 19px; color: #2ecc71; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">🟢 Stage 5 – Cutover & Migration Strategy Options</h2>
+        <h2 style="font-size: 19px; color: #2ecc71; margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">🟢 Stage 4 — Cutover &amp; Traffic Transition</h2>
         
         <h3 style="margin-top:15px; margin-bottom:10px; color:#7ecfff; font-size:14px;">App Migration and Rollback Strategy — Fastest to Slowest</h3>
         <div style="margin-bottom:20px; background:rgba(0,0,0,0.3); border:1px solid #4b6fa0; border-radius:6px; overflow:auto;">
@@ -2388,10 +2387,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 5 · Post-Migration -->
+  <!-- Stage 5 — Stabilization & Handover -->
   <div class="panel" id="panel-s6">
     <div class="info-panel">
-      <h2>Stage 5 – Post-Migration Output Bundle &amp; Sign-off</h2>
+      <h2>Stage 5 — Stabilization &amp; Handover</h2>
       <p style="color:var(--muted);margin-bottom:12px;">Generate the formal Cloud Jumper handoff package, then review the completed migration tasks and close out the customer in the Migration Log.</p>
 
       <div style="margin:16px 0 22px; padding:20px; background:radial-gradient(circle at top left, rgba(14,165,233,.18), rgba(2,6,23,.86)); border:1px solid rgba(56,189,248,.35); border-radius:10px; box-shadow:0 0 22px rgba(14,165,233,.12);">
@@ -2482,35 +2481,35 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 6 · TCO / FinOps -->
+  <!-- Stage 6 — FinOps & Cost Optimization -->
   <div class="panel" id="panel-s7">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(245,158,11,.2), rgba(2,6,23,.92)); border:1px solid rgba(245,158,11,.36); border-radius:12px; padding:24px;">
         <div style="color:#fcd34d; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 6</div>
-        <h2 style="margin:8px 0 10px; color:#fef3c7; font-family:'Orbitron',sans-serif;">TCO / FinOps Integration</h2>
+        <h2 style="margin:8px 0 10px; color:#fef3c7; font-family:'Orbitron',sans-serif;">FinOps &amp; Cost Optimization</h2>
         <p style="color:#94a3b8; margin:0; max-width:940px;">Turns migration output into financial evidence: OSPC baseline, FLEX target run-rate, savings opportunities, right-sizing candidates, and wave-level TCO reporting.</p>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cost Baseline</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Use source inventory, flavors, storage, IPs, and app grouping to model current OSPC spend.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">FLEX Run-Rate</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Translate target flavors, images, volumes, networks, and booted test VMs into projected monthly cost.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization Candidates</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Feed right-sizing candidates into AI OPS and GitOps patch review after migration waves.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #38bdf8; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization Candidates</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Feed right-sizing candidates into AIOps and GitOps patch review after migration waves.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #a78bfa; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#c4b5fd;">Executive Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate cost comparison, wave savings, risk notes, and modernization value for stakeholders.</p></div>
       </div>
 
       <div style="background:rgba(15,23,42,.72); border:1px solid rgba(245,158,11,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
         <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">FinOps chain position</div>
-        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration Output Bundle → TCO / FinOps → IAC Backup & Restore → GitOps/OpenCenter → AI OPS loop</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration output bundle → FinOps &amp; cost optimization → IaC backup &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
       </div>
     </div>
   </div>
 
-  <!-- STAGE 7 · IAC Backup and Restore -->
+  <!-- Stage 7 — IaC Backup & Restore -->
   <div class="panel" id="panel-s8">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
         <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
-        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">IAC Backup and Restore (Terraform + Ansible)</h2>
+        <h2 style="margin:8px 0 10px; color:#dbeafe; font-family:'Orbitron',sans-serif;">IaC Backup &amp; Restore (Terraform + Ansible)</h2>
         <p style="color:#94a3b8; margin:0; max-width:920px;">Capture migrated tenant state as Terraform and Ansible-ready artifacts with backup policies and executable restore runbooks for same-region rebuild or cross-region redeploy.</p>
       </div>
 
@@ -2530,7 +2529,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Cloud Components / Versioning</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Track image, service, Kubernetes, and OpenStack component versions for repeatable rebuilds.</p></div>
       </div>
       <div id="tenant-iac-dr-preflight-status" style="margin-top:14px; padding:12px; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.24); color:#94a3b8; font-size:12px;">
-        Stage 7 readiness appears after generating a migration output bundle.
+        Stage 7 — IaC backup &amp; restore readiness appears after generating a migration output bundle.
       </div>
       <div style="margin-top:14px; padding:16px; background:rgba(2,6,23,.72); border:1px solid rgba(96,165,250,.35); border-radius:10px;">
         <div style="color:#bfdbfe; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Target Cloud Credentials</div>
@@ -2651,12 +2650,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 8 · GitOps / OpenCenter -->
+  <!-- Stage 8 — GitOps & OpenCenter Modernization -->
   <div class="panel" id="panel-s9">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
         <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
-        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">GitOps / OpenCenter</h2>
+        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">GitOps &amp; OpenCenter Modernization</h2>
         <p style="color:#94a3b8; margin:0; max-width:940px;">Use GitOps and OpenCenter controls to publish backup/restore artifacts, create restore stubs, and drive repeatable redeploy pipelines in another FLEX region or OpenStack cloud.</p>
       </div>
 
@@ -2685,18 +2684,18 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- STAGE 9 · AI OPS -->
+  <!-- Stage 9 — AIOps & Continuous Operations -->
   <div class="panel" id="panel-s10">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
         <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
-        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AI OPS</h2>
-        <p style="color:#94a3b8; margin:0; max-width:940px;">AI OPS consumes Cloud Jumper + FinOps + IAC + GitOps/OpenCenter outputs to produce optimization and autorepair recommendations backed by GitOps-ready artifacts.</p>
+        <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AIOps &amp; Continuous Operations</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">AIOps consumes Cloud Jumper, FinOps, IaC, and GitOps / OpenCenter outputs to produce optimization and autorepair recommendations backed by GitOps-ready artifacts.</p>
       </div>
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;">
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #7dd3fc; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size recommendations, capacity tuning, and infra patch proposals.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #f9a8d4; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Autorepair</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Boot, network, service, and runbook remediation plans with rollback hints.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #86efac; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">GitOps Delivery</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Publish AI OPS outputs as reviewable change candidates for GitOps pipelines.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #86efac; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">GitOps Delivery</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Publish AIOps outputs as reviewable change candidates for GitOps pipelines.</p></div>
       </div>
     </div>
   </div>
@@ -2709,7 +2708,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
-  const s2Panes = ['s2retain','s2retire','s2image','s2rehost_p1','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual','s2repurchase'];
+  const s2Panes = ['s2retain','s2retire','s2rehost_p1','s2cloudboot','s2image','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual','s2repurchase'];
   
   function addWorkloadRow(bodyId) {
     const body = document.getElementById(bodyId);
@@ -2787,13 +2786,6 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     JarvisBritishSpeak?.speak(`${path} governance record has been saved and approved.`);
   }
 
-  function loadAll7RExamples() {
-    loadR1Example();
-    loadR2Example();
-    loadR7Example();
-    JarvisBritishSpeak?.speak("Successfully loaded all 7R Governance examples for Acme Financial Services.");
-    // Show a small notification toast if we had one, otherwise speak is enough
-  }
   window.lastMigrationBundle = null;
   window._drReadiness = { profile_persisted: false, migration_bundle: {} };
   window._drRestoreBusy = false;
@@ -2824,7 +2816,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     if (!panel) return;
     if (errorMessage) {
       panel.style.borderColor = 'rgba(239,68,68,.45)';
-      panel.innerHTML = `<div style="color:#fca5a5;font-weight:700;">Stage 7 readiness unavailable: ${errorMessage}</div>`;
+      panel.innerHTML = `<div style="color:#fca5a5;font-weight:700;">Stage 7 — IaC backup &amp; restore readiness unavailable: ${errorMessage}</div>`;
       return;
     }
 
@@ -2832,7 +2824,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     const live = data && data.tenant_live_state ? data.tenant_live_state : null;
     if (!pre) {
       panel.style.borderColor = 'rgba(148,163,184,.25)';
-      panel.innerHTML = 'Stage 7 readiness appears after generating a migration output bundle.';
+      panel.innerHTML = 'Stage 7 — IaC backup &amp; restore readiness appears after generating a migration output bundle.';
       return;
     }
 
@@ -2849,8 +2841,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     }).join('');
 
     const summary = statusReady
-      ? `<div style="color:#86efac;font-weight:800;margin-bottom:6px;">Stage 7 Ready: required upstream artifacts found.</div>`
-      : `<div style="color:#fcd34d;font-weight:800;margin-bottom:6px;">Stage 7 Needs Input: missing required artifacts (${missing.join(', ') || 'unknown'}).</div>`;
+      ? `<div style="color:#86efac;font-weight:800;margin-bottom:6px;">Stage 7 — IaC backup &amp; restore ready: required upstream artifacts found.</div>`
+      : `<div style="color:#fcd34d;font-weight:800;margin-bottom:6px;">Stage 7 — IaC backup &amp; restore needs input: missing required artifacts (${missing.join(', ') || 'unknown'}).</div>`;
 
     let countsHtml = '';
     if (live && live.target_inventory_counts) {
@@ -3966,15 +3958,15 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   
   window.renderGlobalStageHeaders = function(cName = "No Active Customer Selected") {
       const panels = [
-        {id: 'panel-s1', key: 's1', label: 'Stage 1 (Discovery & Assessment)'},
-        {id: 'panel-s2', key: 's2', label: 'Stage 2 (Migration Pipeline)'},
-        {id: 'panel-s4', key: 's4', label: 'Stage 3 (Validation & UAT)'},
-        {id: 'panel-s5', key: 's5', label: 'Stage 4 (Cutover & Handover)'},
-        {id: 'panel-s6', key: 's6', label: 'Stage 5 (Post-Migration Output Bundle)'},
-        {id: 'panel-s7', key: 's7', label: 'Stage 6 (TCO / FinOps)'},
-        {id: 'panel-s8', key: 's8', label: 'Stage 7 (IAC Backup & Restore - Terraform + Ansible)'},
-        {id: 'panel-s9', key: 's9', label: 'Stage 8 (GitOps / OpenCenter)'},
-        {id: 'panel-s10', key: 's10', label: 'Stage 9 (AI OPS)'}
+        {id: 'panel-s1', key: 's1', label: 'Stage 1 — Discovery \u0026 Assessment'},
+        {id: 'panel-s2', key: 's2', label: 'Stage 2 — R-Path Execution'},
+        {id: 'panel-s4', key: 's4', label: 'Stage 3 — Validation \u0026 UAT'},
+        {id: 'panel-s5', key: 's5', label: 'Stage 4 — Cutover \u0026 Traffic Transition'},
+        {id: 'panel-s6', key: 's6', label: 'Stage 5 — Stabilization \u0026 Handover'},
+        {id: 'panel-s7', key: 's7', label: 'Stage 6 — FinOps \u0026 Cost Optimization'},
+        {id: 'panel-s8', key: 's8', label: 'Stage 7 — IaC Backup \u0026 Restore (Terraform + Ansible)'},
+        {id: 'panel-s9', key: 's9', label: 'Stage 8 — GitOps \u0026 OpenCenter Modernization'},
+        {id: 'panel-s10', key: 's10', label: 'Stage 9 — AIOps \u0026 Continuous Operations'}
       ];
       panels.forEach(p => {
           const panelEl = document.querySelector(`#${p.id}`);
@@ -4016,15 +4008,15 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       let payload = { status: status };
       
       const niceStageMap = {
-          's1': 'Stage 1 (Discovery)',
-          's2': 'Stage 2 (Migration Pipeline)',
-          's4': 'Stage 3 (Validation & UAT)',
-          's5': 'Stage 4 (Cutover & Handover)',
-          's6': 'Stage 5 (Post-Migration Output Bundle)',
-          's7': 'Stage 6 (TCO / FinOps)',
-          's8': 'Stage 7 (IAC Backup & Restore - Terraform + Ansible)',
-          's9': 'Stage 8 (GitOps / OpenCenter)',
-          's10': 'Stage 9 (AI OPS)'
+          's1': 'Stage 1 — Discovery \u0026 Assessment',
+          's2': 'Stage 2 — R-Path Execution',
+          's4': 'Stage 3 — Validation \u0026 UAT',
+          's5': 'Stage 4 — Cutover \u0026 Traffic Transition',
+          's6': 'Stage 5 — Stabilization \u0026 Handover',
+          's7': 'Stage 6 — FinOps \u0026 Cost Optimization',
+          's8': 'Stage 7 — IaC Backup \u0026 Restore (Terraform + Ansible)',
+          's9': 'Stage 8 — GitOps \u0026 OpenCenter Modernization',
+          's10': 'Stage 9 — AIOps \u0026 Continuous Operations'
       };
       
       if(status === 'Failed') {

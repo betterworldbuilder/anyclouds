@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R3 Windows boot conversion</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+  <style>
+    body { margin: 0; min-height: 100vh; background: #020617; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; color: #7dd3fc; letter-spacing: 0.02em; }
+    .sub { color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5; }
+    .panel {
+      background: rgba(8, 12, 24, 0.92); border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 16px; padding: 22px 20px; margin-bottom: 18px;
+      box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.65);
+    }
+    label { display: block; font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; font-weight: 600; }
+    input[type="text"], input[type="number"] {
+      width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(0,0,0,0.35); color: #f8fafc;
+      font-size: 14px; margin-bottom: 12px;
+    }
+    input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,0.35); }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 700px) { .row2 { grid-template-columns: 1fr; } }
+    button.run {
+      background: linear-gradient(135deg, #0ea5e9, #0369a1); color: #fff; border: none;
+      padding: 12px 22px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 15px;
+      margin-top: 6px; width: 100%;
+    }
+    button.run:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.run:hover:not(:disabled) { filter: brightness(1.08); }
+    pre#log {
+      background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 14px;
+      min-height: 220px; max-height: 55vh; overflow: auto; font-size: 12px; line-height: 1.45;
+      color: #a5f3fc; white-space: pre-wrap; word-break: break-word;
+    }
+    .warn { background: rgba(234, 179, 8, 0.12); border: 1px solid rgba(234, 179, 8, 0.35); color: #fcd34d;
+      padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+    .ok { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.35); color: #86efac;
+      padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 12px; font-family: ui-monospace, monospace; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>R3 Windows boot conversion</h1>
+    <p class="sub">Compare a running <strong>source</strong> Windows server (e.g. OSPC) with a running <strong>target</strong> Windows server on Flex, then emit <code>cloudboot_repair_bundle/</code> (registry patch, firstboot script, JSON profiles, report). Uses SSH → PowerShell on both hosts.</p>
+
+    {% if not script_exists %}
+    <div class="warn"><strong>Script not found.</strong> Expected: <code>{{ script_resolved }}</code><br>Set <code>CLOUDBOOT_MIGRATOR_SCRIPT</code> to the full path of <code>wincloudbootmigrator.py</code>, or place the <code>cloudjumper</code> repo as a sibling of this deployer (<code>…/OSPC2FLEX/cloudjumper/ospc2Flex-Image-migtool/wincloudbootmigrator.py</code>).</div>
+    {% else %}
+    <div class="ok">Using script: {{ script_resolved }}</div>
+    {% endif %}
+
+    <div class="panel">
+      <div class="row2">
+        <div>
+          <label for="source_host">Source host (OSPC Windows IP)</label>
+          <input type="text" id="source_host" placeholder="146.20.x.x" autocomplete="off">
+          <label for="source_user">Source SSH user</label>
+          <input type="text" id="source_user" value="Administrator" autocomplete="off">
+          <label for="source_key">Source SSH private key path</label>
+          <input type="text" id="source_key" value="~/.ssh/id_rsa" autocomplete="off">
+          <label for="source_port">Source SSH port</label>
+          <input type="number" id="source_port" value="22" min="1" max="65535">
+        </div>
+        <div>
+          <label for="target_host">Target host (Flex Windows IP)</label>
+          <input type="text" id="target_host" placeholder="23.253.x.x" autocomplete="off">
+          <label for="target_user">Target SSH user</label>
+          <input type="text" id="target_user" value="Administrator" autocomplete="off">
+          <label for="target_key">Target SSH private key path</label>
+          <input type="text" id="target_key" value="~/.ssh/id_rsa" autocomplete="off">
+          <label for="target_port">Target SSH port</label>
+          <input type="number" id="target_port" value="22" min="1" max="65535">
+        </div>
+      </div>
+      <label for="outdir">Output directory (on the Flask host)</label>
+      <input type="text" id="outdir" value="./cloudboot_repair_bundle" autocomplete="off">
+      <label for="reg_hive_prefix">Registry hive prefix (optional, offline import)</label>
+      <input type="text" id="reg_hive_prefix" placeholder="HKLM\WIMSYSTEM\ControlSet001" autocomplete="off">
+      <label for="from_json_source">--from-json-source (optional)</label>
+      <input type="text" id="from_json_source" placeholder="/path/to/source_profile.json" autocomplete="off">
+      <label for="from_json_target">--from-json-target (optional)</label>
+      <input type="text" id="from_json_target" placeholder="/path/to/target_profile.json" autocomplete="off">
+      <button type="button" class="run" id="btnRun" {% if not script_exists %}disabled{% endif %}>Generate repair bundle</button>
+    </div>
+
+    <div class="panel">
+      <label for="log">Log</label>
+      <pre id="log"></pre>
+    </div>
+  </div>
+  <script>
+    const logEl = document.getElementById('log');
+    function log(line) {
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    document.getElementById('btnRun').addEventListener('click', async () => {
+      const btn = document.getElementById('btnRun');
+      if (btn.disabled) return;
+      logEl.textContent = '';
+      const payload = {
+        source_host: document.getElementById('source_host').value.trim(),
+        source_user: document.getElementById('source_user').value.trim(),
+        source_key: document.getElementById('source_key').value.trim(),
+        source_port: parseInt(document.getElementById('source_port').value, 10) || 22,
+        target_host: document.getElementById('target_host').value.trim(),
+        target_user: document.getElementById('target_user').value.trim(),
+        target_key: document.getElementById('target_key').value.trim(),
+        target_port: parseInt(document.getElementById('target_port').value, 10) || 22,
+        outdir: document.getElementById('outdir').value.trim() || './cloudboot_repair_bundle',
+        reg_hive_prefix: document.getElementById('reg_hive_prefix').value.trim(),
+        from_json_source: document.getElementById('from_json_source').value.trim(),
+        from_json_target: document.getElementById('from_json_target').value.trim(),
+      };
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/api/cloudboot_migrator/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const t = await resp.text();
+          log('HTTP ' + resp.status + ': ' + t.slice(0, 800));
+          return;
+        }
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = dec.decode(value, { stream: true });
+          chunk.split('\n').forEach(raw => {
+            const line = raw.trimEnd();
+            if (!line) return;
+            if (line.startsWith('data:')) log(line.replace(/^data:\s?/, ''));
+            else log(line);
+          });
+        }
+      } catch (e) {
+        log('Error: ' + (e && e.message ? e.message : String(e)));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

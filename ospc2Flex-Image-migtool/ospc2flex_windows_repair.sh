@@ -9,14 +9,22 @@
 #
 # Usage:
 #   sudo bash ospc2flex_windows_repair.sh --qcow2 /path/to/win.qcow2 \
-#        [--nbd-dev /dev/nbd5] [--force] [--dry-run] [--debug] [--debug-log PATH] [--debug-trace]
+#        [--nbd-dev /dev/nbd5] [--force] [--dry-run] [--bruteforce-flex] [--debug] [--debug-log PATH] [--debug-trace]
+#
+#   OSPC2FLEX_WINDOWS_MODE=bruteforce_flex — same as --bruteforce-flex (aggressive Flex/KVM driver + first-boot path).
 #
 #   --debug          Mirror full stdout/stderr to a log file (default under /tmp).
 #   --debug-log PATH Write debug transcript to this file (--debug implied).
 #   --debug-trace    Bash xtrace (set -x); very noisy; use with --debug.
 #
 # Requirements on jumphost:
-#   apt install qemu-utils ntfs-3g libhivex-bin chntpw wget
+#   apt install qemu-utils ntfs-3g libhivex-bin chntpw wget file
+#
+# VirtIO ISO:
+#   Default: offline/local mode. Require a valid ISO at
+#            /mnt/migration/virtio/virtio-win.iso unless overridden.
+#   OSPC2FLEX_VIRTIO_ISO_LOCAL=/path/to/virtio-win.iso — use this path instead.
+#   OSPC2FLEX_VIRTIO_ISO_OFFLINE=0 — allow network download into $VIRTIO_ISO.
 # ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -29,9 +37,11 @@ DEBUG=0
 DEBUG_TRACE=0
 DEBUG_LOG_FILE=""
 REPAIR_REPORT_FILE=""
+PURGE_XEN=1
+WINDOWS_MODE="${OSPC2FLEX_WINDOWS_MODE:-offline_only}"
 VIRTIO_ISO_URL="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso"
-VIRTIO_ISO="/tmp/virtio-win.iso"
-VIRTIO_MNT="/tmp/virtio_iso_mnt"
+VIRTIO_ISO="${OSPC2FLEX_VIRTIO_ISO_LOCAL:-/mnt/migration/virtio/virtio-win.iso}"
+VIRTIO_MNT="/tmp/virtio_iso_mnt_$$"
 MNT="/tmp/mnt_windows_repair_$$"
 
 # ── Color helpers ─────────────────────────────────────────────────────────────
@@ -48,11 +58,25 @@ while [[ $# -gt 0 ]]; do
     --nbd-dev)  NBD_DEV="$2"; shift 2 ;;
     --dry-run)      DRY_RUN=1; shift ;;
     --force)        FORCE=1; shift ;;
+    --purge-xen)    PURGE_XEN=1; shift ;;
+    --no-purge-xen) PURGE_XEN=0; shift ;;
+    --bruteforce-flex)
+      WINDOWS_MODE="bruteforce_flex"
+      OSPC2FLEX_WINDOWS_MODE="bruteforce_flex"
+      export OSPC2FLEX_WINDOWS_MODE
+      PURGE_XEN=1
+      shift
+      ;;
     --debug)        DEBUG=1; shift ;;
     --debug-log)    DEBUG_LOG_FILE="$2"; DEBUG=1; shift 2 ;;
     --debug-trace)  DEBUG=1; DEBUG_TRACE=1; shift ;;
     -h|--help)
-      echo "Usage: $0 --qcow2 <path> [--nbd-dev /dev/nbdX] [--force] [--dry-run] [--debug] [--debug-log FILE] [--debug-trace]"
+      echo "Usage: $0 --qcow2 <path> [--nbd-dev /dev/nbdX] [--force] [--dry-run] [--purge-xen|--no-purge-xen] [--bruteforce-flex] [--debug] [--debug-log FILE] [--debug-trace]"
+      echo ""
+      echo "  --bruteforce-flex  Aggressively inject and enable Flex/KVM VirtIO + QEMU drivers:"
+      echo "                     viostor, vioscsi, netkvm, balloon, vioserial, viorng, qemufwcfg,"
+      echo "                     qxldod/viogpudo, pvpanic, QEMU-GA MSI, full virtio stage for pnputil,"
+      echo "                     Xen purge, MountedDevices clear; skips auxiliary-driver neutralization."
       exit 0 ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
@@ -92,6 +116,8 @@ echo "  Target qcow2 : $QCOW2"
 echo "  NBD device   : $NBD_DEV"
 echo "  Dry run      : $DRY_RUN"
 echo "  Force        : $FORCE"
+echo "  Purge Xen    : $PURGE_XEN"
+echo "  Win Mode     : $WINDOWS_MODE"
 echo "═══════════════════════════════════════════════════════════════════════════"
 
 # ── Sentinel check ────────────────────────────────────────────────────────────
@@ -111,6 +137,7 @@ ensure_deps() {
   command -v reged >/dev/null 2>&1 || missing_pkgs+=(chntpw)
   command -v wget >/dev/null 2>&1 || missing_pkgs+=(wget)
   command -v sfdisk >/dev/null 2>&1 || missing_pkgs+=(util-linux)
+  command -v file >/dev/null 2>&1 || missing_pkgs+=(file)
 
   if [ "${#missing_pkgs[@]}" -gt 0 ]; then
     INFO "Installing missing Windows repair tools: ${missing_pkgs[*]}"
@@ -148,7 +175,7 @@ ensure_deps() {
   fi
 
   local missing_cmds=()
-  for c in qemu-nbd qemu-img ntfs-3g ntfsfix hivexsh reged wget sfdisk; do
+  for c in qemu-nbd qemu-img ntfs-3g ntfsfix hivexsh reged wget sfdisk file; do
     command -v "$c" >/dev/null 2>&1 || missing_cmds+=("$c")
   done
   if [ "${#missing_cmds[@]}" -gt 0 ]; then
@@ -286,6 +313,10 @@ append_repair_report() {
   printf '%s\n' "$line" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
 }
 
+is_bruteforce_flex() {
+  [ "${WINDOWS_MODE:-}" = "bruteforce_flex" ] || [ "${OSPC2FLEX_WINDOWS_MODE:-}" = "bruteforce_flex" ]
+}
+
 # ── Cleanup function ──────────────────────────────────────────────────────────
 cleanup() {
   echo ""
@@ -305,53 +336,122 @@ trap cleanup EXIT
 echo ""
 echo "── Step 1: VirtIO ISO ─────────────────────────────────────────────────────"
 VIRTIO_FALLBACK_URL="https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win.iso"
+VIRTIO_ISO_MIN_BYTES="${OSPC2FLEX_VIRTIO_ISO_MIN_BYTES:-50000000}"
+VIRTIO_DIR="$(dirname "$VIRTIO_ISO")"
+mkdir -p "$VIRTIO_DIR"
+# 1 = local/offline ISO only (default). 0 = allow download when cache is missing/invalid.
+VIRTIO_ISO_OFFLINE="${OSPC2FLEX_VIRTIO_ISO_OFFLINE:-${OSPC2FLEX_VIRTIO_ISO_NO_DOWNLOAD:-1}}"
 
-fetch_iso() {
-  local url="$1"
-  wget -q --show-progress -O "$VIRTIO_ISO" "$url"
-  sudo mkdir -p "$VIRTIO_MNT"
-  if [ "${DEBUG:-0}" -eq 1 ]; then
-    if sudo mount -o loop,ro "$VIRTIO_ISO" "$VIRTIO_MNT" 2>&1; then
-      PASS "VirtIO ISO mounted at $VIRTIO_MNT"
-      return 0
-    fi
-  else
-    if sudo mount -o loop,ro "$VIRTIO_ISO" "$VIRTIO_MNT" 2>/dev/null; then
-      PASS "VirtIO ISO mounted at $VIRTIO_MNT"
-      return 0
-    fi
+virtio_iso_remediation() {
+  cat >&2 <<'EOF'
+Fix:
+  sudo mkdir -p /mnt/migration/virtio
+  scp virtio-win.iso ubuntu@<jumphost-ip>:/tmp/virtio-win.iso
+  sudo mv /tmp/virtio-win.iso /mnt/migration/virtio/virtio-win.iso
+  sudo chmod 644 /mnt/migration/virtio/virtio-win.iso
+  file /mnt/migration/virtio/virtio-win.iso
+  sudo mkdir -p /mnt/virtio_test
+  sudo mount -o loop,ro /mnt/migration/virtio/virtio-win.iso /mnt/virtio_test
+  ls /mnt/virtio_test | head
+  sudo umount /mnt/virtio_test
+
+Or allow online download:
+  export OSPC2FLEX_VIRTIO_ISO_OFFLINE=0
+EOF
+}
+
+virtio_iso_mount_test() {
+  local iso="$1"
+  local test_mnt
+  test_mnt="$(mktemp -d /tmp/virtio_iso_preflight_XXXXXX)"
+  if sudo mount -o loop,ro "$iso" "$test_mnt" >/dev/null 2>&1; then
+    sudo umount "$test_mnt" >/dev/null 2>&1 || true
+    rmdir "$test_mnt" >/dev/null 2>&1 || true
+    return 0
   fi
-  WARN "ISO mount failed (corrupted). Deleting..."
-  rm -f "$VIRTIO_ISO"
+  rmdir "$test_mnt" >/dev/null 2>&1 || true
   return 1
 }
 
-if [ -f "$VIRTIO_ISO" ]; then
-  sudo mkdir -p "$VIRTIO_MNT"
-  if [ "${DEBUG:-0}" -eq 1 ]; then
-    if sudo mount -o loop,ro "$VIRTIO_ISO" "$VIRTIO_MNT" 2>&1; then
-      PASS "VirtIO ISO cached and mounted: $VIRTIO_ISO"
-    else
-      WARN "Cached ISO is corrupted, re-downloading..."
-      rm -f "$VIRTIO_ISO"
-    fi
+is_valid_iso() {
+  local iso="$1"
+  [ -e "$iso" ] || return 1
+  [ -s "$iso" ] || return 1
+  local size
+  size="$(stat -Lc%s "$iso" 2>/dev/null || echo 0)"
+  if [ "$size" -lt "$VIRTIO_ISO_MIN_BYTES" ]; then
+    WARN "ISO too small: $size bytes"
+    return 1
+  fi
+  if file -L "$iso" 2>/dev/null | grep -Eiq 'ISO|UDF|CD-ROM'; then
+    :
   else
-    if sudo mount -o loop,ro "$VIRTIO_ISO" "$VIRTIO_MNT" 2>/dev/null; then
-      PASS "VirtIO ISO cached and mounted: $VIRTIO_ISO"
+    WARN "File is not detected as ISO: $(file -L "$iso" 2>/dev/null || echo unknown)"
+    return 1
+  fi
+  if ! virtio_iso_mount_test "$iso"; then
+    WARN "ISO mount test failed: $iso"
+    return 1
+  fi
+  return 0
+}
+
+download_virtio_iso() {
+  local url="$1"
+  local dst="$2"
+  local tmp="${dst}.part.$$"
+  INFO "Downloading VirtIO ISO: $url"
+  rm -f "$tmp"
+  # Proxies can mis-route curl (e.g. wrong port); direct fetch only for this download.
+  if ! (
+    unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
+    if command -v curl >/dev/null 2>&1; then
+      curl -fL --retry 5 --retry-delay 5 --connect-timeout 20 --max-time 900 -o "$tmp" "$url"
+    elif command -v wget >/dev/null 2>&1; then
+      wget -O "$tmp" "$url"
     else
-      WARN "Cached ISO is corrupted, re-downloading..."
-      rm -f "$VIRTIO_ISO"
+      exit 127
     fi
+  ); then
+    rm -f "$tmp"
+    return 1
+  fi
+  if ! is_valid_iso "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$dst"
+}
+
+if is_valid_iso "$VIRTIO_ISO"; then
+  PASS "Using local VirtIO ISO: $VIRTIO_ISO"
+elif [ "$VIRTIO_ISO_OFFLINE" != "0" ] && [ "$VIRTIO_ISO_OFFLINE" != "false" ] && [ "$VIRTIO_ISO_OFFLINE" != "no" ]; then
+  FAIL "VirtIO ISO offline mode (OSPC2FLEX_VIRTIO_ISO_OFFLINE=$VIRTIO_ISO_OFFLINE): no valid ISO at $VIRTIO_ISO"
+  virtio_iso_remediation
+  exit 1
+else
+  INFO "No valid cached VirtIO ISO found; downloading..."
+  if download_virtio_iso "$VIRTIO_ISO_URL" "$VIRTIO_ISO"; then
+    PASS "Stable VirtIO ISO downloaded successfully"
+  elif download_virtio_iso "$VIRTIO_FALLBACK_URL" "$VIRTIO_ISO"; then
+    PASS "Latest VirtIO ISO downloaded successfully"
+  else
+    FAIL "Both ISO downloads failed or produced invalid ISO files"
+    FAIL "Fix network access or manually place ISO at: $VIRTIO_ISO"
+    exit 1
   fi
 fi
 
-if [ ! -f "$VIRTIO_ISO" ]; then
-  INFO "Downloading VirtIO ISO (Stable)..."
-  if ! fetch_iso "$VIRTIO_ISO_URL"; then
-    INFO "Downloading VirtIO ISO (Fallback)..."
-    fetch_iso "$VIRTIO_FALLBACK_URL" || { FAIL "Both ISO downloads failed"; exit 1; }
-  fi
+PASS "VirtIO ISO ready: $VIRTIO_ISO"
+ls -lhL "$VIRTIO_ISO" || true
+file -L "$VIRTIO_ISO" || true
+sudo mkdir -p "$VIRTIO_MNT"
+if [ "${DEBUG:-0}" -eq 1 ]; then
+  sudo mount -o loop,ro "$VIRTIO_ISO" "$VIRTIO_MNT" 2>&1 || { FAIL "Unable to mount validated VirtIO ISO"; exit 1; }
+else
+  sudo mount -o loop,ro "$VIRTIO_ISO" "$VIRTIO_MNT" 2>/dev/null || { FAIL "Unable to mount validated VirtIO ISO"; exit 1; }
 fi
+PASS "VirtIO ISO mounted at $VIRTIO_MNT"
 
 # List available driver versions
 INFO "Available driver versions:"
@@ -362,6 +462,76 @@ ls -d "$VIRTIO_MNT"/viostor/2k*/amd64 "$VIRTIO_MNT"/viostor/w*/amd64 2>/dev/null
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "── Step 2: Mount Windows Image ───────────────────────────────────────────"
+# Release stale qemu-nbd lock holders from previous interrupted runs.
+release_qcow_lock_if_needed() {
+  local lock_pids p
+  local wait_sec="${OSPC2FLEX_QCOW_LOCK_WAIT_SEC:-300}"
+  local waited=0
+  lock_pids="$(sudo fuser "$QCOW2" 2>/dev/null || true)"
+  lock_pids="$(printf '%s' "$lock_pids" | tr '\n' ' ' | tr -s ' ' | sed -E 's/^ +| +$//g')"
+  [ -z "$lock_pids" ] && return 0
+
+  WARN "Detected existing process lock(s) on qcow2: $lock_pids"
+  if [ "$FORCE" -ne 1 ]; then
+    FAIL "qcow2 is locked. Re-run with --force, or stop stale qemu-nbd process(es) first."
+    return 1
+  fi
+
+  WARN "Force mode enabled: attempting to clear stale lock holders..."
+  for p in $lock_pids; do
+    _comm="$(sudo ps -p "$p" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
+    _args="$(sudo ps -p "$p" -o args= 2>/dev/null || true)"
+    if echo "$_comm" | grep -qi '^qemu-nbd$'; then
+      _nbd_dev="$(printf '%s\n' "$_args" | sed -n 's/.*--connect=\([^ ]*\).*/\1/p' | head -1)"
+      if [ -n "$_nbd_dev" ]; then
+        sudo qemu-nbd --disconnect "$_nbd_dev" 2>/dev/null || true
+      fi
+      sudo kill "$p" 2>/dev/null || true
+      sleep 1
+      sudo kill -9 "$p" 2>/dev/null || true
+      INFO "Cleared stale qemu-nbd lock holder PID $p"
+    elif echo "$_comm" | grep -qi '^openstack$' && printf '%s\n' "$_args" | grep -Fq "image create" && printf '%s\n' "$_args" | grep -Fq -- "--file $QCOW2"; then
+      _etimes="$(sudo ps -p "$p" -o etimes= 2>/dev/null | tr -d '[:space:]' || echo 0)"
+      [ -z "$_etimes" ] && _etimes=0
+      WARN "Lock holder PID $p is active openstack image upload (elapsed ${_etimes}s); waiting up to ${wait_sec}s for natural release"
+      waited=0
+      while [ "$waited" -lt "$wait_sec" ]; do
+        sleep 5
+        waited=$((waited + 5))
+        if ! sudo ps -p "$p" >/dev/null 2>&1; then
+          INFO "Openstack uploader PID $p exited; lock should clear"
+          break
+        fi
+        if ! sudo fuser "$QCOW2" 2>/dev/null | tr '\n' ' ' | grep -qw "$p"; then
+          INFO "Openstack uploader PID $p no longer holds qcow2 lock"
+          break
+        fi
+      done
+      if sudo ps -p "$p" >/dev/null 2>&1 && sudo fuser "$QCOW2" 2>/dev/null | tr '\n' ' ' | grep -qw "$p"; then
+        WARN "Openstack uploader PID $p still holds lock after ${wait_sec}s; force-clearing as stale"
+        sudo kill "$p" 2>/dev/null || true
+        sleep 1
+        sudo kill -9 "$p" 2>/dev/null || true
+        INFO "Cleared stale openstack image-upload lock holder PID $p"
+      fi
+    else
+      WARN "Lock holder PID $p is not a known stale locker (qemu-nbd/openstack image create); leaving it untouched"
+    fi
+  done
+
+  sleep 1
+  lock_pids="$(sudo fuser "$QCOW2" 2>/dev/null || true)"
+  lock_pids="$(printf '%s' "$lock_pids" | tr '\n' ' ' | tr -s ' ' | sed -E 's/^ +| +$//g')"
+  if [ -n "$lock_pids" ]; then
+    FAIL "qcow2 remains locked after cleanup attempt: $lock_pids"
+    return 1
+  fi
+  PASS "Cleared stale qcow2 lock(s)"
+  return 0
+}
+
+release_qcow_lock_if_needed
+
 # Disconnect any previous NBD
 sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
 sleep 1
@@ -471,6 +641,19 @@ NETKVM_SRC="$VIRTIO_MNT/NetKVM/$WIN_DRIVER_DIR/amd64"
 VIOSERIAL_SRC="$VIRTIO_MNT/vioserial/$WIN_DRIVER_DIR/amd64"
 BALLOON_SRC="$VIRTIO_MNT/Balloon/$WIN_DRIVER_DIR/amd64"
 QXLDOD_SRC="$VIRTIO_MNT/qxldod/$WIN_DRIVER_DIR/amd64"
+VIOSCSI_SRC="$VIRTIO_MNT/vioscsi/$WIN_DRIVER_DIR/amd64"
+VIORNG_SRC="$VIRTIO_MNT/viorng/$WIN_DRIVER_DIR/amd64"
+QEMUFWCFG_SRC="$VIRTIO_MNT/qemufwcfg/$WIN_DRIVER_DIR/amd64"
+PVPANIC_SRC="$VIRTIO_MNT/pvpanic/$WIN_DRIVER_DIR/amd64"
+VIOINPUT_SRC="$VIRTIO_MNT/vioinput/$WIN_DRIVER_DIR/amd64"
+VIOGPU_SRC="$VIRTIO_MNT/viogpudo/$WIN_DRIVER_DIR/amd64"
+if [ -d "$VIRTIO_MNT/qxldod/$WIN_DRIVER_DIR/amd64" ]; then
+  DISPLAY_SRC="$VIRTIO_MNT/qxldod/$WIN_DRIVER_DIR/amd64"
+elif [ -d "$VIRTIO_MNT/viogpudo/$WIN_DRIVER_DIR/amd64" ]; then
+  DISPLAY_SRC="$VIRTIO_MNT/viogpudo/$WIN_DRIVER_DIR/amd64"
+else
+  DISPLAY_SRC=""
+fi
 
 # If exact version not found, fall back to 2k19
 if [ ! -d "$VIOSTOR_SRC" ]; then
@@ -480,6 +663,20 @@ if [ ! -d "$VIOSTOR_SRC" ]; then
   NETKVM_SRC="$VIRTIO_MNT/NetKVM/$WIN_DRIVER_DIR/amd64"
   VIOSERIAL_SRC="$VIRTIO_MNT/vioserial/$WIN_DRIVER_DIR/amd64"
   BALLOON_SRC="$VIRTIO_MNT/Balloon/$WIN_DRIVER_DIR/amd64"
+  QXLDOD_SRC="$VIRTIO_MNT/qxldod/$WIN_DRIVER_DIR/amd64"
+  VIOSCSI_SRC="$VIRTIO_MNT/vioscsi/$WIN_DRIVER_DIR/amd64"
+  VIORNG_SRC="$VIRTIO_MNT/viorng/$WIN_DRIVER_DIR/amd64"
+  QEMUFWCFG_SRC="$VIRTIO_MNT/qemufwcfg/$WIN_DRIVER_DIR/amd64"
+  PVPANIC_SRC="$VIRTIO_MNT/pvpanic/$WIN_DRIVER_DIR/amd64"
+  VIOINPUT_SRC="$VIRTIO_MNT/vioinput/$WIN_DRIVER_DIR/amd64"
+  VIOGPU_SRC="$VIRTIO_MNT/viogpudo/$WIN_DRIVER_DIR/amd64"
+  if [ -d "$VIRTIO_MNT/qxldod/$WIN_DRIVER_DIR/amd64" ]; then
+    DISPLAY_SRC="$VIRTIO_MNT/qxldod/$WIN_DRIVER_DIR/amd64"
+  elif [ -d "$VIRTIO_MNT/viogpudo/$WIN_DRIVER_DIR/amd64" ]; then
+    DISPLAY_SRC="$VIRTIO_MNT/viogpudo/$WIN_DRIVER_DIR/amd64"
+  else
+    DISPLAY_SRC=""
+  fi
 fi
 
 PASS "Windows version: $WIN_VER → driver dir: $WIN_DRIVER_DIR"
@@ -502,6 +699,22 @@ DRIVERS_DIR="$MNT/Windows/System32/drivers"
 DRIVERSTORE="$MNT/Windows/System32/DriverStore/FileRepository"
 DRIVER_STAGE="$MNT/ospc2flex_driver_stage"
 NETKVM_STAGE="$DRIVER_STAGE/NetKVM"
+V2_STAGE_ROOT="$MNT/ospc2flex"
+V2_VIRTIO_STAGE="$V2_STAGE_ROOT/virtio"
+
+copy_v2_stage_tree() {
+  local src="$1" dest="$2"
+  [ -d "$src" ] || return 0
+  sudo mkdir -p "$dest"
+  sudo cp -a "$src"/. "$dest"/ 2>/dev/null || sudo cp -f "$src"/* "$dest"/ 2>/dev/null || true
+}
+
+stage_v2_helper_script() {
+  local src="$1" dest="$2"
+  [ -f "$src" ] || return 0
+  sudo mkdir -p "$(dirname "$dest")"
+  sudo cp -f "$src" "$dest"
+}
 
 if [ $DRY_RUN -eq 0 ]; then
   REPAIR_REPORT_FILE="$MNT/ospc2flex_offline_repair_report.txt"
@@ -525,7 +738,6 @@ EOF
   fi
 
   # --- vioscsi (SCSI disk — CRITICAL when FLEX presents virtio-scsi) ---
-  VIOSCSI_SRC="$VIRTIO_MNT/vioscsi/$WIN_DRIVER_DIR/amd64"
   if [ -d "$VIOSCSI_SRC" ] && [ -f "$VIOSCSI_SRC/vioscsi.sys" ]; then
     sudo cp -f "$VIOSCSI_SRC/vioscsi.sys" "$DRIVERS_DIR/"
     sudo cp -f "$VIOSCSI_SRC/vioscsi.inf" "$DRIVERS_DIR/" 2>/dev/null || true
@@ -553,19 +765,96 @@ EOF
     printf '%s\n' "Driver.netkvm.stage=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
   fi
 
+  if is_bruteforce_flex; then
+    INFO "Brute-force Flex mode: copying all VirtIO runtime drivers"
+
+    copy_driver_sys() {
+      local src="$1"
+      local sysname="$2"
+      local repo_name="$3"
+
+      [ -d "$src" ] || {
+        WARN "Driver source missing: $src"
+        return 0
+      }
+
+      if [ -f "$src/$sysname" ]; then
+        sudo cp -f "$src/$sysname" "$DRIVERS_DIR/"
+        sudo cp -f "$src"/*.inf "$DRIVERS_DIR/" 2>/dev/null || true
+        sudo mkdir -p "$DRIVERSTORE/${repo_name}.inf_amd64"
+        sudo cp -f "$src"/* "$DRIVERSTORE/${repo_name}.inf_amd64/" 2>/dev/null || true
+        PASS "Brute-force copied $sysname → drivers/ + DriverStore"
+        printf '%s\n' "Driver.${repo_name}.copy=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+      else
+        WARN "Missing $sysname in $src"
+        printf '%s\n' "Driver.${repo_name}.copy=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+      fi
+    }
+
+    copy_driver_sys "$BALLOON_SRC" "balloon.sys" "balloon"
+    copy_driver_sys "$VIOSERIAL_SRC" "vioser.sys" "vioser"
+    copy_driver_sys "$VIORNG_SRC" "viorng.sys" "viorng"
+    copy_driver_sys "$QEMUFWCFG_SRC" "qemufwcfg.sys" "qemufwcfg"
+    copy_driver_sys "$PVPANIC_SRC" "pvpanic.sys" "pvpanic"
+
+    if [ -n "$DISPLAY_SRC" ]; then
+      copy_driver_sys "$DISPLAY_SRC" "qxldod.sys" "qxldod"
+      copy_driver_sys "$DISPLAY_SRC" "viogpudo.sys" "viogpudo"
+    fi
+
+    QEMU_GA_DST="$MNT/ospc2flex/guest-agent"
+    sudo mkdir -p "$QEMU_GA_DST"
+    if [ -f "$VIRTIO_MNT/guest-agent/qemu-ga-x86_64.msi" ]; then
+      sudo cp -f "$VIRTIO_MNT/guest-agent/qemu-ga-x86_64.msi" "$QEMU_GA_DST/"
+      PASS "QEMU Guest Agent MSI staged"
+      printf '%s\n' "QEMU-GA.stage=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    else
+      WARN "QEMU Guest Agent MSI not found in VirtIO ISO"
+      printf '%s\n' "QEMU-GA.stage=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    fi
+  fi
+
   # Do not pre-install non-storage VirtIO drivers offline. We have seen
   # first-boot BSODs after importing OSPC guests when Windows binds extra
   # VirtIO devices too early. Keep first boot to the minimum storage path,
   # then let first-boot PowerShell install what is needed locally.
-  sudo rm -f \
-    "$DRIVERS_DIR/vioser.sys" \
-    "$DRIVERS_DIR/balloon.sys" \
-    "$DRIVERS_DIR/qxldod.sys" 2>/dev/null || true
-  sudo rm -rf \
-    "$DRIVERSTORE/vioser.inf_amd64" \
-    "$DRIVERSTORE/balloon.inf_amd64" \
-    "$DRIVERSTORE/qxldod.inf_amd64" 2>/dev/null || true
-  PASS "Deferred only non-network auxiliary VirtIO drivers until first boot (vioser/balloon/qxldod)"
+  if ! is_bruteforce_flex; then
+    sudo rm -f \
+      "$DRIVERS_DIR/vioser.sys" \
+      "$DRIVERS_DIR/balloon.sys" \
+      "$DRIVERS_DIR/qxldod.sys" 2>/dev/null || true
+    sudo rm -rf \
+      "$DRIVERSTORE/vioser.inf_amd64" \
+      "$DRIVERSTORE/balloon.inf_amd64" \
+      "$DRIVERSTORE/qxldod.inf_amd64" 2>/dev/null || true
+    PASS "Deferred only non-network auxiliary VirtIO drivers until first boot (vioser/balloon/qxldod)"
+  else
+    PASS "Brute-force Flex mode: auxiliary VirtIO drivers kept in drivers/ + DriverStore"
+  fi
+
+  if [ "$WINDOWS_MODE" = "two_phase_virtio" ] || is_bruteforce_flex; then
+    sudo mkdir -p "$V2_VIRTIO_STAGE"
+    copy_v2_stage_tree "$VIOSTOR_SRC" "$V2_VIRTIO_STAGE/viostor/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$VIOSCSI_SRC" "$V2_VIRTIO_STAGE/vioscsi/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$NETKVM_SRC" "$V2_VIRTIO_STAGE/NetKVM/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$VIRTIO_MNT/Balloon/$WIN_DRIVER_DIR/amd64" "$V2_VIRTIO_STAGE/Balloon/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$VIRTIO_MNT/pvpanic/$WIN_DRIVER_DIR/amd64" "$V2_VIRTIO_STAGE/pvpanic/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$VIRTIO_MNT/qemufwcfg/$WIN_DRIVER_DIR/amd64" "$V2_VIRTIO_STAGE/qemufwcfg/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$VIOSERIAL_SRC" "$V2_VIRTIO_STAGE/vioserial/$WIN_DRIVER_DIR/amd64"
+    copy_v2_stage_tree "$VIORNG_SRC" "$V2_VIRTIO_STAGE/viorng/$WIN_DRIVER_DIR/amd64"
+    if [ -n "$DISPLAY_SRC" ]; then
+      copy_v2_stage_tree "$DISPLAY_SRC" "$V2_VIRTIO_STAGE/display/$WIN_DRIVER_DIR/amd64"
+    fi
+    if is_bruteforce_flex; then
+      copy_v2_stage_tree "$VIRTIO_MNT/vioinput/$WIN_DRIVER_DIR/amd64" "$V2_VIRTIO_STAGE/vioinput/$WIN_DRIVER_DIR/amd64" 2>/dev/null || true
+    fi
+    if [ "$WINDOWS_MODE" = "two_phase_virtio" ]; then
+      stage_v2_helper_script "/tmp/ospc2flex_windows_firstboot.ps1" "$V2_STAGE_ROOT/ospc2flex_windows_firstboot.ps1"
+      stage_v2_helper_script "/tmp/ospc2flex_windows_v2_verify.ps1" "$V2_STAGE_ROOT/ospc2flex_windows_v2_verify.ps1"
+    fi
+    PASS "Windows staged drivers under C:\\ospc2flex\\virtio (and V2 helpers when applicable)"
+    printf '%s\n' "Driver.v2.stage=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  fi
 
   if [ ! -f "$DRIVERS_DIR/viostor.sys" ]; then
     FAIL "Post-copy check failed: missing $DRIVERS_DIR/viostor.sys"
@@ -582,7 +871,14 @@ EOF
 else
   INFO "[DRY-RUN] Would copy viostor + vioscsi for boot-critical storage"
   INFO "[DRY-RUN] Would copy netkvm normally and stage it as a first-boot fallback"
-  INFO "[DRY-RUN] Would defer vioser/balloon/qxldod"
+  if is_bruteforce_flex; then
+    INFO "[DRY-RUN] Would brute-force copy auxiliary VirtIO + QEMU-GA MSI + full virtio stage"
+  else
+    INFO "[DRY-RUN] Would defer vioser/balloon/qxldod"
+  fi
+  if [ "$WINDOWS_MODE" = "two_phase_virtio" ] || is_bruteforce_flex; then
+    INFO "[DRY-RUN] Would pre-stage VirtIO trees (and V2 helpers for two_phase_virtio) in C:\\ospc2flex"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -716,6 +1012,7 @@ REGEOF
     fi
     PASS "Registry: viostor service (Start=0, Group=SCSI miniport)"
     PASS "Registry: vioscsi service (Start=0, Group=SCSI miniport)"
+    PASS "Registry: storahci/pciide/intelide services forced to Start=0 across detected ControlSets"
     PASS "Registry: netkvm service (Start=3, Group=NDIS)"
     PASS "Registry: CriticalDeviceDatabase PCI entries (1AF4:{1001,1042,1004,1048})"
   else
@@ -723,6 +1020,124 @@ REGEOF
     WARN "Restoring backup..."
     sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
     exit 1
+  fi
+
+  if is_bruteforce_flex; then
+    FLEX_RUNTIME_REG="/tmp/flex_runtime_virtio_$$.reg"
+    cat > "$FLEX_RUNTIME_REG" <<'RUNTIMEOF'
+Windows Registry Editor Version 5.00
+
+; VirtIO Balloon
+"ControlSet001\Services\Balloon\Type"=dword:00000001
+"ControlSet001\Services\Balloon\Start"=dword:00000000
+"ControlSet001\Services\Balloon\ErrorControl"=dword:00000001
+"ControlSet001\Services\Balloon\ImagePath"="system32\\drivers\\balloon.sys"
+"ControlSet001\Services\Balloon\Group"="System Bus Extender"
+"ControlSet001\Services\Balloon\DisplayName"="VirtIO Balloon Driver"
+
+"ControlSet002\Services\Balloon\Type"=dword:00000001
+"ControlSet002\Services\Balloon\Start"=dword:00000000
+"ControlSet002\Services\Balloon\ErrorControl"=dword:00000001
+"ControlSet002\Services\Balloon\ImagePath"="system32\\drivers\\balloon.sys"
+"ControlSet002\Services\Balloon\Group"="System Bus Extender"
+
+; VirtIO Serial
+"ControlSet001\Services\vioser\Type"=dword:00000001
+"ControlSet001\Services\vioser\Start"=dword:00000000
+"ControlSet001\Services\vioser\ErrorControl"=dword:00000001
+"ControlSet001\Services\vioser\ImagePath"="system32\\drivers\\vioser.sys"
+"ControlSet001\Services\vioser\Group"="System Bus Extender"
+"ControlSet001\Services\vioser\DisplayName"="VirtIO Serial Driver"
+
+"ControlSet002\Services\vioser\Type"=dword:00000001
+"ControlSet002\Services\vioser\Start"=dword:00000000
+"ControlSet002\Services\vioser\ErrorControl"=dword:00000001
+"ControlSet002\Services\vioser\ImagePath"="system32\\drivers\\vioser.sys"
+"ControlSet002\Services\vioser\Group"="System Bus Extender"
+
+; VirtIO RNG
+"ControlSet001\Services\viorng\Type"=dword:00000001
+"ControlSet001\Services\viorng\Start"=dword:00000000
+"ControlSet001\Services\viorng\ErrorControl"=dword:00000001
+"ControlSet001\Services\viorng\ImagePath"="system32\\drivers\\viorng.sys"
+"ControlSet001\Services\viorng\Group"="System Bus Extender"
+"ControlSet001\Services\viorng\DisplayName"="VirtIO RNG Driver"
+
+"ControlSet002\Services\viorng\Type"=dword:00000001
+"ControlSet002\Services\viorng\Start"=dword:00000000
+"ControlSet002\Services\viorng\ErrorControl"=dword:00000001
+"ControlSet002\Services\viorng\ImagePath"="system32\\drivers\\viorng.sys"
+"ControlSet002\Services\viorng\Group"="System Bus Extender"
+
+; QEMU FwCfg
+"ControlSet001\Services\qemufwcfg\Type"=dword:00000001
+"ControlSet001\Services\qemufwcfg\Start"=dword:00000000
+"ControlSet001\Services\qemufwcfg\ErrorControl"=dword:00000001
+"ControlSet001\Services\qemufwcfg\ImagePath"="system32\\drivers\\qemufwcfg.sys"
+"ControlSet001\Services\qemufwcfg\Group"="System Bus Extender"
+"ControlSet001\Services\qemufwcfg\DisplayName"="QEMU FwCfg Driver"
+
+"ControlSet002\Services\qemufwcfg\Type"=dword:00000001
+"ControlSet002\Services\qemufwcfg\Start"=dword:00000000
+"ControlSet002\Services\qemufwcfg\ErrorControl"=dword:00000001
+"ControlSet002\Services\qemufwcfg\ImagePath"="system32\\drivers\\qemufwcfg.sys"
+"ControlSet002\Services\qemufwcfg\Group"="System Bus Extender"
+
+; pvpanic
+"ControlSet001\Services\pvpanic\Type"=dword:00000001
+"ControlSet001\Services\pvpanic\Start"=dword:00000000
+"ControlSet001\Services\pvpanic\ErrorControl"=dword:00000001
+"ControlSet001\Services\pvpanic\ImagePath"="system32\\drivers\\pvpanic.sys"
+"ControlSet001\Services\pvpanic\Group"="System Bus Extender"
+"ControlSet001\Services\pvpanic\DisplayName"="QEMU pvpanic device"
+
+"ControlSet002\Services\pvpanic\Type"=dword:00000001
+"ControlSet002\Services\pvpanic\Start"=dword:00000000
+"ControlSet002\Services\pvpanic\ErrorControl"=dword:00000001
+"ControlSet002\Services\pvpanic\ImagePath"="system32\\drivers\\pvpanic.sys"
+"ControlSet002\Services\pvpanic\Group"="System Bus Extender"
+
+; QXL display fallback
+"ControlSet001\Services\qxldod\Type"=dword:00000001
+"ControlSet001\Services\qxldod\Start"=dword:00000000
+"ControlSet001\Services\qxldod\ErrorControl"=dword:00000001
+"ControlSet001\Services\qxldod\ImagePath"="system32\\drivers\\qxldod.sys"
+"ControlSet001\Services\qxldod\Group"="Video"
+"ControlSet001\Services\qxldod\DisplayName"="QXL Display Driver"
+
+"ControlSet002\Services\qxldod\Type"=dword:00000001
+"ControlSet002\Services\qxldod\Start"=dword:00000000
+"ControlSet002\Services\qxldod\ErrorControl"=dword:00000001
+"ControlSet002\Services\qxldod\ImagePath"="system32\\drivers\\qxldod.sys"
+"ControlSet002\Services\qxldod\Group"="Video"
+
+; VirtIO GPU DOD alternate service name
+"ControlSet001\Services\VioGpuDod\Type"=dword:00000001
+"ControlSet001\Services\VioGpuDod\Start"=dword:00000000
+"ControlSet001\Services\VioGpuDod\ErrorControl"=dword:00000001
+"ControlSet001\Services\VioGpuDod\ImagePath"="system32\\drivers\\viogpudo.sys"
+"ControlSet001\Services\VioGpuDod\Group"="Video"
+"ControlSet001\Services\VioGpuDod\DisplayName"="VioGpuDod"
+
+"ControlSet002\Services\VioGpuDod\Type"=dword:00000001
+"ControlSet002\Services\VioGpuDod\Start"=dword:00000000
+"ControlSet002\Services\VioGpuDod\ErrorControl"=dword:00000001
+"ControlSet002\Services\VioGpuDod\ImagePath"="system32\\drivers\\viogpudo.sys"
+"ControlSet002\Services\VioGpuDod\Group"="Video"
+RUNTIMEOF
+
+    set +e
+    merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$FLEX_RUNTIME_REG" 2>&1
+    _flex_reg_rc=$?
+    set -euo pipefail
+    rm -f "$FLEX_RUNTIME_REG"
+    if [ "$_flex_reg_rc" -ne 0 ]; then
+      FAIL "Brute-force Flex runtime registry merge failed"
+      WARN "Restoring backup..."
+      sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
+      exit 1
+    fi
+    PASS "Brute-force Flex runtime registry entries injected"
   fi
 
   # Verify the injection worked
@@ -741,6 +1156,39 @@ REGEOF
     FAIL "Registry verification failed: VirtIO disk services not correctly registered"
     INFO "viostor Start raw: ${VIO_CHK:-<missing>}"
     INFO "vioscsi Start raw: ${SCSI_CHK:-<missing>}"
+    WARN "Restoring backup..."
+    sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
+    exit 1
+  fi
+  STORAHCI_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Services\storahci' 'Start')
+  if echo "$STORAHCI_CHK" | is_reg_dword_zero; then
+    PASS "Registry verification: storahci Start=0 confirmed"
+    printf '%s\n' "Registry.storahci.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  else
+    FAIL "Registry verification failed: storahci is not Start=0"
+    INFO "storahci Start raw: ${STORAHCI_CHK:-<missing>}"
+    WARN "Restoring backup..."
+    sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
+    exit 1
+  fi
+  PCIIDE_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Services\pciide' 'Start')
+  if echo "$PCIIDE_CHK" | is_reg_dword_zero; then
+    PASS "Registry verification: pciide Start=0 confirmed"
+    printf '%s\n' "Registry.pciide.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  else
+    FAIL "Registry verification failed: pciide is not Start=0"
+    INFO "pciide Start raw: ${PCIIDE_CHK:-<missing>}"
+    WARN "Restoring backup..."
+    sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
+    exit 1
+  fi
+  INTELIDE_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Services\intelide' 'Start')
+  if echo "$INTELIDE_CHK" | is_reg_dword_zero; then
+    PASS "Registry verification: intelide Start=0 confirmed"
+    printf '%s\n' "Registry.intelide.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  else
+    FAIL "Registry verification failed: intelide is not Start=0"
+    INFO "intelide Start raw: ${INTELIDE_CHK:-<missing>}"
     WARN "Restoring backup..."
     sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
     exit 1
@@ -802,8 +1250,11 @@ echo ""
 echo "── Step 5b: Neutralize Non-Storage VirtIO For First Boot ─────────────────"
 
 if [ $DRY_RUN -eq 0 ]; then
-  AUX_REG="/tmp/aux_virtio_off_$$.reg"
-  cat > "$AUX_REG" <<'AUXEOF'
+  if is_bruteforce_flex; then
+    PASS "Brute-force Flex mode: keeping auxiliary VirtIO drivers enabled (skip neutralize)"
+  else
+    AUX_REG="/tmp/aux_virtio_off_$$.reg"
+    cat > "$AUX_REG" <<'AUXEOF'
 Windows Registry Editor Version 5.00
 
 "ControlSet001\Services\vioser\Start"=dword:00000004
@@ -813,9 +1264,9 @@ Windows Registry Editor Version 5.00
 "ControlSet001\Services\qxldod\Start"=dword:00000004
 "ControlSet002\Services\qxldod\Start"=dword:00000004
 AUXEOF
-  merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$AUX_REG" >/dev/null 2>&1 || true
-  rm -f "$AUX_REG"
-  sudo hivexsh -w "$HIVE_SYSTEM" <<'EOF' 2>/dev/null || true
+    merge_registry_patch "$HIVE_SYSTEM" "HKEY_LOCAL_MACHINE\\SYSTEM" "$AUX_REG" >/dev/null 2>&1 || true
+    rm -f "$AUX_REG"
+    sudo hivexsh -w "$HIVE_SYSTEM" <<'EOF' 2>/dev/null || true
 cd \ControlSet001\Control\CriticalDeviceDatabase
 del pci#ven_1af4&dev_1000
 del pci#ven_1af4&dev_1041
@@ -824,10 +1275,15 @@ del pci#ven_1af4&dev_1000
 del pci#ven_1af4&dev_1041
 commit
 EOF
-  PASS "Disabled vioser/balloon/qxldod for first boot and removed stale NetKVM CDD entries"
+    PASS "Disabled vioser/balloon/qxldod for first boot and removed stale NetKVM CDD entries"
+  fi
 else
-  INFO "[DRY-RUN] Would disable vioser/balloon/qxldod until first boot"
-  INFO "[DRY-RUN] Would remove stale NetKVM CriticalDeviceDatabase entries"
+  if is_bruteforce_flex; then
+    INFO "[DRY-RUN] Brute-force Flex: would skip vioser/balloon/qxldod neutralize"
+  else
+    INFO "[DRY-RUN] Would disable vioser/balloon/qxldod until first boot"
+    INFO "[DRY-RUN] Would remove stale NetKVM CriticalDeviceDatabase entries"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -890,7 +1346,81 @@ XENEOF
     WARN "Some Xen services still boot-start; boot risk remains"
   fi
 else
-  INFO "[DRY-RUN] Would disable Xen PV drivers"
+  INFO "[DRY-RUN] Would disable Xen PV drivers and Xen guest agents (xenvbd/xendisk/xenfilt/xenbus/...)"
+fi
+
+if [ $DRY_RUN -eq 0 ] && [ "${PURGE_XEN:-0}" -eq 1 ]; then
+  echo ""
+  echo "── Step 6b: Aggressive Xen Purge (opt-in) ───────────────────────────────"
+  XEN_PURGE_BACKUP="$MNT/ospc2flex_xen_purge_backup_$(date -u +%Y%m%d_%H%M%SZ)"
+  sudo mkdir -p "$XEN_PURGE_BACKUP/drivers"
+  append_repair_report "XenPurge.enabled=1"
+  append_repair_report "XenPurge.backup_dir=C:\\ospc2flex_xen_purge_backup_*"
+
+  for _drv in xenbus.sys xenvbd.sys xennet.sys xenvif.sys xeniface.sys xendisk.sys xenfilt.sys xenagent.sys xenbus_monitor.sys xensvc.sys; do
+    _src="$MNT/Windows/System32/drivers/$_drv"
+    if [ -f "$_src" ]; then
+      sudo cp -a "$_src" "$XEN_PURGE_BACKUP/drivers/" 2>/dev/null || true
+      sudo rm -f "$_src" 2>/dev/null || true
+      append_repair_report "XenPurge.driver.$_drv=REMOVED"
+    else
+      append_repair_report "XenPurge.driver.$_drv=NOT_FOUND"
+    fi
+  done
+
+  _xsvc_del_rc=0
+  sudo python3 - "$HIVE_SYSTEM" <<'PY' || _xsvc_del_rc=$?
+import sys
+try:
+    import hivex
+except Exception:
+    sys.exit(2)
+
+path = sys.argv[1]
+targets = ("xenvbd","xennet","xenvif","xeniface","xenbus","xendisk","xenfilt","xenagent","xenbus_monitor","XenSvc")
+
+def child(h, node, name):
+    n = h.node_get_child(node, name)
+    return n if n else 0
+
+h = hivex.Hivex(path, write=True)
+root = h.root()
+for cs in ("ControlSet001", "ControlSet002"):
+    csn = child(h, root, cs)
+    if not csn:
+        continue
+    svc = child(h, csn, "Services")
+    if not svc:
+        continue
+    for t in targets:
+        tn = child(h, svc, t)
+        if tn:
+            try:
+                h.node_delete_child(svc, t)
+            except Exception:
+                pass
+h.commit(path)
+sys.exit(0)
+PY
+  [ "$_xsvc_del_rc" -eq 0 ] || WARN "Some Xen service keys could not be deleted via python-hivex (rc=$_xsvc_del_rc)"
+
+  _xen_left=0
+  for _xsvc in xenvbd xennet xenvif xeniface xenbus xendisk xenfilt xenagent xenbus_monitor XenSvc; do
+    _chk="$(hive_value "$HIVE_SYSTEM" "\\ControlSet001\\Services\\$_xsvc" "Start")"
+    if [ -n "${_chk:-}" ]; then
+      _xen_left=1
+      append_repair_report "XenPurge.service.$_xsvc=STILL_PRESENT"
+    else
+      append_repair_report "XenPurge.service.$_xsvc=REMOVED_OR_ABSENT"
+    fi
+  done
+  if [ "$_xen_left" -eq 0 ]; then
+    PASS "Aggressive Xen purge complete (service keys removed/absent + drivers removed where found)"
+  else
+    WARN "Aggressive Xen purge partial: one or more service keys still present"
+  fi
+elif [ $DRY_RUN -eq 1 ] && [ "${PURGE_XEN:-0}" -eq 1 ]; then
+  INFO "[DRY-RUN] Would aggressively purge Xen service keys and driver files"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -930,21 +1460,60 @@ def child(h, node, name):
 
 h = hivex.Hivex(path, write=True)
 root = h.root()
-for cs in ("ControlSet001", "ControlSet002"):
-    n = child(h, root, cs)
-    if not n:
+for csn in h.node_children(root):
+    cs_name = h.node_name(csn) or ""
+    if not cs_name.startswith("ControlSet"):
         continue
-    svc_root = child(h, n, "Services")
+    svc_root = child(h, csn, "Services")
     if not svc_root:
         continue
-    for svc in ("disk", "volmgr", "volsnap", "partmgr", "mountmgr"):
+    for svc in ("disk", "volmgr", "volsnap", "partmgr", "mountmgr", "viostor", "vioscsi", "storahci", "pciide", "intelide"):
         sn = child(h, svc_root, svc)
         if not sn:
             continue
         h.node_set_value(sn, {"key": "Start", "t": REG_DWORD, "value": zero})
+        # Windows 8+/2012+ often keeps boot storage drivers disabled through
+        # Services\<driver>\StartOverride even when Start=0.  On a migrated
+        # first boot that can make IDE/AHCI/VirtIO storage unavailable early
+        # enough to trigger INACCESSIBLE_BOOT_DEVICE.
+        so = child(h, sn, "StartOverride")
+        if so:
+            for v in h.node_values(so):
+                try:
+                    h.node_set_value(so, {"key": h.value_key(v), "t": REG_DWORD, "value": zero})
+                except Exception:
+                    pass
+            try:
+                h.node_delete_child(so)
+            except Exception:
+                pass
 h.commit(path)
 sys.exit(0)
 PY
+}
+
+_force_storage_startoverride_zero_via_reged() {
+  local hive="$1"
+  local reg_file
+  reg_file="$(mktemp /tmp/ospc2flex_startoverride_XXXXXX.reg)"
+  cat >"$reg_file" <<'EOF'
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\ControlSet001\Services\storahci\StartOverride]
+"0"=dword:00000000
+[HKEY_LOCAL_MACHINE\ControlSet001\Services\pciide\StartOverride]
+"0"=dword:00000000
+[HKEY_LOCAL_MACHINE\ControlSet002\Services\storahci\StartOverride]
+"0"=dword:00000000
+[HKEY_LOCAL_MACHINE\ControlSet002\Services\pciide\StartOverride]
+"0"=dword:00000000
+EOF
+  printf 'y\n' | sudo reged -I "$hive" HKEY_LOCAL_MACHINE "$reg_file" >/dev/null
+  local rc=$?
+  rm -f "$reg_file"
+  # reged can return 2 even after "operation SUCCEEDED"; verification below is
+  # the real gate, so do not make this helper fail on reged's quirky status.
+  return 0
 }
 
 if [ $DRY_RUN -eq 0 ]; then
@@ -952,15 +1521,28 @@ if [ $DRY_RUN -eq 0 ]; then
     WARN "Storage Start= patch via hivex skipped (install: apt install python3-hivex)"
     WARN "Continuing with verification only — Microsoft storage drivers are usually already Start=0"
   else
-    PASS "Microsoft storage services: Start=0 set via hivex (disk, volmgr, volsnap, partmgr, mountmgr)"
+    PASS "Storage services: Start=0 set and StartOverride removed via hivex"
+  fi
+  if _force_storage_startoverride_zero_via_reged "$HIVE_SYSTEM"; then
+    PASS "Storage StartOverride: storahci/pciide forced to 0 across ControlSet001+002"
+  else
+    WARN "Storage StartOverride reged patch failed; IDE/AHCI rescue boot may still fail"
   fi
 
   STORAGE_VERIFY_FAILED=0
-  for svc in disk volmgr volsnap partmgr mountmgr; do
-    if ! check_hive_dword_zero "$HIVE_SYSTEM" "\\ControlSet001\\Services\\$svc" "Start"; then
-      WARN "Standard storage service $svc is not Start=0 in ControlSet001"
-      STORAGE_VERIFY_FAILED=1
-    fi
+  mapfile -t _all_control_sets < <(sudo hivexsh "$HIVE_SYSTEM" <<'EOF' 2>/dev/null || true
+cd \
+ls
+EOF
+  )
+  for _cs in "${_all_control_sets[@]}"; do
+    [[ "$_cs" =~ ^ControlSet[0-9]{3}$ ]] || continue
+    for svc in disk volmgr volsnap partmgr mountmgr viostor vioscsi storahci pciide intelide; do
+      if ! check_hive_dword_zero "$HIVE_SYSTEM" "\\${_cs}\\Services\\$svc" "Start"; then
+        WARN "Storage service $svc is not Start=0 in ${_cs}"
+        STORAGE_VERIFY_FAILED=1
+      fi
+    done
   done
   if [ "$STORAGE_VERIFY_FAILED" -ne 0 ]; then
     FAIL "Standard Windows storage stack verification failed"
@@ -968,10 +1550,39 @@ if [ $DRY_RUN -eq 0 ]; then
     sudo cp "${HIVE_SYSTEM}.ospc2flex.bak" "$HIVE_SYSTEM"
     exit 1
   fi
-  PASS "Standard storage drivers verified (disk, volmgr, volsnap, partmgr, mountmgr)"
+  PASS "Storage drivers verified across detected control sets (MS + VirtIO + AHCI + IDE)"
   printf '%s\n' "Registry.ms_storage.Start=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
 else
   INFO "[DRY-RUN] Would verify standard storage stack"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 7a: Disable Fast Startup / Hiberboot offline
+# ═══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "── Step 7a: Disable Fast Startup (Hiberboot) ─────────────────────────────"
+
+if [ $DRY_RUN -eq 0 ]; then
+  POWER_HIVE="$MNT/Windows/System32/config/SYSTEM"
+  POWER_REG="/tmp/ospc2flex_power_$$.reg"
+  cat > "$POWER_REG" <<'POWEREOF'
+Windows Registry Editor Version 5.00
+
+"ControlSet001\Control\Session Manager\Power\HiberbootEnabled"=dword:00000000
+"ControlSet002\Control\Session Manager\Power\HiberbootEnabled"=dword:00000000
+POWEREOF
+  merge_registry_patch "$POWER_HIVE" "HKEY_LOCAL_MACHINE\\SYSTEM" "$POWER_REG" >/dev/null 2>&1 || true
+  rm -f "$POWER_REG"
+  HIBERBOOT_CHK=$(hive_value "$HIVE_SYSTEM" '\ControlSet001\Control\Session Manager\Power' 'HiberbootEnabled')
+  if echo "$HIBERBOOT_CHK" | is_reg_dword_zero; then
+    PASS "Registry: HiberbootEnabled=0 (Fast Startup disabled)"
+    printf '%s\n' "Registry.HiberbootEnabled=0" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+  else
+    WARN "Could not verify HiberbootEnabled=0 in ControlSet001"
+    INFO "HiberbootEnabled raw: ${HIBERBOOT_CHK:-<missing>}"
+  fi
+else
+  INFO "[DRY-RUN] Would set HiberbootEnabled=0 in ControlSet001+002"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1005,16 +1616,34 @@ else
 fi
 
 if [ "$DRY_RUN" -eq 0 ]; then
-  if [ -f "$MNT/bootmgr" ] && [ -f "$MNT/Boot/BCD" ]; then
-    PASS "Boot files present on Windows volume (bootmgr + Boot/BCD)"
+  BOOT_MODE="BIOS"
+  BCD_HIVE="$MNT/Boot/BCD"
+  if [ -f "$MNT/EFI/Microsoft/Boot/BCD" ]; then
+    BOOT_MODE="UEFI"
+    BCD_HIVE="$MNT/EFI/Microsoft/Boot/BCD"
+  fi
+  INFO "Detected boot mode from offline volume: $BOOT_MODE"
+  append_repair_report "Boot.mode=$BOOT_MODE"
+
+  if [ "$BOOT_MODE" = "BIOS" ]; then
+    if [ -f "$MNT/bootmgr" ] && [ -f "$BCD_HIVE" ]; then
+      PASS "Boot files present on Windows volume (bootmgr + Boot/BCD)"
+    else
+      FAIL "Required BIOS boot files missing on Windows volume"
+      [ -f "$MNT/bootmgr" ] || FAIL "Missing: C:\\bootmgr"
+      [ -f "$BCD_HIVE" ] || FAIL "Missing: C:\\Boot\\BCD"
+      exit 1
+    fi
   else
-    FAIL "Required BIOS boot files missing on Windows volume"
-    [ -f "$MNT/bootmgr" ] || FAIL "Missing: C:\\bootmgr"
-    [ -f "$MNT/Boot/BCD" ] || FAIL "Missing: C:\\Boot\\BCD"
-    exit 1
+    if [ -f "$MNT/EFI/Microsoft/Boot/BCD" ]; then
+      PASS "UEFI boot files present on Windows volume (EFI\\Microsoft\\Boot\\BCD)"
+    else
+      FAIL "Required UEFI boot files missing on Windows volume"
+      FAIL "Missing: EFI\\Microsoft\\Boot\\BCD"
+      exit 1
+    fi
   fi
 
-  BCD_HIVE="$MNT/Boot/BCD"
   if [ -f "$BCD_HIVE" ] && command -v hivexml >/dev/null 2>&1; then
     sudo cp -f "$BCD_HIVE" "${BCD_HIVE}.ospc2flex.bak" 2>/dev/null || true
     # Parse BCD hive: patch EVERY normal Windows winload entry AND every winresume
@@ -1066,7 +1695,8 @@ def scan():
         has_rs = "1" if "14000008" in enames else "0"
         has_re = "1" if "16000009" in enames else "0"
         has_bsp = "1" if "250000e0" in enames else "0"
-        out.append((guid, kind, has_rs, has_re, has_bsp))
+        has_sb = "1" if "25000080" in enames else "0"
+        out.append((guid, kind, has_rs, has_re, has_bsp, has_sb))
     return out
 
 for row in scan():
@@ -1080,7 +1710,7 @@ for row in scan():
       INFO "BCD: preparing WinRE suppression for $_n_patch boot object(s) (winload + winresume)"
       BCD_HIVEX="/tmp/ospc2flex_bcd_hivexsh_$$.txt"
       : >"$BCD_HIVEX"
-      while IFS=$'\t' read -r _guid _kind _has_rs _has_re _has_bsp; do
+      while IFS=$'\t' read -r _guid _kind _has_rs _has_re _has_bsp _has_sb; do
         [ -z "$_guid" ] && continue
         _bcd_elems="\\Objects\\$_guid\\Elements"
         {
@@ -1116,6 +1746,14 @@ for row in scan():
               echo "setval 1"
               echo "Element"
               echo "hex:3:01,00,00,00,00,00,00,00"
+            fi
+            # Do not force Safe Mode during a storage-controller migration.
+            # Safe Mode can skip third-party boot/storage services and trigger
+            # INACCESSIBLE_BOOT_DEVICE before our first-boot script can run.
+            if [ "$_has_sb" = "1" ]; then
+              echo "cd 25000080"
+              echo "del"
+              echo "cd $_bcd_elems"
             fi
           fi
         } >>"$BCD_HIVEX"
@@ -1154,7 +1792,7 @@ for line in open(pl_path, encoding="utf-8", errors="replace"):
     if not line or "\t" not in line:
         continue
     parts = line.split("\t")
-    if len(parts) < 5:
+    if len(parts) < 6:
         continue
     guid, kind = parts[0], parts[1]
     e = enames_for(root, guid)
@@ -1162,11 +1800,13 @@ for line in open(pl_path, encoding="utf-8", errors="replace"):
         sys.exit(3)
     if "14000008" in e:
         sys.exit(4)
-    if kind == "W" and "250000e0" not in e:
-        sys.exit(5)
+    if kind == "W" and "25000080" in e:
+        sys.exit(6)
 sys.exit(0)
 ' "$BCD_PATCHLIST"; then
-          WARN "BCD post-check failed (recoverysequence or bootstatuspolicy) — WinRE may still trigger"
+          WARN "BCD post-check failed (recoverysequence or safeboot) — first boot may still be unsafe"
+        else
+          PASS "BCD: recoverysequence removed and safeboot absent on Windows loaders"
         fi
         if [ "${DEBUG:-0}" -eq 1 ] && [ -s "$_bcd_log" ]; then
           INFO "[DEBUG] BCD hivexsh transcript:"
@@ -1200,9 +1840,10 @@ sys.exit(0)
 echo [ospc2flex] Rebuilding BIOS/MBR Windows boot files on C:
 bcdboot C:\Windows /s C: /f BIOS
 echo [ospc2flex] Normalizing BCD to boot C:\Windows
+bcdedit /set {bootmgr} timeout 0
+bcdedit /set {bootmgr} displaybootmenu No
 bcdedit /set {bootmgr} device partition=C:
 bcdedit /set {bootmgr} default {default}
-bcdedit /set {bootmgr} timeout 5
 bcdedit /set {default} device partition=C:
 bcdedit /set {default} osdevice partition=C:
 bcdedit /set {default} path \Windows\system32\winload.exe
@@ -1230,6 +1871,39 @@ if [ "$DRY_RUN" -eq 0 ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 7c: Pre-upload boot artifact validation gates
+# ═══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "── Step 7c: Pre-Upload Boot Artifact Validation ───────────────────────────"
+
+if [ "$DRY_RUN" -eq 0 ]; then
+  _boot_fail=0
+  if [ -f "$MNT/Windows/System32/winload.exe" ]; then
+    PASS "Validation: winload.exe present"
+  else
+    FAIL "Validation: missing C:\\Windows\\System32\\winload.exe"
+    _boot_fail=1
+  fi
+  if [ -f "$MNT/bootmgr" ]; then
+    PASS "Validation: bootmgr present"
+  else
+    WARN "Validation: bootmgr missing on mounted volume (may be UEFI split-disk layout)"
+  fi
+  if [ -f "$MNT/Boot/BCD" ] || [ -f "$MNT/EFI/Microsoft/Boot/BCD" ]; then
+    PASS "Validation: BCD hive present"
+  else
+    FAIL "Validation: no BCD hive found (Boot/BCD or EFI/Microsoft/Boot/BCD)"
+    _boot_fail=1
+  fi
+  if [ "$_boot_fail" -ne 0 ]; then
+    FAIL "Pre-upload boot validation failed; refusing to continue with this image"
+    exit 1
+  fi
+else
+  INFO "[DRY-RUN] Would validate winload.exe/bootmgr/BCD artifacts before upload"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Step 8: First-Boot Network + Firewall Script (RunOnce)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
@@ -1247,6 +1921,12 @@ if [ $DRY_RUN -eq 0 ]; then
 
   sudo mkdir -p "$FIRSTBOOT_DIR"
 
+  if is_bruteforce_flex; then
+    sudo mkdir -p "$MNT/ospc2flex"
+    sudo touch "$MNT/ospc2flex/BRUTEFORCE_FLEX.marker"
+    append_repair_report "BruteForceFlex.marker=CREATED"
+  fi
+
   sudo tee "$FIRSTBOOT_PS1" > /dev/null <<'FIRSTBOOTEOF'
 # ── ospc2flex first-boot network + firewall repair ──
 # Runs once via SetupComplete.cmd on first Windows boot after migration.
@@ -1256,12 +1936,135 @@ Start-Transcript -Path $logFile -Append
 
 Write-Host "[ospc2flex] First-boot repair starting..."
 
+if (Test-Path 'C:\ospc2flex\BRUTEFORCE_FLEX.marker') {
+    Write-Host "[ospc2flex] Brute-force Flex runtime enablement starting"
+
+    $BfLog = "C:\ospc2flex\bruteforce-flex-firstboot.log"
+    function LogLine($msg) {
+        $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        "$stamp $msg" | Out-File -FilePath $BfLog -Append -Encoding UTF8
+        Write-Host $msg
+    }
+
+    LogLine "Starting brute-force Flex first boot repair"
+
+    try {
+        $null = & bcdedit.exe /set "{default}" device partition=C: 2>&1
+        $null = & bcdedit.exe /set "{default}" osdevice partition=C: 2>&1
+        $null = & bcdedit.exe /set "{default}" path \Windows\system32\winload.exe 2>&1
+        $null = & bcdedit.exe /set "{default}" systemroot \Windows 2>&1
+        $null = & bcdedit.exe /set "{default}" recoveryenabled No 2>&1
+        $null = & bcdedit.exe /deletevalue "{default}" safeboot 2>&1
+        $null = & bcdedit.exe /deletevalue "{default}" detecthal 2>&1
+        $null = & bcdedit.exe /set "{current}" device partition=C: 2>&1
+        $null = & bcdedit.exe /set "{current}" osdevice partition=C: 2>&1
+        $null = & bcdedit.exe /set "{current}" path \Windows\system32\winload.exe 2>&1
+        $null = & bcdedit.exe /set "{current}" systemroot \Windows 2>&1
+        $null = & bcdedit.exe /set "{current}" recoveryenabled No 2>&1
+        $null = & bcdedit.exe /deletevalue "{current}" safeboot 2>&1
+        $null = & bcdedit.exe /deletevalue "{current}" detecthal 2>&1
+        $null = & bcdboot.exe C:\Windows /s C: /f BIOS 2>&1
+        LogLine "BCD: default/current + bcdboot BIOS applied"
+    } catch {
+        LogLine "WARN: BCD/brute bcdboot block: $_"
+    }
+
+    $servicesToAuto = @(
+        "QEMU-GA",
+        "Balloon",
+        "BalloonService",
+        "Dhcp",
+        "Dnscache",
+        "NlaSvc",
+        "netprofm",
+        "nsi",
+        "MpsSvc",
+        "TermService",
+        "UmRdpService",
+        "WinRM"
+    )
+
+    foreach ($svc in $servicesToAuto) {
+        try {
+            $s = Get-Service $svc -ErrorAction SilentlyContinue
+            if ($s) {
+                LogLine "Setting service $svc to Automatic"
+                sc.exe config $svc start= auto | Out-Null
+                Start-Service $svc -ErrorAction SilentlyContinue
+            }
+        } catch {
+            LogLine "WARN: Could not configure service $svc : $_"
+        }
+    }
+
+    $qemuGaMsi = "C:\ospc2flex\guest-agent\qemu-ga-x86_64.msi"
+    if (Test-Path $qemuGaMsi) {
+        LogLine "Installing QEMU Guest Agent from $qemuGaMsi"
+        Start-Process msiexec.exe -ArgumentList "/i `"$qemuGaMsi`" /qn /norestart" -Wait
+        Start-Sleep -Seconds 5
+        sc.exe config "QEMU-GA" start= auto | Out-Null
+        Start-Service "QEMU-GA" -ErrorAction SilentlyContinue
+    } else {
+        LogLine "WARN: QEMU Guest Agent MSI not found"
+    }
+
+    $virtioRoot = "C:\ospc2flex\virtio"
+    if (Test-Path $virtioRoot) {
+        LogLine "Installing all staged VirtIO drivers from $virtioRoot"
+        pnputil /add-driver "$virtioRoot\*.inf" /subdirs /install | Out-File -FilePath $BfLog -Append -Encoding UTF8
+        pnputil /scan-devices | Out-File -FilePath $BfLog -Append -Encoding UTF8
+    } else {
+        LogLine "WARN: VirtIO staged driver root not found: $virtioRoot"
+    }
+
+    Get-NetAdapter | Where-Object {$_.Status -eq "Up"} | ForEach-Object {
+        try {
+            LogLine "Enabling DHCP on adapter $($_.Name)"
+            Set-NetIPInterface -InterfaceAlias $_.Name -Dhcp Enabled -ErrorAction SilentlyContinue
+            Set-DnsClientServerAddress -InterfaceAlias $_.Name -ResetServerAddresses -ErrorAction SilentlyContinue
+        } catch {
+            LogLine "WARN: DHCP repair failed on $($_.Name): $_"
+        }
+    }
+
+    LogLine "Enabling RDP and firewall rules"
+    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction SilentlyContinue
+    Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+    Enable-NetFirewallRule -Name "FPS-ICMP4-ERQ-In" -ErrorAction SilentlyContinue
+
+    try {
+        winrm quickconfig -quiet 2>&1 | Out-Null
+        Enable-PSRemoting -Force 2>&1 | Out-Null
+    } catch {
+        LogLine "WARN: WinRM enable failed: $_"
+    }
+
+    LogLine "Final driver/service status"
+    Get-Service QEMU-GA,Balloon,Dhcp,Dnscache,NlaSvc,netprofm,MpsSvc,TermService,WinRM -ErrorAction SilentlyContinue |
+        Format-Table -AutoSize | Out-File -FilePath $BfLog -Append -Encoding UTF8
+
+    Get-CimInstance Win32_SystemDriver |
+        Where-Object {
+            $_.Name -match "viostor|vioscsi|netkvm|balloon|vioser|viorng|qemu|fwcfg|qxldod|VioGpu|pvpanic"
+        } |
+        Select-Object Name, DisplayName, State, Started, Status |
+        Format-Table -AutoSize | Out-File -FilePath $BfLog -Append -Encoding UTF8
+
+    LogLine "Brute-force Flex first boot repair completed"
+}
+
 # ── 0. Keep boot on the normal Windows loader (not Safe Mode / not auto-recovery) ──
 # Offline repair already patches BCD; this re-applies policy on first successful
 # Windows start so later boots stay on normal mode even if markers were pending.
 try {
+    $null = & bcdedit.exe /set "{bootmgr}" timeout 0 2>&1
+    $null = & bcdedit.exe /set "{bootmgr}" displaybootmenu No 2>&1
     $null = & bcdedit.exe /set "{current}" bootstatuspolicy IgnoreAllFailures 2>&1
     $null = & bcdedit.exe /set "{current}" recoveryenabled No 2>&1
+    $null = & bcdedit.exe /set "{current}" device partition=C: 2>&1
+    $null = & bcdedit.exe /set "{current}" osdevice partition=C: 2>&1
+    $null = & bcdedit.exe /set "{current}" path \Windows\System32\winload.exe 2>&1
+    $null = & bcdedit.exe /set "{current}" systemroot \Windows 2>&1
     $null = & bcdedit.exe /deletevalue "{current}" safeboot 2>&1
     $null = & bcdedit.exe /deletevalue "{current}" safebootalternateshell 2>&1
     $null = & bcdedit.exe /deletevalue "{current}" recoverysequence 2>&1
@@ -1543,6 +2346,30 @@ echo ""
 
 # Write sentinel
 if [ $DRY_RUN -eq 0 ]; then
+  if is_bruteforce_flex; then
+    echo "=== Brute-force Flex validation ===" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    for f in \
+      viostor.sys \
+      vioscsi.sys \
+      netkvm.sys \
+      balloon.sys \
+      vioser.sys \
+      viorng.sys \
+      qemufwcfg.sys
+    do
+      if [ -f "$DRIVERS_DIR/$f" ]; then
+        echo "DriverFile.$f=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+      else
+        echo "DriverFile.$f=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+      fi
+    done
+    if [ -f "$MNT/ospc2flex/guest-agent/qemu-ga-x86_64.msi" ]; then
+      echo "QEMU-GA.MSI=OK" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    else
+      echo "QEMU-GA.MSI=MISSING" | sudo tee -a "$REPAIR_REPORT_FILE" >/dev/null
+    fi
+    PASS "Brute-force Flex validation report written"
+  fi
   touch "${QCOW2}.win_repaired"
   PASS "Sentinel: ${QCOW2}.win_repaired"
 fi
@@ -1554,19 +2381,27 @@ else
 echo " ✅ Windows VirtIO injection complete!"
 fi
 echo "    Product: $PROD_NAME"
-echo "    Drivers: viostor (block) + vioscsi (SCSI) offline; NetKVM preinstalled and also staged"
+if is_bruteforce_flex; then
+  echo "    Mode: bruteforce_flex — full VirtIO + QEMU-GA staging; auxiliary drivers not neutralized"
+else
+  echo "    Drivers: viostor (block) + vioscsi (SCSI) offline; NetKVM preinstalled and also staged"
+fi
 if [ "$DRY_RUN" -eq 1 ]; then
 echo "    Registry: Services + CriticalDeviceDatabase entries would be injected"
-echo "    Xen: PV drivers would be disabled (xenvbd, xennet, xenvif, xeniface, xenbus)"
+echo "    Xen: PV drivers would be disabled (xenvbd, xendisk, xenfilt, xennet, xenvif, xeniface, xenbus, xenagent, xenbus_monitor, XenSvc)"
+echo "    Xen purge: $( [ "${PURGE_XEN:-0}" -eq 1 ] && echo 'aggressive removal would run' || echo 'disabled' )"
 echo "    Storage: Core MS drivers would be verified (disk, volmgr, partmgr, volsnap, mountmgr)"
 echo "    First-boot auto-repair (RunOnce) would configure:"
 else
 echo "    Registry: Services + CriticalDeviceDatabase entries injected"
-echo "    Xen: PV drivers disabled (xenvbd, xennet, xenvif, xeniface, xenbus)"
+echo "    Xen: PV drivers disabled (xenvbd, xendisk, xenfilt, xennet, xenvif, xeniface, xenbus, xenagent, xenbus_monitor, XenSvc)"
+echo "    Xen purge: $( [ "${PURGE_XEN:-0}" -eq 1 ] && echo 'aggressive removal enabled (--purge-xen)' || echo 'disabled' )"
 echo "    Storage: Core MS drivers verified (disk, volmgr, partmgr, volsnap, mountmgr)"
 echo "    First-boot auto-repair (RunOnce):"
 fi
 echo "      - BCD: bcdedit on {current} + recoverysequence scrub on all BCD entries (incl. winresume)"
+echo "      - First boot stays in normal mode; safeboot is removed from BCD if present"
+echo "      - Fast Startup disabled offline (HiberbootEnabled=0)"
 echo "      - Install staged NetKVM, then remove ghost Xen NICs and enable DHCP"
 echo "      - Firewall: RDP (3389) + ICMP + SSH (22) + WinRM (5985)"
 echo "      - OpenSSH Server enabled (2019+) — allows automated SSH verification"

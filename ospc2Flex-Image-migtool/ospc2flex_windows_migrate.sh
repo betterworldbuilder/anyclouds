@@ -45,6 +45,8 @@ WIN_PASSWORD=""
 WIN_SNET_IP=""
 WIN_SSH_IP=""
 SSH_DISK_METHOD=0
+WINDOWS_MODE="${OSPC2FLEX_WINDOWS_MODE:-offline_only}"
+OUTPUT_JSON="${OSPC2FLEX_WINDOWS_OUTPUT_JSON:-}"
 
 # ── Color helpers ─────────────────────────────────────────────────────────────
 # Log helpers write to STDERR (not stdout) so they never contaminate captured
@@ -94,6 +96,87 @@ step_done() {
   echo "  └─ [${elapsed}s elapsed] $status" >&2
 }
 
+validate_virtio_iso_preflight() {
+  local iso_path="${OSPC2FLEX_VIRTIO_ISO_LOCAL:-/mnt/migration/virtio/virtio-win.iso}"
+  local offline="${OSPC2FLEX_VIRTIO_ISO_OFFLINE:-1}"
+  local min_bytes="${OSPC2FLEX_VIRTIO_ISO_MIN_BYTES:-50000000}"
+
+  echo "── Windows VirtIO ISO preflight ─────────────────────────────"
+  echo "VirtIO ISO offline mode : $offline"
+  echo "VirtIO ISO path         : $iso_path"
+
+  if [ "$offline" = "0" ]; then
+    echo "ℹ️  Online VirtIO ISO download is allowed."
+    echo "ℹ️  Step 4 may download ISO if local cache is missing."
+    return 0
+  fi
+
+  if [ ! -f "$iso_path" ]; then
+    echo "❌ Missing VirtIO ISO: $iso_path"
+    echo ""
+    cat <<'EOF'
+Fix:
+  sudo mkdir -p /mnt/migration/virtio
+  scp virtio-win.iso ubuntu@<jumphost-ip>:/tmp/virtio-win.iso
+  sudo mv /tmp/virtio-win.iso /mnt/migration/virtio/virtio-win.iso
+  sudo chmod 644 /mnt/migration/virtio/virtio-win.iso
+  file /mnt/migration/virtio/virtio-win.iso
+  sudo mkdir -p /mnt/virtio_test
+  sudo mount -o loop,ro /mnt/migration/virtio/virtio-win.iso /mnt/virtio_test
+  ls /mnt/virtio_test | head
+  sudo umount /mnt/virtio_test
+
+Or allow online download:
+  export OSPC2FLEX_VIRTIO_ISO_OFFLINE=0
+EOF
+    return 20
+  fi
+
+  if [ ! -s "$iso_path" ]; then
+    echo "❌ VirtIO ISO exists but is empty: $iso_path"
+    return 21
+  fi
+
+  local size
+  size="$(stat -Lc%s "$iso_path" 2>/dev/null || echo 0)"
+  if [ "$size" -lt "$min_bytes" ]; then
+    echo "❌ VirtIO ISO is too small: $size bytes"
+    echo "Expected a real virtio-win.iso larger than 50 MB."
+    return 22
+  fi
+
+  if command -v file >/dev/null 2>&1; then
+    local ftype
+    ftype="$(file -L "$iso_path" 2>/dev/null || true)"
+    echo "ISO file type: $ftype"
+    if ! echo "$ftype" | grep -Eiq 'ISO|UDF|CD-ROM'; then
+      echo "❌ VirtIO ISO does not look like a valid ISO/UDF/CD-ROM image."
+      echo "File type was: $ftype"
+      return 23
+    fi
+  else
+    echo "⚠️  'file' command not found; skipping file type check."
+  fi
+
+  if command -v mount >/dev/null 2>&1; then
+    local test_mnt
+    test_mnt="$(mktemp -d /tmp/virtio_iso_preflight_XXXXXX)"
+    if sudo mount -o loop,ro "$iso_path" "$test_mnt" >/dev/null 2>&1; then
+      echo "✅ VirtIO ISO mount test passed."
+      ls "$test_mnt" | head -10 || true
+      sudo umount "$test_mnt" >/dev/null 2>&1 || true
+      rmdir "$test_mnt" >/dev/null 2>&1 || true
+    else
+      echo "❌ VirtIO ISO mount test failed: $iso_path"
+      rmdir "$test_mnt" >/dev/null 2>&1 || true
+      return 24
+    fi
+  fi
+
+  echo "✅ VirtIO ISO preflight OK: $iso_path"
+  return 0
+}
+
 # ── Parse args ────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -126,46 +209,64 @@ done
 #   CLOUD_LABEL  — Glance image + FLEX VM name; always BASE_LABEL-YYYYMMDD-HHMMSS when
 #                  LABEL equals BASE (resume), else same as LABEL.
 BASE_LABEL="$LABEL"
-_ts=$(date +%Y%m%d-%H%M%S)
 _resume_qcow=""
-if [ "${OSPC2FLEX_LEGACY_IMAGE_NAME:-0}" != "1" ]; then
+RESUME_MODE="${OSPC2FLEX_RESUME_MODE:-on}"
+RESUME_SCAN_NOTE=""
+qcow_is_readable() {
+  local img="$1"
+  qemu-img info --force-share "$img" >/dev/null 2>&1 || qemu-img info "$img" >/dev/null 2>&1
+}
+if [ "$RESUME_MODE" != "off" ]; then
   _plain="$WORK/${BASE_LABEL}.qcow2"
-  if [ -f "$_plain" ] && qemu-img info "$_plain" >/dev/null 2>&1; then
+  if [ -f "$_plain" ] && qcow_is_readable "$_plain"; then
     _sz=$(stat -c%s "$_plain" 2>/dev/null || echo 0)
     if [ "${_sz:-0}" -ge 1048576 ]; then
       _resume_qcow="$_plain"
     fi
+  elif [ -f "$_plain" ]; then
+    RESUME_SCAN_NOTE="Found $_plain, but qemu-img could not read it; ignoring resume candidate."
+  else
+    RESUME_SCAN_NOTE="No plain resume qcow2 found at $_plain."
   fi
   if [ -z "$_resume_qcow" ]; then
+    _dated_seen=0
     for _c in $(ls -t "$WORK/${BASE_LABEL}"-*.qcow2 2>/dev/null || true); do
+      _dated_seen=1
       [ -f "$_c" ] || continue
-      qemu-img info "$_c" >/dev/null 2>&1 || continue
+      qcow_is_readable "$_c" || continue
       _sz=$(stat -c%s "$_c" 2>/dev/null || echo 0)
       if [ "${_sz:-0}" -ge 1048576 ]; then
         _resume_qcow="$_c"
         break
       fi
     done
+    if [ -z "$_resume_qcow" ] && [ "${_dated_seen:-0}" = "1" ]; then
+      RESUME_SCAN_NOTE="Found dated qcow2 candidate(s), but none were readable and large enough; using fresh path."
+    elif [ -z "$_resume_qcow" ] && [ "${_dated_seen:-0}" = "0" ] && [ -z "$RESUME_SCAN_NOTE" ]; then
+      RESUME_SCAN_NOTE="No dated resume qcow2 candidates found for $BASE_LABEL."
+    fi
   fi
   if [ -n "$_resume_qcow" ]; then
     LABEL=$(basename "$_resume_qcow" .qcow2)
   else
-    LABEL="${BASE_LABEL}-${_ts}"
+    LABEL="${BASE_LABEL}"
   fi
 fi
 
-_cloud_ts=$(date +%Y%m%d-%H%M%S)
-if [ "$LABEL" = "$BASE_LABEL" ]; then
-  CLOUD_LABEL="${BASE_LABEL}-${_cloud_ts}"
-else
-  CLOUD_LABEL="$LABEL"
-fi
+CLOUD_LABEL="${OSPC2FLEX_CLOUD_LABEL:-$LABEL}"
 
 QCOW="$WORK/${LABEL}.qcow2"
 IMG_PATH="$WORK/${LABEL}.img"
 IMG_SIZE=0
 DOWNLOAD_METHOD=""
 RESUME_FROM_QCOW=0
+RESUME_FROM_IMG=0
+attempt=0
+max_dl=5
+SAW_GLANCE_DNS_FAIL=0
+SAW_PUBLIC_413=0
+LAST_CURL_LOG=""
+STEP2_DONE=0
 LOG="/tmp/mig_${LABEL}.log"
 if [ "${OSPC2FLEX_SELF_TEE:-auto}" != "0" ]; then
   exec > >(tee -a "$LOG") 2>&1
@@ -184,6 +285,7 @@ echo "  Network   : $NETWORK"
 echo "  Keypair   : $KEYPAIR"
 echo "  OS Family : $OS_FAMILY"
 echo "  OS Type   : $OS_TYPE"
+echo "  Win Mode  : $WINDOWS_MODE"
 echo ""
 echo "  Steps: 1 (OSPC auth/snapshot) → 1b (SSH check) → 2 (disk read) → 3 (qcow2) →"
 echo "         4 (VirtIO repair) → 5 (upload) → 6 (boot) → 7 (floating IP)"
@@ -192,7 +294,9 @@ echo "════════════════════════�
 echo ""
 
 mkdir -p "$WORK"
-if [ -s "$QCOW" ] && qemu-img info "$QCOW" >/dev/null 2>&1; then
+if [ "$RESUME_MODE" = "off" ]; then
+  INFO "Resume mode: OFF (OSPC2FLEX_RESUME_MODE=off) — forcing fresh download/conversion path."
+elif [ -s "$QCOW" ] && qcow_is_readable "$QCOW"; then
   QCOW_EXISTING_BYTES=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
   if [ "${QCOW_EXISTING_BYTES:-0}" -ge 1048576 ]; then
     RESUME_FROM_QCOW=1
@@ -200,12 +304,35 @@ if [ -s "$QCOW" ] && qemu-img info "$QCOW" >/dev/null 2>&1; then
     PASS "Resume point found: $QCOW ($((QCOW_EXISTING_BYTES / 1024 / 1024)) MB)"
     INFO "Skipping SSH/Glance download and raw->qcow2 conversion; resuming at Windows repair stage."
   fi
+elif [ -s "$IMG_PATH" ] && [ -s "${IMG_PATH}.complete" ]; then
+  IMG_EXISTING_BYTES=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+  IMG_COMPLETE_BYTES=$(awk -F= '$1 == "bytes" {print $2; exit}' "${IMG_PATH}.complete" 2>/dev/null || echo 0)
+  if [ "${IMG_EXISTING_BYTES:-0}" -ge 1048576 ] \
+     && [ "${IMG_COMPLETE_BYTES:-0}" -ge 1048576 ] \
+     && [ "$IMG_EXISTING_BYTES" -eq "$IMG_COMPLETE_BYTES" ]; then
+    RESUME_FROM_IMG=1
+    IMG_SIZE="$IMG_EXISTING_BYTES"
+    DOWNLOAD_METHOD="existing-raw-img-resume"
+    PASS "Raw image resume point found: $IMG_PATH ($((IMG_EXISTING_BYTES / 1024 / 1024)) MB)"
+    INFO "Skipping SSH/Glance download; resuming at raw->qcow2 conversion."
+  else
+    INFO "Found raw image plus completion marker, but byte counts do not match; ignoring raw resume candidate."
+    INFO "Raw bytes=${IMG_EXISTING_BYTES:-0}, marker bytes=${IMG_COMPLETE_BYTES:-0}"
+  fi
+fi
+if [ "$RESUME_MODE" != "off" ] && [ "$RESUME_FROM_QCOW" -ne 1 ] && [ "$RESUME_FROM_IMG" -ne 1 ]; then
+  INFO "Resume mode: ON, but no valid qcow2/raw resume point was found for $BASE_LABEL."
+  [ -n "$RESUME_SCAN_NOTE" ] && INFO "$RESUME_SCAN_NOTE"
+fi
+
+if [ "${OS_FAMILY:-}" = "windows" ] || echo "${SERVER_NAME:-} ${LABEL:-}" | grep -qi "windows"; then
+  validate_virtio_iso_preflight || exit $?
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1b: Check SSH first — skip snapshot entirely if SSH is reachable
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
+if [ "$RESUME_FROM_QCOW" -eq 0 ] && [ "$RESUME_FROM_IMG" -eq 0 ]; then
 step_start "1b" "Checking Windows SSH availability (public IP + ServiceNet)"
 _ssh_check_ip=""
 if nc -z -w 8 "$SERVER_IP" 22 2>/dev/null; then
@@ -514,13 +641,13 @@ elif [ "${SSH_DISK_METHOD:-0}" -eq 0 ]; then
   WARN "SSH not available and --windows-password not provided — using Glance fallback only"
 fi
 else
-  INFO "Resume mode: SSH/WinRM/snapshot discovery skipped because qcow2 already exists."
+  INFO "Resume mode: SSH/WinRM/snapshot discovery skipped because a disk image resume point already exists."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Download Windows disk image
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
+if [ "$RESUME_FROM_QCOW" -eq 0 ] && [ "$RESUME_FROM_IMG" -eq 0 ]; then
 step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
 rm -f "$IMG_PATH"
 
@@ -566,7 +693,9 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
   if [ "$_SSH_RC" -eq 0 ] && [ "${IMG_SIZE:-0}" -ge 1048576 ]; then
     PASS "Downloaded via SSH/PowerShell: $((IMG_SIZE / 1024 / 1024)) MB"
     DOWNLOAD_METHOD="ssh-powershell-disk-read"
+    printf 'bytes=%s\nmethod=%s\ncompleted_at=%s\n' "$IMG_SIZE" "$DOWNLOAD_METHOD" "$(date -Is)" > "${IMG_PATH}.complete"
     step_done "OK"
+    STEP2_DONE=1
   else
     WARN "SSH disk read failed (rc=$_SSH_RC size=${IMG_SIZE}B) — falling back to Glance"
     rm -f "$IMG_PATH"
@@ -580,6 +709,37 @@ if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
   INFO "Large Windows disks often take 30–120+ minutes — heartbeat + size logged every 60s."
   rm -f "$IMG_PATH"
 
+  if [ -z "${SNAP_ID:-}" ]; then
+    step_progress "No snapshot ID from Step 1 (SSH-first path); creating on-demand snapshot for Glance fallback..."
+    if [ -f /tmp/ospc2flex_ospc.sh ]; then
+      # shellcheck disable=SC1091
+      source /tmp/ospc2flex_ospc.sh
+    fi
+    export OS_INTERFACE=public OS_IDENTITY_API_VERSION=2
+    SERVER_ID_FALLBACK="$(openstack server list -f value -c ID -c Name 2>/dev/null | awk -v ip="$SERVER_IP" -v nm="$SERVER_NAME" 'tolower($0) ~ tolower(nm) {print $1; exit}')"
+    if [ -z "$SERVER_ID_FALLBACK" ] && [ -n "$SERVER_IP" ]; then
+      SERVER_ID_FALLBACK="$(openstack server list -f json 2>/dev/null | python3 -c 'import json,sys; t=sys.argv[1]; rows=json.load(sys.stdin); 
+for r in rows:
+    blob=" ".join(str(v) for v in r.values())
+    if t and t in blob:
+        print(r.get("ID","")); break' "$SERVER_IP" 2>/dev/null || true)"
+    fi
+    if [ -z "$SERVER_ID_FALLBACK" ]; then
+      FAIL "Glance fallback failed: unable to resolve source server ID for snapshot creation"
+      step_done "FAILED"
+      exit 1
+    fi
+    SNAP_NAME_FALLBACK="${BASE_LABEL}-snap-$(date +%Y%m%d%H%M%S)"
+    openstack server image create --name "$SNAP_NAME_FALLBACK" "$SERVER_ID_FALLBACK" --wait >/dev/null 2>&1 || true
+    SNAP_ID="$(openstack image list --name "$SNAP_NAME_FALLBACK" -f value -c ID 2>/dev/null | head -1 || true)"
+    if [ -z "$SNAP_ID" ]; then
+      FAIL "Glance fallback failed: on-demand snapshot creation did not return image ID"
+      step_done "FAILED"
+      exit 1
+    fi
+    step_progress "On-demand snapshot ready: $SNAP_ID"
+  fi
+
 # OSPC Rackspace Public Cloud only exposes PUBLIC Glance endpoints per region.
 # Using OS_INTERFACE=internal causes `openstack image save` to error with
 # "internal endpoint for image service in <region> not found". Force public.
@@ -588,6 +748,18 @@ OS_USERNAME="${OS_USERNAME:-}"
 OS_PASSWORD="${OS_PASSWORD:-}"
 OS_REGION_NAME="${OS_REGION_NAME:-IAD}"
 export OS_USERNAME OS_PASSWORD OS_REGION_NAME
+
+# If Step 1 was skipped (SSH path), credentials may not be loaded yet.
+if [ -z "${OS_USERNAME:-}" ] || { [ -z "${OS_PASSWORD:-}" ] && [ -z "${OS_API_KEY:-}" ]; }; then
+  if [ -f /tmp/ospc2flex_ospc.sh ]; then
+    # shellcheck disable=SC1091
+    source /tmp/ospc2flex_ospc.sh
+    OS_USERNAME="${OS_USERNAME:-}"
+    OS_PASSWORD="${OS_PASSWORD:-${OS_API_KEY:-}}"
+    OS_REGION_NAME="${OS_REGION_NAME:-IAD}"
+    export OS_USERNAME OS_PASSWORD OS_REGION_NAME
+  fi
+fi
 
 _refresh_ospc_token() {
   OS_TOKEN=$(openstack token issue -f value -c id 2>/dev/null || true)
@@ -851,6 +1023,7 @@ if [ "${IMG_SIZE:-0}" -lt 1048576 ] && [ -x /tmp/ospc2flex_glance_bridge.sh ]; t
     IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
     DOWNLOAD_METHOD="classic-glance-cloud-files-bridge"
     PASS "Downloaded via $DOWNLOAD_METHOD: $((IMG_SIZE / 1024 / 1024))MB"
+    printf 'bytes=%s\nmethod=%s\ncompleted_at=%s\n' "$IMG_SIZE" "$DOWNLOAD_METHOD" "$(date -Is)" > "${IMG_PATH}.complete"
   elif [ "$BRIDGE_RC" -eq 42 ]; then
     FAIL "Windows image export blocked by Rackspace licensing policy — Cloud Files export not permitted for this snapshot."
     FAIL "Contact Rackspace support to enable export for image $SNAP_ID, or migrate data at the application layer."
@@ -865,11 +1038,12 @@ fi
 attempt=1
 max_dl=5
 if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
-while [ "$attempt" -le "$max_dl" ]; do
+while [ "${attempt:-1}" -le "${max_dl:-5}" ]; do
   SAW_GLANCE_DNS_FAIL=0
   SAW_PUBLIC_413=0
   if _try_download_methods "$attempt"; then
     IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+    printf 'bytes=%s\nmethod=%s\ncompleted_at=%s\n' "$IMG_SIZE" "$DOWNLOAD_METHOD" "$(date -Is)" > "${IMG_PATH}.complete"
     break
   fi
   if [ "$SAW_PUBLIC_413" -eq 1 ]; then
@@ -901,7 +1075,13 @@ if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
 fi
 
 PASS "Step 2 complete: Image downloaded ($((IMG_SIZE / 1024 / 1024)) MB via $DOWNLOAD_METHOD)"
-step_done "OK"
+if [ "${STEP2_DONE:-0}" -eq 0 ]; then
+  step_done "OK"
+fi
+elif [ "$RESUME_FROM_IMG" -eq 1 ]; then
+step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
+step_progress "Existing completed raw image present; download skipped."
+step_done "SKIPPED (resume from raw image)"
 else
 step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
 step_progress "Existing qcow2 image present; download skipped."
@@ -925,6 +1105,7 @@ else
   step_progress "Converting raw → qcow2 (this may take 5-10 minutes)..."
   qemu-img convert -p -f "$DETECTED_FMT" -O qcow2 "$IMG_PATH" "$QCOW" 2>&1 || { FAIL "qemu-img convert failed"; step_done "FAILED"; exit 1; }
   rm -f "$IMG_PATH"
+  rm -f "${IMG_PATH}.complete"
   PASS "Converted to qcow2"
 fi
 QCOW_SIZE=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
@@ -976,6 +1157,21 @@ else
   if [ -f "$WIN_REPAIR" ]; then
     set +e  # temporarily disable abort on error
     REPAIR_ARGS=(--qcow2 "$QCOW" --force)
+    if [ -n "${OSPC2FLEX_WIN_NBD_DEV:-}" ]; then
+      REPAIR_ARGS+=(--nbd-dev "${OSPC2FLEX_WIN_NBD_DEV}")
+      INFO "Windows repair: using explicit NBD device ${OSPC2FLEX_WIN_NBD_DEV}"
+    fi
+    if [ "${OSPC2FLEX_WIN_PURGE_XEN:-1}" = "1" ]; then
+      REPAIR_ARGS+=(--purge-xen)
+      INFO "Windows repair: aggressive Xen purge enabled (default; set OSPC2FLEX_WIN_PURGE_XEN=0 to disable)"
+    else
+      REPAIR_ARGS+=(--no-purge-xen)
+      INFO "Windows repair: Xen safe-disable mode enabled (OSPC2FLEX_WIN_PURGE_XEN=0)"
+    fi
+    if [ "${OSPC2FLEX_WINDOWS_MODE:-}" = "bruteforce_flex" ]; then
+      REPAIR_ARGS+=(--bruteforce-flex)
+      INFO "Windows repair: brute-force Flex/KVM mode (OSPC2FLEX_WINDOWS_MODE=bruteforce_flex)"
+    fi
     [ "$DRY_RUN" -eq 1 ] && REPAIR_ARGS+=(--dry-run)
     # Full repair transcript (default on): OSPC2FLEX_WIN_REPAIR_DEBUG=0 to disable
     if [ "${OSPC2FLEX_WIN_REPAIR_DEBUG:-1}" != "0" ]; then
@@ -1002,6 +1198,8 @@ else
     exit 1
   fi
 fi
+
+# Step 4b validator removed by request.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 5: Upload to FLEX
@@ -1157,26 +1355,49 @@ IMG_OS_TYPE="windows"
 IMG_OS_DISTRO="windows"
 IMG_ARCH="x86_64"
 IMG_VM_MODE="hvm"
-IMG_DISK_BUS="scsi"
+IMG_DISK_BUS="${OSPC2FLEX_WIN_DISK_BUS:-ide}"
 IMG_VIF_MODEL="virtio"
 IMG_QGA="yes"
-IMG_SCSI_MODEL="virtio-scsi"
+IMG_SCSI_MODEL=""
+case "$IMG_DISK_BUS" in
+  ide)
+    INFO "Windows IDE rescue boot active: hw_disk_bus=ide"
+    IMG_VIF_MODEL=""
+    IMG_QGA=""
+    ;;
+  virtio)
+    INFO "Windows VirtIO block boot active: hw_disk_bus=virtio"
+    ;;
+  scsi)
+    IMG_SCSI_MODEL="virtio-scsi"
+    INFO "Windows VirtIO-SCSI boot active: hw_disk_bus=scsi + hw_scsi_model=virtio-scsi"
+    ;;
+  *)
+    FAIL "Invalid OSPC2FLEX_WIN_DISK_BUS=$IMG_DISK_BUS. Use: ide, virtio, or scsi"
+    step_done "FAILED"
+    exit 94
+    ;;
+esac
 step_progress "Uploading: $QCOW_BYTES bytes (${QCOW_MIB} MiB) to FLEX Glance..."
-INFO "FLEX image metadata: architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=$IMG_OS_DISTRO hw_disk_bus=$IMG_DISK_BUS hw_scsi_model=$IMG_SCSI_MODEL hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
+INFO "FLEX image metadata: architecture=$IMG_ARCH vm_mode=$IMG_VM_MODE os_type=$IMG_OS_TYPE os_distro=$IMG_OS_DISTRO hw_disk_bus=$IMG_DISK_BUS${IMG_SCSI_MODEL:+ hw_scsi_model=$IMG_SCSI_MODEL}${IMG_VIF_MODEL:+ hw_vif_model=$IMG_VIF_MODEL}${IMG_QGA:+ hw_qemu_guest_agent=$IMG_QGA}"
+
+IMG_PROP_ARGS=(
+  --property "architecture=$IMG_ARCH"
+  --property "vm_mode=$IMG_VM_MODE"
+  --property "os_type=$IMG_OS_TYPE"
+  --property "os_distro=$IMG_OS_DISTRO"
+  --property "hw_disk_bus=$IMG_DISK_BUS"
+)
+[ -n "$IMG_VIF_MODEL" ] && IMG_PROP_ARGS+=(--property "hw_vif_model=$IMG_VIF_MODEL")
+[ -n "$IMG_QGA" ] && IMG_PROP_ARGS+=(--property "hw_qemu_guest_agent=$IMG_QGA")
+[ -n "$IMG_SCSI_MODEL" ] && IMG_PROP_ARGS+=(--property "hw_scsi_model=$IMG_SCSI_MODEL")
 
 FLEX_IMG_ID=$(openstack image create "$CLOUD_LABEL" \
   --disk-format qcow2 \
   --container-format bare \
   --file "$QCOW" \
   --private \
-  --property "architecture=$IMG_ARCH" \
-  --property "vm_mode=$IMG_VM_MODE" \
-  --property "os_type=$IMG_OS_TYPE" \
-  --property "os_distro=$IMG_OS_DISTRO" \
-  --property "hw_disk_bus=$IMG_DISK_BUS" \
-  --property "hw_scsi_model=$IMG_SCSI_MODEL" \
-  --property "hw_vif_model=$IMG_VIF_MODEL" \
-  --property "hw_qemu_guest_agent=$IMG_QGA" \
+  "${IMG_PROP_ARGS[@]}" \
   --format value -c id 2>/dev/null || true)
 
 if [ -z "$FLEX_IMG_ID" ]; then
@@ -1198,6 +1419,101 @@ SHOW_NAME=$(openstack image show "$FLEX_IMG_ID" -f value -c name 2>/dev/null || 
 SHOW_VIS=$(openstack image show "$FLEX_IMG_ID" -f value -c visibility 2>/dev/null || echo "unknown")
 SHOW_STAT=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "${STATUS:-unknown}")
 INFO "[UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$FLEX_IMG_ID name=${SHOW_NAME:-unknown} status=${SHOW_STAT:-unknown} visibility=${SHOW_VIS:-unknown}"
+case "$IMG_DISK_BUS" in
+  ide)
+    openstack image unset \
+      --property hw_scsi_model \
+      --property hw_vif_model \
+      --property hw_qemu_guest_agent \
+      "$FLEX_IMG_ID" 2>/dev/null || true
+    openstack image set \
+      --property os_type=windows \
+      --property os_distro=windows \
+      --property vm_mode=hvm \
+      --property hw_disk_bus=ide \
+      "$FLEX_IMG_ID"
+    ;;
+  scsi)
+    openstack image set \
+      --property os_type=windows \
+      --property os_distro=windows \
+      --property vm_mode=hvm \
+      --property hw_disk_bus=scsi \
+      --property hw_scsi_model=virtio-scsi \
+      --property hw_vif_model=virtio \
+      --property hw_qemu_guest_agent=yes \
+      "$FLEX_IMG_ID"
+    ;;
+  virtio)
+    openstack image unset \
+      --property hw_scsi_model \
+      "$FLEX_IMG_ID" 2>/dev/null || true
+    openstack image set \
+      --property os_type=windows \
+      --property os_distro=windows \
+      --property vm_mode=hvm \
+      --property hw_disk_bus=virtio \
+      --property hw_vif_model=virtio \
+      --property hw_qemu_guest_agent=yes \
+      "$FLEX_IMG_ID"
+    ;;
+esac
+
+PROPS="$(openstack image show -f value -c properties "$FLEX_IMG_ID" 2>/dev/null || true)"
+INFO "Image properties after Windows boot metadata enforcement:"
+printf '%s\n' "$PROPS"
+prop_equals() {
+  local key="$1" expected="$2"
+  printf '%s\n' "$PROPS" | grep -Eq \
+    "${key}[\"']?[[:space:]]*[:=][[:space:]]*[\"']?${expected}([\"']|,|}|[[:space:]]|$)"
+}
+if [ "$IMG_DISK_BUS" = "ide" ]; then
+  prop_equals "hw_disk_bus" "ide" || {
+    FAIL "IDE metadata assertion failed: hw_disk_bus=ide not found"
+    step_done "FAILED"
+    exit 95
+  }
+  if echo "$PROPS" | grep -q "hw_scsi_model"; then
+    FAIL "IDE metadata assertion failed: hw_scsi_model present"
+    step_done "FAILED"
+    exit 96
+  fi
+  if echo "$PROPS" | grep -q "hw_vif_model"; then
+    FAIL "IDE metadata assertion failed: hw_vif_model present"
+    step_done "FAILED"
+    exit 101
+  fi
+  if echo "$PROPS" | grep -q "hw_qemu_guest_agent"; then
+    FAIL "IDE metadata assertion failed: hw_qemu_guest_agent present"
+    step_done "FAILED"
+    exit 102
+  fi
+fi
+if [ "$IMG_DISK_BUS" = "virtio" ]; then
+  prop_equals "hw_disk_bus" "virtio" || {
+    FAIL "VirtIO metadata assertion failed: hw_disk_bus=virtio not found"
+    step_done "FAILED"
+    exit 97
+  }
+  if echo "$PROPS" | grep -q "hw_scsi_model"; then
+    FAIL "VirtIO metadata assertion failed: hw_scsi_model present"
+    step_done "FAILED"
+    exit 98
+  fi
+fi
+if [ "$IMG_DISK_BUS" = "scsi" ]; then
+  prop_equals "hw_disk_bus" "scsi" || {
+    FAIL "SCSI metadata assertion failed: hw_disk_bus=scsi not found"
+    step_done "FAILED"
+    exit 99
+  }
+  prop_equals "hw_scsi_model" "virtio-scsi" || {
+    FAIL "SCSI metadata assertion failed: hw_scsi_model=virtio-scsi not found"
+    step_done "FAILED"
+    exit 100
+  }
+fi
+PASS "Windows FLEX image metadata assertion passed"
 step_done "OK"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1331,6 +1647,68 @@ echo "  RDP Connect:  mstsc /v:${ACTUAL_FIP:-unknown}"
 echo "  Download:     ${DOWNLOAD_METHOD:-unknown} (Step 2)"
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════════"
+
+if [ -z "$OUTPUT_JSON" ]; then
+  OUTPUT_JSON="$WORK/${CLOUD_LABEL}.windows_migrate_result.json"
+fi
+export OSPC2FLEX_RESULT_LABEL="$LABEL"
+export OSPC2FLEX_RESULT_BASE_LABEL="$BASE_LABEL"
+export OSPC2FLEX_RESULT_CLOUD_LABEL="$CLOUD_LABEL"
+export OSPC2FLEX_RESULT_MODE="$WINDOWS_MODE"
+export OSPC2FLEX_RESULT_SERVER_NAME="$SERVER_NAME"
+export OSPC2FLEX_RESULT_SERVER_IP="$SERVER_IP"
+export OSPC2FLEX_RESULT_OS_FAMILY="$OS_FAMILY"
+export OSPC2FLEX_RESULT_OS_TYPE="$OS_TYPE"
+export OSPC2FLEX_RESULT_DOWNLOAD_METHOD="${DOWNLOAD_METHOD:-}"
+export OSPC2FLEX_RESULT_RESUME_FROM_QCOW="$RESUME_FROM_QCOW"
+export OSPC2FLEX_RESULT_QCOW="$QCOW"
+export OSPC2FLEX_RESULT_IMG_PATH="${IMG_PATH:-}"
+export OSPC2FLEX_RESULT_REPAIR_LOG="${REPAIR_LOG:-}"
+export OSPC2FLEX_RESULT_IMAGE_ID="${FLEX_IMG_ID:-}"
+export OSPC2FLEX_RESULT_VM_ID="${VM_ID:-}"
+export OSPC2FLEX_RESULT_VM_STATUS="${VM_STATUS:-}"
+export OSPC2FLEX_RESULT_FLOATING_IP="${ACTUAL_FIP:-}"
+export OSPC2FLEX_RESULT_NETWORK="$NETWORK"
+export OSPC2FLEX_RESULT_FLAVOR="$FLAVOR"
+export OSPC2FLEX_RESULT_KEYPAIR="${KEYPAIR:-}"
+export OSPC2FLEX_RESULT_DISK_BUS="${IMG_DISK_BUS:-}"
+export OSPC2FLEX_RESULT_SCSI_MODEL="${IMG_SCSI_MODEL:-}"
+export OSPC2FLEX_RESULT_OUTPUT_JSON="$OUTPUT_JSON"
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+payload = {
+  "label": os.environ.get("OSPC2FLEX_RESULT_LABEL", ""),
+  "base_label": os.environ.get("OSPC2FLEX_RESULT_BASE_LABEL", ""),
+  "cloud_label": os.environ.get("OSPC2FLEX_RESULT_CLOUD_LABEL", ""),
+  "mode": os.environ.get("OSPC2FLEX_RESULT_MODE", ""),
+  "server_name": os.environ.get("OSPC2FLEX_RESULT_SERVER_NAME", ""),
+  "server_ip": os.environ.get("OSPC2FLEX_RESULT_SERVER_IP", ""),
+  "os_family": os.environ.get("OSPC2FLEX_RESULT_OS_FAMILY", ""),
+  "os_type": os.environ.get("OSPC2FLEX_RESULT_OS_TYPE", ""),
+  "download_method": os.environ.get("OSPC2FLEX_RESULT_DOWNLOAD_METHOD", ""),
+  "resume_from_qcow": os.environ.get("OSPC2FLEX_RESULT_RESUME_FROM_QCOW", "0") not in ("0", "", "false", "False"),
+  "qcow_path": os.environ.get("OSPC2FLEX_RESULT_QCOW", ""),
+  "image_path": os.environ.get("OSPC2FLEX_RESULT_IMG_PATH", ""),
+  "repair_log": os.environ.get("OSPC2FLEX_RESULT_REPAIR_LOG", ""),
+  "image_id": os.environ.get("OSPC2FLEX_RESULT_IMAGE_ID", ""),
+  "vm_id": os.environ.get("OSPC2FLEX_RESULT_VM_ID", ""),
+  "vm_status": os.environ.get("OSPC2FLEX_RESULT_VM_STATUS", ""),
+  "floating_ip": os.environ.get("OSPC2FLEX_RESULT_FLOATING_IP", ""),
+  "network": os.environ.get("OSPC2FLEX_RESULT_NETWORK", ""),
+  "flavor": os.environ.get("OSPC2FLEX_RESULT_FLAVOR", ""),
+  "keypair": os.environ.get("OSPC2FLEX_RESULT_KEYPAIR", ""),
+  "disk_bus": os.environ.get("OSPC2FLEX_RESULT_DISK_BUS", ""),
+  "scsi_model": os.environ.get("OSPC2FLEX_RESULT_SCSI_MODEL", ""),
+  "output_json": os.environ.get("OSPC2FLEX_RESULT_OUTPUT_JSON", ""),
+}
+path = Path(os.environ["OSPC2FLEX_RESULT_OUTPUT_JSON"])
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+PASS "Migration result JSON: $OUTPUT_JSON"
 
 # Cleanup OSPC snapshot
 if [ -n "${SNAP_ID:-}" ]; then

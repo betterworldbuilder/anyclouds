@@ -1010,11 +1010,20 @@ verify_centos_lan_markers() {{
 if [ "${{REPAIR_OS_TYPE:-}}" = "windows" ]; then
   if [ -f "$WIN_REPAIR" ]; then
     log "  [INFO] Running Windows VirtIO repair: $WIN_REPAIR"
-    if sudo bash "$WIN_REPAIR" --qcow2 "$repaired_path" --force; then
-      log "  [OK] Windows offline repair completed"
-      repair_ok=1
+    if [ "${{OSPC2FLEX_VIRTIO_ISO_FORCE_OFFLINE:-0}}" = "1" ]; then
+      if sudo bash "$WIN_REPAIR" --qcow2 "$repaired_path" --force; then
+        log "  [OK] Windows offline repair completed"
+        repair_ok=1
+      else
+        log "  [WARN] Windows repair failed — image may not boot on FLEX virtio"
+      fi
     else
-      log "  [WARN] Windows repair failed — image may not boot on FLEX virtio"
+      if sudo env OSPC2FLEX_VIRTIO_ISO_OFFLINE=0 OSPC2FLEX_VIRTIO_ISO_NO_DOWNLOAD=0 bash "$WIN_REPAIR" --qcow2 "$repaired_path" --force; then
+        log "  [OK] Windows offline repair completed"
+        repair_ok=1
+      else
+        log "  [WARN] Windows repair failed — image may not boot on FLEX virtio"
+      fi
     fi
   else
     log "  [WARN] Windows profile but $WIN_REPAIR not found on jumphost — cannot run VirtIO repair"

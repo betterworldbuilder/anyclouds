@@ -2099,53 +2099,70 @@
                         <button type="button" onclick="jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.75rem; padding:3px 10px; border-radius:4px; cursor:pointer; transition:0.2s;">Test Voice</button>
                     </div>
 
-                    <!-- Max Concurrent Jobs — below voice block -->
-                    <div style="display:flex;align-items:center;justify-content:center;gap:14px;background:rgba(0,0,0,0.35);border:1px solid #374151;border-radius:8px;padding:12px 24px;margin-top:10px;">
-                        <label for="max_concurrent_input" style="color:#94a3b8;font-size:15px;white-space:nowrap;font-family:monospace;font-weight:600;">⚡ Max Concurrent Jobs:</label>
-                        <input type="number" id="max_concurrent_input" min="1" max="50" value="20" style="width:76px;background:#111;border:2px solid #4b5563;color:#f9fafb;border-radius:6px;padding:7px 10px;font-size:18px;font-family:monospace;text-align:center;font-weight:700;">
+                    <!-- ROW 1: BATCH ORCHESTRATION -->
+                    <div style="display:flex; align-items:center; justify-content:center; gap:20px; background:rgba(0,0,0,0.35); border:1px solid #374151; border-radius:8px; padding:12px 24px; margin-top:10px;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <label for="max_concurrent_input" style="color:#94a3b8; font-size:14px; white-space:nowrap; font-family:monospace; font-weight:600;">⚡ Max Concurrent Jobs:</label>
+                            <input type="number" id="max_concurrent_input" min="1" max="50" value="20" style="width:70px; background:#111; border:2px solid #4b5563; color:#f9fafb; border-radius:6px; padding:5px 10px; font-size:16px; font-family:monospace; text-align:center; font-weight:700;">
+                        </div>
+                        <button type="button" id="add-batch-btn" style="display: none; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none; border-radius: 6px; padding: 8px 16px; color: white; font-weight: 600; cursor: pointer; align-items: center; gap: 8px; font-size: 0.85rem;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Add to Running Batch
+                        </button>
                     </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; align-items: center; justify-content: center; margin-top: 10px;">
-
-                            <button type="button" id="add-batch-btn" style="display: none; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none; border-radius: 6px; padding: 10px 20px; color: white; font-weight: 600; cursor: pointer; align-items: center; gap: 8px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                                Add to Running Batch
-                            </button>
+                    <!-- ROW 2: REPAIR LOGIC (Linux & Windows) -->
+                    <div style="margin-top:10px; padding:12px 18px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; gap:15px; flex-wrap:wrap;">
+                        <!-- LINUX REPAIR -->
+                        <div style="display:flex; align-items:center; gap:10px; background:rgba(245,158,11,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.35);"
+                             title="Linux-specific repair profile application.">
+                            <span style="color:#f59e0b; font-size:1rem;">🐧</span>
+                            <label for="offline_repair_method" style="color:#fcd34d; font-weight:700; font-size:0.82rem; white-space:nowrap;">Linux Offline VM Boot Repair:</label>
+                            <select id="offline_repair_method" name="offline_repair_method"
+                                style="background:#1e293b; border:1px solid #f59e0b; border-radius:6px; color:#fcd34d; font-size:0.82rem; font-weight:600; padding:4px 10px; cursor:pointer; outline:none;"
+                                onchange="localStorage.setItem('mig_offline_repair_method', this.value); toggleNbdPanel();">
+                                <option value="custom_os">✦ Native API Snapshot (NO SSH/Password Required)</option>
+                                <option value="generic">⚙ Generic Offline Snapshot (NO SSH/Password Required)</option>
+                                <option value="nbd_inline">🚀 NBD Live Stream (SSH Config Auth Required)</option>
+                                <option value="nbd_dd">📦 NBD Live DD (SSH Config Auth Required)</option>
+                            </select>
                         </div>
 
+                        <!-- WINDOWS REPAIR -->
+                        <div id="windows-method-panel" style="display:flex; align-items:center; gap:10px; background:rgba(14,165,233,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(56,189,248,0.35);"
+                             title="Windows-only sub-method.">
+                            <span style="color:#38bdf8; font-size:1rem;">🪟</span>
+                            <label for="windows_repair_method" style="color:#bae6fd; font-weight:700; font-size:0.82rem; white-space:nowrap;">Windows Offline Repair:</label>
+                            <select id="windows_repair_method" name="windows_repair_method"
+                                style="background:#1e293b; border:1px solid #38bdf8; border-radius:6px; color:#bae6fd; font-size:0.82rem; font-weight:600; padding:4px 10px; cursor:pointer; outline:none;"
+                                onchange="localStorage.setItem('mig_windows_repair_method', this.value); toggleNbdPanel();">
+                                <option value="windows_method_a">Method A — Offline Repair</option>
+                                <option value="windows_method_b_hypervisor">Method B — Hypervisor Two-Phase</option>
+                            </select>
+                            <label for="windows_purge_xen" style="display:flex;align-items:center;gap:6px;color:#7dd3fc;font-size:0.78rem;font-weight:700;white-space:nowrap;cursor:pointer;margin-left:6px;" title="Aggressively remove Xen PV remnants during Windows offline repair.">
+                                <input type="checkbox" id="windows_purge_xen" checked
+                                    style="width:14px;height:14px;accent-color:#38bdf8;cursor:pointer;"
+                                    onchange="localStorage.setItem('mig_windows_purge_xen', this.checked ? '1' : '0');">
+                                Zen Purge
+                            </label>
+                        </div>
+                    </div>
 
-                    <div style="margin: 0 0 16px 0; padding: 14px 18px; background: rgba(74,222,128,0.05); border: 1px solid rgba(74,222,128,0.2); border-radius: 10px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+                    <!-- ROW 3: NETWORKING -->
+                    <div style="margin-top:10px; padding:12px 18px; background:rgba(74,222,128,0.05); border:1px solid rgba(74,222,128,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; gap:25px; flex-wrap:wrap;">
                         <label style="color:#4ade80; font-size:0.9rem; font-weight:600; white-space:nowrap; display:flex; align-items:center; gap:10px; cursor:pointer;">
                             <input type="checkbox" id="auto_floating_ip" checked
                                 style="width:16px; height:16px; accent-color:#4ade80; cursor:pointer;">
                             🌐 Auto-Assign Floating IP
                         </label>
 
-                        <!-- OFFLINE REPAIR METHOD -->
-                        <div style="flex:1; display:flex; justify-content:center;">
-                            <div style="display:flex; align-items:center; gap:10px; background:rgba(245,158,11,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.35);"
-                                 title="Generic: runs ospc2flex_offline_repair.sh on every VM regardless of OS type.&#10;Custom OS Type: applies per-OS repair profile (Ubuntu 24 / Ubuntu / Debian / AlmaLinux / Rocky / RHEL / CentOS / Fedora / openSUSE).">
-                                <span style="color:#f59e0b; font-size:1rem;">🔧</span>
-                                <label for="offline_repair_method" style="color:#fcd34d; font-weight:700; font-size:0.82rem; white-space:nowrap;">Offline VM Boot Repair:</label>
-                                <select id="offline_repair_method" name="offline_repair_method"
-                                    style="background:#1e293b; border:1px solid #f59e0b; border-radius:6px; color:#fcd34d; font-size:0.82rem; font-weight:600; padding:4px 10px; cursor:pointer; outline:none;"
-                                    onchange="localStorage.setItem('mig_offline_repair_method', this.value); toggleNbdPanel();">
-                                    <option value="custom_os">✦ Native API Snapshot (NO SSH/Password Required)</option>
-                                    <option value="generic">⚙ Generic Offline Snapshot (NO SSH/Password Required)</option>
-                                    <option value="nbd_inline">🚀 NBD Live Stream (SSH Config Auth Required)</option>
-                                    <option value="nbd_dd">📦 NBD Live DD (SSH Config Auth Required)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <label for="flex_external_network_input" style="color:#64748b; font-size:0.8rem; white-space:nowrap;">Pool:</label>
+                        <div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.03); padding:6px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+                            <label for="flex_external_network_input" style="color:#94a3b8; font-size:0.82rem; font-weight:600; white-space:nowrap;">Network Pool:</label>
                             <input type="text" id="flex_external_network_input" value="PUBLICNET"
-                                style="width:100px; padding:6px 10px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:0.85rem; font-family:monospace;"
+                                style="width:110px; padding:4px 10px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:0.85rem; font-family:monospace; font-weight:700;"
                                 oninput="localStorage.setItem('mig_flex_ext_net', this.value);">
                         </div>
                     </div>
-
                     <!-- NBD Batch Action Buttons -->
                     <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:flex-end; margin:16px 0 0;">
                         <button type="button" class="btn-primary" id="start-batch-btn"
@@ -6158,6 +6175,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 auto_floating_ip: document.getElementById('auto_floating_ip') ? document.getElementById('auto_floating_ip').checked : false,
                 flex_external_network: document.getElementById('flex_external_network_input') ? document.getElementById('flex_external_network_input').value : 'PUBLICNET',
                 offline_repair_method: document.getElementById('offline_repair_method') ? document.getElementById('offline_repair_method').value : 'custom_os',
+                windows_repair_method: document.getElementById('windows_repair_method') ? document.getElementById('windows_repair_method').value : 'windows_method_a',
+                windows_purge_xen: document.getElementById('windows_purge_xen') ? document.getElementById('windows_purge_xen').checked : true,
                 direct_export: document.getElementById('direct_export') ? document.getElementById('direct_export').checked : false
             };
 
@@ -6181,6 +6200,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             // MODE DISPATCH — branch based on selected offline repair method
             // ================================================================
             const _selectedRepairMethod = payloadTemplate.offline_repair_method || 'custom_os';
+            const _selectedWindowsMethod = payloadTemplate.windows_repair_method || 'windows_method_a';
 
             // Precreate all VM blocks upfront (in order) with IP + flavor hints
             Array.from(_newCheckedVMs).forEach(cb => {
@@ -6207,7 +6227,13 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     return;
                 }
                 const flexCreds = nbdGetFlexCreds();
-                appendLog(`${_selectedRepairMethod === 'nbd_dd' ? '📦 DD' : '🚀 NBD'} Inline Repair — dispatching ${_newCheckedVMs.length} VM(s) via mig_worker_v4.sh on ${jh.jumphost_ip}`, 'system');
+                const _dispatchLabel = _selectedRepairMethod === 'nbd_dd'
+                    ? '📦 DD'
+                    : '🚀 NBD';
+                const _windowsNote = _selectedWindowsMethod === 'windows_method_b_hypervisor'
+                    ? ' · Windows guests -> Method B Hypervisor'
+                    : ' · Windows guests -> Method A';
+                appendLog(`${_dispatchLabel} Inline Repair — dispatching ${_newCheckedVMs.length} VM(s) via mig_worker_v4.sh on ${jh.jumphost_ip}${_windowsNote}`, 'system');
 
                 // Initialize progress tracker with all VM names
                 const _vmNames = Array.from(_newCheckedVMs).map(cb => cb.dataset.sourceName);
@@ -6245,6 +6271,9 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             auth_url:   'https://identity.api.rackspacecloud.com/v2.0/'
                         },
                         dry_run:       document.getElementById('mig_mode_value').value === 'dryrun',
+                        offline_repair_method: _selectedRepairMethod,
+                        windows_repair_method: _selectedWindowsMethod,
+                        windows_purge_xen: !!payloadTemplate.windows_purge_xen,
                         vm: {
                             label:     sName,
                             src_ip:    srcIp,
@@ -6254,6 +6283,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             ssh_key:   vmSshKey || '',
                             password:  vmPassword || '',
                             server_snet_ip: vmSnetIpNbd,
+                            offline_repair_method: _selectedRepairMethod,
+                            windows_repair_method: _selectedWindowsMethod,
                             nbd_idx:   idx,
                             src_port:  10811 + idx,
                             tun_port:  10821 + idx,
@@ -6905,7 +6936,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
     function toggleNbdPanel() {
         const method = (document.getElementById('offline_repair_method') || {}).value;
         const panel  = document.getElementById('nbd-panel');
-        if (panel) panel.style.display = (method === 'nbd_inline' || method === 'nbd_dd') ? 'block' : 'none';
+        const winMethodSel = (document.getElementById('windows_repair_method') || {}).value || 'windows_method_a';
+        const winPanel = document.getElementById('windows-method-panel');
+        const isNbdMethod = (method === 'nbd_inline' || method === 'nbd_dd');
+        if (panel) panel.style.display = isNbdMethod ? 'block' : 'none';
+        if (winPanel) winPanel.style.display = isNbdMethod ? 'flex' : 'none';
         // ── Dynamic button label per repair mode ──
         const lbl = document.getElementById('start-btn-label');
         if (lbl) {
@@ -6920,7 +6955,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         // ── Button color glow per mode ──
         const btn = document.getElementById('start-batch-btn');
         if (btn) {
-            if (method === 'nbd_inline' || method === 'nbd_dd') {
+            if (isNbdMethod) {
                 btn.style.background = method === 'nbd_dd' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #0ea5e9, #2563eb)';
                 btn.style.borderColor = method === 'nbd_dd' ? '#34d399' : '#38bdf8';
             } else if (method === 'generic') {
@@ -6938,9 +6973,12 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         const pTitle   = document.getElementById('pipeline-title');
         const pSub     = document.getElementById('pipeline-subtitle');
         if (s45title && s45desc) {
-            if (method === 'nbd_inline' || method === 'nbd_dd') {
+            if (isNbdMethod) {
                 if (pTitle) pTitle.innerHTML = method === 'nbd_dd' ? '📦 DD Inline Migration Pipeline' : '🚀 NBD Inline Migration Pipeline';
-                if (pSub)  pSub.textContent  = method === 'nbd_dd' ? 'Raw disk copy via dd + SSH · no packages installed on origin · per-OS repair on jumphost' : 'Direct disk copy via NBD tunnel · per-OS inline repair on jumphost · no OSPC Glance needed';
+                if (pSub)  pSub.textContent  =
+                    method === 'nbd_dd'
+                        ? `Raw disk copy via dd + SSH · Linux follows standard inline repair · Windows guests use ${winMethodSel === 'windows_method_b_hypervisor' ? 'Method B Hypervisor' : 'Method A'}`
+                        : `Direct disk copy via NBD tunnel · Linux follows standard inline repair · Windows guests use ${winMethodSel === 'windows_method_b_hypervisor' ? 'Method B Hypervisor' : 'Method A'}`;
                 // Update Steps 1-4 to match actual NBD pipeline
                 const _ps = (id, badge, title, desc, time, titleColor) => {
                     const el = document.getElementById(id);
@@ -6953,17 +6991,19 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 _ps('pipeline-step-1',  '0',   'Clean Old VM + Image',     'Delete previous FLEX VM & image attempts · clean workspace',         '~10s',    '#7dd3fc');
                 _ps('pipeline-step-2',  '1',   'qemu-nbd on Source',        'Start NBD server on OSPC source VM · serves raw disk over network',   '~5s',     '#a78bfa');
                 _ps('pipeline-step-25', '2',   'SSH Tunnel + Keepalive',    'Encrypted tunnel: jumphost:1082x ↔ source:1081x · 30s keepalive',    '~3s',     '#7dd3fc');
-                _ps('pipeline-step-3',  '3',   'Convert NBD → qcow2',      'qemu-img convert via tunnel · compressed qcow2 · BOTTLENECK',        '~60–90 min', '#f59e0b');
+                _ps('pipeline-step-3',  '3',   'Convert NBD → qcow2', 'qemu-img convert via tunnel · compressed qcow2 · BOTTLENECK', '~60–90 min', '#f59e0b');
                 const s3el = document.getElementById('pipeline-step-3');
                 if (s3el) { s3el.style.border = '1px solid rgba(245,158,11,0.3)'; s3el.style.background = '#1a0f00'; }
-                _ps('pipeline-step-4',  '4',   'Offline Repair',            'Mount qcow2 · fix fstab/grub/network/cloud-init per OS profile',     '~2–5 min', '#7dd3fc');
+                _ps('pipeline-step-4',  '4',   'Offline Repair', winMethodSel === 'windows_method_b_hypervisor' ? 'Linux: standard inline repair · Windows: offline repair + staged VirtIO payload for rescue boot' : 'Linux: standard inline repair · Windows: offline repair with current Method A workflow', '~2–5 min', '#7dd3fc');
                 s45title.innerHTML = 'Upload to Glance <span style="color:#0ea5e9;font-weight:400;font-size:10px;">· FLEX</span>';
-                s45desc.innerHTML  = 'openstack image create → wait image active → delete local qcow2';
+                s45desc.innerHTML  = winMethodSel === 'windows_method_b_hypervisor'
+                    ? 'Linux uploads normally · Windows uploads IDE rescue image first, then pivots to final VirtIO image after in-guest driver binding'
+                    : 'Linux uploads normally · Windows follows current Method A upload/boot path';
                 const s45el = document.getElementById('pipeline-step-45');
                 if (s45el) { const t45 = s45el.querySelector('.ps-time'); if (t45) t45.textContent = '~10–20 min'; }
-                _ps('pipeline-step-46', '6',   'Boot VM + Floating IP',     'Create VM from image · attach public IP · staggered per VM',         '~2–3 min', '#fb923c');
-                _ps('pipeline-step-5',  '7',   'SSH Verify',                'Test SSH: flex key + origin key · multiple users · 24 retries',       '~2–5 min', '#4ade80');
-                _ps('pipeline-step-55', '8',   'Report Results',            'Log SSH OK/FAIL · record Image ID + VM ID + FIP',                    '~5s',     '#7dd3fc');
+                _ps('pipeline-step-46', '6',   winMethodSel === 'windows_method_b_hypervisor' ? 'Boot + Windows Rescue Bind' : 'Boot VM + Floating IP', winMethodSel === 'windows_method_b_hypervisor' ? 'Linux: normal boot · Windows: boot IDE rescue VM, wait for WinRM/SSH, run pnputil, clean shutdown' : 'Create VM from image · attach public IP · staggered per VM', '~2–15 min', '#fb923c');
+                _ps('pipeline-step-5',  '7',   winMethodSel === 'windows_method_b_hypervisor' ? 'Windows Final VirtIO Boot Test' : 'SSH Verify', winMethodSel === 'windows_method_b_hypervisor' ? 'Windows only: snapshot rescue VM into final VirtIO/SCSI image and verify final boot' : 'Test SSH: flex key + origin key · multiple users · 24 retries', '~2–10 min', '#4ade80');
+                _ps('pipeline-step-55', '8',   'Report Results',            winMethodSel === 'windows_method_b_hypervisor' ? 'Linux reports normally · Windows keeps rescue VM on failure and writes JSON + logs' : 'Log SSH OK/FAIL · record Image ID + VM ID + FIP', '~5s', '#7dd3fc');
                 _ps('pipeline-step-6',  '✅',  'Migration Complete',        'All steps done · VM running on FLEX with public IP',                  '',        '#4ade80');
             } else if (method === 'generic') {
                 if (pTitle) pTitle.innerHTML = '⚙ Generic Migration Pipeline';
@@ -7574,6 +7614,16 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         if (saved) {
             const sel = document.getElementById('offline_repair_method');
             if (sel) sel.value = saved;
+        }
+        const savedWinMethod = localStorage.getItem('mig_windows_repair_method');
+        if (savedWinMethod) {
+            const sel = document.getElementById('windows_repair_method');
+            if (sel) sel.value = savedWinMethod;
+        }
+        const savedWinPurgeXen = localStorage.getItem('mig_windows_purge_xen');
+        const purgeCb = document.getElementById('windows_purge_xen');
+        if (purgeCb) {
+            purgeCb.checked = savedWinPurgeXen !== '0';
         }
         toggleNbdPanel();
 
