@@ -79,6 +79,7 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "rw,remove_hiberfile" in txt
     assert "mount_windows_ntfs_nbd_rw" in txt
     assert "ntfs-3g -o rw,remove_hiberfile,big_writes" in txt
+    assert "endpoint list --service image --interface public" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():

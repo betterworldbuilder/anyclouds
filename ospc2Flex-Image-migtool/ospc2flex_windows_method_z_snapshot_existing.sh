@@ -1301,11 +1301,12 @@ wait_for_flex_region() {
   for r in "$requested" DFW3 IAD3 ORD3 ORD IAD DFW; do
     [ -n "$r" ] || continue
     export OS_REGION_NAME="$r"
-    if openstack token issue >/dev/null 2>&1; then
+    if openstack token issue >/dev/null 2>&1 && openstack endpoint list --service image --interface public --region "$r" -f value -c URL 2>/dev/null | grep -q .; then
       FLEX_REGION="$r"
       json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
       return 0
     fi
+    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r has no usable public image endpoint; trying fallback"
   done
   return 1
 }
