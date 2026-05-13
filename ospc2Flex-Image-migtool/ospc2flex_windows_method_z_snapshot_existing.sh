@@ -1301,12 +1301,20 @@ wait_for_flex_region() {
   for r in "$requested" DFW3 IAD3 ORD3 ORD IAD DFW; do
     [ -n "$r" ] || continue
     export OS_REGION_NAME="$r"
-    if openstack token issue >/dev/null 2>&1 && openstack endpoint list --service image --interface public --region "$r" -f value -c URL 2>/dev/null | grep -q .; then
+    if ! openstack token issue >/dev/null 2>&1; then
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r token issue failed; trying fallback"
+      continue
+    fi
+    if ! openstack catalog show glance >/dev/null 2>&1; then
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r has no Glance catalog entry; trying fallback"
+      continue
+    fi
+    if openstack image list --limit 1 >/dev/null 2>&1; then
       FLEX_REGION="$r"
       json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
       return 0
     fi
-    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r has no usable public image endpoint; trying fallback"
+    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r Glance API rejected this token/project; trying fallback"
   done
   return 1
 }
@@ -1849,7 +1857,7 @@ log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT standalone offline Windows repair complete
 
 stage_start "ZS6_UPLOAD_FLEX_RESCUE_IMAGE"
 source_openrc_if_present "$FLEX_OPENRC"
-wait_for_flex_region "$FLEX_REGION" || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_token_issue_failed" "Check Flex OpenRC and region."
+wait_for_flex_region "$FLEX_REGION" || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_glance_access_failed" "Keystone token works, but no tested Flex region allowed Glance image access for this project/token."
 redacted_env_snapshot "$JOB_STATE/flex_env_redacted.txt"
 RESCUE_IMAGE_ID="$(openstack image create --container-format bare --disk-format qcow2 --file "$QCOW2" --progress "$RESCUE_IMAGE_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Inspect Flex Glance quota/auth."
