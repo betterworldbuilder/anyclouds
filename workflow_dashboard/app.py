@@ -7290,7 +7290,23 @@ def run_image_migrator():
                     attempts=2,
                     retry_wait=15,
                 )
-                yield "data: [METHOD_Z] Scripts and scoped OpenRC files staged on jumphost.\n\n"
+                yield "data: [METHOD_Z] Preparing SNAPWIN workspace on jumphost: /mnt/migration/ospc2flex_method_z\n\n"
+                prep_cmd = (
+                    "set -e; "
+                    "base=/mnt/migration/ospc2flex_method_z; "
+                    "sudo -n mkdir -p \"$base\"; "
+                    "sudo -n chown -R $(id -u):$(id -g) \"$base\"; "
+                    "mkdir -p \"$base/runs\"; "
+                    "test -w \"$base\""
+                )
+                yield from _run_stage_cmd(
+                    "SNAPWIN workspace prepare",
+                    ssh_base_z + [prep_cmd],
+                    timeout=120,
+                    attempts=2,
+                    retry_wait=15,
+                )
+                yield "data: [METHOD_Z] Scripts, scoped OpenRC files, and SNAPWIN workspace staged on jumphost.\n\n"
 
                 z_cmd = [
                     "bash", remote_script,

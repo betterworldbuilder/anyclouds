@@ -128,7 +128,16 @@ CURRENT_STAGE="ZS0_PREFLIGHT"
 DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_DOWNLOAD_UNAVAILABLE"
 DOWNLOAD_NEXT_ACTION="Provide a local artifact, enable Glance image download/export, or provide Cloud Files object details."
 
-mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT"
+if ! mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT" 2>/dev/null; then
+  echo "[SNAPWIN] Base directory is not writable by $(id -un); preparing $BASE_DIR with sudo" >&2
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "ERROR: cannot create $BASE_DIR and sudo is not available" >&2
+    exit 1
+  fi
+  sudo -n mkdir -p "$BASE_DIR"
+  sudo -n chown -R "$(id -u):$(id -g)" "$BASE_DIR"
+  mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT"
+fi
 : >"$PROGRESS_LOG"
 : >"$BACKGROUND_LOG"
 
