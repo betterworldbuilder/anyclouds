@@ -73,6 +73,7 @@ uploads/migration_output_bundles/
 
 # Backup files
 *.bak
+*.bak.
 *.bak.*
 backups/
 
@@ -88,3 +89,7 @@ ospc2Flex-Image-migtool/web_ui_python/venv/
 # Local scratch backups
 *.bak_
 *.bak_*
+
+# Local agent/editor state
+.claude/
+**/.claude/
