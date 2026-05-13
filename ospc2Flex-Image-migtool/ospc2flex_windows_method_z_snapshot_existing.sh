@@ -1318,8 +1318,25 @@ cleanup_guest_mountpoint() {
   fi
 }
 
+cleanup_stale_guestfs_for_qcow2() {
+  local pid cmd
+  pgrep -f "$QCOW2" 2>/dev/null | while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    case "$cmd" in
+      *guestmount*|*qemu-system*x86_64*)
+        log "[ZS5_OFFLINE_WINDOWS_REPAIR] cleaning stale libguestfs process pid=$pid"
+        kill "$pid" 2>/dev/null || true
+        sleep 1
+        kill -9 "$pid" 2>/dev/null || true
+        ;;
+    esac
+  done
+}
+
 prepare_guest_mountpoint() {
   cleanup_guest_mountpoint "$MNT"
+  cleanup_stale_guestfs_for_qcow2
   rm -rf "$MNT" 2>/dev/null || sudo -n rm -rf "$MNT"
   mkdir -p "$MNT" 2>/dev/null || {
     sudo -n mkdir -p "$MNT"
