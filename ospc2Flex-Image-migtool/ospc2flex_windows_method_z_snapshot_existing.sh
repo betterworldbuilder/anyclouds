@@ -1311,6 +1311,11 @@ find_windows_root() {
   return 1
 }
 
+detect_windows_ntfs_partition() {
+  virt-filesystems -a "$QCOW2" --filesystems --long 2>>"$REPAIR_LOG" \
+    | awk '$3 == "ntfs" { print $1; exit }'
+}
+
 cleanup_guest_mountpoint() {
   local mnt="$1"
   if mountpoint -q "$mnt" 2>/dev/null; then
@@ -1482,7 +1487,16 @@ standalone_offline_windows_repair() {
   ts="$(date -u +%Y%m%d-%H%M%S)"
   prepare_guest_mountpoint
   preclean_ntfs_for_rw_mount
-  guestmount -a "$QCOW2" -i --rw "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
+  local ntfs_part
+  ntfs_part="$(detect_windows_ntfs_partition || true)"
+  if [ -n "$ntfs_part" ]; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] guestmount explicit NTFS partition: $ntfs_part"
+    guestmount -a "$QCOW2" -m "${ntfs_part}:/:rw,remove_hiberfile" "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
+  else
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: NTFS partition not detected; falling back to guestmount inspector"
+    guestmount -a "$QCOW2" -i --rw "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
+  fi
+  touch "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" && rm -f "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_read_only" "NTFS mounted read-only; inspect $REPAIR_LOG."
   winroot="$(find_windows_root)" || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
   [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
   cfg="$winroot/System32/config"
