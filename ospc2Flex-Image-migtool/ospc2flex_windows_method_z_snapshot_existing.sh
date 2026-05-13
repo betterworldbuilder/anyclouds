@@ -1645,8 +1645,14 @@ case "$SOURCE_FORMAT" in
   qcow2)
     safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
     ;;
-  raw|vpc|vhdx|unknown)
-    qemu-img check -r all "$SOURCE_ARTIFACT" >>"$BACKGROUND_LOG" 2>&1 || true
+  raw)
+    qemu-img convert -f raw -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    ;;
+  vpc|vhdx)
+    qemu-img check -r all -f "$SOURCE_FORMAT" "$SOURCE_ARTIFACT" >>"$BACKGROUND_LOG" 2>&1 || true
+    qemu-img convert -f "$SOURCE_FORMAT" -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    ;;
+  unknown)
     qemu-img convert -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
     ;;
   *)

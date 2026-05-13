@@ -65,6 +65,7 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "python3-openstackclient" in txt
     assert "libguestfs-tools" in txt
     assert "ensure_virtio_iso" in txt
+    assert "qemu-img convert -f raw" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():
