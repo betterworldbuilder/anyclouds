@@ -127,6 +127,7 @@ FINAL_FLOATING_IP=""
 ACCESS_METHOD=""
 ACCESS_IP=""
 ACCESS_PORT=""
+SNAPWIN_NBD_DEV=""
 CURRENT_STAGE="ZS0_PREFLIGHT"
 DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_DOWNLOAD_UNAVAILABLE"
 DOWNLOAD_NEXT_ACTION="Provide a local artifact, enable Glance image download/export, or provide Cloud Files object details."
@@ -1316,10 +1317,38 @@ detect_windows_ntfs_partition() {
     | awk '$3 == "ntfs" { print $1; exit }'
 }
 
+wait_for_nbd_ntfs_partition() {
+  local nbd="$1" i part fstype
+  for i in $(seq 1 30); do
+    sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+    command -v udevadm >/dev/null 2>&1 && sudo -n udevadm settle >>"$REPAIR_LOG" 2>&1 || true
+    for part in "${nbd}"p*; do
+      [ -b "$part" ] || continue
+      fstype="$(blkid -o value -s TYPE "$part" 2>/dev/null || true)"
+      if [ "$fstype" = "ntfs" ]; then
+        echo "$part"
+        return 0
+      fi
+    done
+    sleep 1
+  done
+  return 1
+}
+
 cleanup_guest_mountpoint() {
   local mnt="$1"
   if mountpoint -q "$mnt" 2>/dev/null; then
     guestunmount "$mnt" >>"$REPAIR_LOG" 2>&1 || fusermount3 -u "$mnt" >>"$REPAIR_LOG" 2>&1 || fusermount -u "$mnt" >>"$REPAIR_LOG" 2>&1 || sudo -n umount "$mnt" >>"$REPAIR_LOG" 2>&1 || true
+  fi
+}
+
+cleanup_windows_mount() {
+  if mountpoint -q "$MNT" 2>/dev/null; then
+    sudo -n umount "$MNT" >>"$REPAIR_LOG" 2>&1 || guestunmount "$MNT" >>"$REPAIR_LOG" 2>&1 || fusermount3 -u "$MNT" >>"$REPAIR_LOG" 2>&1 || sudo -n umount -l "$MNT" >>"$REPAIR_LOG" 2>&1 || true
+  fi
+  if [ -n "$SNAPWIN_NBD_DEV" ]; then
+    sudo -n qemu-nbd --disconnect "$SNAPWIN_NBD_DEV" >>"$REPAIR_LOG" 2>&1 || true
+    SNAPWIN_NBD_DEV=""
   fi
 }
 
@@ -1339,9 +1368,30 @@ cleanup_stale_guestfs_for_qcow2() {
   done
 }
 
+mount_windows_ntfs_nbd_rw() {
+  local nbd part
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "sudo_required_for_nbd_mount" "Configure passwordless sudo for qemu-nbd/ntfs-3g offline repair."
+  fi
+  sudo -n modprobe nbd max_part=16 >>"$REPAIR_LOG" 2>&1 || true
+  nbd="$(pick_free_nbd_device || true)"
+  [ -n "$nbd" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "no_free_nbd_device" "Detach stale /dev/nbd devices and retry."
+  sudo -n qemu-nbd --disconnect "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] mounting qcow2 via $nbd + ntfs-3g"
+  sudo -n qemu-nbd --connect="$nbd" --format=qcow2 "$QCOW2" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "qemu_nbd_connect_failed" "Inspect $REPAIR_LOG."
+  SNAPWIN_NBD_DEV="$nbd"
+  part="$(wait_for_nbd_ntfs_partition "$nbd" || true)"
+  [ -n "$part" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs_partition_not_found" "Inspect partition table with fdisk -l $nbd."
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] NTFS partition for repair: $part"
+  sudo -n ntfsfix -d "$part" >>"$REPAIR_LOG" 2>&1 || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: ntfsfix returned non-zero for $part"
+  sudo -n ntfs-3g -o rw,remove_hiberfile,big_writes "$part" "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs3g_mount_failed" "Inspect $REPAIR_LOG."
+  touch "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" && rm -f "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs3g_mount_read_only" "NTFS mount is read-only; inspect $REPAIR_LOG."
+}
+
 prepare_guest_mountpoint() {
   cleanup_guest_mountpoint "$MNT"
   cleanup_stale_guestfs_for_qcow2
+  cleanup_windows_mount
   rm -rf "$MNT" 2>/dev/null || sudo -n rm -rf "$MNT"
   mkdir -p "$MNT" 2>/dev/null || {
     sudo -n mkdir -p "$MNT"
@@ -1486,19 +1536,9 @@ standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
   prepare_guest_mountpoint
-  preclean_ntfs_for_rw_mount
-  local ntfs_part
-  ntfs_part="$(detect_windows_ntfs_partition || true)"
-  if [ -n "$ntfs_part" ]; then
-    log "[ZS5_OFFLINE_WINDOWS_REPAIR] guestmount explicit NTFS partition: $ntfs_part"
-    guestmount -a "$QCOW2" -m "${ntfs_part}:/:rw,remove_hiberfile" "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
-  else
-    log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: NTFS partition not detected; falling back to guestmount inspector"
-    guestmount -a "$QCOW2" -i --rw "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
-  fi
-  touch "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" && rm -f "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_read_only" "NTFS mounted read-only; inspect $REPAIR_LOG."
-  winroot="$(find_windows_root)" || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
-  [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
+  mount_windows_ntfs_nbd_rw
+  winroot="$(find_windows_root)" || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
+  [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
   cfg="$winroot/System32/config"
   backup_dir="$winroot/ospc2flex/registry-backups/$ts"
   sudo mkdir -p "$backup_dir"
@@ -1634,7 +1674,7 @@ Windows Registry Editor Version 5.00
 EOF
   merge_software_reg "$sw_reg" "$cfg/SOFTWARE" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SOFTWARE RunOnce merge returned non-zero; inspect $REPAIR_LOG"
 
-  guestunmount "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestunmount_failed" "Unmount $MNT manually and run qemu-img check."
+  cleanup_windows_mount
   touch "${QCOW2}.win_repaired"
 }
 
