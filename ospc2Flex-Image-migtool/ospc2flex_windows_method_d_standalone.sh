@@ -12,9 +12,10 @@ FLAVOR="gp.0.4.4"
 NETWORK="tenant-net"
 KEYPAIR=""
 WORK="${WORK:-/mnt/migration/ospc2flex_image}"
+export OSPC2FLEX_UI_VERBOSE="${OSPC2FLEX_UI_VERBOSE:-0}"
 WIN_USER="Administrator"
 WIN_PASSWORD=""
-WIN_SNET_IP=""
+export WIN_SNET_IP=""
 CLOUDBOOT_TARGET_HOST=""
 CLOUDBOOT_TARGET_USER="Administrator"
 CLOUDBOOT_TARGET_PORT="22"
@@ -23,12 +24,21 @@ CLOUDBOOT_TARGET_KEY=""
 CLOUDBOOT_SOURCE_WINRM_HOST=""
 CLOUDBOOT_TARGET_WINRM_HOST=""
 DRY_RUN=0
-OS_FAMILY="windows"
-OS_TYPE="windows"
+export OS_FAMILY="windows"
+export OS_TYPE="windows"
+FORCE_FRESH_CAPTURE="${OSPC2FLEX_FORCE_FRESH_CAPTURE:-0}"
+DISABLE_RESUME="${OSPC2FLEX_DISABLE_RESUME:-0}"
 
-WINDOWS_MODE="${OSPC2FLEX_WINDOWS_MODE:-two_phase_virtio}"
-# Resume is ON by default for v2/Method D capture helper. Safety guardrails in
-# the capture helper will automatically reject invalid/stale qcow2 artifacts.
+WINDOWS_MODE="two_phase_virtio"
+WORKFLOW="${OSPC2FLEX_WORKFLOW:-method_d}"
+METHOD_F_ARTIFACT_VALIDATION_JSON=""
+OSPC2FLEX_ALLOW_GUEST_DISK_CAPTURE="${OSPC2FLEX_ALLOW_GUEST_DISK_CAPTURE:-0}"
+OSPC2FLEX_ALLOW_DISK2VHD="${OSPC2FLEX_ALLOW_DISK2VHD:-0}"
+OSPC2FLEX_ALLOW_RAW_SSH_CAPTURE="${OSPC2FLEX_ALLOW_RAW_SSH_CAPTURE:-0}"
+OSPC2FLEX_ALLOW_SMB_HTTPS_OBJECT_TRANSFER="${OSPC2FLEX_ALLOW_SMB_HTTPS_OBJECT_TRANSFER:-0}"
+OSPC2FLEX_ALLOW_WINDOWS_GLANCE_ONLY="${OSPC2FLEX_ALLOW_WINDOWS_GLANCE_ONLY:-1}"
+# Resume is ON by default for Method D. Safety guardrails in the capture helper
+# will automatically reject invalid/stale qcow2 artifacts and force a recapture.
 METHOD_D_CAPTURE_RESUME_MODE="${OSPC2FLEX_WINDOWS_METHOD_D_RESUME_MODE:-on}"
 SOURCE_HYPERVISOR="${OSPC2FLEX_WIN_SOURCE_HYPERVISOR:-zen}"
 FORCE_DIRECT_VIRTIO_BOOT="${OSPC2FLEX_FORCE_DIRECT_VIRTIO_BOOT:-0}"
@@ -46,11 +56,11 @@ VERIFY_PS1_WIN='C:\ospc2flex\ospc2flex_windows_v2_verify.ps1'
 CLOUDBOOT_SCRIPT="/tmp/wincloudbootmigrator.py"
 
 RESCUE_SERVER_NAME=""
-RESCUE_IMAGE_NAME=""
 FINAL_IMAGE_NAME=""
 FINAL_SERVER_NAME=""
 RESCUE_JSON=""
 RESULT_JSON=""
+CHECKPOINT_JSON=""
 REPAIR_SENTINEL=""
 
 ACCESS_METHOD=""
@@ -75,6 +85,7 @@ CP_ONLINE_BINDING=0
 CP_VIRTIO_SNAPSHOT=0
 CP_FINAL_OPT_BOOT=0
 CP_SUMMARY_PRINTED=0
+GUEST_UNREACHABLE=0
 
 log()  { echo "[$(date '+%H:%M:%S')][$LABEL][V2] $*"; }
 PASS() { echo "  ✅ $*"; }
@@ -93,18 +104,58 @@ emit_status() {
   shift || true
   local msg="$*"
   case "$CURRENT_STATUS" in
-    WINDOWS_V2_IDE_RESCUE_BOOT) CP_SAFE_FIRST_BOOT=1 ;;
-    WINDOWS_V2_DRIVER_INSTALL) CP_ONLINE_BINDING=1 ;;
-    WINDOWS_V2_FINAL_IMAGE_CREATE) CP_VIRTIO_SNAPSHOT=1 ;;
-    WINDOWS_V2_FINAL_VIRTIO_BOOT) CP_FINAL_OPT_BOOT=1 ;;
+    WINDOWS_V2_RESCUE_READY|WINDOWS_V2_IDE_RESCUE_BOOT) CP_SAFE_FIRST_BOOT=1 ;;
+    WINDOWS_V2_ONLINE_BINDING_DONE|WINDOWS_V2_DRIVER_INSTALL) CP_ONLINE_BINDING=1 ;;
+    WINDOWS_V2_FINAL_IMAGE_READY|WINDOWS_V2_FINAL_IMAGE_CREATE) CP_VIRTIO_SNAPSHOT=1 ;;
+    WINDOWS_V2_SUCCESS|WINDOWS_V2_FINAL_VIRTIO_BOOT) CP_FINAL_OPT_BOOT=1 ;;
   esac
   STATUS_LOG+=("$CURRENT_STATUS${msg:+ :: $msg}")
+  save_checkpoint_state
   echo ""
   echo "═══════════════════════════════════════════════════════════════════════════"
   echo " $CURRENT_STATUS"
   [ -n "$msg" ] && echo " $msg"
   echo " CHECKPOINTS :: Safe first boot=$([ \"$CP_SAFE_FIRST_BOOT\" = \"1\" ] && echo HIT || echo PENDING) · Online VirtIO binding=$([ \"$CP_ONLINE_BINDING\" = \"1\" ] && echo HIT || echo PENDING) · VirtIO-ready snapshot=$([ \"$CP_VIRTIO_SNAPSHOT\" = \"1\" ] && echo HIT || echo PENDING) · Final optimized boot=$([ \"$CP_FINAL_OPT_BOOT\" = \"1\" ] && echo HIT || echo PENDING)"
   echo "═══════════════════════════════════════════════════════════════════════════"
+}
+
+save_checkpoint_state() {
+  [ -n "${CHECKPOINT_JSON:-}" ] || return 0
+  python3 - "$CHECKPOINT_JSON" "$CURRENT_STATUS" "$CP_SAFE_FIRST_BOOT" "$CP_ONLINE_BINDING" "$CP_VIRTIO_SNAPSHOT" "$CP_FINAL_OPT_BOOT" "$RESCUE_SERVER_ID" "$RESCUE_IMAGE_ID" "$RESCUE_FLOATING_IP" <<'PY'
+import json, sys
+path, status, cp1, cp2, cp3, cp4, rescue_vm, rescue_img, rescue_fip = sys.argv[1:10]
+doc = {
+  "status": status,
+  "safe_first_boot": "HIT" if cp1 == "1" else "PENDING",
+  "online_virtio_binding": "HIT" if cp2 == "1" else "PENDING",
+  "virtio_ready_snapshot": "HIT" if cp3 == "1" else "PENDING",
+  "final_optimized_boot": "HIT" if cp4 == "1" else "PENDING",
+  "rescue_server_id": rescue_vm,
+  "rescue_image_id": rescue_img,
+  "rescue_floating_ip": rescue_fip,
+}
+with open(path, "w", encoding="utf-8") as f:
+  json.dump(doc, f, indent=2)
+PY
+}
+
+load_checkpoint_state() {
+  [ -n "${CHECKPOINT_JSON:-}" ] || return 0
+  [ -f "$CHECKPOINT_JSON" ] || return 0
+  eval "$(python3 - "$CHECKPOINT_JSON" <<'PY'
+import json, sys
+doc=json.load(open(sys.argv[1], encoding="utf-8"))
+def hit(v): return "1" if str(v).upper()=="HIT" else "0"
+print(f'CP_SAFE_FIRST_BOOT={hit(doc.get("safe_first_boot","PENDING"))}')
+print(f'CP_ONLINE_BINDING={hit(doc.get("online_virtio_binding","PENDING"))}')
+print(f'CP_VIRTIO_SNAPSHOT={hit(doc.get("virtio_ready_snapshot","PENDING"))}')
+print(f'CP_FINAL_OPT_BOOT={hit(doc.get("final_optimized_boot","PENDING"))}')
+print(f'CURRENT_STATUS="{doc.get("status","WINDOWS_V2_PREFLIGHT")}"')
+print(f'RESCUE_SERVER_ID="{doc.get("rescue_server_id","")}"')
+print(f'RESCUE_IMAGE_ID="{doc.get("rescue_image_id","")}"')
+print(f'RESCUE_FLOATING_IP="{doc.get("rescue_floating_ip","")}"')
+PY
+)"
 }
 
 print_checkpoint_summary() {
@@ -120,8 +171,6 @@ print_checkpoint_summary() {
   echo " Final status          : ${CURRENT_STATUS:-UNKNOWN}"
   echo "═══════════════════════════════════════════════════════════════════════════"
 }
-
-trap print_checkpoint_summary EXIT
 
 json_escape() {
   python3 - "$1" <<'PY'
@@ -196,7 +245,6 @@ generate_cloudboot_bundle() {
   local cache_root="$WORK/cloudboot_cache"
   local force_new="${OSPC2FLEX_CLOUDBOOT_FORCE_NEW:-0}"
   local cache_bundle=""
-  local cache_target_profile=""
   rm -rf "$bundle"
 
   if [ "$DRY_RUN" -eq 1 ] && [ -n "$CLOUDBOOT_TARGET_HOST" ]; then
@@ -391,6 +439,8 @@ while [[ $# -gt 0 ]]; do
     --cloudboot-target-winrm-host) CLOUDBOOT_TARGET_WINRM_HOST="$2"; shift 2 ;;
     --os-family) OS_FAMILY="$2"; shift 2 ;;
     --os-type) OS_TYPE="$2"; shift 2 ;;
+    --force-fresh-capture) FORCE_FRESH_CAPTURE=1; shift ;;
+    --disable-resume) DISABLE_RESUME=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help)
       echo "Usage: $0 --server-name NAME --server-ip IP --label LABEL [--windows-password PASS]"
@@ -404,16 +454,29 @@ done
 [ -n "$LABEL" ] || LABEL="$SERVER_NAME"
 
 mkdir -p "$WORK"
+mkdir -p "$WORK/locks"
+LOCK_FILE="$WORK/locks/${LABEL}.lock"
+if [ "${OSPC2FLEX_DISABLE_LABEL_LOCK:-0}" = "1" ]; then
+  WARN "Method D label lock disabled by OSPC2FLEX_DISABLE_LABEL_LOCK=1"
+else
+  exec 9>"$LOCK_FILE"
+  if ! flock -n 9; then
+    FAIL "Another Method D migration is already active for this label: $LABEL"
+    FAIL "Lock file: $LOCK_FILE"
+    exit 1
+  fi
+fi
 ensure_runtime_deps
 build_method_a_args
 
 RESCUE_SERVER_NAME="${LABEL}-ide-rescue"
-RESCUE_IMAGE_NAME="${LABEL}-ide-rescue-img"
 FINAL_IMAGE_NAME="${LABEL}-virtio-final-img"
 FINAL_SERVER_NAME="${LABEL}-virtio-final"
 RESCUE_JSON="$WORK/${LABEL}.windows_v2_rescue.json"
 RESULT_JSON="$WORK/${LABEL}.windows_v2_result.json"
+CHECKPOINT_JSON="$WORK/${LABEL}.windows_v2_checkpoint.json"
 REPAIR_SENTINEL="$WORK/${LABEL}.qcow2.win_repaired"
+load_checkpoint_state
 
 save_console_log() {
   local server_id="$1" out="$2"
@@ -421,32 +484,108 @@ save_console_log() {
 }
 
 write_result_json() {
-  python3 - "$RESULT_JSON" "$LABEL" "$SERVER_IP" "$WINDOWS_MODE" "$RESCUE_IMAGE_ID" "$RESCUE_SERVER_ID" "$DUMMY_VOLUME_ID" "$FINAL_IMAGE_ID" "$FINAL_SERVER_ID" "$CURRENT_STATUS" "$DRIVER_INSTALL_VERIFIED" "$DUMMY_DETECTED" "$FINAL_BOOT_VERIFIED" "$(printf '%s\n' "${STATUS_LOG[@]}")" <<'PY'
+  python3 - "$RESULT_JSON" "$LABEL" "$SERVER_IP" "$WINDOWS_MODE" "$RESCUE_IMAGE_ID" "$RESCUE_SERVER_ID" "$RESCUE_FLOATING_IP" "$DUMMY_VOLUME_ID" "$FINAL_IMAGE_ID" "$FINAL_SERVER_ID" "$CURRENT_STATUS" "$DRIVER_INSTALL_VERIFIED" "$DUMMY_DETECTED" "$FINAL_BOOT_VERIFIED" "$CP_SAFE_FIRST_BOOT" "$CP_ONLINE_BINDING" "$CP_VIRTIO_SNAPSHOT" "$CP_FINAL_OPT_BOOT" "$GUEST_UNREACHABLE" "$(printf '%s\n' "${STATUS_LOG[@]}")" <<'PY'
 import json, sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
+is_success = sys.argv[11] in {"WINDOWS_V2_SUCCESS", "METHOD_F_SUCCESS", "METHOD_G_SUCCESS"}
 payload = {
   "label": sys.argv[2],
   "source": sys.argv[3],
   "mode": sys.argv[4],
   "rescue_image_id": sys.argv[5],
   "rescue_server_id": sys.argv[6],
-  "dummy_volume_id": sys.argv[7],
-  "final_image_id": sys.argv[8],
-  "final_server_id": sys.argv[9],
-  "status": sys.argv[10],
-  "driver_install_verified": sys.argv[11].lower() == "true",
-  "dummy_volume_detected": sys.argv[12].lower() == "true",
-  "final_boot_verified": sys.argv[13].lower() == "true",
-  "logs": [line for line in sys.argv[14].splitlines() if line.strip()],
+  "rescue_floating_ip": sys.argv[7],
+  "dummy_volume_id": sys.argv[8],
+  "final_image_id": sys.argv[9],
+  "final_server_id": sys.argv[10],
+  "status": sys.argv[11],
+  "driver_install_verified": sys.argv[12].lower() == "true",
+  "dummy_volume_detected": sys.argv[13].lower() == "true",
+  "final_boot_verified": sys.argv[14].lower() == "true",
+  "safe_first_boot": "HIT" if sys.argv[15] == "1" else "PENDING",
+  "online_virtio_binding": "HIT" if sys.argv[16] == "1" else "PENDING",
+  "virtio_ready_snapshot": "HIT" if sys.argv[17] == "1" else "PENDING",
+  "final_optimized_boot": "HIT" if sys.argv[18] == "1" else "PENDING",
+  "final": is_success,
+  "guest_unreachable": sys.argv[19] == "1",
+  "logs": [line for line in sys.argv[20].splitlines() if line.strip()],
 }
 path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
 }
 
-trap 'write_result_json' EXIT
+method_f_emit() {
+  local status="$1"
+  local msg="$2"
+  CURRENT_STATUS="$status"
+  STATUS_LOG+=("$status${msg:+ :: $msg}")
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════════════════"
+  echo " $status"
+  [ -n "$msg" ] && echo " $msg"
+  echo "═══════════════════════════════════════════════════════════════════════════"
+}
+
+method_f_validate_artifact() {
+  local artifact="$1"
+  METHOD_F_ARTIFACT_VALIDATION_JSON="$WORK/${LABEL}.artifact_validation.json"
+  python3 - "$artifact" "$METHOD_F_ARTIFACT_VALIDATION_JSON" <<'PY'
+import json, os, subprocess, sys
+artifact, out_json = sys.argv[1:3]
+status = "METHOD_F_ARTIFACT_VALIDATED"
+failure_reason = ""
+next_action = ""
+ok = True
+details = {"artifact_path": artifact, "is_absolute": os.path.isabs(artifact)}
+if not os.path.isabs(artifact):
+    ok = False
+if not os.path.isfile(artifact):
+    ok = False
+if ok:
+    size = os.path.getsize(artifact)
+    details["size_bytes"] = size
+    if size <= 1024 * 1024:
+        ok = False
+if ok and "/bad_artifacts/" in artifact:
+    ok = False
+if ok:
+    p = subprocess.run(["qemu-img", "info", artifact], capture_output=True, text=True)
+    details["qemu_img_info_rc"] = p.returncode
+    details["qemu_img_info"] = p.stdout[-2000:]
+    if p.returncode != 0:
+        ok = False
+if ok:
+    p = subprocess.run(["qemu-img", "check", artifact], capture_output=True, text=True)
+    details["qemu_img_check_rc"] = p.returncode
+    details["qemu_img_check"] = (p.stdout + "\n" + p.stderr)[-2000:]
+    # qemu-img check may fail for some remote backends; only hard-fail on obvious corruption.
+    if p.returncode not in (0, 3):
+        details["qemu_img_check_warning"] = "non-fatal check return code"
+if not ok:
+    status = "SOURCE_ARTIFACT_INVALID"
+    failure_reason = "INVALID_EXPORTED_DISK_ARTIFACT"
+    next_action = "Re-export source disk or request provider-assisted export."
+doc = {
+    "method": "F",
+    "stage": "F4_LOCAL_ARTIFACT_VALIDATE",
+    "status": status,
+    "failure_reason": failure_reason,
+    "next_action": next_action,
+    "final": False,
+    "details": details,
+}
+with open(out_json, "w", encoding="utf-8") as f:
+    json.dump(doc, f, indent=2)
+if not ok:
+    sys.exit(1)
+PY
+}
+
+rc=0
+trap 'rc=$?; write_result_json || true; print_checkpoint_summary || true; exit $rc' EXIT
 
 wait_for_server_status() {
   local server_id="$1" target="$2" timeout="$3" waited=0
@@ -476,11 +615,13 @@ get_probe_ip_list() {
   local prefer raw
   prefer="${OSPC2FLEX_V2_PREFERRED_IP:-}"
   raw=$(get_server_ips "$server_id")
-  printf '%s\n' "$raw" | python3 - "$prefer" <<'PY'
-import sys
+  # SC2259 fix: heredoc overrides pipe for python3 stdin, so pass IPs via env var
+  MGS_RAW_IPS="$raw" MGS_PREFER_IP="$prefer" python3 <<'PY'
+import os
 
-prefer = (sys.argv[1] or "").strip()
-ips_in = [ln.strip() for ln in sys.stdin if ln.strip()]
+prefer = (os.environ.get("MGS_PREFER_IP") or "").strip()
+raw    = (os.environ.get("MGS_RAW_IPS") or "")
+ips_in = [ln.strip() for ln in raw.splitlines() if ln.strip()]
 seen = set()
 ips = []
 for ip in ips_in:
@@ -779,6 +920,31 @@ payload = {
   "access_port": sys.argv[5],
   "timeout_sec": int(sys.argv[6]),
 }
+
+emit_guest_unreachable_diagnostics() {
+  local server_id="$1"
+  emit_status "WINDOWS_V2_GUEST_UNREACHABLE" "Guest access timeout reached; rescue VM kept running"
+  INFO "Manual next steps:"
+  INFO "  openstack console url show $server_id"
+  INFO "  openstack server show $server_id -c addresses -c status"
+  INFO "  check Windows firewall / RDP service / boot screen"
+  INFO "Diagnostics snapshot:"
+  openstack server show "$server_id" -f value -c status -c addresses -c OS-EXT-STS:vm_state -c OS-EXT-STS:power_state 2>/dev/null | sed 's/^/  /' || true
+  openstack console url show "$server_id" 2>/dev/null | sed 's/^/  /' || true
+  _port_ids=$(openstack port list --server "$server_id" -f value -c ID 2>/dev/null || true)
+  if [ -n "$_port_ids" ]; then
+    INFO "Ports:"
+    printf '%s\n' "$_port_ids" | sed 's/^/  /'
+  fi
+  _sgs=$(openstack server show "$server_id" -f value -c security_groups 2>/dev/null | sed -n "s/.*name='\([^']*\)'.*/\1/p" || true)
+  for sg in $_sgs; do
+    INFO "Security group rules for $sg:"
+    openstack security group rule list "$sg" 2>/dev/null | sed 's/^/  /' || true
+  done
+  if ! nc -z -w 3 "${RESCUE_FLOATING_IP:-}" 3389 2>/dev/null; then
+    WARN "RDP TCP 3389 not reachable. Verify security group and Windows firewall."
+  fi
+}
 Path(sys.argv[1]).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
   return 1
@@ -787,7 +953,7 @@ PY
 create_and_attach_dummy_volume() {
   emit_status "WINDOWS_V2_DUMMY_VOLUME_CREATE" "Creating best-effort dummy volume"
   DUMMY_VOLUME_NAME="${RESCUE_SERVER_NAME}-dummy-virtio"
-  DUMMY_VOLUME_ID=$(openstack volume create --size 5 "$DUMMY_VOLUME_NAME" -f value -c id 2>/dev/null || true)
+  DUMMY_VOLUME_ID=$(openstack volume create --size 5 "$DUMMY_VOLUME_NAME" -f value -c id 2>/dev/null | tr -d '\r\n' || true)
   if [ -z "$DUMMY_VOLUME_ID" ]; then
     WARN "Dummy volume create failed; continuing"
     return 0
@@ -888,6 +1054,12 @@ create_final_image() {
     sleep 10
     waited=$((waited + 10))
   done
+  local status
+  status=$(openstack image show "$FINAL_IMAGE_ID" -f value -c status 2>/dev/null | tr -d '\r' || echo "unknown")
+  if [ "$status" != "active" ]; then
+    FAIL "Final image did not become active: $FINAL_IMAGE_ID status=$status"
+    return 1
+  fi
   openstack image set \
     --property os_type=windows \
     --property os_distro=windows \
@@ -904,6 +1076,45 @@ create_final_image() {
   prop_equals "$props" "hw_vif_model" "virtio" || return 1
   prop_equals "$props" "hw_qemu_guest_agent" "yes" || return 1
   PASS "Final VirtIO image metadata verified"
+}
+
+validate_rescue_safe_metadata() {
+  emit_status "WINDOWS_V2_RESCUE_METADATA_VERIFY" "Validating Phase 1 safe IDE/e1000 image metadata"
+  local props
+  props=$(openstack image show "$RESCUE_IMAGE_ID" -f value -c properties 2>/dev/null || true)
+
+  if echo "$props" | grep -Eq "hw_scsi_model[\"']?[[:space:]]*[:=]"; then
+    FAIL "Unsafe rescue metadata: hw_scsi_model is present during safe IDE first boot"
+    echo "$props"
+    return 1
+  fi
+
+  if echo "$props" | grep -Eq "hw_qemu_guest_agent[\"']?[[:space:]]*[:=]"; then
+    FAIL "Unsafe rescue metadata: hw_qemu_guest_agent is present during safe IDE first boot"
+    echo "$props"
+    return 1
+  fi
+
+  prop_equals "$props" "hw_disk_bus" "ide" || {
+    FAIL "Rescue image metadata missing hw_disk_bus=ide"
+    echo "$props"
+    return 1
+  }
+
+  prop_equals "$props" "hw_cdrom_bus" "ide" || {
+    FAIL "Rescue image metadata missing hw_cdrom_bus=ide"
+    echo "$props"
+    return 1
+  }
+
+  prop_equals "$props" "hw_vif_model" "e1000" || {
+    FAIL "Rescue image metadata missing hw_vif_model=e1000"
+    echo "$props"
+    return 1
+  }
+
+  PASS "Rescue safe IDE/e1000 metadata verified"
+  return 0
 }
 
 boot_final_vm() {
@@ -956,7 +1167,7 @@ cleanup_success() {
 }
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo " OSPC→FLEX Windows Two-Phase VirtIO Binding Engine"
+echo " OSPC→FLEX Windows Method D Standalone Engine"
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo "  Server    : $SERVER_NAME ($SERVER_IP)"
 echo "  Label     : $LABEL"
@@ -966,22 +1177,9 @@ echo "  Network   : $NETWORK"
 echo "  Keypair   : ${KEYPAIR:-<none>}"
 echo "═══════════════════════════════════════════════════════════════════════════"
 
-if [ "$WINDOWS_MODE" = "offline_only" ] \
-   && { [ "${SOURCE_HYPERVISOR,,}" = "zen" ] || [ "${SOURCE_HYPERVISOR,,}" = "xen" ]; } \
-   && [ "$FORCE_DIRECT_VIRTIO_BOOT" != "1" ]; then
-  emit_status "WINDOWS_SAFE_IDE_GUARD" "Guard: OSPC Zen source detected, switching to safe IDE first boot flow (Zen routing → FLEX KVM)"
+if { [ "${SOURCE_HYPERVISOR,,}" = "zen" ] || [ "${SOURCE_HYPERVISOR,,}" = "xen" ]; } && [ "$FORCE_DIRECT_VIRTIO_BOOT" != "1" ]; then
+  emit_status "WINDOWS_SAFE_IDE_GUARD" "Guard active: OSPC Zen source requires safe IDE first boot (Zen routing → FLEX KVM)"
   WARN "Direct first-boot to VirtIO/SCSI is blocked for OSPC Zen/legacy-xen source (set OSPC2FLEX_FORCE_DIRECT_VIRTIO_BOOT=1 to override)."
-  WINDOWS_MODE="two_phase_virtio"
-fi
-
-if [ "$WINDOWS_MODE" = "offline_only" ]; then
-  generate_cloudboot_bundle
-  if [ -f "$WORK/${LABEL}.cloudboot/firstboot-repair.ps1" ]; then
-    METHOD_D_CAPTURE_ARGS+=(--cloudboot-bundle "$WORK/${LABEL}.cloudboot")
-  fi
-  emit_status "WINDOWS_METHOD_C_ACTIVE" "Method C active: CloudJumper compare/bundle + offline apply flow"
-  INFO "Method C runtime path is offline apply by design (CloudJumper bundle staged into Method A workflow)."
-  exec "$METHOD_D_CAPTURE" "${METHOD_D_CAPTURE_ARGS[@]}"
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -992,6 +1190,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   fi
   env OSPC2FLEX_WINDOWS_MODE=two_phase_virtio \
       OSPC2FLEX_RESUME_MODE="$METHOD_D_CAPTURE_RESUME_MODE" \
+      OSPC2FLEX_WINDOWS_BOOT_PROFILE=safe_ide_firstboot \
       OSPC2FLEX_WIN_DISK_BUS=ide \
       OSPC2FLEX_WIN_CDROM_BUS=ide \
       OSPC2FLEX_WIN_VIF_MODEL=e1000 \
@@ -1008,14 +1207,38 @@ if [ ! -x "$METHOD_D_CAPTURE" ]; then
   exit 1
 fi
 
+if [ "$WORKFLOW" = "method_f" ]; then
+  FAIL "Method F has been removed. Use windows_method_g_simple."
+  CURRENT_STATUS="METHOD_F_REMOVED_USE_METHOD_G_SIMPLE"
+  exit 1
+fi
+if [ "$WORKFLOW" = "method_g" ]; then
+  FAIL "Legacy Method G (policy export) is removed. Use windows_method_g_simple."
+  CURRENT_STATUS="METHOD_G_REMOVED_USE_METHOD_G_SIMPLE"
+  exit 1
+fi
+
 emit_status "WINDOWS_V2_PREFLIGHT" "Running Method D standalone capture + IDE rescue flow"
 generate_cloudboot_bundle
 if [ -f "$WORK/${LABEL}.cloudboot/firstboot-repair.ps1" ]; then
   METHOD_D_CAPTURE_ARGS+=(--cloudboot-bundle "$WORK/${LABEL}.cloudboot")
 fi
-METHOD_D_CAPTURE_ARGS+=(--workflow-tag method_v2_engine)
+if [ "$FORCE_FRESH_CAPTURE" = "1" ]; then
+  METHOD_D_CAPTURE_ARGS+=(--force-fresh-capture)
+fi
+if [ "$DISABLE_RESUME" = "1" ]; then
+  METHOD_D_CAPTURE_ARGS+=(--disable-resume)
+fi
+METHOD_D_CAPTURE_ARGS+=(--workflow-tag method_d_standalone)
 env OSPC2FLEX_WINDOWS_MODE=two_phase_virtio \
+    OSPC2FLEX_WORKFLOW="$WORKFLOW" \
+    OSPC2FLEX_ALLOW_GUEST_DISK_CAPTURE="${OSPC2FLEX_ALLOW_GUEST_DISK_CAPTURE:-0}" \
+    OSPC2FLEX_ALLOW_DISK2VHD="${OSPC2FLEX_ALLOW_DISK2VHD:-0}" \
+    OSPC2FLEX_ALLOW_RAW_SSH_CAPTURE="${OSPC2FLEX_ALLOW_RAW_SSH_CAPTURE:-0}" \
+    OSPC2FLEX_ALLOW_SMB_HTTPS_OBJECT_TRANSFER="${OSPC2FLEX_ALLOW_SMB_HTTPS_OBJECT_TRANSFER:-0}" \
+    OSPC2FLEX_ALLOW_WINDOWS_GLANCE_ONLY="${OSPC2FLEX_ALLOW_WINDOWS_GLANCE_ONLY:-1}" \
     OSPC2FLEX_RESUME_MODE="$METHOD_D_CAPTURE_RESUME_MODE" \
+    OSPC2FLEX_WINDOWS_BOOT_PROFILE=safe_ide_firstboot \
     OSPC2FLEX_WIN_DISK_BUS=ide \
     OSPC2FLEX_WIN_CDROM_BUS=ide \
     OSPC2FLEX_WIN_VIF_MODEL=e1000 \
@@ -1080,12 +1303,24 @@ PY
 
 [ -n "$RESCUE_IMAGE_ID" ] || { FAIL "Rescue image ID missing from $RESCUE_JSON"; exit 1; }
 [ -n "$RESCUE_SERVER_ID" ] || { FAIL "Rescue server ID missing from $RESCUE_JSON"; exit 1; }
+validate_rescue_safe_metadata || {
+  CURRENT_STATUS="WINDOWS_V2_FAILED_UNSAFE_RESCUE_METADATA"
+  exit 1
+}
 
-emit_status "WINDOWS_V2_IDE_RESCUE_BOOT" "Safe first boot: rescue VM ready ($RESCUE_SERVER_ID)"
+if openstack console log show "$RESCUE_SERVER_ID" 2>/dev/null | grep -Eiq "Windows\\\\system32\\\\config\\\\system|Status:\s*0xc0000225"; then
+  FAIL "status=WINDOWS_SYSTEM_HIVE_INVALID failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED next_action=Use fresh source export or restore SYSTEM hive backup."
+  emit_status "WINDOWS_SYSTEM_HIVE_INVALID" "failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED next_action=Use fresh source export or restore SYSTEM hive backup."
+  CURRENT_STATUS="WINDOWS_V2_FAILED_SYSTEM_HIVE_CORRUPT"
+  exit 1
+fi
+
+emit_status "WINDOWS_V2_RESCUE_READY" "Safe first boot: rescue VM ready ($RESCUE_SERVER_ID)"
 emit_status "WINDOWS_V2_WAITING_FOR_GUEST" "Waiting for guest access (WinRM/SSH/RDP)"
 if ! OSPC2FLEX_V2_PREFERRED_IP="${RESCUE_FLOATING_IP:-}" wait_for_windows_guest_access "$RESCUE_SERVER_ID" "rescue_wait" "$WAIT_TIMEOUT"; then
   FAIL "Rescue VM never became reachable"
-  CURRENT_STATUS="WINDOWS_V2_FAILED"
+  GUEST_UNREACHABLE=1
+  emit_guest_unreachable_diagnostics "$RESCUE_SERVER_ID"
   [ "$AUTO_CLEANUP_FAILED" = "1" ] && openstack server delete "$RESCUE_SERVER_ID" >/dev/null 2>&1 || true
   exit 1
 fi
@@ -1096,11 +1331,14 @@ create_and_attach_dummy_volume || {
   exit 1
 }
 
+emit_status "WINDOWS_V2_ONLINE_BINDING_RUNNING" "Running online VirtIO binding"
 run_windows_v2_firstboot || {
   CURRENT_STATUS="WINDOWS_V2_FAILED"
   exit 1
 }
+emit_status "WINDOWS_V2_ONLINE_BINDING_DONE" "Online VirtIO binding completed"
 
+emit_status "WINDOWS_V2_REBOOTING_RESCUE" "Rebooting rescue VM on IDE/e1000"
 reboot_rescue_guest_and_verify || {
   CURRENT_STATUS="WINDOWS_V2_FAILED"
   exit 1
@@ -1111,12 +1349,15 @@ shutdown_rescue_guest || {
   exit 1
 }
 
+emit_status "WINDOWS_V2_SNAPSHOT_CREATING" "Creating virtio-ready snapshot"
 create_final_image || {
   FAIL "Final image creation or metadata enforcement failed"
   CURRENT_STATUS="WINDOWS_V2_FAILED"
   exit 1
 }
+emit_status "WINDOWS_V2_FINAL_IMAGE_READY" "Final VirtIO image ready"
 
+emit_status "WINDOWS_V2_FINAL_BOOT_RUNNING" "Booting final VirtIO VM"
 boot_final_vm || {
   FAIL "Final VirtIO VM boot launch failed"
   CURRENT_STATUS="WINDOWS_V2_FAILED"

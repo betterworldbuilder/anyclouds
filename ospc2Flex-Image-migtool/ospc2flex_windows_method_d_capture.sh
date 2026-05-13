@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-# ospc2flex_windows_migrate.sh — Windows VM Migration (SSH disk read + Glance fallback)
+# ospc2flex_windows_method_d_capture.sh — Windows Method D Capture Workflow
 # ═══════════════════════════════════════════════════════════════════════════════
 # Primary path  (Step 1b+2): WinRM → installs OpenSSH on Windows → SSH+PowerShell
 #               reads PhysicalDrive0 directly to jumphost (same as Linux NBD flow).
 # Fallback path (Step 2):    Glance snapshot → Cloud Files bridge → download.
 #
 # Usage:
-#   bash ospc2flex_windows_migrate.sh \
+#   bash ospc2flex_windows_method_d_capture.sh \
 #     --server-name "win2019websql2019" \
 #     --server-ip "104.130.26.6" \
 #     --label "ospc2flex-win2019" \
@@ -34,7 +34,7 @@ NETWORK="tenant-net"
 KEYPAIR="laptopubuntu24"
 WORK="${WORK:-/mnt/migration/ospc2flex_image}"
 OSPC_CREDS="/tmp/ospc2flex_ospc.sh"
-FLEX_CREDS="/tmp/ospc2flex_flex.sh"
+export FLEX_CREDS="/tmp/ospc2flex_flex.sh"
 WIN_REPAIR="/tmp/ospc2flex_windows_repair.sh"
 DRY_RUN=0
 OS_FAMILY="windows"
@@ -45,7 +45,33 @@ WIN_PASSWORD=""
 WIN_SNET_IP=""
 WIN_SSH_IP=""
 SSH_DISK_METHOD=0
+CAPTURE_MODE="blocked"
+WINRM_AUTH_OK=0
+OPENSSH_INSTALL_DENIED=0
+OPENSSH_NOT_INSTALLED=0
+# shellcheck disable=SC2034
+OPENSSH_SERVICE_MISSING=0
+# shellcheck disable=SC2034
+OPENSSH_FIREWALL_BLOCKED=0
+# shellcheck disable=SC2034
+OPENSSH_ENABLE_OK=0
+WINDOWS_TRY_ENABLE_OPENSSH="${OSPC2FLEX_WINDOWS_TRY_ENABLE_OPENSSH:-1}"
+WINRM_AGENT_CAPTURE="${OSPC2FLEX_WINRM_AGENT_CAPTURE:-0}"
 CLOUDBOOT_BUNDLE=""
+FORCE_FRESH_CAPTURE="${OSPC2FLEX_FORCE_FRESH_CAPTURE:-0}"
+DISABLE_RESUME="${OSPC2FLEX_DISABLE_RESUME:-0}"
+MIN_RESUME_QCOW_BYTES="${OSPC2FLEX_MIN_RESUME_QCOW_BYTES:-1073741824}"
+SNAPSHOT_POLICY_BLOCKED=0
+METHOD_D_INPUT_ARTIFACT="${METHOD_D_INPUT_ARTIFACT:-}"
+METHOD_D_SKIP_SOURCE_CAPTURE="${METHOD_D_SKIP_SOURCE_CAPTURE:-0}"
+METHOD_F_PARENT="${METHOD_F_PARENT:-0}"
+# Optional: set via --workflow-tag so pgrep/pkill can scope concurrent Method G vs H captures on the same label.
+CAPTURE_WORKFLOW_TAG="${CAPTURE_WORKFLOW_TAG:-}"
+METHOD_B_CAPTURE_ONLY="${OSPC2FLEX_METHOD_B_CAPTURE_ONLY:-${OSPC2FLEX_METHOD_H_CAPTURE_ONLY:-0}}"
+CAPTURE_LOG_METHOD="${OSPC2FLEX_PARENT_METHOD_NAME:-Method D}"
+CAPTURE_LOG_CONTEXT="${OSPC2FLEX_CAPTURE_LOG_CONTEXT:-Method B/D SSH Capture}"
+CAPTURE_LOG_PREFIX="[$CAPTURE_LOG_METHOD][$CAPTURE_LOG_CONTEXT]"
+CAPTURE_HANDOFF_READY=0
 
 # ── Color helpers ─────────────────────────────────────────────────────────────
 # Log helpers write to STDERR (not stdout) so they never contaminate captured
@@ -54,11 +80,11 @@ CLOUDBOOT_BUNDLE=""
 # emoji, which curl then rejected with "URL rejected: Malformed input to a
 # URL function" (curl exit 3).  The caller invokes this script with
 # `... >log 2>&1` so stderr still lands in the SSE-streamed log file.
-log()  { echo "[$(date '+%H:%M:%S')][$LABEL] $*" >&2; }
-PASS() { echo "  ✅ $*" >&2; }
-FAIL() { echo "  ❌ $*" >&2; }
-WARN() { echo "  ⚠️  $*" >&2; }
-INFO() { echo "  ℹ️  $*" >&2; }
+log()  { echo "[$(date '+%H:%M:%S')]${CAPTURE_LOG_PREFIX}[$LABEL] $*" >&2; }
+PASS() { echo "$CAPTURE_LOG_PREFIX ✅ $*" >&2; }
+FAIL() { echo "$CAPTURE_LOG_PREFIX ❌ $*" >&2; }
+WARN() { echo "$CAPTURE_LOG_PREFIX ⚠️  $*" >&2; }
+INFO() { echo "$CAPTURE_LOG_PREFIX ℹ️  $*" >&2; }
 
 # ── Step tracking (for aligned progress output) ────────────────────────────────
 _STEP_NUM=""
@@ -84,7 +110,13 @@ step_start() {
 step_progress() {
   local msg="$1"
   local elapsed=$(($(date +%s) - _STEP_START_TIME))
-  log "  [$((elapsed))s] $msg"
+  if [ "${OSPC2FLEX_UI_QUIET:-1}" = "1" ] && [ "${OSPC2FLEX_UI_VERBOSE:-0}" != "1" ]; then
+    # Keep noisy per-step progress only in background/progress logs by default.
+    bg_log "[$LABEL]   [${elapsed}s] $msg"
+    progress_log "[$LABEL]   [${elapsed}s] $msg"
+  else
+    log "  [${elapsed}s] $msg"
+  fi
 }
 
 step_done() {
@@ -110,6 +142,12 @@ while [[ $# -gt 0 ]]; do
     --windows-password) WIN_PASSWORD="$2"; shift 2 ;;
     --server-snet-ip)   WIN_SNET_IP="$2"; shift 2 ;;
     --cloudboot-bundle) CLOUDBOOT_BUNDLE="$2"; shift 2 ;;
+    --force-fresh-capture) FORCE_FRESH_CAPTURE=1; shift ;;
+    --disable-resume) DISABLE_RESUME=1; shift ;;
+    --input-artifact) METHOD_D_INPUT_ARTIFACT="$2"; shift 2 ;;
+    --skip-source-capture) METHOD_D_SKIP_SOURCE_CAPTURE=1; shift ;;
+    --method-f-parent) METHOD_F_PARENT=1; shift ;;
+    --workflow-tag)    CAPTURE_WORKFLOW_TAG="$2"; shift 2 ;;
     --dry-run)          DRY_RUN=1; shift ;;
     -h|--help)
       echo "Usage: $0 --server-name <name> --server-ip <ip> --label <label> [--flavor <f>] [--network <n>] [--keypair <k>]"
@@ -131,20 +169,319 @@ BASE_LABEL="$LABEL"
 _ts=$(date +%Y%m%d-%H%M%S)
 _resume_qcow=""
 RESUME_MODE="${OSPC2FLEX_RESUME_MODE:-on}"
+if [ "$FORCE_FRESH_CAPTURE" = "1" ] || [ "$DISABLE_RESUME" = "1" ]; then
+  RESUME_MODE="off"
+fi
+
+archive_cached_artifacts_for_fresh_capture() {
+  local archive_dir="$WORK/cache_archive" ts old_json
+  ts="$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$archive_dir"
+  for f in "$WORK/${BASE_LABEL}.qcow2" "$WORK/${BASE_LABEL}"-*.qcow2; do
+    [ -f "$f" ] || continue
+    mv "$f" "$archive_dir/$(basename "$f").fresh-archive.${ts}" 2>/dev/null || true
+  done
+  rm -f "$WORK/${BASE_LABEL}.qcow2.win_repaired" "$WORK/${BASE_LABEL}"-*.qcow2.win_repaired 2>/dev/null || true
+  old_json="$WORK/${BASE_LABEL}.windows_v2_rescue.json"
+  [ -f "$old_json" ] && rm -f "$old_json" 2>/dev/null || true
+}
+
+archive_bad_resume_qcow() {
+  local qcow="$1" reason="${2:-invalid}" archive_dir="$WORK/cache_archive" ts
+  [ -f "$qcow" ] || return 0
+  ts="$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$archive_dir"
+  WARN "Cached qcow2 is not resumable ($reason); archiving and restarting capture: $qcow"
+  mv "$qcow" "$archive_dir/$(basename "$qcow").bad-resume.${ts}" 2>/dev/null || rm -f "$qcow" 2>/dev/null || true
+  rm -f "${qcow}.win_repaired" 2>/dev/null || true
+}
+
+qcow_resume_ok() {
+  local qcow="$1" sz
+  [ -f "$qcow" ] || return 1
+  if ! qemu-img info "$qcow" >/dev/null 2>&1; then
+    archive_bad_resume_qcow "$qcow" "qemu-img-info-failed"
+    return 1
+  fi
+  if ! qemu-img check "$qcow" >/dev/null 2>&1; then
+    archive_bad_resume_qcow "$qcow" "qemu-img-check-failed"
+    return 1
+  fi
+  sz=$(stat -c%s "$qcow" 2>/dev/null || echo 0)
+  if [ "${sz:-0}" -lt "$MIN_RESUME_QCOW_BYTES" ]; then
+    archive_bad_resume_qcow "$qcow" "size-below-1GiB:${sz:-0}B"
+    return 1
+  fi
+  return 0
+}
+
+write_failure_handoff_json() {
+  local reason="$1" next_action="$2" status="${3:-FAILED}"
+  [ -n "${OSPC2FLEX_WINDOWS_OUTPUT_JSON:-}" ] || return 0
+  python3 - "$OSPC2FLEX_WINDOWS_OUTPUT_JSON" "$LABEL" "$BASE_LABEL" "$reason" "$next_action" "$status" <<'PY'
+import json, sys
+out_path, label, base_label, reason, next_action, status = sys.argv[1:7]
+doc = {
+  "label": label,
+  "base_label": base_label,
+  "status": status,
+  "final": False,
+  "failure_reason": reason,
+  "next_action": next_action,
+  "safe_first_boot": "PENDING",
+  "online_virtio_binding": "PENDING",
+  "virtio_ready_snapshot": "PENDING",
+  "final_optimized_boot": "PENDING"
+}
+with open(out_path, "w", encoding="utf-8") as f:
+  json.dump(doc, f, indent=2)
+PY
+}
+
+write_windows_access_json() {
+  local ssh_open="$1" winrm_auth="$2" endpoint="$3" openssh_present="$4" openssh_attempted="$5" openssh_status="$6" external_ssh="$7" capture_mode="$8" failure_reason="$9" next_action="${10}"
+  local out_json="${WORK}/${BASE_LABEL}.windows_access.json"
+  python3 - "$out_json" "$SERVER_IP" "$WIN_USER" "$ssh_open" "$winrm_auth" "$endpoint" "$openssh_present" "$openssh_attempted" "$openssh_status" "$external_ssh" "$capture_mode" "$failure_reason" "$next_action" <<'PY'
+import json, sys
+(
+  out_path, source_ip, windows_user, ssh_open, winrm_auth, endpoint,
+  openssh_present, openssh_attempted, openssh_status, external_ssh,
+  capture_mode, failure_reason, next_action
+) = sys.argv[1:14]
+doc = {
+  "source_ip": source_ip,
+  "windows_user": windows_user,
+  "ssh_port_open": ssh_open.lower() == "true",
+  "winrm_auth": winrm_auth,
+  "winrm_endpoint": endpoint,
+  "openssh_present": openssh_present.lower() == "true",
+  "openssh_enable_attempted": openssh_attempted.lower() == "true",
+  "openssh_enable_status": openssh_status,
+  "external_ssh_check": external_ssh,
+  "capture_mode": capture_mode,
+  "failure_reason": failure_reason,
+  "next_action": next_action,
+}
+with open(out_path, "w", encoding="utf-8") as f:
+  json.dump(doc, f, indent=2)
+PY
+}
+
+quarantine_bad_qcow() {
+  local artifact="$1" reason="${2:-bad-system-hive}" ts bad_dir bad_path
+  [ -n "$artifact" ] || return 0
+  [ -f "$artifact" ] || return 0
+  ts="$(date +%Y%m%d-%H%M%S)"
+  bad_dir="$WORK/bad_artifacts"
+  mkdir -p "$bad_dir"
+  bad_path="$bad_dir/$(basename "$artifact").${reason}.${ts}"
+  mv "$artifact" "$bad_path" 2>/dev/null || { rm -f "$artifact" 2>/dev/null || true; return 1; }
+  WARN "Quarantined bad qcow2 artifact: $bad_path"
+}
+
+# Raw disk read script for Windows guest (SSH stream). Keep in sync with WinRM dump_ps below.
+emit_windows_diskdump_ps1() {
+  cat <<'WIN_DISKDUMP_PS1'
+$ErrorActionPreference = 'Stop'
+$paths = @('\\.\PHYSICALDRIVE0', '\\.\PhysicalDrive0')
+$drive = $null
+$lastErr = $null
+foreach ($p in $paths) {
+  try {
+    $drive = New-Object System.IO.FileStream(
+      $p,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::ReadWrite
+    )
+    if ($drive) { break }
+  } catch {
+    $lastErr = $_
+    if ($drive) { $drive.Dispose(); $drive = $null }
+  }
+}
+if ($null -eq $drive) {
+  Write-Error ("OSPC2FLEX_PHYSICAL_DRIVE_OPEN_FAILED: " + $lastErr)
+  exit 2
+}
+$stdout = [System.Console]::OpenStandardOutput()
+$bufLen = 4194304
+$buf = New-Object byte[] $bufLen
+try {
+  while ($true) {
+    try {
+      $n = $drive.Read($buf, 0, $bufLen)
+      if ($n -le 0) { break }
+      $stdout.Write($buf, 0, $n)
+    } catch [System.IO.IOException] {
+      break
+    }
+  }
+} finally {
+  $drive.Close()
+  $stdout.Flush()
+}
+WIN_DISKDUMP_PS1
+}
+
+# When SSH is already open, WinRM bootstrap is skipped — still push diskdump helper to the guest.
+deploy_windows_diskdump_via_ssh() {
+  local target="$1"
+  local tmp b64 rc
+  tmp=$(mktemp /tmp/ospc2flex_diskdump_ps1_XXXXXX)
+  emit_windows_diskdump_ps1 >"$tmp"
+  b64=$(base64 -w0 "$tmp" 2>/dev/null) || b64=$(base64 "$tmp" | tr -d '\n')
+  rm -f "$tmp"
+  set +e
+  if [ -n "${WIN_PASSWORD:-}" ]; then
+    sshpass -p "$WIN_PASSWORD" ssh \
+        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR -o ConnectTimeout=30 \
+        -o PreferredAuthentications=password,keyboard-interactive \
+        -o PubkeyAuthentication=no \
+        "$target" \
+        "powershell -NoProfile -NonInteractive -Command \"[IO.File]::WriteAllBytes('C:\\\\Windows\\\\Temp\\\\ospc2flex_diskdump.ps1', [Convert]::FromBase64String('$b64'))\"" \
+        >>"$PROGRESS_LOG" 2>&1
+    rc=$?
+  else
+    ssh -i ~/.ssh/id_rsa \
+        -o StrictHostKeyChecking=no -o BatchMode=yes \
+        -o LogLevel=ERROR -o ConnectTimeout=30 \
+        "$target" \
+        "powershell -NoProfile -NonInteractive -Command \"[IO.File]::WriteAllBytes('C:\\\\Windows\\\\Temp\\\\ospc2flex_diskdump.ps1', [Convert]::FromBase64String('$b64'))\"" \
+        >>"$PROGRESS_LOG" 2>&1
+    rc=$?
+  fi
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    WARN "Could not push ospc2flex_diskdump.ps1 via SSH (rc=$rc); capture may fail if script is missing"
+  else
+    PASS "Deployed C:\\Windows\\Temp\\ospc2flex_diskdump.ps1 via SSH"
+  fi
+}
+
+# Install VirtIO MSI on the live source VM before disk capture.
+# Must run while the VM is still online — drivers registered properly in the
+# Windows Driver Store so they survive the offline repair step without raw injection.
+# Best-effort: failures warn but never abort the capture.
+preinstall_virtio_msi_live() {
+  local target="$1"
+  local msi_src=""
+  local msi_rc=0
+
+  # Locate MSI on jumphost
+  for _p in \
+    /mnt/migration/virtio/virtio-win-gt-x64.msi \
+    /mnt/migration/virtio-win-gt-x64.msi \
+    /tmp/virtio-win-gt-x64.msi; do
+    [ -f "$_p" ] && { msi_src="$_p"; break; }
+  done
+
+  if [ -z "$msi_src" ]; then
+    WARN "[preinstall_virtio_msi] MSI not found on jumphost — skipping live MSI install"
+    WARN "[preinstall_virtio_msi] To enable: place virtio-win-gt-x64.msi at /mnt/migration/virtio/"
+    return 0
+  fi
+
+  PASS "[preinstall_virtio_msi] MSI found: $msi_src"
+
+  # Idempotency: check if viostor already in Windows Driver Store (MSI already ran)
+  local _check_out
+  set +e
+  if [ -n "${WIN_PASSWORD:-}" ]; then
+    _check_out=$(sshpass -p "$WIN_PASSWORD" ssh \
+      -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o LogLevel=ERROR -o ConnectTimeout=20 \
+      -o PreferredAuthentications=password,keyboard-interactive \
+      -o PubkeyAuthentication=no \
+      "$target" \
+      'powershell -NoProfile -NonInteractive -Command "pnputil /enum-drivers | Select-String viostor"' \
+      2>/dev/null || true)
+  else
+    _check_out=$(ssh -i ~/.ssh/id_rsa \
+      -o StrictHostKeyChecking=no -o BatchMode=yes \
+      -o LogLevel=ERROR -o ConnectTimeout=20 \
+      "$target" \
+      'powershell -NoProfile -NonInteractive -Command "pnputil /enum-drivers | Select-String viostor"' \
+      2>/dev/null || true)
+  fi
+  set -e
+
+  if printf '%s\n' "$_check_out" | grep -qi "viostor"; then
+    PASS "[preinstall_virtio_msi] viostor already in Driver Store — MSI pre-install not needed"
+    return 0
+  fi
+
+  INFO "[preinstall_virtio_msi] Uploading MSI to Windows Temp..."
+  set +e
+  if [ -n "${WIN_PASSWORD:-}" ]; then
+    sshpass -p "$WIN_PASSWORD" scp \
+      -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o LogLevel=ERROR -o ConnectTimeout=30 \
+      -o PreferredAuthentications=password,keyboard-interactive \
+      -o PubkeyAuthentication=no \
+      "$msi_src" "${target}:/Windows/Temp/virtio-win-gt-x64.msi" >>"$BACKGROUND_LOG" 2>&1
+    msi_rc=$?
+  else
+    scp -i ~/.ssh/id_rsa \
+      -o StrictHostKeyChecking=no -o BatchMode=yes \
+      -o LogLevel=ERROR -o ConnectTimeout=30 \
+      "$msi_src" "${target}:/Windows/Temp/virtio-win-gt-x64.msi" >>"$BACKGROUND_LOG" 2>&1
+    msi_rc=$?
+  fi
+  set -e
+
+  if [ "$msi_rc" -ne 0 ]; then
+    WARN "[preinstall_virtio_msi] SCP failed (rc=$msi_rc) — skipping live MSI install"
+    return 0
+  fi
+
+  INFO "[preinstall_virtio_msi] Running msiexec /qn on source VM (may take 2-5 min)..."
+  set +e
+  if [ -n "${WIN_PASSWORD:-}" ]; then
+    sshpass -p "$WIN_PASSWORD" ssh \
+      -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o LogLevel=ERROR -o ConnectTimeout=30 \
+      -o PreferredAuthentications=password,keyboard-interactive \
+      -o PubkeyAuthentication=no \
+      "$target" \
+      'msiexec /i C:\Windows\Temp\virtio-win-gt-x64.msi /qn /norestart ADDLOCAL=ALL' \
+      >>"$BACKGROUND_LOG" 2>&1
+    msi_rc=$?
+  else
+    ssh -i ~/.ssh/id_rsa \
+      -o StrictHostKeyChecking=no -o BatchMode=yes \
+      -o LogLevel=ERROR -o ConnectTimeout=300 \
+      "$target" \
+      'msiexec /i C:\Windows\Temp\virtio-win-gt-x64.msi /qn /norestart ADDLOCAL=ALL' \
+      >>"$BACKGROUND_LOG" 2>&1
+    msi_rc=$?
+  fi
+  set -e
+
+  # 0=success, 3010=success+reboot-needed — both are OK for capture
+  if [ "$msi_rc" -eq 0 ] || [ "$msi_rc" -eq 3010 ]; then
+    PASS "[preinstall_virtio_msi] VirtIO MSI installed on live source VM (rc=$msi_rc)"
+  else
+    WARN "[preinstall_virtio_msi] msiexec returned rc=$msi_rc — capture will continue; offline repair will inject drivers as fallback"
+  fi
+  return 0
+}
+
+if [ "$FORCE_FRESH_CAPTURE" = "1" ] || [ "$DISABLE_RESUME" = "1" ]; then
+  INFO "Force-fresh/disable-resume enabled; archiving cached qcow2 and clearing sentinels."
+  archive_cached_artifacts_for_fresh_capture
+fi
+
 if [ "$RESUME_MODE" != "off" ] && [ "${OSPC2FLEX_LEGACY_IMAGE_NAME:-0}" != "1" ]; then
   _plain="$WORK/${BASE_LABEL}.qcow2"
-  if [ -f "$_plain" ] && qemu-img info "$_plain" >/dev/null 2>&1; then
-    _sz=$(stat -c%s "$_plain" 2>/dev/null || echo 0)
-    if [ "${_sz:-0}" -ge 1048576 ]; then
-      _resume_qcow="$_plain"
-    fi
+  if qcow_resume_ok "$_plain"; then
+    _resume_qcow="$_plain"
   fi
   if [ -z "$_resume_qcow" ]; then
     for _c in $(ls -t "$WORK/${BASE_LABEL}"-*.qcow2 2>/dev/null || true); do
       [ -f "$_c" ] || continue
-      qemu-img info "$_c" >/dev/null 2>&1 || continue
-      _sz=$(stat -c%s "$_c" 2>/dev/null || echo 0)
-      if [ "${_sz:-0}" -ge 1048576 ]; then
+      if qcow_resume_ok "$_c"; then
         _resume_qcow="$_c"
         break
       fi
@@ -171,74 +508,130 @@ IMG_PATH="$WORK/${LABEL}.img"
 IMG_SIZE=0
 DOWNLOAD_METHOD=""
 RESUME_FROM_QCOW=0
-RESUME_FROM_RAW=0
 
 # Per-job debug logs (full noisy command output). UI stream stays readable via ui_log / step_*.
 OSPC2FLEX_UI_VERBOSE="${OSPC2FLEX_UI_VERBOSE:-0}"
-mkdir -p "$WORK/logs"
-BACKGROUND_LOG="$WORK/logs/${LABEL}.background.log"
-PROGRESS_LOG="$WORK/logs/${LABEL}.progress.log"
+LOG_DIR="$WORK/logs"
+mkdir -p "$LOG_DIR"
+BACKGROUND_LOG="$LOG_DIR/${LABEL}.background.log"
+PROGRESS_LOG="$LOG_DIR/${LABEL}.progress.log"
 : > "$BACKGROUND_LOG"
 : > "$PROGRESS_LOG"
 
-ui_log() { echo "[$(date '+%H:%M:%S')] $*"; }
+ui_log() { echo "[$(date '+%H:%M:%S')]$CAPTURE_LOG_PREFIX $*" >&2; }
 bg_log() {
-  mkdir -p "$(dirname "$BACKGROUND_LOG")"
-  echo "[$(date '+%H:%M:%S')] $*" >> "$BACKGROUND_LOG"
+  mkdir -p "$LOG_DIR"
+  echo "[$(date '+%H:%M:%S')]$CAPTURE_LOG_PREFIX $*" >> "$BACKGROUND_LOG"
 }
-progress_log() { echo "[$(date '+%H:%M:%S')] $*" >> "$PROGRESS_LOG"; }
+progress_log() { echo "[$(date '+%H:%M:%S')]$CAPTURE_LOG_PREFIX $*" >> "$PROGRESS_LOG"; }
 
-# Run a noisy command with full transcript in BACKGROUND_LOG; optional tee to UI when verbose.
+# Run a noisy command with full transcript in BACKGROUND_LOG.
+# When OSPC2FLEX_UI_VERBOSE=1, allow noisy output to stream to UI.
 run_noisy_bg() {
   local title="$1" rc
   shift
   ui_log "▶ $title started. Full details: $BACKGROUND_LOG"
-  mkdir -p "$(dirname "$BACKGROUND_LOG")"
+  mkdir -p "$LOG_DIR"
+
   if [ "${OSPC2FLEX_UI_VERBOSE:-0}" = "1" ]; then
-    # Subshell so `exit` cannot terminate the migration script (same as non-verbose path).
-    (
-      echo "================================================================"
-      echo "[$(date '+%F %T')] START: $title"
-      echo "CMD: $*"
-      echo "================================================================"
-      "$@"
-      rc=$?
-      echo "================================================================"
-      echo "[$(date '+%F %T')] END: $title rc=$rc"
-      echo "================================================================"
-      exit "$rc"
-    ) 2>&1 | tee -a "$BACKGROUND_LOG"
-    rc=${PIPESTATUS[0]}
-  else
-    (
-      echo "================================================================"
-      echo "[$(date '+%F %T')] START: $title"
-      echo "CMD: $*"
-      echo "================================================================"
-      "$@"
-      rc=$?
-      echo "================================================================"
-      echo "[$(date '+%F %T')] END: $title rc=$rc"
-      echo "================================================================"
-      exit "$rc"
-    ) >> "$BACKGROUND_LOG" 2>&1
-    rc=$?
+    "$@"
+    return $?
   fi
+
+  # Subshell so `exit` does not terminate the whole capture script (brace group would).
+  (
+    echo "================================================================"
+    echo "[$(date '+%F %T')] START: $title"
+    echo "CMD: $*"
+    echo "================================================================"
+    "$@"
+    rc=$?
+    echo "================================================================"
+    echo "[$(date '+%F %T')] END: $title rc=$rc"
+    echo "================================================================"
+    exit "$rc"
+  ) >> "$BACKGROUND_LOG" 2>&1
+
+  rc=$?
   if [ "$rc" -eq 0 ]; then
     ui_log "✅ $title completed"
   else
     ui_log "❌ $title failed rc=$rc. See: $BACKGROUND_LOG"
-    tail -n 40 "$BACKGROUND_LOG" 2>/dev/null | sed 's/^/[debug-tail] /' || true
+    tail -n 40 "$BACKGROUND_LOG" 2>/dev/null | sed 's/^/[debug-tail] /' >&2 || true
     return "$rc"
   fi
 }
 
+# Capture stdout while sending full details to BACKGROUND_LOG when non-verbose.
+# Useful for commands that return IDs (e.g. openstack image create -c id).
+run_noisy_bg_capture() {
+  local title="$1" rc out
+  shift
+  ui_log "▶ $title started. Full details: $BACKGROUND_LOG" >&2
+  mkdir -p "$LOG_DIR"
+
+  if [ "${OSPC2FLEX_UI_VERBOSE:-0}" = "1" ]; then
+    "$@"
+    return $?
+  fi
+
+  {
+    echo "================================================================"
+    echo "[$(date '+%F %T')] START: $title"
+    echo "CMD: $*"
+    echo "================================================================"
+  } >> "$BACKGROUND_LOG" 2>&1
+
+  set +e
+  out=$("$@" 2>>"$BACKGROUND_LOG")
+  rc=$?
+  set -e
+
+  {
+    echo "================================================================"
+    echo "[$(date '+%F %T')] END: $title rc=$rc"
+    echo "================================================================"
+  } >> "$BACKGROUND_LOG" 2>&1
+
+  if [ "$rc" -eq 0 ]; then
+    ui_log "✅ $title completed" >&2
+  else
+    ui_log "❌ $title failed rc=$rc. See: $BACKGROUND_LOG" >&2
+    tail -n 40 "$BACKGROUND_LOG" 2>/dev/null | sed 's/^/[debug-tail] /' >&2 || true
+    return "$rc"
+  fi
+
+  printf '%s' "$out"
+}
+
 _mig_on_exit() {
   local ec=$?
+  # Kill any live heartbeat subshells so their open stdout FD doesn't keep
+  # the self-tee pipe alive after we exit, causing orphan tee noise.
+  rm -f "/tmp/winmig_hb_active_${LABEL:-}" 2>/dev/null || true
+  [ -n "${_HB_PID:-}" ] && kill "$_HB_PID" 2>/dev/null || true
+  if [ -f "/tmp/winmig_hb_pid_${LABEL:-}" ]; then
+    kill "$(cat "/tmp/winmig_hb_pid_${LABEL:-}" 2>/dev/null)" 2>/dev/null || true
+    rm -f "/tmp/winmig_hb_pid_${LABEL:-}" 2>/dev/null || true
+  fi
   [ -z "${BACKGROUND_LOG:-}" ] && return 0
   ui_log "Background log: $BACKGROUND_LOG"
   ui_log "Progress log: $PROGRESS_LOG"
-  if [ "$ec" -eq 0 ]; then
+  # Capture-only: prefer explicit handoff flag, but if the script exited 0 before
+  # CAPTURE_HANDOFF_READY=1 (legacy run_noisy_bg brace/exit bug or partial refactor),
+  # accept a non-empty qcow2 that passes qemu-img info+check so Method G/H still succeed.
+  if [ "$ec" -eq 0 ] && [ "${METHOD_B_CAPTURE_ONLY:-0}" = "1" ]; then
+    if [ "${CAPTURE_HANDOFF_READY:-0}" = "1" ] \
+      || { [ -n "${QCOW:-}" ] && [ -s "$QCOW" ] && qemu-img info "$QCOW" >/dev/null 2>&1 && qemu-img check "$QCOW" >/dev/null 2>&1; }; then
+      ui_log "Capture phase result: METHOD_B_SSH_CAPTURE_READY"
+    else
+      ui_log "Capture phase result: INCOMPLETE"
+      trap - EXIT
+      exit 1
+    fi
+  elif [ "$ec" -eq 0 ] && [ "${OSPC2FLEX_WINDOWS_MODE:-offline_only}" = "two_phase_virtio" ]; then
+    ui_log "Migration phase result: RESCUE_READY"
+  elif [ "$ec" -eq 0 ]; then
     ui_log "Migration result: SUCCESS"
   else
     ui_log "Migration result: FAILED"
@@ -252,7 +645,11 @@ if [ "${OSPC2FLEX_SELF_TEE:-auto}" != "0" ]; then
 fi
 
 echo "═══════════════════════════════════════════════════════════════════════════"
-echo " OSPC→FLEX Windows Migration Workflow"
+if [ -n "${OSPC2FLEX_PARENT_METHOD_NAME:-}" ]; then
+  echo " ${OSPC2FLEX_PARENT_METHOD_NAME} — Shared Method B/D SSH Capture Engine"
+else
+  echo " OSPC→FLEX Windows Method D Capture Workflow"
+fi
 echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 echo "  Server    : $SERVER_NAME ($SERVER_IP)"
@@ -272,29 +669,96 @@ echo "════════════════════════�
 echo ""
 
 mkdir -p "$WORK"
+if [ "$METHOD_D_SKIP_SOURCE_CAPTURE" = "1" ]; then
+  RESUME_MODE="off"
+fi
+RESUME_FROM_IMG=0
 if [ "$RESUME_MODE" = "off" ]; then
   INFO "Resume mode disabled (OSPC2FLEX_RESUME_MODE=off); forcing fresh disk capture + qcow2 conversion."
 elif [ -s "$QCOW" ] && qemu-img info "$QCOW" >/dev/null 2>&1; then
-  QCOW_EXISTING_BYTES=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
-  if [ "${QCOW_EXISTING_BYTES:-0}" -ge 1048576 ]; then
+  if qcow_resume_ok "$QCOW"; then
+    QCOW_EXISTING_BYTES=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
     RESUME_FROM_QCOW=1
     DOWNLOAD_METHOD="existing-qcow2-resume"
     PASS "Resume point found: $QCOW ($((QCOW_EXISTING_BYTES / 1024 / 1024)) MB)"
     INFO "Skipping SSH/Glance download and raw->qcow2 conversion; resuming at Windows repair stage."
   fi
-elif [ -s "$IMG_PATH" ] && qemu-img info "$IMG_PATH" >/dev/null 2>&1; then
-  _raw_sz=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
-  if [ "${_raw_sz:-0}" -ge 1048576 ]; then
-    RESUME_FROM_RAW=1
-    DOWNLOAD_METHOD="existing-raw-resume"
-    PASS "Resume from raw image: $IMG_PATH ($((${_raw_sz}/1024/1024)) MB)"
-    INFO "Skipping disk download; resuming at qcow2 conversion."
+elif [ -s "$IMG_PATH" ]; then
+  _img_resume_sz=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+  if [ "${_img_resume_sz:-0}" -ge "$MIN_RESUME_QCOW_BYTES" ]; then
+    IMG_SIZE="$_img_resume_sz"
+    RESUME_FROM_IMG=1
+    DOWNLOAD_METHOD="existing-img-resume"
+    PASS "Resume point found: $IMG_PATH ($((IMG_SIZE / 1024 / 1024)) MB)"
+    _meta_file="${WORK}/${LABEL}.capture_meta.json"
+    if [ -f "$_meta_file" ] && python3 -c "
+import json, sys
+d = json.loads(open('${_meta_file}').read())
+sys.exit(0 if d.get('img_complete') else 1)
+" 2>/dev/null; then
+      INFO "Sidecar confirms this is a complete disk capture."
+    else
+      WARN "No verified-complete sidecar for this .img; conversion will proceed but qcow2 probe will run after."
+    fi
+    INFO "Skipping SSH disk capture; will convert existing .img to qcow2."
   fi
+fi
+
+# Method D artifact-input mode (used by Method F):
+# Source acquisition already completed by Method F.
+if [ "$METHOD_D_SKIP_SOURCE_CAPTURE" = "1" ]; then
+  [ -n "$METHOD_D_INPUT_ARTIFACT" ] || { FAIL "METHOD_D_ARTIFACT_INPUT_MODE requires --input-artifact"; exit 1; }
+  case "$METHOD_D_INPUT_ARTIFACT" in
+    /*) ;;
+    *)
+      FAIL "METHOD_D_ARTIFACT_INPUT_MODE requires absolute --input-artifact path"
+      exit 1
+      ;;
+  esac
+  [ -f "$METHOD_D_INPUT_ARTIFACT" ] || { FAIL "Input artifact missing: $METHOD_D_INPUT_ARTIFACT"; exit 1; }
+  [ -s "$METHOD_D_INPUT_ARTIFACT" ] || { FAIL "Input artifact empty: $METHOD_D_INPUT_ARTIFACT"; exit 1; }
+  if printf '%s' "$METHOD_D_INPUT_ARTIFACT" | grep -q "/bad_artifacts/"; then
+    FAIL "Refusing bad artifact path: $METHOD_D_INPUT_ARTIFACT"
+    exit 1
+  fi
+  INFO "METHOD_D_ARTIFACT_INPUT_MODE"
+  INFO "Source disk acquisition already completed by upstream export (Method F / G wrapper)."
+  INFO "Input artifact: $METHOD_D_INPUT_ARTIFACT"
+  _input_fmt="$(qemu-img info "$METHOD_D_INPUT_ARTIFACT" 2>/dev/null | awk -F': ' '/^file format:/{print $2; exit}')"
+  [ -n "$_input_fmt" ] || { FAIL "Could not detect input artifact format"; exit 1; }
+  mkdir -p "$WORK"
+  if [ "$_input_fmt" = "qcow2" ]; then
+    if [ "$METHOD_D_INPUT_ARTIFACT" != "$QCOW" ]; then
+      cp -f "$METHOD_D_INPUT_ARTIFACT" "$QCOW"
+    fi
+  else
+    run_noisy_bg "qemu-img convert input artifact to qcow2" qemu-img convert -O qcow2 "$METHOD_D_INPUT_ARTIFACT" "$QCOW"
+  fi
+  qemu-img info "$QCOW" >/dev/null 2>&1 || { FAIL "Converted input qcow2 is unreadable"; exit 1; }
+  RESUME_FROM_QCOW=1
+  DOWNLOAD_METHOD="method-f-input-artifact"
+  DISABLE_RESUME=1
 fi
 
 # Guard against stale/invalid resumed qcow2 for Windows runs.
 # If dry-run validation cannot discover a Windows partition, drop resume and force recapture.
+# Skip probe when capture_meta.json confirms this qcow2 came from a verified complete capture.
 if [ "$RESUME_FROM_QCOW" -eq 1 ] && [ "${OS_FAMILY:-windows}" = "windows" ] && [ -f "$WIN_REPAIR" ]; then
+  _meta_file="${WORK}/${LABEL}.capture_meta.json"
+  _skip_probe=0
+  if [ -f "$_meta_file" ]; then
+    if python3 -c "
+import json, sys
+d = json.loads(open('${_meta_file}').read())
+sys.exit(0 if d.get('qcow2_complete') and d.get('img_complete') else 1)
+" 2>/dev/null; then
+      _skip_probe=1
+      PASS "Capture sidecar confirms complete capture; skipping dry-run probe for resumed qcow2."
+    fi
+  fi
+  if [ "$_skip_probe" -eq 1 ]; then
+    : # probe skipped — sidecar verified
+  else
   _resume_probe_log="$WORK/${LABEL}.resume-validate.log"
   ui_log "Validating resumed qcow2 before skipping capture: $QCOW"
   set +e
@@ -306,17 +770,10 @@ if [ "$RESUME_FROM_QCOW" -eq 1 ] && [ "${OS_FAMILY:-windows}" = "windows" ] && [
     bg_log "Resume validation failed for $QCOW (rc=$_resume_probe_rc)."
     cat "$_resume_probe_log" >> "$BACKGROUND_LOG" 2>/dev/null || true
     if grep -Eiq "SYSTEM hive validation failed|hivexsh: failed to open hive file|SYSTEM hive missing or empty|SYSTEM hive corrupted after repair|Operation not supported|WINDOWS_PARTITION_DETECTION_FAILED|0xc0000225|WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED|failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED|status=WINDOWS_SYSTEM_HIVE_INVALID" "$_resume_probe_log" 2>/dev/null; then
-      rm -f "${QCOW}.win_repaired" "$WORK/${BASE_LABEL}.qcow2.win_repaired" "$WORK/${BASE_LABEL}"-*.qcow2.win_repaired 2>/dev/null || true
-      _bad_dir="$WORK/bad_artifacts"
-      mkdir -p "$_bad_dir"
-      _dest="$_bad_dir/$(basename "$QCOW").bad-system-hive.$(date +%Y%m%d-%H%M%S)"
-      if mv "$QCOW" "$_dest" 2>/dev/null; then
-        WARN "Quarantined bad qcow2 (SYSTEM hive): $_dest"
-      else
-        _bad_qcow="${QCOW}.invalid.$(date +%Y%m%d-%H%M%S)"
-        mv "$QCOW" "$_bad_qcow" 2>/dev/null || rm -f "$QCOW"
-        WARN "Moved invalid resume artifact to: ${_bad_qcow}"
-      fi
+      rm -f "${QCOW}.win_repaired" 2>/dev/null || true
+      rm -f "$WORK/${BASE_LABEL}.windows_v2_rescue.json" 2>/dev/null || true
+      WARN "Detected corrupted SYSTEM hive in resumed qcow2; invalidating artifact and clearing repaired sentinel."
+      quarantine_bad_qcow "$QCOW" "bad-system-hive" || true
     else
       _bad_qcow="${QCOW}.invalid.$(date +%Y%m%d-%H%M%S)"
       mv "$QCOW" "$_bad_qcow" 2>/dev/null || rm -f "$QCOW"
@@ -327,6 +784,7 @@ if [ "$RESUME_FROM_QCOW" -eq 1 ] && [ "${OS_FAMILY:-windows}" = "windows" ] && [
   else
     PASS "Resume qcow2 validation passed; continuing from existing artifact."
   fi
+  fi  # end skip_probe else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -349,6 +807,13 @@ if [ -n "$_ssh_check_ip" ]; then
 else
   step_progress "SSH not reachable — will create OSPC snapshot"
   step_done "DONE"
+fi
+
+if [ "$METHOD_B_CAPTURE_ONLY" = "1" ] && [ "${SSH_DISK_METHOD:-0}" -ne 1 ]; then
+  FAIL "Capture-only mode requires Method B SSH disk download; SSH port 22 is not reachable."
+  INFO "WINDOWS_SSH_BLOCKED"
+  INFO "CAPTURE_MODE=blocked"
+  exit 1
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -437,41 +902,58 @@ for s in d['access']['serviceCatalog']:
   fi
   if [ -n "$SNAP_ID" ]; then
     PASS "Reusing existing active snapshot: $SNAP_ID"
-    step_done "OK"
   else
     # Create snapshot via Nova createImage action
     step_progress "Creating snapshot $SNAP_NAME..."
-    curl -s -X POST -H "X-Auth-Token: $OS_TOKEN" -H "Content-Type: application/json" \
+    _create_resp=$(curl -s -X POST -H "X-Auth-Token: $OS_TOKEN" -H "Content-Type: application/json" \
       "$_NOVA_URL/servers/$SERVER_ID/action" \
-      -d "{\"createImage\":{\"name\":\"$SNAP_NAME\",\"metadata\":{}}}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin))" 2>/dev/null || true
+      -d "{\"createImage\":{\"name\":\"$SNAP_NAME\",\"metadata\":{}}}" 2>/dev/null || true)
+    if echo "$_create_resp" | grep -Eiq "forbidden|snapshot_volume|Policy doesn't allow"; then
+      SNAPSHOT_POLICY_BLOCKED=1
+      WARN "OSPC snapshot policy blocked (403 snapshot_volume). Will attempt SSH/WinRM capture path."
+      WARN "Glance fallback will remain unavailable unless provider policy is changed."
+      step_done "BLOCKED (policy 403)"
+      SNAP_ID=""
+      SERVER_ID="${SERVER_ID:-}"
+      # Continue so WinRM bootstrap section can run next.
+      :
+    fi
+    [ "$SNAPSHOT_POLICY_BLOCKED" -eq 1 ] || echo "$_create_resp" | python3 -c "import sys,json; print(json.load(sys.stdin))" 2>/dev/null || true
 
-    # Poll Glance until active
-    step_progress "Waiting for snapshot to become active..."
-    for i in $(seq 1 90); do
-      sleep 10
-      if [ -n "$_GLANCE_URL" ]; then
-        SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
-          | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
-        [ -n "$SNAP_ID" ] && { step_progress "Snapshot active: $SNAP_ID"; break; }
-        _SNAP_STATUS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
-          | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('status','waiting') if imgs else 'waiting')" 2>/dev/null || echo "waiting")
-        step_progress "  Snapshot status: $_SNAP_STATUS ($((i*10))s elapsed)"
-      fi
-    done
-    step_done "OK"
+    if [ "$SNAPSHOT_POLICY_BLOCKED" -eq 0 ]; then
+      # Poll Glance until active
+      step_progress "Waiting for snapshot to become active..."
+      for i in $(seq 1 90); do
+        sleep 10
+        if [ -n "$_GLANCE_URL" ]; then
+          SNAP_ID=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
+            | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); [print(i['id']) for i in imgs if i.get('status')=='active']" 2>/dev/null | head -1 || true)
+          [ -n "$SNAP_ID" ] && { step_progress "Snapshot active: $SNAP_ID"; break; }
+          _SNAP_STATUS=$(curl -s -H "X-Auth-Token: $OS_TOKEN" "$_GLANCE_URL/v2/images?name=${SNAP_NAME}&limit=5" 2>/dev/null \
+            | python3 -c "import sys,json; imgs=json.load(sys.stdin).get('images',[]); print(imgs[0].get('status','waiting') if imgs else 'waiting')" 2>/dev/null || echo "waiting")
+          step_progress "  Snapshot status: $_SNAP_STATUS ($((i*10))s elapsed)"
+        fi
+      done
+    fi
   fi
 
-  if [ -z "$SNAP_ID" ]; then
+  if [ -z "$SNAP_ID" ] && [ "$SNAPSHOT_POLICY_BLOCKED" -eq 0 ]; then
     FAIL "Failed to create/find snapshot for '$SERVER_NAME'"
     step_done "FAILED"
     exit 1
   fi
+  [ "$SNAPSHOT_POLICY_BLOCKED" -eq 1 ] || step_done "OK"
 fi  # end SSH_DISK_METHOD==0 block
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1b (continued): WinRM bootstrap if SSH still not available
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ -n "$WIN_PASSWORD" ]; then
+if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
+  CAPTURE_MODE="ssh_guest_capture"
+  INFO "WINDOWS_SSH_OPEN"
+fi
+
+if [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ -n "$WIN_PASSWORD" ] && [ "$METHOD_D_SKIP_SOURCE_CAPTURE" != "1" ]; then
   # Probe for WinRM — prefer ServiceNet IP (always accessible from OSPC network),
   # fall back to public IP. Try HTTP (5985) then HTTPS (5986).
   _WINRM_IP=""
@@ -490,6 +972,8 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ -n "$WIN_PASSWORD" ]; then
   done
 
   if [ -z "$_WINRM_IP" ]; then
+    INFO "WINDOWS_WINRM_AUTH_FAILED"
+    INFO "WINDOWS_SSH_BLOCKED"
     WARN "WinRM (5985/5986) not reachable on ${WIN_SNET_IP:+$WIN_SNET_IP or }$SERVER_IP — cannot bootstrap OpenSSH; will use Glance fallback"
   else
     INFO "SSH not open; bootstrapping OpenSSH via WinRM ${_WINRM_SCHEME}://${_WINRM_IP}:${_WINRM_PORT}..."
@@ -502,85 +986,51 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ -n "$WIN_PASSWORD" ]; then
       [ -f "$_kf" ] && { JH_PUBKEY=$(cat "$_kf"); break; }
     done
 
-    _WINRM_PY=$(mktemp /tmp/ospc2flex_winrm_XXXXXX.py)
+    _WINRM_PY=$(mktemp /tmp/ospc2flex_winrm_enable_openssh_XXXXXX.py)
     cat > "$_WINRM_PY" <<'WINRM_SCRIPT'
-import sys, winrm
+import base64
+import json
+import os
+import sys
+import winrm
 
-ip, port, scheme, user, password = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
-pubkey = sys.argv[6] if len(sys.argv) > 6 else ""
+ip, port, scheme, user = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+pubkey = sys.argv[5] if len(sys.argv) > 5 else ""
+diag_path = sys.argv[6] if len(sys.argv) > 6 else ""
+access_json = sys.argv[7] if len(sys.argv) > 7 else ""
+password = os.environ.get("OSPC2FLEX_WINRM_PASSWORD", "")
+try_enable = os.environ.get("OSPC2FLEX_WINDOWS_TRY_ENABLE_OPENSSH", "1").strip() not in ("0", "false", "False")
 
-# PowerShell heredoc — use @'...'@ (here-string) to avoid all escaping issues
-PS_BOOTSTRAP = r"""
-$ErrorActionPreference = 'Stop'
-$pub = "PUBKEY_PLACEHOLDER"
+def emit(msg):
+    print(msg)
+    if diag_path:
+        with open(diag_path, "a", encoding="utf-8") as fh:
+            fh.write(msg + "\n")
 
-# Install OpenSSH if missing (try built-in capability, then GitHub release from jumphost HTTP)
-if (-not (Get-Service sshd -ErrorAction SilentlyContinue)) {
-    $cap = Get-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
-    if ($cap -and $cap.State -eq 'NotPresent') {
-        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue
-    }
-}
-if (-not (Get-Service sshd -ErrorAction SilentlyContinue)) {
-    # Fallback: download from jumphost HTTP server (ServiceNet)
-    $jh = "JUMPHOST_SNET_IP"
-    Invoke-WebRequest -Uri "http://${jh}:8080/OpenSSH-Win64.zip" -OutFile 'C:\Windows\Temp\OpenSSH-Win64.zip' -UseBasicParsing
-    Expand-Archive -Path 'C:\Windows\Temp\OpenSSH-Win64.zip' -DestinationPath 'C:\Program Files\' -Force
-    & 'C:\Program Files\OpenSSH-Win64\install-sshd.ps1'
-    Write-Output "[WinRM] OpenSSH installed from jumphost"
-}
+def run_ps(session, script, fail_on_error=True):
+    r = session.run_ps(script)
+    out = r.std_out.decode("utf-8", errors="replace").strip()
+    err = r.std_err.decode("utf-8", errors="replace").strip()
+    for line in out.splitlines():
+        emit(line)
+    if err and "CLIXML" not in err:
+        for line in err.splitlines():
+            emit(f"[STDERR] {line}")
+    if fail_on_error and r.status_code != 0:
+        raise RuntimeError(f"WinRM PS exit {r.status_code}")
+    return r
 
-# Start and persist sshd
-$attempts = 0
-while ($attempts -lt 6) {
-    try { Start-Service sshd; Set-Service -Name sshd -StartupType Automatic; break }
-    catch { $attempts++; Start-Sleep 5 }
-}
-Write-Output "[WinRM] sshd started"
-
-# Firewall rule for port 22
-if (-not (Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue)) {
-    New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH (ospc2flex)' `
-        -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
-    Write-Output "[WinRM] Firewall rule added"
-}
-
-# Set PowerShell as default SSH shell (with correct path)
-$psExe = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-if (Test-Path $psExe) {
-    if (-not (Test-Path 'HKLM:\SOFTWARE\OpenSSH')) { New-Item -Path 'HKLM:\SOFTWARE\OpenSSH' -Force | Out-Null }
-    Set-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -Name DefaultShell -Value $psExe
-    Write-Output "[WinRM] Default shell = PowerShell"
-}
-
-# Write disk dump script (here-string avoids all escaping)
-$dumpScript = @'
-$drive = [IO.File]::OpenRead('\\.\PhysicalDrive0')
-$stdout = [Console]::OpenStandardOutput()
-$buf = New-Object byte[] 4194304
-while (($n = $drive.Read($buf, 0, $buf.Length)) -gt 0) { $stdout.Write($buf, 0, $n) }
-$drive.Close()
-$stdout.Flush()
-'@
-Set-Content -Path 'C:\Windows\Temp\ospc2flex_diskdump.ps1' -Value $dumpScript -Encoding ascii
-Write-Output "[WinRM] Disk dump script written"
-
-# Install SSH authorized key in home dir with strict ACL
-if ($pub -ne '') {
-    $homeSSH = 'C:\Users\Administrator\.ssh'
-    if (-not (Test-Path $homeSSH)) { New-Item -ItemType Directory -Path $homeSSH | Out-Null }
-    Set-Content -Path "$homeSSH\authorized_keys" -Value $pub -Encoding ascii
-    $fa = New-Object Security.AccessControl.FileSecurity
-    $fa.SetAccessRuleProtection($true,$false)
-    $fa.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule('NT AUTHORITY\SYSTEM','FullControl','None','None','Allow')))
-    $fa.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule('BUILTIN\Administrators','FullControl','None','None','Allow')))
-    Set-Acl "$homeSSH\authorized_keys" $fa
-    Write-Output "[WinRM] Authorized key installed"
-}
-Write-Output "[WinRM] Bootstrap complete"
-"""
+def write_access_json(payload):
+    if not access_json:
+        return
+    with open(access_json, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2)
 
 try:
+    if not password:
+        emit("WINDOWS_PASSWORD_MISSING")
+        emit("WINDOWS_SOURCE_ACCESS_BLOCKED")
+        sys.exit(4)
     s = winrm.Session(
         f"{scheme}://{ip}:{port}/wsman",
         auth=(user, password),
@@ -589,31 +1039,245 @@ try:
         read_timeout_sec=360,
         operation_timeout_sec=300,
     )
-    import socket
-    jh_snet = ""
-    try:
-        jh_snet = socket.gethostbyname(socket.gethostname())
-    except Exception:
-        pass
-    ps = PS_BOOTSTRAP.replace("PUBKEY_PLACEHOLDER", pubkey).replace("JUMPHOST_SNET_IP", jh_snet)
-    r = s.run_ps(ps)
-    out = r.std_out.decode("utf-8", errors="replace").strip()
-    err = r.std_err.decode("utf-8", errors="replace").strip()
-    for line in out.splitlines(): print(line)
-    if err and "CLIXML" not in err:
-        for line in err.splitlines(): print(f"[STDERR] {line}", file=sys.stderr)
-    if r.status_code != 0:
-        print(f"[ERROR] WinRM PS exit {r.status_code}", file=sys.stderr); sys.exit(1)
+    emit("WINDOWS_WINRM_AUTH_OK")
+    emit("WINDOWS_SSH_BLOCKED")
+
+    run_ps(s, r"""
+$ErrorActionPreference='Continue'
+Write-Output 'WINRM_DIAG_BEGIN'
+whoami
+whoami /groups
+Get-Service sshd -ErrorAction SilentlyContinue | Format-List Name,Status,StartType
+Get-WindowsCapability -Online | Where-Object {$_.Name -like "OpenSSH.Server*"} | Format-List Name,State
+Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue
+Test-NetConnection -ComputerName localhost -Port 22 | Format-List ComputerName,RemotePort,TcpTestSucceeded
+Write-Output 'WINRM_DIAG_END'
+""", fail_on_error=False)
+
+    svc_check = run_ps(s, r"""
+if (Get-Service sshd -ErrorAction SilentlyContinue) {
+  Write-Output 'WINDOWS_OPENSSH_INSTALLED'
+} else {
+  Write-Output 'WINDOWS_OPENSSH_NOT_INSTALLED'
+}
+""", fail_on_error=False)
+    open_ssh_present = "WINDOWS_OPENSSH_INSTALLED" in svc_check.std_out.decode("utf-8", errors="replace")
+
+    if not open_ssh_present:
+      emit("WINDOWS_OPENSSH_ENABLE_RUNNING")
+      add_cap = run_ps(s, r"""
+$ErrorActionPreference='Stop'
+try {
+  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null
+  Write-Output 'WINDOWS_OPENSSH_INSTALL_OK'
+} catch {
+  $msg = $_.Exception.Message
+  Write-Output ('ADD_CAPABILITY_ERR: ' + $msg)
+  if ($msg -match 'Access is denied') {
+    Write-Output 'WINDOWS_OPENSSH_INSTALL_DENIED'
+  } else {
+    Write-Output 'WINDOWS_OPENSSH_INSTALL_FAILED'
+  }
+}
+""", fail_on_error=False)
+      add_out = add_cap.std_out.decode("utf-8", errors="replace")
+      if "WINDOWS_OPENSSH_INSTALL_DENIED" in add_out:
+        emit("WINDOWS_OPENSSH_INSTALL_DENIED")
+        emit("[WinRM] Retrying OpenSSH install via elevated SYSTEM scheduled task...")
+        run_ps(s, r"""
+$ErrorActionPreference='Continue'
+$taskName = 'ospc2flex_openssh_install'
+$psPath = 'C:\Windows\Temp\ospc2flex_install_openssh.ps1'
+$psBody = "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null"
+Set-Content -Path $psPath -Value $psBody -Encoding ascii
+schtasks /Delete /TN $taskName /F | Out-Null
+schtasks /Create /TN $taskName /SC ONCE /ST 00:00 /RL HIGHEST /RU SYSTEM /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Temp\ospc2flex_install_openssh.ps1" /F | Out-Null
+schtasks /Run /TN $taskName | Out-Null
+Start-Sleep -Seconds 12
+schtasks /Query /TN $taskName /V /FO LIST
+""", fail_on_error=False)
+        svc_retry = run_ps(s, r"""
+if (Get-Service sshd -ErrorAction SilentlyContinue) {
+  Write-Output 'WINDOWS_OPENSSH_INSTALLED'
+} else {
+  Write-Output 'WINDOWS_OPENSSH_NOT_INSTALLED'
+}
+""", fail_on_error=False)
+        open_ssh_present = "WINDOWS_OPENSSH_INSTALLED" in svc_retry.std_out.decode("utf-8", errors="replace")
+        if not open_ssh_present:
+          emit("WINDOWS_BULK_TRANSFER_REQUIRED")
+          emit("WINDOWS_SOURCE_ACCESS_BLOCKED")
+          emit("WinRM login is valid, but this session cannot install OpenSSH. Log in through console/RDP with elevated Administrator, install OpenSSH Server, enable firewall rule, then rerun. Or enable the WinRM capture path.")
+          write_access_json({
+              "source_ip": ip,
+              "windows_user": user,
+              "ssh_port_open": False,
+              "winrm_auth": "ok",
+              "winrm_endpoint": f"{scheme}://{ip}:{port}/wsman",
+              "openssh_present": False,
+              "openssh_enable_attempted": True,
+              "openssh_enable_status": "denied",
+              "external_ssh_check": "blocked",
+              "capture_mode": "blocked",
+              "failure_reason": "WINRM_AUTH_OK_BUT_SSH_UNAVAILABLE",
+              "next_action": "Use WinRM-agent capture, enable SMB/HTTPS/object upload, or install OpenSSH manually from elevated Windows console/RDP."
+          })
+          sys.exit(2)
+
+      svc_check_after = run_ps(s, r"""
+if (Get-Service sshd -ErrorAction SilentlyContinue) {
+  Write-Output 'WINDOWS_OPENSSH_INSTALLED'
+} else {
+  Write-Output 'WINDOWS_OPENSSH_NOT_INSTALLED'
+}
+""", fail_on_error=False)
+      open_ssh_present = "WINDOWS_OPENSSH_INSTALLED" in svc_check_after.std_out.decode("utf-8", errors="replace")
+
+    if not open_ssh_present:
+      emit("WINDOWS_OPENSSH_NOT_INSTALLED")
+      emit("WINDOWS_OPENSSH_SERVICE_MISSING")
+      emit("WINDOWS_BULK_TRANSFER_REQUIRED")
+      emit("WINDOWS_SOURCE_ACCESS_BLOCKED")
+      sys.exit(2)
+
+    run_ps(s, r"""
+$ErrorActionPreference='Stop'
+Start-Service sshd -ErrorAction SilentlyContinue
+Set-Service -Name sshd -StartupType Automatic -ErrorAction SilentlyContinue
+if (-not (Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue)) {
+  New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH (ospc2flex)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
+}
+$psExe='C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+if (Test-Path $psExe) {
+  if (-not (Test-Path 'HKLM:\SOFTWARE\OpenSSH')) { New-Item -Path 'HKLM:\SOFTWARE\OpenSSH' -Force | Out-Null }
+  Set-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -Name DefaultShell -Value $psExe
+}
+Write-Output "[WinRM] sshd started and shell configured"
+""")
+
+    svc_state = run_ps(s, r"Get-Service sshd -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status", fail_on_error=False)
+    if "Running" not in svc_state.std_out.decode("utf-8", errors="replace"):
+      emit("WINDOWS_OPENSSH_SERVICE_MISSING")
+      emit("WINDOWS_BULK_TRANSFER_REQUIRED")
+      emit("WINDOWS_SOURCE_ACCESS_BLOCKED")
+      sys.exit(2)
+
+    fw_state = run_ps(s, r"Get-NetFirewallRule -Name sshd -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Enabled", fail_on_error=False)
+    if "True" not in fw_state.std_out.decode("utf-8", errors="replace"):
+      emit("WINDOWS_OPENSSH_FIREWALL_BLOCKED")
+      emit("WINDOWS_BULK_TRANSFER_REQUIRED")
+      emit("WINDOWS_SOURCE_ACCESS_BLOCKED")
+      sys.exit(2)
+
+    dump_ps = r"""$ErrorActionPreference='Stop'
+$paths=@('\\.\PHYSICALDRIVE0','\\.\PhysicalDrive0')
+$drive=$null
+$lastErr=$null
+foreach($p in $paths){
+  try{
+    $drive=New-Object System.IO.FileStream($p,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite)
+    if($drive){break}
+  }catch{$lastErr=$_;if($drive){$drive.Dispose();$drive=$null}}
+}
+if($null -eq $drive){Write-Error('OSPC2FLEX_PHYSICAL_DRIVE_OPEN_FAILED: '+$lastErr);exit 2}
+$stdout=[System.Console]::OpenStandardOutput()
+$bufLen=4194304
+$buf=New-Object byte[] $bufLen
+try{while(($n=$drive.Read($buf,0,$bufLen))-gt 0){$stdout.Write($buf,0,$n)}}
+finally{$drive.Close();$stdout.Flush()}
+"""
+    dump_b64 = base64.b64encode(dump_ps.encode("utf-8")).decode("ascii")
+    run_ps(s, f"""
+$c=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{dump_b64}'))
+Set-Content -Path 'C:\\Windows\\Temp\\ospc2flex_diskdump.ps1' -Value $c -Encoding ascii
+Write-Output "[WinRM] Disk dump script written"
+""")
+
+    if pubkey:
+        key_b64 = base64.b64encode(pubkey.encode("utf-8")).decode("ascii")
+        run_ps(s, f"""
+$pub=[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{key_b64}'))
+$homeSSH='C:\\Users\\Administrator\\.ssh'
+if (-not (Test-Path $homeSSH)) {{ New-Item -ItemType Directory -Path $homeSSH | Out-Null }}
+Set-Content -Path "$homeSSH\\authorized_keys" -Value $pub -Encoding ascii
+Write-Output "[WinRM] Authorized key installed"
+""")
+
+    emit("WINDOWS_OPENSSH_ENABLE_OK")
+    emit("WINDOWS_SOURCE_ACCESS_READY")
+    emit("[WinRM] Bootstrap complete")
+    write_access_json({
+        "source_ip": ip,
+        "windows_user": user,
+        "ssh_port_open": False,
+        "winrm_auth": "ok",
+        "winrm_endpoint": f"{scheme}://{ip}:{port}/wsman",
+        "openssh_present": True,
+        "openssh_enable_attempted": bool(try_enable),
+        "openssh_enable_status": "ok",
+        "external_ssh_check": "unknown",
+        "capture_mode": "pending_external_ssh_probe",
+        "failure_reason": "",
+        "next_action": ""
+    })
     sys.exit(0)
 except Exception as e:
-    print(f"[ERROR] WinRM: {e}", file=sys.stderr); sys.exit(1)
+    emit("WINDOWS_WINRM_AUTH_FAILED")
+    emit("WINDOWS_SOURCE_ACCESS_BLOCKED")
+    emit(f"[ERROR] WinRM: {e}")
+    write_access_json({
+        "source_ip": ip,
+        "windows_user": user,
+        "ssh_port_open": False,
+        "winrm_auth": "failed",
+        "winrm_endpoint": f"{scheme}://{ip}:{port}/wsman",
+        "openssh_present": False,
+        "openssh_enable_attempted": False,
+        "openssh_enable_status": "not_attempted",
+        "external_ssh_check": "blocked",
+        "capture_mode": "blocked",
+        "failure_reason": "NO_VALID_GUEST_ACCESS",
+        "next_action": "Provide valid Windows Administrator credentials, enable WinRM, or enable SSH."
+    })
+    sys.exit(1)
 WINRM_SCRIPT
 
+    _WINRM_BOOTSTRAP_LOG=$(mktemp /tmp/ospc2flex_winrm_bootstrap_XXXXXX.log)
+    _WINRM_DIAG_LOG="$WORK/${BASE_LABEL}.winrm_access_diagnostics.log"
+    _WIN_ACCESS_JSON="$WORK/${BASE_LABEL}.windows_access.json"
+    : > "$_WINRM_DIAG_LOG"
+    chmod 600 "$_WINRM_DIAG_LOG" 2>/dev/null || true
+    chmod 600 "$_WINRM_PY" 2>/dev/null || true
     set +e
-    python3 "$_WINRM_PY" "$_WINRM_IP" "$_WINRM_PORT" "$_WINRM_SCHEME" "$WIN_USER" "$WIN_PASSWORD" "$JH_PUBKEY"
+    OSPC2FLEX_WINRM_PASSWORD="$WIN_PASSWORD" OSPC2FLEX_WINDOWS_TRY_ENABLE_OPENSSH="$WINDOWS_TRY_ENABLE_OPENSSH" \
+    python3 "$_WINRM_PY" "$_WINRM_IP" "$_WINRM_PORT" "$_WINRM_SCHEME" "$WIN_USER" "$JH_PUBKEY" "$_WINRM_DIAG_LOG" "$_WIN_ACCESS_JSON" \
+      2>&1 | tee "$_WINRM_BOOTSTRAP_LOG"
     _WINRM_RC=$?
     set -e
     rm -f "$_WINRM_PY"
+
+    if grep -q "WINDOWS_WINRM_AUTH_OK" "$_WINRM_BOOTSTRAP_LOG" 2>/dev/null; then
+      WINRM_AUTH_OK=1
+      CAPTURE_MODE="winrm_guest_capture_or_winrm_control"
+    fi
+    if grep -q "WINDOWS_OPENSSH_INSTALL_DENIED" "$_WINRM_BOOTSTRAP_LOG" 2>/dev/null; then
+      OPENSSH_INSTALL_DENIED=1
+    fi
+    if grep -q "WINDOWS_OPENSSH_SERVICE_MISSING" "$_WINRM_BOOTSTRAP_LOG" 2>/dev/null; then
+      # shellcheck disable=SC2034
+      OPENSSH_SERVICE_MISSING=1
+    fi
+    if grep -q "WINDOWS_OPENSSH_FIREWALL_BLOCKED" "$_WINRM_BOOTSTRAP_LOG" 2>/dev/null; then
+      # shellcheck disable=SC2034
+      OPENSSH_FIREWALL_BLOCKED=1
+    fi
+    if grep -q "WINDOWS_OPENSSH_NOT_INSTALLED" "$_WINRM_BOOTSTRAP_LOG" 2>/dev/null; then
+      OPENSSH_NOT_INSTALLED=1
+    fi
+    if grep -q "WINDOWS_OPENSSH_ENABLE_OK" "$_WINRM_BOOTSTRAP_LOG" 2>/dev/null; then
+      # shellcheck disable=SC2034
+      OPENSSH_ENABLE_OK=1
+    fi
 
     if [ "$_WINRM_RC" -eq 0 ]; then
       PASS "WinRM OpenSSH bootstrap complete"
@@ -631,24 +1295,114 @@ WINRM_SCRIPT
         fi
         sleep 5
       done
-      [ "$_SSH_UP" -eq 1 ] && SSH_DISK_METHOD=1 \
-        || WARN "SSH port 22 did not open within 120s — will use Glance fallback"
+      if [ "$_SSH_UP" -eq 1 ]; then
+        SSH_DISK_METHOD=1
+        CAPTURE_MODE="ssh_guest_capture"
+        INFO "WINDOWS_SSH_OPEN"
+        INFO "WINDOWS_OPENSSH_ENABLE_OK"
+        INFO "WINDOWS_SOURCE_ACCESS_READY"
+        write_windows_access_json "true" "ok" "${_WINRM_SCHEME}://${_WINRM_IP}:${_WINRM_PORT}/wsman" "true" "true" "ok" "open" "$CAPTURE_MODE" "" ""
+      else
+        INFO "WINDOWS_SSH_BLOCKED"
+        INFO "WINDOWS_BULK_TRANSFER_REQUIRED"
+        WARN "SSH port 22 did not open within 120s — will use Glance fallback"
+        write_windows_access_json "false" "ok" "${_WINRM_SCHEME}://${_WINRM_IP}:${_WINRM_PORT}/wsman" "true" "true" "ssh_port_blocked" "blocked" "blocked" "WINRM_AUTH_OK_BUT_SSH_UNAVAILABLE" "Use WinRM-agent capture, enable SMB/HTTPS/object upload, or install OpenSSH manually from elevated Windows console/RDP."
+      fi
     else
-      WARN "WinRM bootstrap failed (rc=$_WINRM_RC) — will use Glance fallback"
+      if [ "$WINRM_AUTH_OK" -eq 1 ] && [ "$OPENSSH_INSTALL_DENIED" -eq 1 ]; then
+        INFO "WINDOWS_OPENSSH_INSTALL_DENIED"
+        INFO "WINDOWS_BULK_TRANSFER_REQUIRED"
+        INFO "WINDOWS_SOURCE_ACCESS_BLOCKED"
+        WARN "WinRM login is valid, but this session cannot install OpenSSH. Log in through console/RDP with elevated Administrator, install OpenSSH Server, enable firewall rule, then rerun. Or enable the WinRM capture path."
+        write_failure_handoff_json \
+          "WINRM_AUTH_OK_BUT_SSH_UNAVAILABLE" \
+          "Use WinRM-agent capture, enable SMB/HTTPS/object upload, or install OpenSSH manually from elevated Windows console/RDP." \
+          "WINDOWS_OPENSSH_INSTALL_DENIED"
+      elif [ "$WINRM_AUTH_OK" -eq 1 ]; then
+        INFO "WINDOWS_BULK_TRANSFER_REQUIRED"
+        INFO "WINDOWS_SOURCE_ACCESS_BLOCKED"
+        write_failure_handoff_json \
+          "WINRM_AUTH_OK_BUT_SSH_UNAVAILABLE" \
+          "Use WinRM-agent capture, enable SMB/HTTPS/object upload, or install OpenSSH manually from elevated Windows console/RDP." \
+          "WINDOWS_BULK_TRANSFER_REQUIRED"
+      else
+        WARN "WinRM bootstrap failed (rc=$_WINRM_RC) — will use Glance fallback"
+      fi
     fi
+    rm -f "$_WINRM_BOOTSTRAP_LOG"
   fi
-elif [ "${SSH_DISK_METHOD:-0}" -eq 0 ]; then
+elif [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ "$METHOD_D_SKIP_SOURCE_CAPTURE" != "1" ]; then
+  INFO "WINDOWS_PASSWORD_MISSING"
+  INFO "WINDOWS_SSH_BLOCKED"
+  INFO "WINDOWS_SOURCE_ACCESS_BLOCKED"
   WARN "SSH not available and --windows-password not provided — using Glance fallback only"
+fi
+if [ "$WINRM_AUTH_OK" -eq 1 ] && [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ "$METHOD_D_SKIP_SOURCE_CAPTURE" != "1" ]; then
+  INFO "WINDOWS_WINRM_AUTH_OK"
+  if [ "${WINRM_AGENT_CAPTURE:-0}" = "1" ]; then
+    CAPTURE_MODE="winrm_agent_capture"
+    INFO "CAPTURE_MODE=winrm_agent_capture"
+    INFO "WINDOWS_SOURCE_ACCESS_READY"
+  else
+    CAPTURE_MODE="winrm_guest_capture_or_winrm_control"
+    INFO "CAPTURE_MODE=winrm_guest_capture_or_winrm_control"
+  fi
+fi
+if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
+  INFO "CAPTURE_MODE=ssh_guest_capture"
 fi
 else
   INFO "Resume mode: SSH/WinRM/snapshot discovery skipped because qcow2 already exists."
 fi
 
+# Step 1c: Install VirtIO MSI on live source VM before disk capture
+if [ "$RESUME_FROM_QCOW" -eq 0 ] && [ "${SSH_DISK_METHOD:-0}" -eq 1 ] && [ "$METHOD_D_SKIP_SOURCE_CAPTURE" != "1" ]; then
+  step_start "1c" "Pre-capture VirtIO MSI install on live source VM"
+  _ssh_msi_target="${WIN_USER}@${WIN_SSH_IP:-$SERVER_IP}"
+  preinstall_virtio_msi_live "$_ssh_msi_target"
+  step_done "OK (best-effort)"
+fi
+
+if [ "${SSH_DISK_METHOD:-0}" -eq 0 ] && [ "${SNAPSHOT_POLICY_BLOCKED:-0}" -eq 1 ] && [ "$METHOD_D_SKIP_SOURCE_CAPTURE" != "1" ]; then
+  if [ "${CAPTURE_MODE:-}" = "winrm_agent_capture" ]; then
+    PASS "Snapshot blocked but WinRM agent capture is enabled; continuing without SSH snapshot fallback."
+  else
+  if [ "$WINRM_AUTH_OK" -ne 1 ] && [ -n "${WIN_PASSWORD:-}" ]; then
+    INFO "WINDOWS_WINRM_AUTH_FAILED"
+  fi
+  if [ "$OPENSSH_NOT_INSTALLED" -eq 1 ]; then
+    INFO "WINDOWS_OPENSSH_NOT_INSTALLED"
+  fi
+  [ "${SSH_DISK_METHOD:-0}" -eq 1 ] || INFO "WINDOWS_SSH_BLOCKED"
+  INFO "WINDOWS_SOURCE_ACCESS_BLOCKED"
+  [ "${CAPTURE_MODE:-blocked}" = "blocked" ] && INFO "CAPTURE_MODE=blocked"
+  FAIL "Snapshot path is policy-blocked and no bulk transfer channel is available."
+  if [ "$WINRM_AUTH_OK" -eq 1 ]; then
+    FAIL "WinRM is reachable, but SSH capture is unavailable. Use WinRM-agent capture, SMB/HTTPS/object upload, or install OpenSSH from elevated console/RDP."
+    write_failure_handoff_json \
+      "WINRM_AUTH_OK_BUT_SSH_UNAVAILABLE" \
+      "Use WinRM-agent capture, enable SMB/HTTPS/object upload, or install OpenSSH manually from elevated Windows console/RDP." \
+      "WINDOWS_BULK_TRANSFER_REQUIRED"
+  else
+    FAIL "Provide valid Windows Administrator credentials, enable WinRM, or enable SSH."
+    write_failure_handoff_json \
+      "NO_VALID_GUEST_ACCESS" \
+      "Provide valid Windows Administrator credentials, enable WinRM, or enable SSH." \
+      "WINDOWS_SOURCE_ACCESS_BLOCKED"
+  fi
+  exit 1
+  fi
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Download Windows disk image
 # ═══════════════════════════════════════════════════════════════════════════════
-if [ "$RESUME_FROM_QCOW" -eq 0 ] && [ "$RESUME_FROM_RAW" -eq 0 ]; then
+if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
 step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
+if [ "${RESUME_FROM_IMG:-0}" -eq 1 ]; then
+  INFO "Resuming from existing .img ($((IMG_SIZE / 1024 / 1024)) MB): $IMG_PATH"
+  step_done "SKIPPED (resume from existing .img)"
+else
 rm -f "$IMG_PATH"
 
 if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
@@ -657,6 +1411,7 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
   # Use the SSH IP resolved in Step 1b (ServiceNet preferred when public port 22 is blocked)
   _SSH_TARGET="${WIN_USER}@${WIN_SSH_IP:-$SERVER_IP}"
   step_progress "SSH target: $_SSH_TARGET"
+  deploy_windows_diskdump_via_ssh "$_SSH_TARGET"
 
   # Prefer password auth for Windows when provided; fall back to SSH key.
   if [ -n "${WIN_PASSWORD:-}" ]; then
@@ -680,6 +1435,7 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
 
   # Heartbeat while SSH dd runs (sparse UI; details in PROGRESS_LOG)
   _ssh_hb_start=$(date +%s)
+  : > "/tmp/winmig_hb_active_${LABEL}"
   (while [ -f "/tmp/winmig_hb_active_${LABEL}" ]; do
      sleep 60
      _sz=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
@@ -688,8 +1444,9 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
      ui_log "SSH disk read: $((_sz / 1024 / 1024)) MiB received, elapsed=${_el}s"
    done) &
   _HB_PID=$!
-  : > "/tmp/winmig_hb_active_${LABEL}"
 
+  _SSH_RC=1
+  _DD_RC=1
   set +e
   if [ -n "${WIN_PASSWORD:-}" ]; then
     sshpass -p "$WIN_PASSWORD" ssh \
@@ -701,7 +1458,9 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
         "$_SSH_TARGET" \
         'powershell -NonInteractive -File C:\Windows\Temp\ospc2flex_diskdump.ps1' \
     | dd of="$IMG_PATH" bs=4M iflag=fullblock status=none 2>>"$PROGRESS_LOG"
-    _SSH_RC=${PIPESTATUS[0]}
+    _ps=("${PIPESTATUS[@]}")
+    _SSH_RC=${_ps[0]:-1}
+    _DD_RC=${_ps[1]:--1}
   else
     ssh -i ~/.ssh/id_rsa \
         -o StrictHostKeyChecking=no -o BatchMode=yes \
@@ -710,7 +1469,9 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
         "$_SSH_TARGET" \
         'powershell -NonInteractive -File C:\Windows\Temp\ospc2flex_diskdump.ps1' \
     | dd of="$IMG_PATH" bs=4M iflag=fullblock status=none 2>>"$PROGRESS_LOG"
-    _SSH_RC=${PIPESTATUS[0]}
+    _ps=("${PIPESTATUS[@]}")
+    _SSH_RC=${_ps[0]:-1}
+    _DD_RC=${_ps[1]:--1}
   fi
   set -e
 
@@ -718,12 +1479,85 @@ if [ "${SSH_DISK_METHOD:-0}" -eq 1 ]; then
   kill "$_HB_PID" 2>/dev/null || true
 
   IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
-  if [ "$_SSH_RC" -eq 0 ] && [ "${IMG_SIZE:-0}" -ge 1048576 ]; then
+  SSH_SIZE_MISMATCH=0
+  if [ "$_SSH_RC" -eq 0 ] && [ "$_DD_RC" -eq 0 ] && [ "${WIN_DISK_BYTES:-0}" -gt 0 ]; then
+    _ssh_tolerance=$((4 * 1024 * 1024))
+    _ssh_low=$((WIN_DISK_BYTES - _ssh_tolerance))
+    [ "$_ssh_low" -lt 0 ] && _ssh_low=0
+    if [ "${IMG_SIZE:-0}" -lt "$_ssh_low" ] || [ "${IMG_SIZE:-0}" -gt "$WIN_DISK_BYTES" ]; then
+      SSH_SIZE_MISMATCH=1
+      WARN "SSH disk stream size mismatch: expected=${WIN_DISK_BYTES}B actual=${IMG_SIZE}B"
+    fi
+  fi
+  if [ "$_SSH_RC" -eq 0 ] && [ "$_DD_RC" -eq 0 ] && [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
+    WARN "SSH disk stream ended with zero-byte payload (rc=0 size=${IMG_SIZE}B); retrying once"
+    rm -f "$IMG_PATH"
+    sleep 3
+    set +e
+    if [ -n "${WIN_PASSWORD:-}" ]; then
+      sshpass -p "$WIN_PASSWORD" ssh \
+          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          -o LogLevel=ERROR \
+          -o PreferredAuthentications=password,keyboard-interactive \
+          -o PubkeyAuthentication=no \
+          -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+          "$_SSH_TARGET" \
+          'powershell -NonInteractive -File C:\Windows\Temp\ospc2flex_diskdump.ps1' \
+      | dd of="$IMG_PATH" bs=4M iflag=fullblock status=none 2>>"$PROGRESS_LOG"
+      _ps=("${PIPESTATUS[@]}")
+      _SSH_RC=${_ps[0]:-1}
+      _DD_RC=${_ps[1]:--1}
+    else
+      ssh -i ~/.ssh/id_rsa \
+          -o StrictHostKeyChecking=no -o BatchMode=yes \
+          -o LogLevel=ERROR \
+          -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+          "$_SSH_TARGET" \
+          'powershell -NonInteractive -File C:\Windows\Temp\ospc2flex_diskdump.ps1' \
+      | dd of="$IMG_PATH" bs=4M iflag=fullblock status=none 2>>"$PROGRESS_LOG"
+      _ps=("${PIPESTATUS[@]}")
+      _SSH_RC=${_ps[0]:-1}
+      _DD_RC=${_ps[1]:--1}
+    fi
+    set -e
+    IMG_SIZE=$(stat -c%s "$IMG_PATH" 2>/dev/null || echo 0)
+    SSH_SIZE_MISMATCH=0
+    if [ "${WIN_DISK_BYTES:-0}" -gt 0 ]; then
+      _ssh_tolerance=$((4 * 1024 * 1024))
+      _ssh_low=$((WIN_DISK_BYTES - _ssh_tolerance))
+      [ "$_ssh_low" -lt 0 ] && _ssh_low=0
+      if [ "${IMG_SIZE:-0}" -lt "$_ssh_low" ] || [ "${IMG_SIZE:-0}" -gt "$WIN_DISK_BYTES" ]; then
+        SSH_SIZE_MISMATCH=1
+        WARN "SSH disk stream size mismatch after retry: expected=${WIN_DISK_BYTES}B actual=${IMG_SIZE}B"
+      fi
+    fi
+  fi
+  # Windows throws IOException "Incorrect function" when reading past the last physical sector.
+  # dd still receives all bytes and exits 0. Accept this as a complete capture when the image
+  # size exactly matches the reported disk size (end-of-disk exception, not a real failure).
+  _eod_complete=0
+  if [ "$_DD_RC" -eq 0 ] && [ "${WIN_DISK_BYTES:-0}" -gt 0 ] && [ "${IMG_SIZE:-0}" -eq "${WIN_DISK_BYTES}" ]; then
+    _eod_complete=1
+    [ "$_SSH_RC" -ne 0 ] && INFO "SSH exited non-zero but dd captured full disk (end-of-disk IOException); treating as complete."
+  fi
+
+  if { [ "$_SSH_RC" -eq 0 ] || [ "$_eod_complete" -eq 1 ]; } && [ "$_DD_RC" -eq 0 ] && [ "${IMG_SIZE:-0}" -ge 1048576 ] && [ "${SSH_SIZE_MISMATCH:-0}" -eq 0 ]; then
     PASS "Downloaded via SSH/PowerShell: $((IMG_SIZE / 1024 / 1024)) MB"
     DOWNLOAD_METHOD="ssh-powershell-disk-read"
-    step_done "OK"
   else
-    WARN "SSH disk read failed (rc=$_SSH_RC size=${IMG_SIZE}B) — falling back to Glance"
+    if [ "$METHOD_B_CAPTURE_ONLY" = "1" ]; then
+      if [ "${SSH_SIZE_MISMATCH:-0}" -eq 1 ]; then
+        FAIL "Capture-only mode uses Method B SSH download only; SSH disk read was partial (expected=${WIN_DISK_BYTES:-unknown}B actual=${IMG_SIZE}B)."
+        INFO "CAPTURE_MODE=ssh_guest_capture"
+        step_done "FAILED"
+        exit 1
+      fi
+      FAIL "Capture-only mode uses Method B SSH download only; SSH disk read failed (ssh_rc=$_SSH_RC dd_rc=$_DD_RC size=${IMG_SIZE}B)."
+      INFO "CAPTURE_MODE=ssh_guest_capture"
+      step_done "FAILED"
+      exit 1
+    fi
+    WARN "SSH disk read failed (ssh_rc=$_SSH_RC dd_rc=$_DD_RC size=${IMG_SIZE}B) — falling back to Glance"
     rm -f "$IMG_PATH"
     IMG_SIZE=0
     step_progress "SSH failed, trying Glance fallback..."
@@ -745,6 +1579,11 @@ OS_REGION_NAME="${OS_REGION_NAME:-IAD}"
 export OS_USERNAME OS_PASSWORD OS_REGION_NAME
 
 _refresh_ospc_token() {
+  if [ -f /tmp/ospc2flex_ospc.sh ]; then
+    # Ensure OSPC credentials are loaded for Glance fallback when Step 1 was skipped.
+    # shellcheck disable=SC1091
+    source /tmp/ospc2flex_ospc.sh
+  fi
   OS_TOKEN=$(openstack token issue -f value -c id 2>/dev/null || true)
   if [ -z "$OS_TOKEN" ] && [ -n "$OS_USERNAME" ] && [ -n "$OS_PASSWORD" ]; then
     _AUTH=$(curl -s -X POST "${OS_AUTH_URL:-https://identity.api.rackspacecloud.com/v2.0/}tokens" \
@@ -816,6 +1655,40 @@ _refresh_ospc_token
 if [ -z "${OS_TOKEN:-}" ]; then
   FAIL "No OSPC token for Glance download"
   exit 1
+fi
+
+if [ -z "${SNAP_ID:-}" ]; then
+  step_progress "SSH path unavailable for full disk read; creating OSPC snapshot for Glance fallback"
+  SNAP_NAME="${LABEL}-snap-$(date +%Y%m%d%H%M%S)"
+  _fallback_server_id=$(openstack server list --ip "$SERVER_IP" -f value -c ID 2>/dev/null | head -1 | tr -d '\r\n' || true)
+  if [ -z "$_fallback_server_id" ]; then
+    _fallback_server_id=$(openstack server list --name "$SERVER_NAME" -f value -c ID 2>/dev/null | head -1 | tr -d '\r\n' || true)
+  fi
+  if [ -z "$_fallback_server_id" ] && [ -n "${SERVER_ID:-}" ]; then
+    _fallback_server_id="$SERVER_ID"
+  fi
+  if [ -z "$_fallback_server_id" ]; then
+    FAIL "Cannot create fallback snapshot: unable to resolve OSPC server ID for $SERVER_NAME"
+    exit 1
+  fi
+  SNAP_ID=$(openstack server image create "$_fallback_server_id" --name "$SNAP_NAME" -f value -c id 2>/dev/null | awk 'NF{print $1; exit}' || true)
+  if [ -z "${SNAP_ID:-}" ]; then
+    FAIL "Failed to create OSPC snapshot for Glance fallback"
+    exit 1
+  fi
+  for i in $(seq 1 90); do
+    _snap_status=$(openstack image show "$SNAP_ID" -f value -c status 2>/dev/null | tr -d '\r' || echo "queued")
+    if [ "$_snap_status" = "active" ] || [ "$_snap_status" = "ACTIVE" ]; then
+      step_progress "Fallback snapshot active: $SNAP_ID"
+      break
+    fi
+    sleep 10
+  done
+  _snap_status=$(openstack image show "$SNAP_ID" -f value -c status 2>/dev/null | tr -d '\r' || echo "unknown")
+  if [ "$_snap_status" != "active" ] && [ "$_snap_status" != "ACTIVE" ]; then
+    FAIL "Fallback snapshot did not become active (status=$_snap_status id=$SNAP_ID)"
+    exit 1
+  fi
 fi
 
 OS_IMAGE_URL=$(_resolve_glance_base)
@@ -1073,11 +1946,25 @@ if [ "${IMG_SIZE:-0}" -lt 1048576 ]; then
 fi
 
 PASS "Step 2 complete: Image downloaded ($((IMG_SIZE / 1024 / 1024)) MB via $DOWNLOAD_METHOD)"
+_img_complete=false
+if [ "${WIN_DISK_BYTES:-0}" -gt 0 ] && [ "${IMG_SIZE:-0}" -eq "${WIN_DISK_BYTES:-0}" ]; then
+  _img_complete=true
+elif [ "${DOWNLOAD_METHOD:-}" != "ssh-powershell-disk-read" ] && [ "${IMG_SIZE:-0}" -gt 0 ]; then
+  _img_complete=true
+fi
+python3 -c "
+import json
+d = {
+  'img_complete': $_img_complete,
+  'disk_bytes': ${WIN_DISK_BYTES:-0},
+  'img_size': ${IMG_SIZE:-0},
+  'download_method': '${DOWNLOAD_METHOD:-unknown}',
+  'capture_timestamp': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+}
+open('${WORK}/${LABEL}.capture_meta.json', 'w').write(json.dumps(d) + '\n')
+" 2>/dev/null || true
 step_done "OK"
-elif [ "$RESUME_FROM_RAW" -eq 1 ]; then
-step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
-step_progress "Existing raw image present; download skipped."
-step_done "SKIPPED (resume from raw)"
+fi  # end RESUME_FROM_IMG else block
 else
 step_start "2" "Downloading Windows disk image (SSH or Glance fallback)"
 step_progress "Existing qcow2 image present; download skipped."
@@ -1089,7 +1976,6 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 if [ "$RESUME_FROM_QCOW" -eq 0 ]; then
 step_start "3" "Converting disk image to qcow2 format"
-[ "$RESUME_FROM_RAW" -eq 1 ] && step_progress "Resuming from raw capture: $IMG_PATH"
 step_progress "Detecting image format..."
 DETECTED_FMT=$(qemu-img info --output=json "$IMG_PATH" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('format','raw'))" 2>/dev/null || echo "raw")
 INFO "Detected format: $DETECTED_FMT"
@@ -1110,12 +1996,34 @@ else
 fi
 QCOW_SIZE=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
 INFO "qcow2 size: $((QCOW_SIZE/1024/1024))MB"
+_meta_file="${WORK}/${LABEL}.capture_meta.json"
+python3 -c "
+import json, os
+f = '${_meta_file}'
+d = json.loads(open(f).read()) if os.path.isfile(f) else {}
+d['qcow2_complete'] = True
+d['qcow2_size'] = ${QCOW_SIZE:-0}
+d['qcow2_timestamp'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+open(f, 'w').write(json.dumps(d) + '\n')
+" 2>/dev/null || true
 step_done "OK"
 else
 step_start "3" "Converting disk image to qcow2 format"
 QCOW_SIZE=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
 INFO "Reusing existing qcow2 size: $((QCOW_SIZE/1024/1024))MB"
 step_done "SKIPPED (resume from qcow2)"
+fi
+
+if [ "$METHOD_B_CAPTURE_ONLY" = "1" ]; then
+  step_start "4" "Capture-only handoff after Method B SSH capture"
+  qemu-img info "$QCOW" >/dev/null 2>&1 || { FAIL "Capture-only handoff qcow2 is unreadable: $QCOW"; step_done "FAILED"; exit 1; }
+  qemu-img check "$QCOW" >/dev/null 2>&1 || { FAIL "Capture-only handoff qcow2 check failed: $QCOW"; step_done "FAILED"; exit 1; }
+  PASS "Capture-only handoff qcow2 ready: $QCOW"
+  INFO "METHOD_B_CAPTURE_ONLY_QCOW=$QCOW"
+  INFO "METHOD_H_CAPTURE_ONLY_QCOW=$QCOW"
+  step_done "OK"
+  CAPTURE_HANDOFF_READY=1
+  exit 0
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1187,6 +2095,13 @@ else
       PASS "Windows repair completed successfully"
       step_done "OK"
     else
+      if grep -Eiq "SYSTEM hive validation failed|hivexsh: failed to open hive file|Operation not supported|WINDOWS_PARTITION_DETECTION_FAILED|0xc0000225|WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED|failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED|status=WINDOWS_SYSTEM_HIVE_INVALID" "$BACKGROUND_LOG" 2>/dev/null; then
+        quarantine_bad_qcow "$QCOW" "bad-system-hive" || true
+        rm -f "${QCOW}.win_repaired" 2>/dev/null || true
+        rm -f "$WORK/${BASE_LABEL}.windows_v2_rescue.json" 2>/dev/null || true
+        WARN "Marked qcow2 invalid due to unreadable SYSTEM hive."
+        write_failure_handoff_json "WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED" "Use fresh source export or restore SYSTEM hive backup." "WINDOWS_SYSTEM_HIVE_INVALID"
+      fi
       FAIL "Windows repair exited with code $REPAIR_EXIT - refusing to upload an unrepaired Windows image"
       FAIL "A VM booted from an unrepaired image commonly lands in WinRE with no fixed disks visible."
       step_done "FAILED"
@@ -1418,8 +2333,6 @@ fi
 if [ "$IMG_DISK_BUS" = "scsi" ] && [ -n "$IMG_SCSI_MODEL" ]; then
   IMG_CREATE_ARGS+=(--property "hw_scsi_model=$IMG_SCSI_MODEL")
 fi
-ui_log "Uploading image to FLEX Glance... size=${QCOW_MIB}MiB (openstack stderr → $BACKGROUND_LOG)"
-echo "[$(date '+%F %T')] openstack image create name=$CLOUD_LABEL file=$QCOW bytes=$QCOW_BYTES" >> "$BACKGROUND_LOG"
 _upload_start=$(date +%s)
 tmp_upload_out="$(mktemp)"
 tmp_upload_err="$(mktemp)"
@@ -1435,7 +2348,7 @@ else
 fi
 rm -f "$tmp_upload_out" "$tmp_upload_err" 2>/dev/null || true
 _upload_el=$(( $(date +%s) - _upload_start ))
-ui_log "openstack image create finished in ${_upload_el}s"
+ui_log "Upload command finished in ${_upload_el}s"
 if ! [[ "${FLEX_IMG_ID:-}" =~ ^[0-9a-fA-F-]{36}$ ]]; then
   ui_log "❌ Invalid Glance image ID captured: ${FLEX_IMG_ID:-<empty>}"
   ui_log "Background log: $BACKGROUND_LOG"
@@ -1443,13 +2356,6 @@ if ! [[ "${FLEX_IMG_ID:-}" =~ ^[0-9a-fA-F-]{36}$ ]]; then
   exit 1
 fi
 ui_log "✅ Image uploaded: $FLEX_IMG_ID"
-
-if [ -z "$FLEX_IMG_ID" ]; then
-  FAIL "Image upload failed"
-  tail -n 40 "$BACKGROUND_LOG" 2>/dev/null | sed 's/^/[debug-tail] /' || true
-  step_done "FAILED"
-  exit 1
-fi
 
 # Wait for image to become active
 step_progress "Waiting for image to become active in Glance..."
@@ -1469,19 +2375,40 @@ PASS "Image uploaded: $FLEX_IMG_ID (status: $STATUS)"
 SHOW_NAME=$(openstack image show "$FLEX_IMG_ID" -f value -c name 2>/dev/null || echo "$CLOUD_LABEL")
 SHOW_VIS=$(openstack image show "$FLEX_IMG_ID" -f value -c visibility 2>/dev/null || echo "unknown")
 SHOW_STAT=$(openstack image show "$FLEX_IMG_ID" -f value -c status 2>/dev/null || echo "${STATUS:-unknown}")
-if [ "$WINDOWS_BOOT_PROFILE" = "safe_ide_firstboot" ]; then
+if [ "$WINDOWS_BOOT_PROFILE" = "safe_ide_firstboot" ] || [ "${WINDOWS_WORKFLOW:-}" = "two_phase_virtio" ]; then
+  # Enforce SAFE IDE/E1000 metadata for rescue boot BEFORE any server create.
   openstack image unset --property hw_scsi_model "$FLEX_IMG_ID" >/dev/null 2>&1 || true
   openstack image unset --property hw_qemu_guest_agent "$FLEX_IMG_ID" >/dev/null 2>&1 || true
   openstack image set "$FLEX_IMG_ID" \
-    --property "architecture=$IMG_ARCH" \
-    --property "vm_mode=$IMG_VM_MODE" \
-    --property "os_type=$IMG_OS_TYPE" \
-    --property "os_distro=$IMG_OS_DISTRO" \
-    --property "hw_disk_bus=ide" \
-    --property "hw_cdrom_bus=ide" \
-    --property "hw_vif_model=e1000" >/dev/null 2>&1 || true
-  INFO "SAFE_IDE_METADATA_APPLIED"
-  INFO "Removed hw_scsi_model and hw_qemu_guest_agent for first boot"
+    --property architecture=x86_64 \
+    --property vm_mode=hvm \
+    --property os_type=windows \
+    --property os_distro=windows \
+    --property hw_disk_bus=ide \
+    --property hw_cdrom_bus=ide \
+    --property hw_vif_model=e1000 >/dev/null 2>&1 || true
+
+  ui_log "SAFE_IDE_METADATA_APPLIED"
+
+  props="$(openstack image show "$FLEX_IMG_ID" -f value -c properties 2>/dev/null || true)"
+
+  if echo "$props" | grep -Eq "hw_scsi_model[\"']?[[:space:]]*[:=]"; then
+    echo "ERROR: unsafe safe-firstboot metadata: hw_scsi_model still present"
+    echo "$props"
+    exit 1
+  fi
+
+  if echo "$props" | grep -Eq "hw_qemu_guest_agent[\"']?[[:space:]]*[:=]"; then
+    echo "ERROR: unsafe safe-firstboot metadata: hw_qemu_guest_agent still present"
+    echo "$props"
+    exit 1
+  fi
+
+  echo "$props" | grep -Eq "hw_disk_bus[\"']?[[:space:]]*[:=][[:space:]]*[\"']?ide" || exit 1
+  echo "$props" | grep -Eq "hw_cdrom_bus[\"']?[[:space:]]*[:=][[:space:]]*[\"']?ide" || exit 1
+  echo "$props" | grep -Eq "hw_vif_model[\"']?[[:space:]]*[:=][[:space:]]*[\"']?e1000" || exit 1
+
+  ui_log "SAFE_IDE_METADATA_VERIFIED"
 fi
 INFO "[UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$FLEX_IMG_ID name=${SHOW_NAME:-unknown} status=${SHOW_STAT:-unknown} visibility=${SHOW_VIS:-unknown}"
 step_done "OK"
@@ -1491,31 +2418,6 @@ step_done "OK"
 # ═══════════════════════════════════════════════════════════════════════════════
 step_start "6" "Booting Windows VM on FLEX from uploaded image"
 step_progress "Resolving target flavor, network, and keypair..."
-if [ "$WINDOWS_BOOT_PROFILE" = "safe_ide_firstboot" ]; then
-  SAFE_PROPS="$(openstack image show "$FLEX_IMG_ID" -f value -c properties 2>/dev/null || true)"
-  if printf '%s\n' "$SAFE_PROPS" | grep -Eq "hw_scsi_model[\"']?[[:space:]]*[:=]"; then
-    FAIL "Unsafe rescue metadata before first boot: hw_scsi_model is present"
-    step_done "FAILED"
-    exit 1
-  fi
-  if printf '%s\n' "$SAFE_PROPS" | grep -Eq "hw_qemu_guest_agent[\"']?[[:space:]]*[:=]"; then
-    FAIL "Unsafe rescue metadata before first boot: hw_qemu_guest_agent is present"
-    step_done "FAILED"
-    exit 1
-  fi
-  if printf '%s\n' "$SAFE_PROPS" | grep -Eq "hw_vif_model[\"']?[[:space:]]*[:=][[:space:]]*[\"']?virtio([\"']|,|}|[[:space:]]|$)"; then
-    FAIL "Unsafe rescue metadata before first boot: hw_vif_model=virtio"
-    step_done "FAILED"
-    exit 1
-  fi
-  if printf '%s\n' "$SAFE_PROPS" | grep -Eq "hw_disk_bus[\"']?[[:space:]]*[:=][[:space:]]*[\"']?scsi([\"']|,|}|[[:space:]]|$)"; then
-    FAIL "Unsafe rescue metadata before first boot: hw_disk_bus=scsi"
-    step_done "FAILED"
-    exit 1
-  fi
-  INFO "SAFE_IDE_METADATA_VERIFIED"
-  INFO "Rescue image has no hw_scsi_model and no hw_qemu_guest_agent"
-fi
 FLAVOR=$(resolve_target_flavor "${MIG_FLAVOR:-$FLAVOR}")
 NETWORK=$(resolve_target_network "${MIG_NETWORK:-$NETWORK}")
 KEYPAIR=$(resolve_target_keypair "${MIG_KEYPAIR:-$KEYPAIR}")
@@ -1567,12 +2469,10 @@ if [ "$VM_STATUS" = "ACTIVE" ]; then
   _vm_console="$(openstack console log show "$VM_ID" 2>/dev/null || true)"
   if printf '%s' "$_vm_console" | grep -Eiq "Windows\\\\system32\\\\config\\\\system|Status:\s*0xc0000225"; then
     FAIL "status=WINDOWS_SYSTEM_HIVE_INVALID failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED next_action=Use fresh source export or restore SYSTEM hive backup."
-    if [ -f "$QCOW" ]; then
-      _bad_dir="$WORK/bad_artifacts"
-      mkdir -p "$_bad_dir"
-      mv "$QCOW" "$_bad_dir/$(basename "$QCOW").bad-system-hive.$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
-      rm -f "${QCOW}.win_repaired" "$WORK/${BASE_LABEL}.qcow2.win_repaired" "$WORK/${BASE_LABEL}"-*.qcow2.win_repaired 2>/dev/null || true
-    fi
+    quarantine_bad_qcow "$QCOW" "bad-system-hive" || true
+    rm -f "${QCOW}.win_repaired" 2>/dev/null || true
+    rm -f "$WORK/${BASE_LABEL}.windows_v2_rescue.json" 2>/dev/null || true
+    write_failure_handoff_json "WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED" "Use fresh source export or restore SYSTEM hive backup." "WINDOWS_SYSTEM_HIVE_INVALID"
     step_done "FAILED"
     exit 1
   fi
@@ -1648,7 +2548,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "╔════════════════════════════════════════════════════════════════════════════╗"
-echo "║                     MIGRATION WORKFLOW COMPLETE                            ║"
+echo "║                         RESCUE BOOT COMPLETE                               ║"
 echo "╚════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 echo "  Server:       $CLOUD_LABEL"
@@ -1671,10 +2571,19 @@ out_path, image_id, vm_id, fip, label, base_label, cloud_label = sys.argv[1:8]
 doc = {
     "image_id": image_id,
     "vm_id": vm_id,
+    "rescue_image_id": image_id,
+    "rescue_server_id": vm_id,
+    "rescue_floating_ip": fip,
     "floating_ip": fip,
     "label": label,
     "base_label": base_label,
     "cloud_label": cloud_label,
+    "status": "RESCUE_READY",
+    "final": False,
+    "safe_first_boot": "HIT",
+    "online_virtio_binding": "PENDING",
+    "virtio_ready_snapshot": "PENDING",
+    "final_optimized_boot": "PENDING",
 }
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(doc, f, indent=2)

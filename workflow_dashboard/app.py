@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import base64
 import csv
+import io
 import ipaddress
 import json
 import os
@@ -8,6 +9,7 @@ import re
 import select
 import shlex
 import subprocess
+import tarfile
 import tempfile
 import threading
 import time
@@ -4080,6 +4082,34 @@ def _sync_gitops_customer_stamp(repo_path: Path, bundle_root: Path, safe_custome
             _shutil.copy2(src, stamp_dir / fname)
             rel_paths.append(str((stamp_dir / fname).relative_to(repo_path)))
 
+    flux_stub = stamp_dir / "gitops-flux-stub"
+    flux_stub.mkdir(parents=True, exist_ok=True)
+    (flux_stub / "kustomization.yaml").write_text(
+        "\n".join(
+            [
+                "apiVersion: kustomize.config.k8s.io/v1beta1",
+                "kind: Kustomization",
+                "metadata:",
+                "  name: cloudjumper-tenant-bundle-stub",
+                "  annotations:",
+                f'    cloudjumper.io/customer: "{safe_customer}"',
+                f'    cloudjumper.io/stamp: "{stamp}"',
+                "resources: []",
+                "# Terraform/Ansible pack: ../tenant-iac-dr (add K8s overlays here when ready).",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (flux_stub / "README.md").write_text(
+        f"# Flux / Kustomize stub\n\nCustomer `{safe_customer}`, stamp `{stamp}`.\n\n"
+        "Cloud Jumper `push-backup` writes IaC under `../tenant-iac-dr`. This directory satisfies Flux/Argo "
+        "`path:` with a valid empty Kustomization until you add real Kubernetes resources.\n",
+        encoding="utf-8",
+    )
+    rel_paths.append(str((flux_stub / "kustomization.yaml").relative_to(repo_path)))
+    rel_paths.append(str((flux_stub / "README.md").relative_to(repo_path)))
+
     manifest = {
         "customer": safe_customer,
         "stamp": stamp,
@@ -4104,6 +4134,118 @@ def _sync_gitops_customer_stamp(repo_path: Path, bundle_root: Path, safe_custome
         "relative_paths": rel_paths,
         "manifest_path": str(man_path),
     }
+
+
+def _plan_gitops_customer_stamp(bundle_root: Path, safe_customer: str, stamp: str) -> Dict[str, Any]:
+    """Describe paths _sync_gitops_customer_stamp would touch under repo root (no writes)."""
+    rel_paths: List[str] = []
+    cust_rel = Path("customers") / safe_customer
+    stamp_rel = cust_rel / "bundles" / stamp
+    rel_paths.append(str(stamp_rel / "BACKUP_SCOPE.md"))
+    rel_paths.append(str(cust_rel / "BACKUP_SCOPE.md"))
+    would_copy_dirs: List[str] = []
+    for name in ("tenant-iac-dr", "discovery-output", "stage2-migration-output", "terraform", "opencenter"):
+        src = bundle_root / name
+        if src.is_dir():
+            dst_rel = stamp_rel / name
+            rel_paths.append(str(dst_rel))
+            would_copy_dirs.append(name)
+    would_copy_files: List[str] = []
+    for fname in ("migration_manifest.json", "terraform.tfvars.json", "ansible_inventory.ini"):
+        src = bundle_root / fname
+        if src.is_file():
+            rel_paths.append(str(stamp_rel / fname))
+            would_copy_files.append(fname)
+    rel_paths.append(str(stamp_rel / "gitops-backup-manifest.json"))
+    rel_paths.append(str(cust_rel / "LATEST_STAMP.txt"))
+    rel_paths.append(str(stamp_rel / "gitops-flux-stub" / "kustomization.yaml"))
+    rel_paths.append(str(stamp_rel / "gitops-flux-stub" / "README.md"))
+    if (bundle_root / "tenant-iac-dr").is_dir():
+        rel_paths.append(str(cust_rel / "tenant-iac-dr"))
+    uniq = sorted(set(rel_paths))
+    return {
+        "customer": safe_customer,
+        "stamp": stamp,
+        "stamp_dir_relative": str(stamp_rel),
+        "relative_paths": uniq,
+        "would_copy_dirs": would_copy_dirs,
+        "would_copy_files": would_copy_files,
+        "bundle_root": str(bundle_root.resolve()),
+    }
+
+
+def _gitops_stamp_slug(stamp: str) -> str:
+    s = re.sub(r"[^a-zA-Z0-9_.-]+", "-", str(stamp)).strip("-").lower()
+    return s or "bundle"
+
+
+def _render_gitops_register_snippets(
+    *, git_url: str, branch: str, safe_customer: str, stamp: str, flux_ns: str
+) -> Dict[str, str]:
+    stamp_slug = _gitops_stamp_slug(stamp)
+    kustomize_path = f"customers/{safe_customer}/bundles/{stamp}/gitops-flux-stub"
+    ctx: Dict[str, str] = {
+        "__GIT_URL__": git_url,
+        "__BRANCH__": branch,
+        "__CUSTOMER__": safe_customer,
+        "__STAMP__": stamp,
+        "__STAMP_SLUG__": stamp_slug,
+        "__KUSTOMIZE_PATH__": kustomize_path,
+        "__FLUX_NS__": flux_ns,
+    }
+    tmpl_root = BASE_DIR / "gitops" / "templates"
+    outputs: Dict[str, str] = {}
+    mapping = (
+        ("flux-gitrepository.yaml.tpl", "flux_git_repository_yaml"),
+        ("flux-kustomization.yaml.tpl", "flux_kustomization_yaml"),
+        ("argocd-application.yaml.tpl", "argocd_application_yaml"),
+    )
+    for file_name, key in mapping:
+        p = tmpl_root / file_name
+        if not p.exists():
+            continue
+        text = p.read_text(encoding="utf-8")
+        for a, b in ctx.items():
+            text = text.replace(a, b)
+        outputs[key] = text
+    return outputs
+
+
+@app.get("/api/gitops/register-snippets")
+def gitops_register_snippets():
+    """Return Flux / Argo CD YAML snippets for the active migration bundle path (no cluster writes)."""
+    customer = request.args.get("customer") or get_active_customer()
+    safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
+    requested_stamp = str(request.args.get("stamp") or "").strip()
+    git_url = str(request.args.get("git_url") or os.environ.get("GITOPS_PUBLIC_REPO_URL") or "").strip()
+    branch = str(request.args.get("branch") or os.environ.get("GITOPS_BRANCH") or "main").strip() or "main"
+    flux_ns = str(request.args.get("flux_namespace") or os.environ.get("GITOPS_FLUX_NAMESPACE") or "flux-system").strip() or "flux-system"
+    if not git_url:
+        git_url = "https://github.com/ORG/PLACEHOLDER.git"
+    try:
+        bundle_root, stamp = _resolve_migration_bundle_root(safe_customer, requested_stamp)
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    if not (bundle_root / "tenant-iac-dr").is_dir():
+        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in selected bundle"}), 404
+    snippet_map = _render_gitops_register_snippets(
+        git_url=git_url, branch=branch, safe_customer=safe_customer, stamp=stamp, flux_ns=flux_ns
+    )
+    kustomize_path = f"customers/{safe_customer}/bundles/{stamp}/gitops-flux-stub"
+    return jsonify(
+        {
+            "ok": True,
+            "customer": safe_customer,
+            "stamp": stamp,
+            "stamp_slug": _gitops_stamp_slug(stamp),
+            "flux_namespace": flux_ns,
+            "kustomize_path": kustomize_path,
+            "git_url_used": git_url,
+            "branch": branch,
+            "snippets": snippet_map,
+            "note": "If git_url is a placeholder, pass ?git_url=... or set GITOPS_PUBLIC_REPO_URL on the server.",
+        }
+    )
 
 
 def _gitops_git_branch() -> str:
@@ -4521,7 +4663,12 @@ def generate_restore_plan():
 
 @app.post("/api/gitops/push-backup")
 def gitops_push_backup():
-    """Sync full tenant GitOps layout to GITOPS_REPO_PATH (or IAC_BACKUP_GIT_REPO_PATH), commit, tag, optional push."""
+    """Sync full tenant GitOps layout to GITOPS_REPO_PATH (or IAC_BACKUP_GIT_REPO_PATH), commit, tag, optional push.
+
+    JSON body options:
+      dry_run: true — resolve bundle and return a plan only (no files written, no git). GITOPS_REPO_PATH optional.
+      push: false — after sync, skip git push even if GITOPS_PUSH_AFTER_COMMIT is set (still commits/tags locally).
+    """
     data = request.json or {}
     customer = data.get("customer") or get_active_customer()
     safe_customer = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(customer)).strip("-") or "default"
@@ -4529,6 +4676,46 @@ def gitops_push_backup():
     remote = str(data.get("remote") or os.environ.get("GITOPS_PUSH_REMOTE", "origin")).strip() or "origin"
     env_push = str(os.environ.get("GITOPS_PUSH_AFTER_COMMIT", "")).strip().lower() in ("1", "true", "yes")
     do_push = bool(data["push"]) if "push" in data else env_push
+    dry_run = str(data.get("dry_run", "")).strip().lower() in ("1", "true", "yes")
+
+    try:
+        bundle_root, stamp = _resolve_migration_bundle_root(safe_customer, requested_stamp)
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    if not (bundle_root / "tenant-iac-dr").is_dir():
+        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in selected bundle"}), 404
+
+    branch = _gitops_git_branch()
+    tag_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", f"gitops-{safe_customer}-{stamp}").strip("-") or f"gitops-{safe_customer}"
+    add_rel = f"customers/{safe_customer}"
+
+    if dry_run:
+        plan = _plan_gitops_customer_stamp(bundle_root, safe_customer, stamp)
+        repo_path = _gitops_repo_from_env()
+        repo_status: Dict[str, Any] = {
+            "configured": bool(repo_path),
+            "path": str(repo_path) if repo_path else None,
+            "is_dir": bool(repo_path and repo_path.is_dir()),
+            "has_dot_git": bool(repo_path and (repo_path / ".git").exists()),
+        }
+        return jsonify(
+            {
+                "ok": True,
+                "dry_run": True,
+                "customer": safe_customer,
+                "stamp": stamp,
+                "plan": plan,
+                "would_git": {
+                    "branch": branch,
+                    "tag": tag_name,
+                    "remote": remote,
+                    "would_push": bool(do_push),
+                    "git_add_path": add_rel,
+                    "commit_message": f"GitOps tenant backup {safe_customer} bundle {stamp}",
+                },
+                "repo": repo_status,
+            }
+        )
 
     repo_path = _gitops_repo_from_env()
     if not repo_path or not repo_path.is_dir():
@@ -4539,26 +4726,17 @@ def gitops_push_backup():
         return jsonify({"ok": False, "error": "Configured path is not a git repository root (.git missing)."}), 400
 
     try:
-        bundle_root, stamp = _resolve_migration_bundle_root(safe_customer, requested_stamp)
-    except FileNotFoundError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 404
-    if not (bundle_root / "tenant-iac-dr").is_dir():
-        return jsonify({"ok": False, "error": "tenant-iac-dr pack missing in selected bundle"}), 404
-
-    try:
         sync_info = _sync_gitops_customer_stamp(repo_path, bundle_root, safe_customer, stamp)
     except Exception as exc:
         return jsonify({"ok": False, "error": f"GitOps sync failed: {exc}"}), 500
 
-    branch = _gitops_git_branch()
-    tag_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", f"gitops-{safe_customer}-{stamp}").strip("-") or f"gitops-{safe_customer}"
-    add_rel = f"customers/{safe_customer}"
     message = f"GitOps tenant backup {safe_customer} bundle {stamp}"
     git_result = _git_commit_tag_push(repo_path, [add_rel], message, tag_name, branch, remote, do_push)
 
     return jsonify(
         {
             "ok": True,
+            "dry_run": False,
             "customer": safe_customer,
             "stamp": stamp,
             "sync": sync_info,
@@ -6925,6 +7103,175 @@ def run_image_migrator():
     process_ip = (req.get('process_host_ip') or '').strip()
     if not process_ip:
         return jsonify({"error": "process_host_ip (jumphost IP) is required. Select Mode 2 or Mode 3 and provide a jumphost."}), 400
+
+    _windows_method = str(req.get('windows_repair_method') or '').strip().lower()
+    if _windows_method == 'windows_method_z_snapshot_existing':
+        method_z_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_windows_method_z_snapshot_existing.sh")
+        method_z_files = [method_z_script]
+        missing_z = [p for p in method_z_files if not os.path.isfile(p)]
+        if missing_z:
+            return jsonify({"error": "Method Z script dependency missing", "missing": missing_z}), 500
+
+        snapshot_id = str(
+            req.get('snapshot_id')
+            or req.get('ospc_image_id')
+            or req.get('ospc_snapshot_id')
+            or ''
+        ).strip()
+        local_artifact = str(req.get('local_artifact') or req.get('method_z_local_artifact') or '').strip()
+        if not snapshot_id and not local_artifact:
+            return jsonify({"error": "Method Z requires a selected OSPC snapshot/image ID or local artifact path."}), 400
+
+        import re as _re
+        label_z = str(req.get('snapshot_name') or req.get('server_name') or snapshot_id or "method-z-snapshot").strip()
+        label_safe_z = _re.sub(r'[^A-Za-z0-9._-]+', '_', label_z).strip('_') or "method-z-snapshot"
+        remote_ospc = f"/tmp/ospc2flex_method_z_{label_safe_z}_ospc.sh"
+        remote_flex = f"/tmp/ospc2flex_method_z_{label_safe_z}_flex.sh"
+        remote_log = f"/tmp/mig_{label_safe_z}.log"
+        remote_script = "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh"
+
+        ssh_key_z = os.path.expanduser((req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip())
+        ssh_usr_z = (req.get('process_ssh_user') or 'ubuntu').strip() or 'ubuntu'
+        ssh_base_z = [
+            "ssh", "-q", "-i", ssh_key_z,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=20",
+            "-o", "ServerAliveInterval=10",
+            "-o", "ServerAliveCountMax=3",
+            f"{ssh_usr_z}@{process_ip}",
+        ]
+        scp_base_z = [
+            "scp", "-q", "-i", ssh_key_z,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=20",
+            "-o", "ServerAliveInterval=10",
+            "-o", "ServerAliveCountMax=3",
+        ]
+
+        def _method_z_generator():
+            yield "data: --- EXECUTING METHOD SNAPWIN ---\n\n"
+            yield f"data: Method SNAPWIN — Existing OSPC Windows Snapshot to Flex: {label_safe_z}\n\n"
+            yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
+            try:
+                subprocess.run(ssh_base_z + ["true"], check=True, timeout=35)
+
+                import hashlib as _snapwin_hashlib
+                with open(method_z_script, "rb") as _fh:
+                    local_method_z_md5 = _snapwin_hashlib.md5(_fh.read()).hexdigest()
+                remote_method_z_md5 = ""
+                try:
+                    _md5 = subprocess.run(
+                        ssh_base_z + [f"test -f {shlex.quote(remote_script)} && md5sum {shlex.quote(remote_script)} | awk '{{print $1}}' || true"],
+                        check=False,
+                        timeout=35,
+                        capture_output=True,
+                        text=True,
+                    )
+                    remote_method_z_md5 = (_md5.stdout or "").strip().splitlines()[-1] if (_md5.stdout or "").strip() else ""
+                except Exception:
+                    remote_method_z_md5 = ""
+
+                if remote_method_z_md5 == local_method_z_md5:
+                    yield "data: [METHOD_Z] SNAPWIN script already current on jumphost; skipped script upload.\n\n"
+                else:
+                    yield "data: [METHOD_Z] Uploading SNAPWIN script to jumphost.\n\n"
+                    subprocess.run(
+                        scp_base_z + [method_z_script, f"{ssh_usr_z}@{process_ip}:{remote_script}"],
+                        check=True,
+                        timeout=600,
+                    )
+
+                for local, remote in ((ospc_path, remote_ospc), (flex_path, remote_flex)):
+                    subprocess.run(scp_base_z + [local, f"{ssh_usr_z}@{process_ip}:{remote}"], check=True, timeout=300)
+                subprocess.run(
+                    ssh_base_z + [f"chmod 600 {shlex.quote(remote_ospc)} {shlex.quote(remote_flex)}; chmod +x {shlex.quote(remote_script)}"],
+                    check=True,
+                    timeout=120,
+                )
+                yield "data: [METHOD_Z] Scripts and scoped OpenRC files staged on jumphost.\n\n"
+
+                z_cmd = [
+                    "bash", remote_script,
+                    "--label", label_safe_z,
+                    "--ospc-openrc", remote_ospc,
+                    "--flex-openrc", remote_flex,
+                    "--flex-region", str(req.get('flex_region') or 'DFW3'),
+                    "--flavor", str(req.get('flex_flavor') or 'gp.0.4.4'),
+                    "--network", str(req.get('flex_network_id') or req.get('flex_network') or 'tenant-net'),
+                ]
+                if req.get('flex_key_name'):
+                    z_cmd.extend(["--keypair", str(req.get('flex_key_name'))])
+                if req.get('flex_security_group'):
+                    z_cmd.extend(["--security-group", str(req.get('flex_security_group'))])
+                if snapshot_id:
+                    z_cmd.extend(["--ospc-image-id", snapshot_id])
+                if local_artifact:
+                    z_cmd.extend(["--local-artifact", local_artifact])
+                if req.get('virtio_iso'):
+                    z_cmd.extend(["--virtio-iso", str(req.get('virtio_iso'))])
+                if req.get('windows_version'):
+                    z_cmd.extend(["--windows-version", str(req.get('windows_version'))])
+                if req.get('export_retries'):
+                    z_cmd.extend(["--export-retries", str(req.get('export_retries'))])
+                if req.get('export_retry_wait'):
+                    z_cmd.extend(["--export-retry-wait", str(req.get('export_retry_wait'))])
+                if req.get('ospc_helper_server_id'):
+                    z_cmd.extend(["--ospc-helper-server-id", str(req.get('ospc_helper_server_id'))])
+                if req.get('dry_run'):
+                    z_cmd.append("--dry-run")
+                if req.get('download_only') or req.get('method_z_download_only'):
+                    z_cmd.append("--download-only")
+                if req.get('skip_rescue_boot'):
+                    z_cmd.append("--skip-rescue-boot")
+                # Existing-snapshot Method Z does not need source credentials. Without
+                # target guest credentials, pause after dummy VirtIO attach and show the
+                # manual pnputil card.
+                if not str(req.get('windows_admin_password') or req.get('origin_vm_password') or '').strip() or req.get('manual_driver_bind', True):
+                    z_cmd.append("--manual-driver-bind")
+
+                remote_inner = " ".join(shlex.quote(x) for x in z_cmd)
+                remote_run = f"set -o pipefail; {remote_inner} 2>&1 | tee {shlex.quote(remote_log)}"
+                yield f"data: [METHOD_Z] Launching selected cold snapshot/image ID: {snapshot_id or local_artifact}\n\n"
+                process = subprocess.Popen(
+                    ssh_base_z + [remote_run],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                )
+                for line in iter(process.stdout.readline, ''):
+                    if not line:
+                        break
+                    yield f"data: {line.rstrip()}\n\n"
+                process.wait()
+                yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
+                if process.returncode != 0:
+                    yield "data: [METHOD_Z] FAILED. Inspect the Method Z log on the jumphost.\n\n"
+            except Exception as exc:
+                if isinstance(exc, subprocess.TimeoutExpired):
+                    yield f"data: [METHOD_Z LAUNCH ERROR] Jumphost staging timed out while running: {exc.cmd}\n\n"
+                    yield "data: [METHOD_Z] The jumphost did not respond quickly enough over SSH/SCP. Check whether a prior SNAPWIN qemu-img/dd job is still saturating disk I/O, then retry.\n\n"
+                else:
+                    yield f"data: [METHOD_Z LAUNCH ERROR] {exc}\n\n"
+            finally:
+                try:
+                    subprocess.run(
+                        ssh_base_z + [f"rm -f {shlex.quote(remote_ospc)} {shlex.quote(remote_flex)} 2>/dev/null || true"],
+                        timeout=30,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+                yield "data: [DONE]\n\n"
+
+        return Response(stream_with_context(_method_z_generator()), mimetype='text/event-stream')
+
     cmd.extend(["--source-server-ip", process_ip])
     cmd.extend(["--origin-image-dir", req.get('workdir') or '/home/ubuntu/image'])
     cmd.extend(["--workdir", "/tmp/ospc2flex_local_orch"])
@@ -6952,6 +7299,34 @@ def run_image_migrator():
         cmd.extend(["--origin-vm-password", origin_vm_password])
         if _is_windows_request:
             cmd.extend(["--windows-admin-password", origin_vm_password])
+
+    if _is_windows_request:
+        _cb_target_host = (
+            req.get('cloudboot_target_host')
+            or req.get('target_windows_ip')
+            or req.get('target_server_ip')
+            or req.get('reference_windows_ip')
+            or ''
+        )
+        _cb_target_host = str(_cb_target_host).strip()
+        if _cb_target_host:
+            cmd.extend(["--cloudboot-target-host", _cb_target_host])
+            _cb_target_user = str(req.get('cloudboot_target_user') or req.get('target_windows_user') or 'Administrator').strip() or 'Administrator'
+            cmd.extend(["--cloudboot-target-user", _cb_target_user])
+            if req.get('cloudboot_target_port') or req.get('target_windows_port'):
+                cmd.extend(["--cloudboot-target-port", str(req.get('cloudboot_target_port') or req.get('target_windows_port'))])
+            _cb_target_key = os.path.expanduser(str(req.get('cloudboot_target_ssh_key') or req.get('target_windows_ssh_key') or '').strip())
+            if _cb_target_key:
+                cmd.extend(["--cloudboot-target-ssh-key-path", _cb_target_key])
+            _cb_target_pass = str(req.get('cloudboot_target_password') or req.get('target_windows_password') or '').strip()
+            if _cb_target_pass:
+                cmd.extend(["--cloudboot-target-password", _cb_target_pass])
+            _cb_src_winrm = str(req.get('cloudboot_source_winrm_host') or req.get('source_snet_ip') or req.get('server_snet_ip') or req.get('snet_ip') or '').strip()
+            if _cb_src_winrm:
+                cmd.extend(["--cloudboot-source-winrm-host", _cb_src_winrm])
+            _cb_tgt_winrm = str(req.get('cloudboot_target_winrm_host') or req.get('target_snet_ip') or req.get('target_windows_snet_ip') or '').strip()
+            if _cb_tgt_winrm:
+                cmd.extend(["--cloudboot-target-winrm-host", _cb_tgt_winrm])
 
     # Production Mode: pass the per-VM origin IP separately so migrator knows to SSH-pipe from it
     origin_vm_ip_override = (req.get('source_server_ip') or req.get('origin_vm_ip') or '').strip()
@@ -7004,10 +7379,13 @@ def run_image_migrator():
 
     def generate():
         global ACTIVE_MIGRATOR_PROCESSES, ACTIVE_MIGRATOR_PROCESSES_BY_SERVER
+        detached_worker_mode = False
         def should_hide_image_migrator_line(line: str) -> bool:
             s = (line or "").strip()
             if not s:
                 return False
+            if _is_noisy_percent_progress_line(s):
+                return True
             if s.startswith("[RUN]"):
                 return True
             if s.startswith("Traceback (most recent call last):"):
@@ -7035,12 +7413,21 @@ def run_image_migrator():
             for line in iter(process.stdout.readline, ''):
                 if not line: break
                 clean_line = line.rstrip()
+                if (
+                    "Worker launched:" in clean_line
+                    or "qemu-img convert to qcow2 started" in clean_line
+                    or "Running Method D standalone capture" in clean_line
+                ):
+                    detached_worker_mode = True
                 if should_hide_image_migrator_line(clean_line):
                     continue
                 yield f"data: {clean_line}\n\n"
             process.wait()
             yield f"data: \n\n"
-            yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
+            if detached_worker_mode and process.returncode == 0:
+                yield "data: [PROCESS DETACHED — background worker still running]\n\n"
+            else:
+                yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
         except Exception as e:
             yield f"data: [SUBPROCESS LAUNCH ERROR: {str(e)}]\n\n"
         finally:
@@ -7224,7 +7611,7 @@ SRC_PASS=""
 
 source /tmp/ospc2flex_flex.sh
 WORK=/mnt/migration/ospc2flex_image
-FLAVOR=${MIG_FLAVOR:-1ba37c74-34c1-47f8-965b-c5005c3825d2}
+FLAVOR=${MIG_FLAVOR:-gp.0.4.4}
 NETWORK=${MIG_NETWORK:-e74c7a0f-e933-41c4-bcad-18c472b0fbf1}
 EXT_NET=${MIG_EXT_NET:-82be3711-cd97-4f7c-8bbd-59f5524a949e}
 KEYPAIR=${MIG_KEYPAIR:-laptopubuntu24}
@@ -7233,6 +7620,20 @@ SRC_RAM_MB=${MIG_SRC_RAM_MB:-}
 SRC_DISK_GB=${MIG_SRC_DISK_GB:-}
 DATE=$(date +%Y%m%d-%H%M)
 LOG=/tmp/mig_${LABEL}.log
+OSPC2FLEX_UI_VERBOSE=${OSPC2FLEX_UI_VERBOSE:-0}
+mkdir -p "${WORK}/logs"
+BACKGROUND_LOG="${WORK}/logs/${LABEL}.background.log"
+PROGRESS_LOG="${WORK}/logs/${LABEL}.progress.log"
+: > "$BACKGROUND_LOG"
+: > "$PROGRESS_LOG"
+_migw_on_exit() {
+  ec=$?
+  [ -z "${BACKGROUND_LOG:-}" ] && return 0
+  ui_log "Background log: $BACKGROUND_LOG"
+  ui_log "Progress log: $PROGRESS_LOG"
+  if [ "$ec" -eq 0 ]; then ui_log "Migration worker result: SUCCESS"; else ui_log "Migration worker result: FAILED"; fi
+}
+trap '_migw_on_exit' EXIT
 # [CACHE BUST 2026-04-22 v4] Sync variable-based output capture for NBD checks
 QCOW=${WORK}/${LABEL}-${SRC_IP}.qcow2
 MNT=/tmp/mnt_${LABEL}_$$
@@ -7244,6 +7645,8 @@ SUDO=""; [ "$SRC_USER" != "root" ] && SUDO="sudo" || true
 > "$LOG"
 TS() { TZ='Asia/Bangkok' date '+%H:%M:%S'; }
 log() { echo "[$(TS)][$LABEL] $*"; }
+ui_log() { echo "[$(TS)][$LABEL] $*"; }
+bg_log() { echo "[$(TS)][$LABEL] $*" >> "$BACKGROUND_LOG"; }
 stage() {
   log "=========================================================="
   log "$1"
@@ -7746,8 +8149,11 @@ sleep 2
 nc -z localhost "$TUN_PORT" 2>/dev/null && log "  Tunnel OK" || { log "ERROR: tunnel failed"; echo "FAIL_TUNNEL|$LABEL" >> "$RESULTS"; exit 1; }
 
 # Step 3: NBD -> qcow2
-  log "Step 3: qemu-img convert NBD -> qcow2..."
-  qemu-img convert "nbd://localhost:${TUN_PORT}/" -O qcow2 "$QCOW" 2>&1 || true
+  log "Step 3: qemu-img convert NBD -> qcow2 (details: $BACKGROUND_LOG)..."
+  (
+    echo "=== qemu-img convert NBD->qcow2 $(date -Iseconds) ==="
+    qemu-img convert "nbd://localhost:${TUN_PORT}/" -O qcow2 "$QCOW"
+  ) >> "$BACKGROUND_LOG" 2>&1 || true
 pkill -f "ssh.*${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true
 QSZ=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
 log "  qcow2 (NBD): $((QSZ/1024/1024))MB"
@@ -7767,7 +8173,10 @@ if [ "$QSZ" -lt 100000000 ]; then
     src_ssh_tunnel "${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true
     sleep 2
     rm -f "$QCOW"
-    qemu-img convert "nbd://localhost:${TUN_PORT}/" -O qcow2 "$QCOW" 2>&1 || true
+    (
+      echo "=== qemu-img convert NBD retry $(date -Iseconds) ==="
+      qemu-img convert "nbd://localhost:${TUN_PORT}/" -O qcow2 "$QCOW"
+    ) >> "$BACKGROUND_LOG" 2>&1 || true
     pkill -f "ssh.*${TUN_PORT}:localhost:${SRC_PORT}" 2>/dev/null || true
     QSZ=$(stat -c%s "$QCOW" 2>/dev/null || echo 0)
     log "  qcow2 (NBD retry): $((QSZ/1024/1024))MB"
@@ -7797,8 +8206,11 @@ if [ "$QSZ" -lt 100000000 ]; then
   RAW_SZ=$(stat -c%s "$RAW_FILE" 2>/dev/null || echo 0)
   log "  raw file: $((RAW_SZ/1024/1024))MB"
   if [ "$RAW_SZ" -gt 100000000 ]; then
-    log "  Converting raw -> qcow2..."
-    qemu-img convert -f raw -O qcow2 "$RAW_FILE" "$QCOW" 2>&1 || true
+    log "  Converting raw -> qcow2 (details: $BACKGROUND_LOG)..."
+    (
+      echo "=== qemu-img convert raw->qcow2 $(date -Iseconds) ==="
+      qemu-img convert -f raw -O qcow2 "$RAW_FILE" "$QCOW"
+    ) >> "$BACKGROUND_LOG" 2>&1 || true
     touch "${QCOW}.converted"
     rm -f "$RAW_FILE"
   else
@@ -7969,9 +8381,10 @@ else
     if [ "$_up_try" -gt 1 ]; then
       log "  Upload attempt $_up_try..."
     fi
-    log "  [UPLOAD $_up_try/3] starting image upload..."
+    log "  [UPLOAD $_up_try/3] starting image upload (stderr -> $BACKGROUND_LOG)..."
+    echo "[$(date -Iseconds)] openstack image create try=$_up_try name=$IMG" >> "$BACKGROUND_LOG"
     NEW_ID=$(openstack image create --format value -c id \
-      "${IMAGE_CREATE_ARGS[@]}" "$IMG" 2>/tmp/os_err_$$.txt || true)
+      "${IMAGE_CREATE_ARGS[@]}" "$IMG" 2>>"$BACKGROUND_LOG" || true)
 
     if [ -n "$NEW_ID" ]; then
       log "  [UPLOAD $_up_try/3] returned image id: $NEW_ID"
@@ -7980,7 +8393,7 @@ else
       break
     fi
 
-    ERR_MSG=$(cat /tmp/os_err_$$.txt 2>/dev/null | tr '\n' ' ' | cut -c 1-200 || echo "Unknown error")
+    ERR_MSG=$(tail -n 8 "$BACKGROUND_LOG" 2>/dev/null | tr '\n' ' ' | cut -c 1-200 || echo "Unknown error")
     log "  [WARN] Upload attempt $_up_try failed: $ERR_MSG"
 
     if [ "$_up_try" -lt 3 ]; then
@@ -7992,10 +8405,8 @@ else
   if [ -z "$NEW_ID" ]; then
     log "ERROR: upload failed after 3 attempts"
     echo "FAIL_UPLOAD|$LABEL" >> "$RESULTS"
-    rm -f /tmp/os_err_$$.txt
     exit 1
   fi
-  rm -f /tmp/os_err_$$.txt
   # Save image ID so future re-runs can skip the 6h upload
   echo "$NEW_ID" > "${QCOW}.image_id"
   kv "Image id cache" "${QCOW}.image_id"
@@ -8008,10 +8419,16 @@ log "  [UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$NEW_ID name=${IM
 
 # Step 6: Wait active
 stage "STEP 6: Wait image active"
+_img_poll_last=0
 for i in $(seq 1 60); do
   ST=$(openstack image show "$NEW_ID" -f value -c status 2>/dev/null || echo "")
-  log "  [DEBUG] Image status poll $i/60: id=$NEW_ID status=${ST:-unknown}"; [ "$ST" = "active" ] && break
+  [ "$ST" = "active" ] && break
   [ "$ST" = "killed" ] && { echo "FAIL_KILLED|$LABEL|$NEW_ID" >> "$RESULTS"; exit 1; }
+  _now=$(date +%s)
+  if [ "$((_now - _img_poll_last))" -ge 60 ] || [ "$i" -eq 1 ]; then
+    _img_poll_last=$_now
+    ui_log "Waiting for Glance ACTIVE... status=${ST:-unknown} poll=$i/60"
+  fi
   sleep 20
 done
 [ "$ST" != "active" ] && { echo "FAIL_INACTIVE|$LABEL" >> "$RESULTS"; exit 1; }
@@ -8231,6 +8648,155 @@ log "=== DONE ==="
 _ACTIVE_NBD_PROCS: Dict[str, Any] = {}
 _ACTIVE_NBD_LOCK = threading.Lock()
 
+# Run on jumphost via `ssh … bash -s` stdin — clears prior mig workers, Windows engines, locks.
+_NBD_JUMPHOST_RESET_SH = r"""set +e
+# Workers & Windows migration engines (patterns avoid matching this script line)
+pkill -f '[m]ig_worker_v4' 2>/dev/null || true
+pkill -f '[o]spc2flex_windows_migrate' 2>/dev/null || true
+pkill -f '[o]spc2flex_windows_v2_engine' 2>/dev/null || true
+pkill -f '[o]spc2flex_windows_method_d_standalone' 2>/dev/null || true
+pkill -f '[o]spc2flex_windows_method_d_capture' 2>/dev/null || true
+pkill -f '[o]spc2flex_windows_method_g_simple' 2>/dev/null || true
+pkill -f '/tmp/ospc2flex_windows_method_d_standalone' 2>/dev/null || true
+pkill -f '/tmp/ospc2flex_windows_method_d_capture' 2>/dev/null || true
+pkill -f '/tmp/ospc2flex_windows_method_g_simple' 2>/dev/null || true
+pkill -f '/tmp/ospc2flex_windows_v2_engine' 2>/dev/null || true
+pkill -f '/tmp/ospc2flex_windows_migrate' 2>/dev/null || true
+pkill -f '[o]spc2flex_image_migrator' 2>/dev/null || true
+pkill -f 'wincloudbootmigrator.py' 2>/dev/null || true
+pkill -f '[o]spc2flex_glance_bridge' 2>/dev/null || true
+pkill -f '[q]emu-img' 2>/dev/null || true
+sudo killall qemu-nbd 2>/dev/null || true
+pkill -f 'dd.*ospc2flex_image' 2>/dev/null || true
+pkill -f 'openstack image' 2>/dev/null || true
+rm -f /mnt/migration/ospc2flex_image/locks/*.lock 2>/dev/null || true
+sleep 1
+echo "[nbd_jumphost_reset_ok]"
+"""
+
+
+def _nbd_jumphost_reset_prior_jobs(ssh_base: List[str], jumphost_ip: str) -> Tuple[bool, str]:
+    """Kill orphan migration jobs on jumphost and remove label locks.
+
+    Intentionally does **not** clear `_nbd_staging_cache`: wiping it dropped
+    `init_done` and forced a full first-run apt + origin-key SCP on every batch
+    (often 3–5+ minutes) even when the jumphost was already prepared.
+    """
+    try:
+        r = subprocess.run(
+            ssh_base + ["bash", "-s"],
+            input=_NBD_JUMPHOST_RESET_SH,
+            text=True,
+            timeout=120,
+            capture_output=True,
+            errors="replace",
+        )
+        out = ((r.stdout or "") + (r.stderr or "")).strip()
+        ok = r.returncode == 0 or "nbd_jumphost_reset_ok" in out
+        return ok, out
+    except subprocess.TimeoutExpired:
+        return False, "jumphost reset timed out after 120s"
+    except Exception as e:
+        return False, str(e)
+
+
+def _nbd_resync_log_cursor(
+    ssh_base: List[str],
+    log_path: str,
+    seen_lines: int,
+    prev_stat: Optional[Tuple[int, int]],
+) -> Tuple[int, Optional[Tuple[int, int]]]:
+    """
+    Keep the sed line offset in sync when /tmp/mig_<label>.log is truncated (new
+    nohup redirect), replaced (new inode), or when the client reconnects with a
+    stale [SEEN] count. Without this, EventSource streams show frozen logs while
+    method_g_simple.json from /nbd/status keeps updating.
+    """
+    try:
+        st = subprocess.run(
+            ssh_base + [f"stat -c '%i %s' {log_path} 2>/dev/null || echo '0 0'"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            errors="replace",
+        )
+        parts = (st.stdout or "").strip().split()
+        cur_ino = int(parts[0]) if len(parts) >= 2 else 0
+        cur_sz = int(parts[1]) if len(parts) >= 2 else 0
+    except (ValueError, IndexError):
+        cur_ino, cur_sz = 0, 0
+
+    new_seen = seen_lines
+    if prev_stat is not None:
+        p_ino, p_sz = prev_stat
+        if p_sz > 0 and cur_sz > 0 and cur_sz < p_sz:
+            new_seen = 0
+        if p_ino and cur_ino and cur_ino != p_ino:
+            new_seen = 0
+
+    if new_seen > 0:
+        try:
+            wl = subprocess.run(
+                ssh_base + [f"wc -l < {log_path} 2>/dev/null || echo 0"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                errors="replace",
+            )
+            nlines = int((wl.stdout or "0").strip() or "0")
+            if cur_sz == 0 and nlines == 0 and new_seen > 0:
+                new_seen = 0
+            elif nlines < new_seen:
+                new_seen = 0
+        except ValueError:
+            pass
+
+    cur_stat: Optional[Tuple[int, int]] = (cur_ino, cur_sz)
+    return new_seen, cur_stat
+
+
+# Substrings that end the live log stream for Method G (success or hard failure).
+_METHOD_G_STREAM_DONE_MARKERS = frozenset({
+    "METHOD_G_SIMPLE_SUCCESS",
+    "[G0_PREFLIGHT] FAILED",
+    "[G1_SSH_ACCESS_CHECK] FAILED",
+    "[G2_SSH_DISK_CAPTURE] FAILED",
+    "[G3_ARTIFACT_VALIDATE] FAILED",
+    "[G4_QCOW2_CONVERT] FAILED",
+    "[G5_WINDOWS_REPAIR] FAILED",
+    "[G6_UPLOAD_SAFE_RESCUE_IMAGE] FAILED",
+    "[G7_BOOT_SAFE_RESCUE_VM] FAILED",
+    "[G8_ATTACH_DUMMY_VIRTIO] FAILED",
+    "[G9_ONLINE_VIRTIO_BINDING] FAILED",
+    "[G10_REBOOT_STILL_IDE] FAILED",
+    "[G11_SNAPSHOT_VIRTIO_READY] FAILED",
+    "[G12_BOOT_FINAL_VIRTIO] FAILED",
+    "[G13_FINAL_VALIDATE] FAILED",
+})
+
+_METHOD_H_STREAM_DONE_MARKERS = frozenset({
+    "METHOD_H_SUCCESS",
+    "[CAPTURE] FAILED",
+    "[LOCAL_KVM_PREP] FAILED",
+    "[DRIVER_BIND] FAILED",
+    "[FLEX_IMPORT] FAILED",
+})
+
+_METHOD_E_STREAM_DONE_MARKERS = frozenset({
+    "METHOD_E_SUCCESS",
+    "[E0_PREFLIGHT] FAILED",
+    "[E1_SSH_DISK_CAPTURE] FAILED",
+    "[E2_ARTIFACT_VALIDATE] FAILED",
+    "[E3_WINDOWS_REPAIR] FAILED",
+    "[E4_UPLOAD_SAFE_RESCUE_IMAGE] FAILED",
+    "[E5_BOOT_SAFE_RESCUE_VM] FAILED",
+    "[E6_ATTACH_DUMMY_VIRTIO] FAILED",
+    "[E7_ONLINE_VIRTIO_BINDING] FAILED",
+    "[E8_REBOOT_STILL_IDE] FAILED",
+    "[E9_SNAPSHOT_VIRTIO_READY] FAILED",
+    "[E10_BOOT_FINAL_VIRTIO] FAILED",
+})
+
 
 @app.post("/api/vm_migrator/nbd/run")
 def nbd_run():
@@ -8271,8 +8837,14 @@ def nbd_run():
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ospc2Flex-Image-migtool", "ospc2flex_offline_repair.sh")
     ) if getattr(app, '_repair_hash', None) is None else app._repair_hash
 
-    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30",
+                "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
                 "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
+
+    # Global reset intentionally omitted here: it kills ALL running jobs on the jumphost
+    # regardless of label (Method G, H, D, Linux workers — everything).  Per-label kill
+    # happens inside each individual job's kill_stale_cmd below. To wipe the jumphost
+    # explicitly, use /api/vm_migrator/nbd/reset or pass reset_jumphost_jobs=true.
 
     try:
         ospc_creds = req.get('ospc_creds', {})
@@ -8335,8 +8907,69 @@ def nbd_run():
 
 # Staging cache: hash-based — only re-upload scripts when content changes
 import threading, hashlib
-_nbd_staging_cache = {}   # { jumphost_ip: { "hash": md5, "init_done": bool } }
+_nbd_staging_cache = {}   # jumphost_ip -> hash, init_done, flex_sh_hash, ospc_sh_hash
+# Serialize whole staging bursts (run_single waits in queue). Must NOT be acquired inside
+# _stage_scripts_on_jumphost: run_single holds this while a worker thread runs that function
+# (non-reentrant Lock → deadlock forever, heartbeats only).
 _nbd_staging_lock = threading.Lock()
+_nbd_staging_cache_lock = threading.Lock()  # short critical sections for cache dict only
+# Per-label single-flight launch guard: prevents duplicate SSE streams from double-launching
+# the same VM concurrently (e.g. browser reconnect or rapid re-click).
+_label_launch_locks: dict = {}
+_label_launch_locks_mu = threading.Lock()
+
+_PERCENT_PROGRESS_RE = re.compile(r"\(\s*\d+(?:\.\d+)?/100%\)|\b\d+(?:\.\d+)?%")
+# wget/curl style chunk rows (may be indented or prefixed by UI timestamps)
+_WGET_CHUNK_PROGRESS_RE = re.compile(
+    r"\d+(?:\.\d+)?[KMG]?\s+\.+.*\b\d{1,3}%\b"
+)
+# Line-leading wget-style chunk counter: "57500K .......... 7%"
+_WGET_LEADING_CHUNK_RE = re.compile(r"^\s*\d+[KMG]?\s+\.+")
+# curl/rsync style: "12.3%" with throughput
+_SPEED_THROUGHPUT_RE = re.compile(
+    r"\d{1,3}(?:\.\d+)?%\s+\d+(?:\.\d+)?\s*[KMG](?:i?B|B)?/s", re.I
+)
+# Long runs of dots (progress bars)
+_DOT_RUN_NOISY_RE = re.compile(r"\.{12,}")
+
+
+def should_hide_from_ui(line: str) -> bool:
+    """True if this log line should be suppressed in the dashboard SSE stream."""
+    return _is_noisy_percent_progress_line(line)
+
+
+def _is_noisy_percent_progress_line(line: str) -> bool:
+    s = (line or "").rstrip()
+    if not s:
+        return False
+    if os.environ.get("OSPC2FLEX_UI_VERBOSE", "").strip().lower() in ("1", "true", "yes", "on"):
+        return False
+    low = s.lower()
+    # PowerShell/SSH disk-read ticker — match anywhere in line (UI may prepend timestamps).
+    if "ssh transfer progress" in low and "mb on disk" in low:
+        return True
+    # Windows Method D heartbeat lines:
+    # "SSH disk read: 30124 MiB received, elapsed=2702s"
+    if "ssh disk read:" in low and "mib received" in low and "elapsed=" in low:
+        return True
+    # Alternate heartbeat wording written into progress/background logs.
+    if "ssh disk read heartbeat:" in low and "mib" in low and "elapsed=" in low:
+        return True
+    # wget/aria style chunk rows:
+    # "680600K .......... .......... .......... 88% 147M 2s"
+    if _WGET_CHUNK_PROGRESS_RE.search(s):
+        return True
+    if _WGET_LEADING_CHUNK_RE.search(s) and "%" in s:
+        return True
+    if _SPEED_THROUGHPUT_RE.search(s):
+        return True
+    if _DOT_RUN_NOISY_RE.search(s) and re.search(r"\d+\s*%", s):
+        return True
+    if "/100%)" in s:
+        return True
+    if _PERCENT_PROGRESS_RE.search(s) and any(k in low for k in ("progress", "download", "upload", "transferred", "copying")):
+        return True
+    return False
 _nbd_job_launch_lock = threading.Lock()
 
 
@@ -8354,13 +8987,56 @@ def _file_md5(path: str) -> str:
     return h.hexdigest()
 
 
+def _nbd_jumphost_migtool_root() -> str:
+    return os.path.abspath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ospc2Flex-Image-migtool")
+    )
+
+
+# Single manifest: same order drives combined_hash and the tarball (plus embedded mig_worker_v4).
+# (path relative to ospc2Flex-Image-migtool/, remote basename under /tmp/)
+_NBD_JUMPHOST_BUNDLE_MEMBERS: Tuple[Tuple[str, str], ...] = (
+    ("ospc2flex_offline_repair.sh", "ospc2flex_offline_repair.sh"),
+    ("ospc2flex_windows_repair.sh", "ospc2flex_windows_repair.sh"),
+    ("ospc2flex_windows_migrate.sh", "ospc2flex_windows_migrate.sh"),
+    ("ospc2flex_windows_method_d_capture.sh", "ospc2flex_windows_method_d_capture.sh"),
+    ("ospc2flex_windows_method_e.sh", "ospc2flex_windows_method_e.sh"),
+    ("ospc2flex_windows_method_g_simple.sh", "ospc2flex_windows_method_g_simple.sh"),
+    ("ospc2flex_windows_method_h_local_kvm.sh", "ospc2flex_windows_method_h_local_kvm.sh"),
+    ("ospc2flex_windows_method_z_snapshot_existing.sh", "ospc2flex_windows_method_z_snapshot_existing.sh"),
+    ("ospc2flex_windows_method_g_simple_lib.sh", "ospc2flex_windows_method_g_simple_lib.sh"),
+    ("cloudboot/wincloudbootmigrator.py", "wincloudbootmigrator.py"),
+    ("ospc2flex_windows_v2_engine.sh", "ospc2flex_windows_v2_engine.sh"),
+    ("ospc2flex_windows_method_d_standalone.sh", "ospc2flex_windows_method_d_standalone.sh"),
+    ("ospc2flex_windows_firstboot.ps1", "ospc2flex_windows_firstboot.ps1"),
+    ("ospc2flex_windows_v2_verify.ps1", "ospc2flex_windows_v2_verify.ps1"),
+    ("ospc2flex_glance_bridge.sh", "ospc2flex_glance_bridge.sh"),
+)
+
+
+def _nbd_bundle_mtime_fp(mig_root: str) -> Tuple[Tuple[str, int, int], ...]:
+    """Cheap fingerprint of bundle source files; must change if contents change."""
+    rows: List[Tuple[str, int, int]] = []
+    for rel, _ in _NBD_JUMPHOST_BUNDLE_MEMBERS:
+        p = os.path.join(mig_root, rel)
+        try:
+            st = os.stat(p)
+            rows.append((rel, int(st.st_mtime_ns), st.st_size))
+        except OSError:
+            rows.append((rel, 0, 0))
+    return tuple(rows)
+
+
 def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base, ospc_creds=None):
     """Stage scripts on jumphost. Returns (messages: list[str], ok: bool).
 
     Auto-sync staging strategy:
-      1. Flex creds  → ALWAYS stage (lightweight, may change per batch)
-      2. Worker + migration scripts → ALWAYS stage (local repo is source of truth)
-      3. SSH key + modprobe + mkdir → only once per jumphost session
+      1. Flex / OSPC creds → upload only when generated content hash changes
+      2. Worker + migration scripts → one .tar.gz upload when combined_hash changes
+      3. Repair-tool check → quick probe only when bundle already current + init done
+      4. SSH key + modprobe + mkdir → only once per jumphost session
+
+    Add new jumphost scripts by appending to `_NBD_JUMPHOST_BUNDLE_MEMBERS` only (hash + tar stay aligned).
     """
     import tempfile
     msgs = []
@@ -8369,62 +9045,55 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         import subprocess
         for attempt in range(3):
             try:
-                # Ensure timeout is always at least 30
-                if kwargs.get('timeout', 0) < 30: kwargs['timeout'] = 30
+                # Jumphost SCP/SSH can stall behind ControlMaster or slow links; keep floor high.
+                if kwargs.get('timeout', 0) < 120:
+                    kwargs['timeout'] = 120
                 return subprocess.run(cmd, **kwargs)
             except Exception:
                 if attempt == 2: raise
                 time.sleep(2)
 
 
-    # --- Compute local hashes ---
-    worker_hash = _md5_of(_MIG_WORKER_V4)
-    _repair_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_offline_repair.sh"
+    # --- Bundle hash: fast path matches Method B (one staging pass) for batch run_single ---
+    _mig_root = _nbd_jumphost_migtool_root()
+    _w_embed = _md5_of(_MIG_WORKER_V4)
+    _mt_fp = _nbd_bundle_mtime_fp(_mig_root)
+    _remote_sha_proc = safe_run(
+        ssh_base + ["cat /tmp/ospc2flex_script_bundle.sha256 2>/dev/null || true"],
+        check=False,
+        timeout=10,
+        capture_output=True,
+        text=True,
     )
-    repair_hash = _file_md5(_repair_path) if os.path.isfile(_repair_path) else ""
-    _win_repair_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_windows_repair.sh"
-    )
-    _win_repair_hash = _file_md5(_win_repair_path) if os.path.isfile(_win_repair_path) else ""
-    _win_migrate_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_windows_migrate.sh"
-    )
-    _win_migrate_hash = _file_md5(_win_migrate_path) if os.path.isfile(_win_migrate_path) else ""
-    _win_v2_engine_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_windows_v2_engine.sh"
-    )
-    _win_v2_engine_hash = _file_md5(_win_v2_engine_path) if os.path.isfile(_win_v2_engine_path) else ""
-    _win_firstboot_ps1 = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_windows_firstboot.ps1"
-    )
-    _win_firstboot_hash = _file_md5(_win_firstboot_ps1) if os.path.isfile(_win_firstboot_ps1) else ""
-    _win_v2_verify_ps1 = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_windows_v2_verify.ps1"
-    )
-    _win_v2_verify_hash = _file_md5(_win_v2_verify_ps1) if os.path.isfile(_win_v2_verify_ps1) else ""
-    _glance_bridge_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..",
-        "ospc2Flex-Image-migtool", "ospc2flex_glance_bridge.sh"
-    )
-    _glance_bridge_hash = _file_md5(_glance_bridge_path) if os.path.isfile(_glance_bridge_path) else ""
+    remote_h = (_remote_sha_proc.stdout or "").strip()
 
-    combined_hash = f"{worker_hash}:{repair_hash}:{_win_repair_hash}:{_win_migrate_hash}:{_win_v2_engine_hash}:{_win_firstboot_hash}:{_win_v2_verify_hash}:{_glance_bridge_hash}"
+    with _nbd_staging_cache_lock:
+        st = _nbd_staging_cache.setdefault(jumphost_ip, {})
+        init_done = st.get("init_done", False)
+        _prev_flex_h = st.get("flex_sh_hash")
+        _prev_ospc_h = st.get("ospc_sh_hash")
+        _bundle_fast = (
+            init_done
+            and remote_h
+            and st.get("bundle_hash") == remote_h
+            and st.get("bundle_mtime_fp") == _mt_fp
+            and st.get("worker_embed_hash") == _w_embed
+        )
 
-    # --- Check cache ---
-    with _nbd_staging_lock:
-        cached = _nbd_staging_cache.get(jumphost_ip, {})
-        init_done = cached.get("init_done", False)
-        _nbd_staging_cache[jumphost_ip] = {
-            "hash": combined_hash,
-            "init_done": init_done,  # will update to True after init
-        }
+    _bundle_abs_pairs: List[Tuple[str, str]] = []
+    if _bundle_fast:
+        combined_hash = remote_h
+        # Do not log "unchanged" yet — capture.sh md5 check below can still force a full re-sync.
+    else:
+        _hash_parts: List[str] = [_w_embed]
+        for _rel, _remote in _NBD_JUMPHOST_BUNDLE_MEMBERS:
+            _abs = os.path.join(_mig_root, _rel)
+            _bundle_abs_pairs.append((_abs, _remote))
+            _hash_parts.append(_file_md5(_abs) if os.path.isfile(_abs) else "")
+        combined_hash = ":".join(_hash_parts)
+
+    with _nbd_staging_cache_lock:
+        _nbd_staging_cache[jumphost_ip]["hash"] = combined_hash
 
     flex_region = normalize_flex_region(
         str(flex_creds.get('region', 'DFW3') or 'DFW3'),
@@ -8456,12 +9125,20 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
             flex_sh += f"export OS_PROJECT_ID={shlex.quote(flex_creds['project_id'])}\n"
             flex_sh += f"export OS_PROJECT_NAME={shlex.quote(flex_creds['project_id'])}\n"
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
-        tf.write(flex_sh); tf_path = tf.name
-    safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                    tf_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_flex.sh"],
-                   check=True, timeout=30)
-    os.unlink(tf_path)
+    _flex_body_hash = hashlib.md5(flex_sh.encode("utf-8")).hexdigest()
+    if _flex_body_hash != _prev_flex_h:
+        msgs.append("[STAGE] Syncing Flex OpenStack credentials to jumphost")
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
+            tf.write(flex_sh)
+            tf_path = tf.name
+        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
+                        tf_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_flex.sh"],
+                       check=True, timeout=30)
+        os.unlink(tf_path)
+        with _nbd_staging_cache_lock:
+            _nbd_staging_cache[jumphost_ip]["flex_sh_hash"] = _flex_body_hash
+    else:
+        msgs.append("[STAGE] Flex credentials unchanged (skipped upload)")
 
     # 1b. Stage OSPC creds for Windows Glance fallback (if NBD inline mode)
     if ospc_creds and (ospc_creds.get('username') or ospc_creds.get('apikey')):
@@ -8478,74 +9155,129 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
             ospc_sh += f"export OS_TENANT_ID={shlex.quote(ospc_account_id)}\n"
             ospc_sh += f"export OS_PROJECT_ID={shlex.quote(ospc_account_id)}\n"
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
-            tf.write(ospc_sh)
-            tf_path_ospc = tf.name
+        _ospc_body_hash = hashlib.md5(ospc_sh.encode("utf-8")).hexdigest()
+        if _ospc_body_hash != _prev_ospc_h:
+            msgs.append("[STAGE] Syncing OSPC credentials to jumphost")
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
+                tf.write(ospc_sh)
+                tf_path_ospc = tf.name
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
+                            tf_path_ospc, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_ospc.sh"],
+                           check=True, timeout=30)
+            os.unlink(tf_path_ospc)
+            with _nbd_staging_cache_lock:
+                _nbd_staging_cache[jumphost_ip]["ospc_sh_hash"] = _ospc_body_hash
+        else:
+            msgs.append("[STAGE] OSPC credentials unchanged (skipped upload)")
+    else:
+        with _nbd_staging_cache_lock:
+            _nbd_staging_cache[jumphost_ip]["ospc_sh_hash"] = None
 
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        tf_path_ospc, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_ospc.sh"],
-                       check=True, timeout=30)
-        os.unlink(tf_path_ospc)
+    scripts_current = _bundle_fast or (remote_h == combined_hash)
 
-    # 2. Always refresh the full script bundle from the local repo.
-    msgs.append("[STAGE] Auto-syncing worker + migration scripts to jumphost")
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as tf:
-        tf.write(_MIG_WORKER_V4); tw_path = tf.name
-    safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                    tw_path, f"{jumphost_user}@{jumphost_ip}:/tmp/mig_worker_v4.sh"],
-                   check=True, timeout=60)
-    os.unlink(tw_path)
-    safe_run(ssh_base + ["chmod +x /tmp/mig_worker_v4.sh"], check=True, timeout=15)
+    # Bundle hash can match while /tmp/ospc2flex_windows_method_d_capture.sh is stale (manual edit,
+    # partial extract, or dashboard host not rebuilt). Compare md5 and force re-sync on mismatch.
+    if scripts_current:
+        _cap_local = os.path.join(_mig_root, "ospc2flex_windows_method_d_capture.sh")
+        if os.path.isfile(_cap_local):
+            try:
+                cap_h = _file_md5(_cap_local)
+                ver = safe_run(
+                    ssh_base + [
+                        "bash",
+                        "-lc",
+                        "md5sum /tmp/ospc2flex_windows_method_d_capture.sh 2>/dev/null | awk '{print $1}'",
+                    ],
+                    check=False,
+                    timeout=15,
+                    capture_output=True,
+                    text=True,
+                )
+                cap_remote = (ver.stdout or "").strip().lower()
+                if not cap_remote or cap_remote != cap_h.lower():
+                    msgs.append(
+                        "[STAGE] ospc2flex_windows_method_d_capture.sh missing or md5 mismatch vs "
+                        "dashboard copy (forcing bundle re-sync)"
+                    )
+                    scripts_current = False
+                    if not _bundle_abs_pairs:
+                        _hash_parts_r: List[str] = [_w_embed]
+                        for _rel, _remote in _NBD_JUMPHOST_BUNDLE_MEMBERS:
+                            _abs = os.path.join(_mig_root, _rel)
+                            _bundle_abs_pairs.append((_abs, _remote))
+                            _hash_parts_r.append(_file_md5(_abs) if os.path.isfile(_abs) else "")
+                        combined_hash = ":".join(_hash_parts_r)
+                        with _nbd_staging_cache_lock:
+                            _nbd_staging_cache[jumphost_ip]["hash"] = combined_hash
+            except OSError:
+                pass
 
-    if os.path.isfile(_repair_path):
-        msgs.append("[STAGE] Syncing Linux repair script")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _repair_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_offline_repair.sh"],
-                       check=True, timeout=60)
-        safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_offline_repair.sh"],
-                       check=True, timeout=15)
+    # After capture-file sanity check: safe to report fast-path "unchanged" (avoids log saying unchanged then re-sync).
+    if scripts_current and _bundle_fast:
+        msgs.append(
+            "[STAGE] Script bundle unchanged (mtime + sha cache + capture script md5 OK; same fast path as Method B)"
+        )
 
-    if os.path.isfile(_win_repair_path):
-        msgs.append("[STAGE] Syncing Windows repair script")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _win_repair_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_repair.sh"],
-                       check=True, timeout=60)
-        safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_repair.sh"],
-                       check=True, timeout=15)
+    # 2. Refresh the script bundle only when local content changed (one SCP like Method B path).
+    if scripts_current:
+        if not _bundle_fast:
+            msgs.append("[STAGE] Script bundle already current on jumphost (skipped sync)")
+        with _nbd_staging_cache_lock:
+            c = _nbd_staging_cache.setdefault(jumphost_ip, {})
+            c["bundle_hash"] = combined_hash
+            c["bundle_mtime_fp"] = _mt_fp
+            c["worker_embed_hash"] = _w_embed
+    else:
+        msgs.append("[STAGE] Auto-syncing worker + migration scripts (single compressed bundle)")
+        fd, _tar_path = tempfile.mkstemp(suffix=".tar.gz")
+        os.close(fd)
+        try:
+            _chmod_names: List[str] = []
+            with tarfile.open(_tar_path, "w:gz") as _tar:
+                _wraw = _MIG_WORKER_V4.encode("utf-8")
+                _wti = tarfile.TarInfo(name="mig_worker_v4.sh")
+                _wti.size = len(_wraw)
+                _wti.mode = 0o755
+                _tar.addfile(_wti, io.BytesIO(_wraw))
+                _chmod_names.append("mig_worker_v4.sh")
+                for _lp, _arc in _bundle_abs_pairs:
+                    if os.path.isfile(_lp):
+                        _tar.add(_lp, arcname=_arc)
+                        if _arc.endswith((".sh", ".py")):
+                            _chmod_names.append(_arc)
+            _remote_bn = f"ospc2flex_bundle_{uuid4().hex[:12]}.tar.gz"
+            _remote_full = f"/tmp/{_remote_bn}"
+            safe_run(
+                ["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto",
+                 "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
+                 "-o", "UserKnownHostsFile=/dev/null",
+                 _tar_path, f"{jumphost_user}@{jumphost_ip}:{_remote_full}"],
+                check=True, timeout=120,
+            )
+            _ch = " ".join(shlex.quote(f"/tmp/{n}") for n in _chmod_names)
+            safe_run(
+                ssh_base + [
+                    "set -e; "
+                    f"tar -xzf {shlex.quote(_remote_full)} -C /tmp && "
+                    f"chmod +x {_ch} && "
+                    f"printf '%s\\n' {shlex.quote(combined_hash)} > /tmp/ospc2flex_script_bundle.sha256 && "
+                    "rm -f /tmp/ospc2flex_windows_method_f_acquire.sh && "
+                    f"rm -f {shlex.quote(_remote_full)}"
+                ],
+                check=True,
+                timeout=90,
+            )
+            with _nbd_staging_cache_lock:
+                c = _nbd_staging_cache.setdefault(jumphost_ip, {})
+                c["bundle_hash"] = combined_hash
+                c["bundle_mtime_fp"] = _mt_fp
+                c["worker_embed_hash"] = _w_embed
+        finally:
+            try:
+                os.unlink(_tar_path)
+            except OSError:
+                pass
 
-    if os.path.isfile(_win_migrate_path):
-        msgs.append("[STAGE] Syncing Windows Method A migration script")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _win_migrate_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_migrate.sh"],
-                       check=True, timeout=60)
-        safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_migrate.sh"],
-                       check=True, timeout=15)
-    if os.path.isfile(_win_v2_engine_path):
-        msgs.append("[STAGE] Syncing Windows Method B engine")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _win_v2_engine_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_v2_engine.sh"],
-                       check=True, timeout=60)
-        safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_windows_v2_engine.sh"],
-                       check=True, timeout=15)
-    if os.path.isfile(_win_firstboot_ps1):
-        msgs.append("[STAGE] Syncing Windows Method B firstboot PowerShell")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _win_firstboot_ps1, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_firstboot.ps1"],
-                       check=True, timeout=60)
-    if os.path.isfile(_win_v2_verify_ps1):
-        msgs.append("[STAGE] Syncing Windows Method B verify PowerShell")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _win_v2_verify_ps1, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_windows_v2_verify.ps1"],
-                       check=True, timeout=60)
-    if os.path.isfile(_glance_bridge_path):
-        msgs.append("[STAGE] Syncing Glance/Cloud Files bridge helper")
-        safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
-                        _glance_bridge_path, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_glance_bridge.sh"],
-                       check=True, timeout=60)
-        safe_run(ssh_base + ["chmod +x /tmp/ospc2flex_glance_bridge.sh"],
-                       check=True, timeout=15)
-
-    msgs.append("[STAGE] Verifying Windows repair dependencies on jumphost")
     dep_cmd = (
         "missing=0; "
         "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do command -v \"$c\" >/dev/null 2>&1 || missing=1; done; "
@@ -8563,14 +9295,35 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         "done; "
         "exit 0"
     )
-    dep_proc = safe_run(ssh_base + [dep_cmd], check=False, timeout=300, capture_output=True, text=True)
-    dep_out = ((dep_proc.stdout or "") + (dep_proc.stderr or "")).strip()
-    if dep_out:
-        for line in dep_out.splitlines()[-12:]:
-            if line.startswith("MISSING:"):
-                msgs.append(f"[STAGE][WARN] Windows repair dependency still missing: {line.split(':', 1)[1]}")
-            elif line.startswith("OK:"):
-                msgs.append(f"[STAGE] {line}")
+    quick_dep = (
+        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do "
+        "if command -v \"$c\" >/dev/null 2>&1; then echo \"OK:$c=$(command -v \"$c\")\"; "
+        "else echo \"MISSING:$c\"; fi; done; exit 0"
+    )
+    skip_full_dep = False
+    if init_done:
+        _qdep = safe_run(ssh_base + [quick_dep], check=False, timeout=30, capture_output=True, text=True)
+        _qout = ((_qdep.stdout or "") + (_qdep.stderr or "")).strip()
+        if "MISSING:" not in _qout:
+            skip_full_dep = True
+            msgs.append("[STAGE] Repair tools present (quick check; skipped apt)")
+            if _qout:
+                for line in _qout.splitlines()[-12:]:
+                    if line.startswith("OK:"):
+                        msgs.append(f"[STAGE] {line}")
+        else:
+            msgs.append("[STAGE] Missing repair tools; running full dependency install")
+
+    if not skip_full_dep:
+        msgs.append("[STAGE] Verifying Windows repair dependencies on jumphost")
+        dep_proc = safe_run(ssh_base + [dep_cmd], check=False, timeout=300, capture_output=True, text=True)
+        dep_out = ((dep_proc.stdout or "") + (dep_proc.stderr or "")).strip()
+        if dep_out:
+            for line in dep_out.splitlines()[-12:]:
+                if line.startswith("MISSING:"):
+                    msgs.append(f"[STAGE][WARN] Windows repair dependency still missing: {line.split(':', 1)[1]}")
+                elif line.startswith("OK:"):
+                    msgs.append(f"[STAGE] {line}")
 
     # 4. One-time init: SSH key, modprobe, workspace dir
     if not init_done:
@@ -8585,13 +9338,14 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         ], check=True, timeout=180)
 
         if os.path.isfile(ssh_key):
-            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
+            safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30",
+                      "-o", "ControlMaster=auto", "-o", f"ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m", "-o", "UserKnownHostsFile=/dev/null",
                             ssh_key, f"{jumphost_user}@{jumphost_ip}:/tmp/ospc2flex_origin_key.pem"],
-                           check=True, timeout=30)
+                           check=True, timeout=300)
             safe_run(ssh_base + ["chmod 600 /tmp/ospc2flex_origin_key.pem"],
-                           check=True, timeout=15)
+                           check=True, timeout=60)
 
-        with _nbd_staging_lock:
+        with _nbd_staging_cache_lock:
             _nbd_staging_cache[jumphost_ip]["init_done"] = True
     else:
         msgs.append("[STAGE] Init already done (skipped)")
@@ -8620,7 +9374,13 @@ def nbd_run_single():
         return Response("data: [ERROR] jumphost_ip required\n\ndata: [DONE]\n\n",
                         mimetype='text/event-stream')
 
-    label    = __import__('re').sub(r'[^a-zA-Z0-9._-]', '_', str(vm.get('label','vm')).strip())
+    # VM list row name may include spaces and other characters that are valid in
+    # OpenStack/Nova names but unsafe for filesystem paths. Keep both:
+    # - server_name: passed through to scripts as OpenStack server name
+    # - label: safe slug for lock/artifact filenames
+    server_name = str(vm.get('source_server_name') or vm.get('label') or 'vm').strip()
+    source_server_id = str(vm.get('source_server_id') or '').strip()
+    label    = __import__('re').sub(r'[^a-zA-Z0-9._-]', '_', server_name)
     src_ip   = str(vm.get('src_ip','')).strip()
     os_type  = str(vm.get('os_type','ubuntu24')).strip().lower()
     defaults = _NBD_OS_DEFAULTS.get(os_type, _NBD_OS_DEFAULTS.get('ubuntu24', {}))
@@ -8629,14 +9389,34 @@ def nbd_run_single():
     flex_user = str(vm.get('flex_user') or defaults.get('flex_user','ubuntu')).strip()
     vm_ssh_key = str(vm.get('ssh_key') or '').strip()
     worker_ssh_key = vm_ssh_key or "/tmp/ospc2flex_origin_key.pem"
-    vm_password = str(vm.get('password') or '').strip()
+    def _pick_secret(*candidates: object) -> str:
+        for raw in candidates:
+            val = str(raw or '').strip()
+            if not val:
+                continue
+            # Ignore masked placeholders from UI cards.
+            if set(val) <= {'*', '•', '●', '·'}:
+                continue
+            return val
+        return ""
+
+    vm_password = _pick_secret(
+        vm.get('password'),
+        vm.get('admin_password'),
+        vm.get('instance_password'),
+        req.get('windows_admin_password'),
+        req.get('origin_vm_password'),
+        req.get('password'),
+        req.get('vm_password'),
+    )
     vm_password_b64 = base64.b64encode(vm_password.encode()).decode() if vm_password else ""
     nbd_idx   = int(vm.get('nbd_idx', defaults.get('nbd', 0)))
     src_port  = int(vm.get('src_port', defaults.get('src_port', 10811)))
     tun_port  = int(vm.get('tun_port', defaults.get('tun_port', 10821)))
     nbd_dev   = f"/dev/nbd{nbd_idx}"
 
-    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
+    ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30",
+                "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
                 "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}"]
     log_path = f"/tmp/mig_{label}.log"
 
@@ -8652,7 +9432,7 @@ def nbd_run_single():
             "tokens = [t for t in (label, src_ip) if t]\n"
             "image_suffixes = (\n"
             "    '.qcow2', '.qcow2.win_repaired', '.qcow2.repaired', '.qcow2.converted', '.qcow2.image_id',\n"
-            "    '.img', '.img.complete', '.raw', '.vhd', '.vhdx'\n"
+            "    '.img', '.img.complete', '.raw', '.raw.partial', '.vhd', '.vhdx', '.method_g_simple.json', '.method_h_local_kvm.json'\n"
             ")\n"
             "removed = []\n"
             "if os.path.isdir(base):\n"
@@ -8673,27 +9453,115 @@ def nbd_run_single():
             "PY"
         )
 
+    _held_lock: list = [None]  # set inside generate() after acquiring; released in _gen_with_lock_cleanup()
+
     def generate():
-        yield f"data: === NBD Worker: {label} ({os_type}) src={src_ip} nbd={nbd_dev} ===\n\n"
+        repair_method = str(req.get('windows_repair_method') or vm.get('windows_repair_method') or req.get('offline_repair_method') or vm.get('offline_repair_method') or 'windows_method_a').strip().lower()
+        method_g_simple_keys = {'windows_method_g_simple', 'windows_method_g_simple_ssh_dummy_virtio'}
+        method_h_keys = {'windows_method_h_local_kvm'}
+        method_e_keys = {'windows_method_e', 'windows_method_e_b_capture_g_deploy'}
+        method_z_keys = {'windows_method_z_snapshot_existing'}
+        is_method_g_simple = repair_method in method_g_simple_keys
+        is_method_h = repair_method in method_h_keys
+        is_method_e = repair_method in method_e_keys
+        is_method_z = repair_method in method_z_keys
+        if is_method_z:
+            yield f"data: === Method SNAPWIN blocked from live/NBD path: {label} ===\n\n"
+            yield "data: [ERROR] Method SNAPWIN is a standalone cold snapshot method. Select one or more rows in Private OSPC Snapshot Discovery and press Start Method SNAPWIN.\n\n"
+            yield "data: [ERROR] Refusing live VM/NBD launch so no SSH raw capture, Method D, or v2 workflow can run.\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        if is_method_h:
+            yield f"data: === Method H Local KVM: {label} src={src_ip} ===\n\n"
+        elif is_method_g_simple:
+            yield f"data: === Method G Simple: {label} src={src_ip} ===\n\n"
+        elif is_method_e:
+            yield f"data: === Method E B-Capture+G-Deploy: {label} src={src_ip} ===\n\n"
+        else:
+            yield f"data: === NBD Worker: {label} ({os_type}) src={src_ip} nbd={nbd_dev} ===\n\n"
+        if not vm_password:
+            yield "data: [ERROR] Password is required for all runs. Fill the VM row password and retry.\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        # Per-label single-flight guard: reject duplicate concurrent launches for same label.
+        with _label_launch_locks_mu:
+            if label not in _label_launch_locks:
+                _label_launch_locks[label] = threading.Lock()
+            _this_label_lock = _label_launch_locks[label]
+        if not _this_label_lock.acquire(blocking=False):
+            yield f"data: [REMOTE WORKER] Launch already in progress for {label} — ignoring duplicate request.\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        _held_lock[0] = _this_label_lock  # mark held so _gen_with_lock_cleanup() releases it
+
+        if req.get("reset_jumphost_jobs"):
+            _rjo, _rjt = _nbd_jumphost_reset_prior_jobs(ssh_base, jumphost_ip)
+            yield f"data: [STAGE] Jumphost reset before run ({'ok' if _rjo else 'warn'}).\n\n"
 
         # Stage scripts on jumphost — hash-based, only uploads if changed
         try:
-            # Serialize staging so only one thread stages at a time
             with _nbd_staging_lock:
                 _is_first = not _nbd_staging_cache.get(jumphost_ip, {}).get("hash")
-
-            if _is_first:
+            if is_method_h:
+                yield f"data: [REMOTE WORKER] Staging scripts on {jumphost_ip} (Method H)...\n\n"
+            elif is_method_g_simple:
+                yield f"data: [REMOTE WORKER] Staging scripts on {jumphost_ip} (Method G)...\n\n"
+            elif is_method_e:
+                yield f"data: [REMOTE WORKER] Staging scripts on {jumphost_ip} (Method E)...\n\n"
+            elif _is_first:
                 yield f"data: [REMOTE WORKER] Staging scripts on {jumphost_ip}...\n\n"
             else:
                 yield f"data: [REMOTE WORKER] Syncing latest scripts to {jumphost_ip}...\n\n"
 
-            stage_msgs, stage_ok = _stage_scripts_on_jumphost(
-                jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base,
-                ospc_creds=ospc_creds
-            )
+            # Serialize the full SCP/SSH staging burst (concurrent batch jobs share one jumphost).
+            # While we hold the lock, emit heartbeats so the SSE client does not look frozen;
+            # run staging in a thread so this generator can yield every few seconds.
+            _wait_s = 0
+            while True:
+                if _nbd_staging_lock.acquire(timeout=2.0):
+                    break
+                _wait_s += 2
+                yield (
+                    "data: [STAGE] Another job is staging the same jumphost — queued… "
+                    f"{_wait_s}s\n\n"
+                )
+            _st_out: Dict[str, Any] = {}
+
+            def _staging_worker() -> None:
+                try:
+                    _st_out["pair"] = _stage_scripts_on_jumphost(
+                        jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base,
+                        ospc_creds=ospc_creds,
+                    )
+                except Exception as _e:
+                    _st_out["exc"] = _e
+
+            _st_th = threading.Thread(target=_staging_worker, daemon=True)
+            try:
+                _st_th.start()
+                _run_s = 0
+                while _st_th.is_alive():
+                    _st_th.join(timeout=2.0)
+                    if _st_th.is_alive():
+                        _run_s += 2
+                        yield (
+                            "data: [STAGE] Jumphost staging in progress (upload / deps / init)… "
+                            f"{_run_s}s\n\n"
+                        )
+                if _st_out.get("exc") is not None:
+                    raise _st_out["exc"]
+                stage_msgs, stage_ok = _st_out["pair"]
+            finally:
+                _nbd_staging_lock.release()
+
             for msg in stage_msgs:
                 yield f"data: {msg}\n\n"
             if not stage_ok:
+                if is_method_g_simple:
+                    yield "data: [CAPTURE] FAILED JUMPHOST_PREP_FAILED\n\n"
+                elif is_method_e:
+                    yield "data: [E1_SSH_DISK_CAPTURE] FAILED JUMPHOST_PREP_FAILED\n\n"
                 yield "data: [DONE]\n\n"
                 return
             yield f"data: [REMOTE WORKER] Scripts ready ✅\n\n"
@@ -8707,7 +9575,6 @@ def nbd_run_single():
         # the Linux NBD/DD worker cannot safely read Windows guests over SSH.
         _is_windows = any(w in label.lower() for w in ['windows', 'win20', 'win16', 'win10', 'winserv']) \
                       or any(w in os_type.lower() for w in ['windows', 'win'])
-        repair_method = str(req.get('windows_repair_method') or vm.get('windows_repair_method') or req.get('offline_repair_method') or vm.get('offline_repair_method') or 'windows_method_a').strip().lower()
         purge_xen_req = req.get('windows_purge_xen')
         purge_xen_vm = vm.get('windows_purge_xen')
         purge_xen_enabled = str(purge_xen_req if purge_xen_req is not None else purge_xen_vm if purge_xen_vm is not None else True).strip().lower() not in ('0', 'false', 'no', 'off')
@@ -8716,8 +9583,14 @@ def nbd_run_single():
             _nbd_idx = int(vm.get('nbd_idx', 0))
         except Exception:
             _nbd_idx = 0
-        # Reserve low nbd devices for legacy/manual flows; map batch idx -> /dev/nbd5..15.
-        _win_nbd_num = 5 + (_nbd_idx % 11)
+        # Assign a per-label NBD device so concurrent Windows jobs never share one.
+        # Explicit nbd_idx from VM config overrides; otherwise derive from label hash (stable
+        # across relaunches of the same server, unique across different labels).
+        if _nbd_idx:
+            _win_nbd_num = 5 + (_nbd_idx % 11)
+        else:
+            import hashlib as _hl
+            _win_nbd_num = 5 + (int(_hl.md5(label.encode()).hexdigest(), 16) % 11)
         _win_nbd_dev = f"/dev/nbd{_win_nbd_num}"
         mig_flavor = vm.get('flavor', '') or req.get('flex_flavor', '')
         mig_src_vcpus = str(
@@ -8743,7 +9616,14 @@ def nbd_run_single():
         mig_key = req.get('flex_key_name', '')
         try:
             if _is_windows:
-                _force_sync = vm.get('force_sync') == True
+                _force_sync_raw = req.get('force_sync')
+                if _force_sync_raw in (None, ""):
+                    # UI often sends this flag per-VM for batch jobs.
+                    _force_sync_raw = vm.get('force_sync')
+                if _force_sync_raw in (None, ""):
+                    _force_sync = False
+                else:
+                    _force_sync = str(_force_sync_raw).strip().lower() in {'1', 'true', 'yes', 'on'}
                 if _force_sync:
                     try:
                         clean = subprocess.run(ssh_base + [fresh_sync_cleanup_cmd()], capture_output=True, text=True, check=True, timeout=30)
@@ -8754,38 +9634,261 @@ def nbd_run_single():
                     except Exception as e:
                         yield f"data: [WARN] Force Fresh Sync cleanup failed for {label}: {e}\n\n"
 
+                # Default lock ON (single-flight per label on jumphost). Set disable_method_d_lock=1 to allow
+                # concurrent Method G vs H on the same label with workflow-scoped pkill instead of flock.
+                _disable_method_d_lock = str(req.get('disable_method_d_lock') or vm.get('disable_method_d_lock') or '0').strip().lower() in {'1', 'true', 'yes', 'on'}
+                # Preflight dedupe: do not launch a second Method D-style run for the same label
+                # while an active lock/process is present on the jumphost.
+                _lock_path = f"/mnt/migration/ospc2flex_image/locks/{label}.lock"
+                if _disable_method_d_lock:
+                    if not is_method_g_simple:
+                        yield f"data: [REMOTE WORKER] Label lock disabled for {label}; forcing takeover of prior run.\n\n"
+                    # Kill ALL method processes for this label regardless of which method is launching.
+                    # Allowing stale G+H to coexist on the same label corrupts the shared .img file.
+                    _lq = shlex.quote(label)
+                    _lkp = shlex.quote(_lock_path)
+                    _pk_win = (
+                        f"pkill -f '[o]spc2flex_windows_method_d_standalone.sh.*--label {_lq}' 2>/dev/null || true; "
+                        f"pkill -f '[o]spc2flex_windows_method_d_capture.sh.*--label {_lq}' 2>/dev/null || true; "
+                        f"pkill -f '[o]spc2flex_windows_method_g_simple.sh.*--label {_lq}' 2>/dev/null || true; "
+                        f"pkill -f '[o]spc2flex_windows_method_h_local_kvm.sh.*--label {_lq}' 2>/dev/null || true; "
+                        f"pkill -f '[o]spc2flex_windows_method_e.sh.*--label {_lq}' 2>/dev/null || true; "
+                        f"pkill -f '/tmp/ospc2flex_windows_method_d_standalone.sh.*{_lq}' 2>/dev/null || true; "
+                        f"pkill -f '/tmp/ospc2flex_windows_method_d_capture.sh.*{_lq}' 2>/dev/null || true; "
+                        f"pkill -f '/tmp/ospc2flex_windows_method_g_simple.sh.*{_lq}' 2>/dev/null || true; "
+                        f"pkill -f '/tmp/ospc2flex_windows_method_h_local_kvm.sh.*{_lq}' 2>/dev/null || true; "
+                        f"pkill -f '/tmp/ospc2flex_windows_method_e.sh.*{_lq}' 2>/dev/null || true; "
+                        f"rm -f {_lkp} 2>/dev/null || true"
+                    )
+                    subprocess.run(ssh_base + [_pk_win], timeout=120, check=False)
+                else:
+                    _active_check_cmd = (
+                        f"if pgrep -f '[o]spc2flex_windows_method_d_standalone.sh.*--label {shlex.quote(label)}' >/dev/null 2>&1 "
+                        f"|| pgrep -f '[o]spc2flex_windows_method_d_capture.sh.*--label {shlex.quote(label)}' >/dev/null 2>&1 "
+                        f"|| pgrep -f '[o]spc2flex_windows_method_g_simple.sh.*--label {shlex.quote(label)}' >/dev/null 2>&1 "
+                        f"|| pgrep -f '[o]spc2flex_windows_method_h_local_kvm.sh.*--label {shlex.quote(label)}' >/dev/null 2>&1 "
+                        f"|| pgrep -f '[o]spc2flex_windows_method_e.sh.*--label {shlex.quote(label)}' >/dev/null 2>&1; then "
+                        f"echo ACTIVE; "
+                        f"elif [ -f {shlex.quote(_lock_path)} ]; then "
+                        f"if flock -n {shlex.quote(_lock_path)} -c true >/dev/null 2>&1; then "
+                        f"echo STALE_LOCK; else echo ACTIVE_LOCK; fi; "
+                        f"else echo CLEAR; fi"
+                    )
+                    _active_chk = subprocess.run(ssh_base + [_active_check_cmd], capture_output=True, text=True, timeout=60)
+                    _active_state = (_active_chk.stdout or "").strip()
+                    if _active_state in {"ACTIVE", "ACTIVE_LOCK"}:
+                        yield f"data: [REMOTE WORKER] Relaunch requested for {label}; stopping existing active run first.\n\n"
+                        _force_replace_cmd = (
+                            f"pkill -f '[o]spc2flex_windows_method_d_standalone.sh.*--label {shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '[o]spc2flex_windows_method_d_capture.sh.*--label {shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '[o]spc2flex_windows_method_g_simple.sh.*--label {shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '[o]spc2flex_windows_method_h_local_kvm.sh.*--label {shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '[o]spc2flex_windows_method_e.sh.*--label {shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '/tmp/ospc2flex_windows_method_d_standalone.sh.*{shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '/tmp/ospc2flex_windows_method_d_capture.sh.*{shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '/tmp/ospc2flex_windows_method_g_simple.sh.*{shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '/tmp/ospc2flex_windows_method_h_local_kvm.sh.*{shlex.quote(label)}' 2>/dev/null || true; "
+                            f"pkill -f '/tmp/ospc2flex_windows_method_e.sh.*{shlex.quote(label)}' 2>/dev/null || true; "
+                            f"sleep 1; rm -f {shlex.quote(_lock_path)} 2>/dev/null || true; echo REPLACED"
+                        )
+                        subprocess.run(ssh_base + [_force_replace_cmd], timeout=120, check=False)
+                        yield f"data: [REMOTE WORKER] Existing run terminated for {label}; lock cleared: {_lock_path}\n\n"
+                    elif _active_state == "STALE_LOCK":
+                        subprocess.run(ssh_base + [f"rm -f {shlex.quote(_lock_path)}"], timeout=60)
+                        yield f"data: [REMOTE WORKER] Cleared stale lock for {label}: {_lock_path}\n\n"
+
                 # Kill stale workers for this label before launching a fresh Windows migration.
-                kill_stale_cmd = (
-                    f"pkill -f '[o]spc2flex_windows_v2_engine.sh.*{label}' 2>/dev/null || true; "
-                    f"pkill -f '[o]spc2flex_windows_migrate.sh.*{label}' 2>/dev/null || true; "
-                    f"pkill -f '[o]spc2flex_diskdump.ps1' 2>/dev/null || true; "
+                _lqt = shlex.quote(label)
+                _ks_tail = (
+                    f"pkill -f 'ospc2flex_windows_migrate.sh.*--dry-run.*{_lqt}' 2>/dev/null || true; "
+                    f"pkill -f 'wincloudbootmigrator.py.*{_lqt}' 2>/dev/null || true; "
                     f"sleep 1; "
                     f"> {log_path}"
                 )
+                _lqh = shlex.quote(label)
+                _ks_head = (
+                    f"pkill -f '[o]spc2flex_windows_v2_engine.sh.*{_lqh}' 2>/dev/null || true; "
+                    f"pkill -f '[o]spc2flex_windows_migrate.sh.*{_lqh}' 2>/dev/null || true; "
+                    f"pkill -f '/tmp/ospc2flex_windows_v2_engine.sh.*{_lqh}' 2>/dev/null || true; "
+                )
+                if is_method_g_simple:
+                    kill_stale_cmd = (
+                        _ks_head
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_standalone.sh.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_capture.sh.*--workflow-tag method_g_simple.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_g_simple.sh.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_migrate.sh.*{label}' 2>/dev/null || true; "
+                        + _ks_tail
+                    )
+                elif is_method_h:
+                    kill_stale_cmd = (
+                        _ks_head
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_standalone.sh.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_capture.sh.*--workflow-tag method_h_local_kvm.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_h_local_kvm.sh.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_migrate.sh.*{label}' 2>/dev/null || true; "
+                        + _ks_tail
+                    )
+                elif is_method_e:
+                    kill_stale_cmd = (
+                        _ks_head
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_e.sh.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_capture.sh.*--workflow-tag method_e.*{label}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_migrate.sh.*{label}' 2>/dev/null || true; "
+                        + _ks_tail
+                    )
+                else:
+                    _lq2 = shlex.quote(label)
+                    kill_stale_cmd = (
+                        _ks_head
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_standalone.sh.*--label.*{_lq2}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_d_capture.sh.*--label.*{_lq2}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_g_simple.sh.*--label.*{_lq2}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_method_h_local_kvm.sh.*--label.*{_lq2}' 2>/dev/null || true; "
+                        + f"pkill -f '/tmp/ospc2flex_windows_migrate.sh.*{_lq2}' 2>/dev/null || true; "
+                        + _ks_tail
+                    )
                 try:
-                    subprocess.run(ssh_base + [kill_stale_cmd], timeout=15)
+                    subprocess.run(ssh_base + [kill_stale_cmd], timeout=120)
                 except Exception:
                     pass
 
+                if not _disable_method_d_lock:
+                    # Hard gate: do not launch replacement until the Method D lock is
+                    # actually acquirable on jumphost (prevents kill/relaunch race).
+                    _prelaunch_gate_cmd = (
+                        f"if flock -w 25 {shlex.quote(_lock_path)} -c true >/dev/null 2>&1; then "
+                        f"  rm -f {shlex.quote(_lock_path)} 2>/dev/null || true; "
+                        f"  echo READY; "
+                        f"else "
+                        f"  echo BUSY; "
+                        f"fi"
+                    )
+                    _gate_chk = subprocess.run(
+                        ssh_base + [_prelaunch_gate_cmd],
+                        capture_output=True,
+                        text=True,
+                        timeout=35,
+                        check=False,
+                    )
+                    _gate_state = (_gate_chk.stdout or "").strip()
+                    if _gate_state != "READY":
+                        yield f"data: [ERROR] Pre-launch lock gate timed out for {label}; existing run still holds lock.\n\n"
+                        yield f"data: [ERROR] Lock file: {_lock_path}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+                    yield f"data: [REMOTE WORKER] Pre-launch lock gate passed for {label}.\n\n"
+
                 _win_user = src_user or "Administrator"
-                _win_pass = vm_password or str(vm.get('admin_password') or vm.get('instance_password') or '').strip()
+                _win_pass = _pick_secret(
+                    vm_password,
+                    vm.get('admin_password'),
+                    vm.get('instance_password'),
+                    req.get('windows_admin_password'),
+                    req.get('origin_vm_password'),
+                    req.get('password'),
+                    req.get('vm_password'),
+                )
                 _win_snet_ip = str(vm.get('server_snet_ip') or vm.get('snet_ip') or '').strip()
+                # Prefer explicit request/UI values over inventory defaults to avoid stale target compare endpoints.
+                _cb_target_host = str(req.get('cloudboot_target_host') or req.get('target_windows_ip') or vm.get('cloudboot_target_host') or vm.get('target_windows_ip') or '').strip()
+                _cb_target_user = str(req.get('cloudboot_target_user') or vm.get('cloudboot_target_user') or 'Administrator').strip() or 'Administrator'
+                _cb_target_pass = str(req.get('cloudboot_target_password') or req.get('target_windows_password') or vm.get('cloudboot_target_password') or '').strip()
+                _cb_target_key = str(vm.get('cloudboot_target_key') or req.get('cloudboot_target_ssh_key') or req.get('target_windows_ssh_key') or '').strip()
+                _cb_target_winrm = str(req.get('cloudboot_target_winrm_host') or req.get('target_windows_snet_ip') or vm.get('cloudboot_target_winrm_host') or vm.get('target_snet_ip') or '').strip()
+                _cb_force_new_raw = req.get('cloudboot_force_new')
+                if _cb_force_new_raw in (None, ""):
+                    _cb_force_new_raw = vm.get('cloudboot_force_new')
+                _cb_force_new = str(_cb_force_new_raw or '').strip() in {'1', 'true', 'yes', 'on', 'True', 'YES', 'ON'}
+                _src_hypervisor = str(
+                    req.get('source_hypervisor')
+                    or vm.get('source_hypervisor')
+                    or vm.get('hypervisor')
+                    or 'zen'
+                ).strip().lower() or 'zen'
+                _force_direct_virtio = str(req.get('force_direct_virtio_boot') or vm.get('force_direct_virtio_boot') or '').strip() in {'1', 'true', 'yes', 'on', 'True', 'YES', 'ON'}
                 _win_mode = 'offline_only'
-                _win_entry = '/tmp/ospc2flex_windows_migrate.sh'
-                _win_resume_mode = 'off' if _force_sync else 'on'
-                if repair_method == 'windows_method_b_hypervisor':
+                _win_entry = '/tmp/ospc2flex_windows_method_d_capture.sh'
+                _win_resume_mode = 'off' if (_force_sync or _cb_force_new) else 'on'
+                _workflow_mode = 'method_a_offline'
+                if repair_method == 'windows_method_d_safe_ide_boot':
+                    _win_mode = 'two_phase_virtio'
+                    _win_entry = '/tmp/ospc2flex_windows_method_d_standalone.sh'
+                    _workflow_mode = 'method_d'
+                elif repair_method == 'windows_method_f_policy_export':
+                    yield "data: [ERROR] Windows Method F has been removed. Use Method G Simple.\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                elif repair_method in method_g_simple_keys:
+                    _win_mode = 'two_phase_virtio'
+                    _win_entry = '/tmp/ospc2flex_windows_method_g_simple.sh'
+                    _workflow_mode = 'method_g_simple'
+                elif repair_method in method_h_keys:
+                    _win_mode = 'local_kvm_virtio_prep'
+                    _win_entry = '/tmp/ospc2flex_windows_method_h_local_kvm.sh'
+                    _workflow_mode = 'method_h_local_kvm'
+                elif repair_method in method_e_keys:
+                    _win_mode = 'two_phase_virtio'
+                    _win_entry = '/tmp/ospc2flex_windows_method_e.sh'
+                    _workflow_mode = 'method_e'
+                elif repair_method in {'windows_method_b_hypervisor'}:
                     _win_mode = 'two_phase_virtio'
                     _win_entry = '/tmp/ospc2flex_windows_v2_engine.sh'
-                elif repair_method == 'windows_method_a':
+                elif repair_method == 'windows_method_c_dynamic_auto':
                     _win_mode = 'offline_only'
-                    _win_entry = '/tmp/ospc2flex_windows_migrate.sh'
+                    _win_entry = '/tmp/ospc2flex_windows_v2_engine.sh'
+                    _workflow_mode = 'method_c_dynamic_auto'
+
+                # Zen routing (OSPC Zen → FLEX KVM): never first-boot Windows straight on virtio-scsi
+                # unless FORCE_DIRECT_VIRTIO_BOOT=1. Discovery may still report legacy hypervisor_type "xen".
+                _zen_routing = _src_hypervisor in ('zen', 'xen')
+                if _zen_routing and not _force_direct_virtio:
+                    # Keep safe-IDE Method D/G paths on their dedicated engines.
+                    if repair_method == 'windows_method_d_safe_ide_boot':
+                        _win_mode = 'two_phase_virtio'
+                        _win_entry = '/tmp/ospc2flex_windows_method_d_standalone.sh'
+                    elif repair_method in method_g_simple_keys:
+                        _win_mode = 'two_phase_virtio'
+                        _win_entry = '/tmp/ospc2flex_windows_method_g_simple.sh'
+                    elif repair_method in method_h_keys:
+                        _win_mode = 'local_kvm_virtio_prep'
+                        _win_entry = '/tmp/ospc2flex_windows_method_h_local_kvm.sh'
+                    elif repair_method in method_e_keys:
+                        _win_mode = 'two_phase_virtio'
+                        _win_entry = '/tmp/ospc2flex_windows_method_e.sh'
+                    elif repair_method in {'windows_method_a', ''}:
+                        _win_mode = 'two_phase_virtio'
+                        _win_entry = '/tmp/ospc2flex_windows_v2_engine.sh'
+                        _workflow_mode = 'method_a_offline'
+                    elif repair_method == 'windows_method_c_dynamic_auto':
+                        _win_mode = 'two_phase_virtio'
+                        _win_entry = '/tmp/ospc2flex_windows_v2_engine.sh'
+                        _workflow_mode = 'method_c_dynamic_auto'
+                    else:
+                        _win_mode = 'two_phase_virtio'
+                        _win_entry = '/tmp/ospc2flex_windows_v2_engine.sh'
+                _win_entry_name = os.path.basename(_win_entry)
+                _run_prefix = re.sub(r'[^a-zA-Z0-9._-]', '_', label)
+                _private_script_setup = (
+                    f"RUN_DIR=$(mktemp -d /tmp/ospc2flex_run_{shlex.quote(_run_prefix)}.XXXXXX); "
+                    "mkdir -p \"$RUN_DIR/scripts\" \"$RUN_DIR/tmp\"; "
+                    "cp -p /tmp/ospc2flex_*.sh /tmp/mig_worker_v4.sh \"$RUN_DIR/scripts\"/ 2>/dev/null || true; "
+                    "chmod +x \"$RUN_DIR/scripts\"/* 2>/dev/null || true; "
+                )
                 cmd_remote = (
-                    f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
+                    _private_script_setup
+                    + f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
                     f"MIG_SRC_VCPUS={shlex.quote(mig_src_vcpus)} "
                     f"MIG_SRC_RAM_MB={shlex.quote(mig_src_ram_mb)} "
                     f"MIG_SRC_DISK_GB={shlex.quote(mig_src_disk_gb)} "
                     f"OSPC2FLEX_SELF_TEE=0 "
                     f"OSPC2FLEX_WINDOWS_MODE={shlex.quote(_win_mode)} "
+                    f"OSPC2FLEX_WORKFLOW={shlex.quote(_workflow_mode)} "
+                    f"OSPC2FLEX_ALLOW_GUEST_DISK_CAPTURE={shlex.quote(str(req.get('allow_guest_disk_capture', '0')))} "
+                    f"OSPC2FLEX_ALLOW_DISK2VHD={shlex.quote(str(req.get('allow_disk2vhd', '0')))} "
+                    f"OSPC2FLEX_ALLOW_RAW_SSH_CAPTURE={shlex.quote(str(req.get('allow_raw_ssh_capture', '0')))} "
+                    f"OSPC2FLEX_ALLOW_SMB_HTTPS_OBJECT_TRANSFER={shlex.quote(str(req.get('allow_smb_https_object_transfer', '0')))} "
+                    f"OSPC2FLEX_ALLOW_WINDOWS_GLANCE_ONLY={shlex.quote(str(req.get('allow_windows_glance_only', '1')))} "
                     f"OSPC2FLEX_WIN_PURGE_XEN={purge_xen_env} "
                     f"OSPC2FLEX_WIN_NBD_DEV={shlex.quote(_win_nbd_dev)} "
                     f"OSPC2FLEX_VIRTIO_ISO_OFFLINE={shlex.quote(str(req.get('virtio_iso_offline') or '1'))} "
@@ -8793,8 +9896,17 @@ def nbd_run_single():
                     f"OSPC2FLEX_WIN_DISK_BUS=ide "
                     f"OSPC2FLEX_SKIP_BOOT_VALIDATOR=1 "
                     f"OSPC2FLEX_RESUME_MODE={shlex.quote(_win_resume_mode)} "
-                    f"bash {_win_entry} "
-                    f"--server-name {shlex.quote(label)} "
+                    f"OSPC2FLEX_DISABLE_RESUME={'1' if _win_resume_mode == 'off' else '0'} "
+                    f"OSPC2FLEX_FORCE_FRESH_CAPTURE={'1' if _win_resume_mode == 'off' else '0'} "
+                    f"OSPC2FLEX_DISABLE_LABEL_LOCK={'1' if _disable_method_d_lock else '0'} "
+                    f"OSPC2FLEX_RUN_DIR=\"${{RUN_DIR}}\" "
+                    f"OSPC2FLEX_JOB_TMP=\"${{RUN_DIR}}/tmp\" "
+                    f"OSPC2FLEX_WIN_SOURCE_HYPERVISOR={shlex.quote(_src_hypervisor)} "
+                    f"OSPC2FLEX_FORCE_DIRECT_VIRTIO_BOOT={'1' if _force_direct_virtio else '0'} "
+                    f"{('OSPC2FLEX_CLOUDBOOT_FORCE_NEW=1 ') if _cb_force_new else ''}"
+                    f"bash \"${{RUN_DIR}}/scripts/{shlex.quote(_win_entry_name)}\" "
+                    f"{('--source-server-id ' + shlex.quote(source_server_id) + ' ') if source_server_id else ''}"
+                    f"--server-name {shlex.quote(server_name)} "
                     f"--server-ip {shlex.quote(src_ip)} "
                     f"--label {shlex.quote(label)} "
                     f"--os-family windows "
@@ -8802,19 +9914,36 @@ def nbd_run_single():
                     f"--windows-user {shlex.quote(_win_user)} "
                     f"{('--windows-password ' + shlex.quote(_win_pass) + ' ') if _win_pass else ''}"
                     f"{('--server-snet-ip ' + shlex.quote(_win_snet_ip) + ' ') if _win_snet_ip else ''}"
+                    f"{('--cloudboot-target-host ' + shlex.quote(_cb_target_host) + ' ') if _cb_target_host else ''}"
+                    f"{('--cloudboot-target-user ' + shlex.quote(_cb_target_user) + ' ') if _cb_target_host else ''}"
+                    f"{('--cloudboot-target-password ' + shlex.quote(_cb_target_pass) + ' ') if _cb_target_pass else ''}"
+                    f"{('--cloudboot-source-winrm-host ' + shlex.quote(_win_snet_ip) + ' ') if _win_snet_ip else ''}"
+                    f"{('--cloudboot-target-winrm-host ' + shlex.quote(_cb_target_winrm) + ' ') if _cb_target_winrm else ''}"
                     f"{('--flavor ' + shlex.quote(mig_flavor)) if mig_flavor else ''} "
                     f"{('--network ' + shlex.quote(mig_net)) if mig_net else ''} "
                     f"{('--keypair ' + shlex.quote(mig_key)) if mig_key else ''} "
                     f"{('--dry-run ') if req.get('dry_run') else ''}"
                     f"</dev/null >{log_path} 2>&1 &"
                 )
-                subprocess.run(ssh_base + [cmd_remote], check=True, timeout=30)
+                subprocess.run(ssh_base + [cmd_remote], check=True, timeout=120)
                 _launch_mode = "SSH+WinRM" if _win_pass else "Glance-only (no password)"
                 yield f"data: [REMOTE WORKER] Windows VM detected — launch mode: {_launch_mode}\n\n"
                 yield f"data: [REMOTE WORKER] Windows workflow: {_win_mode} ({repair_method or 'default'})\n\n"
-                yield f"data: [REMOTE WORKER] Windows Xen purge: {'enabled' if purge_xen_enabled else 'disabled'}\n\n"
+                yield f"data: [REMOTE WORKER] Windows Zen PV purge (OSPC2FLEX_WIN_PURGE_XEN): {'enabled' if purge_xen_enabled else 'disabled'}\n\n"
                 yield f"data: [REMOTE WORKER] Windows NBD device: {_win_nbd_dev}\n\n"
-                yield f"data: [REMOTE WORKER] Worker launched: {label} (win_user={_win_user} pass={'***' if _win_pass else 'none'})\n\n"
+                yield f"data: [REMOTE WORKER] Worker launched: {label} (win_user={_win_user} pass={'provided' if _win_pass else 'none'})\n\n"
+                if repair_method == 'windows_method_d_safe_ide_boot' and not _win_pass:
+                    yield "data: [ERROR] Windows Method D requires source Windows password for SSH/WinRM disk capture; refusing Glance-only launch.\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                if repair_method in method_g_simple_keys and not _win_pass:
+                    yield "data: [ERROR] Windows Method G Simple requires source Windows password for SSH guest disk capture; refusing launch.\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                if repair_method in method_h_keys and not _win_pass:
+                    yield "data: [ERROR] Windows Method H requires source Windows password for SSH guest disk capture; refusing launch.\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
             else:
                 _force_sync = vm.get('force_sync') == True
                 _force_dd = '1' if vm.get('force_dd') else '0'
@@ -8840,15 +9969,24 @@ def nbd_run_single():
                 except Exception:
                     pass
 
+                _run_prefix = re.sub(r'[^a-zA-Z0-9._-]', '_', label)
+                _private_worker_setup = (
+                    f"RUN_DIR=$(mktemp -d /tmp/ospc2flex_run_{shlex.quote(_run_prefix)}.XXXXXX); "
+                    "mkdir -p \"$RUN_DIR/scripts\" \"$RUN_DIR/tmp\"; "
+                    "cp -p /tmp/mig_worker_v4.sh \"$RUN_DIR/scripts\"/ 2>/dev/null || true; "
+                    "chmod +x \"$RUN_DIR/scripts\"/* 2>/dev/null || true; "
+                )
                 cmd_remote = (
-                    f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
+                    _private_worker_setup
+                    + f"nohup env MIG_FLAVOR={shlex.quote(mig_flavor)} "
                     f"MIG_SRC_VCPUS={shlex.quote(mig_src_vcpus)} "
                     f"MIG_SRC_RAM_MB={shlex.quote(mig_src_ram_mb)} "
                     f"MIG_SRC_DISK_GB={shlex.quote(mig_src_disk_gb)} "
                     f"MIG_NETWORK={shlex.quote(mig_net)} "
                     f"MIG_EXT_NET={shlex.quote(mig_ext)} "
                     f"MIG_KEYPAIR={shlex.quote(mig_key)} "
-                    f"bash /tmp/mig_worker_v4.sh "
+                    f"OSPC2FLEX_RUN_DIR=\"${{RUN_DIR}}\" OSPC2FLEX_JOB_TMP=\"${{RUN_DIR}}/tmp\" "
+                    f"bash \"${{RUN_DIR}}/scripts/mig_worker_v4.sh\" "
                     f"{shlex.quote(label)} {shlex.quote(src_ip)} {shlex.quote(src_user)} "
                     f"{shlex.quote(os_type)} {shlex.quote(flex_user)} "
                     f"{shlex.quote(nbd_dev)} {src_port} {tun_port} "
@@ -8856,7 +9994,7 @@ def nbd_run_single():
                     f"{_force_dd} "
                     f"</dev/null >{log_path} 2>&1 &"
                 )
-                subprocess.run(ssh_base + [cmd_remote], check=True, timeout=30)
+                subprocess.run(ssh_base + [cmd_remote], check=True, timeout=120)
                 yield f"data: [REMOTE WORKER] Worker launched: {label} nbd={nbd_dev} port={src_port}\n\n"
         except Exception as e:
             yield f"data: [SUBPROCESS LAUNCH ERROR: {e}]\n\n"
@@ -8866,11 +10004,15 @@ def nbd_run_single():
         # Stream the log — poll-based sed (same approach, but inline in the response)
         _t.sleep(2)  # give worker time to start writing
         seen_lines = 0
+        log_stat_prev: Optional[Tuple[int, int]] = None
         empty_polls = 0
         max_empty = 3600  # 3600 x 2s = 2hr timeout (qemu-img convert can take 50min+)
         done = False
         while not done and empty_polls < max_empty:
             try:
+                seen_lines, log_stat_prev = _nbd_resync_log_cursor(
+                    ssh_base, log_path, seen_lines, log_stat_prev
+                )
                 result = subprocess.run(
                     ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
                     capture_output=True, text=True, timeout=15, errors='replace'
@@ -8881,8 +10023,29 @@ def nbd_run_single():
                     for line in new_lines:
                         stripped = line.rstrip()
                         if stripped:
+                            if (repair_method not in method_g_simple_keys and repair_method not in method_h_keys) and _is_noisy_percent_progress_line(stripped):
+                                continue
                             yield f"data: {stripped}\n\n"
-                        if any(end in stripped for end in ["SSH OK:", "SSH FAILED", "FAIL_", "=== DONE ==="]):
+                        if repair_method in method_g_simple_keys:
+                            if (
+                                any(marker in stripped for marker in _METHOD_G_STREAM_DONE_MARKERS)
+                                or "=== DONE ===" in stripped
+                                or "][V2] FAIL_" in stripped
+                            ):
+                                done = True
+                                break
+                        elif repair_method in method_h_keys:
+                            if any(marker in stripped for marker in _METHOD_H_STREAM_DONE_MARKERS):
+                                done = True
+                                break
+                        elif repair_method in method_e_keys:
+                            if any(marker in stripped for marker in _METHOD_E_STREAM_DONE_MARKERS):
+                                done = True
+                                break
+                        elif any(
+                            end in stripped
+                            for end in ["SSH OK:", "SSH FAILED", "FAIL_", "=== DONE ==="]
+                        ):
                             done = True
                             break
                     seen_lines += len(new_lines)
@@ -8890,10 +10053,13 @@ def nbd_run_single():
                     empty_polls += 1
                     if empty_polls % 5 == 0:
                         chk = subprocess.run(
-                            ssh_base + [f"(pgrep -f '[m]ig_worker.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_migrate.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_v2_engine.*{label}' >/dev/null 2>&1 || pgrep -f '[q]emu-img.*{label}' >/dev/null 2>&1 || pgrep -f '[o]penstack.*{label}' >/dev/null 2>&1) && echo RUNNING || echo STOPPED"],
+                            ssh_base + [f"(pgrep -f '[m]ig_worker.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_migrate.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_v2_engine.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_d_standalone.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_d_capture.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_g_simple.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_h_local_kvm.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_e.*{label}' >/dev/null 2>&1 || pgrep -f '[q]emu-img.*{label}' >/dev/null 2>&1 || pgrep -f '[v]irt-install.*{label}' >/dev/null 2>&1 || pgrep -f '[o]penstack.*{label}' >/dev/null 2>&1) && echo RUNNING || echo STOPPED"],
                             capture_output=True, text=True, timeout=10, errors='replace'
                         )
                         if "STOPPED" in chk.stdout and seen_lines > 0:
+                            seen_lines, log_stat_prev = _nbd_resync_log_cursor(
+                                ssh_base, log_path, seen_lines, log_stat_prev
+                            )
                             result2 = subprocess.run(
                                 ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
                                 capture_output=True, text=True, timeout=15, errors='replace'
@@ -8915,11 +10081,81 @@ def nbd_run_single():
                     yield f": keepalive {empty_polls}\n\n"
                 _t.sleep(2)
 
-        yield f"data: \n\n"
-        yield f"data: [PROCESS EXITED WITH CODE 0]\n\n"
-        yield "data: [DONE]\n\n"
+        exit_code = 0
+        try:
+            alive_probe = subprocess.run(
+                ssh_base + [f"(pgrep -f '[m]ig_worker.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_migrate.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_v2_engine.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_d_standalone.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_d_capture.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_g_simple.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_h_local_kvm.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_e.*{label}' >/dev/null 2>&1 || pgrep -f '[q]emu-img.*{label}' >/dev/null 2>&1 || pgrep -f '[v]irt-install.*{label}' >/dev/null 2>&1 || pgrep -f '[o]penstack.*{label}' >/dev/null 2>&1) && echo RUNNING || echo STOPPED"],
+                capture_output=True, text=True, timeout=10, errors='replace'
+            )
+            if "RUNNING" in (alive_probe.stdout or ""):
+                exit_code = 124
+            if repair_method in method_g_simple_keys:
+                state_path = f"/mnt/migration/ospc2flex_image/{label}.method_g_simple.json"
+            elif repair_method in method_h_keys:
+                state_path = f"/mnt/migration/ospc2flex_image/{label}.method_h_local_kvm.json"
+            elif repair_method in method_e_keys:
+                state_path = f"/mnt/migration/ospc2flex_image/{label}.method_e.json"
+            if repair_method in method_g_simple_keys or repair_method in method_h_keys or repair_method in method_e_keys:
+                if repair_method in method_h_keys:
+                    success_status = "METHOD_H_SUCCESS"
+                elif repair_method in method_e_keys:
+                    success_status = "METHOD_E_SUCCESS"
+                else:
+                    success_status = "METHOD_G_SIMPLE_SUCCESS"
+                rc_cmd = (
+                    f"python3 - {shlex.quote(state_path)} {shlex.quote(log_path)} <<'PY'\n"
+                    "import json, pathlib, sys\n"
+                    "state = pathlib.Path(sys.argv[1])\n"
+                    "log = pathlib.Path(sys.argv[2])\n"
+                    "if state.is_file():\n"
+                    "    try:\n"
+                    "        doc = json.loads(state.read_text(encoding='utf-8'))\n"
+                    "    except Exception:\n"
+                    "        doc = {}\n"
+                    "    status = str(doc.get('status', ''))\n"
+                    "    final = bool(doc.get('final'))\n"
+                    f"    if status == {success_status!r} and final:\n"
+                    "        print(0)\n"
+                    "    elif status == 'FAILED' or doc.get('failure_reason'):\n"
+                    "        print(1)\n"
+                    "    else:\n"
+                    "        print(124)\n"
+                    "else:\n"
+                    "    text = log.read_text(encoding='utf-8', errors='replace') if log.is_file() else ''\n"
+                    f"    if {success_status!r} in text:\n"
+                    "        print(0)\n"
+                    "    elif 'FAILED' in text or 'FAIL_' in text:\n"
+                    "        print(1)\n"
+                    "    else:\n"
+                    "        print(124)\n"
+                    "PY"
+                )
+            else:
+                rc_cmd = f"if grep -q 'Migration result: FAILED' {log_path} 2>/dev/null || grep -q 'FAIL_' {log_path} 2>/dev/null; then echo 1; else echo 0; fi"
+            rc_probe = subprocess.run(
+                ssh_base + [rc_cmd],
+                capture_output=True, text=True, timeout=10, errors='replace'
+            )
+            if (rc_probe.stdout or "").strip() == "1":
+                exit_code = 1
+            elif (rc_probe.stdout or "").strip() == "124":
+                exit_code = 124
+        except Exception:
+            # Keep previous behavior as fallback if probe fails.
+            exit_code = 0
+            yield f"data: \n\n"
+            yield f"data: [PROCESS EXITED WITH CODE {exit_code}]\n\n"
+            yield "data: [DONE]\n\n"
 
-    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+    def _gen_with_lock_cleanup():
+        try:
+            yield from generate()
+        finally:
+            if _held_lock[0] is not None:
+                _held_lock[0].release()
+                _held_lock[0] = None
+
+    return Response(stream_with_context(_gen_with_lock_cleanup()), mimetype='text/event-stream')
 
 
 @app.get("/api/vm_migrator/nbd/stream")
@@ -8942,18 +10178,22 @@ def nbd_stream():
     except (ValueError, TypeError):
         seen_start = 0
     ssh_base = ["ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
-                "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                "-o", "BatchMode=yes", "-o", "ConnectTimeout=30",
                 f"{jumphost_user}@{jumphost_ip}"]
 
     def generate():
         import time as _t
         yield f"data: === Streaming {label} from {jumphost_ip}:{log_path} (seen={seen_start}) ===\n\n"
         seen_lines = seen_start
+        log_stat_prev: Optional[Tuple[int, int]] = None
         empty_polls = 0
-        max_empty = 900  # 900 x 2s = 30 min timeout — covers qemu-img convert silence
+        max_empty = 3600  # align with run_single — Method G capture can run 2h+
         done = False
         while not done and empty_polls < max_empty:
             try:
+                seen_lines, log_stat_prev = _nbd_resync_log_cursor(
+                    ssh_base, log_path, seen_lines, log_stat_prev
+                )
                 result = subprocess.run(
                     ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
                     capture_output=True, text=True, timeout=15, errors='replace'
@@ -8965,30 +10205,51 @@ def nbd_stream():
                         stripped = line.rstrip()
                         if stripped:
                             yield f"data: {stripped}\n\n"
-                        if "SSH OK:" in stripped or "SSH FAILED" in stripped or "=== DONE ===" in stripped:
+                        _mg_done = (
+                            any(marker in stripped for marker in _METHOD_G_STREAM_DONE_MARKERS)
+                            or any(marker in stripped for marker in _METHOD_E_STREAM_DONE_MARKERS)
+                            or "=== DONE ===" in stripped
+                            or "][V2] FAIL_" in stripped
+                        )
+                        if (
+                            "SSH OK:" in stripped
+                            or "SSH FAILED" in stripped
+                            or "=== DONE ===" in stripped
+                            or _mg_done
+                        ):
                             done = True
                             break
                     seen_lines += len(new_lines)
-                    # Emit seen_lines as SSE comment so client can resume on reconnect
-                    yield f": seen={seen_lines}\n\n"
+                    # Emit seen_lines as normal data for EventSource clients.
+                    yield f"data: [SEEN] {seen_lines}\n\n"
                 else:
                     empty_polls += 1
                     # Check if worker process is still running
                     if empty_polls % 5 == 0:
                         chk = subprocess.run(
-                            ssh_base + [f"(pgrep -f '[m]ig_worker.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_migrate.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_v2_engine.*{label}' >/dev/null 2>&1 || pgrep -f '[q]emu-img.*{label}' >/dev/null 2>&1 || pgrep -f '[o]penstack.*{label}' >/dev/null 2>&1) && echo RUNNING || echo STOPPED"],
+                            ssh_base + [f"(pgrep -f '[m]ig_worker.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_migrate.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_v2_engine.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_d_standalone.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_d_capture.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_g_simple.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_h_local_kvm.*{label}' >/dev/null 2>&1 || pgrep -f '[o]spc2flex_windows_method_e.*{label}' >/dev/null 2>&1 || pgrep -f '[q]emu-img.*{label}' >/dev/null 2>&1 || pgrep -f '[v]irt-install.*{label}' >/dev/null 2>&1 || pgrep -f '[o]penstack.*{label}' >/dev/null 2>&1) && echo RUNNING || echo STOPPED"],
                             capture_output=True, text=True, timeout=10, errors='replace'
                         )
                         if "STOPPED" in chk.stdout and seen_lines > 0:
                             # Worker done, flush remaining
+                            seen_lines, log_stat_prev = _nbd_resync_log_cursor(
+                                ssh_base, log_path, seen_lines, log_stat_prev
+                            )
                             result2 = subprocess.run(
                                 ssh_base + [f"sed -n '{seen_lines + 1},$p' {log_path} 2>/dev/null"],
                                 capture_output=True, text=True, timeout=15, errors='replace'
                             )
-                            for line in (result2.stdout.rstrip('\n').split('\n') if result2.stdout.strip() else []):
+                            extra_lines = (
+                                result2.stdout.rstrip("\n").split("\n")
+                                if result2.stdout.strip()
+                                else []
+                            )
+                            for line in extra_lines:
                                 stripped = line.rstrip()
                                 if stripped:
                                     yield f"data: {stripped}\n\n"
+                            seen_lines += len(extra_lines)
+                            yield f"data: [SEEN] {seen_lines}\n\n"
                             done = True
                             break
             except subprocess.TimeoutExpired:
@@ -9056,6 +10317,68 @@ for f in /mnt/migration/ospc2flex_image/*.qcow2.image_id; do
   mt=$(stat -c%Y "$f" 2>/dev/null || echo 0)
   echo "${base}|${image_id}|${size}|${mt}"
 done
+echo '---METHOD_E---'
+for f in /mnt/migration/ospc2flex_image/*.method_e.json; do
+  [ -f "$f" ] || continue
+  base=$(basename "$f")
+  mt=$(stat -c%Y "$f" 2>/dev/null || echo 0)
+  payload=$(python3 - "$f" <<'PY'
+import json, sys
+try:
+    doc = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("")
+    raise SystemExit(0)
+cp = doc.get("checkpoints", {}) or {}
+parts = [
+    str(doc.get("status", "")),
+    str(doc.get("stage", "")),
+    str(cp.get("ssh_capture", "PENDING")),
+    str(cp.get("artifact_validated", "PENDING")),
+    str(cp.get("windows_repaired", "PENDING")),
+    str(cp.get("safe_rescue_boot", "PENDING")),
+    str(cp.get("dummy_virtio_attached", "PENDING")),
+    str(cp.get("online_virtio_bound", "PENDING")),
+    str(cp.get("final_boot_validated", "PENDING")),
+    str(doc.get("failure_reason", "")),
+    str(doc.get("next_action", "")),
+]
+print("||".join(p.replace("|", "/") for p in parts))
+PY
+)
+  echo "${base}|${mt}|${payload}"
+done
+echo '---METHOD_G_SIMPLE---'
+for f in /mnt/migration/ospc2flex_image/*.method_g_simple.json; do
+  [ -f "$f" ] || continue
+  base=$(basename "$f")
+  mt=$(stat -c%Y "$f" 2>/dev/null || echo 0)
+  payload=$(python3 - "$f" <<'PY'
+import json, sys
+try:
+    doc = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("")
+    raise SystemExit(0)
+cp = doc.get("checkpoints", {}) or {}
+parts = [
+    str(doc.get("status", "")),
+    str(doc.get("stage", "")),
+    str(cp.get("ssh_capture", "PENDING")),
+    str(cp.get("artifact_validated", "PENDING")),
+    str(cp.get("windows_repaired", "PENDING")),
+    str(cp.get("safe_rescue_boot", "PENDING")),
+    str(cp.get("dummy_virtio_attached", "PENDING")),
+    str(cp.get("online_virtio_bound", "PENDING")),
+    str(cp.get("final_boot_validated", "PENDING")),
+    str(doc.get("failure_reason", "")),
+    str(doc.get("next_action", "")),
+]
+print("||".join(p.replace("|", "/") for p in parts))
+PY
+)
+  echo "${base}|${mt}|${payload}"
+done
 """
         out = subprocess.check_output(ssh_base + [remote_script], timeout=20, text=True)
 
@@ -9063,7 +10386,7 @@ done
         import re
         res = {
             "sys": None, "disk": None, "timestamp": int(time.time()),
-            "jobs": {}, "images": {}
+            "jobs": {}, "images": {}, "method_g": {}, "method_g_simple": {}, "method_e": {}
         }
 
         def normalize_mig_label(name: str) -> str:
@@ -9160,7 +10483,97 @@ done
                 if log_lines:
                     res["jobs"][lbl]["lines"] = log_lines[-20:]
                     last_blob = "\n".join(log_lines[-8:])
-                    if "PROCESS EXITED WITH CODE 0" in last_blob or "=== DONE ===" in last_blob or "SSH OK" in last_blob:
+                    if ("WINDOWS_SYSTEM_HIVE_INVALID" in last_blob or
+                        "WINDOWS_SYSTEM_HIVE_CORRUPTED" in last_blob or
+                        "WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED" in last_blob or
+                        "failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED" in last_blob or
+                        "SYSTEM hive validation failed" in last_blob or
+                        "Operation not supported" in last_blob or
+                        "0xc0000225" in last_blob or
+                        "\\Windows\\system32\\config\\system" in last_blob):
+                        res["jobs"][lbl]["status"] = "Failed"
+                        res["jobs"][lbl]["lines"].append(
+                            "WINDOWS_SYSTEM_HIVE_INVALID: SYSTEM registry hive is corrupted (failure_reason=WINDOWS_SYSTEM_REGISTRY_HIVE_CORRUPTED). Next action: Use fresh source export or restore SYSTEM hive backup."
+                        )
+                    elif ("SOURCE_DISK_ACQUISITION_BLOCKED" in last_blob or
+                          "NO_APPROVED_DISK_EXPORT_PATH" in last_blob or
+                          "METHOD_F_SOURCE_DISK_ACQUISITION_BLOCKED" in last_blob):
+                        res["jobs"][lbl]["status"] = "Failed"
+                        res["jobs"][lbl]["lines"].append(
+                            "Source disk acquisition blocked. OSPC snapshot/export is not permitted and guest-side disk capture is disabled by policy. Request provider-assisted export or use rebuild + app/data migration."
+                        )
+                    elif ("METHOD_G_PREFLIGHT" in last_blob or
+                          "METHOD_G_SOURCE_DISCOVERY" in last_blob or
+                          "METHOD_G_HANDOFF_TO_METHOD_D" in last_blob or
+                          "METHOD_G_SUCCESS" in last_blob):
+                        if "METHOD_G_SUCCESS" in last_blob:
+                            res["jobs"][lbl]["status"] = "Success"
+                        else:
+                            res["jobs"][lbl]["status"] = "Running"
+                    elif "METHOD_G_SIMPLE_SUCCESS" in last_blob:
+                        res["jobs"][lbl]["status"] = "Complete"
+                        res["jobs"][lbl]["converted"] = True
+                    elif "METHOD_E_SUCCESS" in last_blob:
+                        res["jobs"][lbl]["status"] = "Complete"
+                        res["jobs"][lbl]["converted"] = True
+                    elif "[E" in last_blob and "FAILED" in last_blob:
+                        res["jobs"][lbl]["status"] = "Failed"
+                    elif "[G" in last_blob and "FAILED" in last_blob:
+                        res["jobs"][lbl]["status"] = "Failed"
+                    elif ("WINDOWS_OPENSSH_INSTALL_DENIED" in last_blob or
+                          "WINRM_AUTH_OK_BUT_OPENSSH_INSTALL_DENIED" in last_blob or
+                          "WINRM_AUTH_OK_BUT_SSH_UNAVAILABLE" in last_blob or
+                          "WINDOWS_BULK_TRANSFER_REQUIRED" in last_blob):
+                        res["jobs"][lbl]["status"] = "Failed"
+                        res["jobs"][lbl]["lines"].append(
+                            "Credential valid. WinRM reachable. SSH unavailable because OpenSSH Server is not installed and remote installation was denied. Use WinRM-agent capture, configure SMB/HTTPS/object upload, or manually install OpenSSH from elevated Windows console/RDP."
+                        )
+                    elif ("WINDOWS_WINRM_AUTH_OK" in last_blob and "WINDOWS_SSH_BLOCKED" in last_blob and
+                          "WINDOWS_OPENSSH_NOT_INSTALLED" in last_blob):
+                        res["jobs"][lbl]["status"] = "Failed"
+                        res["jobs"][lbl]["lines"].append(
+                            "Credential valid. WinRM reachable. SSH unavailable because OpenSSH Server is not installed and remote install was denied."
+                        )
+                    elif "WINDOWS_PASSWORD_MISSING" in last_blob:
+                        res["jobs"][lbl]["status"] = "Failed"
+                        res["jobs"][lbl]["lines"].append(
+                            "Windows source password is required for SSH/WinRM source-access preflight."
+                        )
+                    elif "WINDOWS_WINRM_AUTH_FAILED" in last_blob and "WINDOWS_SSH_BLOCKED" in last_blob:
+                        res["jobs"][lbl]["status"] = "Failed"
+                        res["jobs"][lbl]["lines"].append(
+                            "Windows source access blocked: WinRM authentication failed and SSH is unavailable."
+                        )
+                    elif "WINDOWS_V2_GUEST_UNREACHABLE" in last_blob or "GUEST_UNREACHABLE" in last_blob:
+                        res["jobs"][lbl]["status"] = "Failed"
+                    elif "WINDOWS_V2_RESCUE_READY" in last_blob or "RESCUE_READY" in last_blob:
+                        res["jobs"][lbl]["status"] = "In Progress"
+                    elif "WINDOWS_V2_SUCCESS" in last_blob:
+                        res["jobs"][lbl]["status"] = "Complete"
+                        res["jobs"][lbl]["converted"] = True
+                    elif (
+                        lbl in res.get("method_g_simple", {})
+                        and str((res.get("method_g_simple", {}).get(lbl, {}) or {}).get("status", "")).upper() == "FAILED"
+                    ):
+                        res["jobs"][lbl]["status"] = "Failed"
+                    elif (
+                        lbl in res.get("method_g_simple", {})
+                        and str((res.get("method_g_simple", {}).get(lbl, {}) or {}).get("status", "")).upper() == "METHOD_G_SIMPLE_SUCCESS"
+                    ):
+                        res["jobs"][lbl]["status"] = "Complete"
+                        res["jobs"][lbl]["converted"] = True
+                    elif (
+                        lbl in res.get("method_e", {})
+                        and str((res.get("method_e", {}).get(lbl, {}) or {}).get("status", "")).upper() == "FAILED"
+                    ):
+                        res["jobs"][lbl]["status"] = "Failed"
+                    elif (
+                        lbl in res.get("method_e", {})
+                        and str((res.get("method_e", {}).get(lbl, {}) or {}).get("status", "")).upper() == "METHOD_E_SUCCESS"
+                    ):
+                        res["jobs"][lbl]["status"] = "Complete"
+                        res["jobs"][lbl]["converted"] = True
+                    elif "PROCESS EXITED WITH CODE 0" in last_blob or "=== DONE ===" in last_blob or "SSH OK" in last_blob:
                         res["jobs"][lbl]["status"] = "Complete"
                         res["jobs"][lbl]["converted"] = True
                     elif "PROCESS EXITED WITH CODE" in last_blob or "ERROR" in last_blob or "FAIL_" in last_blob:
@@ -9188,10 +10601,203 @@ done
                     "sizeBytes": size_bytes,
                     "mtime": mtime,
                 }
+            elif section == 'METHOD_G':
+                parts = line.split('|', 2)
+                if len(parts) < 3:
+                    continue
+                fname, mt_str, payload = parts[0], parts[1], parts[2]
+                label = normalize_mig_label(fname)
+                p = payload.split('||')
+                while len(p) < 10:
+                    p.append("")
+                try:
+                    mtime = int(mt_str)
+                except (ValueError, TypeError):
+                    mtime = 0
+                res["method_g"][label] = {
+                    "status": p[0] or "",
+                    "stage": p[1] or "",
+                    "checkpoints": {
+                        "source_disk_acquired": p[2] or "PENDING",
+                        "safe_first_boot": p[3] or "PENDING",
+                        "dummy_virtio_attached": p[4] or "PENDING",
+                        "online_virtio_binding": p[5] or "PENDING",
+                        "virtio_ready_snapshot": p[6] or "PENDING",
+                        "final_optimized_boot": p[7] or "PENDING",
+                    },
+                    "failure_reason": p[8] or "",
+                    "next_action": p[9] or "",
+                    "mtime": mtime,
+                }
+            elif section == 'METHOD_G_SIMPLE':
+                parts = line.split('|', 2)
+                if len(parts) < 3:
+                    continue
+                fname, mt_str, payload = parts[0], parts[1], parts[2]
+                label = normalize_mig_label(fname)
+                p = payload.split('||')
+                while len(p) < 11:
+                    p.append("")
+                try:
+                    mtime = int(mt_str)
+                except (ValueError, TypeError):
+                    mtime = 0
+                _cp_ssh = (p[2] or "PENDING").upper()
+                _cp_artifact = (p[3] or "PENDING").upper()
+                _cp_repair = (p[4] or "PENDING").upper()
+                _cp_safe_boot = (p[5] or "PENDING").upper()
+                _cp_dummy = (p[6] or "PENDING").upper()
+                _cp_bound = (p[7] or "PENDING").upper()
+                _cp_final = (p[8] or "PENDING").upper()
+                _allowed = {"PENDING", "HIT", "FAILED"}
+                if _cp_ssh not in _allowed: _cp_ssh = "PENDING"
+                if _cp_artifact not in _allowed: _cp_artifact = "PENDING"
+                if _cp_repair not in _allowed: _cp_repair = "PENDING"
+                if _cp_safe_boot not in _allowed: _cp_safe_boot = "PENDING"
+                if _cp_dummy not in _allowed: _cp_dummy = "PENDING"
+                if _cp_bound not in _allowed: _cp_bound = "PENDING"
+                if _cp_final not in _allowed: _cp_final = "PENDING"
+                res["method_g_simple"][label] = {
+                    "status": p[0] or "",
+                    "stage": p[1] or "",
+                    "checkpoints": {
+                        "ssh_capture": _cp_ssh,
+                        "artifact_validated": _cp_artifact,
+                        "windows_repaired": _cp_repair,
+                        "safe_rescue_boot": _cp_safe_boot,
+                        "dummy_virtio_attached": _cp_dummy,
+                        "online_virtio_bound": _cp_bound,
+                        "final_boot_validated": _cp_final,
+                    },
+                    "failure_reason": p[9] or "",
+                    "next_action": p[10] or "",
+                    "mtime": mtime,
+                }
+            elif section == 'METHOD_E':
+                parts = line.split('|', 2)
+                if len(parts) < 3:
+                    continue
+                fname, mt_str, payload = parts[0], parts[1], parts[2]
+                label = normalize_mig_label(fname)
+                p = payload.split('||')
+                while len(p) < 11:
+                    p.append("")
+                try:
+                    mtime = int(mt_str)
+                except (ValueError, TypeError):
+                    mtime = 0
+                _cp_ssh = (p[2] or "PENDING").upper()
+                _cp_artifact = (p[3] or "PENDING").upper()
+                _cp_repair = (p[4] or "PENDING").upper()
+                _cp_safe_boot = (p[5] or "PENDING").upper()
+                _cp_dummy = (p[6] or "PENDING").upper()
+                _cp_bound = (p[7] or "PENDING").upper()
+                _cp_final = (p[8] or "PENDING").upper()
+                _allowed = {"PENDING", "HIT", "FAILED"}
+                if _cp_ssh not in _allowed: _cp_ssh = "PENDING"
+                if _cp_artifact not in _allowed: _cp_artifact = "PENDING"
+                if _cp_repair not in _allowed: _cp_repair = "PENDING"
+                if _cp_safe_boot not in _allowed: _cp_safe_boot = "PENDING"
+                if _cp_dummy not in _allowed: _cp_dummy = "PENDING"
+                if _cp_bound not in _allowed: _cp_bound = "PENDING"
+                if _cp_final not in _allowed: _cp_final = "PENDING"
+                res["method_e"][label] = {
+                    "status": p[0] or "",
+                    "stage": p[1] or "",
+                    "checkpoints": {
+                        "ssh_capture": _cp_ssh,
+                        "artifact_validated": _cp_artifact,
+                        "windows_repaired": _cp_repair,
+                        "safe_rescue_boot": _cp_safe_boot,
+                        "dummy_virtio_attached": _cp_dummy,
+                        "online_virtio_bound": _cp_bound,
+                        "final_boot_validated": _cp_final,
+                    },
+                    "failure_reason": p[9] or "",
+                    "next_action": p[10] or "",
+                    "mtime": mtime,
+                }
 
         return jsonify(res)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.post("/api/vm_migrator/nbd/reset_jobs")
+def nbd_reset_jobs():
+    """No-op batch reset.
+
+    Do not kill jumphost migration processes here. This endpoint is called before
+    each dashboard batch, and broad pkill here can terminate unrelated parallel
+    jobs. Per-VM cleanup is handled later and scoped to that VM label.
+    """
+    req = request.get_json(force=True, silent=True) or {}
+    jumphost_ip   = (req.get("jumphost_ip") or "").strip()
+    if not jumphost_ip:
+        return jsonify({"error": "jumphost_ip required"}), 400
+    return jsonify({
+        "ok": True,
+        "output": "Skipped global jumphost reset; no running jobs were killed.",
+        "no_kill": True,
+    })
+
+
+@app.post("/api/vm_migrator/nbd/restage")
+def nbd_restage():
+    """Force re-upload of ALL migration scripts to the jumphost, bypassing the mtime/hash cache.
+
+    Clears the local in-memory bundle cache (keeping init_done so apt/key steps are not re-run)
+    and removes the remote sha256 sentinel so the next staging call re-uploads everything.
+    Optionally runs the full staging immediately if flex_creds are supplied.
+    """
+    req = request.get_json(force=True, silent=True) or {}
+    jumphost_ip   = (req.get("jumphost_ip") or "").strip()
+    jumphost_user = (req.get("jumphost_user") or "ubuntu").strip()
+    ssh_key       = os.path.expanduser((req.get("ssh_key_path") or "~/.ssh/id_rsa").strip())
+    flex_creds    = req.get("flex_creds") or {}
+    ospc_creds    = req.get("ospc_creds") or {}
+
+    if not jumphost_ip:
+        return jsonify({"error": "jumphost_ip required"}), 400
+
+    ssh_base = [
+        "ssh", "-q", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30",
+        "-o", "ControlMaster=auto", "-o", "ControlPath=/tmp/ssh-%r@%h:%p", "-o", "ControlPersist=30m",
+        "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+        "-o", "BatchMode=yes", f"{jumphost_user}@{jumphost_ip}",
+    ]
+
+    # 1. Clear local cache entries that control the fast-path (keep init_done to skip apt/key re-run)
+    with _nbd_staging_cache_lock:
+        entry = _nbd_staging_cache.get(jumphost_ip, {})
+        preserved_init = entry.get("init_done", False)
+        _nbd_staging_cache[jumphost_ip] = {"init_done": preserved_init}
+
+    # 2. Delete the remote sha256 sentinel so the remote hash probe returns empty
+    try:
+        subprocess.run(
+            ssh_base + ["rm -f /tmp/ospc2flex_script_bundle.sha256 && echo sha256_cleared"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Could not clear remote sha256: {e}"}), 500
+
+    # 3. If flex_creds supplied, run staging immediately so the caller sees the upload result
+    if flex_creds:
+        try:
+            msgs, ok = _stage_scripts_on_jumphost(
+                jumphost_ip, jumphost_user, ssh_key, flex_creds, ssh_base,
+                ospc_creds=ospc_creds,
+            )
+            return jsonify({"ok": ok, "messages": msgs})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e), "messages": [f"[RESTAGE ERROR] {e}"]}), 500
+
+    return jsonify({"ok": True, "messages": [
+        f"[RESTAGE] Local cache cleared for {jumphost_ip} (init_done={preserved_init}).",
+        "[RESTAGE] Remote sha256 sentinel removed.",
+        "[RESTAGE] Next run_single call will re-upload all scripts.",
+    ]})
 
 
 @app.post("/api/vm_migrator/nbd/stop")
@@ -10788,35 +12394,6 @@ def download_report_file(filename):
     if os.path.exists(safe_path) and safe_path.startswith(base_dir):
         return send_file(safe_path, as_attachment=True)
     return jsonify({"error": "File not found"}), 404
-
-@app.get("/api/coder-drinks")
-def api_coder_drinks():
-    """Top-10 most-liked drinks by coders — queried live from pocdb on 104.130.169.61."""
-    try:
-        result = subprocess.run(
-            [
-                "ssh", "-i", "/root/.ssh/id_rsa",
-                "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
-                "-o", "ConnectTimeout=10",
-                "root@104.130.169.61",
-                "sudo -u postgres psql -d pocdb -t -A -F'|' -c "
-                "\"SELECT emoji, drink, category, likes FROM coder_drinks ORDER BY likes DESC LIMIT 10;\""
-            ],
-            capture_output=True, text=True, timeout=20
-        )
-        rows = []
-        for line in result.stdout.strip().splitlines():
-            parts = line.split("|")
-            if len(parts) == 4:
-                rows.append({
-                    "emoji": parts[0].strip(),
-                    "drink": parts[1].strip(),
-                    "category": parts[2].strip(),
-                    "likes": int(parts[3].strip()),
-                })
-        return jsonify({"ok": True, "rows": rows})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

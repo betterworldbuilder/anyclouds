@@ -447,10 +447,10 @@
                 <input type="hidden" id="process_ssh_user" name="process_ssh_user" value="{{ default_jh_user }}">
                 <input type="hidden" id="process_ssh_key" name="process_ssh_key" value="{{ default_jh_key }}">
 
-                <!-- JUMPHOST CONNECTION — Per-Region -->
+                <!-- JUMPHOST CONNECTION — region picker + single SSH target (no multi-row summary table) -->
                 <div class="config-group" style="margin-top: 16px;">
                     <div class="group-header">
-                        <h3>🖥 Jumphost Connection <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:8px;">Per-Region Configuration</span></h3>
+                        <h3>🖥 Jumphost Connection <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:8px;">SSH target for NBD / Windows migration</span></h3>
                         <label class="toggle-switch accent-blue">
                             <input type="checkbox" checked onchange="document.getElementById('jumphost-fields').classList.toggle('collapsed')">
                             <span class="slider"></span>
@@ -485,8 +485,9 @@
 
                         <div class="form-grid">
                             <div class="form-control">
-                                <label for="nbd_jumphost_ip">Jumphost IP</label>
-                                <input type="text" id="nbd_jumphost_ip" placeholder="e.g. 104.239.169.89" value="{{ default_jh_ip }}" oninput="document.getElementById('process_host_ip').value=this.value; window._jhSaveField('ip', this.value);">
+                                <label for="nbd_jumphost_ip">Jumphost IP or hostname</label>
+                                <input type="text" id="nbd_jumphost_ip" placeholder="e.g. 104.239.169.89" value="{{ default_jh_ip }}" autocomplete="off" spellcheck="false"
+                                    oninput="window._jhOnJumphostIpInput(this);">
                             </div>
                             <div class="form-control">
                                 <label for="nbd_jumphost_user">SSH User</label>
@@ -497,22 +498,7 @@
                                 <input type="text" id="nbd_jumphost_key" placeholder="~/.ssh/id_rsa" value="{{ default_jh_key }}" oninput="document.getElementById('process_ssh_key').value=this.value; window._jhSaveField('key', this.value);">
                             </div>
                         </div>
-
-                        <!-- Per-region config summary table -->
-                        <div style="margin-top:14px;border:1px solid #1e293b;border-radius:8px;overflow:hidden;">
-                            <table style="width:100%;border-collapse:collapse;font-size:11px;">
-                                <thead>
-                                    <tr style="background:#0f172a;">
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Region</th>
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Jumphost IP</th>
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">SSH User</th>
-                                        <th style="padding:6px 10px;text-align:left;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Key Path</th>
-                                        <th style="padding:6px 10px;text-align:center;color:#64748b;font-weight:600;border-bottom:1px solid #1e293b;">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="jh-region-table-body"></tbody>
-                            </table>
-                        </div>
+                        <p style="margin:10px 0 0 0;font-size:11px;color:#64748b;line-height:1.4;">IPv4 or DNS name only — no spaces, no pasted workflow docs. Each OSPC region can remember its own jumphost when you switch the dropdown above.</p>
                     </div>
                 </div>
 
@@ -524,16 +510,46 @@
                     const defaultUser = '{{ default_jh_user }}' || 'ubuntu';
                     const defaultKey = '{{ default_jh_key }}' || '~/.ssh/id_rsa';
 
+                    function _jhSanitizeIp(raw) {
+                        const s = String(raw || '').trim();
+                        if (!s) return '';
+                        if (/[\n\r\t]/.test(s)) return '';
+                        if (/Method G|Success output|Golden rule|Simple flow|Even simpler|virtio-scsi boot|Stage\s+Name|Capture\s+SSH|one-line definition/i.test(s)) return '';
+                        if (/→| — /.test(s)) return '';
+                        if (/\s/.test(s)) return '';
+                        if (s.length > 253) return '';
+                        if (/^(?:(?:25[0-5]|2[0-4]\d|1?\d{1,2})\.){3}(?:25[0-5]|2[0-4]\d|1?\d{1,2})$/.test(s)) return s;
+                        if (/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(s)) return s.toLowerCase();
+                        return '';
+                    }
+                    window._jhSanitizeJumphostHostInput = _jhSanitizeIp;
+
                     function loadConfigs() {
                         try {
                             const raw = localStorage.getItem(STORAGE_KEY);
-                            if (raw) return JSON.parse(raw);
+                            if (raw) {
+                                const parsed = JSON.parse(raw);
+                                let dirty = false;
+                                REGIONS.forEach(function(r) {
+                                    if (!parsed[r]) return;
+                                    const ip0 = parsed[r].ip;
+                                    if (ip0 == null) return;
+                                    const clean = _jhSanitizeIp(ip0);
+                                    if (clean !== String(ip0).trim()) {
+                                        parsed[r].ip = clean;
+                                        dirty = true;
+                                    }
+                                });
+                                if (dirty) {
+                                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed)); } catch(e2) {}
+                                }
+                                return parsed;
+                            }
                         } catch(e) {}
-                        // Initialize with defaults — only first region gets the server-side default IP
                         const configs = {};
-                        REGIONS.forEach((r, i) => {
+                        REGIONS.forEach(function(r, i) {
                             configs[r] = {
-                                ip: i === 0 ? defaultIp : '',
+                                ip: i === 0 ? _jhSanitizeIp(defaultIp) : '',
                                 user: defaultUser,
                                 key: defaultKey
                             };
@@ -552,36 +568,26 @@
                         const ipEl = document.getElementById('nbd_jumphost_ip');
                         const userEl = document.getElementById('nbd_jumphost_user');
                         const keyEl = document.getElementById('nbd_jumphost_key');
-                        if (ipEl)   { ipEl.value = cfg.ip;   document.getElementById('process_host_ip').value = cfg.ip; }
+                        const safeIp = _jhSanitizeIp(cfg.ip);
+                        if (safeIp !== cfg.ip) {
+                            cfg.ip = safeIp;
+                            configs[region] = cfg;
+                            saveConfigs(configs);
+                        }
+                        if (ipEl)   { ipEl.value = safeIp; document.getElementById('process_host_ip').value = safeIp; }
                         if (userEl) { userEl.value = cfg.user; document.getElementById('process_ssh_user').value = cfg.user; }
                         if (keyEl)  { keyEl.value = cfg.key;  document.getElementById('process_ssh_key').value = cfg.key; }
                         const status = document.getElementById('jh-region-status');
-                        if (status) status.textContent = cfg.ip ? `✅ ${region} jumphost loaded` : `⚠ ${region} — no IP configured`;
-                        renderTable(region);
+                        if (status) status.textContent = safeIp ? ('✅ ' + region + ' jumphost: ' + safeIp) : ('⚠ ' + region + ' — enter jumphost IP');
                     }
 
-                    function renderTable(activeRegion) {
-                        const tbody = document.getElementById('jh-region-table-body');
-                        if (!tbody) return;
-                        let html = '';
-                        REGIONS.forEach(r => {
-                            const cfg = configs[r] || {};
-                            const isActive = r === activeRegion;
-                            const hasIp = !!(cfg.ip && cfg.ip.trim());
-                            const rowBg = isActive ? 'background:rgba(59,130,246,0.12);' : '';
-                            const statusIcon = hasIp ? '<span style="color:#4ade80;">✅</span>' : '<span style="color:#475569;">—</span>';
-                            const regionColor = isActive ? '#60a5fa' : '#94a3b8';
-                            const ipColor = hasIp ? '#e2e8f0' : '#475569';
-                            html += `<tr style="${rowBg}border-bottom:1px solid #1e293b;cursor:pointer;" onclick="document.getElementById('jh_region_select').value='${r}'; window._jhSelectRegion('${r}');" title="Click to switch to ${r}">`;
-                            html += `<td style="padding:5px 10px;color:${regionColor};font-weight:${isActive?'700':'400'};">${isActive ? '▸ ' : ''}${r}</td>`;
-                            html += `<td style="padding:5px 10px;color:${ipColor};font-family:monospace;font-size:11px;">${cfg.ip || '—'}</td>`;
-                            html += `<td style="padding:5px 10px;color:#94a3b8;">${cfg.user || '—'}</td>`;
-                            html += `<td style="padding:5px 10px;color:#94a3b8;font-family:monospace;font-size:10px;">${cfg.key || '—'}</td>`;
-                            html += `<td style="padding:5px 10px;text-align:center;">${statusIcon}</td>`;
-                            html += '</tr>';
-                        });
-                        tbody.innerHTML = html;
-                    }
+                    window._jhOnJumphostIpInput = function(el) {
+                        const clean = _jhSanitizeIp(el.value);
+                        if (clean !== el.value) el.value = clean;
+                        const ph = document.getElementById('process_host_ip');
+                        if (ph) ph.value = clean;
+                        window._jhSaveField('ip', clean);
+                    };
 
                     window._jhSelectRegion = function(region) {
                         applyRegion(region);
@@ -590,21 +596,24 @@
                     window._jhSaveField = function(field, value) {
                         const region = document.getElementById('jh_region_select').value;
                         if (!configs[region]) configs[region] = { ip: '', user: 'ubuntu', key: '~/.ssh/id_rsa' };
-                        configs[region][field] = value;
+                        if (field === 'ip') {
+                            configs[region][field] = _jhSanitizeIp(value);
+                        } else {
+                            configs[region][field] = value;
+                        }
                         saveConfigs(configs);
-                        renderTable(region);
                     };
 
-                    // Initialize on page load
                     document.addEventListener('DOMContentLoaded', function() {
-                        // Determine initial region: try to match default IP to a stored config
                         let initRegion = 'IAD';
-                        if (defaultIp) {
+                        const dip = _jhSanitizeIp(defaultIp);
+                        if (dip) {
                             for (const r of REGIONS) {
-                                if (configs[r] && configs[r].ip === defaultIp) { initRegion = r; break; }
+                                if (configs[r] && _jhSanitizeIp(configs[r].ip) === dip) { initRegion = r; break; }
                             }
                         }
-                        document.getElementById('jh_region_select').value = initRegion;
+                        const sel = document.getElementById('jh_region_select');
+                        if (sel) sel.value = initRegion;
                         applyRegion(initRegion);
                         saveConfigs(configs);
                     });
@@ -815,6 +824,14 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                         <span>🖼 Cold Direct Snapshot migration</span>
                     </button>
+                    <button type="button" class="btn-primary img-mig-trigger" id="start-snapwin-migration-btn"
+                        data-windows-repair-method="windows_method_z_snapshot_existing"
+                        style="background: linear-gradient(135deg, #075985 0%, #0e7490 100%); border-color: #38bdf8; justify-content: flex-start;"
+                        title="SNAPWIN: existing OSPC Windows snapshot/image → download → qcow2 → offline Windows repair → FLEX rescue/final boot"
+                        onclick="document.getElementById('mig_mode_value').value='live';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
+                        <span>SNAPWIN</span>
+                    </button>
                     <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-dryrun-btn"
                         style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); border-color: #a855f7; justify-content: flex-start;"
                         title="Dry Run: Glance → jumphost → FLEX pipeline"
@@ -906,7 +923,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
   <td style="padding:7px 10px;font-weight:700;color:#f0abfc;white-space:nowrap;position:sticky;left:0;background:#0f172a;">Ubuntu 20/22/24</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;color:#fb923c;">enX0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">netplan</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda1 (ext4, LABEL)</td>
@@ -921,7 +938,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);">
   <td style="padding:7px 10px;font-weight:700;color:#6ee7b7;white-space:nowrap;position:sticky;left:0;background:#0f172a;">Debian 10/11/12</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;color:#fb923c;">enX0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">interfaces (lo)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda1 (ext4)</td>
@@ -936,7 +953,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
   <td style="padding:7px 10px;font-weight:700;color:#fbbf24;white-space:nowrap;position:sticky;left:0;background:#0f172a;">AlmaLinux 8/9</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">eth0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">ifcfg (static)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda2 (xfs)</td>
@@ -951,7 +968,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);">
   <td style="padding:7px 10px;font-weight:700;color:#f87171;white-space:nowrap;position:sticky;left:0;background:#0f172a;">Rocky 8/9</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">eth0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">ifcfg (static)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda2 (ext4)</td>
@@ -966,7 +983,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
   <td style="padding:7px 10px;font-weight:700;color:#fb923c;white-space:nowrap;position:sticky;left:0;background:#0f172a;">RHEL/CentOS 7</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS (MBR)</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">eth0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">net-scripts</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda1 (ext4)</td>
@@ -981,7 +998,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);">
   <td style="padding:7px 10px;font-weight:700;color:#fb923c;white-space:nowrap;position:sticky;left:0;background:#0f172a;">RHEL/CentOS 8</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">eth0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">ifcfg + NM</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda1 (ext4/xfs)</td>
@@ -996,7 +1013,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
   <td style="padding:7px 10px;font-weight:700;color:#fb923c;white-space:nowrap;position:sticky;left:0;background:#0f172a;">RHEL/CentOS 9</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">eth0</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">NM keyfile</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">vda1 (xfs)</td>
@@ -1011,7 +1028,7 @@
 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);">
   <td style="padding:7px 10px;font-weight:700;color:#60a5fa;white-space:nowrap;position:sticky;left:0;background:#0f172a;">Windows 16/19/22</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">BIOS</td>
-  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">Xen (PVHVM)</td>
+  <td style="padding:7px 10px;text-align:center;font-size:0.68rem;color:#fb923c;">OSPC Zen (PVHVM)</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">Ethernet</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;">Windows Net</td>
   <td style="padding:7px 10px;text-align:center;font-size:0.68rem;font-family:monospace;">C:\ (NTFS)</td>
@@ -1216,7 +1233,7 @@
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">4</td><td style="padding:6px 10px;color:#f0abfc;">Copy VirtIO Drivers</td><td style="padding:6px 10px;">Copies viostor, netkvm, balloon, and vioserial directly into System32\drivers and the Windows DriverStore.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">5</td><td style="padding:6px 10px;color:#f0abfc;">Inject Registry Services</td><td style="padding:6px 10px;">Rewrites the SYSTEM registry hive using hivexregedit to map new VirtIO drivers as Critical Boot-Start (Start=0).</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">6</td><td style="padding:6px 10px;color:#f0abfc;">Registry Verification</td><td style="padding:6px 10px;">Queries the registry back out via hivexsh to guarantee the VirtIO disk drivers were effectively configured to auto-start.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">7</td><td style="padding:6px 10px;color:#f0abfc;">Disable Xen PV Drivers</td><td style="padding:6px 10px;">Suppresses legacy OSPC Xen hypervisor services (xenvbd, xennet) in the registry (Start=4) to prevent Boot BSOD.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);"><td style="padding:6px 10px;font-weight:700;">7</td><td style="padding:6px 10px;color:#f0abfc;">Disable OSPC Zen PV drivers</td><td style="padding:6px 10px;">Suppresses legacy Zen hypervisor PV services (xenvbd, xennet) in the registry (Start=4) to prevent Boot BSOD.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">8</td><td style="padding:6px 10px;color:#f0abfc;">Enable Storage Stack</td><td style="padding:6px 10px;">Scans Microsoft's generic disk controllers (disk, volmgr, partmgr) to ensure they initialize alongside KVM.</td></tr>
                                                 <tr><td style="padding:6px 10px;font-weight:700;">9</td><td style="padding:6px 10px;color:#f0abfc;">Cleanup & Sentinels</td><td style="padding:6px 10px;">Gracefully unmounts the C:\ filesystem, detaches qemu-nbd, and writes a .win_repaired cache sentinel file.</td></tr>
                                             </tbody>
@@ -1268,15 +1285,15 @@
                                             </thead>
                                             <tbody>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">OS Family</td><td style="padding:6px 10px;">Windows Server 2016</td><td style="padding:6px 10px;">Windows Server 2016 Datacenter</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Same Family</td><td style="padding:6px 10px;">Ensure OS-specific repair profile matches target edition (Datacenter).</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Disk Bus</td><td style="padding:6px 10px;">OSPC/Xen-style originally</td><td style="padding:6px 10px;">Red Hat VirtIO SCSI</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;"><b>Critical:</b> FLEX expects VirtIO SCSI. Inject vioscsi + viostor offline.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Disk Bus</td><td style="padding:6px 10px;">OSPC Zen-style originally</td><td style="padding:6px 10px;">Red Hat VirtIO SCSI</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Change</td><td style="padding:6px 10px;"><b>Critical:</b> FLEX expects VirtIO SCSI. Inject vioscsi + viostor offline.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Partition Style</td><td style="padding:6px 10px;">MBR</td><td style="padding:6px 10px;">MBR</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">No UEFI conversion needed. Preserve MBR boot sector.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Boot Mode</td><td style="padding:6px 10px;">BIOS/MBR style</td><td style="padding:6px 10px;">BIOS/MBR style</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Use winload.exe path in BCD; do not switch to winload.efi.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Windows Partition</td><td style="padding:6px 10px;">Single C: partition</td><td style="padding:6px 10px;">C: is Boot/System</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Ensure BCD device/osdevice points to partition=C:</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Recovery Partition</td><td style="padding:6px 10px;">Not clearly separated</td><td style="padding:6px 10px;">Separate 1 GB Recovery</td><td style="padding:6px 10px;color:#cbd5e1;font-weight:700;">FLEX-Specific</td><td style="padding:6px 10px;">FLEX reference has recovery partition; migration should preserve C: as primary boot.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">BCD Loader Path</td><td style="padding:6px 10px;">\windows\system32\winload.exe</td><td style="padding:6px 10px;">\Windows\system32\winload.exe</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Verify loader path case-insensitive match.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Storage Drivers</td><td style="padding:6px 10px;">Not present (Xen)</td><td style="padding:6px 10px;">Present (Start=0)</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Inject</td><td style="padding:6px 10px;"><b>vioscsi</b> is the missing critical FLEX boot driver. Injection required.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Storage Drivers</td><td style="padding:6px 10px;">Not present (Zen)</td><td style="padding:6px 10px;">Present (Start=0)</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Inject</td><td style="padding:6px 10px;"><b>vioscsi</b> is the missing critical FLEX boot driver. Injection required.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Core Storage Stack</td><td style="padding:6px 10px;">disk, partmgr, volmgr...</td><td style="padding:6px 10px;">All boot-start</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Ensure standard Windows storage services are NOT disabled.</td></tr>
-                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Old Xen Drivers</td><td style="padding:6px 10px;">Xen/PV style</td><td style="padding:6px 10px;">Not used on FLEX</td><td style="padding:6px 10px;color:#cbd5e1;font-weight:700;">Disable</td><td style="padding:6px 10px;">Disable xenvbd, xennet etc. to prevent STOP 0x7B conflicts.</td></tr>
+                                                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Old Zen PV drivers</td><td style="padding:6px 10px;">Zen/PV (xen* services)</td><td style="padding:6px 10px;">Not used on FLEX</td><td style="padding:6px 10px;color:#cbd5e1;font-weight:700;">Disable</td><td style="padding:6px 10px;">Disable xenvbd, xennet etc. to prevent STOP 0x7B conflicts.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:transparent;"><td style="padding:6px 10px;font-weight:700;">Drive Mapping</td><td style="padding:6px 10px;">OSPC specific identity</td><td style="padding:6px 10px;">FLEX clean C:</td><td style="padding:6px 10px;color:#ef4444;font-weight:700;">Reset</td><td style="padding:6px 10px;"><b>Critical:</b> Clear <code>MountedDevices</code> registry key to fix Inaccessible Boot Device.</td></tr>
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);"><td style="padding:6px 10px;font-weight:700;">Active MBR Flag</td><td style="padding:6px 10px;">Bootable MBR</td><td style="padding:6px 10px;">Bootable MBR path</td><td style="padding:6px 10px;color:#10b981;font-weight:700;">Keep</td><td style="padding:6px 10px;">Mark Windows partition active in the MBR partition table.</td></tr>
                                             </tbody>
@@ -1286,7 +1303,7 @@
                                             <h4 style="margin:0 0 8px 0;color:#fbcfe8;font-size:0.8rem;">Minimum Safe Default Profile (Repair Script Summary)</h4>
                                             <ul style="margin:0;padding-left:18px;color:#cbd5e1;line-height:1.6;">
                                                 <li>Inject: <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">viostor</code>, <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">vioscsi</code> (if using VirtIO SCSI), <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">netkvm</code></li>
-                                                 <li>Disable Xen PV services</li>
+                                                 <li>Disable OSPC Zen PV services</li>
                                                  <li><b>Registry:</b> Clear <code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">MountedDevices</code> to fix Inaccessible Boot Device</li>
                                                  <li>Preserve BIOS/MBR + existing BCD style (<code style="color:#f472b6;background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;">winload.exe</code>)</li>
                                                 <li>Add first-boot network cleanup + DHCP enable + firewall management access</li>
@@ -1389,7 +1406,7 @@
                             </div>
                             <div class="mapper-actions">
                                 <button id="exportMapperFiltered" type="button" class="btn-adv">Export Filtered CSV</button>
-                                <button id="toggleEditMapper" type="button" class="btn-adv">Enable Edit Mode</button>
+                                <button id="toggleEditMapper" type="button" class="btn-adv">Update</button>
                                 <button id="addVmBtn" type="button" class="btn-adv" style="background:rgba(34,197,94,0.12);border-color:#22c55e;color:#4ade80;" onclick="openAddVmModal()">+ Add VM to Migrate</button>
                                 <button id="deleteSelectedBtn" type="button" class="btn-adv" style="background:rgba(239,68,68,0.12);border-color:#ef4444;color:#f87171;" onclick="deleteSelectedVMs()">🗑 Delete Selected</button>
                             </div>
@@ -1863,6 +1880,10 @@
 
                 <!-- Results summary -->
                 <div id="nbd-results" style="margin-top:12px; font-size:11px; font-family:monospace; color:#4ade80;"></div>
+                <div id="method-g-simple-results-panel" style="display:none; margin-top:12px; border:1px solid rgba(52,211,153,0.35); border-radius:10px; background:rgba(6,78,59,0.22); padding:10px;">
+                    <div style="color:#6ee7b7; font-weight:700; font-size:12px; margin-bottom:8px;">Method G Simple — SSH Capture + Dummy VirtIO Boot</div>
+                    <div id="method-g-simple-results" style="font-size:11px; color:#d1fae5;"></div>
+                </div>
             </div>
 
             <!-- PIPELINE REFERENCE -->
@@ -2112,7 +2133,7 @@
                     </div>
 
                     <!-- ROW 2: REPAIR LOGIC (Linux & Windows) -->
-                    <div style="margin-top:10px; padding:12px 18px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; gap:15px; flex-wrap:wrap;">
+                    <div style="margin-top:10px; padding:12px 18px; background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.2); border-radius:10px; display:flex; align-items:flex-start; justify-content:center; gap:15px; flex-wrap:wrap;">
                         <!-- LINUX REPAIR -->
                         <div style="display:flex; align-items:center; gap:10px; background:rgba(245,158,11,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.35);"
                              title="Linux-specific repair profile application.">
@@ -2129,24 +2150,177 @@
                         </div>
 
                         <!-- WINDOWS REPAIR -->
-                        <div id="windows-method-panel" style="display:flex; align-items:center; gap:10px; background:rgba(14,165,233,0.08); padding:7px 14px; border-radius:8px; border:1px solid rgba(56,189,248,0.35);"
+                        <div id="windows-method-panel" style="display:flex; flex-direction:column; align-items:stretch; gap:10px; background:rgba(14,165,233,0.08); padding:10px 14px; border-radius:8px; border:1px solid rgba(56,189,248,0.35); min-width:min(100%, 520px); flex:1 1 420px;"
                              title="Windows-only sub-method.">
-                            <span style="color:#38bdf8; font-size:1rem;">🪟</span>
-                            <label for="windows_repair_method" style="color:#bae6fd; font-weight:700; font-size:0.82rem; white-space:nowrap;">Windows Offline Repair:</label>
-                            <select id="windows_repair_method" name="windows_repair_method"
-                                style="background:#1e293b; border:1px solid #38bdf8; border-radius:6px; color:#bae6fd; font-size:0.82rem; font-weight:600; padding:4px 10px; cursor:pointer; outline:none;"
-                                onchange="localStorage.setItem('mig_windows_repair_method', this.value); toggleNbdPanel();">
-                                <option value="windows_method_a">Method A — Offline Repair</option>
-                                <option value="windows_method_b_hypervisor">Method B — Hypervisor Two-Phase</option>
-                            </select>
-                            <label for="windows_purge_xen" style="display:flex;align-items:center;gap:6px;color:#7dd3fc;font-size:0.78rem;font-weight:700;white-space:nowrap;cursor:pointer;margin-left:6px;" title="Aggressively remove Xen PV remnants during Windows offline repair.">
-                                <input type="checkbox" id="windows_purge_xen" checked
-                                    style="width:14px;height:14px;accent-color:#38bdf8;cursor:pointer;"
-                                    onchange="localStorage.setItem('mig_windows_purge_xen', this.checked ? '1' : '0');">
-                                Zen Purge
-                            </label>
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px;">
+                                <span style="color:#38bdf8; font-size:1rem; line-height:1;">🪟</span>
+                                <label for="windows_repair_method" style="color:#bae6fd; font-weight:700; font-size:0.82rem; white-space:nowrap; margin:0;">Windows Offline Repair:</label>
+                                <select id="windows_repair_method" name="windows_repair_method"
+                                    style="flex:1 1 260px; min-width:220px; max-width:100%; background:#1e293b; border:1px solid #38bdf8; border-radius:6px; color:#bae6fd; font-size:0.82rem; font-weight:600; padding:6px 10px; cursor:pointer; outline:none;"
+                                    onchange="localStorage.setItem('mig_windows_repair_method', this.value); toggleNbdPanel();">
+                                    <option value="windows_method_a">Method A — Offline Repair</option>
+                                    <option value="windows_method_b_hypervisor">Method B — Hypervisor Two-Phase</option>
+                                    <option value="windows_method_c_dynamic_auto">Method C — Dynamic Auto Repair (CloudJumper)</option>
+                                    <option value="windows_method_d_safe_ide_boot">Method D — Safe IDE Boot (OSPC Zen → FLEX KVM)</option>
+                                    <option value="windows_method_e_b_capture_g_deploy">Method E — B-Capture + G-Deploy (SSH → Rescue → VirtIO Snapshot)</option>
+                                    <option value="windows_method_g_simple_ssh_dummy_virtio" selected>Method G Simple — SSH Capture + Dummy VirtIO Boot</option>
+                                    <option value="windows_method_h_local_kvm">Method H — Local KVM VirtIO Prep + Flex Import</option>
+                                </select>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding-top:2px; border-top:1px solid rgba(56,189,248,0.2);">
+                                <label for="windows_purge_xen" style="display:inline-flex; align-items:center; gap:6px; color:#7dd3fc; font-size:0.78rem; font-weight:700; white-space:nowrap; cursor:pointer; margin:0;" title="Aggressively remove OSPC Zen PV (Xen-class) remnants during Windows offline repair.">
+                                    <input type="checkbox" id="windows_purge_xen" checked
+                                        style="width:14px; height:14px; accent-color:#38bdf8; cursor:pointer; flex-shrink:0;"
+                                        onchange="localStorage.setItem('mig_windows_purge_xen', this.checked ? '1' : '0');">
+                                    Zen Purge
+                                </label>
+                                <input type="checkbox" id="jumphost_label_lock_on" checked
+                                    style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;"
+                                    aria-hidden="true" tabindex="-1"
+                                    onchange="if (typeof migSyncJumphostLabelLockUI === 'function') migSyncJumphostLabelLockUI();">
+                                <button type="button" id="jumphost_label_lock_btn"
+                                    style="background:#0b1220; border:1px solid rgba(125,211,252,0.5); border-radius:8px; color:#bae6fd; font-size:11px; font-weight:800; padding:6px 12px; cursor:pointer; white-space:nowrap;"
+                                    title="ON: single-flight per label (flock). OFF: workflow-scoped pkill so G and H do not cross-kill — best for that coexistence; still risky if both truly run at once (double capture, IO, messy artifacts). See the note below the row."
+                                    onclick="if (typeof migToggleJumphostLabelLock === 'function') migToggleJumphostLabelLock();">
+                                    LABEL LOCK: ON
+                                </button>
+                                <span style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <button type="button" id="cloudboot_force_new_btn"
+                                        style="background:#0b1220; border:1px solid rgba(244,114,182,0.55); border-radius:8px; color:#fbcfe8; font-size:11px; font-weight:800; padding:6px 12px; cursor:pointer; white-space:nowrap;"
+                                        title="Method C (CloudJumper): when ON, the dashboard sends cloudboot_force_new so the worker drops any cached compare/repair bundle, re-runs source-vs-target discovery, and writes a brand-new boot-repair script instead of resuming the last bundle."
+                                        onclick="const cb=document.getElementById('cloudboot_force_new'); cb.checked=!cb.checked; localStorage.setItem('mig_cloudboot_force_new', cb.checked?'1':'0'); this.textContent = cb.checked ? 'CREATE NEW BOOT REPAIR SCRIPT: ON' : 'CREATE NEW BOOT REPAIR SCRIPT';">
+                                        CREATE NEW BOOT REPAIR SCRIPT
+                                    </button>
+                                    <label for="cloudboot_force_new" style="display:inline-flex; align-items:center; gap:6px; color:#fbcfe8; font-size:11px; font-weight:800; white-space:nowrap; cursor:pointer; margin:0;" title="Method C: same as the button — check to force a fresh CloudJumper compare and regenerate the repair/boot script; uncheck to allow resuming cached bundle when the worker supports it.">
+                                        <input type="checkbox" id="cloudboot_force_new"
+                                            style="width:14px; height:14px; accent-color:#f472b6; cursor:pointer; flex-shrink:0;"
+                                            onchange="localStorage.setItem('mig_cloudboot_force_new', this.checked ? '1' : '0'); const b=document.getElementById('cloudboot_force_new_btn'); if(b) b.textContent=this.checked?'CREATE NEW BOOT REPAIR SCRIPT: ON':'CREATE NEW BOOT REPAIR SCRIPT';">
+                                        Force new
+                                    </label>
+                                </span>
+                            </div>
+                            <div style="width:100%; margin-top:6px; padding:8px 10px; background:rgba(15,23,42,0.55); border:1px solid rgba(51,65,85,0.45); border-radius:8px; font-size:10.5px; line-height:1.45; color:#94a3b8;">
+                                <div style="margin-bottom:8px;"><strong style="color:#bae6fd;">Jumphost label lock</strong> — <em>On</em> (recommended): only one Windows Method D/G/H-style job per VM label on the jumphost at a time; a new run waits or replaces the old one, avoiding half-finished captures and conflicting artifacts. Turn the button to <strong style="color:#7dd3fc;">LABEL LOCK: OFF</strong> only when you need the behavior described in the panel that appears below.</div>
+                                <div id="jumphost_workflow_scoped_cleanup_panel" style="display:none; margin-bottom:8px; padding:8px 10px; border-left:3px solid rgba(56,189,248,0.85); background:rgba(56,189,248,0.09); border-radius:0 8px 8px 0;">
+                                    <div style="color:#7dd3fc; font-weight:800; margin-bottom:6px;">Label lock is OFF — workflow-scoped cleanup (active for your next jumphost runs)</div>
+                                    <div style="color:#cbd5e1; margin-bottom:6px;">The dashboard sends <code style="font-size:10px;color:#e2e8f0;">disable_method_d_lock=1</code> and pre-launch <code style="font-size:10px;color:#e2e8f0;">pkill</code> is limited by <strong>workflow tag</strong> (e.g. Method G vs Method H capture), not a single broad match on every <code style="font-size:10px;color:#e2e8f0;">method_d_capture</code> for the label.</div>
+                                    <ul style="margin:0; padding-left:18px; color:#94a3b8;">
+                                        <li style="margin-bottom:5px;"><strong style="color:#e2e8f0;">Coexistence:</strong> Method G and Method H must <strong>not kill each other by mistake</strong> (the old broad <code style="font-size:10px;">pkill</code>); jobs that should <strong>coexist without cross-kill</strong> rely on this <strong>workflow-tagged</strong> cleanup on the jumphost.</li>
+                                        <li><strong style="color:#fca5a5;">Still not magic:</strong> if two jobs truly run <strong>at the same time</strong> against the <strong>same VM / same label</strong>, you can still get double full-disk capture, heavy guest IO, and overlapping artifacts — the lock is what prevents that class of overlap.</li>
+                                    </ul>
+                                </div>
+                                <div><strong style="color:#fbcfe8;">Create new boot repair script / Force new</strong> — Applies to <strong style="color:#5eead4;">Method C (CloudJumper)</strong> only: clears the &quot;resume&quot; path so compare + repair bundle generation runs from scratch instead of reusing the last saved CloudJumper artifacts.</div>
+                            </div>
                         </div>
-                    </div>
+                        <div id="cloudboot-target-panel" style="display:flex; align-items:center; gap:8px; background:rgba(20,184,166,0.08); padding:7px 12px; border-radius:8px; border:1px solid rgba(45,212,191,0.32); flex-wrap:wrap;"
+	                             title="FLEX/reference Windows VM used by CloudJumper Stage 3b for source-vs-target boot comparison before Method A repair.">
+	                            <label for="cloudboot_target_public_ip" style="color:#99f6e4; font-weight:700; font-size:0.78rem; white-space:nowrap;">CloudBoot FLEX target:</label>
+	                            <input type="text" id="cloudboot_target_public_ip" placeholder="public IP"
+	                                style="width:118px; padding:4px 8px; background:#0f172a; border:1px solid #14b8a6; border-radius:6px; color:#99f6e4; font-size:0.78rem; font-family:monospace;"
+	                                oninput="localStorage.setItem('mig_cloudboot_target_public_ip', this.value);">
+	                            <input type="text" id="cloudboot_target_private_ip" placeholder="private IP"
+	                                style="width:112px; padding:4px 8px; background:#0f172a; border:1px solid #0d9488; border-radius:6px; color:#5eead4; font-size:0.78rem; font-family:monospace;"
+	                                oninput="localStorage.setItem('mig_cloudboot_target_private_ip', this.value);">
+	                            <input type="text" id="cloudboot_target_user" value="Administrator" placeholder="user"
+	                                style="width:96px; padding:4px 8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#bae6fd; font-size:0.78rem; font-family:monospace;"
+	                                oninput="localStorage.setItem('mig_cloudboot_target_user', this.value);">
+	                            <input type="password" id="cloudboot_target_password" placeholder="target password"
+	                                style="width:128px; padding:4px 8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#fbcfe8; font-size:0.78rem;"
+	                                oninput="localStorage.setItem('mig_cloudboot_target_password', this.value);">
+	                            <input type="text" id="cloudboot_target_ssh_key" placeholder="target key path"
+	                                style="width:128px; padding:4px 8px; background:#0f172a; border:1px solid #334155; border-radius:6px; color:#93c5fd; font-size:0.78rem; font-family:monospace;"
+	                                oninput="localStorage.setItem('mig_cloudboot_target_ssh_key', this.value);">
+	                        </div>
+                        <div id="windows-method-table" style="width:100%; margin-top:8px; background:rgba(15,23,42,0.65); border:1px solid rgba(71,85,105,0.45); border-radius:8px; overflow:hidden;">
+                            <table style="width:100%; border-collapse:collapse; font-size:11px; color:#cbd5e1;">
+                                <thead>
+                                    <tr style="background:rgba(30,41,59,0.95); color:#e2e8f0;">
+                                        <th style="text-align:left; padding:7px 8px; border-bottom:1px solid #334155;">Method</th>
+                                        <th style="text-align:left; padding:7px 8px; border-bottom:1px solid #334155;">Flow Steps</th>
+                                        <th style="text-align:left; padding:7px 8px; border-bottom:1px solid #334155;">Best Use</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55); color:#7dd3fc; font-weight:700;">Method A</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">Offline repair -> upload IDE image -> boot -> verify</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">Fast baseline runs</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55); color:#fbbf24; font-weight:700;">Method B</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">IDE rescue boot -> in-guest VirtIO bind -> final VirtIO image boot test</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">Hard boot-device cases</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55); color:#5eead4; font-weight:700;">Method C</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">CloudJumper source/target compare -> dynamic repair bundle -> Method A boot flow</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">When target reference VM is reachable</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55); color:#fca5a5; font-weight:700;">Method D</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">Safe IDE first boot -> online VirtIO bind -> virtio-ready snapshot -> final optimized VirtIO boot</td>
+                                        <td style="padding:7px 8px; border-top:1px solid rgba(51,65,85,0.55);">Safest OSPC Zen → FLEX KVM path when avoiding first-boot INACCESSIBLE_BOOT_DEVICE</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="cloudboot-target-prep" style="width:100%; margin-top:10px; background:rgba(20,184,166,0.06); border:1px solid rgba(45,212,191,0.26); border-radius:10px; padding:10px 12px;">
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <div style="color:#5eead4; font-weight:800; font-size:12px; letter-spacing:0.06em; text-transform:uppercase;">
+                                    Target Windows preparation for comparison (Method C)
+                                </div>
+                                <div style="color:#94a3b8; font-size:11px;">
+                                    Use when target FLEX Windows VM is reachable by RDP but CloudJumper cannot reach SSH/WinRM.
+                                </div>
+                            </div>
+
+                            <div style="margin-top:10px; display:flex; gap:12px; flex-wrap:wrap;">
+                                <div style="flex:1; min-width:330px; background:rgba(15,23,42,0.7); border:1px solid rgba(51,65,85,0.55); border-radius:10px; padding:10px;">
+                                    <div style="color:#e2e8f0; font-weight:800; font-size:12px; margin-bottom:8px;">1) RDP into target (copy/paste)</div>
+                                    <pre style="margin:0; white-space:pre-wrap; word-break:break-word; color:#a7f3d0; font-size:11px; background:#020617; border:1px solid rgba(20,184,166,0.25); border-radius:8px; padding:10px; overflow:auto;">xfreerdp /v:&lt;TARGET_PUBLIC_IP&gt; /u:Administrator /p:'&lt;TARGET_PASSWORD&gt;' /cert:ignore /sec:nla</pre>
+                                    <div style="margin-top:6px; color:#94a3b8; font-size:11px;">Replace placeholders with your target FLEX VM public IP and password.</div>
+                                </div>
+
+                                <div style="flex:2; min-width:420px; background:rgba(15,23,42,0.7); border:1px solid rgba(51,65,85,0.55); border-radius:10px; padding:10px;">
+                                    <div style="color:#e2e8f0; font-weight:800; font-size:12px; margin-bottom:8px;">2) Enable WinRM (5985) + attempt OpenSSH (22)</div>
+                                    <div style="color:#94a3b8; font-size:11px; margin-bottom:8px;">Open <strong>PowerShell as Administrator</strong> on the target VM and paste this exact block (single paste, no manual line breaks):</div>
+                                    <pre style="margin:0; white-space:pre; overflow:auto; color:#fbcfe8; font-size:11px; background:#020617; border:1px solid rgba(56,189,248,0.22); border-radius:8px; padding:10px;">$ErrorActionPreference = 'Continue'
+
+# WinRM
+Set-Service WinRM -StartupType Automatic -ErrorAction SilentlyContinue
+Start-Service WinRM -ErrorAction SilentlyContinue
+winrm quickconfig -quiet
+winrm set winrm/config/service '@{AllowUnencrypted="true"}' | Out-Null
+winrm set winrm/config/service/auth '@{Basic="true"}' | Out-Null
+if (-not (Get-NetFirewallRule -DisplayName "ospc2flex-WinRM" -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName "ospc2flex-WinRM" -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -Profile Any | Out-Null
+}
+
+# OpenSSH (Windows Server 2016 safe)
+$capName = "OpenSSH.Server~~~~0.0.1.0"
+$cap = Get-WindowsCapability -Online -Name $capName -ErrorAction SilentlyContinue
+if ($cap -and $cap.State -ne 'Installed') {
+    Add-WindowsCapability -Online -Name $capName | Out-Null
+}
+
+# If capability method unavailable, try built-in service path
+if (Get-Service sshd -ErrorAction SilentlyContinue) {
+    Set-Service sshd -StartupType Automatic -ErrorAction SilentlyContinue
+    Start-Service sshd -ErrorAction SilentlyContinue
+}
+
+if (-not (Get-NetFirewallRule -DisplayName "ospc2flex-SSH" -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName "ospc2flex-SSH" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow -Profile Any | Out-Null
+}
+
+Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
+                                    <div style="margin-top:8px; color:#94a3b8; font-size:11px;">
+                                        After this, rerun <strong>Method C</strong>. CloudJumper should be able to collect the target profile via WinRM and generate the dynamic bundle.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+	                    </div>
 
                     <!-- ROW 3: NETWORKING -->
                     <div style="margin-top:10px; padding:12px 18px; background:rgba(74,222,128,0.05); border:1px solid rgba(74,222,128,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; gap:25px; flex-wrap:wrap;">
@@ -4428,7 +4602,7 @@
     <!-- BATCH PROCESSING JS SCRIPT -->
     <script>
     // Global state so modal functions can access flavorState
-    var flavorState = { headers: [], rows: [], filtered: [], editMode: false };
+    var flavorState = { headers: [], rows: [], filtered: [], editMode: true };
     var blockState  = { headers: [], rows: [], filtered: [], editMode: false };
 
     // Global helpers needed by modal functions
@@ -4502,11 +4676,70 @@
         const row = flavorState.rows.find(r => String(r.source_server_name || r.server_name || r.name || r.source_volume_id || '') === key);
         if (!row) return;
         row[field] = value;
+        if (typeof window._setVmAuthCached === 'function') {
+            const map = {
+                os_family: 'os_family',
+                os_version: 'os_type',
+                ssh_user: 'ssh_user',
+                ssh_key: 'ssh_key',
+                password: 'password',
+                snet_ip: 'snet_ip',
+            };
+            const cacheField = map[field] || field;
+            window._setVmAuthCached(key, { [cacheField]: value });
+        }
         if (row._manually_added) saveManualVms();
+        if (typeof window._refreshMethodDPasswordBadges === 'function') {
+            window._refreshMethodDPasswordBadges();
+        }
     }
 
 
     document.addEventListener("DOMContentLoaded", () => {
+        const LS_VM_AUTH_CACHE = 'ospc2flex_vm_auth_cache_v1';
+
+        function loadVmAuthCache() {
+            try { return JSON.parse(localStorage.getItem(LS_VM_AUTH_CACHE) || '{}') || {}; }
+            catch (_) { return {}; }
+        }
+
+        function saveVmAuthCache(cache) {
+            try { localStorage.setItem(LS_VM_AUTH_CACHE, JSON.stringify(cache || {})); }
+            catch (_) {}
+        }
+
+        function getVmAuthCached(sourceName) {
+            const key = String(sourceName || '');
+            if (!key) return {};
+            const cache = loadVmAuthCache();
+            return (cache[key] && typeof cache[key] === 'object') ? cache[key] : {};
+        }
+
+        function setVmAuthCached(sourceName, patch) {
+            const key = String(sourceName || '');
+            if (!key || !patch || typeof patch !== 'object') return;
+            const cache = loadVmAuthCache();
+            const prev = (cache[key] && typeof cache[key] === 'object') ? cache[key] : {};
+            cache[key] = { ...prev, ...patch, _ts: Date.now() };
+            saveVmAuthCache(cache);
+        }
+        window._setVmAuthCached = setVmAuthCached;
+
+        function refreshMethodDPasswordBadges() {
+            const winM = (document.getElementById('windows_repair_method') || {}).value || '';
+            const needsWindowsPasswordMethod = winM === 'windows_method_d_safe_ide_boot' || winM === 'windows_method_e_b_capture_g_deploy' || winM === 'windows_method_g_simple_ssh_dummy_virtio' || winM === 'windows_method_h_local_kvm';
+            document.querySelectorAll('.vm-checkbox').forEach(cb => {
+                const name = cb.dataset.sourceName || '';
+                const osFamily = String(cb.dataset.osFamily || '').toLowerCase();
+                const password = String(cb.dataset.password || '').trim();
+                const badge = Array.from(document.querySelectorAll('.method-d-password-badge'))
+                    .find(el => (el.dataset.sourceName || '') === name);
+                if (!badge) return;
+                const needsBadge = needsWindowsPasswordMethod && osFamily === 'windows' && !password;
+                badge.style.display = needsBadge ? 'inline-block' : 'none';
+            });
+        }
+        window._refreshMethodDPasswordBadges = refreshMethodDPasswordBadges;
 
         // Dedicated renderer preserving Frozen Checkbox bounds
         function renderAdvTable(state, tableId, countId, isBlock) {
@@ -4603,6 +4836,7 @@
 
                 // Inject the mandatory Checkboxes the backend API hunts for (Data attributes bind the row identifiers mapping)
                 const sname = row.source_server_name || row.server_name || row.name || row.source_volume_id || "Unknown";
+                const sourceServerId = (row.source_server_id || row.server_id || row.id || '').toString().trim();
                 const tname = row.target_server_name || row.server_name || "Unknown";
                 // Check many common flavormap column name variants
                 const tflavor = (
@@ -4627,12 +4861,13 @@
 
                 // Auto-detect SSH user from VM name
                 const snLower = sname.toLowerCase();
-                const osF = row.os_family || (snLower.includes('win') ? 'windows' : 'linux');
-                const osV = row.os_version || (typeof guessOsType === 'function' ? guessOsType(sname) : 'generic');
-                let sshUser = row.ssh_user || row.ssh_login || '';
-                const sshKeyPath = row.ssh_key || row.ssh_key_path || '';
-                const instancePassword = row.password || row.instance_password || row.origin_vm_password || '';
-                const snetIp = row.snet_ip || row.servicenet_ip || row.private_ip || '';
+                const cachedAuth = getVmAuthCached(sname);
+                const osF = cachedAuth.os_family || row.os_family || (snLower.includes('win') ? 'windows' : 'linux');
+                const osV = cachedAuth.os_type || row.os_version || (typeof guessOsType === 'function' ? guessOsType(sname) : 'generic');
+                let sshUser = cachedAuth.ssh_user || row.ssh_user || row.ssh_login || '';
+                const sshKeyPath = cachedAuth.ssh_key || row.ssh_key || row.ssh_key_path || '';
+                const instancePassword = cachedAuth.password || row.password || row.instance_password || row.origin_vm_password || '';
+                const snetIp = cachedAuth.snet_ip || row.snet_ip || row.servicenet_ip || row.private_ip || '';
                 if (!sshUser) {
                     if (osF === 'windows')            sshUser = 'Administrator';
                     else if (snLower.includes('rocky'))   sshUser = 'root';  // migrated OSPC Rocky8: no 'rocky' OS user, Nova injects key into root
@@ -4644,7 +4879,7 @@
                     else                                  sshUser = 'ubuntu';
                 }
 
-                tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-source-name="${escapeHTML(sname)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-snet-ip="${escapeHTML(snetIp)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
+                tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-source-name="${escapeHTML(sname)}" data-source-id="${escapeHTML(sourceServerId)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-snet-ip="${escapeHTML(snetIp)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
 
                 // Row cells — Source & Fresh Sync first, then CSV cols, then Target Flavor, then OS/SSH cols
                 if (!isBlock) {
@@ -4657,7 +4892,10 @@
                         : isScan
                             ? 'color:#4ade80;background:rgba(74,222,128,0.08);'
                             : 'color:#38bdf8;background:rgba(56,189,248,0.06);';
-                    tbody += `<td style="text-align:center;font-size:0.75rem;font-weight:600;${srcStyle}">${srcLabel}</td>`;
+                    tbody += `<td style="text-align:center;font-size:0.75rem;font-weight:600;${srcStyle}">
+                        <span>${srcLabel}</span>
+                        <span class="method-d-password-badge" data-source-name="${escapeHTML(sname)}" style="display:none;margin-left:6px;padding:1px 6px;border-radius:10px;border:1px solid rgba(248,113,113,0.65);background:rgba(127,29,29,0.35);color:#fecaca;font-size:0.65rem;font-weight:700;">SSH/WinRM password required</span>
+                    </td>`;
 
                     // Fresh Sync — SECOND
                     tbody += `<td style="text-align:center;background:rgba(244,63,94,0.05);border-right:1px solid rgba(244,63,94,0.1);">
@@ -4668,11 +4906,7 @@
                 // Print CSV visible columns (service_type, name, public_ips) — THIRD
                 visibleHeaders.forEach(h => {
                     const val = row[h] || '';
-                    if(state.editMode) {
-                        tbody += `<td class="editable-cell" contenteditable="true" data-row="${rowIndex}" data-col="${escapeHTML(h)}">${escapeHTML(val)}</td>`;
-                    } else {
-                        tbody += `<td>${escapeHTML(val)}</td>`;
-                    }
+                    tbody += `<td class="editable-cell" contenteditable="true" data-row="${rowIndex}" data-col="${escapeHTML(h)}">${escapeHTML(val)}</td>`;
                 });
                 // Target Flavor — FOURTH
                 if (!isBlock) {
@@ -4785,6 +5019,7 @@
                 if (_saved[cb.dataset.sourceName]) cb.checked = true;
                 cb.addEventListener('change', () => _saveCheckState(cb));
             });
+            refreshMethodDPasswordBadges();
 
             if (state.editMode) {
                 table.querySelectorAll('.editable-cell').forEach(cell => {
@@ -5083,9 +5318,41 @@
         document.getElementById('exportMapperFiltered').addEventListener('click', () => exportCSV(flavorState, 'flavor_mapper_exported.csv'));
 
         document.getElementById('toggleEditMapper').addEventListener('click', function() {
-            flavorState.editMode = !flavorState.editMode;
-            this.textContent = flavorState.editMode ? 'Disable Edit Mode' : 'Enable Edit Mode';
-            this.classList.toggle('active-edit', flavorState.editMode);
+            // Force-save in-progress contenteditable edits.
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+
+            document.querySelectorAll('#flavor-table tbody tr').forEach(tr => {
+                const cb = tr.querySelector('.vm-checkbox');
+                if (!cb) return;
+                const key = cb.dataset.sourceName || '';
+                const row = flavorState.rows.find(r => String(r.source_server_name || r.server_name || r.name || r.source_volume_id || '') === key);
+                if (!row) return;
+
+                const osFamilyEl = tr.querySelector('.os-family-cell');
+                const osTypeEl = tr.querySelector('.os-version-cell');
+                const sshUserEl = tr.querySelector('.ssh-user-cell');
+                const sshKeyEl = tr.querySelector('.ssh-key-cell');
+                const passEl = tr.querySelector('.ssh-password-cell');
+                const snetEl = tr.querySelector('.snet-ip-cell');
+
+                if (osFamilyEl) row.os_family = osFamilyEl.value || row.os_family || '';
+                if (osTypeEl) row.os_version = osTypeEl.value || row.os_version || '';
+                if (sshUserEl) row.ssh_user = sshUserEl.value || row.ssh_user || '';
+                if (sshKeyEl) row.ssh_key = sshKeyEl.value || row.ssh_key || '';
+                if (passEl) row.password = passEl.value || '';
+                if (snetEl) row.snet_ip = snetEl.value || row.snet_ip || '';
+            });
+
+            try {
+                const manuals = flavorState.rows.filter(r => r._manually_added);
+                localStorage.setItem('ospc2flex_manual_vms', JSON.stringify(manuals));
+            } catch (_) {}
+
+            if (typeof window._refreshMethodDPasswordBadges === 'function') {
+                window._refreshMethodDPasswordBadges();
+            }
             renderAdvTable(flavorState, 'flavor-table', 'mapperRowCount', false);
         });
 
@@ -5370,7 +5637,39 @@
             });
         }
 
+        const MAIN_CONSOLE_MAX_LINES = 2500;
+        const VM_PANEL_MAX_LINES = 2000;
+        const IMAGE_PANEL_MAX_LINES = 2000;
+        const IMAGE_SCAN_LOG_MAX_CHARS = 250000;
+
+        function trimContainerLines(container, maxLines) {
+            if (!container) return;
+            while (container.childElementCount > maxLines) {
+                container.removeChild(container.firstElementChild);
+            }
+        }
+
+        function isChunkDlProgressLine(text) {
+            const s = String(text || '').trim();
+            if (!s) return false;
+            const low = s.toLowerCase();
+            // Windows SSH disk read ticker (any position — batch prepends "[vm] ")
+            if (low.includes('ssh transfer progress') && low.includes('mb on disk')) return true;
+            // Example: "680600K .......... .......... 88% 147M 2s"
+            if (/\d+(?:\.\d+)?[KMG]?\s+\.+.*\b\d{1,3}%\b/.test(s)) return true;
+            // wget-style line start: "57500K .......... 7%"
+            if (/^\s*\d+[KMG]?\s+\.+/.test(s) && /\d+\s*%/.test(s)) return true;
+            // percent + throughput e.g. "7% 26.1MiB/s"
+            if (/\d{1,3}(?:\.\d+)?%\s+\d+(?:\.\d+)?\s*[KMG](?:i?B|B)?\/s/i.test(s)) return true;
+            // curl: "######### 12.3%"
+            if (/\s#{5,}\s+\d+(?:\.\d+)?%/.test(s)) return true;
+            // long dot runs with a percent (progress bar noise)
+            if (/\.{12,}/.test(s) && /\d+\s*%/.test(s)) return true;
+            return false;
+        }
+
         function appendLog(text, type='info') {
+            if (isChunkDlProgressLine(text)) return;
 
             // __MANUAL_REPAIR_JSON__ sentinel removed — online repair replaced by Stage 4.5/4.6 offline repair
             if (text.includes('__MANUAL_REPAIR_JSON__')) return;
@@ -5418,6 +5717,7 @@
             }
 
             consoleOut.appendChild(el);
+            trimContainerLines(consoleOut, MAIN_CONSOLE_MAX_LINES);
             consoleOut.scrollTop = consoleOut.scrollHeight;
         }
 
@@ -5600,6 +5900,7 @@
         function appendImageLog(imageId, text) {
             const id = String(imageId || '').trim();
             if (!id) return;
+            if (isChunkDlProgressLine(text)) return;
             if (String(text || '').includes('[RUN]')) return;
             if (typeof migTracker !== 'undefined' && migTracker.parseImageLog) migTracker.parseImageLog(id, text);
             syncJobTerminalFromLog('image', id, text);
@@ -5616,6 +5917,7 @@
             const lineEl = buildJobTerminalLineElement('image', text);
             if (!lineEl) return;
             panel.appendChild(lineEl);
+            trimContainerLines(panel, IMAGE_PANEL_MAX_LINES);
             panel.scrollTop = panel.scrollHeight;
         }
 
@@ -5829,6 +6131,7 @@
 
         function appendVmLog(vmName, text, _type) {
             // Feed the migration progress tracker
+            if (isChunkDlProgressLine(text)) return;
             if (String(text || '').includes('[RUN]')) return;
             if (typeof migTracker !== 'undefined' && migTracker.vms[vmName]) migTracker.parseLog(vmName, text);
             if (getBatchJobState(vmName).panelClosed) return;
@@ -5838,6 +6141,7 @@
             const lineEl = buildJobTerminalLineElement('vm', text);
             if (!lineEl) return;
             panel.appendChild(lineEl);
+            trimContainerLines(panel, VM_PANEL_MAX_LINES);
             panel.scrollTop = panel.scrollHeight;
         }
 
@@ -6174,11 +6478,23 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 fix_netplan: true,
                 auto_floating_ip: document.getElementById('auto_floating_ip') ? document.getElementById('auto_floating_ip').checked : false,
                 flex_external_network: document.getElementById('flex_external_network_input') ? document.getElementById('flex_external_network_input').value : 'PUBLICNET',
-                offline_repair_method: document.getElementById('offline_repair_method') ? document.getElementById('offline_repair_method').value : 'custom_os',
-                windows_repair_method: document.getElementById('windows_repair_method') ? document.getElementById('windows_repair_method').value : 'windows_method_a',
-                windows_purge_xen: document.getElementById('windows_purge_xen') ? document.getElementById('windows_purge_xen').checked : true,
-                direct_export: document.getElementById('direct_export') ? document.getElementById('direct_export').checked : false
-            };
+	                offline_repair_method: document.getElementById('offline_repair_method') ? document.getElementById('offline_repair_method').value : 'custom_os',
+	                windows_repair_method: document.getElementById('windows_repair_method') ? document.getElementById('windows_repair_method').value : 'windows_method_a',
+	                windows_purge_xen: document.getElementById('windows_purge_xen') ? document.getElementById('windows_purge_xen').checked : true,
+	                cloudboot_target_host: (document.getElementById('cloudboot_target_public_ip')?.value.trim() || document.getElementById('cloudboot_target_private_ip')?.value.trim() || ''),
+	                target_windows_ip: (document.getElementById('cloudboot_target_public_ip')?.value.trim() || document.getElementById('cloudboot_target_private_ip')?.value.trim() || ''),
+	                cloudboot_target_winrm_host: document.getElementById('cloudboot_target_private_ip') ? document.getElementById('cloudboot_target_private_ip').value.trim() : '',
+	                target_windows_snet_ip: document.getElementById('cloudboot_target_private_ip') ? document.getElementById('cloudboot_target_private_ip').value.trim() : '',
+	                cloudboot_target_user: document.getElementById('cloudboot_target_user') ? (document.getElementById('cloudboot_target_user').value.trim() || 'Administrator') : 'Administrator',
+	                target_windows_user: document.getElementById('cloudboot_target_user') ? (document.getElementById('cloudboot_target_user').value.trim() || 'Administrator') : 'Administrator',
+	                cloudboot_target_password: document.getElementById('cloudboot_target_password') ? document.getElementById('cloudboot_target_password').value : '',
+	                target_windows_password: document.getElementById('cloudboot_target_password') ? document.getElementById('cloudboot_target_password').value : '',
+                    cloudboot_force_new: document.getElementById('cloudboot_force_new') && document.getElementById('cloudboot_force_new').checked ? '1' : '0',
+                    disable_method_d_lock: (document.getElementById('jumphost_label_lock_on') && !document.getElementById('jumphost_label_lock_on').checked) ? '1' : '0',
+	                cloudboot_target_ssh_key: document.getElementById('cloudboot_target_ssh_key') ? document.getElementById('cloudboot_target_ssh_key').value.trim() : '',
+	                target_windows_ssh_key: document.getElementById('cloudboot_target_ssh_key') ? document.getElementById('cloudboot_target_ssh_key').value.trim() : '',
+	                direct_export: document.getElementById('direct_export') ? document.getElementById('direct_export').checked : false
+	            };
 
             // ── IP Guard — block VMs with missing / N/A IPs ─────────────────
             const _missingIp = [];
@@ -6230,9 +6546,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const _dispatchLabel = _selectedRepairMethod === 'nbd_dd'
                     ? '📦 DD'
                     : '🚀 NBD';
-                const _windowsNote = _selectedWindowsMethod === 'windows_method_b_hypervisor'
-                    ? ' · Windows guests -> Method B Hypervisor'
-                    : ' · Windows guests -> Method A';
+                const _windowsNote = (_selectedWindowsMethod === 'windows_method_b_hypervisor' || _selectedWindowsMethod === 'windows_method_d_safe_ide_boot' || _selectedWindowsMethod === 'windows_method_g_simple_ssh_dummy_virtio' || _selectedWindowsMethod === 'windows_method_h_local_kvm')
+                    ? ` · Windows guests -> ${_selectedWindowsMethod === 'windows_method_d_safe_ide_boot' ? 'Method D Safe IDE Boot' : (_selectedWindowsMethod === 'windows_method_g_simple_ssh_dummy_virtio' ? 'Method G Simple (SSH Dummy VirtIO)' : (_selectedWindowsMethod === 'windows_method_h_local_kvm' ? 'Method H Local KVM' : 'Method B Hypervisor'))}`
+                    : (_selectedWindowsMethod === 'windows_method_c_dynamic_auto'
+                        ? ' · Windows guests -> Method C Dynamic Auto Repair'
+                        : ' · Windows guests -> Method A');
                 appendLog(`${_dispatchLabel} Inline Repair — dispatching ${_newCheckedVMs.length} VM(s) via mig_worker_v4.sh on ${jh.jumphost_ip}${_windowsNote}`, 'system');
 
                 // Initialize progress tracker with all VM names
@@ -6244,17 +6562,76 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 window._nbdJumphostParams = jh;
                 if (typeof _nbdSaveJumphost === 'function') _nbdSaveJumphost(jh);
 
+                try {
+                    const _rs = await fetch('/api/vm_migrator/nbd/reset_jobs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jumphost_ip: jh.jumphost_ip,
+                            jumphost_user: jh.jumphost_user,
+                            ssh_key_path: jh.ssh_key_path,
+                        }),
+                    });
+                    const _rd = await _rs.json().catch(() => ({}));
+                    if (_rs.ok && _rd.ok !== false) {
+                        appendLog('⏹ Jumphost: global reset skipped; running jobs are preserved.', 'system');
+                    } else {
+                        appendLog('⚠ Jumphost reset reported issues — continuing anyway: ' + String(_rd.output || _rd.error || _rs.status).slice(0, 300), 'warn');
+                    }
+                } catch (_e) {
+                    appendLog('⚠ Jumphost reset request failed — continuing: ' + _e.message, 'warn');
+                }
+
                 async function runOneVM(cb, idx) {
                     if (!isVmBatchRunning) return;
                     const sName = cb.dataset.sourceName;
+                    const sourceServerId = (cb.dataset.sourceId || '').trim();
                     const srcIp = cb.dataset.sourceIp || '';
                     const flavor = cb.dataset.flavor || payload.flex_flavor || '';
                     const vmSshUser = cb.dataset.sshUser || '';
                     const vmSshKey = cb.dataset.sshKey || '';
-                    const vmPassword = cb.dataset.password || '';
+                    const vmPasswordInput = Array.from(document.querySelectorAll('.ssh-password-cell'))
+                        .find(el => (el.dataset.sourceName || '') === String(sName || ''));
+                    const vmPassword = (vmPasswordInput && typeof vmPasswordInput.value === 'string')
+                        ? vmPasswordInput.value
+                        : (cb.dataset.password || '');
+                    // Keep dataset/cache aligned with the value actually dispatched.
+                    cb.dataset.password = vmPassword || '';
+                    if (typeof updateVmRowAuthData === 'function') {
+                        updateVmRowAuthData(sName, 'password', vmPassword || '');
+                    }
                     const vmSnetIpNbd = cb.dataset.snetIp || '';
                     const osType = cb.dataset.osType || guessOsType(sName);
+                    const osFamily = (cb.dataset.osFamily || '').toLowerCase();
                     const defaults = NBD_OS_DEFAULTS[osType] || NBD_OS_DEFAULTS.ubuntu24;
+                    const isWindowsVm = osFamily === 'windows' || String(osType || '').toLowerCase().includes('win');
+
+                    if (!String(vmPassword || '').trim()) {
+                        appendLog(`✖ [${sName}] Password is required for all runs. Fill the row password field, then retry.`, 'error');
+                        setVmStatus(sName, 'error');
+                        return;
+                    }
+
+                    if (isWindowsVm && _selectedWindowsMethod === 'windows_method_d_safe_ide_boot' && !String(vmPassword || '').trim()) {
+                        appendLog(`✖ [${sName}] Windows Method D requires source Windows password. Fill the row password field, then retry.`, 'error');
+                        setVmStatus(sName, 'error');
+                        return;
+                    }
+                    if (isWindowsVm && _selectedWindowsMethod === 'windows_method_g_simple_ssh_dummy_virtio' && !String(vmPassword || '').trim()) {
+                        appendLog(`✖ [${sName}] Windows Method G Simple requires source Windows password for SSH disk capture. Fill the row password field, then retry.`, 'error');
+                        setVmStatus(sName, 'error');
+                        return;
+                    }
+                    if (isWindowsVm && _selectedWindowsMethod === 'windows_method_h_local_kvm' && !String(vmPassword || '').trim()) {
+                        appendLog(`✖ [${sName}] Windows Method H requires source Windows password for SSH disk capture. Fill the row password field, then retry.`, 'error');
+                        setVmStatus(sName, 'error');
+                        return;
+                    }
+                    if (isWindowsVm && _selectedWindowsMethod === 'windows_method_e_b_capture_g_deploy' && !String(vmPassword || '').trim()) {
+                        appendLog(`✖ [${sName}] Windows Method E requires source Windows password for SSH disk capture. Fill the row password field, then retry.`, 'error');
+                        setVmStatus(sName, 'error');
+                        return;
+                    }
 
                     appendLog(`► NBD [${idx+1}/${checkedVMs.length}]: ${sName} (${osType}) → nbd${idx}`, 'system');
 
@@ -6263,6 +6640,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         jumphost_user: jh.jumphost_user,
                         ssh_key_path:  jh.ssh_key_path,
                         flex_creds:    flexCreds,
+                        origin_vm_password: vmPassword || '',
+                        windows_admin_password: vmPassword || '',
                         ospc_creds: {
                             username:   document.getElementById('ospc_cloud_user')?.value || '',
                             apikey:     document.getElementById('ospc_cloud_key')?.value || '',
@@ -6274,18 +6653,42 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         offline_repair_method: _selectedRepairMethod,
                         windows_repair_method: _selectedWindowsMethod,
                         windows_purge_xen: !!payloadTemplate.windows_purge_xen,
+                        allow_guest_disk_capture: '0',
+                        allow_disk2vhd: '0',
+                        allow_raw_ssh_capture: '0',
+                        allow_smb_https_object_transfer: '0',
+                        allow_windows_glance_only: '1',
+                        cloudboot_force_new: payloadTemplate.cloudboot_force_new || '0',
+                        disable_method_d_lock: payloadTemplate.disable_method_d_lock || '0',
                         vm: {
                             label:     sName,
+                            source_server_id: sourceServerId,
+                            source_server_name: sName,
                             src_ip:    srcIp,
                             os_type:   osType,
                             src_user:  vmSshUser || defaults.src_user,
                             flex_user: defaults.flex_user,
                             ssh_key:   vmSshKey || '',
                             password:  vmPassword || '',
+                            admin_password: vmPassword || '',
+                            instance_password: vmPassword || '',
+                            origin_vm_password: vmPassword || '',
                             server_snet_ip: vmSnetIpNbd,
                             offline_repair_method: _selectedRepairMethod,
-                            windows_repair_method: _selectedWindowsMethod,
-                            nbd_idx:   idx,
+	                            windows_repair_method: _selectedWindowsMethod,
+	                            cloudboot_target_host: payloadTemplate.cloudboot_target_host || '',
+	                            target_windows_ip: payloadTemplate.target_windows_ip || '',
+	                            cloudboot_target_winrm_host: payloadTemplate.cloudboot_target_winrm_host || '',
+	                            target_windows_snet_ip: payloadTemplate.target_windows_snet_ip || '',
+	                            cloudboot_target_user: payloadTemplate.cloudboot_target_user || 'Administrator',
+	                            target_windows_user: payloadTemplate.target_windows_user || 'Administrator',
+	                            cloudboot_target_password: payloadTemplate.cloudboot_target_password || '',
+	                            target_windows_password: payloadTemplate.target_windows_password || '',
+	                            cloudboot_target_ssh_key: payloadTemplate.cloudboot_target_ssh_key || '',
+	                            target_windows_ssh_key: payloadTemplate.target_windows_ssh_key || '',
+	                            cloudboot_force_new: payloadTemplate.cloudboot_force_new || '0',
+	                            disable_method_d_lock: payloadTemplate.disable_method_d_lock || '0',
+	                            nbd_idx:   idx,
                             src_port:  10811 + idx,
                             tun_port:  10821 + idx,
                             force_sync: cb.dataset.forceSync === "true",
@@ -6297,6 +6700,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     if (typeof _nbdSaveJob === 'function') _nbdSaveJob(sName, srcIp, flavor, osType);
                     let reader = null;
                     let _jobConfirmedDone = false;
+                    let _jobHadError = false;
                     const jobState = resetBatchJobState(sName, 'nbd_inline');
                     const controller = new AbortController();
                     jobState.controller = controller;
@@ -6334,13 +6738,15 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                                     if (content.includes('[ERROR]') || content.includes('FAILED') || content.includes('LAUNCH ERROR')) {
                                         appendLog(`[${sName}] ${content}`, 'error');
                                         setVmStatus(sName, 'error');
+                                        _jobHadError = true;
+                                        _jobConfirmedDone = true;
                                     }
                                     if (content.includes('SSH OK') || content.includes('BOOT_TEST_OK')) {
                                         setVmStatus(sName, 'success'); _jobConfirmedDone = true;
                                     } else if (content.includes('PROCESS EXITED WITH CODE 0') || content.includes('=== DONE ===')) {
                                         setVmStatus(sName, 'success'); _jobConfirmedDone = true;
                                     } else if (content.includes('PROCESS EXITED WITH CODE') && !content.includes('CODE 0')) {
-                                        setVmStatus(sName, 'error'); _jobConfirmedDone = true;
+                                        setVmStatus(sName, 'error'); _jobHadError = true; _jobConfirmedDone = true;
                                     }
                                 } else if (rawLine.startsWith('[')) {
                                     appendVmLog(sName, rawLine.trim(), 'system');
@@ -6349,7 +6755,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         }
 
                         if (isVmBatchRunning && !jobState.disconnectReason) {
-                            appendLog(`✔ Finished NBD migration: ${sName}`, 'system');
+                            if (_jobHadError) {
+                                appendLog(`✖ NBD failed: ${sName}`, 'error');
+                            } else {
+                                appendLog(`✔ Finished NBD migration: ${sName}`, 'system');
+                            }
                         }
                     } catch (e) {
                         if (jobState.disconnectReason === 'closed' || jobState.disconnectReason === 'killed' || e.name === 'AbortError') {
@@ -6575,6 +6985,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         });
         async function imageBatchInner(btn, dedupRunning = false) {
             const isDryRun = !!(btn && String(btn.id || '').includes('dryrun'));
+            const imageWindowsMethod = String((btn && btn.dataset && btn.dataset.windowsRepairMethod) || '').trim();
             const ospcUser    = (document.getElementById('ospc_cloud_user')    || {}).value || '';
             const ospcApiKey  = (document.getElementById('ospc_cloud_key')     || {}).value || '';
             const ospcTenant  = (document.getElementById('ospc_cloud_account') || {}).value || '';
@@ -6661,12 +7072,18 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 flex_region:      (document.getElementById('credFlexRegion')  || {}).value || 'DFW3',
                 flex_domain:      (document.getElementById('credFlexDomain')  || {}).value || 'rackspace_cloud_domain',
                 flex_auth_url:    (document.getElementById('credFlexAuthUrl') || {}).value || '',
+                flex_flavor:      (document.getElementById('flex_flavor_fallback') || {}).value || 'gp.0.4.4',
+                flex_network_id:  (document.getElementById('flex_network_id') || {}).value || 'tenant-net',
+                flex_key_name:    (document.getElementById('flex_key_name') || document.getElementById('flex_key_name_quick') || {}).value || '',
+                flex_security_group: (document.getElementById('flex_security_group') || {}).value || '',
                 target_format:    (document.getElementById('target_format')   || {}).value || 'qcow2',
                 visibility:       (document.getElementById('visibility')      || {}).value || 'private',
                 container_format: (document.getElementById('container_format')|| {}).value || 'bare',
                 workdir:          (document.getElementById('workdir')         || {}).value || '/mnt/migration/ospc2flex_image',
                 keep_export:      true,
                 os_type_override: osTypeOverride,
+                windows_repair_method: imageWindowsMethod || (document.getElementById('windows_repair_method') || {}).value || 'windows_method_a',
+                manual_driver_bind: true,
                 export_retries:   exportRetries,
                 export_retry_wait: exportRetryWait,
                 process_host_ip:  String(jhIp).trim(),
@@ -6691,6 +7108,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             ? window.imagePipelineAbortController.signal : undefined,
                         body: JSON.stringify({
                             ...sharedPayload,
+                            snapshot_id:   iid,
+                            ospc_image_id: iid,
                             snapshot_name: label,
                             server_name:   r.source_vm_name || label
                         })
@@ -6713,7 +7132,13 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             const line = chunk.replace(/^data:\s?/, '').trim();
                             if (!line) continue;
                             appendImageLog(iid, line);
-                            if (logEl) { logEl.textContent += line + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+                            if (logEl) {
+                                const next = (logEl.textContent || '') + line + '\n';
+                                logEl.textContent = next.length > IMAGE_SCAN_LOG_MAX_CHARS
+                                    ? next.slice(next.length - IMAGE_SCAN_LOG_MAX_CHARS)
+                                    : next;
+                                logEl.scrollTop = logEl.scrollHeight;
+                            }
                         }
                     }
                 } catch (e) {
@@ -6933,14 +7358,37 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         rhel9:    { src_user:'ec2-user',  flex_user:'cloud-user',  nbd:2, src_port:10813, tun_port:10823 },
     };
 
+    /** Label lock UI: sync button label, localStorage, and workflow-scoped cleanup explainer (visible only when lock OFF). */
+    function migSyncJumphostLabelLockUI() {
+        const cb = document.getElementById('jumphost_label_lock_on');
+        const btn = document.getElementById('jumphost_label_lock_btn');
+        const panel = document.getElementById('jumphost_workflow_scoped_cleanup_panel');
+        if (!cb || !btn) return;
+        localStorage.setItem('mig_jumphost_label_lock', cb.checked ? '1' : '0');
+        btn.textContent = cb.checked ? 'LABEL LOCK: ON' : 'LABEL LOCK: OFF';
+        if (panel) panel.style.display = cb.checked ? 'none' : 'block';
+    }
+    function migToggleJumphostLabelLock() {
+        const cb = document.getElementById('jumphost_label_lock_on');
+        if (!cb) return;
+        cb.checked = !cb.checked;
+        migSyncJumphostLabelLockUI();
+    }
+
     function toggleNbdPanel() {
         const method = (document.getElementById('offline_repair_method') || {}).value;
         const panel  = document.getElementById('nbd-panel');
         const winMethodSel = (document.getElementById('windows_repair_method') || {}).value || 'windows_method_a';
+        const isMethodGSimple = (winMethodSel === 'windows_method_g_simple_ssh_dummy_virtio');
+        const isMethodHLocalKvm = (winMethodSel === 'windows_method_h_local_kvm');
+        const isWinSafeIdeMethod = (winMethodSel === 'windows_method_b_hypervisor' || winMethodSel === 'windows_method_d_safe_ide_boot' || isMethodGSimple || isMethodHLocalKvm);
         const winPanel = document.getElementById('windows-method-panel');
         const isNbdMethod = (method === 'nbd_inline' || method === 'nbd_dd');
         if (panel) panel.style.display = isNbdMethod ? 'block' : 'none';
         if (winPanel) winPanel.style.display = isNbdMethod ? 'flex' : 'none';
+        if (typeof window._refreshMethodDPasswordBadges === 'function') {
+            window._refreshMethodDPasswordBadges();
+        }
         // ── Dynamic button label per repair mode ──
         const lbl = document.getElementById('start-btn-label');
         if (lbl) {
@@ -6977,8 +7425,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 if (pTitle) pTitle.innerHTML = method === 'nbd_dd' ? '📦 DD Inline Migration Pipeline' : '🚀 NBD Inline Migration Pipeline';
                 if (pSub)  pSub.textContent  =
                     method === 'nbd_dd'
-                        ? `Raw disk copy via dd + SSH · Linux follows standard inline repair · Windows guests use ${winMethodSel === 'windows_method_b_hypervisor' ? 'Method B Hypervisor' : 'Method A'}`
-                        : `Direct disk copy via NBD tunnel · Linux follows standard inline repair · Windows guests use ${winMethodSel === 'windows_method_b_hypervisor' ? 'Method B Hypervisor' : 'Method A'}`;
+                        ? `Raw disk copy via dd + SSH · Linux follows standard inline repair · Windows guests use ${isWinSafeIdeMethod ? (winMethodSel === 'windows_method_d_safe_ide_boot' ? 'Method D Safe IDE Boot' : (winMethodSel === 'windows_method_g_simple_ssh_dummy_virtio' ? 'Method G Simple (SSH Dummy VirtIO)' : (winMethodSel === 'windows_method_h_local_kvm' ? 'Method H Local KVM' : 'Method B Hypervisor'))) : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Method C Dynamic Auto Repair' : 'Method A')}`
+                        : `Direct disk copy via NBD tunnel · Linux follows standard inline repair · Windows guests use ${isWinSafeIdeMethod ? (winMethodSel === 'windows_method_d_safe_ide_boot' ? 'Method D Safe IDE Boot' : (winMethodSel === 'windows_method_g_simple_ssh_dummy_virtio' ? 'Method G Simple (SSH Dummy VirtIO)' : (winMethodSel === 'windows_method_h_local_kvm' ? 'Method H Local KVM' : 'Method B Hypervisor'))) : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Method C Dynamic Auto Repair' : 'Method A')}`;
                 // Update Steps 1-4 to match actual NBD pipeline
                 const _ps = (id, badge, title, desc, time, titleColor) => {
                     const el = document.getElementById(id);
@@ -6989,21 +7437,34 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     const b = el.querySelector('.ps-badge'); if (b) b.textContent = badge;
                 };
                 _ps('pipeline-step-1',  '0',   'Clean Old VM + Image',     'Delete previous FLEX VM & image attempts · clean workspace',         '~10s',    '#7dd3fc');
-                _ps('pipeline-step-2',  '1',   'qemu-nbd on Source',        'Start NBD server on OSPC source VM · serves raw disk over network',   '~5s',     '#a78bfa');
-                _ps('pipeline-step-25', '2',   'SSH Tunnel + Keepalive',    'Encrypted tunnel: jumphost:1082x ↔ source:1081x · 30s keepalive',    '~3s',     '#7dd3fc');
-                _ps('pipeline-step-3',  '3',   'Convert NBD → qcow2', 'qemu-img convert via tunnel · compressed qcow2 · BOTTLENECK', '~60–90 min', '#f59e0b');
+                if (isMethodGSimple) {
+                    _ps('pipeline-step-2',  '1',   'SSH guest capture',        'Elevated PhysicalDrive stream over SSH to jumphost raw image (no source NBD)', '~60–180 min', '#a78bfa');
+                    _ps('pipeline-step-25', '—',   '(not used)',               'Method G Simple does not use the jumphost↔source qemu-nbd tunnel',    '—',         '#64748b');
+                    _ps('pipeline-step-3',  '2',   'Validate capture',         'qemu-img info + size gate on raw before offline repair',             '~1 min',    '#7dd3fc');
+                } else {
+                    _ps('pipeline-step-2',  '1',   'qemu-nbd on Source',        'Start NBD server on OSPC source VM · serves raw disk over network',   '~5s',     '#a78bfa');
+                    _ps('pipeline-step-25', '2',   'SSH Tunnel + Keepalive',    'Encrypted tunnel: jumphost:1082x ↔ source:1081x · 30s keepalive',    '~3s',     '#7dd3fc');
+                    _ps('pipeline-step-3',  '3',   'Convert NBD → qcow2', 'qemu-img convert via tunnel · compressed qcow2 · BOTTLENECK', '~60–90 min', '#f59e0b');
+                }
                 const s3el = document.getElementById('pipeline-step-3');
-                if (s3el) { s3el.style.border = '1px solid rgba(245,158,11,0.3)'; s3el.style.background = '#1a0f00'; }
-                _ps('pipeline-step-4',  '4',   'Offline Repair', winMethodSel === 'windows_method_b_hypervisor' ? 'Linux: standard inline repair · Windows: offline repair + staged VirtIO payload for rescue boot' : 'Linux: standard inline repair · Windows: offline repair with current Method A workflow', '~2–5 min', '#7dd3fc');
+                if (s3el) {
+                    if (isMethodGSimple) { s3el.style.border = ''; s3el.style.background = ''; }
+                    else { s3el.style.border = '1px solid rgba(245,158,11,0.3)'; s3el.style.background = '#1a0f00'; }
+                }
+                _ps('pipeline-step-4',  '4',   'Offline Repair', isWinSafeIdeMethod ? (isMethodGSimple ? 'Linux: standard inline repair · Windows: qemu convert + repair + registry-safe VirtIO prep' : 'Linux: standard inline repair · Windows: offline repair + staged VirtIO payload for safe IDE rescue boot') : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Linux: standard inline repair · Windows: CloudJumper compare + dynamic repair bundle + Method A offline repair' : 'Linux: standard inline repair · Windows: offline repair with current Method A workflow'), '~2–5 min', '#7dd3fc');
                 s45title.innerHTML = 'Upload to Glance <span style="color:#0ea5e9;font-weight:400;font-size:10px;">· FLEX</span>';
-                s45desc.innerHTML  = winMethodSel === 'windows_method_b_hypervisor'
+                s45desc.innerHTML  = isMethodGSimple
+                    ? 'Windows: upload IDE rescue image from repaired qcow2 · dummy VirtIO disk · pnputil · snapshot · final virtio-scsi boot + healthcheck'
+                    : (isWinSafeIdeMethod
                     ? 'Linux uploads normally · Windows uploads IDE rescue image first, then pivots to final VirtIO image after in-guest driver binding'
-                    : 'Linux uploads normally · Windows follows current Method A upload/boot path';
+                    : (winMethodSel === 'windows_method_c_dynamic_auto'
+                        ? 'Linux uploads normally · Windows runs dynamic CloudJumper repair generation, then follows Method A upload/boot path'
+                        : 'Linux uploads normally · Windows follows current Method A upload/boot path'));
                 const s45el = document.getElementById('pipeline-step-45');
                 if (s45el) { const t45 = s45el.querySelector('.ps-time'); if (t45) t45.textContent = '~10–20 min'; }
-                _ps('pipeline-step-46', '6',   winMethodSel === 'windows_method_b_hypervisor' ? 'Boot + Windows Rescue Bind' : 'Boot VM + Floating IP', winMethodSel === 'windows_method_b_hypervisor' ? 'Linux: normal boot · Windows: boot IDE rescue VM, wait for WinRM/SSH, run pnputil, clean shutdown' : 'Create VM from image · attach public IP · staggered per VM', '~2–15 min', '#fb923c');
-                _ps('pipeline-step-5',  '7',   winMethodSel === 'windows_method_b_hypervisor' ? 'Windows Final VirtIO Boot Test' : 'SSH Verify', winMethodSel === 'windows_method_b_hypervisor' ? 'Windows only: snapshot rescue VM into final VirtIO/SCSI image and verify final boot' : 'Test SSH: flex key + origin key · multiple users · 24 retries', '~2–10 min', '#4ade80');
-                _ps('pipeline-step-55', '8',   'Report Results',            winMethodSel === 'windows_method_b_hypervisor' ? 'Linux reports normally · Windows keeps rescue VM on failure and writes JSON + logs' : 'Log SSH OK/FAIL · record Image ID + VM ID + FIP', '~5s', '#7dd3fc');
+                _ps('pipeline-step-46', '6',   isWinSafeIdeMethod ? 'Safe first boot + online VirtIO binding' : 'Boot VM + Floating IP', isWinSafeIdeMethod ? 'Linux: normal boot · Windows: boot IDE/e1000 rescue VM, wait for WinRM/SSH, run pnputil, reboot, then shutdown cleanly' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Create VM from image repaired via CloudJumper dynamic bundle · attach public IP' : 'Create VM from image · attach public IP · staggered per VM'), '~2–15 min', '#fb923c');
+                _ps('pipeline-step-5',  '7',   isWinSafeIdeMethod ? 'VirtIO-ready snapshot + final optimized boot' : 'SSH Verify', isWinSafeIdeMethod ? 'Windows only: snapshot rescue VM into final VirtIO/SCSI image and verify final production boot' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Verify dynamic auto-repair boot outcome via SSH/WinRM readiness checks' : 'Test SSH: flex key + origin key · multiple users · 24 retries'), '~2–10 min', '#4ade80');
+                _ps('pipeline-step-55', '8',   'Report Results',            isWinSafeIdeMethod ? 'Linux reports normally · Windows emits safe-boot + bind + snapshot + final-boot status artifacts' : (winMethodSel === 'windows_method_c_dynamic_auto' ? 'Log CloudJumper compare outcome + dynamic repair status + VM result IDs' : 'Log SSH OK/FAIL · record Image ID + VM ID + FIP'), '~5s', '#7dd3fc');
                 _ps('pipeline-step-6',  '✅',  'Migration Complete',        'All steps done · VM running on FLEX with public IP',                  '',        '#4ade80');
             } else if (method === 'generic') {
                 if (pTitle) pTitle.innerHTML = '⚙ Generic Migration Pipeline';
@@ -7198,16 +7659,20 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
     function nbdGetJumphostParams() {
         const mem    = window._nbdJumphostParams || {};
         const stored = (() => { try { return JSON.parse(localStorage.getItem(_NBD_JH_KEY) || 'null') || {}; } catch(_) { return {}; } })();
-        const jh   = (document.getElementById('nbd_jumphost_ip')   || {}).value
+        const san = (typeof window._jhSanitizeJumphostHostInput === 'function')
+            ? window._jhSanitizeJumphostHostInput
+            : function(x) { return String(x || '').trim(); };
+        const rawJh = (document.getElementById('nbd_jumphost_ip')   || {}).value
                   || (document.getElementById('process_host_ip')   || {}).value
-                  || mem.jumphost_ip || stored.jumphost_ip || '';
+                  || mem.jumphost_ip || mem.jumphost_host || stored.jumphost_ip || stored.jumphost_host || '';
+        const jh = san(rawJh);
         const user = (document.getElementById('nbd_jumphost_user') || {}).value
                   || (document.getElementById('process_ssh_user')  || {}).value
                   || mem.jumphost_user || stored.jumphost_user || 'ubuntu';
         const key  = (document.getElementById('nbd_jumphost_key')  || {}).value
                   || (document.getElementById('process_ssh_key')   || {}).value
                   || mem.ssh_key_path || stored.ssh_key_path || '~/.ssh/id_rsa';
-        return { jumphost_ip: jh.trim(), jumphost_user: user.trim(), ssh_key_path: key.trim() };
+        return { jumphost_ip: jh, jumphost_host: jh, jumphost_user: user.trim(), ssh_key_path: key.trim() };
     }
 
     function nbdGetFlexCreds() {
@@ -7351,7 +7816,16 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         document.getElementById('nbd-terminals').appendChild(wrap);
     }
 
+    const NBD_MAX_LOG_LINES = 2000;
+    function nbdTrimLogBody(body) {
+        if (!body) return;
+        while (body.childElementCount > NBD_MAX_LOG_LINES) {
+            body.removeChild(body.firstElementChild);
+        }
+    }
+
     function nbdAppendLog(label, text) {
+        if (isChunkDlProgressLine(text)) return;
         if (text.includes('[SRC_SIZE_GB=')) {
             const m = text.match(/\[SRC_SIZE_GB=([0-9.]+)\]/);
             if (m) {
@@ -7382,6 +7856,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         else
             el.innerHTML = `<span style="color:#00e838;">${s}</span>`;
         body.appendChild(el);
+        nbdTrimLogBody(body);
         body.scrollTop = body.scrollHeight;
     }
 
@@ -7399,6 +7874,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             es.onmessage = e => {
                 const txt = e.data;
                 if (state.finished) { es.close(); return; }
+                if (txt.startsWith('[SEEN] ')) {
+                    const n = Number(txt.slice(7).trim());
+                    if (Number.isFinite(n) && n >= 0) seenLines = n;
+                    return;
+                }
                 if (txt === '[DONE]') {
                     state.finished = true;
                     state.eventSource = null;
@@ -7435,17 +7915,6 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     state.eventSource = null;
                     es.close();
                 }
-            };
-            // Parse seen counter from SSE comments (": seen=N")
-            es.addEventListener('message', () => {});  // keep connection alive
-            const origDispatch = es.dispatchEvent.bind(es);
-            // Track seen via custom event — backend sends ": seen=N" comments
-            // Browser EventSource drops comments; we parse them via a raw fetch fallback
-            // For now, increment seenLines on each non-empty message (approximation)
-            const _origOnMsg = es.onmessage;
-            es.onmessage = function(e) {
-                if (e.data && e.data !== '[DONE]' && !e.data.startsWith('===')) seenLines++;
-                _origOnMsg(e);
             };
             es.onerror = () => {
                 es.close();
@@ -7568,7 +8037,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
     }
 
     function nbdPollStatus(jh) {
-        // Poll every 10 seconds for better live feel
+        // Poll every 5 seconds so Method G JSON checkpoints stay closer to live logs
         const ival = setInterval(async () => {
             try {
                 const r = await fetch(`/api/vm_migrator/nbd/status?jumphost_ip=${encodeURIComponent(jh.jumphost_ip)}&jumphost_user=${encodeURIComponent(jh.jumphost_user)}&ssh_key=${encodeURIComponent(jh.ssh_key_path)}`);
@@ -7586,6 +8055,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
 
                 // 2. Render the NEW Jumphost Monitor
                 renderJumphostMonitor(d);
+                renderMethodGSimpleResults(d);
 
                 // 3. Auto-stop if idle for too long (e.g. no logs, no procs)
                 const hasProcs = d.processes && d.processes.length > 0 && d.processes[0] !== 'none';
@@ -7594,7 +8064,78 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     // Let's only stop if the user navigates away or explicitly kills it.
                 }
             } catch(e) { console.warn('JH Poll Error:', e); }
-        }, 10000);
+        }, 5000);
+    }
+
+    function renderMethodGSimpleResults(d) {
+        const panel = document.getElementById('method-g-simple-results-panel');
+        const host = document.getElementById('method-g-simple-results');
+        if (!panel || !host) return;
+        const mg = d && d.method_g_simple ? d.method_g_simple : {};
+        const labels = Object.keys(mg || {});
+        if (!labels.length) {
+            panel.style.display = 'none';
+            host.innerHTML = '';
+            return;
+        }
+        panel.style.display = 'block';
+        const stages = [
+            { key: 'ssh_capture', tab: 'G1-G2', label: 'SSH Capture' },
+            { key: 'artifact_validated', tab: 'G3-G4', label: 'Artifact Validate' },
+            { key: 'windows_repaired', tab: 'G5', label: 'Windows Repair' },
+            { key: 'safe_rescue_boot', tab: 'G6-G7', label: 'Safe Rescue Boot' },
+            { key: 'dummy_virtio_attached', tab: 'G8', label: 'Dummy VirtIO' },
+            { key: 'online_virtio_bound', tab: 'G9-G10', label: 'Online Binding' },
+            { key: 'final_boot_validated', tab: 'G11-G14', label: 'Final Validate' },
+        ];
+        const cpColor = (v) => {
+            const s = String(v || 'PENDING');
+            if (s === 'HIT') return '#4ade80';
+            if (s === 'FAILED') return '#f87171';
+            return '#fbbf24';
+        };
+        const stageToCard = {
+            G1_SSH_ACCESS_CHECK: 'ssh_capture',
+            G2_SSH_DISK_CAPTURE: 'ssh_capture',
+            G3_ARTIFACT_VALIDATE: 'artifact_validated',
+            G4_QCOW2_CONVERT: 'artifact_validated',
+            G5_WINDOWS_REPAIR: 'windows_repaired',
+            G6_UPLOAD_SAFE_RESCUE_IMAGE: 'safe_rescue_boot',
+            G7_BOOT_SAFE_RESCUE_VM: 'safe_rescue_boot',
+            G8_ATTACH_DUMMY_VIRTIO: 'dummy_virtio_attached',
+            G9_ONLINE_VIRTIO_BINDING: 'online_virtio_bound',
+            G10_REBOOT_STILL_IDE: 'online_virtio_bound',
+            G11_SNAPSHOT_VIRTIO_READY: 'final_boot_validated',
+            G12_BOOT_FINAL_VIRTIO: 'final_boot_validated',
+            G13_FINAL_VALIDATE: 'final_boot_validated',
+            G14_SUCCESS: 'final_boot_validated',
+        };
+        let html = '';
+        labels.sort().forEach((lbl) => {
+            const j = mg[lbl] || {};
+            const cps = j.checkpoints || {};
+            const status = String(j.status || 'RUNNING');
+            const stage = String(j.stage || '');
+            html += `<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid rgba(52,211,153,0.2);">`;
+            html += `<div style="color:#6ee7b7;font-weight:800;font-size:12px;margin-bottom:6px;">${lbl}</div>`;
+            html += `<div style="color:#a7f3d0;font-size:11px;margin-bottom:8px;">status=<span style="color:#ecfdf5;">${status}</span> · stage=<span style="color:#ecfdf5;">${stage}</span></div>`;
+            html += `<div style="display:flex;flex-wrap:wrap;gap:8px;">`;
+            stages.forEach((st) => {
+                let v = cps[st.key] || 'PENDING';
+                if (status === 'RUNNING' && stageToCard[stage] === st.key && v === 'PENDING') v = 'RUNNING';
+                const col = cpColor(v);
+                html += `<div style="flex:1;min-width:140px;max-width:220px;border:1px solid rgba(52,211,153,0.35);border-radius:8px;padding:8px;background:rgba(6,78,59,0.35);">`;
+                html += `<div style="color:#34d399;font-weight:800;font-size:11px;">${st.tab} · ${st.label}</div>`;
+                html += `<div style="color:${col};font-weight:800;font-size:11px;margin-top:4px;">${v}</div>`;
+                html += `</div>`;
+            });
+            html += `</div>`;
+            if (j.failure_reason || j.next_action) {
+                html += `<div style="color:#fca5a5;font-size:10px;margin-top:4px;">${j.failure_reason ? `failure_reason=${j.failure_reason}` : ''}${j.failure_reason && j.next_action ? ' · ' : ''}${j.next_action ? `next_action=${j.next_action}` : ''}</div>`;
+            }
+            html += `</div>`;
+        });
+        host.innerHTML = html;
     }
 
     async function nbdStop() {
@@ -7615,15 +8156,37 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             const sel = document.getElementById('offline_repair_method');
             if (sel) sel.value = saved;
         }
-        const savedWinMethod = localStorage.getItem('mig_windows_repair_method');
+        let savedWinMethod = localStorage.getItem('mig_windows_repair_method');
+        if (savedWinMethod === 'windows_method_g_simple' || savedWinMethod === 'windows_method_d_safe_ide_boot') {
+            savedWinMethod = 'windows_method_g_simple_ssh_dummy_virtio';
+            localStorage.setItem('mig_windows_repair_method', savedWinMethod);
+        }
         if (savedWinMethod) {
             const sel = document.getElementById('windows_repair_method');
             if (sel) sel.value = savedWinMethod;
+        }
+        const savedForceNew = localStorage.getItem('mig_cloudboot_force_new');
+        if (savedForceNew) {
+            const cb = document.getElementById('cloudboot_force_new');
+            const btn = document.getElementById('cloudboot_force_new_btn');
+            if (cb) cb.checked = (savedForceNew === '1');
+            if (btn) btn.textContent = (savedForceNew === '1') ? 'CREATE NEW BOOT REPAIR SCRIPT: ON' : 'CREATE NEW BOOT REPAIR SCRIPT';
         }
         const savedWinPurgeXen = localStorage.getItem('mig_windows_purge_xen');
         const purgeCb = document.getElementById('windows_purge_xen');
         if (purgeCb) {
             purgeCb.checked = savedWinPurgeXen !== '0';
+        }
+        const savedLabelLock = localStorage.getItem('mig_jumphost_label_lock');
+        const lockCb = document.getElementById('jumphost_label_lock_on');
+        const lockBtn = document.getElementById('jumphost_label_lock_btn');
+        if (lockCb && lockBtn) {
+            if (savedLabelLock === '0') {
+                lockCb.checked = false;
+            } else {
+                lockCb.checked = true;
+            }
+            if (typeof migSyncJumphostLabelLockUI === 'function') migSyncJumphostLabelLockUI();
         }
         toggleNbdPanel();
 
@@ -7727,7 +8290,7 @@ function notifyParentModalLock(open) {
     } catch (_) {}
 }
 
-function updateAddVmAuthMode(mode) {
+	function updateAddVmAuthMode(mode) {
     const keyEl = document.getElementById('addVm_ssh_key');
     const passEl = document.getElementById('addVm_password');
     const hintEl = document.getElementById('addVm_auth_hint');
@@ -7743,9 +8306,26 @@ function updateAddVmAuthMode(mode) {
             ? 'Password mode selected. SSH key path is not required for this VM.'
             : 'SSH key mode selected. You can still leave it blank if this VM does not need a separate key.';
     }
-}
+	}
 
-function openAddVmModal() {
+	function restoreCloudBootTargetInputs() {
+	    const mappings = [
+	        ['cloudboot_target_public_ip', 'mig_cloudboot_target_public_ip'],
+	        ['cloudboot_target_private_ip', 'mig_cloudboot_target_private_ip'],
+	        ['cloudboot_target_user', 'mig_cloudboot_target_user'],
+	        ['cloudboot_target_password', 'mig_cloudboot_target_password'],
+	        ['cloudboot_target_ssh_key', 'mig_cloudboot_target_ssh_key']
+	    ];
+	    mappings.forEach(([id, key]) => {
+	        const el = document.getElementById(id);
+	        if (!el) return;
+	        const saved = localStorage.getItem(key);
+	        if (saved !== null) el.value = saved;
+	    });
+	}
+	document.addEventListener('DOMContentLoaded', restoreCloudBootTargetInputs);
+	
+	function openAddVmModal() {
     // Only works when the VM table is loaded
     if (!flavorState.headers.length) {
         // Bootstrap the table with minimal headers if no CSV loaded
