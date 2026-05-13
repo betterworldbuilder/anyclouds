@@ -92,6 +92,14 @@ def test_method_z_result_schema_and_checkpoints():
     assert "METHOD_SNAPWIN_SUCCESS" in txt
 
 
+def test_method_z_offline_repair_uses_sectioned_reg_imports():
+    txt = _txt(SCRIPT)
+    assert "[HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\xenbus]" in txt
+    assert "[HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\CriticalDeviceDatabase\\pci#ven_1af4&dev_1001]" in txt
+    assert "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce]" in txt
+    assert '"ControlSet001\\Services\\xenbus\\Start"=dword:00000004' not in txt
+
+
 def test_cold_scan_dispatch_passes_snapshot_id_to_method_z():
     txt = _txt(TEMPLATE)
     assert "start-snapwin-migration-btn" in txt

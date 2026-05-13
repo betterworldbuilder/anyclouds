@@ -1400,50 +1400,113 @@ standalone_offline_windows_repair() {
   cat >"$reg_file" <<'EOF'
 Windows Registry Editor Version 5.00
 
-"ControlSet001\Services\xenbus\Start"=dword:00000004
-"ControlSet001\Services\xenvbd\Start"=dword:00000004
-"ControlSet001\Services\xenfilt\Start"=dword:00000004
-"ControlSet001\Services\xenvif\Start"=dword:00000004
-"ControlSet001\Services\xeniface\Start"=dword:00000004
-"ControlSet001\Services\xennet\Start"=dword:00000004
-"ControlSet001\Services\xenpci\Start"=dword:00000004
-"ControlSet001\Services\xensvc\Start"=dword:00000004
-"ControlSet002\Services\xenbus\Start"=dword:00000004
-"ControlSet002\Services\xenvbd\Start"=dword:00000004
-"ControlSet002\Services\xenfilt\Start"=dword:00000004
-"ControlSet002\Services\xenvif\Start"=dword:00000004
-"ControlSet002\Services\xeniface\Start"=dword:00000004
-"ControlSet002\Services\xennet\Start"=dword:00000004
-"ControlSet002\Services\xenpci\Start"=dword:00000004
-"ControlSet002\Services\xensvc\Start"=dword:00000004
-"ControlSet001\Services\intelppm\Start"=dword:00000004
-"ControlSet001\Services\amdppm\Start"=dword:00000004
-"ControlSet001\Services\processr\Start"=dword:00000004
-"ControlSet002\Services\intelppm\Start"=dword:00000004
-"ControlSet002\Services\amdppm\Start"=dword:00000004
-"ControlSet002\Services\processr\Start"=dword:00000004
-"ControlSet001\Services\intelide\Start"=dword:00000003
-"ControlSet001\Services\atapi\Start"=dword:00000003
-"ControlSet002\Services\intelide\Start"=dword:00000003
-"ControlSet002\Services\atapi\Start"=dword:00000003
-"ControlSet001\Services\viostor\Type"=dword:00000001
-"ControlSet001\Services\viostor\Start"=dword:00000000
-"ControlSet001\Services\viostor\ErrorControl"=dword:00000001
-"ControlSet001\Services\viostor\Group"="SCSI miniport"
-"ControlSet001\Services\viostor\ImagePath"="system32\\drivers\\viostor.sys"
-"ControlSet001\Services\vioscsi\Type"=dword:00000001
-"ControlSet001\Services\vioscsi\Start"=dword:00000000
-"ControlSet001\Services\vioscsi\ErrorControl"=dword:00000001
-"ControlSet001\Services\vioscsi\Group"="SCSI miniport"
-"ControlSet001\Services\vioscsi\ImagePath"="system32\\drivers\\vioscsi.sys"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001\Service"="viostor"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042\Service"="viostor"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004\Service"="vioscsi"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048\Service"="vioscsi"
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenbus]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenvbd]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenfilt]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenvif]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xeniface]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xennet]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenpci]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xensvc]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenbus]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenvbd]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenfilt]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenvif]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xeniface]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xennet]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenpci]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xensvc]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\intelppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\amdppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\processr]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\intelppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\amdppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\processr]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\intelide]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\atapi]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\intelide]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\atapi]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\viostor]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+"ImagePath"="system32\\drivers\\viostor.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\vioscsi]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+"ImagePath"="system32\\drivers\\vioscsi.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="viostor"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="viostor"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="vioscsi"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="vioscsi"
 EOF
   merge_system_reg "$reg_file" "$cfg/SYSTEM" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SYSTEM registry merge returned non-zero; inspect $REPAIR_LOG"
 
@@ -1451,7 +1514,8 @@ EOF
   cat >"$sw_reg" <<'EOF'
 Windows Registry Editor Version 5.00
 
-"Microsoft\Windows\CurrentVersion\RunOnce\ospc2flex_snapwin_network_reset"="cmd.exe /c powershell.exe -ExecutionPolicy Bypass -File C:\\ProgramData\\OSPC2FLEX\\windows-network-reset.ps1"
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce]
+"ospc2flex_snapwin_network_reset"="cmd.exe /c powershell.exe -ExecutionPolicy Bypass -File C:\\ProgramData\\OSPC2FLEX\\windows-network-reset.ps1"
 EOF
   merge_software_reg "$sw_reg" "$cfg/SOFTWARE" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SOFTWARE RunOnce merge returned non-zero; inspect $REPAIR_LOG"
 
