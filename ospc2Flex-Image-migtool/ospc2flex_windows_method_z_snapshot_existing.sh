@@ -715,12 +715,15 @@ PY
 }
 
 cinder_wait_volume_status() {
-  local vol_id="$1" want="$2" timeout="${3:-1800}" waited=0 status
+  local vol_id="$1" want="$2" timeout="${3:-1800}" waited=0 status detail
   while [ "$waited" -lt "$timeout" ]; do
     status="$(rackspace_volume_status "$vol_id" 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -d '\r' || echo unknown)"
     [ "$status" = "$want" ] && return 0
     [ "$status" = "error" ] && return 1
-    [ $((waited % 60)) -eq 0 ] && log "[ZS3B_CINDER_VOLUME_EXPORT] volume=$vol_id status=$status target=$want waited=${waited}s"
+    if [ $((waited % 60)) -eq 0 ]; then
+      detail="$(rackspace_volume_detail_summary "$vol_id")"
+      log "[ZS3B_CINDER_VOLUME_EXPORT] volume=$vol_id status=$status target=$want waited=${waited}s ${detail}"
+    fi
     sleep 10
     waited=$((waited + 10))
   done
@@ -758,7 +761,28 @@ rackspace_volume_status() {
   base="$(rackspace_blockstorage_base)"
   [ -n "$token" ] && [ -n "$base" ] || return 1
   resp="$(curl -sS "$base/volumes/$vol_id" -H "X-Auth-Token: $token" 2>/dev/null || true)"
+  printf '%s\n' "$resp" >"$JOB_TMP/volume_${vol_id}.json" 2>/dev/null || true
   printf '%s' "$resp" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("status","unknown"))' 2>/dev/null || echo unknown
+}
+
+rackspace_volume_detail_summary() {
+  local vol_id="$1" file="$JOB_TMP/volume_${vol_id}.json"
+  [ -s "$file" ] || return 0
+  python3 - "$file" <<'PY' 2>/dev/null || true
+import json, sys
+v = (json.load(open(sys.argv[1], encoding="utf-8")).get("volume") or {})
+fields = ["status", "size", "display_name", "display_description", "availability_zone", "created_at", "volume_type", "bootable"]
+parts = []
+for key in fields:
+    val = v.get(key)
+    if val not in (None, ""):
+        parts.append(f"{key}={val}")
+for key in ("error", "fault", "os-vol-tenant-attr:tenant_id"):
+    val = v.get(key)
+    if val not in (None, ""):
+        parts.append(f"{key}={val}")
+print(" ".join(parts))
+PY
 }
 
 rackspace_create_volume_from_image() {
