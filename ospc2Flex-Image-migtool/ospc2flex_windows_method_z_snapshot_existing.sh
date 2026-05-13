@@ -277,6 +277,10 @@ source_openrc_if_present() {
   local path="$1"
   if [ -n "$path" ]; then
     [ -f "$path" ] || fail_exit "$CURRENT_STAGE" "openrc_missing" "Check path: $path"
+    unset OS_TOKEN OS_AUTH_TOKEN OS_SERVICE_TOKEN OS_AUTH_TYPE
+    unset OS_APPLICATION_CREDENTIAL_ID OS_APPLICATION_CREDENTIAL_NAME OS_APPLICATION_CREDENTIAL_SECRET
+    unset OS_USERNAME OS_PASSWORD OS_PROJECT_ID OS_PROJECT_NAME OS_TENANT_ID OS_TENANT_NAME
+    unset OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_NAME OS_DOMAIN_NAME
     # shellcheck source=/dev/null
     source "$path"
   fi
