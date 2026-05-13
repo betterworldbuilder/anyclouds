@@ -7106,6 +7106,13 @@ def run_image_migrator():
 
     _windows_method = str(req.get('windows_repair_method') or '').strip().lower()
     if _windows_method == 'windows_method_z_snapshot_existing':
+        # SNAPWIN is intentionally pinned to the known processing jumphost.
+        # This removes browser/localStorage drift from the cold snapshot path.
+        snapwin_jumphost_ip = os.environ.get("OSPC2FLEX_SNAPWIN_JUMPHOST_IP", "104.239.169.89")
+        snapwin_jumphost_user = os.environ.get("OSPC2FLEX_SNAPWIN_JUMPHOST_USER", "ubuntu")
+        snapwin_jumphost_key = os.environ.get("OSPC2FLEX_SNAPWIN_JUMPHOST_KEY", "/home/dzoan/.ssh/id_rsa")
+        process_ip = snapwin_jumphost_ip
+
         method_z_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_windows_method_z_snapshot_existing.sh")
         method_z_files = [method_z_script]
         missing_z = [p for p in method_z_files if not os.path.isfile(p)]
@@ -7130,7 +7137,7 @@ def run_image_migrator():
         remote_log = f"/tmp/mig_{label_safe_z}.log"
         remote_script = "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh"
 
-        ssh_key_raw_z = (req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip()
+        ssh_key_raw_z = snapwin_jumphost_key.strip()
         ssh_key_raw_z = ssh_key_raw_z.replace('id _rsa', 'id_rsa')
         if ssh_key_raw_z.startswith('/.ssh/'):
             ssh_key_raw_z = '~' + ssh_key_raw_z
@@ -7139,7 +7146,7 @@ def run_image_migrator():
             default_ssh_key_z = os.path.expanduser('~/.ssh/id_rsa')
             if os.path.exists(default_ssh_key_z):
                 ssh_key_z = default_ssh_key_z
-        ssh_usr_z = (req.get('process_ssh_user') or 'ubuntu').strip() or 'ubuntu'
+        ssh_usr_z = snapwin_jumphost_user.strip() or 'ubuntu'
         ssh_base_z = [
             "ssh", "-i", ssh_key_z,
             "-o", "StrictHostKeyChecking=no",
@@ -7174,6 +7181,7 @@ def run_image_migrator():
             yield "data: --- EXECUTING METHOD SNAPWIN ---\n\n"
             yield f"data: Method SNAPWIN — Existing OSPC Windows Snapshot to Flex: {label_safe_z}\n\n"
             yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
+            yield f"data: [METHOD_Z] SNAPWIN pinned jumphost: {ssh_usr_z}@{process_ip}\n\n"
             yield f"data: [METHOD_Z] Jumphost SSH key: {ssh_key_z}\n\n"
             try:
                 def _run_stage_cmd(stage_label, cmd, timeout, attempts=1, retry_wait=8, capture=True):
