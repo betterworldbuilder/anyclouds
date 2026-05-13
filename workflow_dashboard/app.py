@@ -7138,9 +7138,10 @@ def run_image_migrator():
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
             "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=20",
-            "-o", "ServerAliveInterval=10",
-            "-o", "ServerAliveCountMax=3",
+            "-o", "ConnectTimeout=60",
+            "-o", "ConnectionAttempts=3",
+            "-o", "ServerAliveInterval=15",
+            "-o", "ServerAliveCountMax=4",
             f"{ssh_usr_z}@{process_ip}",
         ]
         scp_base_z = [
@@ -7149,9 +7150,10 @@ def run_image_migrator():
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
             "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=20",
-            "-o", "ServerAliveInterval=10",
-            "-o", "ServerAliveCountMax=3",
+            "-o", "ConnectTimeout=60",
+            "-o", "ConnectionAttempts=3",
+            "-o", "ServerAliveInterval=15",
+            "-o", "ServerAliveCountMax=4",
         ]
 
         def _method_z_generator():
@@ -7159,7 +7161,50 @@ def run_image_migrator():
             yield f"data: Method SNAPWIN — Existing OSPC Windows Snapshot to Flex: {label_safe_z}\n\n"
             yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
             try:
-                subprocess.run(ssh_base_z + ["true"], check=True, timeout=35)
+                def _run_stage_cmd(stage_label, cmd, timeout, attempts=1, retry_wait=8, capture=True):
+                    last = None
+                    for attempt in range(1, attempts + 1):
+                        try:
+                            run_kwargs = {
+                                "check": False,
+                                "timeout": timeout,
+                                "text": True,
+                            }
+                            if capture:
+                                run_kwargs.update({"capture_output": True})
+                            proc = subprocess.run(cmd, **run_kwargs)
+                            if proc.returncode == 0:
+                                return proc
+                            last = proc
+                            err_text = ((getattr(proc, "stderr", "") or "") + "\n" + (getattr(proc, "stdout", "") or "")).strip()
+                            if attempt < attempts:
+                                yield f"data: [METHOD_Z] {stage_label} attempt {attempt}/{attempts} failed over SSH (rc={proc.returncode}); retrying in {retry_wait}s.\n\n"
+                                time.sleep(retry_wait)
+                                continue
+                            raise RuntimeError(
+                                f"{stage_label} failed over SSH/SCP after {attempts} attempt(s) "
+                                f"(rc={proc.returncode}). {err_text[-500:] if err_text else 'No stderr/stdout returned.'}"
+                            )
+                        except subprocess.TimeoutExpired as texc:
+                            last = texc
+                            if attempt < attempts:
+                                yield f"data: [METHOD_Z] {stage_label} timed out over SSH/SCP on attempt {attempt}/{attempts}; retrying in {retry_wait}s.\n\n"
+                                time.sleep(retry_wait)
+                                continue
+                            raise RuntimeError(
+                                f"{stage_label} timed out over SSH/SCP after {attempts} attempt(s). "
+                                "The jumphost accepted the request too slowly, commonly because a previous dd/qemu-img job is saturating disk or sshd is wedged."
+                            )
+                    return last
+
+                yield "data: [METHOD_Z] Checking jumphost SSH readiness before staging SNAPWIN.\n\n"
+                yield from _run_stage_cmd(
+                    "Jumphost SSH readiness check",
+                    ssh_base_z + ["true"],
+                    timeout=90,
+                    attempts=3,
+                    retry_wait=15,
+                )
 
                 import hashlib as _snapwin_hashlib
                 with open(method_z_script, "rb") as _fh:
@@ -7181,18 +7226,28 @@ def run_image_migrator():
                     yield "data: [METHOD_Z] SNAPWIN script already current on jumphost; skipped script upload.\n\n"
                 else:
                     yield "data: [METHOD_Z] Uploading SNAPWIN script to jumphost.\n\n"
-                    subprocess.run(
+                    yield from _run_stage_cmd(
+                        "SNAPWIN script upload",
                         scp_base_z + [method_z_script, f"{ssh_usr_z}@{process_ip}:{remote_script}"],
-                        check=True,
                         timeout=600,
+                        attempts=2,
+                        retry_wait=20,
                     )
 
                 for local, remote in ((ospc_path, remote_ospc), (flex_path, remote_flex)):
-                    subprocess.run(scp_base_z + [local, f"{ssh_usr_z}@{process_ip}:{remote}"], check=True, timeout=300)
-                subprocess.run(
+                    yield from _run_stage_cmd(
+                        f"OpenRC upload {os.path.basename(remote)}",
+                        scp_base_z + [local, f"{ssh_usr_z}@{process_ip}:{remote}"],
+                        timeout=300,
+                        attempts=2,
+                        retry_wait=15,
+                    )
+                yield from _run_stage_cmd(
+                    "SNAPWIN remote chmod",
                     ssh_base_z + [f"chmod 600 {shlex.quote(remote_ospc)} {shlex.quote(remote_flex)}; chmod +x {shlex.quote(remote_script)}"],
-                    check=True,
                     timeout=120,
+                    attempts=2,
+                    retry_wait=15,
                 )
                 yield "data: [METHOD_Z] Scripts and scoped OpenRC files staged on jumphost.\n\n"
 
@@ -7259,6 +7314,7 @@ def run_image_migrator():
                     yield "data: [METHOD_Z] The jumphost did not respond quickly enough over SSH/SCP. Check whether a prior SNAPWIN qemu-img/dd job is still saturating disk I/O, then retry.\n\n"
                 else:
                     yield f"data: [METHOD_Z LAUNCH ERROR] {exc}\n\n"
+                    yield f"data: [METHOD_Z] SSH target was {ssh_usr_z}@{process_ip}. If this repeats, reboot/recover the jumphost or kill any stuck qemu-img/dd jobs before retrying SNAPWIN.\n\n"
             finally:
                 try:
                     subprocess.run(
