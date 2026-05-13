@@ -1324,7 +1324,7 @@ wait_for_nbd_ntfs_partition() {
     command -v udevadm >/dev/null 2>&1 && sudo -n udevadm settle >>"$REPAIR_LOG" 2>&1 || true
     for part in "${nbd}"p*; do
       [ -b "$part" ] || continue
-      fstype="$(blkid -o value -s TYPE "$part" 2>/dev/null || true)"
+      fstype="$(sudo -n blkid -o value -s TYPE "$part" 2>/dev/null || true)"
       if [ "$fstype" = "ntfs" ]; then
         echo "$part"
         return 0
@@ -1381,7 +1381,7 @@ mount_windows_ntfs_nbd_rw() {
   sudo -n qemu-nbd --connect="$nbd" --format=qcow2 "$QCOW2" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "qemu_nbd_connect_failed" "Inspect $REPAIR_LOG."
   SNAPWIN_NBD_DEV="$nbd"
   part="$(wait_for_nbd_ntfs_partition "$nbd" || true)"
-  [ -n "$part" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs_partition_not_found" "Inspect partition table with fdisk -l $nbd."
+  [ -n "$part" ] || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs_partition_not_found" "Inspect partition table with fdisk -l $nbd."; }
   log "[ZS5_OFFLINE_WINDOWS_REPAIR] NTFS partition for repair: $part"
   sudo -n ntfsfix -d "$part" >>"$REPAIR_LOG" 2>&1 || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: ntfsfix returned non-zero for $part"
   sudo -n ntfs-3g -o rw,remove_hiberfile,big_writes "$part" "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs3g_mount_failed" "Inspect $REPAIR_LOG."
