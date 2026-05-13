@@ -1339,7 +1339,7 @@ pick_free_nbd_device() {
 }
 
 preclean_ntfs_for_rw_mount() {
-  local nbd part fstype found=0
+  local nbd part fstype found=0 i
   command -v ntfsfix >/dev/null 2>&1 || return 0
   command -v qemu-nbd >/dev/null 2>&1 || return 0
   if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
@@ -1357,7 +1357,12 @@ preclean_ntfs_for_rw_mount() {
   fi
   sleep 3
   sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
-  sleep 2
+  command -v udevadm >/dev/null 2>&1 && sudo -n udevadm settle >>"$REPAIR_LOG" 2>&1 || true
+  for i in $(seq 1 10); do
+    compgen -G "${nbd}p*" >/dev/null && break
+    sleep 1
+    sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  done
   for part in "${nbd}"p*; do
     [ -b "$part" ] || continue
     fstype="$(blkid -o value -s TYPE "$part" 2>/dev/null || true)"
