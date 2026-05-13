@@ -395,6 +395,25 @@ safe_cp_source() {
   rsync -a --inplace "$src" "$dest"
 }
 
+ensure_libguestfs_kernel_readable() {
+  [ "$DOWNLOAD_ONLY" = 1 ] && return 0
+  command -v guestmount >/dev/null 2>&1 || return 0
+  local unreadable=() kernel
+  while IFS= read -r kernel; do
+    [ -n "$kernel" ] && [ ! -r "$kernel" ] && unreadable+=("$kernel")
+  done < <(find /boot -maxdepth 1 -type f -name 'vmlinuz-*' 2>/dev/null | sort -r)
+  [ "${#unreadable[@]}" -eq 0 ] && return 0
+  log "[ZS0_PREFLIGHT] libguestfs kernel image(s) are not readable by $(id -un): ${unreadable[*]}"
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    fail_exit "ZS0_PREFLIGHT" "libguestfs_kernel_not_readable" "Make /boot/vmlinuz-* readable or run SNAPWIN with passwordless sudo available."
+  fi
+  sudo -n chmod a+r "${unreadable[@]}" >>"$BACKGROUND_LOG" 2>&1 || fail_exit "ZS0_PREFLIGHT" "libguestfs_kernel_chmod_failed" "Allow the jumphost user to read /boot/vmlinuz-* for libguestfs/supermin."
+  for kernel in "${unreadable[@]}"; do
+    [ -r "$kernel" ] || fail_exit "ZS0_PREFLIGHT" "libguestfs_kernel_still_unreadable" "Make $kernel readable and retry."
+    log "[ZS0_PREFLIGHT] OK libguestfs kernel readable: $kernel"
+  done
+}
+
 validate_artifact() {
   local path="$1" min_bytes="${2:-1073741824}" sz
   [ -f "$path" ] || fail_exit "$CURRENT_STAGE" "source_artifact_missing" "Provide a valid local artifact or downloadable OSPC image."
@@ -1562,6 +1581,7 @@ if [ "$DOWNLOAD_ONLY" != 1 ]; then
   for c in "${REPAIR_CMDS[@]}"; do
     require_cmd "$c"
   done
+  ensure_libguestfs_kernel_readable
 else
   log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
 fi
@@ -1617,14 +1637,19 @@ stage_start "ZS3_DOWNLOAD_SNAPSHOT"
 if [ -n "$LOCAL_ARTIFACT" ]; then
   log "[ZS3_DOWNLOAD_SNAPSHOT] Using existing local artifact: $LOCAL_ARTIFACT"
   SOURCE_FORMAT="$(detect_format "$LOCAL_ARTIFACT")"
-  case "$SOURCE_FORMAT" in
-    qcow2) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.qcow2" ;;
-    raw) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.raw" ;;
-    vpc) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhd" ;;
-    vhdx) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhdx" ;;
-    *) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img" ;;
-  esac
-  safe_cp_source "$LOCAL_ARTIFACT" "$SOURCE_ARTIFACT"
+  if [ "${OSPC2FLEX_LOCAL_ARTIFACT_IN_PLACE:-0}" = "1" ]; then
+    SOURCE_ARTIFACT="$LOCAL_ARTIFACT"
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Local artifact in-place mode enabled; avoiding duplicate copy."
+  else
+    case "$SOURCE_FORMAT" in
+      qcow2) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.qcow2" ;;
+      raw) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.raw" ;;
+      vpc) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhd" ;;
+      vhdx) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhdx" ;;
+      *) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img" ;;
+    esac
+    safe_cp_source "$LOCAL_ARTIFACT" "$SOURCE_ARTIFACT"
+  fi
 else
   SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img"
   set +e
