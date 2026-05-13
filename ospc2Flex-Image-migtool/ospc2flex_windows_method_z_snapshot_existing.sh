@@ -1311,6 +1311,22 @@ find_windows_root() {
   return 1
 }
 
+cleanup_guest_mountpoint() {
+  local mnt="$1"
+  if mountpoint -q "$mnt" 2>/dev/null; then
+    guestunmount "$mnt" >>"$REPAIR_LOG" 2>&1 || fusermount3 -u "$mnt" >>"$REPAIR_LOG" 2>&1 || fusermount -u "$mnt" >>"$REPAIR_LOG" 2>&1 || sudo -n umount "$mnt" >>"$REPAIR_LOG" 2>&1 || true
+  fi
+}
+
+prepare_guest_mountpoint() {
+  cleanup_guest_mountpoint "$MNT"
+  rm -rf "$MNT" 2>/dev/null || sudo -n rm -rf "$MNT"
+  mkdir -p "$MNT" 2>/dev/null || {
+    sudo -n mkdir -p "$MNT"
+    sudo -n chown "$(id -u):$(id -g)" "$MNT"
+  }
+}
+
 merge_system_reg() {
   local reg="$1" hive="$2"
   printf 'y\n' | sudo reged -I "$hive" "HKEY_LOCAL_MACHINE\\SYSTEM" "$reg" >>"$REPAIR_LOG" 2>&1
@@ -1398,8 +1414,7 @@ EOF
 standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
-  rm -rf "$MNT"
-  mkdir -p "$MNT"
+  prepare_guest_mountpoint
   guestmount -a "$QCOW2" -i --rw "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
   winroot="$(find_windows_root)" || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
   [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }

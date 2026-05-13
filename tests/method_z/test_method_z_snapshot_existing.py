@@ -69,6 +69,8 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "ensure_libguestfs_kernel_readable" in txt
     assert "chmod a+r" in txt
     assert "OSPC2FLEX_LOCAL_ARTIFACT_IN_PLACE" in txt
+    assert "cleanup_guest_mountpoint" in txt
+    assert "prepare_guest_mountpoint" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():
