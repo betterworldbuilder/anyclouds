@@ -50,6 +50,10 @@ openrcfixed.sh
 
 # Zone.Identifier files (Windows WSL artefacts)
 *Zone.Identifier
+*:Zone.Identifier
+*:sec.endpointdlp
+*Zone.Identifier
+*sec.endpointdlp
 
 # Credential and secret files
 ospc2flexlast.json
