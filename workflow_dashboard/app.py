@@ -7146,10 +7146,13 @@ def run_image_migrator():
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
             "-o", "BatchMode=yes",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "PreferredAuthentications=publickey",
             "-o", "ConnectTimeout=60",
-            "-o", "ConnectionAttempts=3",
+            "-o", "ConnectionAttempts=4",
             "-o", "ServerAliveInterval=15",
             "-o", "ServerAliveCountMax=4",
+            "-o", "IPQoS=none",
             f"{ssh_usr_z}@{process_ip}",
         ]
         scp_base_z = [
@@ -7158,10 +7161,13 @@ def run_image_migrator():
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
             "-o", "BatchMode=yes",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "PreferredAuthentications=publickey",
             "-o", "ConnectTimeout=60",
-            "-o", "ConnectionAttempts=3",
+            "-o", "ConnectionAttempts=4",
             "-o", "ServerAliveInterval=15",
             "-o", "ServerAliveCountMax=4",
+            "-o", "IPQoS=none",
         ]
 
         def _method_z_generator():
@@ -7206,13 +7212,31 @@ def run_image_migrator():
                             )
                     return last
 
+                import socket as _snapwin_socket
+
+                def _tcp_probe_host_port(host, port, attempts=3, timeout=8, retry_wait=5):
+                    last_err = None
+                    for i in range(1, attempts + 1):
+                        try:
+                            with _snapwin_socket.create_connection((host, int(port)), timeout=timeout):
+                                return True
+                        except Exception as _e:
+                            last_err = _e
+                            if i < attempts:
+                                yield f"data: [METHOD_Z] TCP probe {host}:{port} attempt {i}/{attempts} failed; retrying in {retry_wait}s.\n\n"
+                                time.sleep(retry_wait)
+                    raise RuntimeError(f"TCP probe to {host}:{port} failed after {attempts} attempts: {last_err}")
+
+                yield "data: [METHOD_Z] Checking jumphost TCP/22 reachability before SSH staging.\n\n"
+                yield from _tcp_probe_host_port(process_ip, 22, attempts=3, timeout=8, retry_wait=5)
+
                 yield "data: [METHOD_Z] Checking jumphost SSH readiness before staging SNAPWIN.\n\n"
                 yield from _run_stage_cmd(
                     "Jumphost SSH readiness check",
                     ssh_base_z + ["true"],
-                    timeout=90,
-                    attempts=3,
-                    retry_wait=15,
+                    timeout=120,
+                    attempts=5,
+                    retry_wait=20,
                 )
 
                 import hashlib as _snapwin_hashlib
@@ -7323,6 +7347,8 @@ def run_image_migrator():
                     yield "data: [METHOD_Z] The jumphost did not respond quickly enough over SSH/SCP. Check whether a prior SNAPWIN qemu-img/dd job is still saturating disk I/O, then retry.\n\n"
                 else:
                     yield f"data: [METHOD_Z LAUNCH ERROR] {exc}\n\n"
+                    if "banner exchange" in str(exc).lower():
+                        yield "data: [METHOD_Z] Root cause hint: TCP/22 opened but sshd did not deliver its SSH banner in time (usually host overload or wedged sshd).\n\n"
                     yield f"data: [METHOD_Z] SSH target was {ssh_usr_z}@{process_ip}. If this repeats, reboot/recover the jumphost or kill any stuck qemu-img/dd jobs before retrying SNAPWIN.\n\n"
             finally:
                 try:

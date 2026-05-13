@@ -1341,9 +1341,18 @@ PY
 write_initial_state
 
 stage_start "ZS0_PREFLIGHT"
-for c in qemu-img guestmount guestunmount qemu-nbd hivexsh reged chntpw openstack jq curl rsync python3; do
+BASE_CMDS=(qemu-img openstack jq curl rsync python3)
+REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)
+for c in "${BASE_CMDS[@]}"; do
   require_cmd "$c"
 done
+if [ "$DOWNLOAD_ONLY" != 1 ]; then
+  for c in "${REPAIR_CMDS[@]}"; do
+    require_cmd "$c"
+  done
+else
+  log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
+fi
 if mount | grep -q "$RUN_DIR"; then
   fail_exit "ZS0_PREFLIGHT" "stale_guestmount_mount" "Unmount stale guestmount paths under $RUN_DIR."
 fi

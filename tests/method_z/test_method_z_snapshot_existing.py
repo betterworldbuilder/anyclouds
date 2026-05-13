@@ -58,6 +58,9 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "ospc2flex_windows_method_g_simple_lib.sh" not in txt
     assert 'source "${SELF_DIR}' not in txt
     assert "source_openrc_if_present" in txt
+    assert "download-only mode: deferred offline-repair dependency checks" in txt
+    assert "BASE_CMDS=(qemu-img openstack jq curl rsync python3)" in txt
+    assert "REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():
@@ -109,6 +112,16 @@ def test_app_branches_image_migrator_run_to_method_z():
     assert "Method SNAPWIN is a standalone cold snapshot method" in txt
     assert "Refusing live VM/NBD launch" in txt
 
+
+
+
+def test_method_z_tcp_preflight_and_auth_tuning_present():
+    txt = _txt(APP)
+    assert "Checking jumphost TCP/22 reachability before SSH staging." in txt
+    assert "def _tcp_probe_host_port" in txt
+    assert '"-o", "IdentitiesOnly=yes"' in txt
+    assert '"-o", "PreferredAuthentications=publickey"' in txt
+    assert '"-o", "IPQoS=none"' in txt
 
 def test_method_z_bash_syntax_checked():
     r = subprocess.run(["bash", "-n", str(SCRIPT)], capture_output=True, text=True)
