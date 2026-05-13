@@ -12,6 +12,7 @@
 #   * no Method D/G/H/v2 helper stages or sourced helper scripts
 
 set -euo pipefail
+export PATH="$PATH:/usr/sbin:/sbin"
 
 if [ -z "${OSPC2FLEX_LINEBUF_WRAPPER:-}" ] && command -v stdbuf >/dev/null 2>&1; then
   export OSPC2FLEX_LINEBUF_WRAPPER=1
@@ -31,6 +32,8 @@ DOWNLOAD_DIR=""
 FLEX_REGION="${FLEX_REGION:-DFW3}"
 VIRTIO_ISO="${OSPC2FLEX_VIRTIO_ISO_LOCAL:-/mnt/migration/virtio/virtio-win.iso}"
 LEGACY_VIRTIO_ISO="${OSPC2FLEX_LEGACY_VIRTIO_ISO:-/usr/share/virtio-win/virtio-win-0.1.108.iso}"
+VIRTIO_ISO_URL="${OSPC2FLEX_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso}"
+LEGACY_VIRTIO_ISO_URL="${OSPC2FLEX_LEGACY_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/deprecated-isos/archives/virtio-win-0.1.108/virtio-win-0.1.108.iso}"
 WINDOWS_VERSION="auto"
 SKIP_RESCUE_BOOT=0
 MANUAL_DRIVER_BIND=0
@@ -283,6 +286,89 @@ require_cmd() {
     command -v "$1" >/dev/null 2>&1 || log "[DRY-RUN] command not present here, would require on jumphost: $1"
   else
     command -v "$1" >/dev/null 2>&1 || fail_exit "ZS0_PREFLIGHT" "missing_command_$1" "Install $1 on the jumphost and retry."
+  fi
+}
+
+pkg_for_cmd() {
+  case "$1" in
+    qemu-img|qemu-nbd) echo "qemu-utils" ;;
+    guestmount|guestunmount) echo "libguestfs-tools" ;;
+    hivexsh) echo "libhivex-bin" ;;
+    reged|chntpw) echo "chntpw" ;;
+    openstack) echo "python3-openstackclient" ;;
+    jq) echo "jq" ;;
+    curl) echo "curl" ;;
+    rsync) echo "rsync" ;;
+    python3) echo "python3" ;;
+    ntfs-3g|ntfsfix) echo "ntfs-3g" ;;
+    7z) echo "p7zip-full" ;;
+    *) echo "" ;;
+  esac
+}
+
+install_missing_prereqs() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  local missing=() pkgs=() c pkg unique_pkgs
+  for c in "$@"; do
+    command -v "$c" >/dev/null 2>&1 || missing+=("$c")
+  done
+  [ "${#missing[@]}" -gt 0 ] || return 0
+
+  log "[ZS0_PREFLIGHT] Missing tool(s): ${missing[*]}"
+  if ! command -v apt-get >/dev/null 2>&1; then
+    fail_exit "ZS0_PREFLIGHT" "missing_commands_${missing[*]}" "This jumphost is missing tools and does not have apt-get. Install: ${missing[*]}"
+  fi
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    fail_exit "ZS0_PREFLIGHT" "sudo_required_for_prereq_install" "Configure passwordless sudo or preinstall: ${missing[*]}"
+  fi
+
+  for c in "${missing[@]}"; do
+    pkg="$(pkg_for_cmd "$c")"
+    [ -n "$pkg" ] && pkgs+=("$pkg")
+  done
+  [ "${#pkgs[@]}" -gt 0 ] || fail_exit "ZS0_PREFLIGHT" "unknown_prereq_package" "No package mapping for missing tools: ${missing[*]}"
+  unique_pkgs="$(printf '%s\n' "${pkgs[@]}" | awk 'NF && !seen[$0]++' | tr '\n' ' ')"
+  log "[ZS0_PREFLIGHT] Installing missing package(s): $unique_pkgs"
+  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get update >>"$BACKGROUND_LOG" 2>&1
+  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y $unique_pkgs >>"$BACKGROUND_LOG" 2>&1
+
+  for c in "${missing[@]}"; do
+    if command -v "$c" >/dev/null 2>&1; then
+      log "[ZS0_PREFLIGHT] OK after install: $c=$(command -v "$c")"
+    else
+      fail_exit "ZS0_PREFLIGHT" "missing_command_${c}_after_install" "apt install completed but $c is still unavailable. Inspect $BACKGROUND_LOG."
+    fi
+  done
+}
+
+ensure_virtio_iso() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  [ "$DOWNLOAD_ONLY" = 1 ] && return 0
+  local iso="$1" url="$2" label="$3" min_bytes="${4:-50000000}" tmp
+  if [ -s "$iso" ] && [ "$(stat -c%s "$iso" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
+    log "[ZS0_PREFLIGHT] HIT $label present: $iso"
+    return 0
+  fi
+  [ -n "$url" ] || return 0
+  if ! command -v curl >/dev/null 2>&1; then
+    log "[ZS0_PREFLIGHT] WARN cannot download $label because curl is unavailable"
+    return 0
+  fi
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    log "[ZS0_PREFLIGHT] WARN cannot stage $label because passwordless sudo is unavailable"
+    return 0
+  fi
+  log "[ZS0_PREFLIGHT] Downloading missing $label to $iso"
+  sudo -n mkdir -p "$(dirname "$iso")"
+  sudo -n chown "$(id -u):$(id -g)" "$(dirname "$iso")" 2>/dev/null || true
+  tmp="${iso}.tmp.$$"
+  if curl -fL --retry 3 --retry-delay 5 --connect-timeout 20 -o "$tmp" "$url" >>"$BACKGROUND_LOG" 2>&1 \
+     && [ -s "$tmp" ] && [ "$(stat -c%s "$tmp" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
+    mv -f "$tmp" "$iso"
+    log "[ZS0_PREFLIGHT] HIT downloaded $label: $iso"
+  else
+    rm -f "$tmp"
+    log "[ZS0_PREFLIGHT] WARN failed to download $label from $url; repair will fail later if the ISO is required"
   fi
 }
 
@@ -1351,7 +1437,11 @@ write_initial_state
 
 stage_start "ZS0_PREFLIGHT"
 BASE_CMDS=(qemu-img openstack jq curl rsync python3)
-REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)
+REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw ntfs-3g ntfsfix 7z)
+install_missing_prereqs "${BASE_CMDS[@]}"
+if [ "$DOWNLOAD_ONLY" != 1 ]; then
+  install_missing_prereqs "${REPAIR_CMDS[@]}"
+fi
 for c in "${BASE_CMDS[@]}"; do
   require_cmd "$c"
 done
@@ -1361,6 +1451,10 @@ if [ "$DOWNLOAD_ONLY" != 1 ]; then
   done
 else
   log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
+fi
+ensure_virtio_iso "$VIRTIO_ISO" "$VIRTIO_ISO_URL" "virtio-win ISO" 50000000
+if [ "$WINDOWS_VERSION" = "2008r2" ] || [ "$WINDOWS_VERSION" = "2k8r2" ]; then
+  ensure_virtio_iso "$LEGACY_VIRTIO_ISO" "$LEGACY_VIRTIO_ISO_URL" "legacy virtio-win 0.1.108 ISO" 30000000
 fi
 if mount | grep -q "$RUN_DIR"; then
   fail_exit "ZS0_PREFLIGHT" "stale_guestmount_mount" "Unmount stale guestmount paths under $RUN_DIR."

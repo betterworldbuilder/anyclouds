@@ -60,7 +60,11 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "source_openrc_if_present" in txt
     assert "download-only mode: deferred offline-repair dependency checks" in txt
     assert "BASE_CMDS=(qemu-img openstack jq curl rsync python3)" in txt
-    assert "REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)" in txt
+    assert "REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw ntfs-3g ntfsfix 7z)" in txt
+    assert "install_missing_prereqs" in txt
+    assert "python3-openstackclient" in txt
+    assert "libguestfs-tools" in txt
+    assert "ensure_virtio_iso" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():
