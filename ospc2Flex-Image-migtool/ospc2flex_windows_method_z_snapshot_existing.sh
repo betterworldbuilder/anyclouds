@@ -1327,6 +1327,50 @@ prepare_guest_mountpoint() {
   }
 }
 
+pick_free_nbd_device() {
+  local i n size
+  for i in $(seq 15 -1 0); do
+    n="/dev/nbd$i"
+    [ -b "$n" ] || continue
+    size="$(cat "/sys/block/nbd$i/size" 2>/dev/null || echo 1)"
+    [ "$size" = "0" ] && { echo "$n"; return 0; }
+  done
+  return 1
+}
+
+preclean_ntfs_for_rw_mount() {
+  local nbd part fstype found=0
+  command -v ntfsfix >/dev/null 2>&1 || return 0
+  command -v qemu-nbd >/dev/null 2>&1 || return 0
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: sudo unavailable; skipping NTFS dirty-bit preclean"
+    return 0
+  fi
+  sudo -n modprobe nbd max_part=16 >>"$REPAIR_LOG" 2>&1 || true
+  nbd="$(pick_free_nbd_device || true)"
+  [ -n "$nbd" ] || { log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: no free /dev/nbd device for NTFS preclean"; return 0; }
+  sudo -n qemu-nbd --disconnect "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] NTFS preclean via $nbd"
+  if ! sudo -n qemu-nbd --connect="$nbd" --format=qcow2 "$QCOW2" >>"$REPAIR_LOG" 2>&1; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: qemu-nbd connect failed; continuing to guestmount"
+    return 0
+  fi
+  sleep 3
+  sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  sleep 2
+  for part in "${nbd}"p*; do
+    [ -b "$part" ] || continue
+    fstype="$(blkid -o value -s TYPE "$part" 2>/dev/null || true)"
+    [ "$fstype" = "ntfs" ] || continue
+    found=1
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] running ntfsfix -d on $part"
+    sudo -n ntfsfix -d "$part" >>"$REPAIR_LOG" 2>&1 || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: ntfsfix returned non-zero for $part"
+  done
+  [ "$found" = "1" ] || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: no NTFS partition found on $nbd"
+  sudo -n qemu-nbd --disconnect "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  sleep 2
+}
+
 merge_system_reg() {
   local reg="$1" hive="$2"
   printf 'y\n' | sudo reged -I "$hive" "HKEY_LOCAL_MACHINE\\SYSTEM" "$reg" >>"$REPAIR_LOG" 2>&1
@@ -1415,6 +1459,7 @@ standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
   prepare_guest_mountpoint
+  preclean_ntfs_for_rw_mount
   guestmount -a "$QCOW2" -i --rw "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
   winroot="$(find_windows_root)" || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
   [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
