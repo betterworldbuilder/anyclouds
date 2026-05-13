@@ -7130,10 +7130,18 @@ def run_image_migrator():
         remote_log = f"/tmp/mig_{label_safe_z}.log"
         remote_script = "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh"
 
-        ssh_key_z = os.path.expanduser((req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip())
+        ssh_key_raw_z = (req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip()
+        ssh_key_raw_z = ssh_key_raw_z.replace('id _rsa', 'id_rsa')
+        if ssh_key_raw_z.startswith('/.ssh/'):
+            ssh_key_raw_z = '~' + ssh_key_raw_z
+        ssh_key_z = os.path.expanduser(ssh_key_raw_z)
+        if not os.path.exists(ssh_key_z):
+            default_ssh_key_z = os.path.expanduser('~/.ssh/id_rsa')
+            if os.path.exists(default_ssh_key_z):
+                ssh_key_z = default_ssh_key_z
         ssh_usr_z = (req.get('process_ssh_user') or 'ubuntu').strip() or 'ubuntu'
         ssh_base_z = [
-            "ssh", "-q", "-i", ssh_key_z,
+            "ssh", "-i", ssh_key_z,
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
@@ -7145,7 +7153,7 @@ def run_image_migrator():
             f"{ssh_usr_z}@{process_ip}",
         ]
         scp_base_z = [
-            "scp", "-q", "-i", ssh_key_z,
+            "scp", "-i", ssh_key_z,
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
@@ -7160,6 +7168,7 @@ def run_image_migrator():
             yield "data: --- EXECUTING METHOD SNAPWIN ---\n\n"
             yield f"data: Method SNAPWIN — Existing OSPC Windows Snapshot to Flex: {label_safe_z}\n\n"
             yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
+            yield f"data: [METHOD_Z] Jumphost SSH key: {ssh_key_z}\n\n"
             try:
                 def _run_stage_cmd(stage_label, cmd, timeout, attempts=1, retry_wait=8, capture=True):
                     last = None
