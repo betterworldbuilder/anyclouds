@@ -601,6 +601,12 @@ log_file_excerpt() {
   done
 }
 
+is_terminal_direct_download_block() {
+  local file="$1"
+  [ -s "$file" ] || return 1
+  grep -qiE 'HTTP_CODE=413|returned error: 413|Request Entity Too Large|InvalidResponse' "$file"
+}
+
 download_cloud_files_object() {
   local container="$1" object_name="$2" dest="$3" min_bytes="$4" tmp_log="$5" size
   rm -f "$dest"
@@ -1020,7 +1026,7 @@ download_curl_glance() {
 }
 
 download_existing_ospc_snapshot() {
-  local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i
+  local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3_DOWNLOAD_SNAPSHOT] Download waterfall for existing image=$image_id"
   log "[ZS3_DOWNLOAD_SNAPSHOT] Glance endpoint candidates:"
   image_bases | sed 's/^/[ZS3_DOWNLOAD_SNAPSHOT]   - /' | while IFS= read -r line; do log "$line"; done
@@ -1033,6 +1039,11 @@ download_existing_ospc_snapshot() {
     tmp_log="$JOB_LOG/openstack_image_save_default_attempt${attempt}.log"
     if download_openstack_save "" "$image_id" "$dest" "$min_bytes" "$tmp_log"; then
       return 0
+    fi
+    if is_terminal_direct_download_block "$tmp_log"; then
+      direct_blocked=1
+      log "[ZS3_DOWNLOAD_SNAPSHOT] Direct Glance save is terminally blocked for this image; skipping remaining direct retries."
+      break
     fi
     base_i=0
     while IFS= read -r base; do
@@ -1047,16 +1058,30 @@ download_existing_ospc_snapshot() {
       if download_openstack_save "$base" "$image_id" "$dest" "$min_bytes" "$tmp_log"; then
         return 0
       fi
+      if is_terminal_direct_download_block "$tmp_log"; then
+        direct_blocked=1
+        log "[ZS3_DOWNLOAD_SNAPSHOT] Direct Glance save is terminally blocked for $base; skipping remaining direct retries."
+        break
+      fi
       token="$(refresh_ospc_token || printf '%s' "$token")"
       if [ -n "$token" ]; then
         tmp_log="$JOB_LOG/curl_glance_attempt${attempt}_base${base_i}.log"
         if download_curl_glance "$base" "$image_id" "$dest" "$min_bytes" "$token" "$tmp_log"; then
           return 0
         fi
+        if is_terminal_direct_download_block "$tmp_log"; then
+          direct_blocked=1
+          log "[ZS3_DOWNLOAD_SNAPSHOT] Direct Glance file endpoint returned terminal block for $base; skipping remaining direct retries."
+          break
+        fi
       else
         log "[ZS3_DOWNLOAD_SNAPSHOT] WARN token refresh failed; skipping curl fallback for $base"
       fi
     done < <(image_bases)
+    if [ "$direct_blocked" = "1" ]; then
+      log "[ZS3_DOWNLOAD_SNAPSHOT] Falling through to Cloud Files export / Cinder fallback after terminal direct-download block."
+      break
+    fi
     [ "$attempt" -lt "$EXPORT_RETRIES" ] && sleep "$EXPORT_RETRY_WAIT"
     token="$(refresh_ospc_token || printf '%s' "$token")"
     attempt=$((attempt + 1))
