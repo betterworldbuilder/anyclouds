@@ -1841,6 +1841,65 @@ Set-Content -Path $Done -Value (Get-Date).ToString("s")
 EOF
 }
 
+apply_windows_bcd_boot_policy() {
+  local winroot="$1" root bcd export reg loader_count
+  root="$(dirname "$winroot")"
+  for bcd in "$root/Boot/BCD" "$root/EFI/Microsoft/Boot/BCD"; do
+    [ -f "$bcd" ] || continue
+    export="$JOB_TMP/bcd_export.reg"
+    reg="$JOB_TMP/bcd_boot_policy.reg"
+    if ! sudo hivexregedit --export --unsafe-printable-strings "$bcd" '\Objects' >"$export" 2>>"$REPAIR_LOG"; then
+      log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: BCD export failed for ${bcd#$root/}"
+      continue
+    fi
+    loader_count="$(python3 - "$export" "$reg" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(errors="ignore")
+objects = {}
+current = None
+for line in text.splitlines():
+    m = re.match(r"\[\\Objects\\(\{[0-9a-fA-F-]+\})(?:\\(.+))?\]", line)
+    if m:
+        current = m.group(1).lower()
+        objects.setdefault(current, "")
+    if current:
+        objects[current] += line + "\n"
+
+loaders = sorted(
+    guid for guid, body in objects.items()
+    if "winload.exe" in body.lower() or '"Type"=dword:10200003' in body
+)
+
+lines = ["Windows Registry Editor Version 5.00", ""]
+for guid in loaders:
+    lines.extend([
+        f"[HKEY_LOCAL_MACHINE\\BCD\\Objects\\{guid}\\Elements\\16000009]",
+        '"Element"=hex(3):00',
+        "",
+        f"[HKEY_LOCAL_MACHINE\\BCD\\Objects\\{guid}\\Elements\\250000e0]",
+        '"Element"=hex(3):01,00,00,00,00,00,00,00',
+        "",
+    ])
+
+Path(sys.argv[2]).write_text("\n".join(lines), encoding="ascii")
+print(len(loaders))
+PY
+)"
+    if [ "${loader_count:-0}" = "0" ]; then
+      log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: no Windows loader found in BCD ${bcd#$root/}"
+      continue
+    fi
+    if sudo hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\BCD' "$bcd" "$reg" >>"$REPAIR_LOG" 2>&1; then
+      log "[ZS5_OFFLINE_WINDOWS_REPAIR] applied BCD boot policy repair to ${bcd#$root/}"
+    else
+      log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: BCD boot policy merge failed for ${bcd#$root/}"
+    fi
+  done
+}
+
 standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
@@ -1859,6 +1918,7 @@ standalone_offline_windows_repair() {
   log "[ZS5_OFFLINE_WINDOWS_REPAIR] registry hives backed up to C:\\ospc2flex\\registry-backups\\$ts"
   stage_virtio_drivers "$winroot"
   write_firstboot_network_reset "$winroot"
+  apply_windows_bcd_boot_policy "$winroot"
 
   reg_file="$JOB_TMP/snapwin_system.reg"
   cat >"$reg_file" <<'EOF'
@@ -2349,7 +2409,7 @@ else
   log "[ZS9_DRIVER_BIND] Rebooting rescue VM once so Windows PnP can enumerate the dummy VirtIO volume."
   openstack server reboot "$RESCUE_SERVER_ID" >>"$BACKGROUND_LOG" 2>&1 || true
   z_wait_for_server_status "$RESCUE_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS9_DRIVER_BIND" "rescue_reboot_failed" "Inspect rescue VM after offline driver binding reboot."
-  sleep "${OSPC2FLEX_SNAPWIN_PNP_SETTLE_SECONDS:-120}"
+  sleep "${OSPC2FLEX_SNAPWIN_PNP_SETTLE_SECONDS:-300}"
   if console_has_fatal_boot_error "$RESCUE_SERVER_ID"; then console_rc=0; else console_rc=$?; fi
   if [ "$console_rc" -eq 2 ]; then fail_exit "ZS9_DRIVER_BIND" "WINDOWS_SYSTEM_HIVE_OR_REGISTRY_STOP" "Inspect rescue console and restore SYSTEM hive backup."; fi
   if [ "$console_rc" -eq 3 ]; then fail_exit "ZS9_DRIVER_BIND" "INACCESSIBLE_BOOT_DEVICE" "Inspect rescue console and offline VirtIO repair."; fi
