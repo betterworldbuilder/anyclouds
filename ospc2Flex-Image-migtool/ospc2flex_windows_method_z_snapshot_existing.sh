@@ -349,7 +349,7 @@ effective_keypair() {
     printf '%s' "$requested"
     return 0
   fi
-  log "[$CURRENT_STAGE] WARN requested keypair '$requested' not found in FLEX region ${OS_REGION_NAME:-unset}; booting without keypair"
+  log "[$CURRENT_STAGE] WARN requested keypair '$requested' not found in FLEX region ${OS_REGION_NAME:-unset}; booting without keypair" >&2
   return 0
 }
 
