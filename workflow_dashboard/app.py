@@ -295,6 +295,41 @@ def normalize_flex_auth_url(auth_url: str, region: str = "") -> str:
     return f"{m.group(1)}{target_slug}{m.group(3)}{path}"
 
 
+def normalize_flex_v2_auth_url(auth_url: str, region: str = "") -> str:
+    raw = normalize_flex_auth_url(auth_url, region)
+    if re.search(r"/v3/?$", raw):
+        return re.sub(r"/v3/?$", "/v2.0/", raw)
+    if re.search(r"/v2\.0/?$", raw):
+        return re.sub(r"/v2\.0/?$", "/v2.0/", raw)
+    return raw.rstrip("/") + "/v2.0/"
+
+
+def build_flex_v2_openrc(
+    *,
+    auth_url: str,
+    region: str,
+    username: str,
+    password: str,
+    project_id: str,
+) -> str:
+    flex_region = normalize_flex_region(region, auth_url)
+    flex_auth_url = normalize_flex_v2_auth_url(auth_url or "https://keystone.api.dfw3.rackspacecloud.com/v3/", flex_region)
+    return (
+        "#!/usr/bin/env bash\n"
+        f"export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n"
+        "export OS_IDENTITY_API_VERSION=2.0\n"
+        "export OS_INTERFACE=public\n"
+        f"export OS_REGION_NAME={shlex.quote(flex_region)}\n"
+        "export OS_AUTH_TYPE=v2password\n"
+        f"export OS_USERNAME={shlex.quote(username or '')}\n"
+        f"export OS_PASSWORD={shlex.quote(password or '')}\n"
+        f"export OS_API_KEY={shlex.quote(password or '')}\n"
+        f"export OS_TENANT_ID={shlex.quote(project_id or '')}\n"
+        f"export OS_TENANT_NAME={shlex.quote(project_id or '')}\n"
+        f"export OS_PROJECT_ID={shlex.quote(project_id or '')}\n"
+    )
+
+
 def _read_openrc_export(path: str, name: str) -> str:
     if not path or not name:
         return ""
@@ -7062,33 +7097,14 @@ def run_image_migrator():
             flex_region_from_auth or str(req.get('flex_region', 'DFW3') or 'DFW3').strip(),
             flex_auth_input,
         )
-        flex_domain   = str(req.get('flex_domain',   'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
-        flex_auth_url = normalize_flex_auth_url(
-            flex_auth_input or 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
-            flex_region,
-        )
-
         with os.fdopen(fd, 'w', newline='\n') as f:
-            f.write('#!/usr/bin/env bash\n')
-            f.write(f'export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n')
-            f.write('export OS_IDENTITY_API_VERSION=3\n')
-            f.write('export OS_INTERFACE=public\n')
-            f.write(f'export OS_REGION_NAME={shlex.quote(flex_region)}\n')
-
-            if False:
-                f.write('export OS_AUTH_TYPE=v3applicationcredential\n')
-                f.write(f'export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(_flex_app_id)}\n')
-                f.write(f'export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(_flex_app_secret)}\n')
-            else:
-                f.write('export OS_AUTH_TYPE=password\n')
-                f.write(f'export OS_USERNAME={shlex.quote(_flex_username)}\n')
-                f.write(f'export OS_PASSWORD={shlex.quote(_flex_password)}\n')
-                f.write(f'export OS_API_KEY={shlex.quote(_flex_password)}\n')
-                f.write(f'export OS_USER_DOMAIN_NAME={shlex.quote(flex_domain)}\n')
-                f.write(f'export OS_PROJECT_DOMAIN_NAME={shlex.quote(flex_domain)}\n')
-
-                if req.get('flex_project_id'):
-                    f.write(f'export OS_PROJECT_ID={shlex.quote(str(req.get("flex_project_id")))}\n')
+            f.write(build_flex_v2_openrc(
+                auth_url=flex_auth_input,
+                region=flex_region,
+                username=_flex_username,
+                password=_flex_password,
+                project_id=str(req.get("flex_project_id") or ""),
+            ))
 
     if not ospc_path:
         return jsonify({"status": "error", "message": "OSPC credentials missing: fill in OSPC Username + API Key in the credentials panel"}), 400
@@ -9233,35 +9249,14 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
     with _nbd_staging_cache_lock:
         _nbd_staging_cache[jumphost_ip]["hash"] = combined_hash
 
-    flex_region = normalize_flex_region(
-        str(flex_creds.get('region', 'DFW3') or 'DFW3'),
-        str(flex_creds.get('auth_url', '') or ''),
-    )
-    flex_auth_url = normalize_flex_auth_url(
-        str(flex_creds.get('auth_url', '') or ''),
-        flex_region,
-    )
-
     # 1. ALWAYS stage flex creds (lightweight — contains session password)
-    flex_sh = "#!/usr/bin/env bash\n"
-    flex_sh += f"export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n"
-    flex_sh += "export OS_IDENTITY_API_VERSION=3\nexport OS_INTERFACE=public\n"
-    flex_sh += f"export OS_REGION_NAME={shlex.quote(flex_region)}\n"
-    if False:
-        flex_sh += "export OS_AUTH_TYPE=v3applicationcredential\n"
-        flex_sh += f"export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(flex_creds['app_cred_id'])}\n"
-        flex_sh += f"export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(flex_creds.get('app_cred_secret',''))}\n"
-    else:
-        flex_sh += "export OS_AUTH_TYPE=password\n"
-        flex_sh += f"export OS_USERNAME={shlex.quote(flex_creds.get('username',''))}\n"
-        flex_sh += f"export OS_PASSWORD={shlex.quote(flex_creds.get('password',''))}\n"
-        flex_sh += f"export OS_API_KEY={shlex.quote(flex_creds.get('password',''))}\n"
-        domain = flex_creds.get('domain', 'rackspace_cloud_domain')
-        flex_sh += f"export OS_USER_DOMAIN_NAME={shlex.quote(domain)}\n"
-        flex_sh += f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(domain)}\n"
-        if flex_creds.get('project_id'):
-            flex_sh += f"export OS_PROJECT_ID={shlex.quote(flex_creds['project_id'])}\n"
-            flex_sh += f"export OS_PROJECT_NAME={shlex.quote(flex_creds['project_id'])}\n"
+    flex_sh = build_flex_v2_openrc(
+        auth_url=str(flex_creds.get('auth_url', '') or ''),
+        region=str(flex_creds.get('region', 'DFW3') or 'DFW3'),
+        username=str(flex_creds.get('username', '') or ''),
+        password=str(flex_creds.get('password', '') or ''),
+        project_id=str(flex_creds.get('project_id', '') or ''),
+    )
 
     _flex_body_hash = hashlib.md5(flex_sh.encode("utf-8")).hexdigest()
     if _flex_body_hash != _prev_flex_h:

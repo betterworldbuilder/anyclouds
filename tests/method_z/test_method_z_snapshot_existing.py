@@ -152,6 +152,10 @@ def test_app_branches_image_migrator_run_to_method_z():
     assert "manual_driver_bind" in txt
     assert "Method SNAPWIN is a standalone cold snapshot method" in txt
     assert "Refusing live VM/NBD launch" in txt
+    assert "build_flex_v2_openrc" in txt
+    assert "OS_IDENTITY_API_VERSION=2.0" in txt
+    assert "OS_AUTH_TYPE=v2password" in txt
+    assert "OS_TENANT_ID" in txt
 
 
 
