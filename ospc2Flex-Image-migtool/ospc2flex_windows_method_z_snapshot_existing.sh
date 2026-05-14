@@ -454,6 +454,22 @@ safe_cp_source() {
   rsync -a --inplace "$src" "$dest"
 }
 
+find_resume_artifact() {
+  local label_runs="$BASE_DIR/runs/$LABEL_SAFE"
+  [ "${OSPC2FLEX_SNAPWIN_AUTO_RESUME:-1}" = "1" ] || return 1
+  [ -d "$label_runs" ] || return 1
+  find "$label_runs" -type f \( \
+      -name "${LABEL_SAFE}.flex-rescue.qcow2" -o \
+      -name "source_snapshot.qcow2" -o \
+      -name "source_snapshot.raw" -o \
+      -name "source_snapshot.img" -o \
+      -name "source_snapshot.vhd" -o \
+      -name "source_snapshot.vhdx" \
+    \) -size +1G -printf '%T@ %p\n' 2>/dev/null \
+    | sort -nr \
+    | awk '{ $1=""; sub(/^ /, ""); print; exit }'
+}
+
 ensure_libguestfs_kernel_readable() {
   [ "$DOWNLOAD_ONLY" = 1 ] && return 0
   command -v guestmount >/dev/null 2>&1 || return 0
@@ -1998,12 +2014,18 @@ if [ -n "$LOCAL_ARTIFACT" ]; then
     safe_cp_source "$LOCAL_ARTIFACT" "$SOURCE_ARTIFACT"
   fi
 else
-  SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img"
-  set +e
-  download_existing_ospc_snapshot "$OSPC_IMAGE_ID" "$SOURCE_ARTIFACT"
-  dl_rc=$?
-  set -e
-  [ "$dl_rc" -eq 0 ] || fail_exit "ZS3_DOWNLOAD_SNAPSHOT" "$DOWNLOAD_FAILURE_REASON" "$DOWNLOAD_NEXT_ACTION"
+  RESUME_ARTIFACT="$(find_resume_artifact || true)"
+  if [ -n "$RESUME_ARTIFACT" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] HIT auto-resume artifact found on jumphost: $RESUME_ARTIFACT"
+    SOURCE_ARTIFACT="$RESUME_ARTIFACT"
+  else
+    SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img"
+    set +e
+    download_existing_ospc_snapshot "$OSPC_IMAGE_ID" "$SOURCE_ARTIFACT"
+    dl_rc=$?
+    set -e
+    [ "$dl_rc" -eq 0 ] || fail_exit "ZS3_DOWNLOAD_SNAPSHOT" "$DOWNLOAD_FAILURE_REASON" "$DOWNLOAD_NEXT_ACTION"
+  fi
   SOURCE_FORMAT="$(detect_format "$SOURCE_ARTIFACT")"
 fi
 validate_artifact "$SOURCE_ARTIFACT"
@@ -2015,7 +2037,15 @@ stage_start "ZS4_NORMALIZE_QCOW2"
 SOURCE_FORMAT="$(detect_format "$SOURCE_ARTIFACT")"
 case "$SOURCE_FORMAT" in
   qcow2)
-    safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
+    if [ "$SOURCE_ARTIFACT" = "$QCOW2" ]; then
+      log "[ZS4_NORMALIZE_QCOW2] Reusing current-run qcow2 in place: $QCOW2"
+    elif [ -f "${SOURCE_ARTIFACT}.win_repaired" ] || [ -f "${SOURCE_ARTIFACT}.snapwin_repaired" ]; then
+      QCOW2="$SOURCE_ARTIFACT"
+      REPAIR_LOG="${QCOW2%.qcow2}.repair.log"
+      log "[ZS4_NORMALIZE_QCOW2] Reusing previously repaired qcow2 in place: $QCOW2"
+    else
+      safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
+    fi
     ;;
   raw)
     qemu-img convert -f raw -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
