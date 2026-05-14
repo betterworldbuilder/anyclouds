@@ -80,6 +80,7 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "preclean_ntfs_for_rw_mount" in txt
     assert "ntfsfix -d" in txt
     assert "cleanup_stale_guestfs_for_qcow2" in txt
+    assert 'done < <(pgrep -f "$QCOW2" 2>/dev/null || true)' in txt
     assert "detect_windows_ntfs_partition" in txt
     assert "rw,remove_hiberfile" in txt
     assert "mount_windows_ntfs_nbd_rw" in txt

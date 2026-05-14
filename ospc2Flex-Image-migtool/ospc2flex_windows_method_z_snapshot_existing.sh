@@ -1506,7 +1506,7 @@ cleanup_windows_mount() {
 
 cleanup_stale_guestfs_for_qcow2() {
   local pid cmd
-  pgrep -f "$QCOW2" 2>/dev/null | while IFS= read -r pid; do
+  while IFS= read -r pid; do
     [ -n "$pid" ] || continue
     cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
     case "$cmd" in
@@ -1517,7 +1517,7 @@ cleanup_stale_guestfs_for_qcow2() {
         kill -9 "$pid" 2>/dev/null || true
         ;;
     esac
-  done
+  done < <(pgrep -f "$QCOW2" 2>/dev/null || true)
 }
 
 mount_windows_ntfs_nbd_rw() {
