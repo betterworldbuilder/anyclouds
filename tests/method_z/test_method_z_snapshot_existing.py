@@ -48,6 +48,11 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "DUMMY_VOLUME_SIZE_GB" in txt
     assert 'DUMMY_VOLUME_SIZE_GB="${OSPC2FLEX_DUMMY_VOLUME_SIZE_GB:-10}"' in txt
     assert 'openstack volume create --size "$DUMMY_VOLUME_SIZE_GB"' in txt
+    assert 'boot_index=-1' in txt
+    assert 'delete_on_termination=false' in txt
+    assert "wait_volume_status()" in txt
+    assert "server_has_volume()" in txt
+    assert "dummy VirtIO volume attached at rescue boot" in txt
     forbidden = [
         "openstack server image create --name source",
         "openstack server backup create",

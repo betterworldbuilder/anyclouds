@@ -1556,12 +1556,48 @@ find_existing_rescue_image() {
 
 find_existing_rescue_server() {
   local server_id
-  server_id="$(
-    openstack server list --name "$RESCUE_SERVER_NAME" -f value -c ID -c Status 2>/dev/null \
-      | awk '$2 == "ACTIVE" { print $1; exit }'
+  while read -r server_id _status; do
+    [ -n "$server_id" ] || continue
+    if server_has_volume "$server_id" "$DUMMY_VOLUME_ID"; then
+      printf '%s' "$server_id"
+      return 0
+    fi
+    log "[ZS7_BOOT_FLEX_RESCUE_VM] WARN deleting stale rescue VM without dummy volume: $server_id"
+    openstack server delete "$server_id" >>"$BACKGROUND_LOG" 2>&1 || true
+    for _ in $(seq 1 90); do
+      openstack server show "$server_id" >/dev/null 2>&1 || break
+      sleep 5
+    done
+  done < <(openstack server list --name "$RESCUE_SERVER_NAME" -f value -c ID -c Status 2>/dev/null | awk '$2 == "ACTIVE"')
+  return 1
+}
+
+find_available_dummy_volume() {
+  local volume_id
+  volume_id="$(
+    openstack volume list --name "$DUMMY_VOLUME_NAME" -f value -c ID -c Status 2>/dev/null \
+      | awk '$2 == "available" { print $1; exit }'
   )"
-  [ -n "$server_id" ] || return 1
-  printf '%s' "$server_id"
+  [ -n "$volume_id" ] || return 1
+  printf '%s' "$volume_id"
+}
+
+wait_volume_status() {
+  local volume_id="$1" target="$2" waited=0 status
+  while [ "$waited" -lt 600 ]; do
+    status="$(openstack volume show "$volume_id" -f value -c status 2>/dev/null | tr -d '\r' || true)"
+    [ "$status" = "$target" ] && return 0
+    sleep 5
+    waited=$((waited + 5))
+  done
+  return 1
+}
+
+server_has_volume() {
+  local server_id="$1" volume_id="$2"
+  [ -n "$server_id" ] && [ -n "$volume_id" ] || return 1
+  openstack server show "$server_id" -f json -c volumes_attached 2>/dev/null \
+    | jq -e --arg id "$volume_id" '.volumes_attached[]?.id == $id' >/dev/null 2>&1
 }
 
 find_windows_root() {
@@ -2153,18 +2189,31 @@ if [ "$SKIP_RESCUE_BOOT" = 1 ]; then
 fi
 
 stage_start "ZS7_BOOT_FLEX_RESCUE_VM"
+DUMMY_VOLUME_ID="$(find_available_dummy_volume || true)"
+if [ -n "$DUMMY_VOLUME_ID" ]; then
+  log "[ZS7_BOOT_FLEX_RESCUE_VM] Reusing available dummy VirtIO volume for boot-time attach: $DUMMY_VOLUME_ID"
+else
+  log "[ZS7_BOOT_FLEX_RESCUE_VM] Creating ${DUMMY_VOLUME_SIZE_GB}GB dummy VirtIO volume for boot-time attach"
+  DUMMY_VOLUME_ID="$(openstack volume create --size "$DUMMY_VOLUME_SIZE_GB" "$DUMMY_VOLUME_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
+  [ -n "$DUMMY_VOLUME_ID" ] || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "dummy_volume_create_failed" "Inspect Cinder quota/status."
+fi
+wait_volume_status "$DUMMY_VOLUME_ID" "available" || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "dummy_volume_not_available" "Inspect Cinder volume status."
+json_merge "{\"dummy_volume_id\":\"$DUMMY_VOLUME_ID\"}"
 RESCUE_SERVER_ID="$(find_existing_rescue_server || true)"
 if [ -n "$RESCUE_SERVER_ID" ]; then
-  log "[ZS7_BOOT_FLEX_RESCUE_VM] Reusing existing ACTIVE rescue VM: $RESCUE_SERVER_ID"
+  log "[ZS7_BOOT_FLEX_RESCUE_VM] Reusing existing ACTIVE rescue VM with dummy volume attached: $RESCUE_SERVER_ID"
 else
   create_args=(server create "$RESCUE_SERVER_NAME" --image "$RESCUE_IMAGE_ID" --flavor "$FLAVOR" --network "$NETWORK" --wait -f value -c id)
   EFFECTIVE_KEYPAIR="$(effective_keypair)"
   [ -n "$EFFECTIVE_KEYPAIR" ] && create_args+=(--key-name "$EFFECTIVE_KEYPAIR")
   [ -n "$SECURITY_GROUP" ] && create_args+=(--security-group "$SECURITY_GROUP")
+  create_args+=(--block-device "uuid=$DUMMY_VOLUME_ID,source_type=volume,destination_type=volume,boot_index=-1,delete_on_termination=false")
   RESCUE_SERVER_ID="$(openstack "${create_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 fi
 [ -n "$RESCUE_SERVER_ID" ] || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "rescue_server_create_failed" "Inspect rescue image metadata and Nova boot request."
 z_wait_for_server_status "$RESCUE_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "rescue_server_not_active" "Inspect rescue VM console."
+wait_volume_status "$DUMMY_VOLUME_ID" "in-use" || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "dummy_volume_attach_failed" "FLEX did not attach the dummy VirtIO volume during rescue VM boot."
+server_has_volume "$RESCUE_SERVER_ID" "$DUMMY_VOLUME_ID" || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "dummy_volume_attach_missing" "Nova server details do not show the dummy VirtIO volume."
 RESCUE_FLOATING_IP="$(z_attach_floating_ip "$RESCUE_SERVER_ID" || true)"
 if console_has_fatal_boot_error "$RESCUE_SERVER_ID"; then console_rc=0; else console_rc=$?; fi
 if [ "$console_rc" -eq 2 ]; then fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "WINDOWS_SYSTEM_HIVE_OR_REGISTRY_STOP" "Inspect rescue console and restore SYSTEM hive backup."; fi
@@ -2174,16 +2223,8 @@ checkpoint_hit "rescue_boot"
 log "[ZS7_BOOT_FLEX_RESCUE_VM] HIT rescue VM ACTIVE: $RESCUE_SERVER_ID fip=${RESCUE_FLOATING_IP:-none}"
 
 stage_start "ZS8_ATTACH_DUMMY_VIRTIO"
-DUMMY_VOLUME_ID="$(openstack volume create --size "$DUMMY_VOLUME_SIZE_GB" "$DUMMY_VOLUME_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
-[ -n "$DUMMY_VOLUME_ID" ] || fail_exit "ZS8_ATTACH_DUMMY_VIRTIO" "dummy_volume_create_failed" "Inspect Cinder quota/status."
-for _ in $(seq 1 60); do
-  [ "$(openstack volume show "$DUMMY_VOLUME_ID" -f value -c status 2>/dev/null | tr -d '\r')" = "available" ] && break
-  sleep 5
-done
-openstack server add volume "$RESCUE_SERVER_ID" "$DUMMY_VOLUME_ID" >>"$BACKGROUND_LOG" 2>&1 || fail_exit "ZS8_ATTACH_DUMMY_VIRTIO" "dummy_volume_attach_failed" "Inspect Nova/Cinder attachment."
-json_merge "{\"dummy_volume_id\":\"$DUMMY_VOLUME_ID\"}"
 checkpoint_hit "dummy_attach"
-log "[ZS8_ATTACH_DUMMY_VIRTIO] HIT dummy VirtIO volume attached: $DUMMY_VOLUME_ID"
+log "[ZS8_ATTACH_DUMMY_VIRTIO] HIT dummy VirtIO volume attached at rescue boot: $DUMMY_VOLUME_ID"
 
 stage_start "ZS9_DRIVER_BIND"
 if [ "$MANUAL_DRIVER_BIND" = 1 ] || [ -z "$WIN_PASSWORD" ]; then
