@@ -495,6 +495,18 @@ first_resolvable_image_base() {
   return 1
 }
 
+ospc_image_exists() {
+  local image_id="$1" token base code
+  openstack image show "$image_id" >/dev/null 2>&1 && return 0
+  token="$(refresh_ospc_token || true)"
+  token="$(printf '%s' "$token" | tr -d '[:space:]\r')"
+  [ -n "$token" ] || return 1
+  base="$(first_resolvable_image_base || true)"
+  [ -n "$base" ] || return 1
+  code="$(curl -sS -o /dev/null -w '%{http_code}' -H "X-Auth-Token: $token" "$base/v2/images/$image_id" 2>/dev/null || echo 000)"
+  [ "$code" = "200" ]
+}
+
 log_file_excerpt() {
   local prefix="$1" file="$2"
   [ -s "$file" ] || return 0
@@ -793,6 +805,26 @@ print(gb)
 PY
 }
 
+image_is_licensed_cinder_only() {
+  local image_id="$1" meta_json="$JOB_TMP/image_meta_for_export.json"
+  openstack image show "$image_id" -f json >"$meta_json" 2>/dev/null || return 1
+  python3 - "$meta_json" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("0")
+    raise SystemExit
+props = d.get("properties") or {}
+flag = ""
+if isinstance(props, dict):
+    flag = str(props.get("com.rackspace__1__options", "")).strip()
+if not flag:
+    flag = str(d.get("com.rackspace__1__options", "")).strip()
+print("1" if flag == "4" else "0")
+PY
+}
+
 apply_cinder_min_volume_size() {
   local requested="$1" min_size="${CINDER_MIN_VOLUME_SIZE_GB:-75}"
   if [ "$requested" -lt "$min_size" ]; then
@@ -927,6 +959,16 @@ download_curl_glance() {
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i
   log "[ZS3_DOWNLOAD_SNAPSHOT] Download waterfall for existing image=$image_id"
+  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$(image_is_licensed_cinder_only "$image_id" || echo 0)" = "1" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] HIT image metadata indicates licensed/cinder-only (com.rackspace__1__options=4)"
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Prioritizing Cinder volume attach/raw-copy fallback before Glance export attempts"
+    if cinder_volume_raw_export "$image_id" "$dest"; then
+      return 0
+    fi
+    DOWNLOAD_FAILURE_REASON="OSPC_CINDER_VOLUME_EXPORT_FAILED"
+    DOWNLOAD_NEXT_ACTION="Cinder fallback could not create/attach/read the image volume from this jumphost. Inspect $JOB_LOG/cinder_volume_export.log and detach/delete any temporary volume named ${LABEL_SAFE}-snapwin-cinder-export-${RUN_ID} if needed."
+    return 1
+  fi
   log "[ZS3_DOWNLOAD_SNAPSHOT] Glance endpoint candidates:"
   image_bases | sed 's/^/[ZS3_DOWNLOAD_SNAPSHOT]   - /' | while IFS= read -r line; do log "$line"; done
 
@@ -1341,9 +1383,18 @@ PY
 write_initial_state
 
 stage_start "ZS0_PREFLIGHT"
-for c in qemu-img guestmount guestunmount qemu-nbd hivexsh reged chntpw openstack jq curl rsync python3; do
+BASE_CMDS=(qemu-img openstack jq curl rsync python3)
+REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)
+for c in "${BASE_CMDS[@]}"; do
   require_cmd "$c"
 done
+if [ "$DOWNLOAD_ONLY" != 1 ]; then
+  for c in "${REPAIR_CMDS[@]}"; do
+    require_cmd "$c"
+  done
+else
+  log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
+fi
 if mount | grep -q "$RUN_DIR"; then
   fail_exit "ZS0_PREFLIGHT" "stale_guestmount_mount" "Unmount stale guestmount paths under $RUN_DIR."
 fi
@@ -1377,7 +1428,7 @@ fi
 if [ -n "$LOCAL_ARTIFACT" ]; then
   [ -f "$LOCAL_ARTIFACT" ] || fail_exit "ZS2_SELECT_SNAPSHOT" "local_artifact_missing" "Check --local-artifact path."
 elif [ -n "$OSPC_IMAGE_ID" ]; then
-  openstack image show "$OSPC_IMAGE_ID" >/dev/null 2>&1 || fail_exit "ZS2_SELECT_SNAPSHOT" "ospc_image_not_found" "Choose a valid existing OSPC snapshot/image ID from the cold scan."
+  ospc_image_exists "$OSPC_IMAGE_ID" || fail_exit "ZS2_SELECT_SNAPSHOT" "ospc_image_not_found" "Choose a valid existing OSPC snapshot/image ID from the cold scan."
 else
   count="$(list_snapshot_candidates | tail -1)"
   json_merge "{\"stage\":\"ZS2_SELECT_SNAPSHOT\",\"status\":\"WAITING_FOR_SNAPSHOT_SELECTION\",\"failure_reason\":\"\",\"next_action\":\"Choose an OSPC snapshot/image ID.\",\"checkpoints\":{\"snapshot_selected\":\"PENDING\"}}"
