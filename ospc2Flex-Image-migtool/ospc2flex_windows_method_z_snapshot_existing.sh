@@ -159,8 +159,8 @@ step_title() {
     ZS7_BOOT_FLEX_RESCUE_VM) echo "Boot Flex rescue VM" ;;
     ZS8_ATTACH_DUMMY_VIRTIO) echo "Attach dummy VirtIO volume" ;;
     ZS9_DRIVER_BIND) echo "Bind VirtIO drivers in rescue VM" ;;
-    ZS10_SNAPSHOT_VIRTIO_READY) echo "Snapshot virtio-ready rescue VM" ;;
-    ZS11_BOOT_FINAL_FLEX_VM) echo "Boot final Flex virtio-scsi VM" ;;
+    ZS10_SNAPSHOT_VIRTIO_READY) echo "Snapshot final Windows rescue VM" ;;
+    ZS11_BOOT_FINAL_FLEX_VM) echo "Boot final Flex Windows VM" ;;
     ZS12_VALIDATE_AND_REPORT) echo "Validate and report" ;;
     *) echo "$1" ;;
   esac
@@ -1405,7 +1405,7 @@ console_has_fatal_boot_error() {
   local server_id="$1" console
   console="$(openstack console log show "$server_id" 2>/dev/null || true)"
   if printf '%s\n' "$console" | grep -Eiq 'Windows\\system32\\config\\system|0xc0000225'; then return 2; fi
-  if printf '%s\n' "$console" | grep -Eiq 'INACCESSIBLE_BOOT_DEVICE'; then return 3; fi
+  if printf '%s\n' "$console" | grep -Eiq 'INACCESSIBLE[ _]BOOT[ _]DEVICE|INACCESSIBLE_BOOT_DEVICE'; then return 3; fi
   return 0
 }
 
@@ -2401,8 +2401,10 @@ if [ "$MANUAL_DRIVER_BIND" = 1 ]; then
   log "[ZS9_DRIVER_BIND] WARN --manual-driver-bind is deprecated; SNAPWIN will auto-bind unless OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND=1."
 fi
 
+SNAPWIN_ONLINE_BIND=0
 if [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
   run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
+  SNAPWIN_ONLINE_BIND=1
   log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind completed over $ACCESS_METHOD on $ACCESS_IP:$ACCESS_PORT"
 else
   log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; using offline-staged VirtIO drivers and registry/CDDB boot binding."
@@ -2424,18 +2426,34 @@ z_wait_for_server_status "$RESCUE_SERVER_ID" "SHUTOFF" 900 || fail_exit "ZS10_SN
 FINAL_IMAGE_ID="$(openstack server image create "$RESCUE_SERVER_ID" --name "$FINAL_IMAGE_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$FINAL_IMAGE_ID" ] || fail_exit "ZS10_SNAPSHOT_VIRTIO_READY" "final_snapshot_failed" "Inspect rescue VM snapshot task."
 z_wait_for_image_active "$FINAL_IMAGE_ID" 1800 || fail_exit "ZS10_SNAPSHOT_VIRTIO_READY" "final_image_not_active" "Inspect Flex Glance image status."
-openstack image set "$FINAL_IMAGE_ID" \
-  --property hw_disk_bus=scsi \
-  --property hw_scsi_model=virtio-scsi \
-  --property hw_vif_model=virtio \
-  --property hw_qemu_guest_agent=yes \
-  --property os_type=windows \
-  --property os_distro=windows \
-  --property ospc2flex_method=SNAPWIN_STANDALONE \
-  --property ospc2flex_run_id="$RUN_ID" >>"$BACKGROUND_LOG" 2>&1
+if [ "$SNAPWIN_ONLINE_BIND" = "1" ]; then
+  log "[ZS10_SNAPSHOT_VIRTIO_READY] Online driver bind confirmed; setting final image to virtio-scsi/virtio."
+  openstack image set "$FINAL_IMAGE_ID" \
+    --property hw_disk_bus=scsi \
+    --property hw_scsi_model=virtio-scsi \
+    --property hw_vif_model=virtio \
+    --property hw_qemu_guest_agent=yes \
+    --property os_type=windows \
+    --property os_distro=windows \
+    --property ospc2flex_method=SNAPWIN_STANDALONE \
+    --property ospc2flex_run_id="$RUN_ID" >>"$BACKGROUND_LOG" 2>&1
+else
+  log "[ZS10_SNAPSHOT_VIRTIO_READY] No online driver bind confirmation; keeping final image on IDE/e1000 safe boot metadata."
+  openstack image set "$FINAL_IMAGE_ID" \
+    --property architecture=x86_64 \
+    --property hw_disk_bus=ide \
+    --property hw_cdrom_bus=ide \
+    --property hw_vif_model=e1000 \
+    --property hw_qemu_guest_agent=yes \
+    --property os_type=windows \
+    --property os_distro=windows \
+    --property vm_mode=hvm \
+    --property ospc2flex_method=SNAPWIN_STANDALONE \
+    --property ospc2flex_run_id="$RUN_ID" >>"$BACKGROUND_LOG" 2>&1
+fi
 json_merge "{\"final_image_id\":\"$FINAL_IMAGE_ID\"}"
 checkpoint_hit "final_snapshot"
-log "[ZS10_SNAPSHOT_VIRTIO_READY] HIT final virtio-ready image: $FINAL_IMAGE_ID"
+log "[ZS10_SNAPSHOT_VIRTIO_READY] HIT final Windows image: $FINAL_IMAGE_ID"
 
 stage_start "ZS11_BOOT_FINAL_FLEX_VM"
 final_args=(server create "$FINAL_SERVER_NAME" --image "$FINAL_IMAGE_ID" --flavor "$FLAVOR" --network "$NETWORK" --wait -f value -c id)
@@ -2446,6 +2464,10 @@ FINAL_SERVER_ID="$(openstack "${final_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r
 [ -n "$FINAL_SERVER_ID" ] || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_create_failed" "Inspect final image metadata and Nova request."
 z_wait_for_server_status "$FINAL_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_not_active" "Inspect final VM console."
 FINAL_FLOATING_IP="$(z_attach_floating_ip "$FINAL_SERVER_ID" || true)"
+sleep "${OSPC2FLEX_SNAPWIN_FINAL_BOOT_SETTLE_SECONDS:-180}"
+if console_has_fatal_boot_error "$FINAL_SERVER_ID"; then console_rc=0; else console_rc=$?; fi
+if [ "$console_rc" -eq 2 ]; then fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "WINDOWS_SYSTEM_HIVE_OR_REGISTRY_STOP" "Inspect final VM console and restore SYSTEM hive backup."; fi
+if [ "$console_rc" -eq 3 ]; then fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "INACCESSIBLE_BOOT_DEVICE" "Final Windows boot hit INACCESSIBLE_BOOT_DEVICE; do not mark success."; fi
 json_merge "{\"final_server_id\":\"$FINAL_SERVER_ID\"}"
 checkpoint_hit "final_boot"
 log "[ZS11_BOOT_FINAL_FLEX_VM] HIT final VM ACTIVE: $FINAL_SERVER_ID fip=${FINAL_FLOATING_IP:-none}"
