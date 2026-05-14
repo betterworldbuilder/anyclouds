@@ -45,7 +45,9 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "sudo dd if=" in txt
     assert "openstack server image create" in txt
     assert "server create" in txt
-    assert "openstack volume create --size 1" in txt
+    assert "DUMMY_VOLUME_SIZE_GB" in txt
+    assert 'DUMMY_VOLUME_SIZE_GB="${OSPC2FLEX_DUMMY_VOLUME_SIZE_GB:-10}"' in txt
+    assert 'openstack volume create --size "$DUMMY_VOLUME_SIZE_GB"' in txt
     forbidden = [
         "openstack server image create --name source",
         "openstack server backup create",
@@ -95,6 +97,8 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "find_existing_rescue_image()" in txt
     assert "Reusing existing active rescue image" in txt
     assert "HIT rescue image ready" in txt
+    assert "find_existing_rescue_server()" in txt
+    assert "Reusing existing ACTIVE rescue VM" in txt
     assert "effective_keypair()" in txt
     assert "openstack keypair show" in txt
     assert "booting without keypair" in txt

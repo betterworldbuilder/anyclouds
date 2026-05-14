@@ -55,6 +55,7 @@ OSPC_HELPER_SERVER_ID="${OSPC_HELPER_SERVER_ID:-}"
 CINDER_VOLUME_EXPORT_ON_LICENSED="${OSPC2FLEX_CINDER_VOLUME_EXPORT_ON_LICENSED:-1}"
 KEEP_CINDER_EXPORT_VOLUME="${OSPC2FLEX_KEEP_CINDER_EXPORT_VOLUME:-0}"
 CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-75}"
+DUMMY_VOLUME_SIZE_GB="${OSPC2FLEX_DUMMY_VOLUME_SIZE_GB:-10}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -80,6 +81,7 @@ while [[ $# -gt 0 ]]; do
     --export-retries) EXPORT_RETRIES="$2"; shift 2 ;;
     --export-retry-wait) EXPORT_RETRY_WAIT="$2"; shift 2 ;;
     --ospc-helper-server-id|--helper-server-id) OSPC_HELPER_SERVER_ID="$2"; shift 2 ;;
+    --dummy-volume-size|--dummy-volume-size-gb) DUMMY_VOLUME_SIZE_GB="$2"; shift 2 ;;
     --keep-cinder-volume) KEEP_CINDER_EXPORT_VOLUME=1; shift ;;
     --no-cinder-volume-fallback) CINDER_VOLUME_EXPORT_ON_LICENSED=0; shift ;;
     --skip-rescue-boot) SKIP_RESCUE_BOOT=1; shift ;;
@@ -1552,6 +1554,16 @@ find_existing_rescue_image() {
   printf '%s' "$image_id"
 }
 
+find_existing_rescue_server() {
+  local server_id
+  server_id="$(
+    openstack server list --name "$RESCUE_SERVER_NAME" -f value -c ID -c Status 2>/dev/null \
+      | awk '$2 == "ACTIVE" { print $1; exit }'
+  )"
+  [ -n "$server_id" ] || return 1
+  printf '%s' "$server_id"
+}
+
 find_windows_root() {
   if [ -f "$MNT/Windows/System32/config/SYSTEM" ]; then echo "$MNT/Windows"; return 0; fi
   if [ -f "$MNT/windows/system32/config/SYSTEM" ]; then echo "$MNT/windows"; return 0; fi
@@ -2141,11 +2153,16 @@ if [ "$SKIP_RESCUE_BOOT" = 1 ]; then
 fi
 
 stage_start "ZS7_BOOT_FLEX_RESCUE_VM"
-create_args=(server create "$RESCUE_SERVER_NAME" --image "$RESCUE_IMAGE_ID" --flavor "$FLAVOR" --network "$NETWORK" --wait -f value -c id)
-EFFECTIVE_KEYPAIR="$(effective_keypair)"
-[ -n "$EFFECTIVE_KEYPAIR" ] && create_args+=(--key-name "$EFFECTIVE_KEYPAIR")
-[ -n "$SECURITY_GROUP" ] && create_args+=(--security-group "$SECURITY_GROUP")
-RESCUE_SERVER_ID="$(openstack "${create_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
+RESCUE_SERVER_ID="$(find_existing_rescue_server || true)"
+if [ -n "$RESCUE_SERVER_ID" ]; then
+  log "[ZS7_BOOT_FLEX_RESCUE_VM] Reusing existing ACTIVE rescue VM: $RESCUE_SERVER_ID"
+else
+  create_args=(server create "$RESCUE_SERVER_NAME" --image "$RESCUE_IMAGE_ID" --flavor "$FLAVOR" --network "$NETWORK" --wait -f value -c id)
+  EFFECTIVE_KEYPAIR="$(effective_keypair)"
+  [ -n "$EFFECTIVE_KEYPAIR" ] && create_args+=(--key-name "$EFFECTIVE_KEYPAIR")
+  [ -n "$SECURITY_GROUP" ] && create_args+=(--security-group "$SECURITY_GROUP")
+  RESCUE_SERVER_ID="$(openstack "${create_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
+fi
 [ -n "$RESCUE_SERVER_ID" ] || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "rescue_server_create_failed" "Inspect rescue image metadata and Nova boot request."
 z_wait_for_server_status "$RESCUE_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "rescue_server_not_active" "Inspect rescue VM console."
 RESCUE_FLOATING_IP="$(z_attach_floating_ip "$RESCUE_SERVER_ID" || true)"
@@ -2157,7 +2174,7 @@ checkpoint_hit "rescue_boot"
 log "[ZS7_BOOT_FLEX_RESCUE_VM] HIT rescue VM ACTIVE: $RESCUE_SERVER_ID fip=${RESCUE_FLOATING_IP:-none}"
 
 stage_start "ZS8_ATTACH_DUMMY_VIRTIO"
-DUMMY_VOLUME_ID="$(openstack volume create --size 1 "$DUMMY_VOLUME_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
+DUMMY_VOLUME_ID="$(openstack volume create --size "$DUMMY_VOLUME_SIZE_GB" "$DUMMY_VOLUME_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$DUMMY_VOLUME_ID" ] || fail_exit "ZS8_ATTACH_DUMMY_VIRTIO" "dummy_volume_create_failed" "Inspect Cinder quota/status."
 for _ in $(seq 1 60); do
   [ "$(openstack volume show "$DUMMY_VOLUME_ID" -f value -c status 2>/dev/null | tr -d '\r')" = "available" ] && break
