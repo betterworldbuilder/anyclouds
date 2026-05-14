@@ -295,40 +295,32 @@ def normalize_flex_auth_url(auth_url: str, region: str = "") -> str:
     return f"{m.group(1)}{target_slug}{m.group(3)}{path}"
 
 
-def normalize_flex_v2_auth_url(auth_url: str, region: str = "") -> str:
-    raw = normalize_flex_auth_url(auth_url, region)
-    if re.search(r"/v3/?$", raw):
-        return re.sub(r"/v3/?$", "/v2.0/", raw)
-    if re.search(r"/v2\.0/?$", raw):
-        return re.sub(r"/v2\.0/?$", "/v2.0/", raw)
-    return raw.rstrip("/") + "/v2.0/"
-
-
-def build_flex_v2_openrc(
+def build_flex_method_ab_openrc(
     *,
     auth_url: str,
     region: str,
     username: str,
     password: str,
     project_id: str,
+    domain: str = "rackspace_cloud_domain",
 ) -> str:
     flex_region = normalize_flex_region(region, auth_url)
-    flex_auth_url = normalize_flex_v2_auth_url(auth_url or "https://keystone.api.dfw3.rackspacecloud.com/v3/", flex_region)
+    flex_auth_url = normalize_flex_auth_url(auth_url or "https://keystone.api.dfw3.rackspacecloud.com/v3/", flex_region)
+    flex_domain = domain or "rackspace_cloud_domain"
     return (
         "#!/usr/bin/env bash\n"
-        "unset OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_NAME OS_DOMAIN_NAME OS_PROJECT_NAME\n"
-        "unset OS_USER_DOMAIN_ID OS_PROJECT_DOMAIN_ID OS_DEFAULT_DOMAIN\n"
         f"export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n"
-        "export OS_IDENTITY_API_VERSION=2.0\n"
+        "export OS_IDENTITY_API_VERSION=3\n"
         "export OS_INTERFACE=public\n"
         f"export OS_REGION_NAME={shlex.quote(flex_region)}\n"
-        "export OS_AUTH_TYPE=v2password\n"
+        "export OS_AUTH_TYPE=password\n"
         f"export OS_USERNAME={shlex.quote(username or '')}\n"
         f"export OS_PASSWORD={shlex.quote(password or '')}\n"
         f"export OS_API_KEY={shlex.quote(password or '')}\n"
-        f"export OS_TENANT_ID={shlex.quote(project_id or '')}\n"
-        f"export OS_TENANT_NAME={shlex.quote(project_id or '')}\n"
+        f"export OS_USER_DOMAIN_NAME={shlex.quote(flex_domain)}\n"
+        f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(flex_domain)}\n"
         f"export OS_PROJECT_ID={shlex.quote(project_id or '')}\n"
+        f"export OS_PROJECT_NAME={shlex.quote(project_id or '')}\n"
     )
 
 
@@ -7094,18 +7086,19 @@ def run_image_migrator():
         import tempfile
         fd, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_auto_")
         flex_auth_input = str(req.get('flex_auth_url', '') or '').strip()
-        flex_region_from_auth = _extract_flex_region_slug_from_auth_url(flex_auth_input)
         flex_region   = normalize_flex_region(
-            flex_region_from_auth or str(req.get('flex_region', 'DFW3') or 'DFW3').strip(),
+            str(req.get('flex_region', 'DFW3') or 'DFW3').strip(),
             flex_auth_input,
         )
+        flex_domain   = str(req.get('flex_domain',   'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
         with os.fdopen(fd, 'w', newline='\n') as f:
-            f.write(build_flex_v2_openrc(
+            f.write(build_flex_method_ab_openrc(
                 auth_url=flex_auth_input,
                 region=flex_region,
                 username=_flex_username,
                 password=_flex_password,
                 project_id=str(req.get("flex_project_id") or ""),
+                domain=flex_domain,
             ))
 
     if not ospc_path:
@@ -9252,12 +9245,13 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         _nbd_staging_cache[jumphost_ip]["hash"] = combined_hash
 
     # 1. ALWAYS stage flex creds (lightweight — contains session password)
-    flex_sh = build_flex_v2_openrc(
+    flex_sh = build_flex_method_ab_openrc(
         auth_url=str(flex_creds.get('auth_url', '') or ''),
         region=str(flex_creds.get('region', 'DFW3') or 'DFW3'),
         username=str(flex_creds.get('username', '') or ''),
         password=str(flex_creds.get('password', '') or ''),
         project_id=str(flex_creds.get('project_id', '') or ''),
+        domain=str(flex_creds.get('domain', 'rackspace_cloud_domain') or 'rackspace_cloud_domain'),
     )
 
     _flex_body_hash = hashlib.md5(flex_sh.encode("utf-8")).hexdigest()
