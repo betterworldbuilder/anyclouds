@@ -295,6 +295,23 @@ def normalize_flex_auth_url(auth_url: str, region: str = "") -> str:
     return f"{m.group(1)}{target_slug}{m.group(3)}{path}"
 
 
+def _read_openrc_export(path: str, name: str) -> str:
+    if not path or not name:
+        return ""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                text = line.strip()
+                if not text.startswith("export "):
+                    continue
+                key, sep, val = text[len("export "):].partition("=")
+                if sep and key.strip() == name:
+                    return val.strip().strip('"').strip("'")
+    except OSError:
+        return ""
+    return ""
+
+
 def resolve_target_flavor_catalog_for_region(region: str) -> Optional[Path]:
     canonical = normalize_flex_region(region)
     short = short_flex_region(canonical)
@@ -7039,13 +7056,15 @@ def run_image_migrator():
     if (_has_appcred or _has_userpwd) and not flex_path:
         import tempfile
         fd, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_auto_")
+        flex_auth_input = str(req.get('flex_auth_url', '') or '').strip()
+        flex_region_from_auth = _extract_flex_region_slug_from_auth_url(flex_auth_input)
         flex_region   = normalize_flex_region(
-            str(req.get('flex_region', 'DFW3') or 'DFW3').strip(),
-            str(req.get('flex_auth_url', '') or '').strip(),
+            flex_region_from_auth or str(req.get('flex_region', 'DFW3') or 'DFW3').strip(),
+            flex_auth_input,
         )
         flex_domain   = str(req.get('flex_domain',   'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
         flex_auth_url = normalize_flex_auth_url(
-            str(req.get('flex_auth_url', 'https://keystone.api.dfw3.rackspacecloud.com/v3/') or 'https://keystone.api.dfw3.rackspacecloud.com/v3/').strip(),
+            flex_auth_input or 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
             flex_region,
         )
 
@@ -7311,12 +7330,13 @@ def run_image_migrator():
                 )
                 yield "data: [METHOD_Z] Scripts, scoped OpenRC files, and SNAPWIN workspace staged on jumphost.\n\n"
 
+                flex_region_z = _read_openrc_export(flex_path, "OS_REGION_NAME") or str(req.get('flex_region') or 'DFW3')
                 z_cmd = [
                     "bash", remote_script,
                     "--label", label_safe_z,
                     "--ospc-openrc", remote_ospc,
                     "--flex-openrc", remote_flex,
-                    "--flex-region", str(req.get('flex_region') or 'DFW3'),
+                    "--flex-region", flex_region_z,
                     "--flavor", str(req.get('flex_flavor') or 'gp.0.4.4'),
                     "--network", str(req.get('flex_network_id') or req.get('flex_network') or 'tenant-net'),
                 ]

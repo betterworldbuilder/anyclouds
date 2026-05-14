@@ -286,6 +286,60 @@ source_openrc_if_present() {
   fi
 }
 
+region_from_flex_auth_url() {
+  local url="${OS_AUTH_URL:-}"
+  case "$url" in
+    *keystone.api.dfw3.rackspacecloud.com*) echo "DFW3" ;;
+    *keystone.api.iad3.rackspacecloud.com*) echo "IAD3" ;;
+    *keystone.api.ord3.rackspacecloud.com*) echo "ORD3" ;;
+    *) echo "" ;;
+  esac
+}
+
+resolve_flex_region_after_openrc() {
+  local openrc_region="${OS_REGION_NAME:-}" auth_region
+  auth_region="$(region_from_flex_auth_url)"
+  if [ -n "$openrc_region" ]; then
+    if [ -n "${FLEX_REGION:-}" ] && [ "$FLEX_REGION" != "$openrc_region" ]; then
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN requested FLEX region $FLEX_REGION differs from Flex OpenRC region $openrc_region; using OpenRC region"
+    fi
+    FLEX_REGION="$openrc_region"
+  elif [ -n "$auth_region" ]; then
+    if [ -n "${FLEX_REGION:-}" ] && [ "$FLEX_REGION" != "$auth_region" ]; then
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN requested FLEX region $FLEX_REGION differs from Flex auth URL region $auth_region; using auth URL region"
+    fi
+    FLEX_REGION="$auth_region"
+  else
+    FLEX_REGION="${FLEX_REGION:-DFW3}"
+  fi
+  export OS_REGION_NAME="$FLEX_REGION"
+}
+
+check_flex_glance_access() {
+  local token_log image_log rc msg
+  token_log="$JOB_LOG/flex_token_issue.log"
+  image_log="$JOB_LOG/flex_image_access.log"
+  set +e
+  openstack token issue >"$token_log" 2>&1
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    msg="$(tail -n 5 "$token_log" 2>/dev/null | tr '\n' ' ' | cut -c 1-260)"
+    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX token issue failed rc=$rc: ${msg:-unknown error}"
+    return 1
+  fi
+  set +e
+  openstack image list --limit 1 >"$image_log" 2>&1
+  rc=$?
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    msg="$(tail -n 8 "$image_log" 2>/dev/null | tr '\n' ' ' | cut -c 1-320)"
+    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX Glance access failed rc=$rc: ${msg:-unknown error}"
+    return 2
+  fi
+  return 0
+}
+
 require_cmd() {
   if [ "$DRY_RUN" = 1 ]; then
     command -v "$1" >/dev/null 2>&1 || log "[DRY-RUN] command not present here, would require on jumphost: $1"
@@ -1399,7 +1453,7 @@ run_driver_binding() {
 }
 
 upload_flex_rescue_image_method_ab() {
-  local upload_try out_file rc image_id status_line err_msg
+  local upload_try out_file err_file rc image_id status_line err_msg
   local qcow_bytes qcow_mib
   qcow_bytes=$(stat -c%s "$QCOW2" 2>/dev/null || echo 0)
   qcow_mib=$((qcow_bytes / 1024 / 1024))
@@ -1432,9 +1486,11 @@ upload_flex_rescue_image_method_ab() {
     log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] starting image upload (stderr -> $BACKGROUND_LOG)"
     echo "[$(date '+%F %T')] openstack image create name=$RESCUE_IMAGE_NAME file=$QCOW2 bytes=$qcow_bytes try=$upload_try" >>"$BACKGROUND_LOG"
     out_file="$(mktemp)"
-    if openstack "${image_create_args[@]}" >"$out_file" 2>>"$BACKGROUND_LOG"; then
+    err_file="$(mktemp)"
+    if openstack "${image_create_args[@]}" >"$out_file" 2>"$err_file"; then
+      cat "$err_file" >>"$BACKGROUND_LOG"
       image_id="$(grep -Eo '[0-9a-fA-F-]{36}' "$out_file" | tail -n 1 || true)"
-      rm -f "$out_file" 2>/dev/null || true
+      rm -f "$out_file" "$err_file" 2>/dev/null || true
       if [ -n "$image_id" ]; then
         status_line="$(openstack image show "$image_id" -f value -c status 2>/dev/null || echo "unknown")"
         log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] returned image id: $image_id"
@@ -1445,8 +1501,9 @@ upload_flex_rescue_image_method_ab() {
       log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload returned no image id"
     else
       rc=$?
-      rm -f "$out_file" 2>/dev/null || true
-      err_msg="$(tail -n 8 "$BACKGROUND_LOG" 2>/dev/null | tr '\n' ' ' | cut -c 1-260 || echo "Unknown error")"
+      cat "$err_file" >>"$BACKGROUND_LOG"
+      err_msg="$(tail -n 8 "$err_file" 2>/dev/null | tr '\n' ' ' | cut -c 1-320 || echo "Unknown error")"
+      rm -f "$out_file" "$err_file" 2>/dev/null || true
       log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try failed rc=$rc: $err_msg"
     fi
 
@@ -1998,9 +2055,11 @@ log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT standalone offline Windows repair complete
 
 stage_start "ZS6_UPLOAD_FLEX_RESCUE_IMAGE"
 source_openrc_if_present "$FLEX_OPENRC"
-[ -n "$FLEX_REGION" ] && export OS_REGION_NAME="$FLEX_REGION"
+resolve_flex_region_after_openrc
 redacted_env_snapshot "$JOB_STATE/flex_env_redacted.txt"
+json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
 log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX region: ${OS_REGION_NAME:-unset}"
+check_flex_glance_access || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_glance_auth_failed" "Flex Keystone token works only if Glance also accepts it. Check FLEX project/region/API credentials; see $JOB_LOG/flex_image_access.log."
 RESCUE_IMAGE_ID=""
 upload_flex_rescue_image_method_ab || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path failed after 3 attempts; inspect $BACKGROUND_LOG."
 [ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path returned no image id; inspect $BACKGROUND_LOG."
