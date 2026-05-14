@@ -1751,11 +1751,19 @@ preclean_ntfs_for_rw_mount() {
 
 merge_system_reg() {
   local reg="$1" hive="$2"
+  if command -v hivexregedit >/dev/null 2>&1; then
+    sudo hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' "$hive" "$reg" >>"$REPAIR_LOG" 2>&1
+    return $?
+  fi
   printf 'y\n' | sudo reged -I "$hive" "HKEY_LOCAL_MACHINE\\SYSTEM" "$reg" >>"$REPAIR_LOG" 2>&1
 }
 
 merge_software_reg() {
   local reg="$1" hive="$2"
+  if command -v hivexregedit >/dev/null 2>&1; then
+    sudo hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' "$hive" "$reg" >>"$REPAIR_LOG" 2>&1
+    return $?
+  fi
   printf 'y\n' | sudo reged -I "$hive" "HKEY_LOCAL_MACHINE\\SOFTWARE" "$reg" >>"$REPAIR_LOG" 2>&1
 }
 
@@ -1923,16 +1931,58 @@ Windows Registry Editor Version 5.00
 "Start"=dword:00000004
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\intelide]
-"Start"=dword:00000003
+"Start"=dword:00000000
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\atapi]
-"Start"=dword:00000003
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\pciide]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\pciide\StartOverride]
+"0"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\storahci]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\storahci\StartOverride]
+"0"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\msahci]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\iaStorV]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\iaStorV\StartOverride]
+"0"=dword:00000000
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\intelide]
-"Start"=dword:00000003
+"Start"=dword:00000000
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\atapi]
-"Start"=dword:00000003
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\pciide]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\pciide\StartOverride]
+"0"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\storahci]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\storahci\StartOverride]
+"0"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\msahci]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\iaStorV]
+"Start"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\iaStorV\StartOverride]
+"0"=dword:00000000
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\viostor]
 "Type"=dword:00000001
@@ -1947,6 +1997,22 @@ Windows Registry Editor Version 5.00
 "ErrorControl"=dword:00000001
 "Group"="SCSI miniport"
 "ImagePath"="system32\\drivers\\vioscsi.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\viostor]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+"ImagePath"="system32\\drivers\\viostor.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\vioscsi]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+"ImagePath"="system32\\drivers\\vioscsi.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase]
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001]
 "ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
@@ -1963,6 +2029,30 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048]
 "ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
 "Service"="vioscsi"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\CriticalDeviceDatabase]
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="viostor"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="viostor"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="vioscsi"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="vioscsi"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Class\{4D36E97D-E325-11CE-BFC1-08002BE10318}]
+"UpperFilters"=hex(7):00,00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\Class\{4D36E97D-E325-11CE-BFC1-08002BE10318}]
+"UpperFilters"=hex(7):00,00
 EOF
   merge_system_reg "$reg_file" "$cfg/SYSTEM" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SYSTEM registry merge returned non-zero; inspect $REPAIR_LOG"
 
@@ -2166,7 +2256,12 @@ redacted_env_snapshot "$JOB_STATE/flex_env_redacted.txt"
 json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
 log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX region: ${OS_REGION_NAME:-unset}"
 check_flex_glance_access || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_glance_auth_failed" "Flex Keystone token works only if Glance also accepts it. Check FLEX project/region/API credentials; see $JOB_LOG/flex_image_access.log."
-RESCUE_IMAGE_ID="$(find_existing_rescue_image || true)"
+RESCUE_IMAGE_ID=""
+if [ "${OSPC2FLEX_SNAPWIN_REUSE_RESCUE_IMAGE:-1}" = "1" ]; then
+  RESCUE_IMAGE_ID="$(find_existing_rescue_image || true)"
+else
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Rescue image reuse disabled; uploading fresh repaired qcow2."
+fi
 if [ -n "$RESCUE_IMAGE_ID" ]; then
   log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Reusing existing active rescue image: $RESCUE_IMAGE_ID"
 else
@@ -2234,15 +2329,32 @@ checkpoint_hit "dummy_attach"
 log "[ZS8_ATTACH_DUMMY_VIRTIO] HIT dummy VirtIO volume attached at rescue boot: $DUMMY_VOLUME_ID"
 
 stage_start "ZS9_DRIVER_BIND"
-if [ "$MANUAL_DRIVER_BIND" = 1 ] || [ -z "$WIN_PASSWORD" ]; then
+if [ "${OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND:-0}" = "1" ]; then
   show_manual_driver_card
   json_merge "{\"stage\":\"ZS9_DRIVER_BIND\",\"status\":\"WAITING_FOR_DRIVER_BIND\",\"next_action\":\"Run the displayed pnputil commands in the rescue VM, reboot, then continue Method SNAPWIN.\",\"checkpoints\":{\"driver_bind\":\"PENDING\"}}"
   log "[ZS9_DRIVER_BIND] WAITING_FOR_DRIVER_BIND manual confirmation required"
   write_report
   exit 0
 fi
-z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT" || fail_exit "ZS9_DRIVER_BIND" "rescue_guest_unreachable" "Use console/RDP and manual pnputil bind."
-run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
+
+if [ "$MANUAL_DRIVER_BIND" = 1 ]; then
+  log "[ZS9_DRIVER_BIND] WARN --manual-driver-bind is deprecated; SNAPWIN will auto-bind unless OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND=1."
+fi
+
+if [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
+  run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
+  log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind completed over $ACCESS_METHOD on $ACCESS_IP:$ACCESS_PORT"
+else
+  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; using offline-staged VirtIO drivers and registry/CDDB boot binding."
+  log "[ZS9_DRIVER_BIND] Rebooting rescue VM once so Windows PnP can enumerate the dummy VirtIO volume."
+  openstack server reboot "$RESCUE_SERVER_ID" >>"$BACKGROUND_LOG" 2>&1 || true
+  z_wait_for_server_status "$RESCUE_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS9_DRIVER_BIND" "rescue_reboot_failed" "Inspect rescue VM after offline driver binding reboot."
+  sleep "${OSPC2FLEX_SNAPWIN_PNP_SETTLE_SECONDS:-120}"
+  if console_has_fatal_boot_error "$RESCUE_SERVER_ID"; then console_rc=0; else console_rc=$?; fi
+  if [ "$console_rc" -eq 2 ]; then fail_exit "ZS9_DRIVER_BIND" "WINDOWS_SYSTEM_HIVE_OR_REGISTRY_STOP" "Inspect rescue console and restore SYSTEM hive backup."; fi
+  if [ "$console_rc" -eq 3 ]; then fail_exit "ZS9_DRIVER_BIND" "INACCESSIBLE_BOOT_DEVICE" "Inspect rescue console and offline VirtIO repair."; fi
+  log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted after rescue reboot"
+fi
 checkpoint_hit "driver_bind"
 log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind confirmed"
 
