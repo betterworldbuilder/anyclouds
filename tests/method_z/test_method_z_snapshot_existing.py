@@ -41,6 +41,7 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "rackspace_create_volume_from_image" in txt
     assert "rackspace_attach_volume" in txt
     assert "CINDER_MIN_VOLUME_SIZE_GB" in txt
+    assert "grep -Eq '^[0-9]+$'" in txt
     assert "os-volume_attachments" in txt
     assert "sudo dd if=" in txt
     assert "openstack server image create" in txt

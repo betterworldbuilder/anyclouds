@@ -1117,6 +1117,13 @@ PY
 
 apply_cinder_min_volume_size() {
   local requested="$1" min_size="${CINDER_MIN_VOLUME_SIZE_GB:-75}"
+  if ! printf '%s' "$requested" | grep -Eq '^[0-9]+$'; then
+    printf '%s' "$min_size"
+    return 0
+  fi
+  if ! printf '%s' "$min_size" | grep -Eq '^[0-9]+$'; then
+    min_size=75
+  fi
   if [ "$requested" -lt "$min_size" ]; then
     printf '%s' "$min_size"
   else
