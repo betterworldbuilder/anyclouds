@@ -92,6 +92,12 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "upload_flex_rescue_image_method_ab" in txt
     assert "Method A/B Glance upload path" in txt
     assert "image create \"$RESCUE_IMAGE_NAME\"" in txt
+    assert "find_existing_rescue_image()" in txt
+    assert "Reusing existing active rescue image" in txt
+    assert "HIT rescue image ready" in txt
+    assert "effective_keypair()" in txt
+    assert "openstack keypair show" in txt
+    assert "booting without keypair" in txt
     assert "--private" in txt
     assert "rackspace_identity_v2_auth" in txt
     assert "RAX-KSKEY:apiKeyCredentials" in txt

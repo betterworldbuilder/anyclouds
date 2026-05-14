@@ -340,6 +340,17 @@ check_flex_glance_access() {
   return 0
 }
 
+effective_keypair() {
+  local requested="${KEYPAIR:-}"
+  [ -n "$requested" ] || return 0
+  if openstack keypair show "$requested" >/dev/null 2>&1; then
+    printf '%s' "$requested"
+    return 0
+  fi
+  log "[$CURRENT_STAGE] WARN requested keypair '$requested' not found in FLEX region ${OS_REGION_NAME:-unset}; booting without keypair"
+  return 0
+}
+
 require_cmd() {
   if [ "$DRY_RUN" = 1 ]; then
     command -v "$1" >/dev/null 2>&1 || log "[DRY-RUN] command not present here, would require on jumphost: $1"
@@ -1531,6 +1542,16 @@ upload_flex_rescue_image_method_ab() {
   return 1
 }
 
+find_existing_rescue_image() {
+  local image_id
+  image_id="$(
+    openstack image list --name "$RESCUE_IMAGE_NAME" -f value -c ID -c Status 2>/dev/null \
+      | awk '$2 == "active" { print $1; exit }'
+  )"
+  [ -n "$image_id" ] || return 1
+  printf '%s' "$image_id"
+}
+
 find_windows_root() {
   if [ -f "$MNT/Windows/System32/config/SYSTEM" ]; then echo "$MNT/Windows"; return 0; fi
   if [ -f "$MNT/windows/system32/config/SYSTEM" ]; then echo "$MNT/windows"; return 0; fi
@@ -2090,8 +2111,12 @@ redacted_env_snapshot "$JOB_STATE/flex_env_redacted.txt"
 json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
 log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX region: ${OS_REGION_NAME:-unset}"
 check_flex_glance_access || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_glance_auth_failed" "Flex Keystone token works only if Glance also accepts it. Check FLEX project/region/API credentials; see $JOB_LOG/flex_image_access.log."
-RESCUE_IMAGE_ID=""
-upload_flex_rescue_image_method_ab || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path failed after 3 attempts; inspect $BACKGROUND_LOG."
+RESCUE_IMAGE_ID="$(find_existing_rescue_image || true)"
+if [ -n "$RESCUE_IMAGE_ID" ]; then
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Reusing existing active rescue image: $RESCUE_IMAGE_ID"
+else
+  upload_flex_rescue_image_method_ab || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path failed after 3 attempts; inspect $BACKGROUND_LOG."
+fi
 [ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path returned no image id; inspect $BACKGROUND_LOG."
 z_wait_for_image_active "$RESCUE_IMAGE_ID" 1800 || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_not_active" "Inspect Flex Glance image status."
 openstack image set "$RESCUE_IMAGE_ID" \
@@ -2107,7 +2132,7 @@ openstack image set "$RESCUE_IMAGE_ID" \
   --property ospc2flex_run_id="$RUN_ID" >>"$BACKGROUND_LOG" 2>&1
 json_merge "{\"rescue_image_id\":\"$RESCUE_IMAGE_ID\"}"
 checkpoint_hit "flex_upload"
-log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] HIT rescue image uploaded: $RESCUE_IMAGE_ID"
+log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] HIT rescue image ready: $RESCUE_IMAGE_ID"
 
 if [ "$SKIP_RESCUE_BOOT" = 1 ]; then
   json_merge "{\"stage\":\"ZS6_UPLOAD_FLEX_RESCUE_IMAGE\",\"status\":\"WAITING_FOR_DRIVER_BIND\",\"next_action\":\"Rescue boot was skipped by request; boot image manually or rerun without --skip-rescue-boot.\"}"
@@ -2117,7 +2142,8 @@ fi
 
 stage_start "ZS7_BOOT_FLEX_RESCUE_VM"
 create_args=(server create "$RESCUE_SERVER_NAME" --image "$RESCUE_IMAGE_ID" --flavor "$FLAVOR" --network "$NETWORK" --wait -f value -c id)
-[ -n "$KEYPAIR" ] && create_args+=(--key-name "$KEYPAIR")
+EFFECTIVE_KEYPAIR="$(effective_keypair)"
+[ -n "$EFFECTIVE_KEYPAIR" ] && create_args+=(--key-name "$EFFECTIVE_KEYPAIR")
 [ -n "$SECURITY_GROUP" ] && create_args+=(--security-group "$SECURITY_GROUP")
 RESCUE_SERVER_ID="$(openstack "${create_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$RESCUE_SERVER_ID" ] || fail_exit "ZS7_BOOT_FLEX_RESCUE_VM" "rescue_server_create_failed" "Inspect rescue image metadata and Nova boot request."
@@ -2176,7 +2202,8 @@ log "[ZS10_SNAPSHOT_VIRTIO_READY] HIT final virtio-ready image: $FINAL_IMAGE_ID"
 
 stage_start "ZS11_BOOT_FINAL_FLEX_VM"
 final_args=(server create "$FINAL_SERVER_NAME" --image "$FINAL_IMAGE_ID" --flavor "$FLAVOR" --network "$NETWORK" --wait -f value -c id)
-[ -n "$KEYPAIR" ] && final_args+=(--key-name "$KEYPAIR")
+EFFECTIVE_KEYPAIR="$(effective_keypair)"
+[ -n "$EFFECTIVE_KEYPAIR" ] && final_args+=(--key-name "$EFFECTIVE_KEYPAIR")
 [ -n "$SECURITY_GROUP" ] && final_args+=(--security-group "$SECURITY_GROUP")
 FINAL_SERVER_ID="$(openstack "${final_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$FINAL_SERVER_ID" ] || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_create_failed" "Inspect final image metadata and Nova request."
