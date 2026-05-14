@@ -7130,7 +7130,12 @@ def run_image_migrator():
         remote_log = f"/tmp/mig_{label_safe_z}.log"
         remote_script = "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh"
 
-        ssh_key_raw_z = (req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip()
+        ssh_key_raw_z = (
+            req.get('process_ssh_key')
+            or req.get('ssh_key_path')
+            or os.environ.get("OSPC2FLEX_SNAPWIN_JUMPHOST_KEY")
+            or '~/.ssh/id_rsa'
+        ).strip()
         ssh_key_raw_z = ssh_key_raw_z.replace('id _rsa', 'id_rsa')
         if ssh_key_raw_z.startswith('/.ssh/'):
             ssh_key_raw_z = '~' + ssh_key_raw_z
@@ -7139,7 +7144,12 @@ def run_image_migrator():
             default_ssh_key_z = os.path.expanduser('~/.ssh/id_rsa')
             if os.path.exists(default_ssh_key_z):
                 ssh_key_z = default_ssh_key_z
-        ssh_usr_z = (req.get('process_ssh_user') or 'ubuntu').strip() or 'ubuntu'
+        ssh_usr_z = (
+            req.get('process_ssh_user')
+            or req.get('jumphost_user')
+            or os.environ.get("OSPC2FLEX_SNAPWIN_JUMPHOST_USER")
+            or 'ubuntu'
+        ).strip() or 'ubuntu'
         ssh_base_z = [
             "ssh", "-i", ssh_key_z,
             "-o", "StrictHostKeyChecking=no",
@@ -7174,6 +7184,7 @@ def run_image_migrator():
             yield "data: --- EXECUTING METHOD SNAPWIN ---\n\n"
             yield f"data: Method SNAPWIN — Existing OSPC Windows Snapshot to Flex: {label_safe_z}\n\n"
             yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
+            yield f"data: [METHOD_Z] SNAPWIN selected jumphost: {ssh_usr_z}@{process_ip}\n\n"
             yield f"data: [METHOD_Z] Jumphost SSH key: {ssh_key_z}\n\n"
             try:
                 def _run_stage_cmd(stage_label, cmd, timeout, attempts=1, retry_wait=8, capture=True):
@@ -7282,7 +7293,23 @@ def run_image_migrator():
                     attempts=2,
                     retry_wait=15,
                 )
-                yield "data: [METHOD_Z] Scripts and scoped OpenRC files staged on jumphost.\n\n"
+                yield "data: [METHOD_Z] Preparing SNAPWIN workspace on jumphost: /mnt/migration/ospc2flex_method_z\n\n"
+                prep_cmd = (
+                    "set -e; "
+                    "base=/mnt/migration/ospc2flex_method_z; "
+                    "sudo -n mkdir -p \"$base\"; "
+                    "sudo -n chown -R $(id -u):$(id -g) \"$base\"; "
+                    "mkdir -p \"$base/runs\"; "
+                    "test -w \"$base\""
+                )
+                yield from _run_stage_cmd(
+                    "SNAPWIN workspace prepare",
+                    ssh_base_z + [prep_cmd],
+                    timeout=120,
+                    attempts=2,
+                    retry_wait=15,
+                )
+                yield "data: [METHOD_Z] Scripts, scoped OpenRC files, and SNAPWIN workspace staged on jumphost.\n\n"
 
                 z_cmd = [
                     "bash", remote_script,

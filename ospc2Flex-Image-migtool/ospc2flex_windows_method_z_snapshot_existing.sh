@@ -12,6 +12,7 @@
 #   * no Method D/G/H/v2 helper stages or sourced helper scripts
 
 set -euo pipefail
+export PATH="$PATH:/usr/sbin:/sbin"
 
 if [ -z "${OSPC2FLEX_LINEBUF_WRAPPER:-}" ] && command -v stdbuf >/dev/null 2>&1; then
   export OSPC2FLEX_LINEBUF_WRAPPER=1
@@ -31,6 +32,8 @@ DOWNLOAD_DIR=""
 FLEX_REGION="${FLEX_REGION:-DFW3}"
 VIRTIO_ISO="${OSPC2FLEX_VIRTIO_ISO_LOCAL:-/mnt/migration/virtio/virtio-win.iso}"
 LEGACY_VIRTIO_ISO="${OSPC2FLEX_LEGACY_VIRTIO_ISO:-/usr/share/virtio-win/virtio-win-0.1.108.iso}"
+VIRTIO_ISO_URL="${OSPC2FLEX_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso}"
+LEGACY_VIRTIO_ISO_URL="${OSPC2FLEX_LEGACY_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/deprecated-isos/archives/virtio-win-0.1.108/virtio-win-0.1.108.iso}"
 WINDOWS_VERSION="auto"
 SKIP_RESCUE_BOOT=0
 MANUAL_DRIVER_BIND=0
@@ -124,11 +127,21 @@ FINAL_FLOATING_IP=""
 ACCESS_METHOD=""
 ACCESS_IP=""
 ACCESS_PORT=""
+SNAPWIN_NBD_DEV=""
 CURRENT_STAGE="ZS0_PREFLIGHT"
 DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_DOWNLOAD_UNAVAILABLE"
 DOWNLOAD_NEXT_ACTION="Provide a local artifact, enable Glance image download/export, or provide Cloud Files object details."
 
-mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT"
+if ! mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT" 2>/dev/null; then
+  echo "[SNAPWIN] Base directory is not writable by $(id -un); preparing $BASE_DIR with sudo" >&2
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "ERROR: cannot create $BASE_DIR and sudo is not available" >&2
+    exit 1
+  fi
+  sudo -n mkdir -p "$BASE_DIR"
+  sudo -n chown -R "$(id -u):$(id -g)" "$BASE_DIR"
+  mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT"
+fi
 : >"$PROGRESS_LOG"
 : >"$BACKGROUND_LOG"
 
@@ -264,6 +277,10 @@ source_openrc_if_present() {
   local path="$1"
   if [ -n "$path" ]; then
     [ -f "$path" ] || fail_exit "$CURRENT_STAGE" "openrc_missing" "Check path: $path"
+    unset OS_TOKEN OS_AUTH_TOKEN OS_SERVICE_TOKEN OS_AUTH_TYPE
+    unset OS_APPLICATION_CREDENTIAL_ID OS_APPLICATION_CREDENTIAL_NAME OS_APPLICATION_CREDENTIAL_SECRET
+    unset OS_USERNAME OS_PASSWORD OS_PROJECT_ID OS_PROJECT_NAME OS_TENANT_ID OS_TENANT_NAME
+    unset OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_NAME OS_DOMAIN_NAME
     # shellcheck source=/dev/null
     source "$path"
   fi
@@ -274,6 +291,89 @@ require_cmd() {
     command -v "$1" >/dev/null 2>&1 || log "[DRY-RUN] command not present here, would require on jumphost: $1"
   else
     command -v "$1" >/dev/null 2>&1 || fail_exit "ZS0_PREFLIGHT" "missing_command_$1" "Install $1 on the jumphost and retry."
+  fi
+}
+
+pkg_for_cmd() {
+  case "$1" in
+    qemu-img|qemu-nbd) echo "qemu-utils" ;;
+    guestmount|guestunmount) echo "libguestfs-tools" ;;
+    hivexsh) echo "libhivex-bin" ;;
+    reged|chntpw) echo "chntpw" ;;
+    openstack) echo "python3-openstackclient" ;;
+    jq) echo "jq" ;;
+    curl) echo "curl" ;;
+    rsync) echo "rsync" ;;
+    python3) echo "python3" ;;
+    ntfs-3g|ntfsfix) echo "ntfs-3g" ;;
+    7z) echo "p7zip-full" ;;
+    *) echo "" ;;
+  esac
+}
+
+install_missing_prereqs() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  local missing=() pkgs=() c pkg unique_pkgs
+  for c in "$@"; do
+    command -v "$c" >/dev/null 2>&1 || missing+=("$c")
+  done
+  [ "${#missing[@]}" -gt 0 ] || return 0
+
+  log "[ZS0_PREFLIGHT] Missing tool(s): ${missing[*]}"
+  if ! command -v apt-get >/dev/null 2>&1; then
+    fail_exit "ZS0_PREFLIGHT" "missing_commands_${missing[*]}" "This jumphost is missing tools and does not have apt-get. Install: ${missing[*]}"
+  fi
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    fail_exit "ZS0_PREFLIGHT" "sudo_required_for_prereq_install" "Configure passwordless sudo or preinstall: ${missing[*]}"
+  fi
+
+  for c in "${missing[@]}"; do
+    pkg="$(pkg_for_cmd "$c")"
+    [ -n "$pkg" ] && pkgs+=("$pkg")
+  done
+  [ "${#pkgs[@]}" -gt 0 ] || fail_exit "ZS0_PREFLIGHT" "unknown_prereq_package" "No package mapping for missing tools: ${missing[*]}"
+  unique_pkgs="$(printf '%s\n' "${pkgs[@]}" | awk 'NF && !seen[$0]++' | tr '\n' ' ')"
+  log "[ZS0_PREFLIGHT] Installing missing package(s): $unique_pkgs"
+  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get update >>"$BACKGROUND_LOG" 2>&1
+  sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y $unique_pkgs >>"$BACKGROUND_LOG" 2>&1
+
+  for c in "${missing[@]}"; do
+    if command -v "$c" >/dev/null 2>&1; then
+      log "[ZS0_PREFLIGHT] OK after install: $c=$(command -v "$c")"
+    else
+      fail_exit "ZS0_PREFLIGHT" "missing_command_${c}_after_install" "apt install completed but $c is still unavailable. Inspect $BACKGROUND_LOG."
+    fi
+  done
+}
+
+ensure_virtio_iso() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  [ "$DOWNLOAD_ONLY" = 1 ] && return 0
+  local iso="$1" url="$2" label="$3" min_bytes="${4:-50000000}" tmp
+  if [ -s "$iso" ] && [ "$(stat -c%s "$iso" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
+    log "[ZS0_PREFLIGHT] HIT $label present: $iso"
+    return 0
+  fi
+  [ -n "$url" ] || return 0
+  if ! command -v curl >/dev/null 2>&1; then
+    log "[ZS0_PREFLIGHT] WARN cannot download $label because curl is unavailable"
+    return 0
+  fi
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    log "[ZS0_PREFLIGHT] WARN cannot stage $label because passwordless sudo is unavailable"
+    return 0
+  fi
+  log "[ZS0_PREFLIGHT] Downloading missing $label to $iso"
+  sudo -n mkdir -p "$(dirname "$iso")"
+  sudo -n chown "$(id -u):$(id -g)" "$(dirname "$iso")" 2>/dev/null || true
+  tmp="${iso}.tmp.$$"
+  if curl -fL --retry 3 --retry-delay 5 --connect-timeout 20 -o "$tmp" "$url" >>"$BACKGROUND_LOG" 2>&1 \
+     && [ -s "$tmp" ] && [ "$(stat -c%s "$tmp" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
+    mv -f "$tmp" "$iso"
+    log "[ZS0_PREFLIGHT] HIT downloaded $label: $iso"
+  else
+    rm -f "$tmp"
+    log "[ZS0_PREFLIGHT] WARN failed to download $label from $url; repair will fail later if the ISO is required"
   fi
 }
 
@@ -298,6 +398,25 @@ safe_cp_source() {
   local src="$1" dest="$2"
   [ "$src" = "$dest" ] && return 0
   rsync -a --inplace "$src" "$dest"
+}
+
+ensure_libguestfs_kernel_readable() {
+  [ "$DOWNLOAD_ONLY" = 1 ] && return 0
+  command -v guestmount >/dev/null 2>&1 || return 0
+  local unreadable=() kernel
+  while IFS= read -r kernel; do
+    [ -n "$kernel" ] && [ ! -r "$kernel" ] && unreadable+=("$kernel")
+  done < <(find /boot -maxdepth 1 -type f -name 'vmlinuz-*' 2>/dev/null | sort -r)
+  [ "${#unreadable[@]}" -eq 0 ] && return 0
+  log "[ZS0_PREFLIGHT] libguestfs kernel image(s) are not readable by $(id -un): ${unreadable[*]}"
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    fail_exit "ZS0_PREFLIGHT" "libguestfs_kernel_not_readable" "Make /boot/vmlinuz-* readable or run SNAPWIN with passwordless sudo available."
+  fi
+  sudo -n chmod a+r "${unreadable[@]}" >>"$BACKGROUND_LOG" 2>&1 || fail_exit "ZS0_PREFLIGHT" "libguestfs_kernel_chmod_failed" "Allow the jumphost user to read /boot/vmlinuz-* for libguestfs/supermin."
+  for kernel in "${unreadable[@]}"; do
+    [ -r "$kernel" ] || fail_exit "ZS0_PREFLIGHT" "libguestfs_kernel_still_unreadable" "Make $kernel readable and retry."
+    log "[ZS0_PREFLIGHT] OK libguestfs kernel readable: $kernel"
+  done
 }
 
 validate_artifact() {
@@ -518,6 +637,12 @@ log_file_excerpt() {
   done
 }
 
+is_terminal_direct_download_block() {
+  local file="$1"
+  [ -s "$file" ] || return 1
+  grep -qiE 'HTTP_CODE=413|returned error: 413|Request Entity Too Large|InvalidResponse' "$file"
+}
+
 download_cloud_files_object() {
   local container="$1" object_name="$2" dest="$3" min_bytes="$4" tmp_log="$5" size
   rm -f "$dest"
@@ -626,12 +751,15 @@ PY
 }
 
 cinder_wait_volume_status() {
-  local vol_id="$1" want="$2" timeout="${3:-1800}" waited=0 status
+  local vol_id="$1" want="$2" timeout="${3:-1800}" waited=0 status detail
   while [ "$waited" -lt "$timeout" ]; do
     status="$(rackspace_volume_status "$vol_id" 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -d '\r' || echo unknown)"
     [ "$status" = "$want" ] && return 0
     [ "$status" = "error" ] && return 1
-    [ $((waited % 60)) -eq 0 ] && log "[ZS3B_CINDER_VOLUME_EXPORT] volume=$vol_id status=$status target=$want waited=${waited}s"
+    if [ $((waited % 60)) -eq 0 ]; then
+      detail="$(rackspace_volume_detail_summary "$vol_id")"
+      log "[ZS3B_CINDER_VOLUME_EXPORT] volume=$vol_id status=$status target=$want waited=${waited}s ${detail}"
+    fi
     sleep 10
     waited=$((waited + 10))
   done
@@ -669,7 +797,28 @@ rackspace_volume_status() {
   base="$(rackspace_blockstorage_base)"
   [ -n "$token" ] && [ -n "$base" ] || return 1
   resp="$(curl -sS "$base/volumes/$vol_id" -H "X-Auth-Token: $token" 2>/dev/null || true)"
+  printf '%s\n' "$resp" >"$JOB_TMP/volume_${vol_id}.json" 2>/dev/null || true
   printf '%s' "$resp" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("status","unknown"))' 2>/dev/null || echo unknown
+}
+
+rackspace_volume_detail_summary() {
+  local vol_id="$1" file="$JOB_TMP/volume_${vol_id}.json"
+  [ -s "$file" ] || return 0
+  python3 - "$file" <<'PY' 2>/dev/null || true
+import json, sys
+v = (json.load(open(sys.argv[1], encoding="utf-8")).get("volume") or {})
+fields = ["status", "size", "display_name", "display_description", "availability_zone", "created_at", "volume_type", "bootable"]
+parts = []
+for key in fields:
+    val = v.get(key)
+    if val not in (None, ""):
+        parts.append(f"{key}={val}")
+for key in ("error", "fault", "os-vol-tenant-attr:tenant_id"):
+    val = v.get(key)
+    if val not in (None, ""):
+        parts.append(f"{key}={val}")
+print(" ".join(parts))
+PY
 }
 
 rackspace_create_volume_from_image() {
@@ -957,7 +1106,7 @@ download_curl_glance() {
 }
 
 download_existing_ospc_snapshot() {
-  local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i
+  local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3_DOWNLOAD_SNAPSHOT] Download waterfall for existing image=$image_id"
   if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$(image_is_licensed_cinder_only "$image_id" || echo 0)" = "1" ]; then
     log "[ZS3_DOWNLOAD_SNAPSHOT] HIT image metadata indicates licensed/cinder-only (com.rackspace__1__options=4)"
@@ -981,6 +1130,11 @@ download_existing_ospc_snapshot() {
     if download_openstack_save "" "$image_id" "$dest" "$min_bytes" "$tmp_log"; then
       return 0
     fi
+    if is_terminal_direct_download_block "$tmp_log"; then
+      direct_blocked=1
+      log "[ZS3_DOWNLOAD_SNAPSHOT] Direct Glance save is terminally blocked for this image; skipping remaining direct retries."
+      break
+    fi
     base_i=0
     while IFS= read -r base; do
       [ -n "$base" ] || continue
@@ -994,16 +1148,30 @@ download_existing_ospc_snapshot() {
       if download_openstack_save "$base" "$image_id" "$dest" "$min_bytes" "$tmp_log"; then
         return 0
       fi
+      if is_terminal_direct_download_block "$tmp_log"; then
+        direct_blocked=1
+        log "[ZS3_DOWNLOAD_SNAPSHOT] Direct Glance save is terminally blocked for $base; skipping remaining direct retries."
+        break
+      fi
       token="$(refresh_ospc_token || printf '%s' "$token")"
       if [ -n "$token" ]; then
         tmp_log="$JOB_LOG/curl_glance_attempt${attempt}_base${base_i}.log"
         if download_curl_glance "$base" "$image_id" "$dest" "$min_bytes" "$token" "$tmp_log"; then
           return 0
         fi
+        if is_terminal_direct_download_block "$tmp_log"; then
+          direct_blocked=1
+          log "[ZS3_DOWNLOAD_SNAPSHOT] Direct Glance file endpoint returned terminal block for $base; skipping remaining direct retries."
+          break
+        fi
       else
         log "[ZS3_DOWNLOAD_SNAPSHOT] WARN token refresh failed; skipping curl fallback for $base"
       fi
     done < <(image_bases)
+    if [ "$direct_blocked" = "1" ]; then
+      log "[ZS3_DOWNLOAD_SNAPSHOT] Falling through to Cloud Files export / Cinder fallback after terminal direct-download block."
+      break
+    fi
     [ "$attempt" -lt "$EXPORT_RETRIES" ] && sleep "$EXPORT_RETRY_WAIT"
     token="$(refresh_ospc_token || printf '%s' "$token")"
     attempt=$((attempt + 1))
@@ -1170,15 +1338,61 @@ run_driver_binding() {
   run_winrm_ps "$script" >>"$BACKGROUND_LOG" 2>&1
 }
 
-wait_for_flex_region() {
-  local requested="$1" r
-  for r in "$requested" DFW3 IAD3 ORD3 ORD IAD DFW; do
-    [ -n "$r" ] || continue
-    export OS_REGION_NAME="$r"
-    if openstack token issue >/dev/null 2>&1; then
-      FLEX_REGION="$r"
-      json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
-      return 0
+upload_flex_rescue_image_method_ab() {
+  local upload_try out_file rc image_id status_line err_msg
+  local qcow_bytes qcow_mib
+  qcow_bytes=$(stat -c%s "$QCOW2" 2>/dev/null || echo 0)
+  qcow_mib=$((qcow_bytes / 1024 / 1024))
+
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Method A/B Glance upload path"
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Uploading: ${qcow_bytes} bytes (${qcow_mib} MiB) to FLEX Glance"
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Metadata: architecture=x86_64 vm_mode=hvm os_type=windows os_distro=windows hw_disk_bus=ide hw_cdrom_bus=ide hw_vif_model=e1000 hw_qemu_guest_agent=yes"
+
+  local image_create_args=(
+    image create "$RESCUE_IMAGE_NAME"
+    --disk-format qcow2
+    --container-format bare
+    --file "$QCOW2"
+    --private
+    --property "architecture=x86_64"
+    --property "vm_mode=hvm"
+    --property "os_type=windows"
+    --property "os_distro=windows"
+    --property "hw_disk_bus=ide"
+    --property "hw_cdrom_bus=ide"
+    --property "hw_vif_model=e1000"
+    --property "hw_qemu_guest_agent=yes"
+    --property "ospc2flex_method=SNAPWIN_STANDALONE"
+    --property "ospc2flex_run_id=$RUN_ID"
+    --format value -c id
+  )
+
+  for upload_try in 1 2 3; do
+    [ "$upload_try" -gt 1 ] && log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Upload attempt $upload_try/3"
+    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] starting image upload (stderr -> $BACKGROUND_LOG)"
+    echo "[$(date '+%F %T')] openstack image create name=$RESCUE_IMAGE_NAME file=$QCOW2 bytes=$qcow_bytes try=$upload_try" >>"$BACKGROUND_LOG"
+    out_file="$(mktemp)"
+    if openstack "${image_create_args[@]}" >"$out_file" 2>>"$BACKGROUND_LOG"; then
+      image_id="$(grep -Eo '[0-9a-fA-F-]{36}' "$out_file" | tail -n 1 || true)"
+      rm -f "$out_file" 2>/dev/null || true
+      if [ -n "$image_id" ]; then
+        status_line="$(openstack image show "$image_id" -f value -c status 2>/dev/null || echo "unknown")"
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] returned image id: $image_id"
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] initial image status: ${status_line:-unknown}"
+        RESCUE_IMAGE_ID="$image_id"
+        return 0
+      fi
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload returned no image id"
+    else
+      rc=$?
+      rm -f "$out_file" 2>/dev/null || true
+      err_msg="$(tail -n 8 "$BACKGROUND_LOG" 2>/dev/null | tr '\n' ' ' | cut -c 1-260 || echo "Unknown error")"
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try failed rc=$rc: $err_msg"
+    fi
+
+    if [ "$upload_try" -lt 3 ]; then
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] sleeping 20s before retry"
+      sleep 20
     fi
   done
   return 1
@@ -1188,6 +1402,142 @@ find_windows_root() {
   if [ -f "$MNT/Windows/System32/config/SYSTEM" ]; then echo "$MNT/Windows"; return 0; fi
   if [ -f "$MNT/windows/system32/config/SYSTEM" ]; then echo "$MNT/windows"; return 0; fi
   return 1
+}
+
+detect_windows_ntfs_partition() {
+  virt-filesystems -a "$QCOW2" --filesystems --long 2>>"$REPAIR_LOG" \
+    | awk '$3 == "ntfs" { print $1; exit }'
+}
+
+wait_for_nbd_ntfs_partition() {
+  local nbd="$1" i part fstype
+  for i in $(seq 1 30); do
+    sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+    command -v udevadm >/dev/null 2>&1 && sudo -n udevadm settle >>"$REPAIR_LOG" 2>&1 || true
+    for part in "${nbd}"p*; do
+      [ -b "$part" ] || continue
+      fstype="$(sudo -n blkid -o value -s TYPE "$part" 2>/dev/null || true)"
+      if [ "$fstype" = "ntfs" ]; then
+        echo "$part"
+        return 0
+      fi
+    done
+    sleep 1
+  done
+  return 1
+}
+
+cleanup_guest_mountpoint() {
+  local mnt="$1"
+  if mountpoint -q "$mnt" 2>/dev/null; then
+    guestunmount "$mnt" >>"$REPAIR_LOG" 2>&1 || fusermount3 -u "$mnt" >>"$REPAIR_LOG" 2>&1 || fusermount -u "$mnt" >>"$REPAIR_LOG" 2>&1 || sudo -n umount "$mnt" >>"$REPAIR_LOG" 2>&1 || true
+  fi
+}
+
+cleanup_windows_mount() {
+  if mountpoint -q "$MNT" 2>/dev/null; then
+    sudo -n umount "$MNT" >>"$REPAIR_LOG" 2>&1 || guestunmount "$MNT" >>"$REPAIR_LOG" 2>&1 || fusermount3 -u "$MNT" >>"$REPAIR_LOG" 2>&1 || sudo -n umount -l "$MNT" >>"$REPAIR_LOG" 2>&1 || true
+  fi
+  if [ -n "$SNAPWIN_NBD_DEV" ]; then
+    sudo -n qemu-nbd --disconnect "$SNAPWIN_NBD_DEV" >>"$REPAIR_LOG" 2>&1 || true
+    SNAPWIN_NBD_DEV=""
+  fi
+}
+
+cleanup_stale_guestfs_for_qcow2() {
+  local pid cmd
+  pgrep -f "$QCOW2" 2>/dev/null | while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    case "$cmd" in
+      *guestmount*|*qemu-system*x86_64*)
+        log "[ZS5_OFFLINE_WINDOWS_REPAIR] cleaning stale libguestfs process pid=$pid"
+        kill "$pid" 2>/dev/null || true
+        sleep 1
+        kill -9 "$pid" 2>/dev/null || true
+        ;;
+    esac
+  done
+}
+
+mount_windows_ntfs_nbd_rw() {
+  local nbd part
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "sudo_required_for_nbd_mount" "Configure passwordless sudo for qemu-nbd/ntfs-3g offline repair."
+  fi
+  sudo -n modprobe nbd max_part=16 >>"$REPAIR_LOG" 2>&1 || true
+  nbd="$(pick_free_nbd_device || true)"
+  [ -n "$nbd" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "no_free_nbd_device" "Detach stale /dev/nbd devices and retry."
+  sudo -n qemu-nbd --disconnect "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] mounting qcow2 via $nbd + ntfs-3g"
+  sudo -n qemu-nbd --connect="$nbd" --format=qcow2 "$QCOW2" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "qemu_nbd_connect_failed" "Inspect $REPAIR_LOG."
+  SNAPWIN_NBD_DEV="$nbd"
+  part="$(wait_for_nbd_ntfs_partition "$nbd" || true)"
+  [ -n "$part" ] || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs_partition_not_found" "Inspect partition table with fdisk -l $nbd."; }
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] NTFS partition for repair: $part"
+  sudo -n ntfsfix -d "$part" >>"$REPAIR_LOG" 2>&1 || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: ntfsfix returned non-zero for $part"
+  sudo -n ntfs-3g -o rw,remove_hiberfile,big_writes "$part" "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs3g_mount_failed" "Inspect $REPAIR_LOG."
+  touch "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" && rm -f "$MNT/.snapwin-rw-test" 2>>"$REPAIR_LOG" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "ntfs3g_mount_read_only" "NTFS mount is read-only; inspect $REPAIR_LOG."
+}
+
+prepare_guest_mountpoint() {
+  cleanup_guest_mountpoint "$MNT"
+  cleanup_stale_guestfs_for_qcow2
+  cleanup_windows_mount
+  rm -rf "$MNT" 2>/dev/null || sudo -n rm -rf "$MNT"
+  mkdir -p "$MNT" 2>/dev/null || {
+    sudo -n mkdir -p "$MNT"
+    sudo -n chown "$(id -u):$(id -g)" "$MNT"
+  }
+}
+
+pick_free_nbd_device() {
+  local i n size
+  for i in $(seq 15 -1 0); do
+    n="/dev/nbd$i"
+    [ -b "$n" ] || continue
+    size="$(cat "/sys/block/nbd$i/size" 2>/dev/null || echo 1)"
+    [ "$size" = "0" ] && { echo "$n"; return 0; }
+  done
+  return 1
+}
+
+preclean_ntfs_for_rw_mount() {
+  local nbd part fstype found=0 i
+  command -v ntfsfix >/dev/null 2>&1 || return 0
+  command -v qemu-nbd >/dev/null 2>&1 || return 0
+  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: sudo unavailable; skipping NTFS dirty-bit preclean"
+    return 0
+  fi
+  sudo -n modprobe nbd max_part=16 >>"$REPAIR_LOG" 2>&1 || true
+  nbd="$(pick_free_nbd_device || true)"
+  [ -n "$nbd" ] || { log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: no free /dev/nbd device for NTFS preclean"; return 0; }
+  sudo -n qemu-nbd --disconnect "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] NTFS preclean via $nbd"
+  if ! sudo -n qemu-nbd --connect="$nbd" --format=qcow2 "$QCOW2" >>"$REPAIR_LOG" 2>&1; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: qemu-nbd connect failed; continuing to guestmount"
+    return 0
+  fi
+  sleep 3
+  sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  command -v udevadm >/dev/null 2>&1 && sudo -n udevadm settle >>"$REPAIR_LOG" 2>&1 || true
+  for i in $(seq 1 10); do
+    compgen -G "${nbd}p*" >/dev/null && break
+    sleep 1
+    sudo -n partprobe "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  done
+  for part in "${nbd}"p*; do
+    [ -b "$part" ] || continue
+    fstype="$(blkid -o value -s TYPE "$part" 2>/dev/null || true)"
+    [ "$fstype" = "ntfs" ] || continue
+    found=1
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] running ntfsfix -d on $part"
+    sudo -n ntfsfix -d "$part" >>"$REPAIR_LOG" 2>&1 || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: ntfsfix returned non-zero for $part"
+  done
+  [ "$found" = "1" ] || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: no NTFS partition found on $nbd"
+  sudo -n qemu-nbd --disconnect "$nbd" >>"$REPAIR_LOG" 2>&1 || true
+  sleep 2
 }
 
 merge_system_reg() {
@@ -1277,11 +1627,10 @@ EOF
 standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
-  rm -rf "$MNT"
-  mkdir -p "$MNT"
-  guestmount -a "$QCOW2" -i --rw "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestmount_failed" "Inspect libguestfs output in $REPAIR_LOG."
-  winroot="$(find_windows_root)" || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
-  [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { guestunmount "$MNT" || true; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
+  prepare_guest_mountpoint
+  mount_windows_ntfs_nbd_rw
+  winroot="$(find_windows_root)" || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
+  [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
   cfg="$winroot/System32/config"
   backup_dir="$winroot/ospc2flex/registry-backups/$ts"
   sudo mkdir -p "$backup_dir"
@@ -1298,50 +1647,113 @@ standalone_offline_windows_repair() {
   cat >"$reg_file" <<'EOF'
 Windows Registry Editor Version 5.00
 
-"ControlSet001\Services\xenbus\Start"=dword:00000004
-"ControlSet001\Services\xenvbd\Start"=dword:00000004
-"ControlSet001\Services\xenfilt\Start"=dword:00000004
-"ControlSet001\Services\xenvif\Start"=dword:00000004
-"ControlSet001\Services\xeniface\Start"=dword:00000004
-"ControlSet001\Services\xennet\Start"=dword:00000004
-"ControlSet001\Services\xenpci\Start"=dword:00000004
-"ControlSet001\Services\xensvc\Start"=dword:00000004
-"ControlSet002\Services\xenbus\Start"=dword:00000004
-"ControlSet002\Services\xenvbd\Start"=dword:00000004
-"ControlSet002\Services\xenfilt\Start"=dword:00000004
-"ControlSet002\Services\xenvif\Start"=dword:00000004
-"ControlSet002\Services\xeniface\Start"=dword:00000004
-"ControlSet002\Services\xennet\Start"=dword:00000004
-"ControlSet002\Services\xenpci\Start"=dword:00000004
-"ControlSet002\Services\xensvc\Start"=dword:00000004
-"ControlSet001\Services\intelppm\Start"=dword:00000004
-"ControlSet001\Services\amdppm\Start"=dword:00000004
-"ControlSet001\Services\processr\Start"=dword:00000004
-"ControlSet002\Services\intelppm\Start"=dword:00000004
-"ControlSet002\Services\amdppm\Start"=dword:00000004
-"ControlSet002\Services\processr\Start"=dword:00000004
-"ControlSet001\Services\intelide\Start"=dword:00000003
-"ControlSet001\Services\atapi\Start"=dword:00000003
-"ControlSet002\Services\intelide\Start"=dword:00000003
-"ControlSet002\Services\atapi\Start"=dword:00000003
-"ControlSet001\Services\viostor\Type"=dword:00000001
-"ControlSet001\Services\viostor\Start"=dword:00000000
-"ControlSet001\Services\viostor\ErrorControl"=dword:00000001
-"ControlSet001\Services\viostor\Group"="SCSI miniport"
-"ControlSet001\Services\viostor\ImagePath"="system32\\drivers\\viostor.sys"
-"ControlSet001\Services\vioscsi\Type"=dword:00000001
-"ControlSet001\Services\vioscsi\Start"=dword:00000000
-"ControlSet001\Services\vioscsi\ErrorControl"=dword:00000001
-"ControlSet001\Services\vioscsi\Group"="SCSI miniport"
-"ControlSet001\Services\vioscsi\ImagePath"="system32\\drivers\\vioscsi.sys"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001\Service"="viostor"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042\Service"="viostor"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004\Service"="vioscsi"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048\ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
-"ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048\Service"="vioscsi"
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenbus]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenvbd]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenfilt]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenvif]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xeniface]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xennet]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenpci]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xensvc]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenbus]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenvbd]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenfilt]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenvif]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xeniface]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xennet]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenpci]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xensvc]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\intelppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\amdppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\processr]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\intelppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\amdppm]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\processr]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\intelide]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\atapi]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\intelide]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\atapi]
+"Start"=dword:00000003
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\viostor]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+"ImagePath"="system32\\drivers\\viostor.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\vioscsi]
+"Type"=dword:00000001
+"Start"=dword:00000000
+"ErrorControl"=dword:00000001
+"Group"="SCSI miniport"
+"ImagePath"="system32\\drivers\\vioscsi.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1001]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="viostor"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1042]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="viostor"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1004]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="vioscsi"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase\pci#ven_1af4&dev_1048]
+"ClassGUID"="{4D36E97B-E325-11CE-BFC1-08002BE10318}"
+"Service"="vioscsi"
 EOF
   merge_system_reg "$reg_file" "$cfg/SYSTEM" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SYSTEM registry merge returned non-zero; inspect $REPAIR_LOG"
 
@@ -1349,11 +1761,12 @@ EOF
   cat >"$sw_reg" <<'EOF'
 Windows Registry Editor Version 5.00
 
-"Microsoft\Windows\CurrentVersion\RunOnce\ospc2flex_snapwin_network_reset"="cmd.exe /c powershell.exe -ExecutionPolicy Bypass -File C:\\ProgramData\\OSPC2FLEX\\windows-network-reset.ps1"
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce]
+"ospc2flex_snapwin_network_reset"="cmd.exe /c powershell.exe -ExecutionPolicy Bypass -File C:\\ProgramData\\OSPC2FLEX\\windows-network-reset.ps1"
 EOF
   merge_software_reg "$sw_reg" "$cfg/SOFTWARE" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SOFTWARE RunOnce merge returned non-zero; inspect $REPAIR_LOG"
 
-  guestunmount "$MNT" >>"$REPAIR_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "guestunmount_failed" "Unmount $MNT manually and run qemu-img check."
+  cleanup_windows_mount
   touch "${QCOW2}.win_repaired"
 }
 
@@ -1385,6 +1798,11 @@ write_initial_state
 stage_start "ZS0_PREFLIGHT"
 BASE_CMDS=(qemu-img openstack jq curl rsync python3)
 REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)
+REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw ntfs-3g ntfsfix 7z)
+install_missing_prereqs "${BASE_CMDS[@]}"
+if [ "$DOWNLOAD_ONLY" != 1 ]; then
+  install_missing_prereqs "${REPAIR_CMDS[@]}"
+fi
 for c in "${BASE_CMDS[@]}"; do
   require_cmd "$c"
 done
@@ -1394,6 +1812,14 @@ if [ "$DOWNLOAD_ONLY" != 1 ]; then
   done
 else
   log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
+fi
+  ensure_libguestfs_kernel_readable
+else
+  log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
+fi
+ensure_virtio_iso "$VIRTIO_ISO" "$VIRTIO_ISO_URL" "virtio-win ISO" 50000000
+if [ "$WINDOWS_VERSION" = "2008r2" ] || [ "$WINDOWS_VERSION" = "2k8r2" ]; then
+  ensure_virtio_iso "$LEGACY_VIRTIO_ISO" "$LEGACY_VIRTIO_ISO_URL" "legacy virtio-win 0.1.108 ISO" 30000000
 fi
 if mount | grep -q "$RUN_DIR"; then
   fail_exit "ZS0_PREFLIGHT" "stale_guestmount_mount" "Unmount stale guestmount paths under $RUN_DIR."
@@ -1443,14 +1869,19 @@ stage_start "ZS3_DOWNLOAD_SNAPSHOT"
 if [ -n "$LOCAL_ARTIFACT" ]; then
   log "[ZS3_DOWNLOAD_SNAPSHOT] Using existing local artifact: $LOCAL_ARTIFACT"
   SOURCE_FORMAT="$(detect_format "$LOCAL_ARTIFACT")"
-  case "$SOURCE_FORMAT" in
-    qcow2) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.qcow2" ;;
-    raw) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.raw" ;;
-    vpc) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhd" ;;
-    vhdx) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhdx" ;;
-    *) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img" ;;
-  esac
-  safe_cp_source "$LOCAL_ARTIFACT" "$SOURCE_ARTIFACT"
+  if [ "${OSPC2FLEX_LOCAL_ARTIFACT_IN_PLACE:-0}" = "1" ]; then
+    SOURCE_ARTIFACT="$LOCAL_ARTIFACT"
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Local artifact in-place mode enabled; avoiding duplicate copy."
+  else
+    case "$SOURCE_FORMAT" in
+      qcow2) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.qcow2" ;;
+      raw) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.raw" ;;
+      vpc) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhd" ;;
+      vhdx) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.vhdx" ;;
+      *) SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img" ;;
+    esac
+    safe_cp_source "$LOCAL_ARTIFACT" "$SOURCE_ARTIFACT"
+  fi
 else
   SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img"
   set +e
@@ -1471,8 +1902,14 @@ case "$SOURCE_FORMAT" in
   qcow2)
     safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
     ;;
-  raw|vpc|vhdx|unknown)
-    qemu-img check -r all "$SOURCE_ARTIFACT" >>"$BACKGROUND_LOG" 2>&1 || true
+  raw)
+    qemu-img convert -f raw -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    ;;
+  vpc|vhdx)
+    qemu-img check -r all -f "$SOURCE_FORMAT" "$SOURCE_ARTIFACT" >>"$BACKGROUND_LOG" 2>&1 || true
+    qemu-img convert -f "$SOURCE_FORMAT" -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    ;;
+  unknown)
     qemu-img convert -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
     ;;
   *)
@@ -1503,15 +1940,19 @@ log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT standalone offline Windows repair complete
 
 stage_start "ZS6_UPLOAD_FLEX_RESCUE_IMAGE"
 source_openrc_if_present "$FLEX_OPENRC"
-wait_for_flex_region "$FLEX_REGION" || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_token_issue_failed" "Check Flex OpenRC and region."
+[ -n "$FLEX_REGION" ] && export OS_REGION_NAME="$FLEX_REGION"
 redacted_env_snapshot "$JOB_STATE/flex_env_redacted.txt"
-RESCUE_IMAGE_ID="$(openstack image create --container-format bare --disk-format qcow2 --file "$QCOW2" --progress "$RESCUE_IMAGE_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
-[ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Inspect Flex Glance quota/auth."
+log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX region: ${OS_REGION_NAME:-unset}"
+RESCUE_IMAGE_ID=""
+upload_flex_rescue_image_method_ab || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path failed after 3 attempts; inspect $BACKGROUND_LOG."
+[ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path returned no image id; inspect $BACKGROUND_LOG."
 z_wait_for_image_active "$RESCUE_IMAGE_ID" 1800 || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_not_active" "Inspect Flex Glance image status."
 openstack image set "$RESCUE_IMAGE_ID" \
+  --property architecture=x86_64 \
   --property hw_disk_bus=ide \
   --property hw_cdrom_bus=ide \
   --property hw_vif_model=e1000 \
+  --property hw_qemu_guest_agent=yes \
   --property os_type=windows \
   --property os_distro=windows \
   --property vm_mode=hvm \

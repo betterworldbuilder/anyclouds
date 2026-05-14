@@ -65,6 +65,29 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "Prioritizing Cinder volume attach/raw-copy fallback before Glance export attempts" in txt
     assert "ospc_image_exists()" in txt
     assert 'curl -sS -o /dev/null -w \'%{http_code}\'' in txt
+    assert "REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw ntfs-3g ntfsfix 7z)" in txt
+    assert "install_missing_prereqs" in txt
+    assert "python3-openstackclient" in txt
+    assert "libguestfs-tools" in txt
+    assert "ensure_virtio_iso" in txt
+    assert "qemu-img convert -f raw" in txt
+    assert "ensure_libguestfs_kernel_readable" in txt
+    assert "chmod a+r" in txt
+    assert "OSPC2FLEX_LOCAL_ARTIFACT_IN_PLACE" in txt
+    assert "unset OS_TOKEN OS_AUTH_TOKEN OS_SERVICE_TOKEN OS_AUTH_TYPE" in txt
+    assert "cleanup_guest_mountpoint" in txt
+    assert "prepare_guest_mountpoint" in txt
+    assert "preclean_ntfs_for_rw_mount" in txt
+    assert "ntfsfix -d" in txt
+    assert "cleanup_stale_guestfs_for_qcow2" in txt
+    assert "detect_windows_ntfs_partition" in txt
+    assert "rw,remove_hiberfile" in txt
+    assert "mount_windows_ntfs_nbd_rw" in txt
+    assert "ntfs-3g -o rw,remove_hiberfile,big_writes" in txt
+    assert "upload_flex_rescue_image_method_ab" in txt
+    assert "Method A/B Glance upload path" in txt
+    assert "image create \"$RESCUE_IMAGE_NAME\"" in txt
+    assert "--private" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():
@@ -90,6 +113,14 @@ def test_method_z_result_schema_and_checkpoints():
     assert "WAITING_FOR_SNAPSHOT_SELECTION" in txt
     assert "WAITING_FOR_DRIVER_BIND" in txt
     assert "METHOD_SNAPWIN_SUCCESS" in txt
+
+
+def test_method_z_offline_repair_uses_sectioned_reg_imports():
+    txt = _txt(SCRIPT)
+    assert "[HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Services\\xenbus]" in txt
+    assert "[HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\CriticalDeviceDatabase\\pci#ven_1af4&dev_1001]" in txt
+    assert "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce]" in txt
+    assert '"ControlSet001\\Services\\xenbus\\Start"=dword:00000004' not in txt
 
 
 def test_cold_scan_dispatch_passes_snapshot_id_to_method_z():
