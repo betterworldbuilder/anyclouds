@@ -1296,25 +1296,62 @@ run_driver_binding() {
   run_winrm_ps "$script" >>"$BACKGROUND_LOG" 2>&1
 }
 
-wait_for_flex_region() {
-  local requested="$1" r
-  for r in "$requested" DFW3 IAD3 ORD3 ORD IAD DFW; do
-    [ -n "$r" ] || continue
-    export OS_REGION_NAME="$r"
-    if ! openstack token issue >/dev/null 2>&1; then
-      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r token issue failed; trying fallback"
-      continue
+upload_flex_rescue_image_method_ab() {
+  local upload_try out_file rc image_id status_line err_msg
+  local qcow_bytes qcow_mib
+  qcow_bytes=$(stat -c%s "$QCOW2" 2>/dev/null || echo 0)
+  qcow_mib=$((qcow_bytes / 1024 / 1024))
+
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Method A/B Glance upload path"
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Uploading: ${qcow_bytes} bytes (${qcow_mib} MiB) to FLEX Glance"
+  log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Metadata: architecture=x86_64 vm_mode=hvm os_type=windows os_distro=windows hw_disk_bus=ide hw_cdrom_bus=ide hw_vif_model=e1000 hw_qemu_guest_agent=yes"
+
+  local image_create_args=(
+    image create "$RESCUE_IMAGE_NAME"
+    --disk-format qcow2
+    --container-format bare
+    --file "$QCOW2"
+    --private
+    --property "architecture=x86_64"
+    --property "vm_mode=hvm"
+    --property "os_type=windows"
+    --property "os_distro=windows"
+    --property "hw_disk_bus=ide"
+    --property "hw_cdrom_bus=ide"
+    --property "hw_vif_model=e1000"
+    --property "hw_qemu_guest_agent=yes"
+    --property "ospc2flex_method=SNAPWIN_STANDALONE"
+    --property "ospc2flex_run_id=$RUN_ID"
+    --format value -c id
+  )
+
+  for upload_try in 1 2 3; do
+    [ "$upload_try" -gt 1 ] && log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Upload attempt $upload_try/3"
+    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] starting image upload (stderr -> $BACKGROUND_LOG)"
+    echo "[$(date '+%F %T')] openstack image create name=$RESCUE_IMAGE_NAME file=$QCOW2 bytes=$qcow_bytes try=$upload_try" >>"$BACKGROUND_LOG"
+    out_file="$(mktemp)"
+    if openstack "${image_create_args[@]}" >"$out_file" 2>>"$BACKGROUND_LOG"; then
+      image_id="$(grep -Eo '[0-9a-fA-F-]{36}' "$out_file" | tail -n 1 || true)"
+      rm -f "$out_file" 2>/dev/null || true
+      if [ -n "$image_id" ]; then
+        status_line="$(openstack image show "$image_id" -f value -c status 2>/dev/null || echo "unknown")"
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] returned image id: $image_id"
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] initial image status: ${status_line:-unknown}"
+        RESCUE_IMAGE_ID="$image_id"
+        return 0
+      fi
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload returned no image id"
+    else
+      rc=$?
+      rm -f "$out_file" 2>/dev/null || true
+      err_msg="$(tail -n 8 "$BACKGROUND_LOG" 2>/dev/null | tr '\n' ' ' | cut -c 1-260 || echo "Unknown error")"
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try failed rc=$rc: $err_msg"
     fi
-    if ! openstack catalog show glance >/dev/null 2>&1; then
-      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r has no Glance catalog entry; trying fallback"
-      continue
+
+    if [ "$upload_try" -lt 3 ]; then
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] sleeping 20s before retry"
+      sleep 20
     fi
-    if openstack image list --limit 1 >/dev/null 2>&1; then
-      FLEX_REGION="$r"
-      json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
-      return 0
-    fi
-    log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Flex region $r Glance API rejected this token/project; trying fallback"
   done
   return 1
 }
@@ -1857,15 +1894,19 @@ log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT standalone offline Windows repair complete
 
 stage_start "ZS6_UPLOAD_FLEX_RESCUE_IMAGE"
 source_openrc_if_present "$FLEX_OPENRC"
-wait_for_flex_region "$FLEX_REGION" || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_glance_access_failed" "Keystone token works, but no tested Flex region allowed Glance image access for this project/token."
+[ -n "$FLEX_REGION" ] && export OS_REGION_NAME="$FLEX_REGION"
 redacted_env_snapshot "$JOB_STATE/flex_env_redacted.txt"
-RESCUE_IMAGE_ID="$(openstack image create --container-format bare --disk-format qcow2 --file "$QCOW2" --progress "$RESCUE_IMAGE_NAME" -f value -c id 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
-[ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Inspect Flex Glance quota/auth."
+log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX region: ${OS_REGION_NAME:-unset}"
+RESCUE_IMAGE_ID=""
+upload_flex_rescue_image_method_ab || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path failed after 3 attempts; inspect $BACKGROUND_LOG."
+[ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path returned no image id; inspect $BACKGROUND_LOG."
 z_wait_for_image_active "$RESCUE_IMAGE_ID" 1800 || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_not_active" "Inspect Flex Glance image status."
 openstack image set "$RESCUE_IMAGE_ID" \
+  --property architecture=x86_64 \
   --property hw_disk_bus=ide \
   --property hw_cdrom_bus=ide \
   --property hw_vif_model=e1000 \
+  --property hw_qemu_guest_agent=yes \
   --property os_type=windows \
   --property os_distro=windows \
   --property vm_mode=hvm \
