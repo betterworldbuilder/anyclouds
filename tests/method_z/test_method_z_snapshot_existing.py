@@ -85,7 +85,10 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "OSPC2FLEX_SNAPWIN_AUTO_RESUME" in txt
     assert "find_resume_artifact()" in txt
     assert "HIT auto-resume artifact found on jumphost" in txt
-    assert "Reusing previously repaired qcow2 in place" in txt
+    assert "SNAPWIN_REPAIR_VERSION" in txt
+    assert "is_current_repaired_qcow" in txt
+    assert "Reusing current-version repaired qcow2 in place" in txt
+    assert "Previous repaired qcow2 marker is stale or missing current repair version" in txt
     assert "unset OS_TOKEN OS_AUTH_TOKEN OS_SERVICE_TOKEN OS_AUTH_TYPE" in txt
     assert "cleanup_guest_mountpoint" in txt
     assert "prepare_guest_mountpoint" in txt

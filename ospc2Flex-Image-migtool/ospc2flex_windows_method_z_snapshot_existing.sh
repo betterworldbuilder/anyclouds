@@ -35,6 +35,8 @@ LEGACY_VIRTIO_ISO="${OSPC2FLEX_LEGACY_VIRTIO_ISO:-/usr/share/virtio-win/virtio-w
 VIRTIO_ISO_URL="${OSPC2FLEX_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso}"
 LEGACY_VIRTIO_ISO_URL="${OSPC2FLEX_LEGACY_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/deprecated-isos/archives/virtio-win-0.1.108/virtio-win-0.1.108.iso}"
 WINDOWS_VERSION="auto"
+WINDOWS_VERSION_REQUESTED="${WINDOWS_VERSION}"
+SNAPWIN_REPAIR_VERSION="${OSPC2FLEX_SNAPWIN_REPAIR_VERSION:-20260515-driver-token-marker-v1}"
 SKIP_RESCUE_BOOT=0
 MANUAL_DRIVER_BIND=0
 CONTINUE_AFTER_DRIVER_BIND=0
@@ -146,6 +148,20 @@ if ! mkdir -p "$JOB_ART" "$JOB_LOG" "$JOB_STATE" "$JOB_TMP" "$JOB_REPORT" 2>/dev
 fi
 : >"$PROGRESS_LOG"
 : >"$BACKGROUND_LOG"
+
+WINDOWS_VERSION_REQUESTED="$WINDOWS_VERSION"
+if [ "${WINDOWS_VERSION,,}" = "auto" ] || [ -z "$WINDOWS_VERSION" ]; then
+  case "${LABEL_SAFE,,}" in
+    *2008*r2*|*2k8r2*) WINDOWS_VERSION="2008r2" ;;
+    *2012*r2*|*2k12r2*) WINDOWS_VERSION="2012r2" ;;
+    *2012*|*2k12*) WINDOWS_VERSION="2012" ;;
+    *2016*|*2k16*) WINDOWS_VERSION="2016" ;;
+    *2019*|*2k19*) WINDOWS_VERSION="2019" ;;
+    *2022*|*2k22*) WINDOWS_VERSION="2022" ;;
+    *) WINDOWS_VERSION="${OSPC2FLEX_SNAPWIN_DEFAULT_WINDOWS_VERSION:-2016}" ;;
+  esac
+fi
+WINDOWS_VERSION="${WINDOWS_VERSION,,}"
 
 step_title() {
   case "$1" in
@@ -465,6 +481,29 @@ safe_cp_source() {
   local src="$1" dest="$2"
   [ "$src" = "$dest" ] && return 0
   rsync -a --inplace "$src" "$dest"
+}
+
+repair_marker_path() {
+  printf '%s.snapwin_repair_version' "$1"
+}
+
+is_current_repaired_qcow() {
+  local qcow="$1" marker
+  marker="$(repair_marker_path "$qcow")"
+  [ -f "$marker" ] && grep -qx "SNAPWIN_REPAIR_VERSION=$SNAPWIN_REPAIR_VERSION" "$marker"
+}
+
+write_repair_marker() {
+  local qcow="$1" marker token
+  marker="$(repair_marker_path "$qcow")"
+  token="$(choose_driver_token || true)"
+  {
+    echo "SNAPWIN_REPAIR_VERSION=$SNAPWIN_REPAIR_VERSION"
+    echo "windows_version_requested=$WINDOWS_VERSION_REQUESTED"
+    echo "windows_version_effective=$WINDOWS_VERSION"
+    echo "virtio_driver_token=$token"
+    echo "repaired_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } >"$marker"
 }
 
 find_resume_artifact() {
@@ -1778,6 +1817,17 @@ choose_driver_token() {
   esac
 }
 
+driver_token_candidates() {
+  case "$WINDOWS_VERSION" in
+    2008r2|2k8r2) echo "2k8R2 2k8" ;;
+    2012|2012r2|2k12|2k12r2) echo "2k12R2 2k12" ;;
+    2016|2k16) echo "2k16 w10" ;;
+    2019|2k19) echo "2k19 2k16 w10" ;;
+    2022|2k22) echo "2k22 2k19 2k16 w10" ;;
+    *) return 1 ;;
+  esac
+}
+
 mount_virtio_iso() {
   local iso="$1"
   [ -f "$iso" ] || return 1
@@ -1788,19 +1838,22 @@ mount_virtio_iso() {
 
 stage_virtio_drivers() {
   local winroot="$1" drv_root="$winroot/ospc2flex/drivers" sys32="$winroot/System32" infdir="$winroot/inf"
-  local iso="$VIRTIO_ISO" token bundle dir target
+  local iso="$VIRTIO_ISO" token tokens bundle dir target candidate missing_required=0
   if [ "$WINDOWS_VERSION" = "2008r2" ] && [ -f "$LEGACY_VIRTIO_ISO" ]; then
     iso="$LEGACY_VIRTIO_ISO"
   fi
   mount_virtio_iso "$iso" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "virtio_iso_mount_failed" "Set --virtio-iso to a readable virtio-win ISO."
   token="$(choose_driver_token)"
+  tokens="$(driver_token_candidates || true)"
+  [ -n "$token" ] && [ -n "$tokens" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_version_not_supported" "Pass --windows-version 2008r2, 2012r2, 2016, 2019, or 2022."
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] Windows version requested=${WINDOWS_VERSION_REQUESTED}; effective=${WINDOWS_VERSION}; VirtIO token preference=$tokens"
   sudo mkdir -p "$drv_root" "$sys32" "$sys32/drivers" "$infdir"
   for bundle in viostor vioscsi NetKVM Balloon vioserial viorng; do
     dir=""
-    if [ -n "$token" ]; then
-      dir="$(find "$VIRTIO_MNT/$bundle" -type d -path "*/$token/amd64" 2>/dev/null | head -1 || true)"
-    fi
-    [ -n "$dir" ] || dir="$(find "$VIRTIO_MNT/$bundle" -type d -path "*/amd64" 2>/dev/null | head -1 || true)"
+    for candidate in $tokens; do
+      dir="$(find "$VIRTIO_MNT/$bundle" -type d -path "*/$candidate/amd64" 2>/dev/null | head -1 || true)"
+      [ -n "$dir" ] && break
+    done
     if [ -n "$dir" ]; then
       target="$drv_root/$bundle"
       sudo mkdir -p "$target"
@@ -1810,10 +1863,19 @@ stage_virtio_drivers() {
       sudo find "$target" -maxdepth 1 \( -iname '*.dll' -o -iname '*.exe' \) -exec cp -f {} "$sys32/" \; 2>/dev/null || true
       log "[ZS5_OFFLINE_WINDOWS_REPAIR] staged $bundle drivers from ${dir#$VIRTIO_MNT/}"
     else
-      log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: $bundle amd64 driver not found in ISO"
+      case "$bundle" in
+        viostor|vioscsi|NetKVM)
+          log "[ZS5_OFFLINE_WINDOWS_REPAIR] ERROR: $bundle amd64 driver not found for Windows $WINDOWS_VERSION in ISO"
+          missing_required=1
+          ;;
+        *)
+          log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: $bundle amd64 driver not found for Windows $WINDOWS_VERSION in ISO"
+          ;;
+      esac
     fi
   done
   sudo umount "$VIRTIO_MNT" >/dev/null 2>&1 || true
+  [ "$missing_required" = "0" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "virtio_required_driver_missing" "Use a virtio-win ISO that contains drivers for Windows $WINDOWS_VERSION."
 }
 
 write_firstboot_network_reset() {
@@ -2126,6 +2188,7 @@ EOF
   merge_software_reg "$sw_reg" "$cfg/SOFTWARE" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SOFTWARE RunOnce merge returned non-zero; inspect $REPAIR_LOG"
 
   cleanup_windows_mount
+  write_repair_marker "$QCOW2"
   touch "${QCOW2}.win_repaired"
 }
 
@@ -2265,10 +2328,13 @@ case "$SOURCE_FORMAT" in
   qcow2)
     if [ "$SOURCE_ARTIFACT" = "$QCOW2" ]; then
       log "[ZS4_NORMALIZE_QCOW2] Reusing current-run qcow2 in place: $QCOW2"
-    elif [ -f "${SOURCE_ARTIFACT}.win_repaired" ] || [ -f "${SOURCE_ARTIFACT}.snapwin_repaired" ]; then
+    elif is_current_repaired_qcow "$SOURCE_ARTIFACT"; then
       QCOW2="$SOURCE_ARTIFACT"
       REPAIR_LOG="${QCOW2%.qcow2}.repair.log"
-      log "[ZS4_NORMALIZE_QCOW2] Reusing previously repaired qcow2 in place: $QCOW2"
+      log "[ZS4_NORMALIZE_QCOW2] Reusing current-version repaired qcow2 in place: $QCOW2"
+    elif [ -f "${SOURCE_ARTIFACT}.win_repaired" ] || [ -f "${SOURCE_ARTIFACT}.snapwin_repaired" ] || [ -f "$(repair_marker_path "$SOURCE_ARTIFACT")" ]; then
+      log "[ZS4_NORMALIZE_QCOW2] Previous repaired qcow2 marker is stale or missing current repair version; copying and repairing again."
+      safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
     else
       safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
     fi
@@ -2303,8 +2369,12 @@ if [ "$DOWNLOAD_ONLY" = 1 ]; then
 fi
 
 stage_start "ZS5_OFFLINE_WINDOWS_REPAIR"
-standalone_offline_windows_repair
-[ -f "${QCOW2}.win_repaired" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "win_repaired_sentinel_missing" "Inspect $REPAIR_LOG."
+if is_current_repaired_qcow "$QCOW2"; then
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] Current SNAPWIN repair marker found; skipping duplicate offline repair."
+else
+  standalone_offline_windows_repair
+fi
+is_current_repaired_qcow "$QCOW2" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "snapwin_repair_marker_missing" "Inspect $REPAIR_LOG."
 qemu-img check "$QCOW2" >>"$BACKGROUND_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "post_repair_qcow2_check_failed" "Use registry backup or fresh source export."
 checkpoint_hit "offline_repair"
 log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT standalone offline Windows repair complete"
@@ -2317,7 +2387,7 @@ json_merge "{\"flex_region\":\"$FLEX_REGION\"}"
 log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] FLEX region: ${OS_REGION_NAME:-unset}"
 check_flex_glance_access || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "flex_glance_auth_failed" "Flex Keystone token works only if Glance also accepts it. Check FLEX project/region/API credentials; see $JOB_LOG/flex_image_access.log."
 RESCUE_IMAGE_ID=""
-if [ "${OSPC2FLEX_SNAPWIN_REUSE_RESCUE_IMAGE:-1}" = "1" ]; then
+if [ "${OSPC2FLEX_SNAPWIN_REUSE_RESCUE_IMAGE:-0}" = "1" ]; then
   RESCUE_IMAGE_ID="$(find_existing_rescue_image || true)"
 else
   log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Rescue image reuse disabled; uploading fresh repaired qcow2."
