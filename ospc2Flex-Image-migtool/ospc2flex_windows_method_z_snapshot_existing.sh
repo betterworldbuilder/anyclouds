@@ -1562,7 +1562,7 @@ find_existing_rescue_server() {
       printf '%s' "$server_id"
       return 0
     fi
-    log "[ZS7_BOOT_FLEX_RESCUE_VM] WARN deleting stale rescue VM without dummy volume: $server_id"
+    log "[ZS7_BOOT_FLEX_RESCUE_VM] WARN deleting stale rescue VM without dummy volume: $server_id" >&2
     openstack server delete "$server_id" >>"$BACKGROUND_LOG" 2>&1 || true
     for _ in $(seq 1 90); do
       openstack server show "$server_id" >/dev/null 2>&1 || break
