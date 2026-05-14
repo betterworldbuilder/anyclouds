@@ -316,6 +316,8 @@ def build_flex_v2_openrc(
     flex_auth_url = normalize_flex_v2_auth_url(auth_url or "https://keystone.api.dfw3.rackspacecloud.com/v3/", flex_region)
     return (
         "#!/usr/bin/env bash\n"
+        "unset OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_NAME OS_DOMAIN_NAME OS_PROJECT_NAME\n"
+        "unset OS_USER_DOMAIN_ID OS_PROJECT_DOMAIN_ID OS_DEFAULT_DOMAIN\n"
         f"export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n"
         "export OS_IDENTITY_API_VERSION=2.0\n"
         "export OS_INTERFACE=public\n"
