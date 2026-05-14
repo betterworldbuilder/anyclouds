@@ -520,6 +520,10 @@ region_short() {
   printf '%s' "$r"
 }
 
+ospc_tenant_id() {
+  printf '%s' "${OS_TENANT_ID:-${OS_PROJECT_ID:-${OS_TENANT_NAME:-${OS_PROJECT_NAME:-}}}}"
+}
+
 translate_rackspace_images_base() {
   local base host label prefix region translated_host
   base="$(normalize_glance_base "$1")"
@@ -548,6 +552,29 @@ image_bases() {
   region="$(region_short)"
   catalog_json="$(openstack catalog show image -f json 2>/dev/null || true)"
   {
+    if rackspace_identity_v2_auth >/dev/null 2>&1 && [ -s "$JOB_TMP/ospc_identity_v2_auth.json" ]; then
+      WANTED_REGION="$(printf '%s' "${OS_REGION_NAME:-ALL}" | tr '[:lower:]' '[:upper:]')" python3 - "$JOB_TMP/ospc_identity_v2_auth.json" <<'PY' 2>/dev/null || true
+import json, os, sys
+wanted = (os.environ.get("WANTED_REGION") or "ALL").strip().upper()
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    data = {}
+for svc in (((data or {}).get("access") or {}).get("serviceCatalog") or []):
+    stype = str((svc or {}).get("type") or "").strip().lower()
+    sname = str((svc or {}).get("name") or "").strip().lower()
+    if stype not in {"image", "cloudimages"} and sname not in {"image", "cloudimages"}:
+        continue
+    for ep in (svc or {}).get("endpoints") or []:
+        region = str((ep or {}).get("region") or "").strip().upper()
+        url = str((ep or {}).get("publicURL") or (ep or {}).get("url") or "").strip().rstrip("/")
+        if not url:
+            continue
+        if wanted != "ALL" and region != wanted:
+            continue
+        print(url)
+PY
+    fi
     if [ -n "$catalog_json" ]; then
       CATALOG_JSON="$catalog_json" python3 - <<'PY' 2>/dev/null || true
 import json, os
@@ -575,22 +602,50 @@ PY
   done | awk 'NF && !seen[$0]++'
 }
 
+rackspace_identity_v2_auth() {
+  local auth_url api_key tenant payload auth_resp token
+  api_key="${OS_API_KEY:-${OS_PASSWORD:-}}"
+  tenant="$(ospc_tenant_id)"
+  [ -n "${OS_USERNAME:-}" ] && [ -n "$api_key" ] && [ -n "$tenant" ] || return 1
+  auth_url="${OS_AUTH_URL:-https://identity.api.rackspacecloud.com/v2.0/}"
+  auth_url="${auth_url%/}/tokens"
+  payload="$(OSPC_USER="$OS_USERNAME" OSPC_API_KEY="$api_key" OSPC_TENANT="$tenant" python3 - <<'PY'
+import json, os
+print(json.dumps({
+    "auth": {
+        "RAX-KSKEY:apiKeyCredentials": {
+            "username": os.environ["OSPC_USER"],
+            "apiKey": os.environ["OSPC_API_KEY"],
+        },
+        "tenantId": os.environ["OSPC_TENANT"],
+    }
+}, separators=(",", ":")))
+PY
+)"
+  auth_resp="$(curl -sS -k -X POST "$auth_url" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    -d "$payload" 2>/dev/null || true)"
+  token="$(printf '%s' "$auth_resp" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access"]["token"]["id"])' 2>/dev/null || true)"
+  [ -n "$token" ] || return 1
+  printf '%s\n' "$auth_resp" >"$JOB_TMP/ospc_identity_v2_auth.json" 2>/dev/null || true
+  chmod 600 "$JOB_TMP/ospc_identity_v2_auth.json" 2>/dev/null || true
+  printf '%s' "$token"
+}
+
 refresh_ospc_token() {
-  local token auth_url api_key auth_resp
+  local token
+  token="$(rackspace_identity_v2_auth || true)"
+  if [ -n "$token" ]; then
+    printf '%s' "$token"
+    return 0
+  fi
   token="$(openstack token issue -f value -c id 2>/dev/null || true)"
   if [ -n "$token" ]; then
     printf '%s' "$token"
     return 0
   fi
-  api_key="${OS_API_KEY:-${OS_PASSWORD:-}}"
-  [ -n "${OS_USERNAME:-}" ] && [ -n "$api_key" ] || return 1
-  auth_url="${OS_AUTH_URL:-https://identity.api.rackspacecloud.com/v2.0/}"
-  auth_url="${auth_url%/}/tokens"
-  auth_resp="$(curl -sS -X POST "$auth_url" \
-    -H "Content-Type: application/json" \
-    -d "{\"auth\":{\"RAX-KSKEY:apiKeyCredentials\":{\"username\":\"$OS_USERNAME\",\"apiKey\":\"$api_key\"}}}" \
-    2>/dev/null || true)"
-  printf '%s' "$auth_resp" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access"]["token"]["id"])' 2>/dev/null
+  return 1
 }
 
 safe_object_name() {
@@ -615,14 +670,15 @@ first_resolvable_image_base() {
 }
 
 ospc_image_exists() {
-  local image_id="$1" token base code
+  local image_id="$1" token base code project_header=()
   openstack image show "$image_id" >/dev/null 2>&1 && return 0
   token="$(refresh_ospc_token || true)"
   token="$(printf '%s' "$token" | tr -d '[:space:]\r')"
   [ -n "$token" ] || return 1
   base="$(first_resolvable_image_base || true)"
   [ -n "$base" ] || return 1
-  code="$(curl -sS -o /dev/null -w '%{http_code}' -H "X-Auth-Token: $token" "$base/v2/images/$image_id" 2>/dev/null || echo 000)"
+  [ -n "$(ospc_tenant_id)" ] && project_header=(-H "X-Auth-Project-Id: $(ospc_tenant_id)")
+  code="$(curl -sS -o /dev/null -w '%{http_code}' -H "X-Auth-Token: $token" "${project_header[@]}" "$base/v2/images/$image_id" 2>/dev/null || echo 000)"
   [ "$code" = "200" ]
 }
 
@@ -662,7 +718,7 @@ download_cloud_files_object() {
 
 download_cloud_files_export_task() {
   local image_id="$1" dest="$2" container="$3" min_bytes="$4"
-  local object_name glance_base tasks_url payload token create_resp task_id task_json status elapsed start task_msg tmp_log
+  local object_name glance_base tasks_url payload token create_resp task_id task_json status elapsed start task_msg tmp_log project_header=()
 
   [ -n "$container" ] || container="ospc2flex-export"
   object_name="$(safe_object_name "${LABEL_SAFE}-${image_id}.vhd")"
@@ -694,9 +750,11 @@ PY
 )"
   token="$(refresh_ospc_token || true)"
   [ -n "$token" ] || return 1
+  [ -n "$(ospc_tenant_id)" ] && project_header=(-H "X-Auth-Project-Id: $(ospc_tenant_id)")
 
   create_resp="$(curl -sS -X POST "$tasks_url" \
     -H "X-Auth-Token: $token" \
+    "${project_header[@]}" \
     -H "Content-Type: application/json" \
     -d "$payload" 2>"$JOB_LOG/cloud_files_task_create.err" || true)"
   task_id="$(printf '%s' "$create_resp" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null || true)"
@@ -714,7 +772,7 @@ PY
       return 1
     fi
     token="$(refresh_ospc_token || printf '%s' "$token")"
-    task_json="$(curl -sS "$tasks_url/$task_id" -H "X-Auth-Token: $token" 2>/dev/null || true)"
+    task_json="$(curl -sS "$tasks_url/$task_id" -H "X-Auth-Token: $token" "${project_header[@]}" 2>/dev/null || true)"
     status="$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null || echo unknown)"
     log "[ZS3_DOWNLOAD_SNAPSHOT] Cloud Files export task status=$status elapsed=${elapsed}s"
     case "$status" in
@@ -1073,14 +1131,16 @@ download_openstack_save() {
 }
 
 download_curl_glance() {
-  local base="$1" image_id="$2" dest="$3" min_bytes="$4" token="$5" tmp_log="$6" url rc size
+  local base="$1" image_id="$2" dest="$3" min_bytes="$4" token="$5" tmp_log="$6" url rc size project_header=()
   rm -f "$dest"
   url="${base}/v2/images/${image_id}/file"
+  [ -n "$(ospc_tenant_id)" ] && project_header=(-H "X-Auth-Project-Id: $(ospc_tenant_id)")
   log "[ZS3_DOWNLOAD_SNAPSHOT] curl direct Glance download: $url"
   set +e
   curl -fSL --connect-timeout 30 --retry 2 --retry-delay 10 \
     --speed-time 180 --speed-limit 1024 \
     -H "X-Auth-Token: $token" \
+    "${project_header[@]}" \
     -H "Accept: application/octet-stream" \
     -H "Expect:" \
     -A "ospc2flex-snapwin/1.0" \
@@ -1797,7 +1857,6 @@ write_initial_state
 
 stage_start "ZS0_PREFLIGHT"
 BASE_CMDS=(qemu-img openstack jq curl rsync python3)
-REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)
 REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw ntfs-3g ntfsfix 7z)
 install_missing_prereqs "${BASE_CMDS[@]}"
 if [ "$DOWNLOAD_ONLY" != 1 ]; then
@@ -1810,9 +1869,6 @@ if [ "$DOWNLOAD_ONLY" != 1 ]; then
   for c in "${REPAIR_CMDS[@]}"; do
     require_cmd "$c"
   done
-else
-  log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
-fi
   ensure_libguestfs_kernel_readable
 else
   log "[ZS0_PREFLIGHT] download-only mode: deferred offline-repair dependency checks (guestmount/qemu-nbd/hivex/reged/chntpw)"
@@ -1842,7 +1898,9 @@ fi
 
 stage_start "ZS1_LOAD_CREDENTIALS"
 source_openrc_if_present "$OSPC_OPENRC"
-openstack token issue >/dev/null 2>&1 || fail_exit "ZS1_LOAD_CREDENTIALS" "ospc_token_issue_failed" "Check OSPC credentials or current OS_* environment."
+OSPC_TOKEN="$(rackspace_identity_v2_auth || true)"
+[ -n "$OSPC_TOKEN" ] || fail_exit "ZS1_LOAD_CREDENTIALS" "ospc_v2_token_issue_failed" "Use the same OSPC username/API key/account ID as the private snapshot scanner."
+log "[ZS1_LOAD_CREDENTIALS] Rackspace Identity v2 auth succeeded"
 redacted_env_snapshot "$JOB_STATE/ospc_env_redacted.txt"
 checkpoint_hit "preflight"
 log "[ZS1_LOAD_CREDENTIALS] HIT OSPC credentials validated"

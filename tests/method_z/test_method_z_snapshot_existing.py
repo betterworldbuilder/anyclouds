@@ -60,7 +60,7 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "source_openrc_if_present" in txt
     assert "download-only mode: deferred offline-repair dependency checks" in txt
     assert "BASE_CMDS=(qemu-img openstack jq curl rsync python3)" in txt
-    assert "REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw)" in txt
+    assert "REPAIR_CMDS=(guestmount guestunmount qemu-nbd hivexsh reged chntpw ntfs-3g ntfsfix 7z)" in txt
     assert "image_is_licensed_cinder_only()" in txt
     assert "Prioritizing Cinder volume attach/raw-copy fallback before Glance export attempts" in txt
     assert "ospc_image_exists()" in txt
@@ -88,6 +88,11 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "Method A/B Glance upload path" in txt
     assert "image create \"$RESCUE_IMAGE_NAME\"" in txt
     assert "--private" in txt
+    assert "rackspace_identity_v2_auth" in txt
+    assert "RAX-KSKEY:apiKeyCredentials" in txt
+    assert "\"tenantId\"" in txt
+    assert "X-Auth-Project-Id" in txt
+    assert "Rackspace Identity v2 auth succeeded" in txt
 
 
 def test_method_z_result_schema_and_checkpoints():
