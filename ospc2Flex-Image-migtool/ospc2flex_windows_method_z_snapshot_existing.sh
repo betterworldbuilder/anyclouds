@@ -233,6 +233,10 @@ for path in (state, result):
 PY
 }
 
+json_string() {
+  python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$1"
+}
+
 checkpoint_for_stage() {
   case "$1" in
     ZS0_PREFLIGHT|ZS1_LOAD_CREDENTIALS) echo "preflight" ;;
@@ -263,14 +267,18 @@ checkpoint_hit() {
 }
 
 fail_exit() {
-  local stage="$1" reason="$2" next="$3" cp
+  local stage="$1" reason="$2" next="$3" cp stage_json reason_json next_json cp_json
   cp="$(checkpoint_for_stage "$stage")"
   log "[$stage] FAILED $reason"
   log "next_action=$next"
+  stage_json="$(json_string "$stage")"
+  reason_json="$(json_string "$reason")"
+  next_json="$(json_string "$next")"
   if [ -n "$cp" ]; then
-    json_merge "{\"stage\":\"$stage\",\"status\":\"FAILED\",\"failure_reason\":\"$reason\",\"next_action\":\"$next\",\"final\":false,\"checkpoints\":{\"$cp\":\"FAILED\"}}"
+    cp_json="$(json_string "$cp")"
+    json_merge "{\"stage\":$stage_json,\"status\":\"FAILED\",\"failure_reason\":$reason_json,\"next_action\":$next_json,\"final\":false,\"checkpoints\":{$cp_json:\"FAILED\"}}"
   else
-    json_merge "{\"stage\":\"$stage\",\"status\":\"FAILED\",\"failure_reason\":\"$reason\",\"next_action\":\"$next\",\"final\":false}"
+    json_merge "{\"stage\":$stage_json,\"status\":\"FAILED\",\"failure_reason\":$reason_json,\"next_action\":$next_json,\"final\":false}"
   fi
   exit 1
 }
@@ -481,6 +489,15 @@ safe_cp_source() {
   local src="$1" dest="$2"
   [ "$src" = "$dest" ] && return 0
   rsync -a --inplace "$src" "$dest"
+}
+
+qemu_convert_to_qcow2() {
+  local src="$1" dest="$2"; shift 2
+  rm -f "$dest"
+  if ! qemu-img convert "$@" -p -O qcow2 "$src" "$dest" 2>&1 | tee -a "$BACKGROUND_LOG"; then
+    rm -f "$dest"
+    fail_exit "ZS4_NORMALIZE_QCOW2" "qcow2_convert_failed" "qemu-img convert failed. Check free space on $(dirname "$dest") and inspect $BACKGROUND_LOG."
+  fi
 }
 
 repair_marker_path() {
@@ -2332,17 +2349,17 @@ case "$SOURCE_FORMAT" in
     fi
     ;;
   raw)
-    qemu-img convert -f raw -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    qemu_convert_to_qcow2 "$SOURCE_ARTIFACT" "$QCOW2" -f raw
     ;;
   vpc|vhdx)
     qemu-img check -r all -f "$SOURCE_FORMAT" "$SOURCE_ARTIFACT" >>"$BACKGROUND_LOG" 2>&1 || true
-    qemu-img convert -f "$SOURCE_FORMAT" -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    qemu_convert_to_qcow2 "$SOURCE_ARTIFACT" "$QCOW2" -f "$SOURCE_FORMAT"
     ;;
   unknown)
-    qemu-img convert -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    qemu_convert_to_qcow2 "$SOURCE_ARTIFACT" "$QCOW2"
     ;;
   *)
-    qemu-img convert -p -O qcow2 "$SOURCE_ARTIFACT" "$QCOW2" 2>&1 | tee -a "$BACKGROUND_LOG"
+    qemu_convert_to_qcow2 "$SOURCE_ARTIFACT" "$QCOW2"
     ;;
 esac
 [ -s "$QCOW2" ] || fail_exit "ZS4_NORMALIZE_QCOW2" "qcow2_zero_size" "Repeat source download/export."

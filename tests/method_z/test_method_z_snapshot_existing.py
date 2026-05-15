@@ -78,7 +78,8 @@ def test_method_z_starts_from_existing_snapshot_only():
     assert "python3-openstackclient" in txt
     assert "libguestfs-tools" in txt
     assert "ensure_virtio_iso" in txt
-    assert "qemu-img convert -f raw" in txt
+    assert "qemu_convert_to_qcow2" in txt
+    assert 'qemu_convert_to_qcow2 "$SOURCE_ARTIFACT" "$QCOW2" -f raw' in txt
     assert "ensure_libguestfs_kernel_readable" in txt
     assert "chmod a+r" in txt
     assert "OSPC2FLEX_LOCAL_ARTIFACT_IN_PLACE" in txt
