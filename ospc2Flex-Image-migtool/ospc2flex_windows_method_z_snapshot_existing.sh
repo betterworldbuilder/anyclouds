@@ -511,7 +511,6 @@ find_resume_artifact() {
   [ "${OSPC2FLEX_SNAPWIN_AUTO_RESUME:-1}" = "1" ] || return 1
   [ -d "$label_runs" ] || return 1
   find "$label_runs" -type f \( \
-      -name "${LABEL_SAFE}.flex-rescue.qcow2" -o \
       -name "source_snapshot.qcow2" -o \
       -name "source_snapshot.raw" -o \
       -name "source_snapshot.img" -o \
@@ -2328,13 +2327,6 @@ case "$SOURCE_FORMAT" in
   qcow2)
     if [ "$SOURCE_ARTIFACT" = "$QCOW2" ]; then
       log "[ZS4_NORMALIZE_QCOW2] Reusing current-run qcow2 in place: $QCOW2"
-    elif is_current_repaired_qcow "$SOURCE_ARTIFACT"; then
-      QCOW2="$SOURCE_ARTIFACT"
-      REPAIR_LOG="${QCOW2%.qcow2}.repair.log"
-      log "[ZS4_NORMALIZE_QCOW2] Reusing current-version repaired qcow2 in place: $QCOW2"
-    elif [ -f "${SOURCE_ARTIFACT}.win_repaired" ] || [ -f "${SOURCE_ARTIFACT}.snapwin_repaired" ] || [ -f "$(repair_marker_path "$SOURCE_ARTIFACT")" ]; then
-      log "[ZS4_NORMALIZE_QCOW2] Previous repaired qcow2 marker is stale or missing current repair version; copying and repairing again."
-      safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
     else
       safe_cp_source "$SOURCE_ARTIFACT" "$QCOW2"
     fi
@@ -2369,11 +2361,7 @@ if [ "$DOWNLOAD_ONLY" = 1 ]; then
 fi
 
 stage_start "ZS5_OFFLINE_WINDOWS_REPAIR"
-if is_current_repaired_qcow "$QCOW2"; then
-  log "[ZS5_OFFLINE_WINDOWS_REPAIR] Current SNAPWIN repair marker found; skipping duplicate offline repair."
-else
-  standalone_offline_windows_repair
-fi
+standalone_offline_windows_repair
 is_current_repaired_qcow "$QCOW2" || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "snapwin_repair_marker_missing" "Inspect $REPAIR_LOG."
 qemu-img check "$QCOW2" >>"$BACKGROUND_LOG" 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "post_repair_qcow2_check_failed" "Use registry backup or fresh source export."
 checkpoint_hit "offline_repair"
