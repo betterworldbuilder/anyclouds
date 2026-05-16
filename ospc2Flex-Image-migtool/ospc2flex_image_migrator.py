@@ -493,12 +493,6 @@ else
 fi
 stage_done 1
 
-# ── Restore converted image from repaired image ensuring we force Stage 4 re-repair ──
-if [ -f "$repaired_path" ]; then
-  log "  [INFO] Reverting previous repaired image to converted state to force Stage 4 execution: $repaired_path -> $converted_path"
-  mv "$repaired_path" "$converted_path"
-fi
-
 # ── STAGE 2.5: Clean Old Workspace Images ────────────────────────────────────
 # Only delete files belonging to THIS VM's snap prefix — never touch other VMs' files
 # (parallel jobs share the same workdir — deleting other VMs' qcow2s would corrupt them)
@@ -517,11 +511,16 @@ df -h "$workdir" | tail -1 | awk '{{print "  [INFO] Disk free: " $4 " / " $2}}'
 stage_done '2.5'
 
 # ── Check: skip to repair if converted .qcow2 already exists and is large enough ─
-MIN_SIZE_BYTES=10737418240  # 10 GB — images smaller than this are incomplete (Windows min ~12 GB)
+# Windows images are 12+ GB; Linux images can be 1-4 GB when compressed as qcow2.
+if [ "$IS_WINDOWS" = "1" ]; then
+  MIN_SIZE_BYTES=10737418240  # 10 GB — Windows min
+else
+  MIN_SIZE_BYTES=1073741824   # 1 GB  — Linux min
+fi
 if [ -f "$converted_path" ]; then
   _sz=$(stat -c%s "$converted_path" 2>/dev/null || echo 0)
   if [ "$_sz" -lt "$MIN_SIZE_BYTES" ]; then
-    log "  [WARN] Converted qcow2 too small ($_sz bytes < 5 GB) — deleting and re-downloading"
+    log "  [WARN] Converted qcow2 too small ($_sz bytes) — deleting and re-downloading"
     rm -f "$converted_path"
   else
     log "  [INFO] Converted qcow2 exists: $converted_path ($_sz bytes) — skipping to stage 4.5 (offline repair)"
@@ -859,6 +858,20 @@ REPAIR_OS_TYPE={shell_quote(repair_os_type or "")}
 OFFLINE_REPAIR_METHOD={shell_quote(offline_repair_method or "custom_os")}
 log "[INFO] Repair profile: REPAIR_OS_TYPE=${{REPAIR_OS_TYPE:-<auto>}} method=$OFFLINE_REPAIR_METHOD"
 
+# ── Check: resume from repaired image if already done (skip stages 4.5/4.6/4.7) ──
+repair_done=0
+if [ -f "$repaired_path" ]; then
+  _rz=$(stat -c%s "$repaired_path" 2>/dev/null || echo 0)
+  if [ "$_rz" -ge "$MIN_SIZE_BYTES" ]; then
+    log "  [INFO] Repaired image exists: $repaired_path ($_rz bytes) — resuming from repaired image (skipping repair stages)"
+    repair_done=1
+  else
+    log "  [WARN] Repaired image too small ($_rz bytes) — discarding and re-repairing"
+    rm -f "$repaired_path"
+  fi
+fi
+if [ $repair_done -eq 0 ]; then
+
 # ── STAGE 4.5: Offline Guest Repair ──────────────────────────────────────────
 # Linux quick path (fstab + netplan). Windows skips — Stage 4.6 runs VirtIO script.
 repair_ok=0
@@ -883,7 +896,7 @@ if command -v qemu-nbd >/dev/null 2>&1; then
   if sudo qemu-nbd --connect="$NBD_DEV" "$converted_path" 2>/tmp/nbd_err.txt; then
     sleep 3
     ROOT_PART=$(sudo fdisk -l "$NBD_DEV" 2>/dev/null | awk '/Linux filesystem/{{print $1; exit}}')
-    [ -z "$ROOT_PART" ] && ROOT_PART="${{NBD_DEV}}p1"
+    [ -z "$ROOT_PART" ] && ROOT_PART="${{NBD_DEV}}p1" || true
     log "  Root partition: $ROOT_PART"
     sudo mkdir -p "$MNT"
     # Run fsck to repair dirty journal from live snapshot
@@ -1106,7 +1119,7 @@ _verify_repair() {{
   sleep 3
   local _root
   _root=$(sudo fdisk -l "$_nbd" 2>/dev/null | awk '/Linux filesystem/{{sz=strtonum($5); if(sz>max){{max=sz;p=$1}}}} END{{print p}}')
-  [ -z "$_root" ] && _root="${{_nbd}}p1"
+  [ -z "$_root" ] && _root="${{_nbd}}p1" || true
   sudo mkdir -p "$_mnt"
   local _mounted=0
   if sudo mount "$_root" "$_mnt" 2>/dev/null; then
@@ -1480,6 +1493,8 @@ if [ $_verify_passed -eq 0 ] && [ $_repair_attempt -ge $_max_repair_attempts ]; 
 fi
 fi  # end Windows/Linux verify branch
 stage_done '4.7'
+
+fi  # end repair_done check (stages 4.5/4.6/4.7)
 
 # ── STAGE 5: Upload to FLEX Glance ───────────────────────────────────────────
 stage_start 5 'Upload to FLEX Glance' 'Prefer FLEX Cloud Files staging → Glance import; fallback to direct Glance upload'

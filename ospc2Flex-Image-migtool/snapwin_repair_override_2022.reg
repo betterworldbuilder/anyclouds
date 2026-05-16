@@ -1,0 +1,30 @@
+Windows Registry Editor Version 5.00
+
+; Windows Server 2022 repair overlay (build 20348+).
+; Mirrors 2019 overlay — same Xen driver differences vs 2016 baseline.
+
+; Xen services that are Start=0 or Start=2 on 2022 but Start=4 on 2016.
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xendisk]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenagent]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenbus_monitor]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xendisk]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenagent]
+"Start"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenbus_monitor]
+"Start"=dword:00000004
+
+; SCSI adapter class UpperFilters — Win 2022 Xen driver installs XENFILT here.
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Class\{4d36e96a-e325-11ce-bfc1-08002be10318}]
+"UpperFilters"=hex(7):00,00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\Class\{4d36e96a-e325-11ce-bfc1-08002be10318}]
+"UpperFilters"=hex(7):00,00

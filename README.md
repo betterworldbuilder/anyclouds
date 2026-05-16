@@ -18,6 +18,7 @@ CloudJumper is a browser-based control room for OSPC to FLEX migration. It bring
 - **Flight Path Tracking**: Customer migration tracking.
 - **Orbital Mechanics**: Topology import, design, validation, deploy, and rollback.
 - **Zero-G Image Transport**: VM image migration through a jumphost using NBD, Glance, Cloud Files, and `qemu-img`.
+- **Private Snapshot Migration**: Browser-driven Linux, Windows, and Volume snapshot migration from OSPC to FLEX — no Glance round-trip, no qcow2 conversion, streamed directly to FLEX Cinder.
 - **In-Flight Pod Repair**: Linux offline repair (Ubuntu, Debian, CentOS, RHEL, Rocky, AlmaLinux) and Windows offline VirtIO repair/snapshot-based migration.
 - **Mission Telemetry**: Batch job telemetry in the MBUX/Apollo dashboard.
 - **Atmospheric Re-entry**: SSH/UAT verification, reports, and J.A.R.V.I.S. audio alerts.
@@ -76,6 +77,52 @@ The dashboard is not only a launcher. It is an evidence machine. Every scan, map
 | **Step 8** | Assign floating IP | FLEX cloud (server-side) | < 1 min |
 | **TOTAL** | | | ~45–70 min |
 
+### 3. Private Server Volume Snapshot Migration
+
+The **Private Server Volume Snapshot Migration Table** (`image_migrator.html`) is a browser-native snapshot migration cockpit. It scans all OSPC private snapshots and organises them into three dedicated tabs:
+
+| Tab | Content | Migration Script |
+|-----|---------|-----------------|
+| 🐧 Linux Snapshots | Non-Windows, non-volume OSPC snapshots | `ospc2flex_linux_snap_migrate.sh` |
+| 🪟 Windows Snapshots | Windows private snapshots | `ospc2flex_windows_method_z_snapshot_existing.sh` |
+| 📦 Volume Snapshots | OSPC Cinder volume snapshots | `ospc2flex_volsnap_migrate.sh` |
+
+All three tabs share:
+- Per-row **Select** checkbox + select-all toggle
+- **No image resume** checkbox (force fresh start, per-row + select-all toggle)
+- Sortable columns (▲/▼/⇅) on all fields: type, snapshot name, ID, source VM, OS distro, size, format, status, migratable, licensed, method, reason, created date
+- **Export CSV** button next to summary stats line
+- Real-time SSE log stream per snapshot in the results panel below the table
+
+#### 3a. Linux Snapshot Migration Pipeline
+
+`ospc2flex_linux_snap_migrate.sh` — staged on jumphost, streamed over SSH.
+
+Each selected Linux snapshot is migrated independently. The script handles OSPC auth, snapshot-to-image staging, download to jumphost, offline Linux repair (bootloader, fstab, virtio drivers, network), upload to FLEX Glance, and FLEX instance boot.
+
+#### 3b. Windows Snapshot Migration Pipeline
+
+`ospc2flex_windows_method_z_snapshot_existing.sh` — triggered via **Windows Snapshot Mig** button.
+
+Applies Method Z: uses an existing OSPC snapshot, injects VirtIO drivers offline, corrects Xen service start values (`xendisk Start=0`, `XENFILT` on SCSI class), repairs the Windows registry for VirtIO class filters and PnP mappings, uploads to FLEX Glance, and boots the target FLEX VM.
+
+#### 3c. Volume Snapshot Migration Pipeline
+
+`ospc2flex_volsnap_migrate.sh` — triggered via **Volume-Snapshot-Mig** button. No Glance. No image file. No qcow2. Direct block-device stream.
+
+| Stage | What Happens | Where |
+|-------|-------------|-------|
+| **1. OSPC snapshot** | Verify snapshot exists and is `available` | OSPC API |
+| **2. Temporary OSPC volume** | Create a temporary Cinder volume from the snapshot | OSPC cloud |
+| **3. Attach temp volume to OSPC helper VM** | Attach temp volume so block device is accessible over SSH | OSPC cloud |
+| **4. Create blank FLEX Cinder volume** | Provision an empty target Cinder volume of matching size | FLEX cloud |
+| **5. Attach FLEX volume to FLEX helper VM** | Attach target volume to a FLEX helper VM to receive the stream | FLEX cloud |
+| **6. Stream block device over SSH using dd + gzip** | `dd if=/dev/sdX | gzip | ssh flex-helper "gunzip | dd of=/dev/sdY"` | Jumphost → OSPC helper → FLEX helper |
+| **7. Detach from helper** | Detach temp volumes from both helper VMs | OSPC + FLEX clouds |
+| **8. Attach final FLEX volume to target FLEX VM** | Attach the new FLEX Cinder volume to the target FLEX instance | FLEX cloud |
+
+Jumphost credentials (IP, SSH user, SSH key) and OSPC/FLEX cloud credentials are read from the existing page fields — no separate modal required.
+
 ### 2. Windows VM Migration Process
 
 `ospc2flex_windows_migrate.sh` — SSH direct disk read via PowerShell, no agent required.
@@ -97,9 +144,9 @@ The dashboard is not only a launcher. It is an evidence machine. Every scan, map
 | Category                        | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Current Status                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | **Workflow Stages**             | Stage 0: Customer Migration Tracker (Backlog management)<br>Stage 1: Discovery & Assessment (OSPC/FLEX scanning & topology import)<br>Stage 2: Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)<br>Stage 3: Validation & UAT (Automated cross-cloud checks & HTTP health tests)<br>Stage 4: Cutover & Handover (Traffic split, DB promotion, final sync)<br>Stage 5: Post-Migration (Stability tracking, artifact bundle generation)<br>Stage 6: TCO / FinOps<br>Stage 7: IAC Backup & Restore (Terraform + Ansible)<br>Stage 8: GitOps / OpenCenter<br>Stage 9: AI OPS | Stage 2 VM shift and lift: ready<br>Server and DB rehost: ready<br>Windows VM migration: WIP<br>Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build |
-| **Current Features (✅ Ready)**  | Single-Tab Mission Control: No CLI required, full GUI wrapper<br>Live Execution: Real-time logs streaming to browser<br>Visual Topology Designer: Drag-and-drop infra cloning<br>Offline Guest Repair: Pre-boot image patching for networks<br>Parallel Execution: Migrate multiple DBs/Servers simultaneously<br>No Database Required: Stateless backend (CSV + local browser storage)                                                                                                                                                          | **READY**                                                                                            |
-| **Available Migration Methods** | Direct Shift & Lift (Images): Production Mode, External Offload, Direct Export<br><br>REHOST (Apps & Servers): Infra duplication, Full Clone, Quick Install<br><br>Database Replication: Dump & Restore, DBaaS Streaming, HA Replica<br><br>Kubernetes Migration: Genestack/Kubespray, OpenCenter (GitOps), Magnum export                                                                                                                                                                                                                        | All Shift and rehost READY<br>Windows VM migration: under Test<br>Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build |
-| **Supported OS Types**          | Ubuntu (20.04, 22.04, 24.04)<br>Debian (10, 11, 12)<br>CentOS 7<br>RedHat 6, 8<br>Rocky Linux 8 / 9<br>AlmaLinux 8 / 9<br>Windows Server 2016 / 2019                                                                                                                                                                                                                                                                                                                                                                                             | Linux VM rehost set: ready<br>Windows VM set: under Test                                             |
+| **Current Features (✅ Ready)**  | Single-Tab Mission Control: No CLI required, full GUI wrapper<br>Live Execution: Real-time logs streaming to browser<br>Visual Topology Designer: Drag-and-drop infra cloning<br>Offline Guest Repair: Pre-boot image patching for networks<br>Parallel Execution: Migrate multiple DBs/Servers simultaneously<br>No Database Required: Stateless backend (CSV + local browser storage)<br>**Private Snapshot Migration Table**: 3-tab (Linux/Windows/Volume) snapshot discovery and migration cockpit with sortable columns, Export CSV, per-row SSE log stream | **READY**                                                                                            |
+| **Available Migration Methods** | Direct Shift & Lift (Images): Production Mode, External Offload, Direct Export<br><br>REHOST (Apps & Servers): Infra duplication, Full Clone, Quick Install<br><br>Database Replication: Dump & Restore, DBaaS Streaming, HA Replica<br><br>Kubernetes Migration: Genestack/Kubespray, OpenCenter (GitOps), Magnum export<br><br>**Snapshot Migration**: Linux private snapshots → FLEX Glance; Windows snapshots → Method Z VirtIO repair → FLEX; Volume snapshots → direct block-device stream → FLEX Cinder (no Glance, no qcow2) | All Shift and rehost READY<br>Linux snapshot migration: READY<br>Windows snapshot migration: READY<br>Volume snapshot migration: READY<br>Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build |
+| **Supported OS Types**          | Ubuntu (20.04, 22.04, 24.04)<br>Debian (10, 11, 12)<br>CentOS 7<br>RedHat 6, 8<br>Rocky Linux 8 / 9<br>AlmaLinux 8 / 9<br>Windows Server 2016 / 2019                                                                                                                                                                                                                                                                                                                                                                                             | Linux VM rehost set: ready<br>Linux/Windows/Volume snapshot migration: ready<br>Windows live-VM migration: under Test                                             |
 | **Future / Upcoming**           | Stage 6: TCO / FinOps (Right-sizing + cost summary)<br>Stage 7: IAC Backup & Restore (Terraform + Ansible)<br>Stage 8: GitOps / OpenCenter<br>Stage 9: AI OPS (optimization + autorepair recommendations using GitOps)                                                                                                                                                                                                                                                                                                                                                                          | under construction |
 
 ## 👨‍🚀 For Who
@@ -118,11 +165,14 @@ Run the dashboard from a Linux or WSL2 operator workstation. Run heavy image wor
 | Module Path | Mission Purpose |
 |---|---|
 | `workflow_dashboard/app.py` | Flask dashboard backend and API endpoints |
-| `workflow_dashboard/templates/image_migrator.html` | Main VM/image migration console |
+| `workflow_dashboard/templates/image_migrator.html` | Main VM/image migration console (snapshot tabs, modal, SSE logs) |
 | `ospc2Flex-Image-migtool/ospc2flex_image_migrator.py` | Standalone image migration pipeline |
 | `ospc2Flex-Image-migtool/ospc2flex_offline_repair.sh` | Linux offline repair engine |
-| `ospc2Flex-Image-migtool/ospc2flex_windows_migrate.sh` | Windows migration workflow |
+| `ospc2Flex-Image-migtool/ospc2flex_linux_snap_migrate.sh` | Linux private snapshot → FLEX migration |
+| `ospc2Flex-Image-migtool/ospc2flex_windows_migrate.sh` | Windows live-VM migration workflow |
+| `ospc2Flex-Image-migtool/ospc2flex_windows_method_z_snapshot_existing.sh` | Windows snapshot migration (Method Z — existing OSPC snapshot) |
 | `ospc2Flex-Image-migtool/ospc2flex_windows_repair.sh` | Windows VirtIO repair engine |
+| `ospc2Flex-Image-migtool/ospc2flex_volsnap_migrate.sh` | Volume snapshot → FLEX Cinder direct-stream (no Glance, no qcow2) |
 | `ospc2Flex-Image-migtool/setup_jumphost.sh` | Jumphost bootstrap |
 
 ## 🛠️ Easy Install + Launch

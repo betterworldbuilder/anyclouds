@@ -34,9 +34,9 @@ VIRTIO_ISO="${OSPC2FLEX_VIRTIO_ISO_LOCAL:-/mnt/migration/virtio/virtio-win.iso}"
 LEGACY_VIRTIO_ISO="${OSPC2FLEX_LEGACY_VIRTIO_ISO:-/usr/share/virtio-win/virtio-win-0.1.108.iso}"
 VIRTIO_ISO_URL="${OSPC2FLEX_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso}"
 LEGACY_VIRTIO_ISO_URL="${OSPC2FLEX_LEGACY_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/deprecated-isos/archives/virtio-win-0.1.108/virtio-win-0.1.108.iso}"
-WINDOWS_VERSION="auto"
+WINDOWS_VERSION="2019"
 WINDOWS_VERSION_REQUESTED="${WINDOWS_VERSION}"
-SNAPWIN_REPAIR_VERSION="${OSPC2FLEX_SNAPWIN_REPAIR_VERSION:-20260515-unified-v7}"
+SNAPWIN_REPAIR_VERSION="${OSPC2FLEX_SNAPWIN_REPAIR_VERSION:-20260515-win2019-startoverride-v1}"
 SKIP_RESCUE_BOOT=0
 MANUAL_DRIVER_BIND=0
 CONTINUE_AFTER_DRIVER_BIND=0
@@ -517,7 +517,7 @@ qemu_convert_to_qcow2() {
 }
 
 repair_marker_path() {
-  printf '%s.snapwin_repair_version' "$1"
+  printf '%s/snapwin_repair_version' "$JOB_STATE"
 }
 
 is_current_repaired_qcow() {
@@ -540,18 +540,24 @@ write_repair_marker() {
 }
 
 find_resume_artifact() {
-  local label_runs="$BASE_DIR/runs/$LABEL_SAFE"
   [ "${OSPC2FLEX_SNAPWIN_AUTO_RESUME:-1}" = "1" ] || return 1
-  [ -d "$label_runs" ] || return 1
-  find "$label_runs" -type f \( \
-      -name "source_snapshot.qcow2" -o \
-      -name "source_snapshot.raw" -o \
-      -name "source_snapshot.img" -o \
-      -name "source_snapshot.vhd" -o \
-      -name "source_snapshot.vhdx" \
-    \) -size +1G -printf '%T@ %p\n' 2>/dev/null \
-    | sort -nr \
-    | awk '{ $1=""; sub(/^ /, ""); print; exit }'
+  local f dirs=()
+  [ -d "$BASE_DIR/runs/$LABEL_SAFE" ] && dirs+=("$BASE_DIR/runs/$LABEL_SAFE")
+  IFS=: read -ra _extra <<< "${OSPC2FLEX_ARTIFACT_SEARCH_DIRS:-}"
+  dirs+=("${_extra[@]}")
+  for dir in "${dirs[@]}"; do
+    [ -d "$dir" ] || continue
+    while IFS= read -r f; do
+      [ -f "${JOB_STATE}/snapwin_repair_version" ] && continue
+      if ! qemu-img check -q "$f" >>"$BACKGROUND_LOG" 2>&1; then
+        log "[ZS3_DOWNLOAD_SNAPSHOT] corrupt qcow2 deleted: $f"
+        rm -f "$f"; continue
+      fi
+      echo "$f"; return 0
+    done < <(find "$dir" -maxdepth 3 -type f -name "*${LABEL_SAFE}*.qcow2" \
+        -size +1G -printf '%s %p\n' 2>/dev/null | sort -nr | awk '{ $1=""; sub(/^ /, ""); print }')
+  done
+  return 1
 }
 
 ensure_libguestfs_kernel_readable() {
@@ -1829,13 +1835,6 @@ merge_system_reg() {
   printf 'y\n' | sudo reged -I "$hive" "HKEY_LOCAL_MACHINE\\SYSTEM" "$reg" >>"$REPAIR_LOG" 2>&1
 }
 
-# Use reged directly — hivexregedit silently skips new key hierarchies that don't exist yet.
-# reged can create new keys from a .reg file, which is needed for DriverDatabase on Win2019/2022.
-merge_system_reg_create_keys() {
-  local reg="$1" hive="$2"
-  printf 'y\n' | sudo reged -I "$hive" "HKEY_LOCAL_MACHINE\\SYSTEM" "$reg" >>"$REPAIR_LOG" 2>&1
-}
-
 merge_software_reg() {
   local reg="$1" hive="$2"
   if command -v hivexregedit >/dev/null 2>&1; then
@@ -1913,21 +1912,6 @@ stage_virtio_drivers() {
       esac
     fi
   done
-  # DISM-inspired: for Windows 2019/2022+ create oem-named INF copies so that
-  # Owners registry values (set in per-version overlay) point to valid files in Windows\inf\.
-  # Skipped for 2016 and earlier — their base repair is unchanged and working.
-  case "$WINDOWS_VERSION" in
-    2019|2k19|2022|2k22)
-      for _pair in "viostor:oem21" "vioscsi:oem19" "NetKVM:oem22"; do
-        _bundle="${_pair%%:*}"; _oem="${_pair##*:}"
-        _src="$(find "$drv_root/$_bundle" -maxdepth 1 -iname '*.inf' 2>/dev/null | sort | head -1 || true)"
-        if [ -n "$_src" ]; then
-          sudo cp -f "$_src" "$infdir/${_oem}.inf" 2>/dev/null || true
-          log "[ZS5_OFFLINE_WINDOWS_REPAIR] created ${_oem}.inf for $_bundle Owners reference"
-        fi
-      done
-      ;;
-  esac
   sudo umount "$VIRTIO_MNT" >/dev/null 2>&1 || true
   [ "$missing_required" = "0" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "virtio_required_driver_missing" "Use a virtio-win ISO that contains drivers for Windows $WINDOWS_VERSION."
 }
@@ -2167,12 +2151,18 @@ Windows Registry Editor Version 5.00
 "Group"="SCSI miniport"
 "ImagePath"="system32\\drivers\\viostor.sys"
 
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\viostor\StartOverride]
+"0"=dword:00000000
+
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\vioscsi]
 "Type"=dword:00000001
 "Start"=dword:00000000
 "ErrorControl"=dword:00000001
 "Group"="SCSI miniport"
 "ImagePath"="system32\\drivers\\vioscsi.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\vioscsi\StartOverride]
+"0"=dword:00000000
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\viostor]
 "Type"=dword:00000001
@@ -2181,12 +2171,18 @@ Windows Registry Editor Version 5.00
 "Group"="SCSI miniport"
 "ImagePath"="system32\\drivers\\viostor.sys"
 
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\viostor\StartOverride]
+"0"=dword:00000000
+
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\vioscsi]
 "Type"=dword:00000001
 "Start"=dword:00000000
 "ErrorControl"=dword:00000001
 "Group"="SCSI miniport"
 "ImagePath"="system32\\drivers\\vioscsi.sys"
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\vioscsi\StartOverride]
+"0"=dword:00000000
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\CriticalDeviceDatabase]
 
@@ -2229,41 +2225,8 @@ Windows Registry Editor Version 5.00
 
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\Class\{4D36E97D-E325-11CE-BFC1-08002BE10318}]
 "UpperFilters"=hex(7):00,00
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\Class\{4d36e96a-e325-11ce-bfc1-08002be10318}]
-"UpperFilters"=hex(7):00,00
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Control\Class\{4d36e96a-e325-11ce-bfc1-08002be10318}]
-"UpperFilters"=hex(7):00,00
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xendisk]
-"Start"=dword:00000004
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenagent]
-"Start"=dword:00000004
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\xenbus_monitor]
-"Start"=dword:00000004
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xendisk]
-"Start"=dword:00000004
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenagent]
-"Start"=dword:00000004
-
-[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\xenbus_monitor]
-"Start"=dword:00000004
-
 EOF
   merge_system_reg "$reg_file" "$cfg/SYSTEM" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SYSTEM registry merge returned non-zero; inspect $REPAIR_LOG"
-
-  local override_reg
-  override_reg="$(dirname "$(readlink -f "$0")")/snapwin_repair_override_${WINDOWS_VERSION}.reg"
-  if [ -f "$override_reg" ]; then
-    log "[ZS5_OFFLINE_WINDOWS_REPAIR] applying Windows ${WINDOWS_VERSION} repair overlay: $(basename "$override_reg")"
-    merge_system_reg_create_keys "$override_reg" "$cfg/SYSTEM" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: ${WINDOWS_VERSION} overlay merge returned non-zero; inspect $REPAIR_LOG"
-    log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT Windows ${WINDOWS_VERSION} repair overlay applied"
-  fi
 
   sw_reg="$JOB_TMP/snapwin_software.reg"
   cat >"$sw_reg" <<'EOF'
@@ -2273,14 +2236,6 @@ Windows Registry Editor Version 5.00
 "ospc2flex_snapwin_network_reset"="cmd.exe /c powershell.exe -ExecutionPolicy Bypass -File C:\\ProgramData\\OSPC2FLEX\\windows-network-reset.ps1"
 EOF
   merge_software_reg "$sw_reg" "$cfg/SOFTWARE" || log "[ZS5_OFFLINE_WINDOWS_REPAIR] WARN: SOFTWARE RunOnce merge returned non-zero; inspect $REPAIR_LOG"
-
-  # Clear Windows registry transaction logs so they cannot replay and overwrite
-  # the offline registry edits above on first boot. Affects Windows 10/2016/2019/2022.
-  for hive in SYSTEM SOFTWARE; do
-    sudo rm -f "$cfg/${hive}.LOG1" "$cfg/${hive}.LOG2" 2>/dev/null || true
-    sudo truncate -s 0 "$cfg/${hive}.LOG1" "$cfg/${hive}.LOG2" 2>/dev/null || true
-    log "[ZS5_OFFLINE_WINDOWS_REPAIR] cleared transaction logs for $hive hive"
-  done
 
   cleanup_windows_mount
   write_repair_marker "$QCOW2"

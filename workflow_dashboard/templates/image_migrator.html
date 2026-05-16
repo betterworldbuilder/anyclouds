@@ -788,12 +788,27 @@
 
                         <div id="ospcImageContainer" style="display:none;margin-top:10px;">
                             <div class="table-header">
-                                <h2>Private Snapshot Migration List</h2>
+                                <h2>Private Server Volume Snapshot Migration Table</h2>
                                 <span id="imageRowCount" class="pill">0 rows</span>
                             </div>
                             <div id="privateSnapshotListBody">
-                            <div id="imageScanSummary" style="margin:8px 0 10px;color:#86efac;font-size:12px;">Private images found: 0 | Migratable snapshots: 0 | Excluded private images: 0 | Skipped provider/public images: 0</div>
-                            <div class="mapper-search">
+                            <div style="display:flex;align-items:center;gap:10px;margin:8px 0 10px;">
+                                <div id="imageScanSummary" style="color:#86efac;font-size:12px;flex:1;">Private images found: 0 | Migratable snapshots: 0 | Excluded private images: 0 | Skipped provider/public images: 0</div>
+                                <button type="button" id="export-snapshot-csv-btn" style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:12px;padding:5px 11px;cursor:pointer;white-space:nowrap;" title="Export visible rows to CSV">⬇ Export CSV</button>
+                            </div>
+                            <style>
+                                .snap-tab { padding:8px 18px; background:#0f172a; border:1px solid #334155; border-bottom:none; border-radius:6px 6px 0 0; color:#64748b; font-size:13px; font-weight:500; cursor:pointer; margin-bottom:-2px; transition:color .12s,background .12s; }
+                                .snap-tab:hover:not(.snap-tab-active) { color:#94a3b8; background:#111827; }
+                                .snap-tab.snap-tab-active { background:#1e293b; border-color:#475569; border-bottom-color:#1e293b; color:#e2e8f0; font-weight:700; }
+                                .snap-tab-count { display:inline-block; background:#1e293b; border-radius:10px; padding:1px 8px; font-size:11px; margin-left:6px; color:#64748b; }
+                                .snap-tab.snap-tab-active .snap-tab-count { background:#065f46; color:#6ee7b7; }
+                            </style>
+                            <div id="snapshot-tab-bar" style="display:flex;gap:3px;margin:12px 0 0;border-bottom:2px solid #334155;">
+                                <button type="button" class="snap-tab snap-tab-active" data-tab="linux">🐧 Linux Snapshots<span class="snap-tab-count" id="tab-count-linux">0</span></button>
+                                <button type="button" class="snap-tab" data-tab="windows">🪟 Windows Snapshots<span class="snap-tab-count" id="tab-count-windows">0</span></button>
+                                <button type="button" class="snap-tab" data-tab="volume">📦 Volume Snapshots<span class="snap-tab-count" id="tab-count-volume">0</span></button>
+                            </div>
+                            <div class="mapper-search" style="margin-top:10px;">
                                 <input id="imageTableSearch" type="text" placeholder="Search snapshots by name, ID, or source VM…" />
                                 <select id="imageFilterMode" style="margin-left:8px;background:#0f172a;border:1px solid #334155;border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;">
                                     <option value="migratable" selected>Migratable only</option>
@@ -801,19 +816,91 @@
                                     <option value="rejected">Rejected only</option>
                                 </select>
                             </div>
-                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
-                                <button type="button" id="refresh-private-snapshots-btn" style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#cbd5e1;font-size:12px;padding:7px 12px;cursor:pointer;">Refresh Private Snapshots</button>
-                                <button type="button" id="select-all-migratable-btn" style="background:#052e1d;border:1px solid #065f46;border-radius:7px;color:#6ee7b7;font-size:12px;padding:7px 12px;cursor:pointer;">Select All Migratable</button>
-                                <button type="button" id="clear-snapshot-selection-btn" style="background:#1f2937;border:1px solid #475569;border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 12px;cursor:pointer;">Clear Selection</button>
-                                <button type="button" id="download-selected-snapshots-btn" style="background:#0b5ed7;border:1px solid #3b82f6;border-radius:7px;color:#fff;font-size:12px;padding:7px 12px;cursor:pointer;">Download Selected Snapshots</button>
-                                <button type="button" id="generate-snapshot-manifest-btn" style="background:#3f1d7a;border:1px solid #8b5cf6;border-radius:7px;color:#f5f3ff;font-size:12px;padding:7px 12px;cursor:pointer;">Generate Migration Manifest</button>
-                            </div>
                             <div class="table-wrap">
                                 <table class="adv-table" id="ospc-image-table"></table>
                             </div>
                             </div>
                         </div>
+
+                        <!-- Method Z (SNAPWIN) Stage Reference -->
+                        <div style="margin-top:18px;">
+                            <div class="table-header" style="cursor:pointer;user-select:none;" onclick="(function(el){el.style.display=el.style.display==='none'?'':'none';})(document.getElementById('mz-stage-table-body'))">
+                                <h2 style="font-size:13px;color:#38bdf8;">&#9654; SNAPWIN (Method Z) — Stage Reference</h2>
+                            </div>
+                            <div id="mz-stage-table-body">
+                            <div class="table-wrap" style="margin-top:6px;">
+                                <table class="adv-table" style="font-size:12px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:140px;">Stage</th>
+                                            <th style="width:200px;">Name</th>
+                                            <th>What it does</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td><code>MZ-Stage 0</code></td><td>PREFLIGHT</td><td>Checks all required tools (qemu-img, nbd, openstack CLI, WinRM) are available on the jumphost.</td></tr>
+                                        <tr><td><code>MZ-Stage 1</code></td><td>LOAD_CREDENTIALS</td><td>Sources OSPC and FLEX RC files; authenticates both OpenStack environments.</td></tr>
+                                        <tr><td><code>MZ-Stage 2</code></td><td>SELECT_SNAPSHOT</td><td>Verifies the named OSPC snapshot exists in Glance and captures its metadata.</td></tr>
+                                        <tr><td><code>MZ-Stage 3</code></td><td>DOWNLOAD_SNAPSHOT</td><td>Downloads raw image via Cinder volume DD or Glance direct export. Auto-resumes if a valid label-matched qcow2 exists; deletes corrupt artifacts.</td></tr>
+                                        <tr><td><code>MZ-Stage 4</code></td><td>NORMALIZE_QCOW2</td><td>Uses source in-place if already qcow2; converts raw/vhd to qcow2 via qemu-img otherwise.</td></tr>
+                                        <tr><td><code>MZ-Stage 5</code></td><td>OFFLINE_WINDOWS_REPAIR</td><td>Mounts qcow2 via nbd, stages VirtIO drivers into the Windows driver store, repairs BCD boot entries.</td></tr>
+                                        <tr><td><code>MZ-Stage 6</code></td><td>UPLOAD_FLEX_RESCUE_IMAGE</td><td>Uploads repaired qcow2 to FLEX Glance with IDE disk bus and e1000 NIC (safe boot profile).</td></tr>
+                                        <tr><td><code>MZ-Stage 7</code></td><td>BOOT_FLEX_RESCUE_VM</td><td>Boots a rescue VM from the uploaded image; polls until ACTIVE.</td></tr>
+                                        <tr><td><code>MZ-Stage 8</code></td><td>ATTACH_DUMMY_VIRTIO</td><td>Attaches a small dummy Cinder volume to force Windows to enumerate the VirtIO storage controller.</td></tr>
+                                        <tr><td><code>MZ-Stage 9</code></td><td>DRIVER_BIND</td><td>Triggers VirtIO driver binding via WinRM (online) or offline registry injection (fallback).</td></tr>
+                                        <tr><td><code>MZ-Stage 10</code></td><td>SNAPSHOT_VIRTIO_READY</td><td>Snapshots the rescue VM once VirtIO drivers are confirmed installed.</td></tr>
+                                        <tr><td><code>MZ-Stage 11</code></td><td>BOOT_FINAL_FLEX_VM</td><td>Boots the final VM from the VirtIO-ready snapshot on the virtio disk bus.</td></tr>
+                                        <tr><td><code>MZ-Stage 12</code></td><td>VALIDATE_AND_REPORT</td><td>Confirms VM is reachable, writes result JSON to the run state directory.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            </div>
+                        </div>
                 </section>
+
+                <!-- Snapshot migration settings: FLEX Key Pair · Jarvis · Concurrency -->
+                <div style="margin:14px 0 8px; padding:12px 18px; background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); border-radius:10px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+                    <label for="snap_flex_key_name" style="color:#7dd3fc; font-size:0.9rem; font-weight:600; white-space:nowrap; min-width:120px;">🔑 FLEX Key Pair</label>
+                    <input type="text" id="snap_flex_key_name" placeholder="e.g. laptopubuntu24" value="laptopubuntu24"
+                        style="flex:1; min-width:180px; padding:9px 14px; background:#0f172a; border:1px solid #334155; border-radius:8px; color:#e2e8f0; font-size:0.9rem; font-family:monospace;"
+                        oninput="['flex_key_name','flex_key_name_quick'].forEach(function(id){var o=document.getElementById(id);if(o)o.value=this.value;},this); localStorage.setItem('mig_flex_key_name', this.value);">
+                    <span style="color:#64748b; font-size:0.8rem;">FLEX keypair used to create the test VM</span>
+                </div>
+                <div style="margin:0 auto 8px; padding:10px 18px; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.3); border-radius:10px; display:flex; align-items:center; gap:15px; flex-wrap:wrap; justify-content:center; max-width:fit-content;">
+                    <label style="color:#c4b5fd; font-size:0.9rem; font-weight:600; display:flex; align-items:center; gap:10px; cursor:pointer;">
+                        <input type="checkbox" id="snap_enable_jarvis_voice" checked style="width:16px; height:16px; accent-color:#8b5cf6; cursor:pointer;"
+                            onchange="localStorage.setItem('mig_jarvis_voice', this.checked); var o=document.getElementById('enable_jarvis_voice'); if(o) o.checked=this.checked;">
+                        🎙️ Jarvis Pipeline Audio Alerts
+                    </label>
+                    <select id="snap_jarvis_voice_gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid #8b5cf640;padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;cursor:pointer;"
+                        onchange="localStorage.setItem('mig_jarvis_gender', this.value); var o=document.getElementById('jarvis_voice_gender'); if(o) o.value=this.value;">
+                        <option value="female">British Female Voice</option>
+                        <option value="male">British Male Voice</option>
+                    </select>
+                    <button type="button" onclick="jarvisAnnounce('Audio sub-systems on-line and standing by.')" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.75rem; padding:3px 10px; border-radius:4px; cursor:pointer; transition:0.2s;">Test Voice</button>
+                </div>
+                <div style="display:flex; align-items:center; justify-content:center; gap:20px; background:rgba(0,0,0,0.35); border:1px solid #374151; border-radius:8px; padding:10px 24px; margin:0 0 10px 0;">
+                    <label for="snap_max_concurrent" style="color:#94a3b8; font-size:14px; white-space:nowrap; font-family:monospace; font-weight:600;">⚡ Max Concurrent Jobs:</label>
+                    <input type="number" id="snap_max_concurrent" min="1" max="50" value="20"
+                        style="width:70px; background:#111; border:2px solid #4b5563; color:#f9fafb; border-radius:6px; padding:5px 10px; font-size:16px; font-family:monospace; text-align:center; font-weight:700;"
+                        oninput="var o=document.getElementById('max_concurrent_input'); if(o) o.value=this.value; localStorage.setItem('mig_max_concurrent', this.value);">
+                </div>
+                <script>
+                (function() {
+                    var jv = localStorage.getItem('mig_jarvis_voice');
+                    var jg = localStorage.getItem('mig_jarvis_gender');
+                    var kn = localStorage.getItem('mig_flex_key_name');
+                    var mc = localStorage.getItem('mig_max_concurrent');
+                    var sjv = document.getElementById('snap_enable_jarvis_voice');
+                    var sjg = document.getElementById('snap_jarvis_voice_gender');
+                    var skn = document.getElementById('snap_flex_key_name');
+                    var smc = document.getElementById('snap_max_concurrent');
+                    if (sjv && jv === 'false') sjv.checked = false;
+                    if (sjg && jg) sjg.value = jg;
+                    if (skn && kn) skn.value = kn;
+                    if (smc && mc) { smc.value = mc; var o = document.getElementById('max_concurrent_input'); if (o) o.value = mc; }
+                })();
+                </script>
 
                 <!-- Cold Image Migration Action Buttons -->
                 <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:18px 0 24px;">
@@ -822,7 +909,7 @@
                         title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
                         onclick="document.getElementById('mig_mode_value').value='live';">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                        <span>🖼 Cold Direct Snapshot migration</span>
+                        <span>🖼 LinuxSnapshot-Mig</span>
                     </button>
                     <button type="button" class="btn-primary img-mig-trigger" id="start-snapwin-migration-btn"
                         data-windows-repair-method="windows_method_z_snapshot_existing"
@@ -830,20 +917,47 @@
                         title="SNAPWIN: existing OSPC Windows snapshot/image → download → qcow2 → offline Windows repair → FLEX rescue/final boot"
                         onclick="document.getElementById('mig_mode_value').value='live';">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
-                        <span>SNAPWIN</span>
+                        <span>Windows Snapshot Mig</span>
                     </button>
-                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-dryrun-btn"
-                        style="background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); border-color: #a855f7; justify-content: flex-start;"
-                        title="Dry Run: Glance → jumphost → FLEX pipeline"
-                        onclick="document.getElementById('mig_mode_value').value='dryrun';">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <span>🖼 Direct OSPC 2 Flex Image Dry run Migration</span>
+                    <div style="display:flex;align-items:center;gap:6px;background:rgba(52,211,153,0.07);border:1px solid #065f46;border-radius:8px;padding:4px 10px 4px 4px;">
+                        <button type="button" id="start-volsnap-mig-btn"
+                            style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); border: 1px solid #34d399; border-radius:6px; padding:10px 18px; color:white; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"
+                            title="Volume-Snapshot-Mig: auto-pair OSPC volume snapshots to migrated FLEX VMs, then stream-migrate">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                            <span>📦 Volume-Snapshot-Mig</span>
+                        </button>
+                        <div style="display:flex;flex-direction:column;gap:2px;">
+                            <label for="volsnap-attach-mode" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Attach Mode</label>
+                            <select id="volsnap-attach-mode"
+                                style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#34d399;font-size:12px;font-weight:600;padding:4px 8px;cursor:pointer;outline:none;"
+                                title="review = auto-pair + show preflight modal before migration&#10;auto = auto-pair high-confidence only, no modal&#10;manual = choose OSPC snapshot and FLEX VM for each row">
+                                <option value="direct" selected>Direct Launch</option>
+                                <option value="review">Review Before Attach</option>
+                                <option value="auto">Auto Attach</option>
+                                <option value="manual">Manual Target</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <!-- Stop buttons row — one per snapshot type -->
+                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:0 0 16px;">
+                    <button type="button" id="stop-linux-snap-btn"
+                        style="display:none; background:linear-gradient(135deg,#7c2d12,#c2410c); border:1px solid #f97316; border-radius:6px; padding:8px 18px; color:#fff; font-weight:600; cursor:pointer; align-items:center; gap:7px; font-size:13px;"
+                        title="Abort all running Linux snapshot migrations">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                        ⏹ Stop Linux Batch
                     </button>
-                    <button type="button" id="stop-image-batch-btn"
-                        style="display:none; background: linear-gradient(135deg, #c2410c 0%, #7c2d12 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;"
-                        title="Stop the image migration pipeline only">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                        ⏹ Stop Image Batch
+                    <button type="button" id="stop-windows-snap-btn"
+                        style="display:none; background:linear-gradient(135deg,#1e3a5f,#1d4ed8); border:1px solid #60a5fa; border-radius:6px; padding:8px 18px; color:#fff; font-weight:600; cursor:pointer; align-items:center; gap:7px; font-size:13px;"
+                        title="Abort all running Windows snapshot migrations">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                        ⏹ Stop Windows Batch
+                    </button>
+                    <button type="button" id="stop-volsnap-btn"
+                        style="display:none; background:linear-gradient(135deg,#14532d,#166534); border:1px solid #4ade80; border-radius:6px; padding:8px 18px; color:#fff; font-weight:600; cursor:pointer; align-items:center; gap:7px; font-size:13px;"
+                        title="Abort all running Volume snapshot migrations">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                        ⏹ Stop Volume Batch
                     </button>
                 </div>
                 </div>
@@ -1347,8 +1461,10 @@
                         .adv-table td.editable-cell:focus { outline: 2px solid #ff77c5; background: rgba(255,255,255,0.15); color: #fff; }
                         #ospc-image-table tr.snapshot-row-windows td { background: rgba(251,191,36,0.08); color:#dbeafe; }
                         #ospc-image-table tr.snapshot-row-restricted td { background: rgba(248,113,113,0.10); color:#fee2e2; }
+                        #ospc-image-table tr.snapshot-row-volsnap td { background: rgba(167,139,250,0.08); color:#ede9fe; }
                         #ospc-image-table tr.snapshot-row-windows:hover td,
-                        #ospc-image-table tr.snapshot-row-restricted:hover td { background: rgba(59,130,246,0.16); color:#fff; }
+                        #ospc-image-table tr.snapshot-row-restricted:hover td,
+                        #ospc-image-table tr.snapshot-row-volsnap:hover td { background: rgba(59,130,246,0.16); color:#fff; }
                         #ospc-image-table td.snapshot-id-cell,
                         #ospc-image-table td.snapshot-date-cell { color:#b6c7e8; }
                         #ospc-image-table td.snapshot-size-cell { color:#e2e8f0; text-align:right; }
@@ -1535,10 +1651,14 @@
                     </script>
 
                     <script>
-                    const imageScanState = { rows: [], filtered: [], headers: [], summary: {} }; // filtered: { row, idx }[]
+                    const imageScanState = { rows: [], filtered: [], headers: [], summary: {}, sortCol: '', sortDir: 'asc', activeTab: 'linux' }; // filtered: { row, idx }[]
+                    window._volsnapPairingMap = window._volsnapPairingMap || {}; // snapshot_id → VolumePairingResult
+                    // Parallel to headers array — keys used for sorting
+                    const _IMG_SORT_KEYS = ['start_fresh','asset_type','snapshot_name','snapshot_id','source_vm_name','os_distro','size_gb','disk_format','status','migratable','licensed_restricted','migration_method','reason','created_at'];
                     const LS_OSPC_IMAGE_SCAN = 'mig_ospc_image_scan_cache_v1';
                     const LS_OSPC_IMAGE_SELECTION = 'mig_ospc_image_selection_v1';
                     const LS_OSPC_IMAGE_SEARCH = 'mig_ospc_image_search_v1';
+                    const LS_OSPC_IMAGE_FRESH = 'mig_ospc_image_fresh_v1';
 
                     function _loadImageSelectionMap() {
                         try { return JSON.parse(localStorage.getItem(LS_OSPC_IMAGE_SELECTION) || '{}') || {}; }
@@ -1546,6 +1666,14 @@
                     }
                     function _saveImageSelectionMap(map) {
                         try { localStorage.setItem(LS_OSPC_IMAGE_SELECTION, JSON.stringify(map || {})); }
+                        catch (e) { /* ignore quota/private mode */ }
+                    }
+                    function _loadFreshMap() {
+                        try { return JSON.parse(localStorage.getItem(LS_OSPC_IMAGE_FRESH) || '{}') || {}; }
+                        catch (e) { return {}; }
+                    }
+                    function _saveFreshMap(map) {
+                        try { localStorage.setItem(LS_OSPC_IMAGE_FRESH, JSON.stringify(map || {})); }
                         catch (e) { /* ignore quota/private mode */ }
                     }
                     function _persistCurrentImageSelectionFromDom() {
@@ -1585,44 +1713,115 @@
                     function filterImageRows() {
                         const q = ((document.getElementById('imageTableSearch') || {}).value || '').trim().toLowerCase();
                         const mode = ((document.getElementById('imageFilterMode') || {}).value || 'migratable').toLowerCase();
+                        const activeTab = imageScanState.activeTab || 'linux';
                         const rows = imageScanState.rows || [];
+
+                        // Update tab count badges (mode-filtered, not tab/search filtered)
+                        const modePassed = rows.filter(r => {
+                            if (mode === 'migratable' && !r.migratable) return false;
+                            if (mode === 'rejected' && !!r.migratable) return false;
+                            return true;
+                        });
+                        const tcL = document.getElementById('tab-count-linux');   if (tcL) tcL.textContent = modePassed.filter(r => r.asset_type !== 'volume_snapshot' && !r.is_windows).length;
+                        const tcW = document.getElementById('tab-count-windows'); if (tcW) tcW.textContent = modePassed.filter(r => r.asset_type !== 'volume_snapshot' && !!r.is_windows).length;
+                        const tcV = document.getElementById('tab-count-volume');  if (tcV) tcV.textContent = modePassed.filter(r => r.asset_type === 'volume_snapshot').length;
+
                         imageScanState.filtered = rows
                             .map((row, idx) => ({ row, idx }))
                             .filter(({ row }) => {
                                 if (mode === 'migratable' && !row.migratable) return false;
                                 if (mode === 'rejected' && !!row.migratable) return false;
-                                const name = String(row.snapshot_name || '').toLowerCase();
-                                const id = String(row.snapshot_id || '').toLowerCase();
-                                const src = String(row.source_vm_name || '').toLowerCase();
+                                // Tab filter
+                                const isVol = row.asset_type === 'volume_snapshot';
+                                const isWin = !!row.is_windows;
+                                if (activeTab === 'linux'   && (isVol || isWin))  return false;
+                                if (activeTab === 'windows' && (isVol || !isWin)) return false;
+                                if (activeTab === 'volume'  && !isVol)            return false;
+                                // Search filter
                                 if (!q) return true;
+                                const name = String(row.snapshot_name || '').toLowerCase();
+                                const id   = String(row.snapshot_id   || '').toLowerCase();
+                                const src  = String(row.source_vm_name|| '').toLowerCase();
                                 return name.includes(q) || id.includes(q) || src.includes(q);
                             });
+
+                        const sortKey = imageScanState.sortCol || '';
+                        if (sortKey) {
+                            const dir = imageScanState.sortDir === 'desc' ? -1 : 1;
+                            const freshMap = _loadFreshMap();
+                            imageScanState.filtered.sort((a, b) => {
+                                let av, bv;
+                                if (sortKey === 'start_fresh') {
+                                    const aid = String((a.row && a.row.snapshot_id) || '').trim();
+                                    const bid = String((b.row && b.row.snapshot_id) || '').trim();
+                                    av = (aid in freshMap) ? (freshMap[aid] ? 1 : 0) : 1;
+                                    bv = (bid in freshMap) ? (freshMap[bid] ? 1 : 0) : 1;
+                                } else if (sortKey === 'size_gb') {
+                                    av = Number(a.row.size_gb || 0);
+                                    bv = Number(b.row.size_gb || 0);
+                                } else if (sortKey === 'migratable' || sortKey === 'licensed_restricted') {
+                                    av = a.row[sortKey] ? 1 : 0;
+                                    bv = b.row[sortKey] ? 1 : 0;
+                                } else if (sortKey === 'os_distro') {
+                                    av = String(a.row.os_distro || a.row.os_type || '').toLowerCase();
+                                    bv = String(b.row.os_distro || b.row.os_type || '').toLowerCase();
+                                } else {
+                                    av = String(a.row[sortKey] || '').toLowerCase();
+                                    bv = String(b.row[sortKey] || '').toLowerCase();
+                                }
+                                return av < bv ? -dir : av > bv ? dir : 0;
+                            });
+                        }
                     }
 
                     function renderImageSummary() {
                         const s = imageScanState.summary || {};
                         const el = document.getElementById('imageScanSummary');
                         if (!el) return;
-                        el.textContent = `Private images found: ${Number(s.private_images_found || 0)} | Migratable: ${Number(s.migratable_snapshots || 0)} | Licensed/restricted (Cinder only): ${Number(s.licensed_restricted || 0)} | Windows: ${Number(s.windows_images || 0)} | Cinder required: ${Number(s.cinder_required || 0)} | Excluded: ${Number(s.excluded_private_images || 0)}`;
+                        el.textContent = `Total: ${Number(s.private_images_found || 0)} | Migratable: ${Number(s.migratable_snapshots || 0)} | Glance images: ${Number((s.private_images_found || 0) - (s.volume_snapshots_found || 0))} | Volume snapshots: ${Number(s.volume_snapshots_found || 0)} | Licensed/restricted: ${Number(s.licensed_restricted || 0)} | Windows: ${Number(s.windows_images || 0)} | Excluded: ${Number(s.excluded_private_images || 0)}`;
                     }
 
                     function renderImageTable() {
                         filterImageRows();
                         const table = document.getElementById('ospc-image-table');
                         if (!table) return;
-                        const headers = ['Select', 'snapshot_name', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at'];
+                        const headers = ['No image resume', 'type', 'snapshot_name', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at', 'Pairing'];
                         const rows = imageScanState.filtered || [];
-                        const th = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+                        // Row 1 — column name labels
+                        const labelRow = '<tr>'
+                            + '<th style="text-align:center;color:#94a3b8;font-size:11px;font-weight:600;white-space:nowrap;">Select</th>'
+                            + headers.map((h, i) => {
+                                const key = _IMG_SORT_KEYS[i];
+                                if (h === 'Pairing') return `<th style="color:#a78bfa;font-size:11px;font-weight:700;white-space:nowrap;text-align:center;">Pairing</th>`;
+                                const isActive = imageScanState.sortCol === key;
+                                const arrow = isActive ? (imageScanState.sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+                                return `<th data-sort-key="${key}" style="cursor:pointer;user-select:none;white-space:nowrap${isActive ? ';color:#34d399' : ''}" title="Sort by ${h}">${h}<span style="font-size:0.75em;opacity:${isActive ? 1 : 0.35}">${arrow}</span></th>`;
+                            }).join('')
+                            + '</tr>';
+                        // Row 2 — select-all controls under col 1 & col 2
+                        const ctrlRow = '<tr>'
+                            + '<th style="text-align:center;padding:3px 0;border-bottom:1px solid #334155;"><input type="checkbox" id="ospc-select-all-cb" title="Select / deselect all migratable rows"></th>'
+                            + '<th style="text-align:center;padding:3px 0;border-bottom:1px solid #334155;"><input type="checkbox" id="ospc-fresh-all-cb" style="accent-color:#34d399;" title="Check / uncheck all No image resume"></th>'
+                            + headers.slice(1).map(() => '<th style="border-bottom:1px solid #334155;"></th>').join('')
+                            + '</tr>';
+                        const th = labelRow + ctrlRow;
                         const methodBadge = m => {
                             if (m === 'cinder-only')      return '<span style="color:#e74c3c;font-weight:bold">⛔ cinder-only</span>';
                             if (m === 'cinder-preferred') return '<span style="color:#e67e22;font-weight:bold">⚠ cinder-preferred</span>';
+                            if (m === 'cinder-export')    return '<span style="color:#3b82f6;font-weight:bold">💾 cinder-export</span>';
                             return '<span style="color:#27ae60">✅ glance-export</span>';
+                        };
+                        const assetBadge = t => {
+                            if (t === 'volume_snapshot') return '<span style="color:#a78bfa;font-size:0.85em">📦 vol-snap</span>';
+                            return '<span style="color:#6ee7b7;font-size:0.85em">🖼 glance</span>';
                         };
                         const body = rows.map(({ row: r, idx }) => {
                             const isMigratable = !!r.migratable;
-                            const rowClass = r.licensed_restricted ? 'snapshot-row-restricted' : (r.is_windows ? 'snapshot-row-windows' : '');
+                            const rowClass = r.asset_type === 'volume_snapshot' ? 'snapshot-row-volsnap' : (r.licensed_restricted ? 'snapshot-row-restricted' : (r.is_windows ? 'snapshot-row-windows' : ''));
                             return `<tr class="${rowClass}">`
                                 + `<td><input type="checkbox" class="ospc-image-cb" data-idx="${idx}" ${isMigratable ? '' : 'disabled'}></td>`
+                                + `<td style="text-align:center"><input type="checkbox" class="ospc-fresh-cb" data-idx="${idx}" ${isMigratable ? 'checked' : 'disabled'} title="No image resume — force re-download from OSPC, ignore any existing artifacts"></td>`
+                                + `<td>${assetBadge(r.asset_type || 'glance_image')}</td>`
                                 + `<td>${escapeHTML(String(r.snapshot_name || ''))}</td>`
                                 + `<td class="snapshot-id-cell" style="font-size:0.8em">${escapeHTML(String(r.snapshot_id || ''))}</td>`
                                 + `<td>${escapeHTML(String(r.source_vm_name || ''))}</td>`
@@ -1635,11 +1834,47 @@
                                 + `<td>${methodBadge(r.migration_method || '')}</td>`
                                 + `<td>${escapeHTML(String(r.reason || ''))}</td>`
                                 + `<td class="snapshot-date-cell" style="font-size:0.8em">${escapeHTML(String(r.created_at || '').slice(0,10))}</td>`
+                                + (function() {
+                                    const pr = (window._volsnapPairingMap || {})[r.snapshot_id];
+                                    if (!pr) return '<td style="color:#475569;font-size:0.8em;text-align:center;">—</td>';
+                                    const badges = {
+                                        matched:         `<span style="color:#34d399;font-size:0.78em;white-space:nowrap" title="${escapeHTML(pr.flex_server_name||'')}">✅ ${escapeHTML(pr.flex_server_name||'Matched')}</span>`,
+                                        review_needed:   '<span style="color:#fbbf24;font-size:0.78em">⚠ Review needed</span>',
+                                        manual_required: '<span style="color:#f97316;font-size:0.78em">✋ Manual required</span>',
+                                        manual_selected: `<span style="color:#818cf8;font-size:0.78em;white-space:nowrap" title="${escapeHTML(pr.flex_server_name||'')}">✋ Manual: ${escapeHTML(pr.flex_server_name||'selected')}</span>`,
+                                        blocked:         `<span style="color:#f87171;font-size:0.78em">⛔ ${escapeHTML((pr.reason||'Blocked').split(':')[0])}</span>`,
+                                        attached:        `<span style="color:#34d399;font-size:0.78em;white-space:nowrap">🚀 Attached: ${escapeHTML(pr.flex_server_name||'')}</span>`,
+                                        failed:          `<span style="color:#f87171;font-size:0.78em">❌ Failed</span>`,
+                                    };
+                                    return `<td style="text-align:center">${badges[pr.pairing_status] || `<span style="color:#94a3b8;font-size:0.78em">${escapeHTML(pr.pairing_status)}</span>`}</td>`;
+                                })()
                                 + '</tr>';
                         }).join('');
                         table.innerHTML = `<thead>${th}</thead><tbody>${body}</tbody>`;
+                        // Column sort — delegated on thead so it survives innerHTML rewrites
+                        table.querySelector('thead').addEventListener('click', e => {
+                            if (e.target && e.target.id === 'ospc-fresh-all-cb') return; // checkbox handles itself
+                            const thEl = e.target.closest('th[data-sort-key]');
+                            if (!thEl) return;
+                            const key = thEl.dataset.sortKey;
+                            if (imageScanState.sortCol === key) {
+                                imageScanState.sortDir = imageScanState.sortDir === 'asc' ? 'desc' : 'asc';
+                            } else {
+                                imageScanState.sortCol = key;
+                                imageScanState.sortDir = 'asc';
+                            }
+                            renderImageTable();
+                        });
                         // Restore selection state by stable key (image_id), not row index.
                         const selectedMap = _loadImageSelectionMap();
+                        const _syncSelectAll = () => {
+                            const allCbs = [...table.querySelectorAll('.ospc-image-cb:not([disabled])')];
+                            const hdr = document.getElementById('ospc-select-all-cb');
+                            if (!hdr || !allCbs.length) return;
+                            const checkedCount = allCbs.filter(c => c.checked).length;
+                            hdr.checked = checkedCount === allCbs.length;
+                            hdr.indeterminate = checkedCount > 0 && checkedCount < allCbs.length;
+                        };
                         table.querySelectorAll('.ospc-image-cb').forEach(cb => {
                             const idx = Number(cb.dataset.idx || -1);
                             const row = imageScanState.rows[idx];
@@ -1654,8 +1889,64 @@
                                 const next = _loadImageSelectionMap();
                                 next[id] = cb.checked;
                                 _saveImageSelectionMap(next);
+                                _syncSelectAll();
                             });
                         });
+                        _syncSelectAll();
+                        const selectAllCb = document.getElementById('ospc-select-all-cb');
+                        if (selectAllCb) {
+                            selectAllCb.addEventListener('change', () => {
+                                const allCbs = [...table.querySelectorAll('.ospc-image-cb:not([disabled])')];
+                                const next = _loadImageSelectionMap();
+                                allCbs.forEach(cb => {
+                                    cb.checked = selectAllCb.checked;
+                                    const idx = Number(cb.dataset.idx || -1);
+                                    const row = imageScanState.rows[idx];
+                                    const id = String((row && row.snapshot_id) || '').trim();
+                                    if (id) next[id] = selectAllCb.checked;
+                                });
+                                _saveImageSelectionMap(next);
+                            });
+                        }
+                        // Restore start-fresh state; default checked for migratable rows.
+                        const freshMap = _loadFreshMap();
+                        const _syncFreshAll = () => {
+                            const allFresh = [...table.querySelectorAll('.ospc-fresh-cb:not([disabled])')];
+                            const hdr = document.getElementById('ospc-fresh-all-cb');
+                            if (!hdr || !allFresh.length) return;
+                            const checkedCount = allFresh.filter(c => c.checked).length;
+                            hdr.checked = checkedCount === allFresh.length;
+                            hdr.indeterminate = checkedCount > 0 && checkedCount < allFresh.length;
+                        };
+                        table.querySelectorAll('.ospc-fresh-cb').forEach(cb => {
+                            const idx = Number(cb.dataset.idx || -1);
+                            const row = imageScanState.rows[idx];
+                            const id = String((row && row.snapshot_id) || '').trim();
+                            if (!id || !row || !row.migratable) return;
+                            cb.checked = id in freshMap ? !!freshMap[id] : true;
+                            cb.addEventListener('change', () => {
+                                const next = _loadFreshMap();
+                                next[id] = cb.checked;
+                                _saveFreshMap(next);
+                                _syncFreshAll();
+                            });
+                        });
+                        _syncFreshAll();
+                        const freshAllCb = document.getElementById('ospc-fresh-all-cb');
+                        if (freshAllCb) {
+                            freshAllCb.addEventListener('change', () => {
+                                const allFresh = [...table.querySelectorAll('.ospc-fresh-cb:not([disabled])')];
+                                const next = _loadFreshMap();
+                                allFresh.forEach(cb => {
+                                    cb.checked = freshAllCb.checked;
+                                    const i2 = Number(cb.dataset.idx || -1);
+                                    const r2 = imageScanState.rows[i2];
+                                    const id2 = String((r2 && r2.snapshot_id) || '').trim();
+                                    if (id2) next[id2] = freshAllCb.checked;
+                                });
+                                _saveFreshMap(next);
+                            });
+                        }
                         const total = (imageScanState.rows || []).length;
                         const shown = rows.length;
                         document.getElementById('imageRowCount').textContent =
@@ -1679,6 +1970,49 @@
                         const imageFilterModeEl = document.getElementById('imageFilterMode');
                         if (imageFilterModeEl) {
                             imageFilterModeEl.addEventListener('change', () => renderImageTable());
+                        }
+                        document.querySelectorAll('#snapshot-tab-bar [data-tab]').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                imageScanState.activeTab = btn.dataset.tab;
+                                document.querySelectorAll('#snapshot-tab-bar [data-tab]').forEach(b =>
+                                    b.classList.toggle('snap-tab-active', b === btn));
+                                renderImageTable();
+                            });
+                        });
+                        const exportCsvBtn = document.getElementById('export-snapshot-csv-btn');
+                        if (exportCsvBtn) {
+                            exportCsvBtn.addEventListener('click', () => {
+                                const csvHeaders = ['start_fresh','asset_type','snapshot_name','snapshot_id','source_vm_name','os_distro','size_gb','disk_format','status','migratable','licensed','migration_method','reason','created_at'];
+                                const freshMap = _loadFreshMap();
+                                const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+                                const lines = [csvHeaders.join(',')];
+                                (imageScanState.filtered || []).forEach(({ row: r, idx }) => {
+                                    const id = String(r.snapshot_id || '').trim();
+                                    const fresh = (id in freshMap) ? !!freshMap[id] : !!r.migratable;
+                                    lines.push([
+                                        esc(fresh),
+                                        esc(r.asset_type || 'glance_image'),
+                                        esc(r.snapshot_name || ''),
+                                        esc(r.snapshot_id || ''),
+                                        esc(r.source_vm_name || ''),
+                                        esc(r.os_distro || r.os_type || ''),
+                                        esc(r.size_gb || 0),
+                                        esc(r.disk_format || ''),
+                                        esc(r.status || ''),
+                                        esc(!!r.migratable),
+                                        esc(!!r.licensed_restricted),
+                                        esc(r.migration_method || ''),
+                                        esc(r.reason || ''),
+                                        esc(String(r.created_at || '').slice(0, 10)),
+                                    ].join(','));
+                                });
+                                const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+                                const a = document.createElement('a');
+                                a.href = URL.createObjectURL(blob);
+                                a.download = `snapshots_${new Date().toISOString().slice(0,10)}.csv`;
+                                a.click();
+                                URL.revokeObjectURL(a.href);
+                            });
                         }
 
                         const scanBtn = document.getElementById('image-scan-btn');
@@ -2414,6 +2748,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                             </span>
                         </div>
                         <div style="display:flex; gap:10px;">
+                            <button class="icon-btn" id="copy-log-btn" title="Copy Log to Clipboard" onclick="copyConsoleLog(this)" style="background:transparent; border:none; cursor:pointer; font-size:18px;">📋</button>
                             <button class="icon-btn" id="save-log-btn" title="Save Log as TXT" onclick="downloadConsoleLog()" style="background:transparent; border:none; cursor:pointer; font-size:18px;">💾</button>
                             <button class="icon-btn" id="clear-log-btn" title="Clear Console" onclick="clearExecutionLogs()" style="background:transparent; border:none; cursor:pointer; font-size:18px;">🗑️</button>
                         </div>
@@ -5365,6 +5700,19 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             return String(value || 'job').replace(/[^a-zA-Z0-9._-]+/g, '_');
         }
 
+        function copyToClipboard(text, btn, origLabel) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                if (btn) { btn.textContent = '✓ COPIED'; setTimeout(() => { btn.textContent = origLabel; }, 1500); }
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (btn) { btn.textContent = '✓ COPIED'; setTimeout(() => { btn.textContent = origLabel; }, 1500); }
+            });
+        }
+
         function downloadTextFile(filename, text) {
             const blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
             const link = document.createElement("a");
@@ -5402,6 +5750,12 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         function clearExecutionLogs() {
             if (consoleOut) consoleOut.innerHTML = '';
             document.querySelectorAll('.vm-terminal-body, .nbd-terminal-body, .image-terminal-body').forEach(el => { el.innerHTML = ''; });
+            try {
+                localStorage.removeItem('mig_con_html');
+                const idx = JSON.parse(localStorage.getItem('mig_panel_idx') || '[]');
+                idx.forEach(({ imageId }) => { if (imageId) localStorage.removeItem('mig_panel_html_' + imagePanelSafeId(imageId)); });
+                localStorage.removeItem('mig_panel_idx');
+            } catch(e) {}
             const ipc = document.getElementById('image-panels-container');
             if (ipc) ipc.innerHTML = '';
             const ipo = document.getElementById('image-panels-outer');
@@ -5429,6 +5783,22 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
             const text = sections.join('\n\n') || 'No execution logs available.';
             downloadTextFile(`migration_execution_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`, text);
+        }
+
+        function copyConsoleLog(btn) {
+            const sections = [];
+            const vmContainer = document.getElementById('vm-panels-container');
+            const nbdContainer = document.getElementById('nbd-terminals');
+            const imgWrap = document.getElementById('image-panels-container');
+            const vmLogs = collectContainerText(vmContainer);
+            if (vmLogs.length) sections.push('=== Batch Job Panels ===\n' + vmLogs.join('\n\n'));
+            const nbdLogs = collectContainerText(nbdContainer);
+            if (nbdLogs.length) sections.push('=== NBD Job Panels ===\n' + nbdLogs.join('\n\n'));
+            const imgLogs = collectContainerText(imgWrap);
+            if (imgLogs.length) sections.push('=== Image pipeline panels ===\n' + imgLogs.join('\n\n'));
+            const consoleLogs = collectContainerText(consoleOut);
+            if (consoleLogs.length) sections.push('=== Shared Console ===\n' + consoleLogs.join('\n'));
+            copyToClipboard(sections.join('\n\n') || 'No execution logs available.', btn, '📋');
         }
 
         function getBatchJobState(vmName) {
@@ -5719,6 +6089,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             consoleOut.appendChild(el);
             trimContainerLines(consoleOut, MAIN_CONSOLE_MAX_LINES);
             consoleOut.scrollTop = consoleOut.scrollHeight;
+            _persistLogs();
         }
 
         function vmSafeId(name) { return 'vm_' + name.replace(/[^a-zA-Z0-9]/g, '_'); }
@@ -5752,6 +6123,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
             const block = document.createElement('div');
             block.id = 'img-block-' + safeId;
+            block.dataset.imageId = id;
+            block.dataset.titleLabel = String(titleLabel || id);
             if (jobServerName) block.dataset.serverName = String(jobServerName);
             block.style.cssText = `
                 background: linear-gradient(135deg, #2d3748 0%, #111827 50%, #0f172a 100%);
@@ -5810,14 +6183,55 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 b.onclick = onclick; return b;
             };
 
+            const _imgCopyBtn = mkHwBtn('COPY', 'Copy log to clipboard', null, '#0c1a0c', '#4ade80', '#22c55e');
+            _imgCopyBtn.onclick = () => { const b = document.getElementById('img-block-' + safeId); copyToClipboard(extractTerminalText(b), _imgCopyBtn, 'COPY'); };
+            actions.appendChild(_imgCopyBtn);
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearImagePanelLog(id), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadImagePanelLog === 'function' ? downloadImagePanelLog(id) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
             actions.appendChild(mkHwBtn('STOP', 'Stop only this image migration job', () => typeof killImageJob === 'function' ? killImageJob(id) : null, '#3f0f0f', '#f87171', '#ef4444'));
-
             actions.appendChild(mkHwBtn('CLOSE', 'Close panel', () => closeImageTerminal && closeImageTerminal(id), '#1f2937', '#94a3b8', '#64748b'));
 
             return document.getElementById('img-panel-' + safeId);
         }
+
+        // ── Log persistence across page refreshes ─────────────────────────────
+        let _persistTimer = null;
+        function _persistLogs() {
+            clearTimeout(_persistTimer);
+            _persistTimer = setTimeout(() => {
+                try {
+                    if (consoleOut) localStorage.setItem('mig_con_html', consoleOut.innerHTML);
+                    const idx = [];
+                    document.querySelectorAll('[id^="img-block-"]').forEach(block => {
+                        const sId = block.id.slice(10);
+                        const panelEl = document.getElementById('img-panel-' + sId);
+                        if (!panelEl) return;
+                        idx.push({ imageId: block.dataset.imageId || sId, title: block.dataset.titleLabel || sId });
+                        localStorage.setItem('mig_panel_html_' + sId, panelEl.innerHTML);
+                    });
+                    localStorage.setItem('mig_panel_idx', JSON.stringify(idx));
+                } catch(e) { /* quota exceeded — silent */ }
+            }, 800);
+        }
+        function _restoreLogs() {
+            try {
+                const savedCon = localStorage.getItem('mig_con_html');
+                if (savedCon && consoleOut) {
+                    consoleOut.innerHTML = savedCon;
+                    consoleOut.scrollTop = consoleOut.scrollHeight;
+                }
+                const idx = JSON.parse(localStorage.getItem('mig_panel_idx') || '[]');
+                idx.forEach(({ imageId, title }) => {
+                    if (!imageId) return;
+                    getOrCreateImagePanel(imageId, title, title);
+                    const safeId = imagePanelSafeId(imageId);
+                    const panelEl = document.getElementById('img-panel-' + safeId);
+                    const saved = localStorage.getItem('mig_panel_html_' + safeId);
+                    if (panelEl && saved) { panelEl.innerHTML = saved; panelEl.scrollTop = panelEl.scrollHeight; }
+                });
+            } catch(e) {}
+        }
+        _restoreLogs();
 
         function downloadImagePanelLog(imageId) {
             const safeId = imagePanelSafeId(imageId);
@@ -5831,6 +6245,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const safeId = imagePanelSafeId(imageId);
             const panel = document.getElementById('img-panel-' + safeId);
             if (panel) panel.innerHTML = '';
+            try { localStorage.removeItem('mig_panel_html_' + safeId); } catch(e) {}
         }
 
         async function killImageJob(imageId) {
@@ -5919,6 +6334,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             panel.appendChild(lineEl);
             trimContainerLines(panel, IMAGE_PANEL_MAX_LINES);
             panel.scrollTop = panel.scrollHeight;
+            _persistLogs();
         }
 
         function getOrCreateVmPanel(vmName, ipHint, flavorHint) {
@@ -6000,11 +6416,13 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 b.onclick = onclick; return b;
             };
 
+            const _vmCopyBtn = mkHwBtn('COPY', 'Copy log to clipboard', null, '#0c1a0c', '#4ade80', '#22c55e');
+            _vmCopyBtn.onclick = () => { const b = document.getElementById('vm-block-' + safeId); copyToClipboard(extractTerminalText(b), _vmCopyBtn, 'COPY'); };
+            actions.appendChild(_vmCopyBtn);
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearVmPanelLog(vmName), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadVmPanelLog === 'function' ? downloadVmPanelLog(vmName) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
             actions.appendChild(mkHwBtn('STOP', 'Stop only this VM migration job', () => typeof killVmJob === 'function' ? killVmJob(vmName) : null, '#3f0f0f', '#f87171', '#ef4444'));
-
-            actions.appendChild(mkHwBtn('CLOSE',  'Close panel (job keeps running)',() => closeVmTerminal && closeVmTerminal(vmName),                        '#1f2937', '#94a3b8', '#64748b'));
+            actions.appendChild(mkHwBtn('CLOSE', 'Close panel (job keeps running)', () => closeVmTerminal && closeVmTerminal(vmName), '#1f2937', '#94a3b8', '#64748b'));
 
             return document.getElementById('vm-panel-' + safeId);
         }
@@ -6215,6 +6633,9 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         let activeReader = null;
         let isVmBatchRunning = false;
         let isImageBatchRunning = false;
+        let isLinuxSnapRunning = false;
+        let isWindowsSnapRunning = false;
+        let isVolsnapRunning = false;
 
         function refreshMigrationToolbar() {
             const sb   = document.getElementById('stop-batch-btn');       // VM stop
@@ -6237,6 +6658,13 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             if (imgM) { imgM.style.display = 'flex'; imgM.disabled = false; imgM.style.opacity = ''; }
             if (imgD) { imgD.style.display = 'flex'; imgD.disabled = false; imgD.style.opacity = ''; }
             if (imgOs) imgOs.style.display = '';
+            // Per-type snapshot stop buttons
+            const slb = document.getElementById('stop-linux-snap-btn');
+            const swb = document.getElementById('stop-windows-snap-btn');
+            const svb = document.getElementById('stop-volsnap-btn');
+            if (slb) slb.style.display = isLinuxSnapRunning   ? 'flex' : 'none';
+            if (swb) swb.style.display = isWindowsSnapRunning ? 'flex' : 'none';
+            if (svb) svb.style.display = isVolsnapRunning     ? 'flex' : 'none';
         }
 
 
@@ -6314,6 +6742,63 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             } catch (err) {
                 appendLog(`[ERROR] Failed to stop image pipeline: ${err}`, 'error');
             }
+        });
+
+        // ── Stop Linux Batch ──────────────────────────────────────────
+        const stopLinuxSnapBtn = document.getElementById('stop-linux-snap-btn');
+        if (stopLinuxSnapBtn) stopLinuxSnapBtn.addEventListener('click', async () => {
+            if (!isLinuxSnapRunning) return;
+            appendLog('[SYSTEM] Stopping Linux snapshot batch...', 'system');
+            try {
+                try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
+                if (window.imagePipelineAbortController) {
+                    try { window.imagePipelineAbortController.abort(); } catch (e) {}
+                    window.imagePipelineAbortController = null;
+                }
+                isImageBatchRunning = false;
+                isLinuxSnapRunning = false;
+                refreshMigrationToolbar();
+                jarvisAnnounce('Linux snapshot batch halted.');
+                appendLog('[SYSTEM] Linux snapshot batch stopped.', 'error');
+            } catch (err) {
+                appendLog(`[ERROR] Failed to stop Linux snapshot batch: ${err}`, 'error');
+            }
+        });
+
+        // ── Stop Windows Batch ───────────────────────────────────────
+        const stopWindowsSnapBtn = document.getElementById('stop-windows-snap-btn');
+        if (stopWindowsSnapBtn) stopWindowsSnapBtn.addEventListener('click', async () => {
+            if (!isWindowsSnapRunning) return;
+            appendLog('[SYSTEM] Stopping Windows snapshot batch...', 'system');
+            try {
+                try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
+                if (window.imagePipelineAbortController) {
+                    try { window.imagePipelineAbortController.abort(); } catch (e) {}
+                    window.imagePipelineAbortController = null;
+                }
+                isImageBatchRunning = false;
+                isWindowsSnapRunning = false;
+                refreshMigrationToolbar();
+                jarvisAnnounce('Windows snapshot batch halted.');
+                appendLog('[SYSTEM] Windows snapshot batch stopped.', 'error');
+            } catch (err) {
+                appendLog(`[ERROR] Failed to stop Windows snapshot batch: ${err}`, 'error');
+            }
+        });
+
+        // ── Stop Volume Batch ─────────────────────────────────────────
+        const stopVolsnapBtn = document.getElementById('stop-volsnap-btn');
+        if (stopVolsnapBtn) stopVolsnapBtn.addEventListener('click', () => {
+            if (!isVolsnapRunning) return;
+            appendLog('[SYSTEM] Stopping Volume snapshot batch...', 'system');
+            if (window.volsnapAbortController) {
+                try { window.volsnapAbortController.abort(); } catch (e) {}
+                window.volsnapAbortController = null;
+            }
+            isVolsnapRunning = false;
+            refreshMigrationToolbar();
+            jarvisAnnounce('Volume snapshot batch halted.');
+            appendLog('[SYSTEM] Volume snapshot batch stopped.', 'error');
         });
 
 
@@ -6974,7 +7459,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 if (depth > 0 || isVmBatchRunning) {
                     alert("Executing Image Migration concurrently alongside active VM Jobs! Bandwidth will be shared on the Jumphost.");
                 } else {
-                    jarvisAnnounce("Initializing Image Migration Batch.");
+                    const isWin = btn.id === 'start-snapwin-migration-btn';
+                    jarvisAnnounce(isWin ? 'Initializing Windows Snapshot Migration Batch.' : 'Initializing Linux Snapshot Migration Batch.');
                 }
 
                 // Fire without queuing
@@ -6983,6 +7469,493 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 });
             });
         });
+
+        // ── Volume-Snapshot-Mig button handler (pairing-aware) ──────────────
+        (function() {
+            const volsnapBtn = document.getElementById('start-volsnap-mig-btn');
+            if (!volsnapBtn) return;
+
+            // ── helpers ──────────────────────────────────────────────────────
+            const gv = id => (document.getElementById(id) || {}).value || '';
+
+            function _volSnapRows() {
+                return Array.from(document.querySelectorAll('.ospc-image-cb:checked')).map(cb => {
+                    const i = Number(cb.dataset.idx || -1);
+                    return (typeof imageScanState !== 'undefined' && imageScanState.rows) ? imageScanState.rows[i] : null;
+                }).filter(r => r && String(r.snapshot_id || '').trim()).filter(r =>
+                    r.asset_type === 'volume_snapshot' ||
+                    /vol/i.test(r.snapshot_name || '') ||
+                    /vol/i.test(r.source_vm_name || '')
+                );
+            }
+
+            function _sharedPayload() {
+                return {
+                    ospc_username:        gv('ospc_cloud_user'),
+                    ospc_apikey:          gv('ospc_cloud_key'),
+                    ospc_region:          gv('image_scan_region') || 'IAD',
+                    ospc_auth_url:        'https://identity.api.rackspacecloud.com/v2.0/',
+                    ospc_account_id:      gv('ospc_cloud_account'),
+                    flex_username:        gv('credFlexUsername'),
+                    flex_password:        gv('credFlexPassword'),
+                    flex_app_cred_id:     gv('credFlexAppCredId'),
+                    flex_app_cred_secret: gv('credFlexAppCredSecret'),
+                    flex_project_id:      gv('credFlexProjectId'),
+                    flex_region:          gv('credFlexRegion')  || 'DFW3',
+                    flex_domain:          gv('credFlexDomain')  || 'rackspace_cloud_domain',
+                    flex_auth_url:        gv('credFlexAuthUrl'),
+                    process_host_ip:      gv('process_host_ip')  || gv('nbd_jumphost_ip'),
+                    process_ssh_user:     gv('process_ssh_user') || gv('nbd_jumphost_user') || 'ubuntu',
+                    process_ssh_key:      gv('process_ssh_key')  || gv('nbd_jumphost_key')  || '~/.ssh/id_rsa',
+                };
+            }
+
+            // ── stream one approved snapshot ──────────────────────────────────
+            async function streamOne(r, flexTargetVmId, totalCount) {
+                const iid   = String(r.snapshot_id || '').trim();
+                const label = r.snapshot_name || iid;
+                getOrCreateImagePanel(iid, label, label);
+                appendImageLog(iid, `[VOLSNAP] Starting: ${label} (${iid})`);
+                if (flexTargetVmId) appendImageLog(iid, `[VOLSNAP] Target FLEX VM: ${flexTargetVmId}`);
+                const payload = { ..._sharedPayload(), snapshot_id: iid, snapshot_name: label };
+                if (flexTargetVmId) payload.flex_target_vm = flexTargetVmId;
+                try {
+                    const resp = await fetch('/api/volsnap/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal: window.volsnapAbortController ? window.volsnapAbortController.signal : undefined,
+                        body: JSON.stringify(payload),
+                    });
+                    if (!resp.ok || !resp.body) {
+                        appendImageLog(iid, `[ERROR] HTTP ${resp.status} — failed to start for ${label}`);
+                        return;
+                    }
+                    const reader  = resp.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buf = '';
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        buf += decoder.decode(value, { stream: true });
+                        const chunks = buf.split('\n\n');
+                        buf = chunks.pop() || '';
+                        for (const chunk of chunks) {
+                            if (!chunk.startsWith('data:')) continue;
+                            const line = chunk.replace(/^data:\s?/, '').trim();
+                            if (line) appendImageLog(iid, line);
+                        }
+                    }
+                    // mark attached in pairing map
+                    if (window._volsnapPairingMap && window._volsnapPairingMap[iid]) {
+                        window._volsnapPairingMap[iid].pairing_status = 'attached';
+                        window._volsnapPairingMap[iid].final_attach_status = 'attached';
+                    }
+                } catch (e) {
+                    if (e && e.name === 'AbortError') {
+                        appendImageLog(iid, '[SYSTEM] Aborted.');
+                    } else {
+                        appendImageLog(iid, `[ERROR] ${e && e.message ? e.message : String(e)}`);
+                        jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
+                        if (window._volsnapPairingMap && window._volsnapPairingMap[iid]) {
+                            window._volsnapPairingMap[iid].pairing_status = 'failed';
+                            window._volsnapPairingMap[iid].final_attach_status = 'failed';
+                        }
+                    }
+                } finally {
+                    window._vsCompleted = (window._vsCompleted || 0) + 1;
+                    if (window._vsCompleted >= (window._vsTotal || 1)) {
+                        isVolsnapRunning = false;
+                        window.volsnapAbortController = null;
+                        refreshMigrationToolbar();
+                        jarvisAnnounce('Volume snapshot batch complete.');
+                        if (typeof renderImageTable === 'function') renderImageTable();
+                    }
+                }
+            }
+
+            // ── launch approved jobs list ─────────────────────────────────────
+            function launchApproved(approvedJobs) {
+                if (!approvedJobs.length) { alert('No jobs to run — all rows are blocked or unapproved.'); return; }
+                appendLog(`📦 Volume-Snapshot-Mig — ${approvedJobs.length} approved snapshot(s)`, 'system');
+                jarvisAnnounce(`Initializing Volume Snapshot Migration Batch. ${approvedJobs.length} snapshot${approvedJobs.length === 1 ? '' : 's'} queued.`);
+                window.volsnapAbortController = new AbortController();
+                window._vsCompleted = 0;
+                window._vsTotal = approvedJobs.length;
+                isVolsnapRunning = true;
+                refreshMigrationToolbar();
+                const rowMap = {};
+                (typeof imageScanState !== 'undefined' ? imageScanState.rows : []).forEach(r => { rowMap[r.snapshot_id] = r; });
+                approvedJobs.forEach(p => {
+                    const r = rowMap[p.snapshot_id] || { snapshot_id: p.snapshot_id, snapshot_name: p.snapshot_name || p.snapshot_id };
+                    streamOne(r, p.flex_server_id || '', approvedJobs.length);
+                });
+            }
+
+            // ── preflight + modal ─────────────────────────────────────────────
+            async function runPreflight(snaps, attachMode) {
+                const ospcUser   = gv('ospc_cloud_user');
+                const ospcApiKey = gv('ospc_cloud_key');
+                if (!ospcUser || !ospcApiKey) { alert('Fill OSPC credentials first.'); return; }
+
+                const snapIds = snaps.map(r => r.snapshot_id);
+                let pairings = [], summary = {};
+
+                // show spinner — position at the level of the volsnap button in the viewport
+                const modal = document.getElementById('volsnap-preflight-modal');
+                if (modal) {
+                    const ref = document.getElementById('start-volsnap-mig-btn');
+                    const topOffset = ref ? Math.max(16, ref.getBoundingClientRect().top - 16) : 80;
+                    modal.style.paddingTop = topOffset + 'px';
+                    modal.style.display = 'flex';
+                    document.getElementById('vsp-pairing-tbody').innerHTML = '<tr><td colspan="8" style="color:#94a3b8;text-align:center;padding:20px">🔍 Running pairing preflight…</td></tr>';
+                    document.getElementById('vsp-summary-cards').innerHTML = '';
+                    document.getElementById('vsp-start-mig-btn').disabled = true;
+                }
+
+                try {
+                    const resp = await fetch('/migration/volume-snapshot/pairing/preflight', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            selected_snapshot_ids: snapIds,
+                            attach_mode: attachMode,
+                            ospc_username: ospcUser,
+                            ospc_apikey:   ospcApiKey,
+                            ospc_region:   gv('image_scan_region') || 'IAD',
+                            ospc_account_id: gv('ospc_cloud_account'),
+                            migration_map_path: './migration_map.json',
+                            allow_name_fallback: true,
+                        }),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) { document.getElementById('vsp-pairing-tbody').innerHTML = `<tr><td colspan="8" style="color:#f87171;padding:16px">[ERROR] ${escapeHTML(data.error || resp.status)}</td></tr>`; return; }
+                    pairings = data.pairings || [];
+                    summary  = data.summary  || {};
+                } catch (e) {
+                    document.getElementById('vsp-pairing-tbody').innerHTML = `<tr><td colspan="8" style="color:#f87171;padding:16px">[ERROR] ${escapeHTML(String(e))}</td></tr>`;
+                    return;
+                }
+
+                // store in pairing map + refresh table
+                window._volsnapPairingMap = window._volsnapPairingMap || {};
+                pairings.forEach(p => { window._volsnapPairingMap[p.snapshot_id] = p; });
+                if (typeof renderImageTable === 'function') renderImageTable();
+
+                // load manual options for dropdowns
+                let sourceOpts = [], flexOpts = [];
+                try {
+                    const r2 = await fetch('/migration/volume-snapshot/manual-options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+                    const d2 = await r2.json();
+                    sourceOpts = d2.source_server_options || [];
+                    flexOpts   = d2.flex_server_options   || [];
+                } catch (_) {}
+
+                renderPreflightModal(pairings, summary, attachMode, sourceOpts, flexOpts);
+            }
+
+            // ── render modal content ──────────────────────────────────────────
+            function renderPreflightModal(pairings, summary, attachMode, sourceOpts, flexOpts) {
+                // Summary cards
+                const cardCfg = [
+                    { label: '✅ Auto Matched',    key: 'matched',         bg: 'rgba(52,211,153,0.15)', color: '#34d399' },
+                    { label: '⚠ Review Needed',   key: 'review_needed',   bg: 'rgba(251,191,36,0.12)', color: '#fbbf24' },
+                    { label: '✋ Manual Required', key: 'manual_required', bg: 'rgba(249,115,22,0.12)', color: '#f97316' },
+                    { label: '⛔ Blocked',         key: 'blocked',         bg: 'rgba(248,113,113,0.12)', color: '#f87171' },
+                ];
+                document.getElementById('vsp-summary-cards').innerHTML = cardCfg.map(c =>
+                    `<div class="vsp-card" style="background:${c.bg};border:1px solid ${c.color}40;color:${c.color}">
+                        <div style="font-size:20px;font-weight:800">${summary[c.key] || 0}</div>
+                        <div class="vsp-card-label">${c.label}</div>
+                    </div>`
+                ).join('');
+
+                const confBadge = c => ({ high: '<span style="color:#34d399">● high</span>', medium: '<span style="color:#fbbf24">● medium</span>', low: '<span style="color:#f87171">● low</span>', none: '<span style="color:#64748b">● none</span>', manual: '<span style="color:#818cf8">● manual</span>' }[c] || c);
+                const statusBadge = s => ({ matched: '<span style="color:#34d399">✅ matched</span>', review_needed: '<span style="color:#fbbf24">⚠ review</span>', manual_required: '<span style="color:#f97316">✋ manual</span>', manual_selected: '<span style="color:#818cf8">✋ selected</span>', blocked: '<span style="color:#f87171">⛔ blocked</span>' }[s] || `<span style="color:#94a3b8">${escapeHTML(s)}</span>`);
+
+                function makeSourceDrop(p) {
+                    const opts = sourceOpts.map(o =>
+                        `<option value="${escapeHTML(o.ospc_server_id)}" data-flex-id="${escapeHTML(o.mapped_flex_server_id)}" data-flex-name="${escapeHTML(o.mapped_flex_server_name)}">${escapeHTML(o.ospc_server_name || o.ospc_server_id)} / ${escapeHTML(o.ospc_server_snapshot_name || '—')} → ${escapeHTML(o.mapped_flex_server_name || '—')}</option>`
+                    ).join('');
+                    return `<select class="vsp-manual-sel vsp-src-sel" data-snap-id="${escapeHTML(p.snapshot_id)}"><option value="">— choose OSPC server —</option>${opts}</select>`;
+                }
+                function makeFlexDrop(p) {
+                    const opts = flexOpts.map(o =>
+                        `<option value="${escapeHTML(o.flex_server_id)}" data-flex-name="${escapeHTML(o.flex_server_name)}">${escapeHTML(o.flex_server_name || o.flex_server_id)}</option>`
+                    ).join('');
+                    return `<select class="vsp-manual-sel vsp-flex-sel" data-snap-id="${escapeHTML(p.snapshot_id)}"><option value="">— choose FLEX VM —</option>${opts}</select>`;
+                }
+
+                const rows = pairings.map(p => {
+                    const isBlocked  = p.pairing_status === 'blocked';
+                    const isManual   = p.pairing_status === 'manual_required';
+                    const isReview   = p.pairing_status === 'review_needed';
+                    const isMatched  = p.pairing_status === 'matched';
+                    let action = '';
+                    if (isBlocked)      action = `<span style="color:#64748b;font-size:11px" title="${escapeHTML(p.reason)}">Skipped</span>`;
+                    else if (isManual)  action = `<div style="display:flex;flex-direction:column;gap:4px">${makeSourceDrop(p)}${makeFlexDrop(p)}</div>`;
+                    else if (isReview)  action = `<label style="display:flex;align-items:center;gap:5px;color:#fbbf24;font-size:11px;cursor:pointer"><input type="checkbox" class="vsp-approve-cb" data-snap-id="${escapeHTML(p.snapshot_id)}" style="accent-color:#fbbf24"> Confirm attach</label>`;
+                    else if (isMatched) action = `<span style="color:#34d399;font-size:11px">Auto attach after confirm</span>`;
+                    const rowStyle = isBlocked ? 'opacity:0.5' : '';
+                    return `<tr class="vsp-tr" style="${rowStyle}">
+                        <td><span title="${escapeHTML(p.snapshot_id)}">${escapeHTML(p.snapshot_name || p.snapshot_id)}</span></td>
+                        <td style="color:#94a3b8">${escapeHTML(p.source_volume_name || p.source_volume_id || '—')}</td>
+                        <td style="color:#7dd3fc">${escapeHTML(p.ospc_server_name || '—')}</td>
+                        <td style="color:#94a3b8;font-size:11px">${escapeHTML(p.ospc_server_snapshot_name || '—')}</td>
+                        <td style="color:#6ee7b7">${escapeHTML(p.flex_server_name || p.flex_server_id || (isBlocked ? '—' : ''))}</td>
+                        <td style="text-align:center">${confBadge(p.confidence)}</td>
+                        <td style="text-align:center">${statusBadge(p.pairing_status)}<br><span style="font-size:10px;color:#475569;display:block;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${escapeHTML(p.reason)}">${escapeHTML((p.reason || '').slice(0, 50))}</span></td>
+                        <td>${action}</td>
+                    </tr>`;
+                }).join('');
+
+                document.getElementById('vsp-pairing-tbody').innerHTML = rows || '<tr><td colspan="8" style="color:#64748b;text-align:center;padding:14px">No snapshots to display.</td></tr>';
+
+                // Delegate: when source dropdown changes, auto-fill flex dropdown
+                document.getElementById('vsp-pairing-tbody').addEventListener('change', e => {
+                    if (e.target.classList.contains('vsp-src-sel')) {
+                        const snapId  = e.target.dataset.snapId;
+                        const opt     = e.target.options[e.target.selectedIndex];
+                        const flexId  = opt ? opt.dataset.flexId  : '';
+                        const flexName= opt ? opt.dataset.flexName : '';
+                        const flexSel = document.querySelector(`.vsp-flex-sel[data-snap-id="${CSS.escape(snapId)}"]`);
+                        if (flexSel && flexId) {
+                            for (let i = 0; i < flexSel.options.length; i++) {
+                                if (flexSel.options[i].value === flexId) { flexSel.selectedIndex = i; break; }
+                            }
+                        }
+                    }
+                    _updateStartBtn(pairings, attachMode);
+                });
+                document.getElementById('vsp-pairing-tbody').addEventListener('change', e => {
+                    if (e.target.classList.contains('vsp-approve-cb') || e.target.classList.contains('vsp-flex-sel')) {
+                        _updateStartBtn(pairings, attachMode);
+                    }
+                });
+
+                _updateStartBtn(pairings, attachMode);
+            }
+
+            function _updateStartBtn(pairings, attachMode) {
+                const btn = document.getElementById('vsp-start-mig-btn');
+                if (!btn) return;
+                const nonBlocked = pairings.filter(p => p.pairing_status !== 'blocked');
+                if (!nonBlocked.length) { btn.disabled = true; return; }
+                const allReady = nonBlocked.every(p => {
+                    if (p.pairing_status === 'matched')       return true;
+                    if (p.pairing_status === 'manual_selected') return !!p.flex_server_id;
+                    if (p.pairing_status === 'review_needed') {
+                        const cb = document.querySelector(`.vsp-approve-cb[data-snap-id="${CSS.escape(p.snapshot_id)}"]`);
+                        return cb && cb.checked;
+                    }
+                    if (p.pairing_status === 'manual_required') {
+                        const sel = document.querySelector(`.vsp-flex-sel[data-snap-id="${CSS.escape(p.snapshot_id)}"]`);
+                        return sel && !!sel.value;
+                    }
+                    return false;
+                });
+                btn.disabled = !allReady;
+            }
+
+            // ── collect modal selections and launch ───────────────────────────
+            async function _collectAndLaunch(pairings, attachMode) {
+                // collect manual selections from modal
+                const manualSels = [];
+                document.querySelectorAll('.vsp-flex-sel').forEach(sel => {
+                    if (!sel.value) return;
+                    const snapId  = sel.dataset.snapId;
+                    const srcSel  = document.querySelector(`.vsp-src-sel[data-snap-id="${CSS.escape(snapId)}"]`);
+                    manualSels.push({
+                        snapshot_id:                  snapId,
+                        manual_ospc_server_id:         srcSel ? srcSel.value : '',
+                        manual_ospc_server_snapshot_id: '',
+                        flex_target_server_id:         sel.value,
+                        flex_target_server_name:       sel.options[sel.selectedIndex]?.text || '',
+                    });
+                });
+                // collect review approvals
+                document.querySelectorAll('.vsp-approve-cb:checked').forEach(cb => {
+                    const snapId = cb.dataset.snapId;
+                    const p = pairings.find(x => x.snapshot_id === snapId);
+                    if (p) p.approved = true;
+                });
+
+                // apply manual selections
+                let finalPairings = pairings;
+                if (manualSels.length) {
+                    try {
+                        const r = await fetch('/migration/volume-snapshot/manual-apply', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pairings, manual_selections: manualSels }),
+                        });
+                        const d = await r.json();
+                        finalPairings = d.pairings || pairings;
+                    } catch (_) {}
+                }
+
+                // get approved jobs from server
+                const r2 = await fetch('/migration/volume-snapshot/migrate', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ attach_mode: attachMode, pairings: finalPairings }),
+                });
+                const d2 = await r2.json();
+
+                document.getElementById('volsnap-preflight-modal').style.display = 'none';
+
+                // update pairing map with final state
+                (d2.approved_jobs || []).forEach(p => { window._volsnapPairingMap[p.snapshot_id] = p; });
+                (d2.skipped_jobs  || []).forEach(p => { if (window._volsnapPairingMap[p.snapshot_id]) window._volsnapPairingMap[p.snapshot_id].pairing_status = 'skipped'; });
+                if (typeof renderImageTable === 'function') renderImageTable();
+
+                launchApproved(d2.approved_jobs || []);
+            }
+
+            // ── modal button wiring ───────────────────────────────────────────
+            let _currentPairings = [], _currentAttachMode = 'review';
+
+            document.getElementById('vsp-modal-close').addEventListener('click', () => {
+                document.getElementById('volsnap-preflight-modal').style.display = 'none';
+            });
+            document.getElementById('vsp-cancel-btn').addEventListener('click', () => {
+                document.getElementById('volsnap-preflight-modal').style.display = 'none';
+            });
+            document.getElementById('vsp-save-map-btn').addEventListener('click', async () => {
+                if (!_currentPairings.length) return;
+                try {
+                    await fetch('/migration/volume-snapshot/pairing/preflight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ selected_snapshot_ids: [], attach_mode: 'review' }) });
+                } catch (_) {}
+                // Client-side CSV download as fallback
+                const cols = ['snapshot_id','snapshot_name','pairing_status','confidence','ospc_server_name','flex_server_name','reason'];
+                const csv  = [cols.join(','), ..._currentPairings.map(p => cols.map(c => JSON.stringify(p[c] ?? '')).join(','))].join('\n');
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'migration_volume_pairing_map.csv'; a.click();
+            });
+            document.getElementById('vsp-start-mig-btn').addEventListener('click', () => {
+                _collectAndLaunch(_currentPairings, _currentAttachMode);
+            });
+
+            // ── main click handler ────────────────────────────────────────────
+            volsnapBtn.addEventListener('click', async () => {
+                const snaps = _volSnapRows();
+                if (!snaps.length) {
+                    alert('No volume snapshots selected. Select rows tagged 📦 vol-snap in the Private Server Volume Snapshot Migration Table.');
+                    return;
+                }
+                const attachMode = (document.getElementById('volsnap-attach-mode') || {}).value || 'direct';
+
+                const ospcUser   = gv('ospc_cloud_user');
+                const ospcApiKey = gv('ospc_cloud_key');
+                const jhIp       = gv('process_host_ip') || gv('nbd_jumphost_ip');
+                const jhUser     = gv('process_ssh_user') || gv('nbd_jumphost_user') || 'ubuntu';
+                const jhKey      = gv('process_ssh_key')  || gv('nbd_jumphost_key')  || '~/.ssh/id_rsa';
+
+                if (!ospcUser || !ospcApiKey) { alert('Fill OSPC credentials first.'); return; }
+                if (!jhIp) { alert('Set Jumphost IP.'); return; }
+
+                // ── auto: silent preflight, launch high-confidence only ────────
+                if (attachMode === 'auto') {
+                    appendLog('📦 Auto Attach — running pairing preflight…', 'system');
+                    try {
+                        const resp = await fetch('/migration/volume-snapshot/pairing/preflight', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ selected_snapshot_ids: snaps.map(r => r.snapshot_id), attach_mode: 'auto', ospc_username: ospcUser, ospc_apikey: ospcApiKey, ospc_region: gv('image_scan_region') || 'IAD', ospc_account_id: gv('ospc_cloud_account'), migration_map_path: './migration_map.json', allow_name_fallback: true }),
+                        });
+                        const data = await resp.json();
+                        const pairings = data.pairings || [];
+                        pairings.forEach(p => { window._volsnapPairingMap[p.snapshot_id] = p; });
+                        if (typeof renderImageTable === 'function') renderImageTable();
+                        const autoSafe = pairings.filter(p => p.pairing_status === 'matched' && p.confidence === 'high' && p.flex_server_id);
+                        const skipped  = pairings.length - autoSafe.length;
+                        if (skipped) appendLog(`⚠ Auto mode skipped ${skipped} non-high-confidence row(s) — switch to Review for details`, 'system');
+                        launchApproved(autoSafe);
+                    } catch (e) { appendLog(`[ERROR] Pairing preflight failed: ${e}`, 'error'); }
+                    return;
+                }
+
+                // ── review / manual: show pairing preflight modal ─────────────
+                if (attachMode === 'review' || attachMode === 'manual') {
+                    _currentAttachMode = attachMode;
+                    await runPreflight(snaps, attachMode);
+                    _currentPairings = Object.values(window._volsnapPairingMap || {}).filter(p =>
+                        snaps.some(s => s.snapshot_id === p.snapshot_id)
+                    );
+                    return;
+                }
+
+                // ── direct (default): launch immediately, no pairing ──────────
+                appendLog(`📦 Volume-Snapshot-Mig — ${snaps.length} snapshot(s)`, 'system');
+                jarvisAnnounce(`Initializing Volume Snapshot Migration Batch. ${snaps.length} snapshot${snaps.length === 1 ? '' : 's'} queued.`);
+                window.volsnapAbortController = new AbortController();
+                isVolsnapRunning = true;
+                refreshMigrationToolbar();
+
+                const sharedPayload = {
+                    ospc_username:        ospcUser,
+                    ospc_apikey:          ospcApiKey,
+                    ospc_region:          gv('image_scan_region') || 'IAD',
+                    ospc_auth_url:        'https://identity.api.rackspacecloud.com/v2.0/',
+                    ospc_account_id:      gv('ospc_cloud_account'),
+                    flex_username:        gv('credFlexUsername'),
+                    flex_password:        gv('credFlexPassword'),
+                    flex_app_cred_id:     gv('credFlexAppCredId'),
+                    flex_app_cred_secret: gv('credFlexAppCredSecret'),
+                    flex_project_id:      gv('credFlexProjectId'),
+                    flex_region:          gv('credFlexRegion')  || 'DFW3',
+                    flex_domain:          gv('credFlexDomain')  || 'rackspace_cloud_domain',
+                    flex_auth_url:        gv('credFlexAuthUrl'),
+                    process_host_ip:      jhIp,
+                    process_ssh_user:     jhUser,
+                    process_ssh_key:      jhKey,
+                };
+
+                let volsnapCompleted = 0;
+                const streamOneDirect = async (r) => {
+                    const iid   = String(r.snapshot_id || '').trim();
+                    const label = r.snapshot_name || iid;
+                    getOrCreateImagePanel(iid, label, label);
+                    appendImageLog(iid, `[VOLSNAP] Starting: ${label} (${iid})`);
+                    try {
+                        const resp = await fetch('/api/volsnap/run', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: window.volsnapAbortController ? window.volsnapAbortController.signal : undefined,
+                            body: JSON.stringify({ ...sharedPayload, snapshot_id: iid, snapshot_name: label }),
+                        });
+                        if (!resp.ok || !resp.body) { appendImageLog(iid, `[ERROR] HTTP ${resp.status} — failed to start for ${label}`); return; }
+                        const reader = resp.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buf = '';
+                        while (true) {
+                            const { value, done } = await reader.read();
+                            if (done) break;
+                            buf += decoder.decode(value, { stream: true });
+                            const chunks = buf.split('\n\n');
+                            buf = chunks.pop() || '';
+                            for (const chunk of chunks) {
+                                if (!chunk.startsWith('data:')) continue;
+                                const line = chunk.replace(/^data:\s?/, '').trim();
+                                if (line) appendImageLog(iid, line);
+                            }
+                        }
+                    } catch (e) {
+                        if (e && e.name === 'AbortError') {
+                            appendImageLog(iid, '[SYSTEM] Aborted.');
+                        } else {
+                            appendImageLog(iid, `[ERROR] ${e && e.message ? e.message : String(e)}`);
+                            jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
+                        }
+                    } finally {
+                        volsnapCompleted++;
+                        if (volsnapCompleted >= snaps.length) {
+                            isVolsnapRunning = false;
+                            window.volsnapAbortController = null;
+                            refreshMigrationToolbar();
+                            jarvisAnnounce('Volume snapshot batch complete.');
+                        }
+                    }
+                };
+                snaps.forEach(r => streamOneDirect(r));
+            });
+        })();
+
         async function imageBatchInner(btn, dedupRunning = false) {
             const isDryRun = !!(btn && String(btn.id || '').includes('dryrun'));
             const imageWindowsMethod = String((btn && btn.dataset && btn.dataset.windowsRepairMethod) || '').trim();
@@ -7011,7 +7984,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             }).filter(r => r && r.migratable && String(r.snapshot_id || '').trim());
 
             if (!allChecked.length) {
-                alert('Select at least one migratable private snapshot from Private Snapshot Migration List.');
+                alert('Select at least one migratable private snapshot from Private Server Volume Snapshot Migration Table.');
                 return;
             }
 
@@ -7043,6 +8016,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             appendLog(`🖼 Image pipeline (Glance → jumphost → FLEX) — ${selected.length} job(s)`, 'system');
 
             isImageBatchRunning = true;
+            if (btn && btn.id === 'start-snapwin-migration-btn') isWindowsSnapRunning = true;
+            else isLinuxSnapRunning = true;
             refreshMigrationToolbar();
             window.imagePipelineAbortController = new AbortController();
 
@@ -7100,6 +8075,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             const streamOne = async (r) => {
                 const iid   = String(r.snapshot_id  || '').trim();
                 const label = r.snapshot_name || iid;
+                const freshMap = _loadFreshMap();
+                const startFresh = iid in freshMap ? !!freshMap[iid] : true;
                 try {
                     const resp = await fetch('/api/image_migrator/run', {
                         method: 'POST',
@@ -7111,7 +8088,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             snapshot_id:   iid,
                             ospc_image_id: iid,
                             snapshot_name: label,
-                            server_name:   r.source_vm_name || label
+                            server_name:   r.source_vm_name || label,
+                            start_fresh:   startFresh
                         })
                     });
                     if (!resp.ok || !resp.body) {
@@ -7153,6 +8131,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         const mmv = document.getElementById('mig_mode_value');
                         if (mmv) mmv.value = 'live';
                         isImageBatchRunning = false;
+                        isLinuxSnapRunning = false;
+                        isWindowsSnapRunning = false;
                         window.imagePipelineAbortController = null;
                         refreshMigrationToolbar();
                         appendLog('🖼 Image pipeline complete.', 'system');
@@ -7786,6 +8766,12 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 <span style="color:#00ff41;font-weight:700;font-size:13px;text-shadow:0 0 8px #00ff41;font-family:monospace;">▶ ${label}</span>
                 <div style="display:flex;align-items:center;gap:10px;">
                     <span id="nbd-term-status-${label}" style="color:#00cc33;font-size:11px;font-family:monospace;">running…</span>
+                    <button type="button"
+                            title="Copy this job log to clipboard"
+                            onclick="(function(btn){copyToClipboard(nbdGetTerminalText(${JSON.stringify(label)}),btn,'Copy');})(this)"
+                            style="background:transparent;border:1px solid rgba(0,255,65,0.35);color:#9dff9d;cursor:pointer;font-size:11px;padding:2px 8px;border-radius:6px;font-family:monospace;">
+                        Copy
+                    </button>
                     <button type="button"
                             title="Save this job log"
                             onclick="nbdDownloadTerminalLog(${JSON.stringify(label)})"
@@ -8611,6 +9597,171 @@ document.addEventListener('keydown', function(e) {
         toggleLunarGame();
     }
 });
+
+// ─── Universal terminal COPY button injector ────────────────────────────────
+// Watches for ANY terminal button bar (present or future) that has CLEAR/SAVE/
+// STOP/CLOSE/Kill but no COPY, and automatically injects a COPY button first.
+(function setupUniversalCopyInjector() {
+    // Terminal keyword signals — text that marks a button bar as a terminal bar
+    const TERM_SIGNALS = /^(CLEAR|SAVE|STOP|CLOSE|KILL|Kill|Clear|Save|Stop|Close)$/;
+    // Emoji signals for the main console toolbar
+    const EMOJI_SIGNALS = /^(💾|🗑️)$/;
+
+    function nearestTerminalText(el) {
+        // Walk up to 8 ancestors, look for a terminal body element or scrollable log
+        for (let node = el, i = 0; node && i < 8; node = node.parentElement, i++) {
+            const body = node.querySelector && node.querySelector(
+                '.vm-terminal-body,.nbd-terminal-body,.image-terminal-body,[class*="terminal-body"],[id*="term-body"],[id*="terminal-body"]'
+            );
+            if (body) return typeof extractTerminalText === 'function' ? extractTerminalText(body) : (body.innerText || '');
+        }
+        // Fallback: find nearest monospace scrollable sibling/child
+        for (let node = el, i = 0; node && i < 6; node = node.parentElement, i++) {
+            const scroll = node.querySelector && node.querySelector('[style*="overflow-y"]');
+            if (scroll && scroll !== node) return scroll.innerText || '';
+        }
+        return '';
+    }
+
+    function injectCopy(bar) {
+        if (!bar || bar.dataset.uCopyDone) return;
+        bar.dataset.uCopyDone = '1';
+
+        const buttons = Array.from(bar.querySelectorAll(':scope > button'));
+        if (buttons.length < 2) return;
+
+        const labels = buttons.map(b => (b.textContent || '').trim());
+        const hasSignal = labels.some(l => TERM_SIGNALS.test(l) || EMOJI_SIGNALS.test(l));
+        const hasCopy = labels.some(l => /copy/i.test(l)) || bar.querySelector('[id*="copy"]');
+        if (!hasSignal || hasCopy) return;
+
+        const ref = buttons[0];
+        const isMkHw = ref.style.fontFamily && ref.style.fontFamily.includes('Share Tech');
+        const isEmoji = /^\p{Emoji}/u.test((ref.textContent || '').trim());
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = 'Copy log to clipboard';
+
+        if (isEmoji) {
+            btn.textContent = '📋';
+            btn.style.cssText = ref.style.cssText;
+        } else if (isMkHw) {
+            btn.textContent = 'COPY';
+            btn.style.cssText = ref.style.cssText;
+            btn.style.background = '#0c1a0c';
+            btn.style.borderColor = '#4ade80';
+            btn.style.color = '#4ade80';
+            btn.style.textShadow = '0 0 8px #22c55e';
+            btn.onmousedown = () => { btn.style.transform = 'translateY(2px)'; };
+            btn.onmouseup   = () => { btn.style.transform = 'none'; };
+            btn.onmouseleave= () => { btn.style.transform = 'none'; };
+        } else {
+            btn.textContent = 'Copy';
+            btn.style.cssText = ref.style.cssText;
+            btn.style.color = '#9dff9d';
+            btn.style.borderColor = 'rgba(0,255,65,0.35)';
+        }
+
+        const orig = btn.textContent;
+        btn.onclick = function() {
+            const text = nearestTerminalText(bar);
+            if (typeof copyToClipboard === 'function') {
+                copyToClipboard(text, btn, orig);
+            } else {
+                navigator.clipboard.writeText(text || '').catch(() => {});
+                btn.textContent = '✓ COPIED';
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+            }
+        };
+
+        bar.insertBefore(btn, bar.firstChild);
+    }
+
+    function scanNode(root) {
+        if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+        // Check if root itself is a button bar
+        injectCopy(root);
+        // Check all flex containers inside root that could be button bars
+        (root.querySelectorAll || function(){return[];}).call(root,
+            '[style*="display:flex"],[style*="display: flex"]'
+        ).forEach(injectCopy);
+    }
+
+    const obs = new MutationObserver(function(mutations) {
+        for (const m of mutations) {
+            m.addedNodes.forEach(function(n) { scanNode(n); });
+        }
+    });
+
+    function init() {
+        obs.observe(document.body, { childList: true, subtree: true });
+        scanNode(document.body);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
 </script>
+
+<!-- ── Volume-Snapshot Pairing Preflight Modal ─────────────────────────────── -->
+<div id="volsnap-preflight-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;">
+  <div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:26px 28px;width:900px;max-width:98vw;box-shadow:0 24px 60px rgba(0,0,0,0.9);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 16px;">
+      <h3 style="color:#34d399;margin:0;font-size:16px;">📦 Volume Snapshot Migration Preflight</h3>
+      <button type="button" id="vsp-modal-close" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:0 4px;">✕</button>
+    </div>
+
+    <!-- Summary cards -->
+    <div id="vsp-summary-cards" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;"></div>
+
+    <!-- Pairing table -->
+    <div style="overflow-x:auto;margin-bottom:18px;">
+      <table id="vsp-pairing-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid #334155;">
+            <th style="color:#94a3b8;padding:6px 8px;text-align:left;white-space:nowrap;">Volume Snapshot</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:left;white-space:nowrap;">Source Volume</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:left;white-space:nowrap;">OSPC Source VM</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:left;white-space:nowrap;">OSPC Server Snap</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:left;white-space:nowrap;">FLEX Target VM</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:center;white-space:nowrap;">Confidence</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:center;white-space:nowrap;">Status</th>
+            <th style="color:#94a3b8;padding:6px 8px;text-align:left;white-space:nowrap;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="vsp-pairing-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Footer buttons -->
+    <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #1e293b;padding-top:14px;flex-wrap:wrap;">
+      <button type="button" id="vsp-save-map-btn"
+        style="background:#1e293b;border:1px solid #475569;border-radius:6px;padding:8px 16px;color:#94a3b8;cursor:pointer;font-size:13px;">
+        💾 Save Pairing Map
+      </button>
+      <button type="button" id="vsp-cancel-btn"
+        style="background:#1e293b;border:1px solid #475569;border-radius:6px;padding:8px 16px;color:#94a3b8;cursor:pointer;font-size:13px;">
+        Cancel
+      </button>
+      <button type="button" id="vsp-start-mig-btn"
+        style="background:linear-gradient(135deg,#065f46,#047857);border:1px solid #34d399;border-radius:6px;padding:8px 24px;color:white;font-weight:700;cursor:pointer;font-size:13px;" disabled>
+        🚀 Start Migration
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+.vsp-card { padding:10px 16px;border-radius:8px;font-size:12px;font-weight:700;min-width:90px;text-align:center; }
+.vsp-card-label { font-size:10px;font-weight:500;opacity:.7;margin-top:2px; }
+.vsp-tr td { padding:6px 8px;border-bottom:1px solid #1e293b; }
+.vsp-tr:hover td { background:rgba(255,255,255,0.03); }
+.vsp-manual-sel { background:#0f172a;border:1px solid #475569;border-radius:4px;color:#e2e8f0;font-size:11px;padding:3px 6px;min-width:140px; }
+</style>
+
 </body>
 </html>

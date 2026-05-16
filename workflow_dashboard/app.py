@@ -1128,6 +1128,33 @@ def _extract_glance_endpoints_from_catalog(auth_body: dict, wanted_region: str) 
     return uniq
 
 
+def _extract_cinder_endpoints_from_catalog(auth_body: dict, wanted_region: str) -> List[Tuple[str, str]]:
+    wanted = (wanted_region or "ALL").strip().upper()
+    out: List[Tuple[str, str]] = []
+    for svc in ((auth_body or {}).get("access") or {}).get("serviceCatalog", []) or []:
+        stype = str((svc or {}).get("type", "")).strip().lower()
+        sname = str((svc or {}).get("name", "")).strip().lower()
+        if stype not in {"volume", "volumev2", "volumev3", "blockstorage"} and sname not in {"cloudblockstorage", "blockstorage"}:
+            continue
+        for ep in (svc or {}).get("endpoints", []) or []:
+            region = str((ep or {}).get("region", "")).strip().upper()
+            url = str((ep or {}).get("publicURL", "") or (ep or {}).get("url", "")).strip().rstrip("/")
+            if not url:
+                continue
+            if wanted != "ALL" and region != wanted:
+                continue
+            out.append((region or "UNK", url))
+    seen: set = set()
+    uniq: List[Tuple[str, str]] = []
+    for r, u in out:
+        k = (r, u)
+        if k in seen:
+            continue
+        seen.add(k)
+        uniq.append((r, u))
+    return uniq
+
+
 @app.post("/api/image_migrator/images/scan")
 def image_migrator_scan_images():
     req = request.get_json(silent=True) or {}
@@ -1253,6 +1280,7 @@ def image_migrator_scan_images():
                     migratable += 1
 
                 rows.append({
+                    "asset_type": "glance_image",
                     "snapshot_name": str((img or {}).get("name", "")).strip(),
                     "snapshot_id": iid,
                     "source_vm_name": source_vm,
@@ -1273,6 +1301,74 @@ def image_migrator_scan_images():
                     "region": ep_region,
                 })
 
+        # ── Cinder volume snapshot scan ──────────────────────────────────────
+        volume_snapshots_found = 0
+        cinder_endpoints = _extract_cinder_endpoints_from_catalog(auth_body, region)
+        if not cinder_endpoints:
+            logs.append(f"[INFO] No Cinder (block storage) endpoint found for region={region} — skipping volume snapshot scan")
+        for c_region, c_url in cinder_endpoints:
+            logs.append(f"[INFO] Querying Cinder endpoint {c_region}: {c_url}")
+            snap_url = f"{c_url}/snapshots/detail?limit=1000"
+            cinder_proc = subprocess.run(
+                [
+                    "curl", "-sS", "-k", snap_url,
+                    "-H", f"X-Auth-Token: {token}",
+                    "-H", "Accept: application/json",
+                ],
+                cwd=str(BASE_DIR),
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            if cinder_proc.returncode != 0:
+                logs.append(f"[WARN] Cinder endpoint query failed rc={cinder_proc.returncode}: {(cinder_proc.stderr or '')[:220]}")
+                continue
+            c_payload = parse_json_mixed_output(cinder_proc.stdout or "{}")
+            c_snaps = (c_payload or {}).get("snapshots") if isinstance(c_payload, dict) else []
+            if not isinstance(c_snaps, list):
+                c_snaps = []
+            logs.append(f"[INFO] {c_region}: {len(c_snaps)} volume snapshots returned")
+            for snap in c_snaps:
+                sid = str((snap or {}).get("id", "")).strip()
+                if not sid or sid in seen_ids:
+                    continue
+                seen_ids.add(sid)
+                sname = str((snap or {}).get("name", "") or f"vol-snap-{sid[:8]}").strip()
+                s_status = str((snap or {}).get("status", "")).strip().lower()
+                s_size_gb = int((snap or {}).get("size") or 0)
+                s_vol_id = str((snap or {}).get("volume_id", "")).strip()
+                s_desc = str((snap or {}).get("description", "") or "").strip()
+                s_created = str((snap or {}).get("created_at", "")).strip()
+                s_updated = str((snap or {}).get("updated_at", "")).strip()
+                s_ok = s_status == "available"
+                s_reason = "volume snapshot — exportable" if s_ok else f"volume snapshot status={s_status}"
+                if s_ok:
+                    migratable += 1
+                    volume_snapshots_found += 1
+                rows.append({
+                    "asset_type": "volume_snapshot",
+                    "snapshot_name": sname,
+                    "snapshot_id": sid,
+                    "source_vm_name": s_desc or s_vol_id,
+                    "created_at": s_created,
+                    "updated_at": s_updated,
+                    "disk_format": "raw",
+                    "size_gb": s_size_gb,
+                    "visibility": "private",
+                    "protected": False,
+                    "status": s_status,
+                    "migratable": s_ok,
+                    "reason": s_reason,
+                    "licensed_restricted": False,
+                    "os_distro": "",
+                    "os_type": "",
+                    "is_windows": False,
+                    "migration_method": "cinder-export",
+                    "region": c_region,
+                    "volume_id": s_vol_id,
+                })
+
         rows.sort(key=lambda r: str(r.get("updated_at") or r.get("created_at") or ""), reverse=True)
         licensed_count = sum(1 for r in rows if r.get("licensed_restricted"))
         windows_count = sum(1 for r in rows if r.get("is_windows"))
@@ -1285,11 +1381,14 @@ def image_migrator_scan_images():
             "licensed_restricted": licensed_count,
             "windows_images": windows_count,
             "cinder_required": cinder_required,
+            "volume_snapshots_found": volume_snapshots_found,
         }
         logs.append(
             f"[OK] Scan complete: total={summary['private_images_found']} "
             f"migratable={summary['migratable_snapshots']} "
-            f"licensed_restricted={licensed_count} windows={windows_count} cinder_required={cinder_required}"
+            f"glance_images={len([r for r in rows if r.get('asset_type')=='glance_image'])} "
+            f"volume_snapshots={volume_snapshots_found} "
+            f"licensed_restricted={licensed_count} windows={windows_count}"
         )
         return jsonify({"rows": rows, "summary": summary, "logs": logs})
     except Exception as exc:
@@ -7308,6 +7407,9 @@ def run_image_migrator():
                         retry_wait=20,
                     )
 
+                import time as _snapwin_time
+                _launch_ts = int(_snapwin_time.time())
+                remote_flex = f"/tmp/snapwin_flex_{label_safe_z}_{_launch_ts}.sh"
                 for local, remote in ((ospc_path, remote_ospc), (flex_path, remote_flex)):
                     yield from _run_stage_cmd(
                         f"OpenRC upload {os.path.basename(remote)}",
@@ -7381,8 +7483,12 @@ def run_image_migrator():
                 if not str(req.get('windows_admin_password') or req.get('origin_vm_password') or '').strip() or req.get('manual_driver_bind', True):
                     z_cmd.append("--manual-driver-bind")
 
+                run_script = f"/tmp/snapwin_run_{label_safe_z}_{_launch_ts}.sh"
                 remote_inner = " ".join(shlex.quote(x) for x in z_cmd)
-                remote_run = f"set -o pipefail; {remote_inner} 2>&1 | tee {shlex.quote(remote_log)}"
+                _snapwin_env = "OSPC2FLEX_ARTIFACT_SEARCH_DIRS=/mnt/migration/ospc2flex_image"
+                if req.get('start_fresh'):
+                    _snapwin_env += " OSPC2FLEX_SNAPWIN_AUTO_RESUME=0"
+                remote_run = f"cp {shlex.quote(remote_script)} {shlex.quote(run_script)} && set -o pipefail; {_snapwin_env} {remote_inner.replace(shlex.quote(remote_script), shlex.quote(run_script), 1)} 2>&1 | tee {shlex.quote(remote_log)}"
                 yield f"data: [METHOD_Z] Launching selected cold snapshot/image ID: {snapshot_id or local_artifact}\n\n"
                 process = subprocess.Popen(
                     ssh_base_z + [remote_run],
@@ -7390,12 +7496,17 @@ def run_image_migrator():
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
+                    start_new_session=True,
                 )
+                ACTIVE_MIGRATOR_PROCESSES.add(process)
+                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[label_safe_z] = process
                 for line in iter(process.stdout.readline, ''):
                     if not line:
                         break
                     yield f"data: {line.rstrip()}\n\n"
                 process.wait()
+                ACTIVE_MIGRATOR_PROCESSES.discard(process)
+                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(label_safe_z, None)
                 yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
                 if process.returncode != 0:
                     yield "data: [METHOD_Z] FAILED. Inspect the Method Z log on the jumphost.\n\n"
@@ -7587,6 +7698,450 @@ def run_image_migrator():
             yield "data: [DONE]\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+@app.post("/api/volsnap/run")
+def run_volsnap_migrator():
+    """Volume-Snapshot-Mig: OSPC Cinder snapshot → temp volume → attach → qcow2 → FLEX VM.
+    Uses ospc2flex_volsnap_migrate.sh staged on the jumphost.
+    Streams SSE output — same pattern as SNAPWIN.
+    """
+    import re as _re
+    req = request.get_json(force=True, silent=True) or {}
+
+    snapshot_id = str(req.get('snapshot_id') or req.get('ospc_snapshot_id') or '').strip()
+    if not snapshot_id:
+        return jsonify({"error": "snapshot_id required"}), 400
+
+    label_raw = str(req.get('snapshot_name') or snapshot_id).strip()
+    label_safe = _re.sub(r'[^A-Za-z0-9._-]+', '_', label_raw).strip('_') or "volsnap"
+    os_type = str(req.get('os_type') or 'linux').strip()
+
+    process_ip = str(req.get('process_host_ip') or '').strip()
+    if not process_ip:
+        return jsonify({"error": "process_host_ip (jumphost IP) required"}), 400
+
+    ssh_key_raw = str(req.get('process_ssh_key') or '~/.ssh/id_rsa').strip()
+    if ssh_key_raw.startswith('/.ssh/'):
+        ssh_key_raw = '~' + ssh_key_raw
+    ssh_key = os.path.expanduser(ssh_key_raw)
+    if not os.path.exists(ssh_key):
+        fallback = os.path.expanduser('~/.ssh/id_rsa')
+        if os.path.exists(fallback):
+            ssh_key = fallback
+    ssh_user = str(req.get('process_ssh_user') or 'ubuntu').strip() or 'ubuntu'
+
+    ssh_base = [
+        "ssh", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
+        "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
+        "-o", "IPQoS=none",
+        f"{ssh_user}@{process_ip}",
+    ]
+    scp_base = [
+        "scp", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
+        "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
+        "-o", "IPQoS=none",
+    ]
+
+    local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_volsnap_migrate.sh")
+    if not os.path.isfile(local_script):
+        return jsonify({"error": f"ospc2flex_volsnap_migrate.sh not found at {local_script}"}), 500
+
+    import time as _vs_time
+    _ts = int(_vs_time.time())
+    remote_script = "/tmp/ospc2flex_volsnap_migrate.sh"
+    remote_ospc   = f"/tmp/volsnap_{label_safe}_{_ts}_ospc.sh"
+    remote_flex   = "/tmp/ospc2flex_flex.sh"  # reuse linsnap-staged FLEX openrc (correct IAD3 region)
+    remote_log    = f"/tmp/volsnap_{label_safe}_{_ts}.log"
+
+    # Synthesize OSPC openrc (reuse same logic as run_image_migrator)
+    ospc_path = req.get('ospc_openrc')
+    if req.get('ospc_username') and req.get('ospc_apikey') and not ospc_path:
+        import tempfile, shlex as _shlex2
+        fd, ospc_path = tempfile.mkstemp(suffix=".sh", prefix="ospc_vs_")
+        ospc_region   = str(req.get('ospc_region', 'IAD')).strip() or 'IAD'
+        ospc_auth_url = str(req.get('ospc_auth_url', '') or '').strip()
+        with os.fdopen(fd, 'w') as f:
+            f.write("#!/usr/bin/env bash\n")
+            f.write(f"export OS_REGION_NAME={_shlex2.quote(ospc_region)}\n")
+            f.write("export OS_NO_CACHE=1\n")
+            f.write(f"export OS_USERNAME={_shlex2.quote(str(req.get('ospc_username')))}\n")
+            f.write(f"export OS_API_KEY={_shlex2.quote(str(req.get('ospc_apikey')))}\n")
+            url = ospc_auth_url or 'https://identity.api.rackspacecloud.com/v2.0/'
+            f.write(f"export OS_AUTH_URL={_shlex2.quote(url)}\n")
+            f.write("export OS_IDENTITY_API_VERSION=2\n")
+            try:
+                import requests as _rq2
+                _resp2 = _rq2.post(
+                    url.rstrip('/') + '/tokens',
+                    json={"auth": {"RAX-KSKEY:apiKeyCredentials": {
+                        "username": req.get('ospc_username'),
+                        "apiKey":   req.get('ospc_apikey'),
+                    }}},
+                    timeout=90
+                )
+                _data2 = _resp2.json()
+                _token2 = _data2['access']['token']['id']
+                _tenant2 = _data2['access']['token'].get('tenant', {}).get('id', '')
+                f.write(f"export OS_TOKEN={_shlex2.quote(_token2)}\n")
+                f.write("export OS_AUTH_TYPE=token\n")
+                if _tenant2:
+                    f.write(f"export OS_TENANT_ID={_shlex2.quote(_tenant2)}\n")
+                    f.write(f"export OS_PROJECT_ID={_shlex2.quote(_tenant2)}\n")
+            except Exception:
+                acct = str(req.get('ospc_account_id', '')).strip()
+                if acct:
+                    f.write(f"export OS_TENANT_ID={_shlex2.quote(acct)}\n")
+
+    # Synthesize FLEX openrc
+    flex_path = req.get('flex_openrc')
+    _flex_app_id     = str(req.get('flex_app_cred_id',     '') or '').strip()
+    _flex_app_secret = str(req.get('flex_app_cred_secret', '') or '').strip()
+    _flex_user       = str(req.get('flex_username', '') or '').strip()
+    _flex_pass       = str(req.get('flex_password', '') or '').strip()
+    if (_flex_app_id and _flex_app_secret or _flex_user and _flex_pass) and not flex_path:
+        import tempfile, shlex as _shlex3
+        fd2, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_vs_")
+        flex_auth_url   = str(req.get('flex_auth_url', '') or '').strip()
+        flex_region     = str(req.get('flex_region', 'DFW3') or 'DFW3').strip()
+        flex_project    = str(req.get('flex_project_id', '') or '').strip()
+        flex_domain     = str(req.get('flex_domain', 'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
+        with os.fdopen(fd2, 'w') as f:
+            f.write("#!/usr/bin/env bash\n")
+            f.write(f"export OS_REGION_NAME={_shlex3.quote(flex_region)}\n")
+            auth_url = flex_auth_url or 'https://identity.api.rackspacecloud.com/v3/'
+            f.write(f"export OS_AUTH_URL={_shlex3.quote(auth_url)}\n")
+            f.write("export OS_IDENTITY_API_VERSION=3\n")
+            f.write(f"export OS_USER_DOMAIN_NAME={_shlex3.quote(flex_domain)}\n")
+            f.write(f"export OS_PROJECT_DOMAIN_NAME={_shlex3.quote(flex_domain)}\n")
+            if flex_project:
+                f.write(f"export OS_PROJECT_ID={_shlex3.quote(flex_project)}\n")
+            if _flex_app_id and _flex_app_secret:
+                f.write("export OS_AUTH_TYPE=v3applicationcredential\n")
+                f.write(f"export OS_APPLICATION_CREDENTIAL_ID={_shlex3.quote(_flex_app_id)}\n")
+                f.write(f"export OS_APPLICATION_CREDENTIAL_SECRET={_shlex3.quote(_flex_app_secret)}\n")
+            else:
+                f.write("export OS_AUTH_TYPE=password\n")
+                f.write(f"export OS_USERNAME={_shlex3.quote(_flex_user)}\n")
+                f.write(f"export OS_PASSWORD={_shlex3.quote(_flex_pass)}\n")
+
+    if not ospc_path or not flex_path:
+        return jsonify({"error": "Could not resolve OSPC or FLEX credentials"}), 400
+
+    def _volsnap_generator():
+        import hashlib as _vshash, shlex as _vsshlex
+        yield f"data: [VOLSNAP] Starting Volume-Snapshot-Mig: {label_safe} (snapshot={snapshot_id})\n\n"
+        yield f"data: [VOLSNAP] Jumphost: {ssh_user}@{process_ip}  os_type={os_type}\n\n"
+
+        def _run(label, cmd, timeout=120):
+            proc = subprocess.run(cmd, check=False, timeout=timeout, capture_output=True, text=True)
+            if proc.returncode != 0:
+                err = ((proc.stderr or '') + (proc.stdout or '')).strip()[-400:]
+                raise RuntimeError(f"{label} failed (rc={proc.returncode}): {err}")
+            return proc
+
+        try:
+            # Stage script (MD5 check)
+            with open(local_script, "rb") as _fh:
+                local_md5 = _vshash.md5(_fh.read()).hexdigest()
+            try:
+                _chk = subprocess.run(
+                    ssh_base + [f"test -f {_vsshlex.quote(remote_script)} && md5sum {_vsshlex.quote(remote_script)} | awk '{{print $1}}' || true"],
+                    check=False, timeout=30, capture_output=True, text=True)
+                remote_md5 = (_chk.stdout or '').strip().splitlines()[-1] if (_chk.stdout or '').strip() else ''
+            except Exception:
+                remote_md5 = ''
+
+            if remote_md5 == local_md5:
+                yield "data: [VOLSNAP] Script already current on jumphost; skipped upload.\n\n"
+            else:
+                yield "data: [VOLSNAP] Uploading ospc2flex_volsnap_migrate.sh to jumphost.\n\n"
+                _run("script upload", scp_base + [local_script, f"{ssh_user}@{process_ip}:{remote_script}"], timeout=120)
+
+            # Upload OSPC openrc; reuse linsnap's /tmp/ospc2flex_flex.sh for FLEX (correct IAD3 region)
+            _run(f"openrc upload {os.path.basename(remote_ospc)}",
+                 scp_base + [ospc_path, f"{ssh_user}@{process_ip}:{remote_ospc}"], timeout=60)
+            _run("chmod openrc",
+                 ssh_base + [f"chmod 600 {_vsshlex.quote(remote_ospc)}; chmod +x {_vsshlex.quote(remote_script)}"],
+                 timeout=30)
+            yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
+
+            # Build remote command
+            vs_cmd = [
+                "bash", remote_script,
+                "--label",       label_safe,
+                "--snapshot-id", snapshot_id,
+                "--ospc-openrc", remote_ospc,
+                "--flex-openrc", remote_flex,
+                "--os-type",     os_type,
+            ]
+            remote_run = (
+                f"set -o pipefail; {' '.join(_vsshlex.quote(x) for x in vs_cmd)}"
+                f" 2>&1 | tee {_vsshlex.quote(remote_log)}"
+            )
+            yield f"data: [VOLSNAP] Launching on jumphost: snapshot={snapshot_id}\n\n"
+            process = subprocess.Popen(
+                ssh_base + [remote_run],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, start_new_session=True,
+            )
+            ACTIVE_MIGRATOR_PROCESSES.add(process)
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                yield f"data: {line.rstrip()}\n\n"
+            process.wait()
+            ACTIVE_MIGRATOR_PROCESSES.discard(process)
+            yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
+            if process.returncode != 0:
+                yield "data: [VOLSNAP] FAILED — check log on jumphost.\n\n"
+            else:
+                yield "data: [VOLSNAP] Complete.\n\n"
+
+        except Exception as exc:
+            yield f"data: [VOLSNAP ERROR] {exc}\n\n"
+        finally:
+            try:
+                subprocess.run(
+                    ssh_base + [f"rm -f {_vsshlex.quote(remote_ospc)} 2>/dev/null || true"],
+                    timeout=30, check=False)
+            except Exception:
+                pass
+            yield "data: [DONE]\n\n"
+
+    return Response(stream_with_context(_volsnap_generator()), mimetype='text/event-stream')
+
+
+# ── Volume-Snapshot Pairing endpoints ─────────────────────────────────────────
+
+def _load_volume_pairing():
+    """Lazy-load volume_pairing module without requiring installation."""
+    import importlib.util as _ilu
+    mod_name = "volume_pairing"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
+    mod_path = BASE_DIR / "services" / "api" / "workflows" / "volume_pairing.py"
+    spec = _ilu.spec_from_file_location(mod_name, str(mod_path))
+    mod = _ilu.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _build_ospc_openrc_from_req(req: dict) -> Optional[str]:
+    """Write a temp openrc file from OSPC credentials in the request body."""
+    if not req.get("ospc_username") or not req.get("ospc_apikey"):
+        return None
+    import shlex as _sx
+    fd, path = tempfile.mkstemp(suffix=".sh", prefix="ospc_pair_")
+    region   = str(req.get("ospc_region", "IAD")).strip() or "IAD"
+    auth_url = str(req.get("ospc_auth_url", "") or "https://identity.api.rackspacecloud.com/v2.0/").strip()
+    with os.fdopen(fd, "w") as f:
+        f.write("#!/usr/bin/env bash\n")
+        f.write(f"export OS_REGION_NAME={_sx.quote(region)}\n")
+        f.write("export OS_NO_CACHE=1\n")
+        f.write(f"export OS_USERNAME={_sx.quote(str(req['ospc_username']))}\n")
+        f.write(f"export OS_API_KEY={_sx.quote(str(req['ospc_apikey']))}\n")
+        f.write(f"export OS_AUTH_URL={_sx.quote(auth_url)}\n")
+        f.write("export OS_IDENTITY_API_VERSION=2\n")
+        if req.get("ospc_account_id"):
+            f.write(f"export OS_TENANT_NAME={_sx.quote(str(req['ospc_account_id']))}\n")
+    os.chmod(path, 0o600)
+    return path
+
+
+@app.post("/migration/volume-snapshot/pairing/preflight")
+def volsnap_pairing_preflight():
+    """
+    Run Auto→Review→Manual pairing preflight for selected OSPC volume snapshots.
+    Returns pairing classification for each snapshot without executing any migration.
+    """
+    vp = _load_volume_pairing()
+    req = request.get_json(force=True, silent=True) or {}
+
+    selected_ids  = req.get("selected_snapshot_ids") or []
+    attach_mode   = str(req.get("attach_mode", "review")).strip()
+    map_path      = str(req.get("migration_map_path", "./migration_map.json")).strip()
+    allow_fallback = bool(req.get("allow_name_fallback", True))
+
+    if not selected_ids:
+        return jsonify({"error": "selected_snapshot_ids required"}), 400
+    if attach_mode not in vp.ATTACH_MODES:
+        return jsonify({"error": f"attach_mode must be one of {vp.ATTACH_MODES}"}), 400
+
+    ospc_openrc = _build_ospc_openrc_from_req(req)
+    cleanup_rc  = ospc_openrc is not None
+    if not ospc_openrc:
+        ospc_openrc = str(req.get("ospc_openrc", "")).strip()
+    if not ospc_openrc or not os.path.isfile(ospc_openrc):
+        return jsonify({"error": "OSPC credentials required (ospc_username+ospc_apikey or ospc_openrc path)"}), 400
+
+    try:
+        pairings = vp.pair_selected_volume_snapshots(
+            selected_snapshot_ids=selected_ids,
+            attach_mode=attach_mode,
+            ospc_openrc=ospc_openrc,
+            migration_map_path=map_path,
+            allow_name_fallback=allow_fallback,
+        )
+        summary = vp.build_preflight_summary(pairings)
+        return jsonify({
+            "status":   "ok",
+            "summary":  summary.as_dict(),
+            "pairings": [p.as_dict() for p in pairings],
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if cleanup_rc and ospc_openrc:
+            try:
+                os.unlink(ospc_openrc)
+            except OSError:
+                pass
+
+
+@app.post("/migration/volume-snapshot/manual-options")
+def volsnap_manual_options():
+    """
+    Return dropdown option lists for the manual pairing UI.
+    Reads from migration_map.json (and optionally live FLEX server list).
+    """
+    vp = _load_volume_pairing()
+    req     = request.get_json(force=True, silent=True) or {}
+    map_path = str(req.get("migration_map_path", "./migration_map.json")).strip()
+
+    migration_map = vp.load_migration_map(map_path)
+    options = vp.list_manual_target_options(migration_map)
+    return jsonify({"status": "ok", **options})
+
+
+@app.post("/migration/volume-snapshot/manual-apply")
+def volsnap_manual_apply():
+    """
+    Apply user's manual target selections to existing pairing results.
+    Returns updated pairings with confidence=manual, approved=True.
+    """
+    vp  = _load_volume_pairing()
+    req = request.get_json(force=True, silent=True) or {}
+
+    raw_pairings   = req.get("pairings", [])
+    manual_sels    = req.get("manual_selections", [])
+
+    if not isinstance(raw_pairings, list):
+        return jsonify({"error": "pairings must be a list"}), 400
+
+    # Rebuild VolumePairingResult objects from dicts
+    pairings: List[dict] = raw_pairings
+    sel_map = {s["snapshot_id"]: s for s in manual_sels if s.get("snapshot_id")}
+
+    updated = []
+    for p in pairings:
+        sid = p.get("snapshot_id", "")
+        result = vp.VolumePairingResult(
+            snapshot_id               = sid,
+            snapshot_name             = p.get("snapshot_name", ""),
+            snapshot_status           = p.get("snapshot_status", ""),
+            source_volume_id          = p.get("source_volume_id", ""),
+            source_volume_name        = p.get("source_volume_name", ""),
+            source_volume_size_gb     = int(p.get("source_volume_size_gb", 0)),
+            ospc_server_id            = p.get("ospc_server_id", ""),
+            ospc_server_name          = p.get("ospc_server_name", ""),
+            ospc_server_snapshot_id   = p.get("ospc_server_snapshot_id", ""),
+            ospc_server_snapshot_name = p.get("ospc_server_snapshot_name", ""),
+            ospc_device               = p.get("ospc_device", ""),
+            flex_server_id            = p.get("flex_server_id", ""),
+            flex_server_name          = p.get("flex_server_name", ""),
+            flex_volume_id            = p.get("flex_volume_id"),
+            flex_volume_name          = p.get("flex_volume_name"),
+            pairing_status            = p.get("pairing_status", "manual_required"),
+            confidence                = p.get("confidence", "none"),
+            attach_mode               = p.get("attach_mode", "review"),
+            reason                    = p.get("reason", ""),
+            warnings                  = list(p.get("warnings", [])),
+            approved                  = bool(p.get("approved", False)),
+            manual_override           = bool(p.get("manual_override", False)),
+            final_attach_status       = p.get("final_attach_status", "pending"),
+        )
+        if sid in sel_map:
+            vp.apply_manual_pairing(result, sel_map[sid])
+        updated.append(result.as_dict())
+
+    return jsonify({"status": "ok", "pairings": updated})
+
+
+@app.post("/migration/volume-snapshot/migrate")
+def volsnap_migrate_approved():
+    """
+    Validate approved pairings and return per-snapshot migration configs.
+    Actual streaming migration is handled client-side via /api/volsnap/run.
+
+    Rules:
+    - review mode:  only rows with approved=True are included
+    - auto mode:    only confidence=high + pairing_status=matched
+    - manual mode:  only pairing_status=manual_selected with flex_server_id set
+    - blocked rows are always excluded
+    """
+    vp  = _load_volume_pairing()
+    req = request.get_json(force=True, silent=True) or {}
+
+    attach_mode  = str(req.get("attach_mode", "review")).strip()
+    raw_pairings = req.get("pairings", [])
+
+    if attach_mode not in vp.ATTACH_MODES:
+        return jsonify({"error": f"attach_mode must be one of {vp.ATTACH_MODES}"}), 400
+    if not isinstance(raw_pairings, list):
+        return jsonify({"error": "pairings must be a list"}), 400
+
+    approved_jobs = []
+    skipped_jobs  = []
+
+    for p in raw_pairings:
+        status     = p.get("pairing_status", "")
+        confidence = p.get("confidence", "")
+        approved   = bool(p.get("approved", False))
+        flex_id    = str(p.get("flex_server_id", "") or "").strip()
+        snap_id    = str(p.get("snapshot_id", "") or "").strip()
+
+        if status == "blocked":
+            skipped_jobs.append({"snapshot_id": snap_id, "reason": "blocked: " + p.get("reason", "")})
+            continue
+
+        if attach_mode == "auto":
+            if status == "matched" and confidence == "high" and flex_id:
+                approved_jobs.append(p)
+            else:
+                skipped_jobs.append({"snapshot_id": snap_id, "reason": f"auto_mode: skipped non-high confidence ({confidence}/{status})"})
+
+        elif attach_mode == "review":
+            if approved and flex_id:
+                approved_jobs.append(p)
+            elif not approved:
+                skipped_jobs.append({"snapshot_id": snap_id, "reason": "review_mode: not approved by operator"})
+            else:
+                skipped_jobs.append({"snapshot_id": snap_id, "reason": "review_mode: missing flex_server_id"})
+
+        elif attach_mode == "manual":
+            if status == "manual_selected" and flex_id:
+                approved_jobs.append(p)
+            else:
+                skipped_jobs.append({"snapshot_id": snap_id, "reason": "manual_mode: flex_server_id not selected"})
+
+    return jsonify({
+        "status":        "ok",
+        "attach_mode":   attach_mode,
+        "approved_count": len(approved_jobs),
+        "skipped_count":  len(skipped_jobs),
+        "approved_jobs":  approved_jobs,
+        "skipped_jobs":   skipped_jobs,
+    })
 
 
 def _cloudboot_migrator_script() -> Path:
