@@ -793,7 +793,10 @@
                             </div>
                             <div id="privateSnapshotListBody">
                             <div style="display:flex;align-items:center;gap:10px;margin:8px 0 10px;">
-                                <div id="imageScanSummary" style="color:#86efac;font-size:12px;flex:1;">Private images found: 0 | Migratable snapshots: 0 | Excluded private images: 0 | Skipped provider/public images: 0</div>
+                                <div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap;">
+                                    <div id="imageScanSummary" style="color:#86efac;font-size:12px;">Private images found: 0 | Migratable snapshots: 0 | Excluded private images: 0 | Skipped provider/public images: 0</div>
+                                    <span id="image-scan-cache-age" style="display:none;font-size:11px;color:#64748b;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:2px 7px;white-space:nowrap;"></span>
+                                </div>
                                 <button type="button" id="export-snapshot-csv-btn" style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:12px;padding:5px 11px;cursor:pointer;white-space:nowrap;" title="Export visible rows to CSV">⬇ Export CSV</button>
                             </div>
                             <style>
@@ -937,8 +940,41 @@
                                 <option value="manual">Manual Target</option>
                             </select>
                         </div>
+                        <div style="display:flex;flex-direction:column;gap:6px;border-left:2px solid #34d399;padding-left:10px;">
+                            <span style="color:#34d399;font-size:10px;font-weight:800;letter-spacing:.08em;white-space:nowrap;text-transform:uppercase;">Target Flex VM to Attach</span>
+                            <div style="display:flex;flex-direction:column;gap:2px;" title="UUID of the FLEX VM the volume will be attached to and block-streamed into">
+                                <label for="volsnap_flex_helper_vm_id" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Target Flex VM ID <span style="color:#f87171;font-weight:600;">(mandatory)</span></label>
+                                <input type="text" id="volsnap_flex_helper_vm_id" placeholder="FLEX VM uuid"
+                                    style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 7px;width:210px;outline:none;"
+                                    oninput="localStorage.setItem('volsnap_flex_helper_vm_id',this.value)">
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <div style="display:flex;flex-direction:column;gap:2px;" title="SSH IP of the target FLEX VM — jumphost streams block data here">
+                                    <label for="volsnap_flex_helper_ip" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Target Flex VM IP</label>
+                                    <input type="text" id="volsnap_flex_helper_ip" placeholder="e.g. 10.0.0.5"
+                                        style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 7px;width:120px;outline:none;"
+                                        oninput="localStorage.setItem('volsnap_flex_helper_ip',this.value)">
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:2px;" title="SSH username on the target FLEX VM. Defaults to ubuntu.">
+                                    <label for="volsnap_flex_helper_user" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">SSH Username</label>
+                                    <input type="text" id="volsnap_flex_helper_user" placeholder="ubuntu"
+                                        style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 7px;width:90px;outline:none;"
+                                        oninput="localStorage.setItem('volsnap_flex_helper_user',this.value)">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                <script>
+                (function(){
+                    var v=localStorage.getItem('volsnap_flex_helper_vm_id'),
+                        i=localStorage.getItem('volsnap_flex_helper_ip'),
+                        u=localStorage.getItem('volsnap_flex_helper_user');
+                    if(v){var e=document.getElementById('volsnap_flex_helper_vm_id');if(e)e.value=v;}
+                    if(i){var e=document.getElementById('volsnap_flex_helper_ip');if(e)e.value=i;}
+                    if(u){var e=document.getElementById('volsnap_flex_helper_user');if(e)e.value=u;}
+                })();
+                </script>
                 <!-- Stop buttons row — one per snapshot type -->
                 <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:0 0 16px;">
                     <button type="button" id="stop-linux-snap-btn"
@@ -1447,27 +1483,42 @@
                         .btn-adv { border: 1px solid #8ea2cc; border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; font-weight: 600; background: #2f3e66; color: #fff; cursor: pointer; transition: 0.2s; }
                         .btn-adv:hover { background: #4b5f91; }
                         .btn-adv.active-edit { background: #6a7daf; border-color: #e2e8f0; color:#111827; box-shadow: 0 0 10px rgba(106,125,175,0.5); }
-                        .table-wrap { width: 100%; max-width: 100%; max-height: 500px; overflow: scroll !important; border: 1px solid rgba(142,162,204,0.4); border-radius: 10px; scrollbar-gutter: stable both-edges; scrollbar-width: auto; scrollbar-color: #60a5fa #1e293b; box-sizing: border-box; }
-                        .table-wrap::-webkit-scrollbar { width: 16px !important; height: 16px !important; display: block !important; background: #1e293b; }
-                        .table-wrap::-webkit-scrollbar-track { background: #1e293b; border: 1px solid #334155; }
-                        .table-wrap::-webkit-scrollbar-thumb { background: #3b82f6; border: 3px solid #1e293b; border-radius: 8px; min-height: 40px; min-width: 40px; }
-                        .table-wrap::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
-                        .table-wrap::-webkit-scrollbar-corner { background: #1e293b; border: 1px solid #334155; }
-                        .adv-table { border-collapse: separate; border-spacing: 0; min-width: 1200px; background: rgba(255,255,255,0.02); }
-                        .adv-table th, .adv-table td { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; padding: 8px 12px; border-bottom: 1px solid rgba(184,196,255,0.15); text-align: left; white-space: nowrap; color:#cbd5e1;}
-                        .adv-table th { position: sticky; top: 0; background: #23315e; z-index: 2; box-shadow: 0 1px 0 rgba(184,196,255,0.2); border-bottom: none; }
-                        .adv-table tr:hover td { background: rgba(255,255,255,0.06); color:#fff; }
-                        .adv-table td.editable-cell { outline: 1px dashed rgba(198,206,255,0.4); cursor: text; }
-                        .adv-table td.editable-cell:focus { outline: 2px solid #ff77c5; background: rgba(255,255,255,0.15); color: #fff; }
-                        #ospc-image-table tr.snapshot-row-windows td { background: rgba(251,191,36,0.08); color:#dbeafe; }
-                        #ospc-image-table tr.snapshot-row-restricted td { background: rgba(248,113,113,0.10); color:#fee2e2; }
-                        #ospc-image-table tr.snapshot-row-volsnap td { background: rgba(167,139,250,0.08); color:#ede9fe; }
+                        /* ── macOS-style table container ── */
+                        .table-wrap { width: 100%; max-width: 100%; max-height: 520px; overflow: auto; border: 1px solid rgba(255,255,255,0.09); border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05); background: rgba(15,20,40,0.6); scrollbar-gutter: stable both-edges; scrollbar-width: thin; scrollbar-color: rgba(100,130,200,0.4) transparent; box-sizing: border-box; }
+                        .table-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+                        .table-wrap::-webkit-scrollbar-track { background: transparent; }
+                        .table-wrap::-webkit-scrollbar-thumb { background: rgba(100,130,200,0.35); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+                        .table-wrap::-webkit-scrollbar-thumb:hover { background: rgba(100,160,255,0.6); border: 2px solid transparent; background-clip: padding-box; }
+                        .table-wrap::-webkit-scrollbar-corner { background: transparent; }
+                        /* ── macOS-style table base ── */
+                        .adv-table { border-collapse: collapse; min-width: 1200px; width: 100%; background: transparent; }
+                        /* ── Header ── */
+                        .adv-table thead tr { background: rgba(20,30,60,0.95); }
+                        .adv-table th { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 9px 14px; text-align: left; white-space: nowrap; color: #8899bb; position: sticky; top: 0; background: rgba(20,30,60,0.97); z-index: 2; border-bottom: 1px solid rgba(255,255,255,0.10); border-right: 1px solid rgba(255,255,255,0.06); }
+                        .adv-table th:last-child { border-right: none; }
+                        /* ── Cells ── */
+                        .adv-table td { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', sans-serif; font-size: 0.82rem; padding: 7px 14px; text-align: left; white-space: nowrap; color: #c8d8f0; border-bottom: 1px solid rgba(255,255,255,0.055); border-right: 1px solid rgba(255,255,255,0.045); }
+                        .adv-table td:last-child { border-right: none; }
+                        /* ── Alternating rows ── */
+                        .adv-table tbody tr:nth-child(odd)  td { background: rgba(255,255,255,0.0); }
+                        .adv-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.025); }
+                        /* ── Hover ── */
+                        .adv-table tbody tr:hover td { background: rgba(59,130,246,0.14) !important; color: #fff; }
+                        /* ── Editable cells ── */
+                        .adv-table td.editable-cell { outline: 1px dashed rgba(198,206,255,0.3); cursor: text; }
+                        .adv-table td.editable-cell:focus { outline: 2px solid rgba(59,130,246,0.8); background: rgba(59,130,246,0.1) !important; color: #fff; }
+                        /* ── Snapshot name column: compact + wrapped ── */
+                        .snap-name-wrap { max-width: 160px; white-space: normal; word-break: break-all; overflow-wrap: anywhere; line-height: 1.4; }
+                        /* ── Image table row tints (preserve existing color semantics) ── */
+                        #ospc-image-table tr.snapshot-row-windows td { background: rgba(251,191,36,0.07); color: #dbeafe; }
+                        #ospc-image-table tr.snapshot-row-restricted td { background: rgba(248,113,113,0.09); color: #fee2e2; }
+                        #ospc-image-table tr.snapshot-row-volsnap td { background: rgba(167,139,250,0.07); color: #ede9fe; }
                         #ospc-image-table tr.snapshot-row-windows:hover td,
                         #ospc-image-table tr.snapshot-row-restricted:hover td,
-                        #ospc-image-table tr.snapshot-row-volsnap:hover td { background: rgba(59,130,246,0.16); color:#fff; }
+                        #ospc-image-table tr.snapshot-row-volsnap:hover td { background: rgba(59,130,246,0.16) !important; color: #fff; }
                         #ospc-image-table td.snapshot-id-cell,
-                        #ospc-image-table td.snapshot-date-cell { color:#b6c7e8; }
-                        #ospc-image-table td.snapshot-size-cell { color:#e2e8f0; text-align:right; }
+                        #ospc-image-table td.snapshot-date-cell { color: #8fabd4; }
+                        #ospc-image-table td.snapshot-size-cell { color: #e2e8f0; text-align: right; }
                     </style>
 
                     <section class="adv-panel" id="mapperTablePanel">
@@ -1654,7 +1705,7 @@
                     const imageScanState = { rows: [], filtered: [], headers: [], summary: {}, sortCol: '', sortDir: 'asc', activeTab: 'linux' }; // filtered: { row, idx }[]
                     window._volsnapPairingMap = window._volsnapPairingMap || {}; // snapshot_id → VolumePairingResult
                     // Parallel to headers array — keys used for sorting
-                    const _IMG_SORT_KEYS = ['start_fresh','asset_type','snapshot_name','snapshot_id','source_vm_name','os_distro','size_gb','disk_format','status','migratable','licensed_restricted','migration_method','reason','created_at'];
+                    const _IMG_SORT_KEYS = ['start_fresh','asset_type','snapshot_name','attached_to','vm_glance_snap','snapshot_id','source_vm_name','os_distro','size_gb','disk_format','status','migratable','licensed_restricted','migration_method','reason','created_at'];
                     const LS_OSPC_IMAGE_SCAN = 'mig_ospc_image_scan_cache_v1';
                     const LS_OSPC_IMAGE_SELECTION = 'mig_ospc_image_selection_v1';
                     const LS_OSPC_IMAGE_SEARCH = 'mig_ospc_image_search_v1';
@@ -1785,7 +1836,7 @@
                         filterImageRows();
                         const table = document.getElementById('ospc-image-table');
                         if (!table) return;
-                        const headers = ['No image resume', 'type', 'snapshot_name', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at', 'Pairing'];
+                        const headers = ['No image resume', 'type', 'snapshot_name', 'attached_to', 'vm_glance_snap', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at', 'Pairing'];
                         const rows = imageScanState.filtered || [];
                         // Row 1 — column name labels
                         const labelRow = '<tr>'
@@ -1815,6 +1866,18 @@
                             if (t === 'volume_snapshot') return '<span style="color:#a78bfa;font-size:0.85em">📦 vol-snap</span>';
                             return '<span style="color:#6ee7b7;font-size:0.85em">🖼 glance</span>';
                         };
+                        // Build vm-name → [{name, id}] map from Glance rows.
+                        // In OSPC, Glance snapshots are named after their source VM (source_vm_name is empty
+                        // in the scan because Glance metadata doesn't carry it), so snapshot_name == VM name.
+                        const vmGlanceMap = {};
+                        (imageScanState.rows || []).forEach(row => {
+                            if (row.asset_type === 'volume_snapshot') return;
+                            const snapName = String(row.snapshot_name || '').trim();
+                            if (!snapName) return;
+                            if (!vmGlanceMap[snapName]) vmGlanceMap[snapName] = [];
+                            vmGlanceMap[snapName].push({ name: snapName, id: String(row.snapshot_id || '') });
+                        });
+
                         const body = rows.map(({ row: r, idx }) => {
                             const isMigratable = !!r.migratable;
                             const rowClass = r.asset_type === 'volume_snapshot' ? 'snapshot-row-volsnap' : (r.licensed_restricted ? 'snapshot-row-restricted' : (r.is_windows ? 'snapshot-row-windows' : ''));
@@ -1822,7 +1885,23 @@
                                 + `<td><input type="checkbox" class="ospc-image-cb" data-idx="${idx}" ${isMigratable ? '' : 'disabled'}></td>`
                                 + `<td style="text-align:center"><input type="checkbox" class="ospc-fresh-cb" data-idx="${idx}" ${isMigratable ? 'checked' : 'disabled'} title="No image resume — force re-download from OSPC, ignore any existing artifacts"></td>`
                                 + `<td>${assetBadge(r.asset_type || 'glance_image')}</td>`
-                                + `<td>${escapeHTML(String(r.snapshot_name || ''))}</td>`
+                                + `<td><div class="snap-name-wrap">${escapeHTML(String(r.snapshot_name || ''))}</div></td>`
+                                + (r.asset_type === 'volume_snapshot'
+                                    ? `<td style="font-size:0.82em;color:${r.attached_to ? '#6ee7b7' : '#475569'}">${r.attached_to ? '🖥 ' + escapeHTML(r.attached_to) : '—'}</td>`
+                                    : `<td></td>`)
+                                + (r.asset_type === 'volume_snapshot' ? (() => {
+                                    const vm = r.attached_to || '';
+                                    const snaps = vm ? (vmGlanceMap[vm] || []) : [];
+                                    const vmIp = String(r.attached_vm_ip || '').trim();
+                                    if (!snaps.length && !vmIp) return `<td style="color:#475569;font-size:0.8em">—</td>`;
+                                    return `<td style="font-size:0.78em;color:#a78bfa;">`
+                                        + snaps.map(s =>
+                                            `<span style="display:block;white-space:nowrap">🖼 ${escapeHTML(s.name)}</span>`
+                                            + (s.id ? `<span style="display:block;font-family:monospace;font-size:0.82em;color:#64748b;white-space:nowrap;margin-left:14px">${escapeHTML(s.id)}</span>` : '')
+                                        ).join('')
+                                        + (vmIp ? `<span style="display:block;white-space:nowrap;margin-top:2px;color:#38bdf8">🌐 ${escapeHTML(vmIp)}</span>` : '')
+                                        + `</td>`;
+                                })() : `<td></td>`)
                                 + `<td class="snapshot-id-cell" style="font-size:0.8em">${escapeHTML(String(r.snapshot_id || ''))}</td>`
                                 + `<td>${escapeHTML(String(r.source_vm_name || ''))}</td>`
                                 + `<td>${escapeHTML(String(r.os_distro || r.os_type || ''))}</td>`
@@ -2027,6 +2106,9 @@
                                 logEl.textContent = 'Connecting to image scanner...\n';
                                 btn.disabled = true;
                                 btn.textContent = '⏳ Scanning…';
+                                imageScanState.rows = [];
+                                imageScanState.filtered = [];
+                                renderImageTable();
                                 try {
                                     const region = (document.getElementById('image_scan_region') || {}).value || 'ALL';
                                     const ospcUser = (document.getElementById('ospc_cloud_user') || {}).value || '';
@@ -2065,6 +2147,8 @@
                                     renderImageTable();
                                     _persistCurrentImageSelectionFromDom();
                                     persistOspcImageScanCache(imageScanState.rows, region, ospcTenant);
+                                    const ageElFresh = document.getElementById('image-scan-cache-age');
+                                    if (ageElFresh) { ageElFresh.textContent = '🟢 live'; ageElFresh.style.display = 'inline'; }
                                     const lines = Array.isArray(data.logs) ? data.logs : [];
                                     logEl.textContent = (['✅ Private snapshot scan complete.'].concat(lines)).join('\n');
                                 } catch (err) {
@@ -2121,6 +2205,33 @@
                                 if (liveBtn) liveBtn.click();
                             });
                         }
+
+                        // Restore snapshot table from localStorage cache on page load
+                        (function _restoreImageScanCache() {
+                            try {
+                                const raw = localStorage.getItem(LS_OSPC_IMAGE_SCAN);
+                                if (!raw) return;
+                                const c = JSON.parse(raw);
+                                if (!c || !Array.isArray(c.rows) || !c.rows.length) return;
+                                imageScanState.rows = c.rows;
+                                imageScanState.summary = {
+                                    private_images_found:    c.rows.length,
+                                    migratable_snapshots:    c.rows.filter(r => r.migratable).length,
+                                    volume_snapshots_found:  c.rows.filter(r => r.asset_type === 'volume_snapshot').length,
+                                    licensed_restricted:     c.rows.filter(r => r.licensed_restricted).length,
+                                    windows_images:          c.rows.filter(r => r.is_windows).length,
+                                    excluded_private_images: 0,
+                                };
+                                renderImageTable();
+                                const ageEl = document.getElementById('image-scan-cache-age');
+                                if (ageEl && c.ts) {
+                                    const mins = Math.round((Date.now() - c.ts) / 60000);
+                                    const age = mins < 2 ? 'just now' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
+                                    ageEl.textContent = `cached · ${age}`;
+                                    ageEl.style.display = 'inline';
+                                }
+                            } catch (e) { /* ignore corrupt cache */ }
+                        })();
                     });
 
                     </script>
@@ -7479,13 +7590,18 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             const gv = id => (document.getElementById(id) || {}).value || '';
 
             function _volSnapRows() {
-                return Array.from(document.querySelectorAll('.ospc-image-cb:checked')).map(cb => {
-                    const i = Number(cb.dataset.idx || -1);
-                    return (typeof imageScanState !== 'undefined' && imageScanState.rows) ? imageScanState.rows[i] : null;
-                }).filter(r => r && String(r.snapshot_id || '').trim()).filter(r =>
-                    r.asset_type === 'volume_snapshot' ||
-                    /vol/i.test(r.snapshot_name || '') ||
-                    /vol/i.test(r.source_vm_name || '')
+                // Read from localStorage so selection survives tab switches and table re-renders
+                let selMap = {};
+                try { selMap = JSON.parse(localStorage.getItem('mig_ospc_image_selection_v1') || '{}'); } catch(e) {}
+                const allRows = (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows))
+                    ? imageScanState.rows : [];
+                return allRows.filter(r =>
+                    r &&
+                    r.migratable &&
+                    selMap[String(r.snapshot_id || '').trim()] === true &&
+                    (r.asset_type === 'volume_snapshot' ||
+                     /vol/i.test(r.snapshot_name || '') ||
+                     /vol/i.test(r.source_vm_name || ''))
                 );
             }
 
@@ -7507,6 +7623,10 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     process_host_ip:      gv('process_host_ip')  || gv('nbd_jumphost_ip'),
                     process_ssh_user:     gv('process_ssh_user') || gv('nbd_jumphost_user') || 'ubuntu',
                     process_ssh_key:      gv('process_ssh_key')  || gv('nbd_jumphost_key')  || '~/.ssh/id_rsa',
+                    // Direct Cinder stream fields
+                    flex_helper_vm_id:    gv('volsnap_flex_helper_vm_id'),
+                    flex_helper_ip:       gv('volsnap_flex_helper_ip'),
+                    flex_helper_user:     gv('volsnap_flex_helper_user') || 'ubuntu',
                 };
             }
 
@@ -7904,6 +8024,9 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     process_host_ip:      jhIp,
                     process_ssh_user:     jhUser,
                     process_ssh_key:      jhKey,
+                    flex_helper_vm_id:    gv('volsnap_flex_helper_vm_id'),
+                    flex_helper_ip:       gv('volsnap_flex_helper_ip'),
+                    flex_helper_user:     gv('volsnap_flex_helper_user') || 'ubuntu',
                 };
 
                 let volsnapCompleted = 0;

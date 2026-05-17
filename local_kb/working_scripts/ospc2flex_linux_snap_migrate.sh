@@ -144,56 +144,6 @@ install_if_missing() {
   done
 }
 
-cleanup_stale_jumphost_images() {
-  [ "${OSPC2FLEX_LINUX_SNAP_CLEAN_STALE_IMAGES:-1}" = "1" ] || {
-    log "[LS0A] stale image cleanup disabled"
-    return 0
-  }
-
-  local cleanup_root="/mnt/migration"
-  [ -d "$cleanup_root" ] || {
-    log "[LS0A] cleanup root not found: $cleanup_root"
-    return 0
-  }
-  [ "$(readlink -f "$cleanup_root")" = "/mnt/migration" ] || {
-    log "[LS0A] refusing cleanup outside /mnt/migration"
-    return 0
-  }
-
-  local delete_list="$JOB_TMP/stale_image_delete.tsv"
-  : >"$delete_list"
-
-  sudo find "$cleanup_root" -xdev -type f \( \
-      -iname "*.img" -o -iname "*.raw" -o -iname "*.vhd" -o -iname "*.vhdx" -o -iname "*.vpc" \
-      -o -iname "*repaired*.qcow2" -o -iname "*repair*.qcow2" \
-      -o -iname "*flex-rescue*.qcow2" -o -iname "*final*.qcow2" -o -iname "*rescue*.qcow2" \
-      -o -iname "*.invalid*" -o -iname "*.partial*" \
-    \) -printf '%s\t%p\n' 2>/dev/null | sort -nr >"$delete_list" || true
-
-  local count bytes
-  count="$(wc -l <"$delete_list" | tr -d '[:space:]')"
-  bytes="$(awk -F '\t' '{s+=$1} END{printf "%.0f", s+0}' "$delete_list")"
-  if [ "${count:-0}" -eq 0 ]; then
-    log "[LS0A] no stale image files found; keeping unrepaired qcow2 files for resume"
-    return 0
-  fi
-
-  log "[LS0A] deleting stale image files: count=$count bytes=$bytes"
-  head -20 "$delete_list" | while IFS=$'\t' read -r sz path; do
-    log "[LS0A] delete candidate: ${sz}B $path"
-  done
-
-  while IFS=$'\t' read -r _sz path; do
-    [ -n "$path" ] || continue
-    case "$path" in
-      /mnt/migration/*) sudo rm -f -- "$path" ;;
-      *) log "[LS0A] skip outside cleanup root: $path" ;;
-    esac
-  done <"$delete_list"
-
-  log "[LS0A] stale image cleanup complete; only unrepaired qcow2 files are kept for resume"
-}
-
 # ── openrc helpers ────────────────────────────────────────────────────────────
 source_ospc_openrc() {
   [ -f "$OSPC_OPENRC" ] || fail_exit "$CURRENT_STAGE" "OSPC openrc not found: $OSPC_OPENRC"
@@ -739,9 +689,6 @@ log "ospc_openrc=$OSPC_OPENRC flex_openrc=$FLEX_OPENRC"
 log "os_type=${OS_TYPE:-auto} flex_user=$FLEX_USER"
 log "base_dir=$BASE_DIR"
 install_if_missing qemu-img qemu-nbd python3 openstack curl
-
-stage "LS0A_CLEAN_STALE_IMAGES"
-cleanup_stale_jumphost_images
 
 stage "LS1_LOAD_CREDENTIALS"
 source_ospc_openrc

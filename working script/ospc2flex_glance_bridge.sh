@@ -318,7 +318,6 @@ _download_curl() {
 _download_cloud_files_object() {
   local container="$1" object_name="$2" dest="$3" min_bytes="$4"
   local rc size token swift_url _region _acct
-  CF_OBJECT_DOWNLOAD_REASON=""
 
   log "[INFO] Downloading Cloud Files object to jumphost: $container/$object_name"
 
@@ -351,13 +350,6 @@ _download_cloud_files_object() {
     warn "openstack object save failed rc=$rc size=${size}B"
     tail -20 /tmp/ospc2flex_cf_object_save.log >&2 2>/dev/null || true
     rm -f "$dest"
-    if grep -qiE 'No space left on device|Errno 28' /tmp/ospc2flex_cf_object_save.log 2>/dev/null; then
-      CF_OBJECT_DOWNLOAD_REASON="no_space"
-    elif grep -qiE 'Not Found|HTTP 404|404' /tmp/ospc2flex_cf_object_save.log 2>/dev/null; then
-      CF_OBJECT_DOWNLOAD_REASON="missing"
-    else
-      CF_OBJECT_DOWNLOAD_REASON="failed"
-    fi
     return 1
   fi
 
@@ -419,26 +411,11 @@ _download_cloud_files_object() {
     warn "openstack object save failed rc=$osave_rc size=${size}B"
     tail -20 /tmp/ospc2flex_cf_object_save.log >&2 2>/dev/null || true
     rm -f "$dest"
-    if grep -qiE 'No space left on device|Errno 28' /tmp/ospc2flex_cf_object_save.log 2>/dev/null; then
-      CF_OBJECT_DOWNLOAD_REASON="no_space"
-    elif grep -qiE 'Not Found|HTTP 404|404' /tmp/ospc2flex_cf_object_save.log 2>/dev/null; then
-      CF_OBJECT_DOWNLOAD_REASON="missing"
-    else
-      CF_OBJECT_DOWNLOAD_REASON="failed"
-    fi
-    return 1
-  fi
-
-  if [ "$rc" -eq 22 ] && [ "$size" -eq 0 ]; then
-    warn "Cloud Files object download returned HTTP error with no payload — treating object as missing/stale"
-    rm -f "$dest"
-    CF_OBJECT_DOWNLOAD_REASON="missing"
     return 1
   fi
 
   # Keep partial file — don't rm -f — so the next resume attempt continues from here
   warn "Cloud Files curl download failed rc=$rc size=${size}B — partial file kept for resume"
-  CF_OBJECT_DOWNLOAD_REASON="partial"
   return 1
 }
 
@@ -456,21 +433,13 @@ _download_cloud_files_export_task() {
     log "[OK] Reused existing Cloud Files export object: $container/$object_name"
     return 0
   fi
-  if [ "${CF_OBJECT_DOWNLOAD_REASON:-}" = "no_space" ]; then
-    warn "Cloud Files object download stopped: no space left on jumphost. Free disk space before retrying."
-    return 1
-  fi
-  if [ "${CF_OBJECT_DOWNLOAD_REASON:-}" = "missing" ]; then
-    log "[INFO] Existing CF object is missing/stale — creating a fresh export task"
-    rm -f "$dest"
-    openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
-  elif openstack object show "$container" "$object_name" >/dev/null 2>&1; then
-    warn "CF object exists in Swift but download failed/interrupted — partial file kept for resume on reconnect"
-    return 1
-  fi
   # If the CF object exists but download failed (SSH dropped mid-transfer), preserve it
   # so the next Python retry can resume curl from the partial local file.
   # Only delete and re-export if the CF object is genuinely absent.
+  if openstack object show "$container" "$object_name" >/dev/null 2>&1; then
+    warn "CF object exists in Swift but download failed/interrupted — partial file kept for resume on reconnect"
+    return 1
+  fi
   log "[INFO] No CF object found — removing any stale partial local file and creating new export task"
   rm -f "$dest"
   openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true

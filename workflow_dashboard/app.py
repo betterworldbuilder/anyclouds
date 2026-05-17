@@ -1128,6 +1128,31 @@ def _extract_glance_endpoints_from_catalog(auth_body: dict, wanted_region: str) 
     return uniq
 
 
+def _extract_nova_endpoints_from_catalog(auth_body: dict, wanted_region: str) -> List[Tuple[str, str]]:
+    wanted = (wanted_region or "ALL").strip().upper()
+    out: List[Tuple[str, str]] = []
+    for svc in ((auth_body or {}).get("access") or {}).get("serviceCatalog", []) or []:
+        stype = str((svc or {}).get("type", "")).strip().lower()
+        sname = str((svc or {}).get("name", "")).strip().lower()
+        if stype not in {"compute"} and sname not in {"cloudserversopenstack", "nova", "compute"}:
+            continue
+        for ep in (svc or {}).get("endpoints", []) or []:
+            region = str((ep or {}).get("region", "")).strip().upper()
+            url = str((ep or {}).get("publicURL", "") or (ep or {}).get("url", "")).strip().rstrip("/")
+            if not url:
+                continue
+            if wanted != "ALL" and region != wanted:
+                continue
+            out.append((region or "UNK", url))
+    seen: set = set()
+    uniq: List[Tuple[str, str]] = []
+    for r, u in out:
+        if (r, u) not in seen:
+            seen.add((r, u))
+            uniq.append((r, u))
+    return uniq
+
+
 def _extract_cinder_endpoints_from_catalog(auth_body: dict, wanted_region: str) -> List[Tuple[str, str]]:
     wanted = (wanted_region or "ALL").strip().upper()
     out: List[Tuple[str, str]] = []
@@ -1308,6 +1333,64 @@ def image_migrator_scan_images():
             logs.append(f"[INFO] No Cinder (block storage) endpoint found for region={region} — skipping volume snapshot scan")
         for c_region, c_url in cinder_endpoints:
             logs.append(f"[INFO] Querying Cinder endpoint {c_region}: {c_url}")
+
+            # Build server_id → server_name and server_name → best_ip maps via Nova (one call per region)
+            server_name_map: dict = {}
+            server_name_ip_map: dict = {}  # server_name → first usable IP
+            nova_endpoints = _extract_nova_endpoints_from_catalog(auth_body, c_region)
+            if nova_endpoints:
+                nova_url = nova_endpoints[0][1]
+                nova_proc = subprocess.run(
+                    ["curl", "-sS", "-k", f"{nova_url}/servers/detail?limit=1000",
+                     "-H", f"X-Auth-Token: {token}", "-H", "Accept: application/json"],
+                    cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
+                )
+                if nova_proc.returncode == 0:
+                    nova_payload = parse_json_mixed_output(nova_proc.stdout or "{}")
+                    for srv in ((nova_payload or {}).get("servers") or []):
+                        svid = str((srv or {}).get("id", "")).strip()
+                        svname = str((srv or {}).get("name", "") or "").strip()
+                        if svid and svname:
+                            server_name_map[svid] = svname
+                        # Extract best IP — prefer accessIPv4, then first address entry
+                        best_ip = str((srv or {}).get("accessIPv4", "")).strip()
+                        if not best_ip:
+                            addresses = (srv or {}).get("addresses") or {}
+                            for _net, _entries in (addresses.items() if isinstance(addresses, dict) else []):
+                                for _e in (_entries if isinstance(_entries, list) else []):
+                                    _ip = str((_e or {}).get("addr", "")).strip()
+                                    if _ip:
+                                        best_ip = _ip
+                                        break
+                                if best_ip:
+                                    break
+                        if svname and best_ip:
+                            server_name_ip_map[svname] = best_ip
+
+            # Fetch volume name + attachment map (volume_id → name, volume_id → attached VM name)
+            vol_name_map: dict = {}
+            vol_attached_map: dict = {}  # volume_id → VM name if currently attached
+            vol_proc = subprocess.run(
+                ["curl", "-sS", "-k", f"{c_url}/volumes/detail?limit=1000",
+                 "-H", f"X-Auth-Token: {token}", "-H", "Accept: application/json"],
+                cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
+            )
+            if vol_proc.returncode == 0:
+                vol_payload = parse_json_mixed_output(vol_proc.stdout or "{}")
+                for v in ((vol_payload or {}).get("volumes") or []):
+                    vid = str((v or {}).get("id", "")).strip()
+                    # Rackspace Classic uses display_name (Cinder v1); standard Cinder uses name
+                    vname = str((v or {}).get("name") or (v or {}).get("display_name") or "").strip()
+                    if vid and vname:
+                        vol_name_map[vid] = vname
+                    # Resolve attached server name from attachments list
+                    for att in ((v or {}).get("attachments") or []):
+                        svid = str((att or {}).get("server_id", "")).strip()
+                        if svid and vid:
+                            svname = server_name_map.get(svid, svid[:8])
+                            vol_attached_map[vid] = svname
+                            break
+
             snap_url = f"{c_url}/snapshots/detail?limit=1000"
             cinder_proc = subprocess.run(
                 [
@@ -1334,23 +1417,31 @@ def image_migrator_scan_images():
                 if not sid or sid in seen_ids:
                     continue
                 seen_ids.add(sid)
-                sname = str((snap or {}).get("name", "") or f"vol-snap-{sid[:8]}").strip()
                 s_status = str((snap or {}).get("status", "")).strip().lower()
                 s_size_gb = int((snap or {}).get("size") or 0)
                 s_vol_id = str((snap or {}).get("volume_id", "")).strip()
-                s_desc = str((snap or {}).get("description", "") or "").strip()
+                s_desc = str((snap or {}).get("description") or (snap or {}).get("display_description") or "").strip()
                 s_created = str((snap or {}).get("created_at", "")).strip()
                 s_updated = str((snap or {}).get("updated_at", "")).strip()
+                # Use Cinder snapshot name → fall back to volume name → fall back to vol-snap-{id}
+                # Rackspace Classic returns display_name (Cinder v1); standard Cinder uses name
+                _cinder_name = str((snap or {}).get("name") or (snap or {}).get("display_name") or "").strip()
+                _vol_name = vol_name_map.get(s_vol_id, "")
+                sname = _cinder_name or _vol_name or f"vol-snap-{sid[:8]}"
                 s_ok = s_status == "available"
                 s_reason = "volume snapshot — exportable" if s_ok else f"volume snapshot status={s_status}"
                 if s_ok:
                     migratable += 1
                     volume_snapshots_found += 1
+                _attached_vm = vol_attached_map.get(s_vol_id, "")
+                _attached_vm_ip = server_name_ip_map.get(_attached_vm, "") if _attached_vm else ""
                 rows.append({
                     "asset_type": "volume_snapshot",
                     "snapshot_name": sname,
                     "snapshot_id": sid,
-                    "source_vm_name": s_desc or s_vol_id,
+                    "source_vm_name": _vol_name or s_desc or s_vol_id,
+                    "attached_to": _attached_vm,
+                    "attached_vm_ip": _attached_vm_ip,
                     "created_at": s_created,
                     "updated_at": s_updated,
                     "disk_format": "raw",
@@ -7874,15 +7965,35 @@ def run_volsnap_migrator():
                  timeout=30)
             yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
 
-            # Build remote command
+            # Build remote command — pass FLEX helper args for direct Cinder path
+            flex_helper_vm_id = str(req.get('flex_helper_vm_id') or '').strip()
+            flex_helper_ip    = str(req.get('flex_helper_ip')    or '').strip()
+            flex_helper_user  = str(req.get('flex_helper_user')  or 'ubuntu').strip() or 'ubuntu'
+            flex_target_vm_id = str(req.get('flex_target_vm_id') or '').strip()
+            flex_volume_name  = str(req.get('flex_volume_name')  or '').strip()
+            cleanup_temp      = str(req.get('cleanup_temp',  'true')).strip().lower()
+            attach_to_final   = str(req.get('attach_to_final','true')).strip().lower()
+
             vs_cmd = [
                 "bash", remote_script,
                 "--label",       label_safe,
                 "--snapshot-id", snapshot_id,
                 "--ospc-openrc", remote_ospc,
                 "--flex-openrc", remote_flex,
-                "--os-type",     os_type,
             ]
+            if flex_helper_vm_id:
+                vs_cmd += ["--flex-helper-vm-id", flex_helper_vm_id]
+            if flex_helper_ip:
+                vs_cmd += ["--flex-helper-ip", flex_helper_ip]
+            if flex_helper_user and flex_helper_user != 'ubuntu':
+                vs_cmd += ["--flex-helper-user", flex_helper_user]
+            if flex_target_vm_id:
+                vs_cmd += ["--flex-target-vm-id", flex_target_vm_id]
+            if flex_volume_name:
+                vs_cmd += ["--flex-volume-name", flex_volume_name]
+            vs_cmd += ["--cleanup-temp", cleanup_temp, "--attach-to-final", attach_to_final]
+            # ssh key used on jumphost to reach FLEX helper
+            vs_cmd += ["--ssh-key-path", "~/.ssh/id_rsa"]
             remote_run = (
                 f"set -o pipefail; {' '.join(_vsshlex.quote(x) for x in vs_cmd)}"
                 f" 2>&1 | tee {_vsshlex.quote(remote_log)}"

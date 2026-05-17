@@ -496,24 +496,19 @@ fi
 stage_done 1
 
 # ── STAGE 2.5: Clean Old Workspace Images ────────────────────────────────────
-# Keep only unrepaired qcow2 files for resume. Raw/download artifacts are large
-# and can block new downloads with ENOSPC.
-stage_start '2.5' 'Clean Old Workspace' 'Keeping only unrepaired qcow2 resume files'
+# Only delete files belonging to THIS VM's snap prefix — never touch other VMs' files
+# (parallel jobs share the same workdir — deleting other VMs' qcow2s would corrupt them)
+stage_start '2.5' 'Clean Old Workspace' 'Removing previous .img + .qcow2 from old runs (freeing disk space)'
 cleaned=0
-for f in "$workdir"/*.img "$workdir"/*.raw "$workdir"/*.vhd "$workdir"/*.vhdx "$workdir"/*.vpc; do
+SNAP_PREFIX="{snap_name}"
+for f in "$workdir"/"$SNAP_PREFIX"*.img "$workdir"/"$SNAP_PREFIX"*.qcow2; do
   [ -f "$f" ] || continue
+  [ "$f" = "$img_path" ] && continue
+  [ "$f" = "$converted_path" ] && continue
+  [ "$f" = "$repaired_path" ] && continue
   rm -f "$f" && log "  [DEL] $f" && cleaned=$((cleaned+1))
 done
-for f in "$workdir"/*.qcow2; do
-  [ -f "$f" ] || continue
-  [ "$f" = "$converted_path" ] && continue
-  case "$(basename "$f")" in
-    *repaired*|*repair*|*rescue*|*final*|*.invalid.*|*.partial*|*.tmp*)
-      rm -f "$f" && log "  [DEL] $f" && cleaned=$((cleaned+1))
-      ;;
-  esac
-done
-[ $cleaned -eq 0 ] && log '  [OK] No stale image files to clean' || log "  [OK] Removed $cleaned stale image file(s)"
+[ $cleaned -eq 0 ] && log '  [OK] No old images to clean' || log "  [OK] Removed $cleaned old image file(s)"
 df -h "$workdir" | tail -1 | awk '{{print "  [INFO] Disk free: " $4 " / " $2}}'
 stage_done '2.5'
 
