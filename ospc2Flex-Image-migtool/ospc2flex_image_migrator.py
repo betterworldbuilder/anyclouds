@@ -7,6 +7,7 @@ Always runs fresh — no smart-resume skip logic.
 import argparse
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -770,6 +771,7 @@ SNET_DOWNLOAD_URL="https://snet-${{_SNET_REGION}}.images.api.rackspacecloud.com/
 log "  Target: $IMG_DOWNLOAD_URL"
 log "  Snet fallback: $SNET_DOWNLOAD_URL"
 success=0
+SKIP_LEGACY_GLANCE=0
 GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
 if [ $success -eq 0 ] && [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
   log "  Trying {'Cloud Files preferred' if prefer_cloud_files_download else 'Classic Glance first'} bridge (Glance/Cloud Files waterfall)..."
@@ -794,14 +796,24 @@ if [ $success -eq 0 ] && [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x 
     rm -f "$img_path"
     stage_fail 3 "Cloud Files export is blocked by Rackspace image licensing/billing policy for this snapshot; direct Glance cannot handle this large image path"
   else
-    log "  [WARN] Bridge download failed — falling back to legacy public Glance loop"
+    if [ "${{OSPC2FLEX_ALLOW_LEGACY_GLANCE_DOWNLOAD:-0}}" = "1" ]; then
+      log "  [WARN] Bridge download failed — legacy direct Glance retry enabled by OSPC2FLEX_ALLOW_LEGACY_GLANCE_DOWNLOAD=1"
+    else
+      log "  [WARN] Bridge download failed — skipping legacy direct Glance retry because this environment returns InvalidResponse/413/000"
+      SKIP_LEGACY_GLANCE=1
+    fi
     rm -f "$img_path"
   fi
 elif [ "{1 if cloud_files_fallback else 0}" = "1" ]; then
-  log "  [WARN] Glance bridge not found at $GLANCE_BRIDGE — using legacy public Glance loop"
+  if [ "${{OSPC2FLEX_ALLOW_LEGACY_GLANCE_DOWNLOAD:-0}}" = "1" ]; then
+    log "  [WARN] Glance bridge not found at $GLANCE_BRIDGE — legacy direct Glance retry enabled"
+  else
+    log "  [WARN] Glance bridge not found at $GLANCE_BRIDGE — skipping legacy direct Glance retry"
+    SKIP_LEGACY_GLANCE=1
+  fi
 fi
 # Try openstack image save — first via public URL, then snet (bypasses 413 on large images)
-if [ $success -eq 0 ]; then
+if [ $success -eq 0 ] && [ "$SKIP_LEGACY_GLANCE" -eq 0 ]; then
 for _osave_url in "$OS_IMAGE_URL" "https://snet-${{_SNET_REGION}}.images.api.rackspacecloud.com"; do
   log "  Trying openstack image save via $_osave_url ..."
   rm -f "$img_path"
@@ -821,7 +833,7 @@ for _osave_url in "$OS_IMAGE_URL" "https://snet-${{_SNET_REGION}}.images.api.rac
 done
 fi
 # Curl fallback with retry loop (if openstack image save failed)
-if [ $success -eq 0 ]; then
+if [ $success -eq 0 ] && [ "$SKIP_LEGACY_GLANCE" -eq 0 ]; then
 for attempt in $(seq 1 $export_retries); do
   log "  curl attempt $attempt/$export_retries — large file, please wait..."
   HTTP_STATUS=$(curl -s -C - -L --retry 3 --retry-delay 10 --retry-max-time 180 \\
@@ -861,7 +873,12 @@ for attempt in $(seq 1 $export_retries); do
   [ $attempt -lt $export_retries ] && {{ log "  Waiting ${{export_retry_wait}}s..."; sleep $export_retry_wait; }}
 done
 fi
-[ $success -eq 0 ] && stage_fail 3 'Download failed after all attempts (openstack image save + curl both failed)'
+if [ $success -eq 0 ]; then
+  if [ "$SKIP_LEGACY_GLANCE" -eq 1 ]; then
+    stage_fail 3 'Cloud Files export/download failed; direct Glance retry skipped because it is known broken here. Use the Linux snapshot Cinder raw-copy fallback path.'
+  fi
+  stage_fail 3 'Download failed after all attempts (openstack image save + curl both failed)'
+fi
 stage_done 3
 
 # ── STAGE 4: Convert Image Format ────────────────────────────────────────────
@@ -1542,6 +1559,8 @@ log '  [OK] OpenRC sourced and authentication verified'
 
 UPLOAD_SIZE=$(stat -c%s "$repaired_path" 2>/dev/null || echo 0)
 log "  [INFO] Image: $repaired_path (${{UPLOAD_SIZE}} bytes)"
+[ -f "$repaired_path" ] || stage_fail 5 "Repaired image missing, refusing upload: $repaired_path"
+[ "$UPLOAD_SIZE" -ge "$MIN_SIZE_BYTES" ] || stage_fail 5 "Repaired image too small ($UPLOAD_SIZE bytes), refusing upload: $repaired_path"
 IMG_ID=""
 GLANCE_BRIDGE={shell_quote(glance_bridge_path)}
 if [ "{1 if cloud_files_fallback else 0}" = "1" ] && [ -x "$GLANCE_BRIDGE" ]; then
@@ -1574,8 +1593,11 @@ if [ -z "$IMG_ID" ] || echo "$IMG_ID" | grep -qiE 'error|failed|traceback|except
     --format value -c id \\
     "{flex_image_name}" 2>&1 || true)
 fi
-if [ -z "$IMG_ID" ] || echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized'; then
+if [ -z "$IMG_ID" ] || echo "$IMG_ID" | grep -qiE 'error|failed|traceback|exception|unauthorized|not a valid file'; then
   stage_fail 5 "Image upload produced no FLEX image ID after all methods: $IMG_ID"
+fi
+if ! printf '%s' "$IMG_ID" | grep -Eq '^[0-9a-fA-F-]{{36}}$'; then
+  stage_fail 5 "Image upload returned invalid FLEX image ID: $IMG_ID"
 fi
 log "  [OK] Upload complete — Image ID: $IMG_ID"
 SHOW_NAME=$(openstack image show "$IMG_ID" -f value -c name 2>/dev/null || echo "{flex_image_name}")
@@ -1901,13 +1923,39 @@ def main() -> None:
                 import time as _time; _time.sleep(10)
 
             log(f"[INFO] Creating OSPC snapshot '{snapshot_name}'...")
-            run(
-                openstack_cmd(
-                    ospc_openrc,
-                    f"openstack server image create --name {shell_quote(snapshot_name)} {shell_quote(args.server_name)}"
-                ),
-                dry_run=args.dry_run,
-            )
+            create_error = ""
+            created_after_error = False
+            for create_attempt in range(1, 4):
+                try:
+                    run(
+                        openstack_cmd(
+                            ospc_openrc,
+                            f"openstack server image create --name {shell_quote(snapshot_name)} {shell_quote(args.server_name)}"
+                        ),
+                        dry_run=args.dry_run,
+                    )
+                    create_error = ""
+                    break
+                except Exception as exc:
+                    create_error = str(exc).replace("\n", " ")[:500]
+                    log(f"[WARN] Snapshot create attempt {create_attempt}/3 failed: {create_error}")
+                    try:
+                        _existing_snap = json.loads(run(
+                            openstack_cmd(ospc_openrc, f"openstack image show {shell_quote(snapshot_name)} -f json"),
+                            dry_run=False,
+                            check=False,
+                        ) or "{}")
+                        if _existing_snap.get("id"):
+                            image_id = _existing_snap["id"]
+                            created_after_error = True
+                            log(f"[OK] Snapshot '{snapshot_name}' appeared after create failure (id={image_id}) — continuing")
+                            break
+                    except Exception:
+                        pass
+                    if create_attempt < 3:
+                        time.sleep(30)
+            if create_error and not created_after_error:
+                raise RuntimeError(f"Snapshot create failed after 3 attempts: {create_error}")
 
             image_payload = wait_for_image_status(
                 openrc=ospc_openrc,
@@ -2027,7 +2075,7 @@ def main() -> None:
                 run(perm_win, capture=False, dry_run=False, check=False, log_cmd=False)
             log(f"[OK] Windows repair script staged at {_win_repair_remote}")
         else:
-            log("[WARN] ospc2flex_windows_repair.sh not found locally — Windows Stage 4.6 will be unavailable")
+            log("[WARN] ospc2flex_windows_repair.sh not found locally — optional compatibility repair helper will be unavailable")
 
         _glance_bridge_local = Path(__file__).resolve().parent / "ospc2flex_glance_bridge.sh"
         _glance_bridge_remote = "/tmp/ospc2flex_glance_bridge.sh"
@@ -2186,22 +2234,75 @@ def main() -> None:
         # Use unique filename per VM to avoid race condition when parallel jobs share workdir
         ts = int(time.time())
         safe_vm_name = args.server_name.replace(" ", "_").replace("/", "_")
+        queue_job_id = str(ts)
         local_script = workdir / f"remote_export_{safe_vm_name}_{ts}.sh"
         local_script.write_text(script_content, encoding="utf-8")
 
         remote_script = f"ospc2flex_remote_export_{safe_vm_name}_{ts}.sh"
+        log(f"[INFO] Queue job id: {queue_job_id} ({safe_vm_name})")
         smart_copy(str(local_script), jh_user, processing_host, remote_script, key=args.ssh_key_path, port=args.ssh_port, dry_run=args.dry_run)
 
-        # Kill any orphaned prior remote_export runs for this snapshot before launching —
-        # prevents duplicate glance_bridge processes racing each other when SSH dropped mid-run.
-        # NOTE: only kill ospc2flex_remote_export_* processes — DO NOT kill by image_id since
-        # that would also kill a concurrently running METHOD_Z SNAPWIN process on the jumphost.
-        kill_cmd = (
+        # Guard concurrent runs for the same snapshot. Do not kill running jobs:
+        # starting a new image must not abort an existing migration.
+        active_cmd = (
             f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} "
-            f"\"pgrep -af 'ospc2flex_remote_export_{safe_vm_name}_' | grep -v $$ | awk '{{print \\$1}}' | xargs -r kill 2>/dev/null; true\""
+            f"\"pgrep -af 'ospc2flex_remote_export_{safe_vm_name}_|/mnt/migration/ospc2flex_image/{safe_vm_name}\\.img|/mnt/migration/ospc2flex_image/{safe_vm_name}\\.qcow2' | grep -v $$ || true\""
         )
-        run(kill_cmd, capture=True, dry_run=args.dry_run)
-        log(f"[INFO] Cleared any orphaned prior-run processes for {safe_vm_name}")
+        status_cmd = (
+            f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} "
+            f"\"ps -eo pid,etimes,cmd | grep -E 'ospc2flex_remote_export_{safe_vm_name}_|/mnt/migration/ospc2flex_image/{safe_vm_name}\\.img|/mnt/migration/ospc2flex_image/{safe_vm_name}\\.qcow2' | grep -v grep; "
+            f"printf 'ARTIFACT '; stat -c '%s %n ' /mnt/migration/ospc2flex_image/{safe_vm_name}.img /mnt/migration/ospc2flex_image/{safe_vm_name}.qcow2 2>/dev/null || true\""
+        )
+
+        def describe_active_job(status_text: str) -> tuple[str, str, str, str]:
+            active_id = "unknown"
+            active_stage = "running"
+            elapsed = 0
+            img_size = 0
+            qcow_size = 0
+            for line in status_text.splitlines():
+                if f"ospc2flex_remote_export_{safe_vm_name}_" in line:
+                    m = re.search(rf"ospc2flex_remote_export_{re.escape(safe_vm_name)}_(\d+)\.sh", line)
+                    if m:
+                        active_id = m.group(1)
+                    parts = line.split(None, 2)
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        elapsed = max(elapsed, int(parts[1]))
+                if "ospc2flex_glance_bridge.sh download" in line or "openstack object save" in line:
+                    active_stage = "downloading snapshot"
+                if "qemu-img convert" in line:
+                    active_stage = "converting qcow2"
+                    parts = line.split(None, 2)
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        elapsed = max(elapsed, int(parts[1]))
+                if line.startswith("ARTIFACT "):
+                    matches = re.findall(r"(\d+) (/mnt/migration/ospc2flex_image/[^ ]+)", line)
+                    for size_s, path_s in matches:
+                        if path_s.endswith(f"/{safe_vm_name}.img"):
+                            img_size = int(size_s)
+                        elif path_s.endswith(f"/{safe_vm_name}.qcow2"):
+                            qcow_size = int(size_s)
+            artifact_detail = f"img={img_size}B qcow2={qcow_size}B"
+            eta = "unknown"
+            if active_stage == "converting qcow2" and img_size > 0 and qcow_size > 0 and elapsed > 10:
+                rate = qcow_size / elapsed
+                remaining = max(img_size - qcow_size, 0)
+                eta_seconds = int(remaining / rate) if rate > 0 else 0
+                eta = f"~{max(1, eta_seconds // 60)} min"
+            return active_id, active_stage, artifact_detail, eta
+
+        while True:
+            active_runs = run(active_cmd, capture=True, dry_run=args.dry_run, check=False)
+            if not active_runs or not active_runs.strip():
+                break
+            status_text = run(status_cmd, capture=True, dry_run=args.dry_run, check=False, log_cmd=False)
+            active_id, active_stage, artifact_detail, eta = describe_active_job(status_text or active_runs)
+            log(
+                f"[INFO] Queue job {queue_job_id} waiting: job {active_id} is still running on {processing_host}; "
+                f"current_status={active_stage}; {artifact_detail}; estimated_wait={eta}; next_check=60s"
+            )
+            time.sleep(60)
+        log(f"[INFO] Queue job {queue_job_id}: no active prior remote_export process for {safe_vm_name}; starting queued job")
 
         ssh_cmd = f"{ssh_base_cmd(args.ssh_key_path, jh_user, processing_host, args.ssh_port)} bash {remote_script}"
         _max_ssh_retries = 4

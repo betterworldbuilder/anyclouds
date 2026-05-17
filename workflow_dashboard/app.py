@@ -7325,6 +7325,209 @@ def run_image_migrator():
         return jsonify({"error": "process_host_ip (jumphost IP) is required. Select Mode 2 or Mode 3 and provide a jumphost."}), 400
 
     _windows_method = str(req.get('windows_repair_method') or '').strip().lower()
+    _snapshot_id_for_linux = str(req.get('snapshot_id') or req.get('ospc_image_id') or req.get('ospc_snapshot_id') or '').strip()
+    _asset_type_for_linux = str(req.get('asset_type') or '').strip().lower()
+    _is_windows_for_linux = bool(req.get('is_windows'))
+    if _snapshot_id_for_linux and not _is_windows_for_linux and _asset_type_for_linux != 'volume_snapshot' and _windows_method != 'windows_method_z_snapshot_existing':
+        import re as _re
+        label_raw = str(req.get('snapshot_name') or req.get('server_name') or _snapshot_id_for_linux).strip()
+        label_safe = _re.sub(r'[^A-Za-z0-9._-]+', '_', label_raw).strip('_') or "linux-snapshot"
+        local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_linux_snap_migrate.sh")
+        if not os.path.isfile(local_script):
+            return jsonify({"error": f"ospc2flex_linux_snap_migrate.sh not found at {local_script}"}), 500
+
+        ssh_key_raw = (req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip()
+        if ssh_key_raw.startswith('/.ssh/'):
+            ssh_key_raw = '~' + ssh_key_raw
+        ssh_key = os.path.expanduser(ssh_key_raw)
+        if not os.path.exists(ssh_key):
+            fallback = os.path.expanduser('~/.ssh/id_rsa')
+            if os.path.exists(fallback):
+                ssh_key = fallback
+        ssh_usr = (req.get('process_ssh_user') or 'ubuntu').strip() or 'ubuntu'
+        ssh_base = [
+            "ssh", "-i", ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR",
+            "-o", "BatchMode=yes",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "PreferredAuthentications=publickey",
+            "-o", "ConnectTimeout=60",
+            "-o", "ConnectionAttempts=4",
+            "-o", "ServerAliveInterval=15",
+            "-o", "ServerAliveCountMax=4",
+            "-o", "IPQoS=none",
+            f"{ssh_usr}@{process_ip}",
+        ]
+        scp_base = [
+            "scp", "-i", ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR",
+            "-o", "BatchMode=yes",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "PreferredAuthentications=publickey",
+            "-o", "ConnectTimeout=60",
+            "-o", "ConnectionAttempts=4",
+            "-o", "ServerAliveInterval=15",
+            "-o", "ServerAliveCountMax=4",
+            "-o", "IPQoS=none",
+        ]
+
+        import time as _linsnap_time
+        _ts = int(_linsnap_time.time())
+        _job_id = str(req.get('job_id') or _ts)
+        remote_script = "/tmp/ospc2flex_linux_snap_migrate.sh"
+        remote_job_script = f"/tmp/ospc2flex_linux_snap_migrate.sh.{label_safe}.{_job_id}"
+        remote_ospc = f"/tmp/linsnap_{label_safe}_{_ts}_ospc.sh"
+        remote_flex = f"/tmp/linsnap_{label_safe}_{_ts}_flex.sh"
+        remote_log = f"/tmp/linsnap_{label_safe}_{_ts}.log"
+
+        def _linux_snap_generator():
+            import hashlib as _hashlib, shlex as _shlex
+            start_fresh_kill = bool(req.get('start_fresh_kill') or req.get('force_start_fresh_kill'))
+            yield "data: --- EXECUTING LINUX SNAPSHOT MIGRATION ---\n\n"
+            yield f"data: Linux snapshot migration — {label_safe} ({_snapshot_id_for_linux})\n\n"
+            yield f"data: [LINSNAP] Job id: {_job_id}\n\n"
+            yield f"data: [LINSNAP] Jumphost: {ssh_usr}@{process_ip}\n\n"
+
+            def _run(label, cmd, timeout=180):
+                proc = subprocess.run(cmd, check=False, timeout=timeout, capture_output=True, text=True)
+                if proc.returncode != 0:
+                    err = ((proc.stderr or '') + '\n' + (proc.stdout or '')).strip()[-500:]
+                    raise RuntimeError(f"{label} failed (rc={proc.returncode}): {err}")
+                return proc
+
+            try:
+                os_type = str(req.get('os_type') or req.get('os_type_override') or '').strip()
+                if os_type.lower() == 'alma':
+                    os_type = 'almalinux'
+                lcmd = [
+                    "bash", remote_job_script,
+                    "--label", label_safe,
+                    "--ospc-image-id", _snapshot_id_for_linux,
+                    "--ospc-openrc", remote_ospc,
+                    "--flex-openrc", remote_flex,
+                    "--flavor", str(req.get('flex_flavor') or 'gp.0.4.4'),
+                    "--network", str(req.get('flex_network_id') or req.get('flex_network') or 'tenant-net'),
+                    "--ssh-key-path", "~/.ssh/id_rsa",
+                    "--job-id", _job_id,
+                ]
+                if os_type:
+                    lcmd += ["--os-type", os_type]
+                if req.get('flex_key_name'):
+                    lcmd += ["--keypair", str(req.get('flex_key_name'))]
+                if req.get('flex_external_network'):
+                    lcmd += ["--flex-ext-net", str(req.get('flex_external_network'))]
+                if req.get('download_only'):
+                    lcmd.append("--download-only")
+                if req.get('dry_run'):
+                    lcmd.append("--dry-run")
+                if start_fresh_kill:
+                    lcmd.append("--start-fresh")
+                if req.get('dry_run'):
+                    remote_run = f"set -o pipefail; {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
+                    yield "data: [LINSNAP][DRY-RUN] Would stage ospc2flex_linux_snap_migrate.sh and OpenRC files on jumphost.\n\n"
+                    if start_fresh_kill:
+                        yield "data: [LINSNAP][DRY-RUN] START FRESH would kill existing Linux snapshot jobs and ignore/delete previous resume artifacts for this label.\n\n"
+                    yield f"data: [LINSNAP][DRY-RUN] Would run: {remote_run}\n\n"
+                    yield "data: [LINSNAP][DRY-RUN] Route confirmed: Linux snapshot uses ospc2flex_linux_snap_migrate.sh.\n\n"
+                    yield "data: METHOD_LINUX_SNAPSHOT_DASHBOARD_DRY_RUN_SUCCESS\n\n"
+                    return
+
+                if start_fresh_kill and not req.get('dry_run'):
+                    label_match = f"--label {label_safe}"
+                    kill_cmd = (
+                        "pids=$(pgrep -af 'ospc2flex_linux_snap_migrate.sh' | "
+                        f"grep -F -- {_shlex.quote(label_match)} | "
+                        "grep -v 'pgrep -af' | awk '{print $1}' | grep -v \"^$$$\" || true); "
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                        "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                    )
+                    killed = subprocess.run(
+                        ssh_base + [kill_cmd],
+                        check=False, timeout=45, capture_output=True, text=True,
+                    )
+                    killed_pids = " ".join((killed.stdout or "").split())
+                    yield f"data: [LINSNAP] START FRESH: killed existing Linux snapshot job pid(s): {killed_pids or 'none'}\n\n"
+
+                active_check = (
+                    "pgrep -af ospc2flex_linux_snap_migrate.sh | "
+                    f"grep -F -- '--label {_shlex.quote(label_safe)}' | "
+                    "grep -v 'pgrep -af' | head -1 || true"
+                )
+                while True:
+                    active = subprocess.run(
+                        ssh_base + [active_check],
+                        check=False, timeout=45, capture_output=True, text=True,
+                    )
+                    active_line = (active.stdout or '').strip().splitlines()
+                    if not active_line:
+                        break
+                    parts = active_line[0].split(None, 1)
+                    running_pid = parts[0] if parts else "unknown"
+                    status_cmd = (
+                        f"latest=$(find /mnt/migration/ospc2flex_linux_snap/runs/{_shlex.quote(label_safe)} "
+                        "-type f -name linux_snap.progress.log 2>/dev/null | sort | tail -1); "
+                        "if [ -n \"$latest\" ]; then tail -1 \"$latest\"; else echo status=starting; fi"
+                    )
+                    status = subprocess.run(
+                        ssh_base + [status_cmd],
+                        check=False, timeout=45, capture_output=True, text=True,
+                    )
+                    status_text = ((status.stdout or '').strip().splitlines()[-1:] or ["status=unknown"])[0]
+                    yield (
+                        f"data: [LINSNAP] Queue job {_job_id} waiting: existing job pid={running_pid} "
+                        f"is still running for {label_safe}; current_status={status_text}; next_check=60s\n\n"
+                    )
+                    _linsnap_time.sleep(60)
+
+                yield f"data: [LINSNAP] Queue job {_job_id}: no active prior Linux snapshot job for {label_safe}; starting.\n\n"
+
+                yield "data: [LINSNAP] Uploading ospc2flex_linux_snap_migrate.sh to jumphost.\n\n"
+                _run("script upload", scp_base + [local_script, f"{ssh_usr}@{process_ip}:{remote_script}"], timeout=300)
+
+                _run("OSPC OpenRC upload", scp_base + [ospc_path, f"{ssh_usr}@{process_ip}:{remote_ospc}"], timeout=120)
+                _run("FLEX OpenRC upload", scp_base + [flex_path, f"{ssh_usr}@{process_ip}:{remote_flex}"], timeout=120)
+                _run(
+                    "chmod",
+                    ssh_base + [
+                        f"cp -f {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)}; "
+                        f"chmod 600 {_shlex.quote(remote_ospc)} {_shlex.quote(remote_flex)}; "
+                        f"chmod +x {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)}"
+                    ],
+                    timeout=60,
+                )
+                yield "data: [LINSNAP] Script and OpenRC files staged on jumphost.\n\n"
+
+                remote_run = f"set -o pipefail; {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
+                yield f"data: [LINSNAP] Launching Linux snapshot script with LS7/LS8/LS9 enabled.\n\n"
+                process = subprocess.Popen(
+                    ssh_base + [remote_run],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    start_new_session=True,
+                )
+                ACTIVE_MIGRATOR_PROCESSES.add(process)
+                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[label_safe] = process
+                for line in iter(process.stdout.readline, ''):
+                    if not line:
+                        break
+                    yield f"data: {line.rstrip()}\n\n"
+                process.wait()
+                ACTIVE_MIGRATOR_PROCESSES.discard(process)
+                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(label_safe, None)
+                yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
+            except Exception as exc:
+                yield f"data: [LINSNAP ERROR] {exc}\n\n"
+            finally:
+                yield "data: [DONE]\n\n"
+
+        return Response(stream_with_context(_linux_snap_generator()), mimetype='text/event-stream')
+
     if _windows_method == 'windows_method_z_snapshot_existing':
         method_z_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_windows_method_z_snapshot_existing.sh")
         method_z_files = [method_z_script]
@@ -7401,6 +7604,7 @@ def run_image_migrator():
         ]
 
         def _method_z_generator():
+            start_fresh_kill = bool(req.get('start_fresh_kill') or req.get('force_start_fresh_kill'))
             yield "data: --- EXECUTING METHOD SNAPWIN ---\n\n"
             yield f"data: Method SNAPWIN — Existing OSPC Windows Snapshot to Flex: {label_safe_z}\n\n"
             yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
@@ -7469,6 +7673,23 @@ def run_image_migrator():
                     attempts=5,
                     retry_wait=20,
                 )
+
+                if start_fresh_kill and not req.get('dry_run'):
+                    yield "data: [METHOD_Z] START FRESH: killing existing Windows SNAPWIN jobs on jumphost.\n\n"
+                    kill_cmd = (
+                        "pids=$(pgrep -f 'ospc2flex_windows_method_z_snapshot_existing.sh|snapwin_run_' | grep -v \"^$$$\" || true); "
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                        "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                    )
+                    killed = subprocess.run(
+                        ssh_base_z + [kill_cmd],
+                        check=False,
+                        timeout=45,
+                        capture_output=True,
+                        text=True,
+                    )
+                    killed_pids = " ".join((killed.stdout or "").split())
+                    yield f"data: [METHOD_Z] START FRESH: killed pid(s): {killed_pids or 'none'}\n\n"
 
                 import hashlib as _snapwin_hashlib
                 with open(method_z_script, "rb") as _fh:
@@ -7929,6 +8150,7 @@ def run_volsnap_migrator():
 
     def _volsnap_generator():
         import hashlib as _vshash, shlex as _vsshlex
+        start_fresh_kill = bool(req.get('start_fresh_kill') or req.get('force_start_fresh_kill'))
         yield f"data: [VOLSNAP] Starting Volume-Snapshot-Mig: {label_safe} (snapshot={snapshot_id})\n\n"
         yield f"data: [VOLSNAP] Jumphost: {ssh_user}@{process_ip}  os_type={os_type}\n\n"
 
@@ -7940,6 +8162,19 @@ def run_volsnap_migrator():
             return proc
 
         try:
+            if start_fresh_kill and not req.get('dry_run'):
+                kill_cmd = (
+                    "pids=$(pgrep -f 'ospc2flex_volsnap_migrate.sh' | grep -v \"^$$$\" || true); "
+                    "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                    "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                )
+                killed = subprocess.run(
+                    ssh_base + [kill_cmd],
+                    check=False, timeout=45, capture_output=True, text=True,
+                )
+                killed_pids = " ".join((killed.stdout or "").split())
+                yield f"data: [VOLSNAP] START FRESH: killed existing volume snapshot job pid(s): {killed_pids or 'none'}\n\n"
+
             # Stage script (MD5 check)
             with open(local_script, "rb") as _fh:
                 local_md5 = _vshash.md5(_fh.read()).hexdigest()
@@ -10260,6 +10495,8 @@ def nbd_run_single():
         is_method_h = repair_method in method_h_keys
         is_method_e = repair_method in method_e_keys
         is_method_z = repair_method in method_z_keys
+        _is_windows_row = any(w in label.lower() for w in ['windows', 'win20', 'win16', 'win10', 'winserv']) \
+                          or any(w in os_type.lower() for w in ['windows', 'win'])
         if is_method_z:
             yield f"data: === Method SNAPWIN blocked from live/NBD path: {label} ===\n\n"
             yield "data: [ERROR] Method SNAPWIN is a standalone cold snapshot method. Select one or more rows in Private OSPC Snapshot Discovery and press Start Method SNAPWIN.\n\n"
@@ -10274,8 +10511,8 @@ def nbd_run_single():
             yield f"data: === Method E B-Capture+G-Deploy: {label} src={src_ip} ===\n\n"
         else:
             yield f"data: === NBD Worker: {label} ({os_type}) src={src_ip} nbd={nbd_dev} ===\n\n"
-        if not vm_password:
-            yield "data: [ERROR] Password is required for all runs. Fill the VM row password and retry.\n\n"
+        if _is_windows_row and not vm_password and (repair_method == 'windows_method_d_safe_ide_boot' or is_method_g_simple or is_method_h or is_method_e):
+            yield f"data: [ERROR] Windows {repair_method} requires the source Windows password. Fill the VM row password and retry.\n\n"
             yield "data: [DONE]\n\n"
             return
 
@@ -10368,8 +10605,7 @@ def nbd_run_single():
 
         # Launch the worker. Windows is handled by the snapshot/Glance path because
         # the Linux NBD/DD worker cannot safely read Windows guests over SSH.
-        _is_windows = any(w in label.lower() for w in ['windows', 'win20', 'win16', 'win10', 'winserv']) \
-                      or any(w in os_type.lower() for w in ['windows', 'win'])
+        _is_windows = _is_windows_row
         purge_xen_req = req.get('windows_purge_xen')
         purge_xen_vm = vm.get('windows_purge_xen')
         purge_xen_enabled = str(purge_xen_req if purge_xen_req is not None else purge_xen_vm if purge_xen_vm is not None else True).strip().lower() not in ('0', 'false', 'no', 'off')

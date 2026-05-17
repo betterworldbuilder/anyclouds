@@ -134,6 +134,17 @@ resolve_part_by_fstab_spec() {
   return 1
 }
 
+unmount_part_mounts() {
+  local part="$1" _target
+  [ -n "$part" ] || return 0
+  findmnt -rn -S "$part" -o TARGET 2>/dev/null | sort -r | while read -r _target; do
+    [ -n "$_target" ] || continue
+    WARN "Unmounting stale mount for $part at $_target"
+    sudo umount "$_target" 2>/dev/null || sudo umount -l "$_target" 2>/dev/null || true
+  done || true
+  return 0
+}
+
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║    OSPC2FLEX — Offline Guest Repair v2.0                 ║"
@@ -171,22 +182,23 @@ echo "── NBD Device Selection ───────────────�
 sudo modprobe nbd max_part=16 2>/dev/null || true
 sleep 1
 NBD_DEV=""
+NBD_CANDIDATES=()
 for _d in /dev/nbd{0..15}; do
   _sz=$(sudo blockdev --getsize64 "$_d" 2>/dev/null || echo 0)
   if [ "${_sz:-0}" -eq 0 ]; then
     if ! sudo fuser "$_d" 2>/dev/null | grep -q .; then
-      NBD_DEV="$_d"
-      break
+      NBD_CANDIDATES+=("$_d")
     fi
   fi
 done
 # If --nbd-dev provided, use it directly — prevents parallel race condition
 if [ -n "$NBD_DEV_ARG" ]; then
   NBD_DEV="$NBD_DEV_ARG"
+  NBD_CANDIDATES=("$NBD_DEV_ARG")
   INFO "Using specified NBD device (--nbd-dev): $NBD_DEV"
 else
-  [ -z "$NBD_DEV" ] && { FAIL "No free NBD device (nbd0-15 all busy)"; exit 1; }
-  INFO "Using auto-selected NBD device: $NBD_DEV"
+  [ "${#NBD_CANDIDATES[@]}" -eq 0 ] && { FAIL "No free NBD device (nbd0-15 all busy)"; exit 1; }
+  INFO "NBD candidates: ${NBD_CANDIDATES[*]}"
 fi
 MNT=$(mktemp -d /tmp/ospc2flex_repair_XXXXXX)
 
@@ -195,12 +207,14 @@ cleanup() {
   sudo umount "$MNT/boot/efi" 2>/dev/null || true
   sudo umount "$MNT/boot"     2>/dev/null || true
   sudo umount "$MNT/proc" "$MNT/sys" "$MNT/dev" 2>/dev/null || true
-  sudo umount "$MNT"          2>/dev/null || true
+  sudo umount "$MNT"          2>/dev/null || sudo umount -l "$MNT" 2>/dev/null || true
   sync
 
   # Final safety fsck after unmount before destroying NBD connection
   if [ -n "${ROOT_PART:-}" ] && [ -b "${ROOT_PART:-}" ]; then
-    if [ "${ROOT_FSTYPE:-}" != "xfs" ]; then
+    if findmnt -rn -S "$ROOT_PART" >/dev/null 2>&1; then
+      WARN "Skipping final fsck because $ROOT_PART is still mounted"
+    elif [ "${ROOT_FSTYPE:-}" != "xfs" ]; then
       sudo e2fsck -p -f "$ROOT_PART" 2>/dev/null || sudo e2fsck -y "$ROOT_PART" 2>/dev/null || true
     else
       sudo xfs_repair -L "$ROOT_PART" 2>/dev/null || true
@@ -226,10 +240,18 @@ INFO "Image format: $_IMG_FMT"
 # Kill any process holding a write lock on the file (previous run left qemu-nbd open)
 sudo fuser -k "$QCOW2" 2>/dev/null || true
 sleep 1
-sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
-sleep 1
-sudo qemu-nbd -f "$_IMG_FMT" --connect="$NBD_DEV" "$QCOW2" 2>/tmp/nbd_err_$$.txt \
-  || { FAIL "qemu-nbd failed: $(cat /tmp/nbd_err_$$.txt | head -3)"; exit 1; }
+_connected=0
+for _candidate in "${NBD_CANDIDATES[@]}"; do
+  NBD_DEV="$_candidate"
+  sudo qemu-nbd --disconnect "$NBD_DEV" 2>/dev/null || true
+  sleep 1
+  if sudo qemu-nbd -f "$_IMG_FMT" --connect="$NBD_DEV" "$QCOW2" 2>/tmp/nbd_err_$$.txt; then
+    _connected=1
+    break
+  fi
+  WARN "qemu-nbd connect failed on $NBD_DEV: $(cat /tmp/nbd_err_$$.txt | head -1)"
+done
+[ "$_connected" -eq 1 ] || { FAIL "qemu-nbd failed on all candidates: $(cat /tmp/nbd_err_$$.txt | head -3)"; exit 1; }
 sleep 3
 sudo partprobe "$NBD_DEV" 2>/dev/null || sudo blockdev --rereadpt "$NBD_DEV" 2>/dev/null || true
 sleep 2
@@ -297,6 +319,7 @@ echo ""
 
 # ── Filesystem check (2 passes for dirty live-snapshot journals) ──────────────
 echo "── Filesystem Check ─────────────────────────────────────────────────────"
+unmount_part_mounts "$ROOT_PART"
 set +e
 if [ "$ROOT_FSTYPE" = "xfs" ]; then
   log "xfs_repair pass 1 on $ROOT_PART..."
@@ -318,8 +341,17 @@ echo "── Mount Root ──────────────────�
 MOUNT_OPTS=""
 [ "$ROOT_FSTYPE" = "xfs" ] && MOUNT_OPTS="-o nouuid" || MOUNT_OPTS=""
 
-if sudo mount $MOUNT_OPTS "$ROOT_PART" "$MNT" 2>/dev/null; then
+unmount_part_mounts "$ROOT_PART"
+if sudo mount $MOUNT_OPTS "$ROOT_PART" "$MNT" 2>/tmp/mount_root_$$.txt; then
   PASS "Mounted $ROOT_PART → $MNT"
+elif findmnt -rn -S "$ROOT_PART" -o TARGET 2>/dev/null | grep -Fxq "$MNT"; then
+  PASS "Mounted $ROOT_PART → $MNT"
+elif findmnt -rn -S "$ROOT_PART" >/dev/null 2>&1; then
+  WARN "Mount reported failure but $ROOT_PART is mounted elsewhere; unmounting and retrying"
+  unmount_part_mounts "$ROOT_PART"
+  sudo mount $MOUNT_OPTS "$ROOT_PART" "$MNT" 2>/tmp/mount_root_retry_$$.txt \
+    && PASS "Mounted $ROOT_PART → $MNT (after stale mount cleanup)" \
+    || { FAIL "Cannot mount root partition: $(head -1 /tmp/mount_root_retry_$$.txt)"; exit 1; }
 elif [ "$ROOT_FSTYPE" = "xfs" ]; then
   # XFS dirty journal: clear log with xfs_repair -L, then retry mount read-write
   WARN "XFS mount failed (dirty journal) — running xfs_repair -L to force-clear log..."
@@ -338,7 +370,7 @@ elif sudo mount -o norecovery,ro "$ROOT_PART" "$MNT" 2>/dev/null; then
 elif sudo mount -o ro "$ROOT_PART" "$MNT" 2>/dev/null; then
   WARN "Mounted read-only"
 else
-  FAIL "Cannot mount root partition"
+  FAIL "Cannot mount root partition: $(head -1 /tmp/mount_root_$$.txt)"
   exit 1
 fi
 echo ""
@@ -1893,6 +1925,7 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 echo "── SSH Host Keys (FRESH) ──────────────────────────────────────────────"
 if [ $DRY_RUN -eq 0 ]; then
+  sudo mkdir -p "$MNT/etc/ssh"
   # Delete ALL old OSPC host keys — no exceptions
   sudo rm -f "$MNT/etc/ssh/ssh_host_"* 2>/dev/null || true
   PASS "All OSPC SSH host keys DELETED"

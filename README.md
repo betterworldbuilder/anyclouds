@@ -100,6 +100,35 @@ All three tabs share:
 
 Each selected Linux snapshot is migrated independently. The script handles OSPC auth, snapshot-to-image staging, download to jumphost, offline Linux repair (bootloader, fstab, virtio drivers, network), upload to FLEX Glance, and FLEX instance boot.
 
+#### 3a-1. Snapshot vs VM Migration OS Method Matrix
+
+Use snapshot migration for the operating systems below unless the table explicitly says otherwise. Ubuntu 24 is the known exception: use the live VM/NBD migration path for Ubuntu 24 workloads.
+
+| OS / Distro | `os_type` | Snapshot Migration Method | VM Migration Method | Notes |
+|---|---|---|---|---|
+| Ubuntu 20 | `ubuntu20` / `ubuntu` | Works | Works | Snapshot/Cloud Files path OK |
+| Ubuntu 22 | `ubuntu22` | Works | Works | Cloud Files export/download confirmed |
+| Ubuntu 24 | `ubuntu24` | Do not use | Works only | Use NBD Inline Live / VM migration |
+| Debian 10 | `debian10` | Works | Works | Snapshot path OK |
+| Debian 11 / 12 | `debian11` / `debian12` | Expected works | Works | Same Debian family handling |
+| Rocky 8 | `rocky8` | Works | Works | Same Rocky repair path |
+| Rocky 9 | `rocky9` | Works | Works | Cloud Files download confirmed |
+| AlmaLinux 8 | `alma8` | Works | Works | Same Alma repair path |
+| AlmaLinux 9 | `alma9` / `almalinux` | Works | Works | Snapshot flow confirmed through upload/boot path |
+| CentOS 7 | `centos7` | Works | Works | Cloud Files download confirmed |
+| CentOS 8 / 9 / Stream 9 | `centos8`, `centos9`, `centosstream9` | Expected works | Works | Same CentOS family handling |
+| RHEL 7 / 8 / 9 | `rhel7`, `rhel8`, `rhel9` | Expected works | Works | Supported by NBD defaults; snapshot family maps like RHEL/CentOS |
+| Windows Server 2016 | `windows2016` / `windows` | Works | Works with Windows methods | Use Windows Snapshot Mig / Method Z path |
+| Windows Server 2019 | `windows2019` / `windows` | Works | Works with Windows methods | Use Windows Snapshot Mig / Method Z path |
+
+Quick routing rule:
+
+| Case | Use |
+|---|---|
+| Ubuntu 24 / `u24*` / `postgresqlU24` / `u24clean` | VM Migration: NBD Inline Live |
+| Windows Server 2016 / 2019 | Snapshot Migration |
+| Other supported Linux images | Snapshot Migration preferred |
+
 #### 3b. Windows Snapshot Migration Pipeline
 
 `ospc2flex_windows_method_z_snapshot_existing.sh` — triggered via **Windows Snapshot Mig** button.

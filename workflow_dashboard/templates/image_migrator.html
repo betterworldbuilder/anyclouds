@@ -907,21 +907,31 @@
 
                 <!-- Cold Image Migration Action Buttons -->
                 <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:18px 0 24px;">
-                    <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
-                        style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start;"
-                        title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
-                        onclick="document.getElementById('mig_mode_value').value='live';">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                        <span>🖼 LinuxSnapshot-Mig</span>
-                    </button>
-                    <button type="button" class="btn-primary img-mig-trigger" id="start-snapwin-migration-btn"
-                        data-windows-repair-method="windows_method_z_snapshot_existing"
-                        style="background: linear-gradient(135deg, #075985 0%, #0e7490 100%); border-color: #38bdf8; justify-content: flex-start;"
-                        title="SNAPWIN: existing OSPC Windows snapshot/image → download → qcow2 → offline Windows repair → FLEX rescue/final boot"
-                        onclick="document.getElementById('mig_mode_value').value='live';">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
-                        <span>Windows Snapshot Mig</span>
-                    </button>
+                    <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+                        <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
+                            style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start;"
+                            title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
+                            onclick="document.getElementById('mig_mode_value').value='live';">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span>🖼 LinuxSnapshot-Mig</span>
+                        </button>
+                        <label style="display:flex;align-items:center;gap:6px;color:#c4b5fd;font-size:11px;font-weight:800;cursor:pointer;" title="Kill existing Linux snapshot migration processes on the jumphost before launching this batch.">
+                            <input type="checkbox" id="linux_snap_start_fresh_kill" style="accent-color:#8b5cf6;"> START FRESH
+                        </label>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+                        <button type="button" class="btn-primary img-mig-trigger" id="start-snapwin-migration-btn"
+                            data-windows-repair-method="windows_method_z_snapshot_existing"
+                            style="background: linear-gradient(135deg, #075985 0%, #0e7490 100%); border-color: #38bdf8; justify-content: flex-start;"
+                            title="SNAPWIN: existing OSPC Windows snapshot/image → download → qcow2 → offline Windows repair → FLEX rescue/final boot"
+                            onclick="document.getElementById('mig_mode_value').value='live';">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
+                            <span>Windows Snapshot Mig</span>
+                        </button>
+                        <label style="display:flex;align-items:center;gap:6px;color:#7dd3fc;font-size:11px;font-weight:800;cursor:pointer;" title="Kill existing Windows SNAPWIN processes on the jumphost before launching this batch.">
+                            <input type="checkbox" id="snapwin_start_fresh_kill" style="accent-color:#38bdf8;"> START FRESH
+                        </label>
+                    </div>
                     <div style="display:flex;align-items:center;gap:6px;background:rgba(52,211,153,0.07);border:1px solid #065f46;border-radius:8px;padding:4px 10px 4px 4px;">
                         <button type="button" id="start-volsnap-mig-btn"
                             style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); border: 1px solid #34d399; border-radius:6px; padding:10px 18px; color:white; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"
@@ -929,6 +939,9 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
                             <span>📦 Volume-Snapshot-Mig</span>
                         </button>
+                        <label style="display:flex;align-items:center;gap:6px;color:#6ee7b7;font-size:11px;font-weight:800;cursor:pointer;" title="Kill existing volume snapshot migration processes on the jumphost before launching this batch.">
+                            <input type="checkbox" id="volsnap_start_fresh_kill" style="accent-color:#34d399;"> START FRESH
+                        </label>
                         <div style="display:flex;flex-direction:column;gap:2px;">
                             <label for="volsnap-attach-mode" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Attach Mode</label>
                             <select id="volsnap-attach-mode"
@@ -973,6 +986,12 @@
                     if(v){var e=document.getElementById('volsnap_flex_helper_vm_id');if(e)e.value=v;}
                     if(i){var e=document.getElementById('volsnap_flex_helper_ip');if(e)e.value=i;}
                     if(u){var e=document.getElementById('volsnap_flex_helper_user');if(e)e.value=u;}
+                    ['linux_snap_start_fresh_kill','snapwin_start_fresh_kill','volsnap_start_fresh_kill'].forEach(function(id){
+                        var el=document.getElementById(id);
+                        if(!el) return;
+                        el.checked = localStorage.getItem(id) === '1';
+                        el.addEventListener('change', function(){ localStorage.setItem(id, el.checked ? '1' : '0'); });
+                    });
                 })();
                 </script>
                 <!-- Stop buttons row — one per snapshot type -->
@@ -2594,8 +2613,17 @@
                             </select>
                         </div>
 
+                        <details id="windows-repair-details" style="flex:1 1 680px; min-width:min(100%,520px); background:rgba(14,165,233,0.06); border:1px solid rgba(56,189,248,0.28); border-radius:10px; padding:8px 12px;">
+                            <summary style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; color:#bae6fd; font-weight:800; font-size:0.82rem; user-select:none;">
+                                <span style="display:inline-flex; align-items:center; gap:8px;">
+                                    <span style="color:#38bdf8; font-size:1rem; line-height:1;">🪟</span>
+                                    Windows Offline Repair Options
+                                </span>
+                                <span style="color:#7dd3fc; font-size:0.72rem; font-weight:700;">Open</span>
+                            </summary>
+                            <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
                         <!-- WINDOWS REPAIR -->
-                        <div id="windows-method-panel" style="display:flex; flex-direction:column; align-items:stretch; gap:10px; background:rgba(14,165,233,0.08); padding:10px 14px; border-radius:8px; border:1px solid rgba(56,189,248,0.35); min-width:min(100%, 520px); flex:1 1 420px;"
+                        <div id="windows-method-panel" style="display:flex; flex-direction:column; align-items:stretch; gap:10px; background:rgba(14,165,233,0.08); padding:10px 14px; border-radius:8px; border:1px solid rgba(56,189,248,0.35); width:100%;"
                              title="Windows-only sub-method.">
                             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px;">
                                 <span style="color:#38bdf8; font-size:1rem; line-height:1;">🪟</span>
@@ -2655,9 +2683,9 @@
                                     </ul>
                                 </div>
                                 <div><strong style="color:#fbcfe8;">Create new boot repair script / Force new</strong> — Applies to <strong style="color:#5eead4;">Method C (CloudJumper)</strong> only: clears the &quot;resume&quot; path so compare + repair bundle generation runs from scratch instead of reusing the last saved CloudJumper artifacts.</div>
-                            </div>
                         </div>
-                        <div id="cloudboot-target-panel" style="display:flex; align-items:center; gap:8px; background:rgba(20,184,166,0.08); padding:7px 12px; border-radius:8px; border:1px solid rgba(45,212,191,0.32); flex-wrap:wrap;"
+                        </div>
+	                        <div id="cloudboot-target-panel" style="display:flex; align-items:center; gap:8px; background:rgba(20,184,166,0.08); padding:7px 12px; border-radius:8px; border:1px solid rgba(45,212,191,0.32); flex-wrap:wrap;"
 	                             title="FLEX/reference Windows VM used by CloudJumper Stage 3b for source-vs-target boot comparison before Method A repair.">
 	                            <label for="cloudboot_target_public_ip" style="color:#99f6e4; font-weight:700; font-size:0.78rem; white-space:nowrap;">CloudBoot FLEX target:</label>
 	                            <input type="text" id="cloudboot_target_public_ip" placeholder="public IP"
@@ -2765,7 +2793,9 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                                 </div>
                             </div>
                         </div>
-	                    </div>
+                            </div>
+                        </details>
+		                    </div>
 
                     <!-- ROW 3: NETWORKING -->
                     <div style="margin-top:10px; padding:12px 18px; background:rgba(74,222,128,0.05); border:1px solid rgba(74,222,128,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; gap:25px; flex-wrap:wrap;">
@@ -7202,12 +7232,6 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     const defaults = NBD_OS_DEFAULTS[osType] || NBD_OS_DEFAULTS.ubuntu24;
                     const isWindowsVm = osFamily === 'windows' || String(osType || '').toLowerCase().includes('win');
 
-                    if (!String(vmPassword || '').trim()) {
-                        appendLog(`✖ [${sName}] Password is required for all runs. Fill the row password field, then retry.`, 'error');
-                        setVmStatus(sName, 'error');
-                        return;
-                    }
-
                     if (isWindowsVm && _selectedWindowsMethod === 'windows_method_d_safe_ide_boot' && !String(vmPassword || '').trim()) {
                         appendLog(`✖ [${sName}] Windows Method D requires source Windows password. Fill the row password field, then retry.`, 'error');
                         setVmStatus(sName, 'error');
@@ -7627,6 +7651,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     flex_helper_vm_id:    gv('volsnap_flex_helper_vm_id'),
                     flex_helper_ip:       gv('volsnap_flex_helper_ip'),
                     flex_helper_user:     gv('volsnap_flex_helper_user') || 'ubuntu',
+                    start_fresh_kill:     !!(document.getElementById('volsnap_start_fresh_kill') || {}).checked,
                 };
             }
 
@@ -8027,6 +8052,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     flex_helper_vm_id:    gv('volsnap_flex_helper_vm_id'),
                     flex_helper_ip:       gv('volsnap_flex_helper_ip'),
                     flex_helper_user:     gv('volsnap_flex_helper_user') || 'ubuntu',
+                    start_fresh_kill:     !!(document.getElementById('volsnap_start_fresh_kill') || {}).checked,
                 };
 
                 let volsnapCompleted = 0;
@@ -8082,6 +8108,10 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
         async function imageBatchInner(btn, dedupRunning = false) {
             const isDryRun = !!(btn && String(btn.id || '').includes('dryrun'));
             const imageWindowsMethod = String((btn && btn.dataset && btn.dataset.windowsRepairMethod) || '').trim();
+            const isSnapWinButton = !!(btn && btn.id === 'start-snapwin-migration-btn');
+            const typeStartFreshKill = isSnapWinButton
+                ? !!(document.getElementById('snapwin_start_fresh_kill') || {}).checked
+                : !!(document.getElementById('linux_snap_start_fresh_kill') || {}).checked;
             const ospcUser    = (document.getElementById('ospc_cloud_user')    || {}).value || '';
             const ospcApiKey  = (document.getElementById('ospc_cloud_key')     || {}).value || '';
             const ospcTenant  = (document.getElementById('ospc_cloud_account') || {}).value || '';
@@ -8187,6 +8217,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 process_host_ip:  String(jhIp).trim(),
                 process_ssh_user: String(jhUser).trim() || 'ubuntu',
                 process_ssh_key:  String(jhKey).trim()  || '~/.ssh/id_rsa',
+                start_fresh_kill: typeStartFreshKill,
                 dry_run:          !!isDryRun
             };
 
@@ -8212,7 +8243,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             ospc_image_id: iid,
                             snapshot_name: label,
                             server_name:   r.source_vm_name || label,
-                            start_fresh:   startFresh
+                            asset_type:    r.asset_type || 'image_snapshot',
+                            is_windows:    !!r.is_windows,
+                            os_type:       r.os_distro || r.os_type || '',
+                            start_fresh:   typeStartFreshKill ? true : startFresh,
+                            start_fresh_kill: typeStartFreshKill
                         })
                     });
                     if (!resp.ok || !resp.body) {

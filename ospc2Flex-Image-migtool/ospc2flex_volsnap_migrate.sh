@@ -42,6 +42,7 @@ ATTACH_TO_FINAL="true"
 SOURCE_DEVICE_OVERRIDE=""
 TARGET_DEVICE_OVERRIDE=""
 BASE_DIR="${OSPC2FLEX_LINUX_SNAP_BASE_DIR:-/mnt/migration/ospc2flex_linux_snap}"
+DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -61,6 +62,7 @@ while [[ $# -gt 0 ]]; do
     --source-device)       SOURCE_DEVICE_OVERRIDE="$2";  shift 2 ;;
     --target-device)       TARGET_DEVICE_OVERRIDE="$2";  shift 2 ;;
     --base-dir)            BASE_DIR="$2";                shift 2 ;;
+    --dry-run)             DRY_RUN=1;                    shift ;;
     # legacy compat — ignored
     --os-type|--nbd-dev)   shift 2 ;;
     *) echo "ERROR: Unknown arg: $1" >&2; exit 2 ;;
@@ -69,9 +71,11 @@ done
 
 [ -n "$LABEL" ]             || { echo "ERROR: --label required" >&2; exit 2; }
 [ -n "$SNAPSHOT_ID" ]       || { echo "ERROR: --snapshot-id required" >&2; exit 2; }
-[ -n "$OSPC_OPENRC" ]       || { echo "ERROR: --ospc-openrc required" >&2; exit 2; }
-[ -n "$FLEX_OPENRC" ]       || { echo "ERROR: --flex-openrc required" >&2; exit 2; }
-[ -n "$FLEX_HELPER_IP" ]    || { echo "ERROR: --flex-helper-ip required" >&2; exit 2; }
+if [ "$DRY_RUN" != 1 ]; then
+  [ -n "$OSPC_OPENRC" ]       || { echo "ERROR: --ospc-openrc required" >&2; exit 2; }
+  [ -n "$FLEX_OPENRC" ]       || { echo "ERROR: --flex-openrc required" >&2; exit 2; }
+  [ -n "$FLEX_HELPER_IP" ]    || { echo "ERROR: --flex-helper-ip required" >&2; exit 2; }
+fi
 
 LABEL_SAFE="$(printf '%s' "$LABEL" | tr -c 'A-Za-z0-9._-' '_' | sed 's/_$//')"
 RUN_ID="${OSPC2FLEX_RUN_ID:-$(date -u +%Y%m%d-%H%M%S)}"
@@ -79,6 +83,11 @@ RUN_DIR="$BASE_DIR/runs/$LABEL_SAFE/$RUN_ID"
 JOB_ART="$RUN_DIR/artifacts"
 JOB_TMP="$RUN_DIR/tmp"
 JOB_LOG="$RUN_DIR/logs"
+OSPC_VOL_ID=""
+SELF_SERVER_ID=""
+FLEX_VOL_ID=""
+FLEX_TARGET_DEV=""
+CLEANUP_DONE=0
 
 mkdir -p "$JOB_ART" "$JOB_TMP" "$JOB_LOG"
 exec > >(tee -a "$JOB_LOG/volsnap_direct.log") 2>&1
@@ -87,6 +96,57 @@ log()      { printf '[%s][%s][VOLSNAP] %s\n' "$(date -u +%H:%M:%S)" "$LABEL_SAFE
 stage()    { log "══════════════════════════════════════════════════════"; log "  $1"; log "══════════════════════════════════════════════════════"; }
 fail_exit(){ log "FAILED: $*"; exit 1; }
 kv()       { log "  $(printf '%-24s' "$1"): $2"; }
+
+if [ "$DRY_RUN" = 1 ]; then
+  for s in \
+    VS0_LOAD_CREDENTIALS \
+    VS1_CREATE_TEMP_OSPC_VOLUME \
+    VS2_ATTACH_OSPC_VOLUME \
+    VS3_GET_SOURCE_SIZE \
+    VS4_CREATE_FLEX_CINDER_VOLUME \
+    VS5_ATTACH_FLEX_VOLUME_TO_HELPER \
+    VS6_DETECT_FLEX_TARGET_DEVICE \
+    VS7_VALIDATE_SIZES \
+    VS8_STREAM_BLOCK_DATA \
+    VS9_VALIDATE_FLEX_DISK \
+    VS10_DETACH_FLEX_FROM_HELPER \
+    VS12_CLEANUP_OSPC
+  do
+    stage "$s"
+    log "[$s] DRY-RUN volume snapshot stage; no Cinder volume create, attach, block stream, detach, or delete"
+  done
+  log "METHOD_VOLSNAP_DRY_RUN_SUCCESS"
+  exit 0
+fi
+
+cleanup_on_exit() {
+  local rc=$?
+  [ "$CLEANUP_DONE" = "1" ] && return "$rc"
+  CLEANUP_DONE=1
+  [ "$rc" -eq 0 ] && return 0
+
+  log "[CLEANUP] Failure cleanup start rc=$rc"
+  if [ -n "${FLEX_VOL_ID:-}" ] && [ -n "${FLEX_HELPER_VM_ID:-}" ]; then
+    # shellcheck disable=SC1090
+    source "$FLEX_OPENRC" 2>/dev/null || true
+    log "[CLEANUP] Detaching FLEX volume $FLEX_VOL_ID from helper $FLEX_HELPER_VM_ID"
+    openstack server remove volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+  fi
+  if [ -n "${OSPC_VOL_ID:-}" ] && [ -n "${SELF_SERVER_ID:-}" ]; then
+    # shellcheck disable=SC1090
+    source "$OSPC_OPENRC" 2>/dev/null || true
+    log "[CLEANUP] Detaching OSPC temp volume $OSPC_VOL_ID from $SELF_SERVER_ID"
+    _compute_delete "servers/$SELF_SERVER_ID/os-volume_attachments/$OSPC_VOL_ID" || true
+    ospc_wait_volume "$OSPC_VOL_ID" "available" 300 || true
+    if [ "$CLEANUP_TEMP" = "true" ]; then
+      log "[CLEANUP] Deleting OSPC temp volume $OSPC_VOL_ID"
+      _cinder_delete "volumes/$OSPC_VOL_ID" || true
+    fi
+  fi
+  log "[CLEANUP] Failure cleanup complete"
+  return "$rc"
+}
+trap cleanup_on_exit EXIT
 
 # ── SSH helper to FLEX helper VM ──────────────────────────────────────────────
 SSH_FLEX_BASE=(
@@ -154,6 +214,12 @@ flex_volume_device() {
 local_block_disks() {
   sudo lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2=="disk" && $1 !~ /^\/dev\/(nbd|loop|sr|fd)/ {print $1}' | sort
 }
+region_short() {
+  local r="${OS_REGION_NAME:-IAD}"
+  r="$(printf '%s' "$r" | tr '[:upper:]' '[:lower:]' | tr -d '0-9')"
+  [ -n "$r" ] || r="iad"
+  printf '%s' "$r"
+}
 discover_self_server_id() {
   local ips_json server_json
   ips_json="$(hostname -I 2>/dev/null | tr ' ' '\n' | awk 'NF' | \
@@ -180,9 +246,11 @@ OSPC_TOKEN="${OS_TOKEN:-}"
 OSPC_TENANT="${OS_TENANT_ID:-${OS_PROJECT_ID:-}}"
 [ -n "$OSPC_TOKEN" ]  || fail_exit "OS_TOKEN not set in $OSPC_OPENRC"
 [ -n "$OSPC_TENANT" ] || fail_exit "OS_TENANT_ID not set in $OSPC_OPENRC"
-OSPC_BS_BASE="https://iad.blockstorage.api.rackspacecloud.com/v1/$OSPC_TENANT"
-OSPC_COMPUTE_BASE="https://iad.servers.api.rackspacecloud.com/v2/$OSPC_TENANT"
+OSPC_API_REGION="$(region_short)"
+OSPC_BS_BASE="https://${OSPC_API_REGION}.blockstorage.api.rackspacecloud.com/v1/$OSPC_TENANT"
+OSPC_COMPUTE_BASE="https://${OSPC_API_REGION}.servers.api.rackspacecloud.com/v2/$OSPC_TENANT"
 kv "OSPC tenant"   "$OSPC_TENANT"
+kv "OSPC region"   "$OSPC_API_REGION"
 kv "Snapshot ID"   "$SNAPSHOT_ID"
 kv "Label"         "$LABEL_SAFE"
 kv "FLEX helper"   "${FLEX_HELPER_USER}@${FLEX_HELPER_IP} (vm=${FLEX_HELPER_VM_ID:-none})"
@@ -314,7 +382,7 @@ if [ -n "$TARGET_DEVICE_OVERRIDE" ]; then
   FLEX_TARGET_DEV="$TARGET_DEVICE_OVERRIDE"
   log "[VS6] Target device overridden: $FLEX_TARGET_DEV"
 elif [ -n "$FLEX_HELPER_VM_ID" ]; then
-  # Full path: poll Cinder API for device path, then SSH lsblk fallback
+  # Full path: poll Cinder API for the exact attachment device.
   FLEX_TARGET_DEV=""
   for _i in $(seq 1 24); do
     sleep 5
@@ -322,28 +390,17 @@ elif [ -n "$FLEX_HELPER_VM_ID" ]; then
     [ -n "$FLEX_TARGET_DEV" ] && break
     FLEX_TARGET_DEV=""
   done
-  if [ -z "$FLEX_TARGET_DEV" ]; then
-    log "[VS6] Cinder device path not available — diffing lsblk on FLEX helper"
-    FLEX_TARGET_DEV="$(ssh_flex \
-      "lsblk -dnpo NAME,TYPE 2>/dev/null | awk '\$2==\"disk\"&&\$1!~/nbd|loop|sr|fd/{print \$1}' | sort" \
-      2>/dev/null | sort | head -1 || true)"
-  fi
-  [ -n "$FLEX_TARGET_DEV" ] || fail_exit "Could not detect target device on FLEX helper"
+  [ -n "$FLEX_TARGET_DEV" ] || fail_exit "Cinder did not report target device for FLEX volume $FLEX_VOL_ID — pass --target-device explicitly"
 else
-  # No VM ID — can't use Cinder API; detect via SSH lsblk only
-  log "[VS6] No FLEX helper VM ID — detecting device via SSH lsblk"
-  FLEX_TARGET_DEV="$(ssh_flex \
-    "lsblk -dnpo NAME,TYPE 2>/dev/null | awk '\$2==\"disk\"&&\$1!~/nbd|loop|sr|fd/{print \$1}' | sort" \
-    2>/dev/null | sort | head -1 || true)"
-  [ -n "$FLEX_TARGET_DEV" ] || fail_exit "Could not detect target device via SSH lsblk — set --target-device to override"
+  fail_exit "No FLEX helper VM ID was provided — set --target-device explicitly if the FLEX volume is already attached"
 fi
 kv "FLEX target device" "$FLEX_TARGET_DEV"
 
 # Safety: never allow target to be mounted or be the root device
-FLEX_MOUNTS="$(ssh_flex "mount | grep -w $FLEX_TARGET_DEV || true" 2>/dev/null || true)"
-if [ -n "$FLEX_MOUNTS" ]; then
-  fail_exit "FLEX target device $FLEX_TARGET_DEV is mounted — aborting to prevent data loss: $FLEX_MOUNTS"
-fi
+case "$FLEX_TARGET_DEV" in /dev/*) ;; *) fail_exit "FLEX target device must be a /dev path: $FLEX_TARGET_DEV" ;; esac
+printf '%s' "$FLEX_TARGET_DEV" | grep -Eq '^/dev/[A-Za-z0-9._/-]+$' || fail_exit "Unsafe FLEX target device path: $FLEX_TARGET_DEV"
+ssh_flex "set -e; dev='$FLEX_TARGET_DEV'; [ -b \"\$dev\" ]; [ \"\$(lsblk -dnro TYPE \"\$dev\")\" = disk ]; root_src=\$(findmnt -n -o SOURCE /); root_mm=\$(findmnt -n -o MAJ:MIN /); dev_mm=\$(lsblk -dnro MAJ:MIN \"\$dev\"); root_pk=\$(lsblk -npo PKNAME \"\$root_src\" 2>/dev/null | head -1); [ \"\$dev\" != \"\$root_src\" ]; [ \"\$dev_mm\" != \"\$root_mm\" ]; [ -z \"\$root_pk\" ] || [ \"\$dev\" != \"\$root_pk\" ]; ! lsblk -nrpo NAME,MOUNTPOINT \"\$dev\" | awk 'NF>=2 && \$2 != \"\" {found=1} END{exit found?0:1}'" \
+  || fail_exit "FLEX target device $FLEX_TARGET_DEV is root, mounted, missing, or unsafe — aborting to prevent data loss"
 
 # ── VS7: Validate target_bytes >= source_bytes ────────────────────────────────
 stage "VS7_VALIDATE_SIZES"
@@ -375,18 +432,10 @@ log "[VS8] Pipeline: dd | gzip -1 | ssh | gunzip | dd"
 
 _DD_COUNT=$(( SNAP_SIZE_ORIG_GB * 16 ))  # 64M * 16 = 1 GiB → count = orig GB * 16
 log "[VS8] Streaming ${SNAP_SIZE_ORIG_GB}GB (${_DD_COUNT} blocks of 64M)"
-STREAM_CMD="sudo dd if=$SOURCE_DEV bs=64M count=$_DD_COUNT status=progress conv=sync,noerror 2>>'$JOB_LOG/stream_src.log' | \
-  gzip -1 | \
-  ssh -i $SSH_KEY_PATH \
-      -o StrictHostKeyChecking=accept-new \
-      -o UserKnownHostsFile=/dev/null \
-      -o BatchMode=yes \
-      -o ServerAliveInterval=30 \
-      -o ServerAliveCountMax=10 \
-      ${FLEX_HELPER_USER}@${FLEX_HELPER_IP} \
-      \"gunzip | sudo dd of=${FLEX_TARGET_DEV} bs=64M status=progress conv=fsync 2>>/tmp/volsnap_stream_dst_${LABEL_SAFE}.log\""
-
-eval "$STREAM_CMD" 2>&1 | tee -a "$JOB_LOG/stream.log" || \
+sudo dd if="$SOURCE_DEV" bs=64M count="$_DD_COUNT" status=progress conv=sync,noerror 2>>"$JOB_LOG/stream_src.log" \
+  | gzip -1 \
+  | "${SSH_FLEX_BASE[@]}" "gunzip | sudo dd of='$FLEX_TARGET_DEV' bs=64M status=progress conv=fsync 2>>/tmp/volsnap_stream_dst_${LABEL_SAFE}.log" \
+  2>&1 | tee -a "$JOB_LOG/stream.log" || \
   fail_exit "Block stream failed — check $JOB_LOG/stream.log"
 log "[VS8] HIT block stream complete"
 
@@ -440,6 +489,7 @@ if [ "$CLEANUP_TEMP" = "true" ]; then
 else
   log "[VS12] cleanup_temp=false — temp OSPC volume $OSPC_VOL_ID left in available state"
 fi
+CLEANUP_DONE=1
 
 log "══════════════════════════════════════════════════════"
 log "  VOLSNAP DIRECT CINDER COMPLETE"

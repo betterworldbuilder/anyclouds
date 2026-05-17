@@ -855,6 +855,7 @@ is_terminal_direct_download_block() {
 
 download_cloud_files_object() {
   local container="$1" object_name="$2" dest="$3" min_bytes="$4" tmp_log="$5" size
+  CF_OBJECT_DOWNLOAD_REASON=""
   rm -f "$dest"
   log "[ZS3_DOWNLOAD_SNAPSHOT] Cloud Files object download: $container/$object_name"
   if openstack object save "$container" "$object_name" --file "$dest" >"$tmp_log" 2>&1; then
@@ -867,6 +868,13 @@ download_cloud_files_object() {
   log "[ZS3_DOWNLOAD_SNAPSHOT] WARN Cloud Files object download failed log=$tmp_log"
   log_file_excerpt "[ZS3_DOWNLOAD_SNAPSHOT] cloud-files-error:" "$tmp_log"
   rm -f "$dest"
+  if grep -qiE 'No space left on device|Errno 28' "$tmp_log" 2>/dev/null; then
+    CF_OBJECT_DOWNLOAD_REASON="no_space"
+  elif grep -qiE 'Not Found|HTTP 404|404' "$tmp_log" 2>/dev/null; then
+    CF_OBJECT_DOWNLOAD_REASON="missing"
+  else
+    CF_OBJECT_DOWNLOAD_REASON="failed"
+  fi
   return 1
 }
 
@@ -885,6 +893,14 @@ download_cloud_files_export_task() {
   if download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes" "$tmp_log"; then
     log "[ZS3_DOWNLOAD_SNAPSHOT] HIT reused existing Cloud Files export object"
     return 0
+  fi
+  if [ "${CF_OBJECT_DOWNLOAD_REASON:-}" = "no_space" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] WARN Cloud Files object download stopped: no space left on jumphost"
+    return 1
+  fi
+  if openstack object show "$container" "$object_name" >/dev/null 2>&1; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Existing Cloud Files object is stale/unreadable — deleting before fresh export"
+    openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
   fi
 
   glance_base="$(first_resolvable_image_base || true)"
@@ -951,7 +967,13 @@ PY
         fi
         if printf '%s' "$task_json" | grep -qi 'Object already exists'; then
           log "[ZS3_DOWNLOAD_SNAPSHOT] Export object already exists; attempting reuse"
-          download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes" "$tmp_log" && return 0
+          if download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes" "$tmp_log"; then
+            return 0
+          fi
+          if [ "${CF_OBJECT_DOWNLOAD_REASON:-}" != "no_space" ]; then
+            log "[ZS3_DOWNLOAD_SNAPSHOT] Existing export object is stale/unreadable — deleting it for next retry"
+            openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
+          fi
         fi
         return 1
         ;;
@@ -2546,7 +2568,7 @@ checkpoint_hit "dummy_attach"
 log "[ZS8_ATTACH_DUMMY_VIRTIO] HIT dummy VirtIO volume attached at rescue boot: $DUMMY_VOLUME_ID"
 
 stage_start "ZS9_DRIVER_BIND"
-if [ "${OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND:-0}" = "1" ]; then
+if [ "$CONTINUE_AFTER_DRIVER_BIND" != 1 ] && { [ "${OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND:-0}" = "1" ] || [ "$MANUAL_DRIVER_BIND" = 1 ]; }; then
   show_manual_driver_card
   json_merge "{\"stage\":\"ZS9_DRIVER_BIND\",\"status\":\"WAITING_FOR_DRIVER_BIND\",\"next_action\":\"Run the displayed pnputil commands in the rescue VM, reboot, then continue Method SNAPWIN.\",\"checkpoints\":{\"driver_bind\":\"PENDING\"}}"
   log "[ZS9_DRIVER_BIND] WAITING_FOR_DRIVER_BIND manual confirmation required"
@@ -2554,18 +2576,20 @@ if [ "${OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND:-0}" = "1" ]; then
   exit 0
 fi
 
-if [ "$MANUAL_DRIVER_BIND" = 1 ]; then
-  log "[ZS9_DRIVER_BIND] WARN --manual-driver-bind is deprecated; SNAPWIN will auto-bind unless OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND=1."
-fi
-
 SNAPWIN_ONLINE_BIND=0
-if [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
+if [ "$CONTINUE_AFTER_DRIVER_BIND" = 1 ]; then
+  SNAPWIN_ONLINE_BIND=1
+  log "[ZS9_DRIVER_BIND] HIT manual VirtIO driver bind confirmed by operator"
+elif [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
   run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
   SNAPWIN_ONLINE_BIND=1
   log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind completed over $ACCESS_METHOD on $ACCESS_IP:$ACCESS_PORT"
 else
-  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; using offline-staged VirtIO drivers and registry/CDDB boot binding."
-  log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted (no rescue reboot — matching win2016 working method)"
+  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; manual driver bind required."
+  show_manual_driver_card
+  json_merge "{\"stage\":\"ZS9_DRIVER_BIND\",\"status\":\"WAITING_FOR_DRIVER_BIND\",\"next_action\":\"Run pnputil in the rescue VM, reboot, then rerun with --continue-after-driver-bind.\",\"checkpoints\":{\"driver_bind\":\"PENDING\"}}"
+  write_report
+  exit 0
 fi
 checkpoint_hit "driver_bind"
 log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind confirmed"
