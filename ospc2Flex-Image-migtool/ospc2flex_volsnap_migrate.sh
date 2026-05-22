@@ -183,16 +183,20 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT
 
 # ── SSH helper to FLEX helper VM ──────────────────────────────────────────────
-SSH_FLEX_BASE=(
-  ssh -i "$SSH_KEY_PATH"
-  -o StrictHostKeyChecking=accept-new
-  -o UserKnownHostsFile=/dev/null
-  -o BatchMode=yes
-  -o ConnectTimeout=30
-  -o ServerAliveInterval=15
-  -o ServerAliveCountMax=4
-  "${FLEX_HELPER_USER}@${FLEX_HELPER_IP}"
-)
+SSH_FLEX_BASE=()
+set_ssh_flex_base() {
+  SSH_FLEX_BASE=(
+    ssh -i "$SSH_KEY_PATH"
+    -o StrictHostKeyChecking=accept-new
+    -o UserKnownHostsFile=/dev/null
+    -o BatchMode=yes
+    -o ConnectTimeout=30
+    -o ServerAliveInterval=15
+    -o ServerAliveCountMax=4
+    "${FLEX_HELPER_USER}@${FLEX_HELPER_IP}"
+  )
+}
+set_ssh_flex_base
 ssh_flex() { "${SSH_FLEX_BASE[@]}" "$@"; }
 
 # ── OSPC Cinder/Compute REST helpers (use saved OSPC_TOKEN, never overwritten) ─
@@ -300,6 +304,31 @@ local_block_disks() {
 flex_remote_block_disks() {
   ssh_flex "lsblk -dnpo NAME,TYPE 2>/dev/null | awk '\$2==\"disk\" && \$1 !~ /^\\/dev\\/(nbd|loop|sr|fd)/ {print \$1}' | sort" 2>>"$JOB_LOG/flex_ssh.log" || true
 }
+select_flex_helper_ssh_user() {
+  [ -n "$FLEX_HELPER_IP" ] || return 0
+  local original_user="$FLEX_HELPER_USER" candidates=() seen=" " user
+  for user in "$original_user" root debian ubuntu cloud-user centos almalinux rocky ec2-user; do
+    [ -n "$user" ] || continue
+    case "$seen" in *" $user "*) continue ;; esac
+    seen="${seen}${user} "
+    candidates+=("$user")
+  done
+  for user in "${candidates[@]}"; do
+    FLEX_HELPER_USER="$user"
+    set_ssh_flex_base
+    if ssh_flex "command -v lsblk >/dev/null && lsblk -dnpo NAME,TYPE >/dev/null" >>"$JOB_LOG/flex_ssh.log" 2>&1; then
+      if [ "$user" != "$original_user" ]; then
+        log "[FLEX-SSH] Row SSH user '$original_user' failed; using '$user' for FLEX helper/target SSH"
+      else
+        log "[FLEX-SSH] SSH user '$user' verified for FLEX helper/target"
+      fi
+      return 0
+    fi
+  done
+  FLEX_HELPER_USER="$original_user"
+  set_ssh_flex_base
+  fail_exit "Cannot SSH to FLEX helper/target ${FLEX_HELPER_IP} with key ${SSH_KEY_PATH}; tried users: ${candidates[*]}"
+}
 flex_remote_device_is_safe() {
   local dev="$1"
   case "$dev" in /dev/*) ;; *) return 1 ;; esac
@@ -383,8 +412,9 @@ kv "OSPC tenant"   "$OSPC_TENANT"
 kv "OSPC region"   "$OSPC_API_REGION"
 kv "Snapshot ID"   "$SNAPSHOT_ID"
 kv "Label"         "$LABEL_SAFE"
-kv "FLEX helper"   "${FLEX_HELPER_USER}@${FLEX_HELPER_IP} (vm=${FLEX_HELPER_VM_ID:-none})"
 validate_flex_helper_server
+select_flex_helper_ssh_user
+kv "FLEX helper"   "${FLEX_HELPER_USER}@${FLEX_HELPER_IP} (vm=${FLEX_HELPER_VM_ID:-none})"
 
 # ── VS1: Create temp OSPC Cinder volume from snapshot ─────────────────────────
 stage "VS1_CREATE_TEMP_OSPC_VOLUME"
