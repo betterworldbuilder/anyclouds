@@ -121,6 +121,7 @@ SELF_SERVER_ID=""
 FLEX_VOL_ID=""
 FLEX_TARGET_DEV=""
 CLEANUP_DONE=0
+FLEX_FINAL_ATTACHED=0
 
 mkdir -p "$JOB_ART" "$JOB_TMP" "$JOB_LOG"
 exec > >(tee -a "$JOB_LOG/volsnap_direct.log") 2>&1
@@ -160,11 +161,13 @@ cleanup_on_exit() {
   [ "$rc" -eq 0 ] && return 0
 
   log "[CLEANUP] Failure cleanup start rc=$rc"
-  if [ -n "${FLEX_VOL_ID:-}" ] && [ -n "${FLEX_HELPER_VM_ID:-}" ]; then
+  if [ -n "${FLEX_VOL_ID:-}" ] && [ -n "${FLEX_HELPER_VM_ID:-}" ] && [ "$FLEX_FINAL_ATTACHED" != "1" ]; then
     # shellcheck disable=SC1090
     source "$FLEX_OPENRC" 2>/dev/null || true
     log "[CLEANUP] Detaching FLEX volume $FLEX_VOL_ID from helper $FLEX_HELPER_VM_ID"
     openstack server remove volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+  elif [ -n "${FLEX_VOL_ID:-}" ] && [ "$FLEX_FINAL_ATTACHED" = "1" ]; then
+    log "[CLEANUP] Keeping migrated FLEX volume $FLEX_VOL_ID attached to final target after post-copy failure"
   fi
   if [ -n "${OSPC_VOL_ID:-}" ] && [ -n "${SELF_SERVER_ID:-}" ]; then
     # shellcheck disable=SC1090
@@ -328,6 +331,32 @@ select_flex_helper_ssh_user() {
   FLEX_HELPER_USER="$original_user"
   set_ssh_flex_base
   fail_exit "Cannot SSH to FLEX helper/target ${FLEX_HELPER_IP} with key ${SSH_KEY_PATH}; tried users: ${candidates[*]}"
+}
+select_post_attach_ssh_user() {
+  local target_ip="$1"
+  [ -n "$target_ip" ] || return 0
+  local original_user="$POST_ATTACH_SSH_USER" candidates=() seen=" " user
+  for user in "$POST_ATTACH_SSH_USER" "$FLEX_HELPER_USER" root debian ubuntu cloud-user centos almalinux rocky ec2-user; do
+    [ -n "$user" ] || continue
+    case "$seen" in *" $user "*) continue ;; esac
+    seen="${seen}${user} "
+    candidates+=("$user")
+  done
+  for user in "${candidates[@]}"; do
+    if ssh -i "$POST_ATTACH_SSH_KEY_PATH" \
+      -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
+      -o BatchMode=yes -o ConnectTimeout=12 \
+      "${user}@${target_ip}" "command -v sh >/dev/null" >>"$VALIDATE_LOG" 2>&1; then
+      POST_ATTACH_SSH_USER="$user"
+      if [ "$user" != "$original_user" ]; then
+        log "[VOL_POST_ATTACH_VALIDATE] Row SSH user '$original_user' failed; using '$user' for target validation SSH"
+      else
+        log "[VOL_POST_ATTACH_VALIDATE] SSH user '$user' verified for target validation"
+      fi
+      return 0
+    fi
+  done
+  fail_exit "Cannot SSH to post-attach target ${target_ip} with key ${POST_ATTACH_SSH_KEY_PATH}; tried users: ${candidates[*]}"
 }
 flex_remote_device_is_safe() {
   local dev="$1"
@@ -665,6 +694,7 @@ if [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_TARGET_VM_ID" ]; then
   flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || \
     log "[VS11] WARN: FLEX volume did not reach in-use after final attach"
   log "[VS11] HIT FLEX volume attached to final VM $FLEX_TARGET_VM_ID"
+  FLEX_FINAL_ATTACHED=1
   FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
   [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
 elif [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_HELPER_VM_ID" ]; then
@@ -675,6 +705,7 @@ elif [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_HELPER_VM_ID" ]; then
   flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || \
     log "[VS11] WARN: FLEX volume did not reach in-use after final attach"
   log "[VS11] HIT FLEX volume attached to final VM $FLEX_HELPER_VM_ID"
+  FLEX_FINAL_ATTACHED=1
   FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
   [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
 else
@@ -707,6 +738,8 @@ if [ "$POST_ATTACH_VALIDATE_MOUNT" = "true" ] || [ "$POST_ATTACH_VALIDATE_PG" = 
   VALIDATE_LOG="$JOB_ART/post_attach_validate_${FLEX_VOL_ID}.log"
   VALIDATE_JSON="$JOB_ART/post_attach_validate_${FLEX_VOL_ID}.json"
   REMOTE_VALIDATE_SCRIPT="/tmp/osflex_post_attach_pg_mount_validate.sh"
+  : >"$VALIDATE_LOG"
+  select_post_attach_ssh_user "$TARGET_SSH_IP"
   log "[VOL_POST_ATTACH_VALIDATE] Target SSH: ${POST_ATTACH_SSH_USER}@${TARGET_SSH_IP}"
   log "[VOL_POST_ATTACH_VALIDATE] Device hint: ${POST_ATTACH_DEVICE_HINT:-auto}"
   log "[VOL_POST_ATTACH_VALIDATE] Mount override: ${POST_ATTACH_MOUNT_POINT:-auto}"
