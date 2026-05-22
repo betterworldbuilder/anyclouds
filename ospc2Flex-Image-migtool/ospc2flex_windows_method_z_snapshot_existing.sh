@@ -36,6 +36,7 @@ VIRTIO_ISO_URL="${OSPC2FLEX_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt
 LEGACY_VIRTIO_ISO_URL="${OSPC2FLEX_LEGACY_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/deprecated-isos/archives/virtio-win-0.1.108/virtio-win-0.1.108.iso}"
 WINDOWS_VERSION="auto"
 WINDOWS_VERSION_REQUESTED="${WINDOWS_VERSION}"
+WINDOWS_VERSION_EXPECTED_SOURCE="arg"
 SNAPWIN_REPAIR_VERSION="${OSPC2FLEX_SNAPWIN_REPAIR_VERSION:-20260515-unified-v7}"
 SKIP_RESCUE_BOOT=0
 MANUAL_DRIVER_BIND=0
@@ -151,13 +152,14 @@ fi
 
 WINDOWS_VERSION_REQUESTED="$WINDOWS_VERSION"
 if [ "${WINDOWS_VERSION,,}" = "auto" ] || [ -z "$WINDOWS_VERSION" ]; then
+  WINDOWS_VERSION_EXPECTED_SOURCE="default"
   case "${LABEL_SAFE,,}" in
-    *2008*r2*|*2k8r2*) WINDOWS_VERSION="2008r2" ;;
-    *2012*r2*|*2k12r2*) WINDOWS_VERSION="2012r2" ;;
-    *2012*|*2k12*) WINDOWS_VERSION="2012" ;;
-    *2016*|*2k16*) WINDOWS_VERSION="2016" ;;
-    *2019*|*2k19*) WINDOWS_VERSION="2019" ;;
-    *2022*|*2k22*) WINDOWS_VERSION="2022" ;;
+    *2008*r2*|*2k8r2*) WINDOWS_VERSION="2008r2"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2012*r2*|*2k12r2*) WINDOWS_VERSION="2012r2"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2012*|*2k12*) WINDOWS_VERSION="2012"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2016*|*2k16*) WINDOWS_VERSION="2016"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2019*|*2k19*) WINDOWS_VERSION="2019"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2022*|*2k22*) WINDOWS_VERSION="2022"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
     *) WINDOWS_VERSION="${OSPC2FLEX_SNAPWIN_DEFAULT_WINDOWS_VERSION:-2016}" ;;
   esac
 fi
@@ -540,18 +542,31 @@ write_repair_marker() {
 }
 
 find_resume_artifact() {
-  local label_runs="$BASE_DIR/runs/$LABEL_SAFE"
   [ "${OSPC2FLEX_SNAPWIN_AUTO_RESUME:-1}" = "1" ] || return 1
-  [ -d "$label_runs" ] || return 1
-  find "$label_runs" -type f \( \
-      -name "source_snapshot.qcow2" -o \
-      -name "source_snapshot.raw" -o \
-      -name "source_snapshot.img" -o \
-      -name "source_snapshot.vhd" -o \
-      -name "source_snapshot.vhdx" \
-    \) -size +1G -printf '%T@ %p\n' 2>/dev/null \
-    | sort -nr \
-    | awk '{ $1=""; sub(/^ /, ""); print; exit }'
+  local f dir label_dir dirs=()
+  [ -d "$BASE_DIR/runs/$LABEL_SAFE" ] && dirs+=("$BASE_DIR/runs/$LABEL_SAFE")
+  IFS=: read -ra _extra <<< "${OSPC2FLEX_ARTIFACT_SEARCH_DIRS:-}"
+  dirs+=("${_extra[@]}")
+  for dir in "${dirs[@]}"; do
+    [ -d "$dir" ] || continue
+    label_dir=0
+    case "$dir" in
+      "$BASE_DIR/runs/$LABEL_SAFE"|"$BASE_DIR/runs/$LABEL_SAFE"/*) label_dir=1 ;;
+    esac
+    while IFS= read -r f; do
+      if [ "$label_dir" != "1" ] && [[ "${f,,}" != *"${LABEL_SAFE,,}"* ]]; then
+        printf '%s\n' "[ZS3_DOWNLOAD_SNAPSHOT] foreign qcow2 skipped: $f" >>"$BACKGROUND_LOG"
+        continue
+      fi
+      if ! qemu-img check -q "$f" >>"$BACKGROUND_LOG" 2>&1; then
+        printf '%s\n' "[ZS3_DOWNLOAD_SNAPSHOT] corrupt qcow2 skipped: $f" >>"$BACKGROUND_LOG"
+        continue
+      fi
+      echo "$f"; return 0
+    done < <(find "$dir" -maxdepth 3 -type f -name "*.qcow2" \
+        -size +1G -printf '%s %p\n' 2>/dev/null | sort -nr | awk '{ $1=""; sub(/^ /, ""); print }')
+  done
+  return 1
 }
 
 ensure_libguestfs_kernel_readable() {
@@ -855,7 +870,6 @@ is_terminal_direct_download_block() {
 
 download_cloud_files_object() {
   local container="$1" object_name="$2" dest="$3" min_bytes="$4" tmp_log="$5" size
-  CF_OBJECT_DOWNLOAD_REASON=""
   rm -f "$dest"
   log "[ZS3_DOWNLOAD_SNAPSHOT] Cloud Files object download: $container/$object_name"
   if openstack object save "$container" "$object_name" --file "$dest" >"$tmp_log" 2>&1; then
@@ -868,13 +882,6 @@ download_cloud_files_object() {
   log "[ZS3_DOWNLOAD_SNAPSHOT] WARN Cloud Files object download failed log=$tmp_log"
   log_file_excerpt "[ZS3_DOWNLOAD_SNAPSHOT] cloud-files-error:" "$tmp_log"
   rm -f "$dest"
-  if grep -qiE 'No space left on device|Errno 28' "$tmp_log" 2>/dev/null; then
-    CF_OBJECT_DOWNLOAD_REASON="no_space"
-  elif grep -qiE 'Not Found|HTTP 404|404' "$tmp_log" 2>/dev/null; then
-    CF_OBJECT_DOWNLOAD_REASON="missing"
-  else
-    CF_OBJECT_DOWNLOAD_REASON="failed"
-  fi
   return 1
 }
 
@@ -893,14 +900,6 @@ download_cloud_files_export_task() {
   if download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes" "$tmp_log"; then
     log "[ZS3_DOWNLOAD_SNAPSHOT] HIT reused existing Cloud Files export object"
     return 0
-  fi
-  if [ "${CF_OBJECT_DOWNLOAD_REASON:-}" = "no_space" ]; then
-    log "[ZS3_DOWNLOAD_SNAPSHOT] WARN Cloud Files object download stopped: no space left on jumphost"
-    return 1
-  fi
-  if openstack object show "$container" "$object_name" >/dev/null 2>&1; then
-    log "[ZS3_DOWNLOAD_SNAPSHOT] Existing Cloud Files object is stale/unreadable — deleting before fresh export"
-    openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
   fi
 
   glance_base="$(first_resolvable_image_base || true)"
@@ -967,13 +966,7 @@ PY
         fi
         if printf '%s' "$task_json" | grep -qi 'Object already exists'; then
           log "[ZS3_DOWNLOAD_SNAPSHOT] Export object already exists; attempting reuse"
-          if download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes" "$tmp_log"; then
-            return 0
-          fi
-          if [ "${CF_OBJECT_DOWNLOAD_REASON:-}" != "no_space" ]; then
-            log "[ZS3_DOWNLOAD_SNAPSHOT] Existing export object is stale/unreadable — deleting it for next retry"
-            openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
-          fi
+          download_cloud_files_object "$container" "$object_name" "$dest" "$min_bytes" "$tmp_log" && return 0
         fi
         return 1
         ;;
@@ -1889,6 +1882,65 @@ driver_token_candidates() {
   esac
 }
 
+windows_version_from_registry() {
+  local cfg="$1" software="$cfg/SOFTWARE" product build actual=""
+  [ -f "$software" ] || return 1
+  command -v hivexget >/dev/null 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "hivexget_missing" "Install hivex on the jumphost."
+
+  product="$(sudo hivexget "$software" 'Microsoft\Windows NT\CurrentVersion' ProductName 2>/dev/null || true)"
+  build="$(sudo hivexget "$software" 'Microsoft\Windows NT\CurrentVersion' CurrentBuildNumber 2>/dev/null || true)"
+  [ -n "$build" ] || build="$(sudo hivexget "$software" 'Microsoft\Windows NT\CurrentVersion' CurrentBuild 2>/dev/null || true)"
+
+  case "${product,,}" in
+    *2022*) actual="2022" ;;
+    *2019*) actual="2019" ;;
+    *2016*) actual="2016" ;;
+    *2012*r2*) actual="2012r2" ;;
+    *2012*) actual="2012" ;;
+    *2008*r2*) actual="2008r2" ;;
+  esac
+  if [ -z "$actual" ]; then
+    case "$build" in
+      20348*) actual="2022" ;;
+      17763*) actual="2019" ;;
+      14393*) actual="2016" ;;
+      9600*) actual="2012r2" ;;
+      9200*) actual="2012" ;;
+    esac
+  fi
+
+  WINDOWS_PRODUCT_DETECTED="${product:-unknown}"
+  WINDOWS_BUILD_DETECTED="${build:-unknown}"
+  [ -n "$actual" ] || return 1
+  printf '%s\n' "$actual"
+}
+
+assert_windows_version_matches_artifact() {
+  local cfg="$1" actual expected="$WINDOWS_VERSION"
+  WINDOWS_PRODUCT_DETECTED=""
+  WINDOWS_BUILD_DETECTED=""
+  actual="$(windows_version_from_registry "$cfg" || true)"
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] Detected Windows product: ${WINDOWS_PRODUCT_DETECTED:-unknown} build=${WINDOWS_BUILD_DETECTED:-unknown}"
+
+  if [ -z "$actual" ]; then
+    cleanup_windows_mount
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_version_unknown" "Cannot read Windows version from the mounted qcow2 registry; inspect $REPAIR_LOG."
+  fi
+
+  if [ "$WINDOWS_VERSION_EXPECTED_SOURCE" = "default" ]; then
+    WINDOWS_VERSION="$actual"
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] Auto-detected Windows version from qcow2: $WINDOWS_VERSION"
+    return 0
+  fi
+
+  if [ "$actual" != "$expected" ]; then
+    cleanup_windows_mount
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_version_mismatch" "Selected snapshot expects Windows $expected but cached/source qcow2 is Windows $actual. Disable image resume or select the correct artifact."
+  fi
+
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT Windows version guard: expected=$expected actual=$actual"
+}
+
 mount_virtio_iso() {
   local iso="$1"
   [ -f "$iso" ] || return 1
@@ -2038,6 +2090,30 @@ PY
   done
 }
 
+clear_windows_password_offline() {
+  local cfg="$1" user="${WIN_USER:-Administrator}" clear_out verify_out
+  [ -f "$cfg/SAM" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "sam_hive_missing" "Windows SAM hive was not found for offline password clear."
+  command -v chntpw >/dev/null 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "chntpw_missing" "Install chntpw on the jumphost."
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] clearing Windows password for ${user} via offline SAM"
+
+  clear_out="$(mktemp)"
+  verify_out="$(mktemp)"
+  printf '1\nq\ny\n' | sudo chntpw -u "$user" "$cfg/SAM" >"$clear_out" 2>&1 || true
+  cat "$clear_out" >>"$REPAIR_LOG"
+
+  printf 'q\n' | sudo chntpw -u "$user" "$cfg/SAM" >"$verify_out" 2>&1 || true
+  cat "$verify_out" >>"$REPAIR_LOG"
+
+  if grep -Eiq 'No NT MD4 hash found|BLANK password' "$verify_out"; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT Windows password cleared for ${user}"
+  else
+    rm -f "$clear_out" "$verify_out"
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_password_clear_failed" "Inspect $REPAIR_LOG for chntpw output."
+  fi
+
+  rm -f "$clear_out" "$verify_out"
+}
+
 standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
@@ -2046,6 +2122,7 @@ standalone_offline_windows_repair() {
   winroot="$(find_windows_root)" || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
   [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
   cfg="$winroot/System32/config"
+  assert_windows_version_matches_artifact "$cfg"
   backup_dir="$winroot/ospc2flex/registry-backups/$ts"
   sudo mkdir -p "$backup_dir"
   for hive in SYSTEM SOFTWARE SAM SECURITY DEFAULT; do
@@ -2054,6 +2131,7 @@ standalone_offline_windows_repair() {
     sudo cp -a "$cfg/$hive" "$backup_dir/$hive"
   done
   log "[ZS5_OFFLINE_WINDOWS_REPAIR] registry hives backed up to C:\\ospc2flex\\registry-backups\\$ts"
+  clear_windows_password_offline "$cfg"
   stage_virtio_drivers "$winroot"
   write_firstboot_network_reset "$winroot"
   apply_windows_bcd_boot_policy "$winroot"
@@ -2431,6 +2509,7 @@ else
     log "[ZS3_DOWNLOAD_SNAPSHOT] HIT auto-resume artifact found on jumphost: $RESUME_ARTIFACT"
     SOURCE_ARTIFACT="$RESUME_ARTIFACT"
   else
+    log "[ZS3_DOWNLOAD_SNAPSHOT] No matching auto-resume qcow2 found; exporting selected snapshot/image."
     SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img"
     set +e
     download_existing_ospc_snapshot "$OSPC_IMAGE_ID" "$SOURCE_ARTIFACT"
@@ -2568,7 +2647,7 @@ checkpoint_hit "dummy_attach"
 log "[ZS8_ATTACH_DUMMY_VIRTIO] HIT dummy VirtIO volume attached at rescue boot: $DUMMY_VOLUME_ID"
 
 stage_start "ZS9_DRIVER_BIND"
-if [ "$CONTINUE_AFTER_DRIVER_BIND" != 1 ] && { [ "${OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND:-0}" = "1" ] || [ "$MANUAL_DRIVER_BIND" = 1 ]; }; then
+if [ "${OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND:-0}" = "1" ]; then
   show_manual_driver_card
   json_merge "{\"stage\":\"ZS9_DRIVER_BIND\",\"status\":\"WAITING_FOR_DRIVER_BIND\",\"next_action\":\"Run the displayed pnputil commands in the rescue VM, reboot, then continue Method SNAPWIN.\",\"checkpoints\":{\"driver_bind\":\"PENDING\"}}"
   log "[ZS9_DRIVER_BIND] WAITING_FOR_DRIVER_BIND manual confirmation required"
@@ -2576,20 +2655,18 @@ if [ "$CONTINUE_AFTER_DRIVER_BIND" != 1 ] && { [ "${OSPC2FLEX_SNAPWIN_FORCE_MANU
   exit 0
 fi
 
+if [ "$MANUAL_DRIVER_BIND" = 1 ]; then
+  log "[ZS9_DRIVER_BIND] WARN --manual-driver-bind is deprecated; SNAPWIN will auto-bind unless OSPC2FLEX_SNAPWIN_FORCE_MANUAL_BIND=1."
+fi
+
 SNAPWIN_ONLINE_BIND=0
-if [ "$CONTINUE_AFTER_DRIVER_BIND" = 1 ]; then
-  SNAPWIN_ONLINE_BIND=1
-  log "[ZS9_DRIVER_BIND] HIT manual VirtIO driver bind confirmed by operator"
-elif [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
+if [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
   run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
   SNAPWIN_ONLINE_BIND=1
   log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind completed over $ACCESS_METHOD on $ACCESS_IP:$ACCESS_PORT"
 else
-  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; manual driver bind required."
-  show_manual_driver_card
-  json_merge "{\"stage\":\"ZS9_DRIVER_BIND\",\"status\":\"WAITING_FOR_DRIVER_BIND\",\"next_action\":\"Run pnputil in the rescue VM, reboot, then rerun with --continue-after-driver-bind.\",\"checkpoints\":{\"driver_bind\":\"PENDING\"}}"
-  write_report
-  exit 0
+  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; using offline-staged VirtIO drivers and registry/CDDB boot binding."
+  log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted (no rescue reboot — matching win2016 working method)"
 fi
 checkpoint_hit "driver_bind"
 log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind confirmed"

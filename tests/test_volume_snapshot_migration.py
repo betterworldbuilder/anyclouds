@@ -380,6 +380,7 @@ class TestFullDryRunPipeline(unittest.TestCase):
             "post_stream_validation",
             "detach_from_helper",
             "attach_final_flex_volume_to_target_vm",
+            "VOL_POST_ATTACH_VALIDATE",
             "cleanup",
         ]:
             self.assertIn(expected, step_names, f"Stage '{expected}' missing from pipeline")

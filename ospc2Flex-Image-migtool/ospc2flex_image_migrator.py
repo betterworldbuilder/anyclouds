@@ -1903,6 +1903,18 @@ def main() -> None:
                 metadata_file.write_text(json.dumps(_existing_snap, indent=2), encoding="utf-8")
                 log(f"[INFO] OSPC snapshot metadata written to {metadata_file}")
         else:
+            if not args.dry_run:
+                try:
+                    run(
+                        openstack_cmd(ospc_openrc, f"openstack server show {shell_quote(args.server_name)} -f value -c id"),
+                        dry_run=False,
+                    )
+                except Exception as exc:
+                    msg = str(exc).replace("\n", " ")[:500]
+                    die(
+                        f"Source OSPC server '{args.server_name}' was not found before snapshot creation. "
+                        f"Use the exact source server name/UUID, or use Volume-Snapshot-Mig for an existing volume snapshot. Detail: {msg}"
+                    )
             log(f"[INFO] Waiting for server task_state to clear before snapshotting (max 10 min)...")
             for _wait_attempt in range(60):
                 if args.dry_run:

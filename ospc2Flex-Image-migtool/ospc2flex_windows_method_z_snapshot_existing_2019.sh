@@ -548,10 +548,9 @@ find_resume_artifact() {
   for dir in "${dirs[@]}"; do
     [ -d "$dir" ] || continue
     while IFS= read -r f; do
-      [ -f "${JOB_STATE}/snapwin_repair_version" ] && continue
       if ! qemu-img check -q "$f" >>"$BACKGROUND_LOG" 2>&1; then
-        log "[ZS3_DOWNLOAD_SNAPSHOT] corrupt qcow2 deleted: $f"
-        rm -f "$f"; continue
+        log "[ZS3_DOWNLOAD_SNAPSHOT] corrupt qcow2 skipped: $f"
+        continue
       fi
       echo "$f"; return 0
     done < <(find "$dir" -maxdepth 3 -type f -name "*${LABEL_SAFE}*.qcow2" \

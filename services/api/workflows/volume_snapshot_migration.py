@@ -22,6 +22,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Generator, List, Optional
 
 log = logging.getLogger(__name__)
@@ -51,9 +52,26 @@ class VolumeSnapshotMigrationConfig:
     rollback_delete_flex_volume: bool = False
     stream_timeout:           int = 7200   # seconds
     volume_poll_timeout:      int = 1800   # seconds
+    post_attach_validate_mount: bool = False
+    post_attach_validate_pg: bool = False
+    post_attach_db_validator: str = "none"
+    post_attach_custom_validate_cmd: str = ""
+    post_attach_pg_db_name: str = "openstack_drinks"
+    post_attach_pg_table_name: str = "preferred_drinks"
+    post_attach_mount_point: Optional[str] = None
+    post_attach_device_hint: Optional[str] = None
+    post_attach_ssh_user: str = "ubuntu"
+    post_attach_ssh_key_path: str = "~/.ssh/id_rsa"
+    post_attach_allow_luks_open: bool = True
+    post_attach_allow_lvm_activate: bool = True
+    post_attach_update_postgresql_conf: bool = True
+    post_attach_start_postgresql: bool = True
+    post_attach_artifact_dir: str = ""
+    post_attach_script_path: str = ""
 
     def __post_init__(self):
         self.ssh_key_path = os.path.expanduser(self.ssh_key_path)
+        self.post_attach_ssh_key_path = os.path.expanduser(self.post_attach_ssh_key_path)
 
 
 @dataclass
@@ -84,6 +102,12 @@ class ValidationResult:
     target_bytes:        int = 0
     filesystem_detected: str = ""
     mount_validation:    str = "skipped"  # "success" | "skipped" | "failed"
+    post_attach_validation_status: str = "skipped"
+    post_attach_query_row_count: Optional[int] = None
+    post_attach_mount_point: str = ""
+    post_attach_data_dir: str = ""
+    post_attach_log_path: str = ""
+    post_attach_result_path: str = ""
 
 
 @dataclass
@@ -121,6 +145,12 @@ class VolumeSnapshotMigrationResult:
                 "target_bytes":        self.validation.target_bytes,
                 "filesystem_detected": self.validation.filesystem_detected,
                 "mount_validation":    self.validation.mount_validation,
+                "post_attach_validation_status": self.validation.post_attach_validation_status,
+                "post_attach_query_row_count": self.validation.post_attach_query_row_count,
+                "post_attach_mount_point": self.validation.post_attach_mount_point,
+                "post_attach_data_dir": self.validation.post_attach_data_dir,
+                "post_attach_log_path": self.validation.post_attach_log_path,
+                "post_attach_result_path": self.validation.post_attach_result_path,
             },
             "error": self.error,
         }
@@ -192,6 +222,142 @@ def _detect_new_device_via_ssh(ip: str, user: str, key: str) -> str:
         if kind == "disk" and not mountpoint and not _is_root_device(name):
             candidates.append(name)
     return f"/dev/{candidates[-1]}" if candidates else ""
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _resolve_server_ip(openrc_path: str, server_id: str) -> str:
+    if not server_id:
+        return ""
+    r = run_openstack(openrc_path, ["server", "show", server_id, "-f", "json"], timeout=60)
+    if r.returncode != 0:
+        return ""
+    try:
+        data = json.loads(r.stdout or "{}")
+    except Exception:
+        return ""
+    addresses = data.get("addresses") or data.get("Addresses") or ""
+    import re
+    blob = json.dumps(addresses) if isinstance(addresses, (dict, list)) else str(addresses)
+    ips = re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", blob)
+    return ips[-1] if ips else ""
+
+
+def _flex_volume_attached_device(openrc_path: str, volume_id: str) -> str:
+    if not volume_id:
+        return ""
+    r = run_openstack(openrc_path, ["volume", "show", volume_id, "-f", "json"], timeout=60)
+    if r.returncode != 0:
+        return ""
+    try:
+        data = json.loads(r.stdout or "{}")
+    except Exception:
+        return ""
+    attachments = data.get("attachments") or data.get("Attachments") or []
+    if isinstance(attachments, str):
+        return ""
+    if attachments:
+        return str(attachments[0].get("device") or "")
+    return ""
+
+
+def run_post_attach_pg_validation(pairing_result: dict, config: VolumeSnapshotMigrationConfig) -> dict:
+    """Stage and run the safe post-attach volume mount validator on the FLEX target VM."""
+    flex_volume_id = str(pairing_result.get("flex_volume_id") or "")
+    flex_target_vm_id = str(pairing_result.get("flex_target_vm_id") or config.flex_target_vm or config.flex_helper_vm or "")
+    target_ip = str(pairing_result.get("flex_target_vm_ip") or "")
+    if not target_ip:
+        target_ip = _resolve_server_ip(config.flex_openrc, flex_target_vm_id)
+    if not target_ip and flex_target_vm_id == config.flex_helper_vm:
+        target_ip = config.flex_helper_ip
+
+    artifact_dir = Path(config.post_attach_artifact_dir or os.getcwd())
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    log_path = artifact_dir / f"post_attach_validate_{flex_volume_id or 'unknown'}.log"
+    json_path = artifact_dir / f"post_attach_validate_{flex_volume_id or 'unknown'}.json"
+
+    result = {
+        "post_attach_validation_status": "skipped",
+        "flex_volume_id": flex_volume_id,
+        "flex_target_vm_id": flex_target_vm_id,
+        "post_attach_query_row_count": None,
+        "post_attach_mount_point": config.post_attach_mount_point or "",
+        "post_attach_data_dir": "",
+        "log_path": str(log_path),
+        "result_path": str(json_path),
+    }
+
+    if not (config.post_attach_validate_mount or config.post_attach_validate_pg):
+        json_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
+        return result
+
+    if not target_ip:
+        result["post_attach_validation_status"] = "failed"
+        result["reason"] = "target_vm_ip_not_resolved"
+        json_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
+        return result
+
+    script_path = Path(config.post_attach_script_path) if config.post_attach_script_path else _repo_root() / "scripts" / "osflex_post_attach_pg_mount_validate.sh"
+    if not script_path.is_file():
+        result["post_attach_validation_status"] = "failed"
+        result["reason"] = f"script_not_found:{script_path}"
+        json_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
+        return result
+
+    device_hint = str(pairing_result.get("attached_device_hint") or config.post_attach_device_hint or "")
+    if not device_hint:
+        device_hint = _flex_volume_attached_device(config.flex_openrc, flex_volume_id)
+
+    scp_cmd = [
+        "scp", "-i", config.post_attach_ssh_key_path,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "BatchMode=yes", "-o", "ConnectTimeout=30",
+        str(script_path), f"{config.post_attach_ssh_user}@{target_ip}:/tmp/osflex_post_attach_pg_mount_validate.sh",
+    ]
+    with log_path.open("w", encoding="utf-8") as log_fh:
+        scp_proc = subprocess.run(scp_cmd, stdout=log_fh, stderr=subprocess.STDOUT, text=True, timeout=120)
+        if scp_proc.returncode != 0:
+            result["post_attach_validation_status"] = "failed"
+            result["reason"] = "script_upload_failed"
+            json_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
+            return result
+
+        env_cmd = (
+            "sudo "
+            f"DEV_HINT={shlex.quote(device_hint)} "
+            f"MOUNT_POINT={shlex.quote(config.post_attach_mount_point or '')} "
+            f"DB_NAME={shlex.quote(config.post_attach_pg_db_name)} "
+            f"TABLE_NAME={shlex.quote(config.post_attach_pg_table_name)} "
+            f"VALIDATE_PG={shlex.quote(str(config.post_attach_validate_pg).lower())} "
+            f"DB_VALIDATOR={shlex.quote(config.post_attach_db_validator or 'none')} "
+            f"CUSTOM_VALIDATE_CMD={shlex.quote(config.post_attach_custom_validate_cmd or '')} "
+            f"ALLOW_LVM={shlex.quote(str(config.post_attach_allow_lvm_activate).lower())} "
+            f"ALLOW_LUKS={shlex.quote(str(config.post_attach_allow_luks_open).lower())} "
+            f"UPDATE_PG_CONF={shlex.quote(str(config.post_attach_update_postgresql_conf).lower())} "
+            f"START_POSTGRES={shlex.quote(str(config.post_attach_start_postgresql).lower())} "
+            "bash /tmp/osflex_post_attach_pg_mount_validate.sh"
+        )
+        ssh_cmd = [
+            "ssh", "-i", config.post_attach_ssh_key_path,
+            "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "BatchMode=yes", "-o", "ConnectTimeout=30",
+            f"{config.post_attach_ssh_user}@{target_ip}", env_cmd,
+        ]
+        proc = subprocess.run(ssh_cmd, stdout=log_fh, stderr=subprocess.STDOUT, text=True, timeout=1800)
+
+    log_text = log_path.read_text(encoding="utf-8", errors="replace")
+    import re
+    count_match = re.search(r"Row count:\s*\n\s*(\d+)\s*$", log_text, re.MULTILINE)
+    mount_match = re.search(r"Mount point:\s*(\S+)", log_text)
+    data_match = re.search(r"Detected PostgreSQL data directory:\s*(\S+)", log_text)
+    result["post_attach_validation_status"] = "success" if proc.returncode == 0 else "failed"
+    result["post_attach_query_row_count"] = int(count_match.group(1)) if count_match else None
+    result["post_attach_mount_point"] = mount_match.group(1) if mount_match else (config.post_attach_mount_point or "")
+    result["post_attach_data_dir"] = data_match.group(1) if data_match else ""
+    json_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
+    return result
 
 
 # ── Migration stages (generators yielding log strings) ────────────────────────
@@ -801,6 +967,60 @@ def _stage_attach_to_final_vm(
     yield f"[attach final FLEX volume to target FLEX VM] OK — vol={flex_vol_id} attached to {cfg.flex_target_vm}"
 
 
+def _stage_post_attach_pg_validate(
+    cfg: VolumeSnapshotMigrationConfig,
+    flex_vol_id: str,
+    result: VolumeSnapshotMigrationResult,
+) -> Generator[str, None, None]:
+    step = VolumeSnapshotMigrationStepResult.start("VOL_POST_ATTACH_VALIDATE")
+    result.steps.append(step)
+
+    if not (cfg.post_attach_validate_mount or cfg.post_attach_validate_pg):
+        result.validation.post_attach_validation_status = "skipped"
+        step.finish("skipped", "post_attach_validate_mount=False")
+        yield "[VOL_POST_ATTACH_VALIDATE] skipped (post_attach_validate_mount=False)"
+        return
+
+    if cfg.dry_run:
+        if not cfg.attach_to_final_vm:
+            result.validation.post_attach_validation_status = "skipped"
+            step.finish("skipped", "attach_to_final_vm=False")
+            yield "[VOL_POST_ATTACH_VALIDATE] skipped — final attach is not enabled"
+            return
+        result.validation.post_attach_validation_status = "skipped"
+        extra = " and PostgreSQL proof query" if cfg.post_attach_validate_pg else ""
+        step.finish("dry_run", f"dry_run — would run volume mount validation{extra}")
+        yield f"[VOL_POST_ATTACH_VALIDATE] dry_run: would stage script, mount volume, validate mount{extra}"
+        return
+
+    if not result.attached_to_final_vm:
+        result.validation.post_attach_validation_status = "skipped"
+        step.finish("skipped", "final attach did not succeed")
+        yield "[VOL_POST_ATTACH_VALIDATE] skipped — final attach did not succeed"
+        return
+
+    extra = " + PostgreSQL query" if cfg.post_attach_validate_pg else ""
+    yield f"[VOL_POST_ATTACH_VALIDATE] Running post-attach volume mount validation{extra}"
+    payload = {
+        "flex_volume_id": flex_vol_id,
+        "flex_target_vm_id": cfg.flex_target_vm or cfg.flex_helper_vm,
+        "attached_device_hint": cfg.post_attach_device_hint or _flex_volume_attached_device(cfg.flex_openrc, flex_vol_id),
+    }
+    validation = run_post_attach_pg_validation(payload, cfg)
+
+    result.validation.post_attach_validation_status = str(validation.get("post_attach_validation_status") or "failed")
+    result.validation.post_attach_query_row_count = validation.get("post_attach_query_row_count")
+    result.validation.post_attach_mount_point = str(validation.get("post_attach_mount_point") or "")
+    result.validation.post_attach_data_dir = str(validation.get("post_attach_data_dir") or "")
+    result.validation.post_attach_log_path = str(validation.get("log_path") or "")
+    result.validation.post_attach_result_path = str(validation.get("result_path") or "")
+
+    status = result.validation.post_attach_validation_status
+    msg = f"status={status} rows={result.validation.post_attach_query_row_count} log={result.validation.post_attach_log_path}"
+    step.finish("success" if status == "success" else "failed", msg)
+    yield f"[VOL_POST_ATTACH_VALIDATE] {msg}"
+
+
 def _stage_cleanup(
     cfg: VolumeSnapshotMigrationConfig,
     ospc_vol_id: str,
@@ -971,6 +1191,10 @@ def migrate_volume_snapshot_to_flex(
         for msg in _stage_attach_to_final_vm(config, flex_vol_id, result):
             log.info(msg)
 
+        # 11b. optional post-attach PostgreSQL validation
+        for msg in _stage_post_attach_pg_validate(config, flex_vol_id, result):
+            log.info(msg)
+
         # 12. cleanup temp OSPC volume
         for msg in _stage_cleanup(config, ospc_vol_id, result):
             log.info(msg)
@@ -1057,6 +1281,7 @@ def migrate_volume_snapshot_to_flex_stream(
         yield from _stage_post_stream_validation(config, tgt_dev, result)
         yield from _stage_detach_from_helpers(config, ospc_vol_id, flex_vol_id, result)
         yield from _stage_attach_to_final_vm(config, flex_vol_id, result)
+        yield from _stage_post_attach_pg_validate(config, flex_vol_id, result)
         yield from _stage_cleanup(config, ospc_vol_id, result)
 
         result.status = "success"

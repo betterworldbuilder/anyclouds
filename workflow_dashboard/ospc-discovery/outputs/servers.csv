@@ -1,2 +1,26 @@
 collected_at,service_type,region,name,resource_id,status,public_ips,private_ips,flavor_id,image_id,image_name,image_os_distro,image_os_version,image_os_type
-2026-05-16T17:17:38Z,cloud_server,ORD,Weekly-musiclabradio.com,8498fa91-0e3d-45a4-b245-d2354db17ac7,ACTIVE,23.253.20.7,10.209.96.10,general1-1,,Linux,,,Linux
+2026-05-17T11:23:43Z,cloud_server,IAD,u24clean,de46ca25-136c-4b88-b7a3-40c680962c5c,ACTIVE,104.130.26.122,10.176.192.91,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,debian12,59065b63-15b9-4099-b5ea-f5ab005f8b2c,ACTIVE,104.130.13.12,10.176.194.47,general1-2,c4dc0279-67d9-4272-a4d3-ddfe2eaf4d4c,Debian 12,debian,12,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,u24,13b9ba25-fe39-4169-a1fb-437276a07e45,ACTIVE,23.253.159.251,10.176.194.35,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,u-22,dd5476a0-6479-4f56-aefd-8b50db956412,ACTIVE,23.253.159.243,10.176.194.16,general1-2,c2e5b7be-32ea-4f74-bb88-1c9a4104f8ca,Ubuntu 22.04,ubuntu,22.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,Server-21,bb29c9d8-1b00-4c6f-852f-d07fe4c8b749,ACTIVE,23.253.159.18,10.176.193.7,general1-2,233f8254-398c-4d2e-b817-c543a1d1ea6c,Alma 9,alma,9,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,musicradio,faa49462-d7ab-475b-9aa6-5d65a16667e8,ACTIVE,104.130.26.6,10.176.192.4,general1-2,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,postgresqlU24,7beb21aa-2937-43b5-ae77-3d849ba2bd5e,ACTIVE,104.130.26.81,10.176.192.108,general1-1,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,u24,401890d9-81b8-4a8c-9ede-cfe6f4397eeb,ACTIVE,104.130.26.247,10.176.192.247,general1-1,2fd07c5d-3104-4931-882b-4fe6a115c3bd,Ubuntu 24.04,ubuntu,24.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,ospcwin2019,09d88d96-901d-4741-9a61-38bfbd466e84,ACTIVE,23.253.159.176,10.176.193.227,general1-1,,Windows Server,windows,,Windows
+2026-05-17T11:23:43Z,cloud_server,IAD,opscwin2016,d69037a7-8441-42e2-b349-30628dbd7ecc,ACTIVE,104.130.26.118,10.176.192.154,general1-2,1ccd0f49-2169-4854-9222-443914c71830,Windows 2016,windows,2016,windows
+2026-05-17T11:23:43Z,cloud_server,IAD,bigjumpwindowsiad,77fbe978-4b0b-43cd-8722-47a495827d49,ACTIVE,104.130.29.126,10.209.32.49,compute1-30,,Windows Server,windows,,Windows
+2026-05-17T11:23:43Z,cloud_server,IAD,test-c7hwfix-iad-1,f2110fde-3890-464c-b35c-8ee1dc0bbf24,ACTIVE,104.130.26.245,10.176.192.219,general1-4,53d597be-89ea-4c46-a169-dce0fb50b24b,linux,,,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,Bigjim-iad,467cf940-3b81-43d6-985f-3cbe90ed98e9,ACTIVE,104.239.169.89,10.209.32.79,compute1-30,,Linux,,,Linux
+2026-05-17T11:23:43Z,cloud_server,IAD,jenkins,107d8faf-4a18-4d50-88c9-f49042843f18,ACTIVE,23.253.159.66,10.176.193.35,general1-4,4fed5350-f0ab-4090-a03b-ed9a3e7b4dd4,Centos 7,centos,7,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,centos7,8daf4f80-47bc-41a6-bbcb-cd5974193b41,ACTIVE,104.130.29.156,10.209.32.39,compute1-4,,Centos,centos,,Linux
+2026-05-17T11:23:43Z,cloud_server,IAD,win2019,aaabe292-762c-4847-b249-b181ead4737c,ACTIVE,104.130.165.51,10.209.32.14,compute1-4,,Windows Server,windows,,Windows
+2026-05-17T11:23:43Z,cloud_server,IAD,windows2016,1850f963-95f6-477f-97da-81e5b404694f,ACTIVE,104.130.26.194,10.176.192.167,general1-2,1ccd0f49-2169-4854-9222-443914c71830,Windows 2016,windows,2016,windows
+2026-05-17T11:23:43Z,cloud_server,IAD,debian11new,cd6a356c-62fc-4763-aafc-ca342ec8f923,ACTIVE,104.130.26.136,10.176.192.152,general1-2,006590f9-caf1-43a7-b76b-6d71807921b4,Debian 11,debian,11,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,dbian10new,9262a99e-6bd3-495d-bacd-06a015b29088,ACTIVE,23.253.159.136,10.176.193.142,general1-2,22247828-3dc1-42db-b123-9dc5e96c81b2,Debian 10,debian,10,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,u20,f4dd8084-20c4-40a4-8784-7db8c6c5162a,ACTIVE,23.253.159.30,10.176.193.20,general1-1,f0927f2c-7b84-4bc9-ac8c-a0891ffb16d4,Ubuntu 20.04,ubuntu,20.04,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,rocky9,12962165-11ca-498c-8a2f-db69947f9264,ACTIVE,104.130.26.163,10.176.192.150,general1-1,d671b38a-6066-41cd-9a4e-f0a834aa7e4a,Rocky 9,rocky,9,linux
+2026-05-17T11:23:43Z,cloud_server,IAD,alma8,f4680994-c54f-473a-8549-b6fb1176088c,SHUTOFF,104.130.165.76,10.209.32.73,compute1-4,,AlmaLinux,almalinux,,Linux
+2026-05-17T11:23:43Z,cloud_server,IAD,dbian12,8d7309ea-f39c-417b-8f50-c28f76ffd9db,ACTIVE,104.130.165.31,10.209.32.41,compute1-4,,Linux,,,Linux
+2026-05-17T11:23:43Z,cloud_server,IAD,Alma9,de2cc03b-b53a-4f32-8b1b-8a3c9d757069,SHUTOFF,146.20.65.205,10.209.224.9,compute1-8,,AlmaLinux,almalinux,,Linux
+2026-05-17T11:23:43Z,cloud_server,IAD,rocky8,7afcc45d-4080-475e-a771-8ee1f265ef5c,ACTIVE,146.20.65.60,10.209.224.6,compute1-8,,Rocky,rocky,,Linux

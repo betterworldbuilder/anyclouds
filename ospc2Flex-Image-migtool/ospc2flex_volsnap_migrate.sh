@@ -13,6 +13,7 @@
 # VS9:  Validate FLEX target disk (blkid, file -s)
 # VS10: Detach FLEX volume from helper VM
 # VS11: Attach FLEX volume to paired migrated FLEX VM (optional)
+# VOL_POST_ATTACH_VALIDATE: optionally mount migrated volume and optionally query PostgreSQL proof table
 # VS12: Cleanup — detach + delete temp OSPC volume
 #
 # No FLEX Glance. No qcow2. No image create. No virtual-size mismatch.
@@ -41,6 +42,22 @@ CLEANUP_TEMP="true"
 ATTACH_TO_FINAL="true"
 SOURCE_DEVICE_OVERRIDE=""
 TARGET_DEVICE_OVERRIDE=""
+POST_ATTACH_VALIDATE_MOUNT="false"
+POST_ATTACH_VALIDATE_PG="false"
+POST_ATTACH_DB_VALIDATOR="none"
+POST_ATTACH_CUSTOM_VALIDATE_CMD=""
+POST_ATTACH_PG_DB_NAME="openstack_drinks"
+POST_ATTACH_PG_TABLE_NAME="preferred_drinks"
+POST_ATTACH_MOUNT_POINT=""
+POST_ATTACH_DEVICE_HINT=""
+POST_ATTACH_SSH_USER="ubuntu"
+POST_ATTACH_SSH_KEY_PATH="${HOME}/.ssh/id_rsa"
+POST_ATTACH_SSH_IP=""
+POST_ATTACH_ALLOW_LUKS_OPEN="true"
+POST_ATTACH_ALLOW_LVM_ACTIVATE="true"
+POST_ATTACH_UPDATE_POSTGRESQL_CONF="true"
+POST_ATTACH_START_POSTGRESQL="true"
+POST_ATTACH_SCRIPT_PATH="/tmp/osflex_post_attach_pg_mount_validate.sh"
 BASE_DIR="${OSPC2FLEX_LINUX_SNAP_BASE_DIR:-/mnt/migration/ospc2flex_linux_snap}"
 DRY_RUN=0
 
@@ -61,6 +78,22 @@ while [[ $# -gt 0 ]]; do
     --attach-to-final)     ATTACH_TO_FINAL="$2";         shift 2 ;;
     --source-device)       SOURCE_DEVICE_OVERRIDE="$2";  shift 2 ;;
     --target-device)       TARGET_DEVICE_OVERRIDE="$2";  shift 2 ;;
+    --post-attach-validate-mount) POST_ATTACH_VALIDATE_MOUNT="$2"; shift 2 ;;
+    --post-attach-validate-pg) POST_ATTACH_VALIDATE_PG="$2"; shift 2 ;;
+    --post-attach-db-validator) POST_ATTACH_DB_VALIDATOR="$2"; shift 2 ;;
+    --post-attach-custom-validate-cmd) POST_ATTACH_CUSTOM_VALIDATE_CMD="$2"; shift 2 ;;
+    --post-attach-pg-db-name) POST_ATTACH_PG_DB_NAME="$2"; shift 2 ;;
+    --post-attach-pg-table-name) POST_ATTACH_PG_TABLE_NAME="$2"; shift 2 ;;
+    --post-attach-mount-point) POST_ATTACH_MOUNT_POINT="$2"; shift 2 ;;
+    --post-attach-device-hint) POST_ATTACH_DEVICE_HINT="$2"; shift 2 ;;
+    --post-attach-ssh-user) POST_ATTACH_SSH_USER="$2"; shift 2 ;;
+    --post-attach-ssh-key-path) POST_ATTACH_SSH_KEY_PATH="$2"; shift 2 ;;
+    --post-attach-ssh-ip) POST_ATTACH_SSH_IP="$2"; shift 2 ;;
+    --post-attach-allow-luks-open) POST_ATTACH_ALLOW_LUKS_OPEN="$2"; shift 2 ;;
+    --post-attach-allow-lvm-activate) POST_ATTACH_ALLOW_LVM_ACTIVATE="$2"; shift 2 ;;
+    --post-attach-update-postgresql-conf) POST_ATTACH_UPDATE_POSTGRESQL_CONF="$2"; shift 2 ;;
+    --post-attach-start-postgresql) POST_ATTACH_START_POSTGRESQL="$2"; shift 2 ;;
+    --post-attach-script-path) POST_ATTACH_SCRIPT_PATH="$2"; shift 2 ;;
     --base-dir)            BASE_DIR="$2";                shift 2 ;;
     --dry-run)             DRY_RUN=1;                    shift ;;
     # legacy compat — ignored
@@ -110,6 +143,7 @@ if [ "$DRY_RUN" = 1 ]; then
     VS8_STREAM_BLOCK_DATA \
     VS9_VALIDATE_FLEX_DISK \
     VS10_DETACH_FLEX_FROM_HELPER \
+    VOL_POST_ATTACH_VALIDATE \
     VS12_CLEANUP_OSPC
   do
     stage "$s"
@@ -210,9 +244,105 @@ flex_volume_device() {
     'import json,sys; v=json.load(sys.stdin); a=v.get("attachments") or []; print(a[0].get("device","") if a else "")' \
     2>/dev/null || true
 }
+flex_server_first_ip() {
+  openstack server show "$1" -f json 2>/dev/null | python3 -c '
+import json, re, sys
+try:
+    data=json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+addresses=data.get("addresses") or data.get("Addresses") or ""
+if isinstance(addresses, dict):
+    blob=" ".join(str(x) for vals in addresses.values() for x in (vals if isinstance(vals, list) else [vals]))
+else:
+    blob=str(addresses)
+ips=re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", blob)
+print(ips[-1] if ips else "")
+' || true
+}
+validate_flex_helper_server() {
+  [ -n "$FLEX_HELPER_VM_ID" ] || return 0
+  local out="$JOB_LOG/flex_helper_preflight.log"
+  : >"$out"
+  (
+    set +u
+    unset OS_TOKEN OS_AUTH_TYPE OS_AUTH_URL OS_TENANT_ID OS_TENANT_NAME \
+          OS_REGION_NAME OS_IDENTITY_API_VERSION OS_INTERFACE \
+          OS_PROJECT_ID OS_PROJECT_NAME OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_ID
+    # shellcheck disable=SC1090
+    source "$FLEX_OPENRC"
+    openstack token issue >/dev/null 2>&1 || { echo "FLEX authentication failed"; exit 10; }
+    if openstack server show "$FLEX_HELPER_VM_ID" -f value -c id >/dev/null 2>&1; then
+      exit 0
+    fi
+    echo "No FLEX server found for: $FLEX_HELPER_VM_ID"
+    if openstack image show "$FLEX_HELPER_VM_ID" -f value -c id >/dev/null 2>&1; then
+      echo "That UUID exists as an image, not a server. Use the instance/server ID from the VM details."
+    fi
+    if [ -n "$FLEX_HELPER_IP" ]; then
+      echo "Servers matching helper IP $FLEX_HELPER_IP:"
+      openstack server list --long -f value -c ID -c Name -c Networks 2>/dev/null | grep -F "$FLEX_HELPER_IP" | head -5 || true
+    fi
+    exit 11
+  ) >"$out" 2>&1
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && log "[FLEX-PREFLIGHT] $line"
+    done <"$out"
+    fail_exit "Invalid FLEX helper VM ID '$FLEX_HELPER_VM_ID' — use the FLEX instance/server ID, not the Image Info ID"
+  fi
+}
 
 local_block_disks() {
   sudo lsblk -dnpo NAME,TYPE 2>/dev/null | awk '$2=="disk" && $1 !~ /^\/dev\/(nbd|loop|sr|fd)/ {print $1}' | sort
+}
+flex_remote_block_disks() {
+  ssh_flex "lsblk -dnpo NAME,TYPE 2>/dev/null | awk '\$2==\"disk\" && \$1 !~ /^\\/dev\\/(nbd|loop|sr|fd)/ {print \$1}' | sort" 2>>"$JOB_LOG/flex_ssh.log" || true
+}
+flex_remote_device_is_safe() {
+  local dev="$1"
+  case "$dev" in /dev/*) ;; *) return 1 ;; esac
+  printf '%s' "$dev" | grep -Eq '^/dev/[A-Za-z0-9._/-]+$' || return 1
+  ssh_flex "set -e
+dev='$dev'
+[ -b \"\$dev\" ] || { echo \"missing block device: \$dev\" >&2; exit 20; }
+[ \"\$(lsblk -dnro TYPE \"\$dev\")\" = disk ] || { echo \"not a disk: \$dev\" >&2; exit 21; }
+root_src=\$(findmnt -n -o SOURCE /)
+root_mm=\$(findmnt -n -o MAJ:MIN /)
+dev_mm=\$(lsblk -dnro MAJ:MIN \"\$dev\")
+root_pk=\$(lsblk -npo PKNAME \"\$root_src\" 2>/dev/null | head -1)
+[ \"\$dev\" != \"\$root_src\" ] || { echo \"device is root source: \$dev\" >&2; exit 22; }
+[ \"\$dev_mm\" != \"\$root_mm\" ] || { echo \"device has root maj:min: \$dev\" >&2; exit 23; }
+[ -z \"\$root_pk\" ] || [ \"\$dev\" != \"\$root_pk\" ] || { echo \"device is root parent: \$dev\" >&2; exit 24; }
+if lsblk -nrpo NAME,MOUNTPOINT \"\$dev\" | awk 'NF>=2 && \$2 != \"\" {found=1} END{exit found?0:1}'; then
+  echo \"device has mounted filesystem: \$dev\" >&2
+  exit 25
+fi" 2>>"$JOB_LOG/flex_ssh.log"
+}
+flex_find_new_safe_disk() {
+  local before="$1" before_b64
+  before_b64="$(printf '%s' "$before" | base64 | tr -d '\n')"
+  ssh_flex "set -e
+before=\$(printf '%s' '$before_b64' | base64 -d 2>/dev/null || true)
+for dev in \$(lsblk -dnpo NAME,TYPE 2>/dev/null | awk '\$2==\"disk\" && \$1 !~ /^\\/dev\\/(nbd|loop|sr|fd)/ {print \$1}' | sort); do
+  case \" \$before \" in *\" \$dev \"*) continue ;; esac
+  [ -b \"\$dev\" ] || continue
+  [ \"\$(lsblk -dnro TYPE \"\$dev\")\" = disk ] || continue
+  root_src=\$(findmnt -n -o SOURCE /)
+  root_mm=\$(findmnt -n -o MAJ:MIN /)
+  dev_mm=\$(lsblk -dnro MAJ:MIN \"\$dev\")
+  root_pk=\$(lsblk -npo PKNAME \"\$root_src\" 2>/dev/null | head -1)
+  [ \"\$dev\" != \"\$root_src\" ] || continue
+  [ \"\$dev_mm\" != \"\$root_mm\" ] || continue
+  [ -z \"\$root_pk\" ] || [ \"\$dev\" != \"\$root_pk\" ] || continue
+  if lsblk -nrpo NAME,MOUNTPOINT \"\$dev\" | awk 'NF>=2 && \$2 != \"\" {found=1} END{exit found?0:1}'; then
+    continue
+  fi
+  echo \"\$dev\"
+  exit 0
+done
+exit 1" 2>>"$JOB_LOG/flex_ssh.log" || true
 }
 region_short() {
   local r="${OS_REGION_NAME:-IAD}"
@@ -254,6 +384,7 @@ kv "OSPC region"   "$OSPC_API_REGION"
 kv "Snapshot ID"   "$SNAPSHOT_ID"
 kv "Label"         "$LABEL_SAFE"
 kv "FLEX helper"   "${FLEX_HELPER_USER}@${FLEX_HELPER_IP} (vm=${FLEX_HELPER_VM_ID:-none})"
+validate_flex_helper_server
 
 # ── VS1: Create temp OSPC Cinder volume from snapshot ─────────────────────────
 stage "VS1_CREATE_TEMP_OSPC_VOLUME"
@@ -348,10 +479,14 @@ unset OS_TOKEN OS_AUTH_TYPE OS_AUTH_URL OS_TENANT_ID OS_TENANT_NAME \
 source "$FLEX_OPENRC"
 openstack token issue >/dev/null 2>&1 || fail_exit "FLEX authentication failed — check $FLEX_OPENRC"
 
-FLEX_VOL_SIZE_GB="$SNAP_SIZE_ORIG_GB"
+# FLEX encrypted Cinder can expose a guest block device slightly smaller than
+# the requested size because of provider-side encryption/header reservation.
+# Use +1GiB headroom so a full original-size block stream does not hit EOD.
+FLEX_VOL_SIZE_GB=$(( SNAP_SIZE_ORIG_GB + 1 ))
 FLEX_VOL_NAME="${FLEX_VOLUME_NAME_OVERRIDE:-mig-${LABEL_SAFE}-flex}"
 kv "FLEX volume name" "$FLEX_VOL_NAME"
 kv "FLEX volume size" "${FLEX_VOL_SIZE_GB}GB"
+log "[VS4] FLEX volume includes +1GB safety headroom for encrypted Cinder presented-size differences"
 
 FLEX_VOL_ID="$(openstack volume create \
   --size "$FLEX_VOL_SIZE_GB" \
@@ -365,7 +500,14 @@ log "[VS4] HIT FLEX volume available"
 
 # ── VS5: Attach blank FLEX volume to FLEX helper VM ───────────────────────────
 stage "VS5_ATTACH_FLEX_VOLUME_TO_HELPER"
+FLEX_PRE_ATTACH_DISKS=""
 if [ -n "$FLEX_HELPER_VM_ID" ]; then
+  FLEX_PRE_ATTACH_DISKS="$(flex_remote_block_disks | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  if [ -n "$FLEX_PRE_ATTACH_DISKS" ]; then
+    log "[VS5] FLEX helper disks before attach: $FLEX_PRE_ATTACH_DISKS"
+  else
+    log "[VS5] FLEX helper pre-attach disk scan empty; will still use Cinder-reported device"
+  fi
   log "[VS5] Attaching $FLEX_VOL_ID to FLEX helper vm=$FLEX_HELPER_VM_ID"
   openstack server add volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" \
     2>>"$JOB_LOG/flex_cinder.log" || fail_exit "openstack server add volume failed"
@@ -399,8 +541,31 @@ kv "FLEX target device" "$FLEX_TARGET_DEV"
 # Safety: never allow target to be mounted or be the root device
 case "$FLEX_TARGET_DEV" in /dev/*) ;; *) fail_exit "FLEX target device must be a /dev path: $FLEX_TARGET_DEV" ;; esac
 printf '%s' "$FLEX_TARGET_DEV" | grep -Eq '^/dev/[A-Za-z0-9._/-]+$' || fail_exit "Unsafe FLEX target device path: $FLEX_TARGET_DEV"
-ssh_flex "set -e; dev='$FLEX_TARGET_DEV'; [ -b \"\$dev\" ]; [ \"\$(lsblk -dnro TYPE \"\$dev\")\" = disk ]; root_src=\$(findmnt -n -o SOURCE /); root_mm=\$(findmnt -n -o MAJ:MIN /); dev_mm=\$(lsblk -dnro MAJ:MIN \"\$dev\"); root_pk=\$(lsblk -npo PKNAME \"\$root_src\" 2>/dev/null | head -1); [ \"\$dev\" != \"\$root_src\" ]; [ \"\$dev_mm\" != \"\$root_mm\" ]; [ -z \"\$root_pk\" ] || [ \"\$dev\" != \"\$root_pk\" ]; ! lsblk -nrpo NAME,MOUNTPOINT \"\$dev\" | awk 'NF>=2 && \$2 != \"\" {found=1} END{exit found?0:1}'" \
-  || fail_exit "FLEX target device $FLEX_TARGET_DEV is root, mounted, missing, or unsafe — aborting to prevent data loss"
+FLEX_TARGET_DEV_REPORTED="$FLEX_TARGET_DEV"
+FLEX_TARGET_DEV_READY=""
+for _i in $(seq 1 24); do
+  if flex_remote_device_is_safe "$FLEX_TARGET_DEV_REPORTED"; then
+    FLEX_TARGET_DEV="$FLEX_TARGET_DEV_REPORTED"
+    FLEX_TARGET_DEV_READY="true"
+    break
+  fi
+  FLEX_TARGET_DEV_FALLBACK="$(flex_find_new_safe_disk "$FLEX_PRE_ATTACH_DISKS")"
+  if [ -n "$FLEX_TARGET_DEV_FALLBACK" ] && flex_remote_device_is_safe "$FLEX_TARGET_DEV_FALLBACK"; then
+    if [ "$FLEX_TARGET_DEV_FALLBACK" != "$FLEX_TARGET_DEV_REPORTED" ]; then
+      log "[VS6] Remapped Cinder device to guest device: $FLEX_TARGET_DEV_REPORTED -> $FLEX_TARGET_DEV_FALLBACK"
+    fi
+    FLEX_TARGET_DEV="$FLEX_TARGET_DEV_FALLBACK"
+    FLEX_TARGET_DEV_READY="true"
+    break
+  fi
+  [ $((_i % 6)) -eq 0 ] && log "[VS6] Waiting for new safe FLEX guest disk (${_i}/24)"
+  sleep 5
+done
+[ "$FLEX_TARGET_DEV_READY" = "true" ] || {
+  log "[VS6] Current FLEX helper disks: $(flex_remote_block_disks | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  fail_exit "FLEX target device $FLEX_TARGET_DEV_REPORTED is root, mounted, missing, or unsafe — aborting to prevent data loss"
+}
+kv "FLEX target device" "$FLEX_TARGET_DEV"
 
 # ── VS7: Validate target_bytes >= source_bytes ────────────────────────────────
 stage "VS7_VALIDATE_SIZES"
@@ -415,14 +580,13 @@ for _i in $(seq 1 12); do
 done
 kv "Target bytes" "$TARGET_BYTES"
 kv "Source bytes" "$SOURCE_BYTES"
-# Compare FLEX target against original snapshot size (not padded OSPC vol which may be 75GB).
-# Allow 200 MiB slack for backend sector-alignment differences.
+# Compare FLEX target against original snapshot size (not padded OSPC vol which may be 80GB).
+# The target must be large enough for the exact byte stream; otherwise dd fails
+# at the end and leaves a partial destination volume.
 STREAM_BYTES=$(( SNAP_SIZE_ORIG_GB * 1073741824 ))
-_TOLERANCE_BYTES=209715200
-_REQUIRED_BYTES=$(( STREAM_BYTES - _TOLERANCE_BYTES ))
 kv "Stream bytes (orig ${SNAP_SIZE_ORIG_GB}GB)" "$STREAM_BYTES"
-[ "${TARGET_BYTES}" -ge "${_REQUIRED_BYTES}" ] || \
-  fail_exit "FLEX target too small: ${TARGET_BYTES}B < ${STREAM_BYTES}B (original snapshot ${SNAP_SIZE_ORIG_GB}GB, 200MiB tolerance)"
+[ "${TARGET_BYTES}" -ge "${STREAM_BYTES}" ] || \
+  fail_exit "FLEX target too small for exact stream: ${TARGET_BYTES}B < ${STREAM_BYTES}B (original snapshot ${SNAP_SIZE_ORIG_GB}GB; recreate FLEX volume with +1GB headroom)"
 log "[VS7] Size validation passed (target=${TARGET_BYTES}B stream=${STREAM_BYTES}B)"
 
 # ── VS8: Direct block stream ──────────────────────────────────────────────────
@@ -461,6 +625,8 @@ else
 fi
 
 # ── VS11: Attach FLEX volume to paired migrated FLEX VM ───────────────────────
+FINAL_ATTACH_DEVICE=""
+FINAL_TARGET_VM_ID="${FLEX_TARGET_VM_ID:-$FLEX_HELPER_VM_ID}"
 if [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_TARGET_VM_ID" ]; then
   stage "VS11_ATTACH_TO_FINAL_FLEX_VM"
   kv "Final FLEX VM" "$FLEX_TARGET_VM_ID"
@@ -469,8 +635,92 @@ if [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_TARGET_VM_ID" ]; then
   flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || \
     log "[VS11] WARN: FLEX volume did not reach in-use after final attach"
   log "[VS11] HIT FLEX volume attached to final VM $FLEX_TARGET_VM_ID"
+  FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
+  [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
+elif [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_HELPER_VM_ID" ]; then
+  stage "VS11_ATTACH_TO_FINAL_FLEX_VM"
+  kv "Final FLEX VM" "$FLEX_HELPER_VM_ID (helper reused as final target)"
+  openstack server add volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" \
+    2>>"$JOB_LOG/flex_cinder.log" || fail_exit "Final attach to helper/final target $FLEX_HELPER_VM_ID failed"
+  flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || \
+    log "[VS11] WARN: FLEX volume did not reach in-use after final attach"
+  log "[VS11] HIT FLEX volume attached to final VM $FLEX_HELPER_VM_ID"
+  FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
+  [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
 else
   log "[VS11] Skipped final attach (attach_to_final=$ATTACH_TO_FINAL flex_target_vm_id='${FLEX_TARGET_VM_ID}')"
+fi
+
+# ── VOL_POST_ATTACH_VALIDATE: mount migrated volume + optional PostgreSQL query ──
+if [ "$POST_ATTACH_VALIDATE_MOUNT" = "true" ] || [ "$POST_ATTACH_VALIDATE_PG" = "true" ]; then
+  stage "VOL_POST_ATTACH_VALIDATE"
+  [ -n "$FINAL_TARGET_VM_ID" ] || fail_exit "Post-attach validation requested but no final FLEX target VM is known"
+  [ "$ATTACH_TO_FINAL" = "true" ] || fail_exit "Post-attach validation requires attach_to_final=true"
+  if [ ! -f "$POST_ATTACH_SCRIPT_PATH" ]; then
+    fail_exit "Post-attach script not found on jumphost: $POST_ATTACH_SCRIPT_PATH"
+  fi
+
+  TARGET_SSH_IP="$POST_ATTACH_SSH_IP"
+  if [ -z "$TARGET_SSH_IP" ]; then
+    TARGET_SSH_IP="$(flex_server_first_ip "$FINAL_TARGET_VM_ID" | tail -1 | tr -d '[:space:]')"
+  fi
+  if [ -z "$TARGET_SSH_IP" ]; then
+    TARGET_SSH_IP="$FLEX_HELPER_IP"
+    log "[VOL_POST_ATTACH_VALIDATE] WARN: could not resolve final VM IP from OpenStack; using FLEX helper IP $TARGET_SSH_IP"
+  fi
+  [ -n "$TARGET_SSH_IP" ] || fail_exit "Could not determine target VM SSH IP for post-attach validation"
+
+  if [ -z "$POST_ATTACH_DEVICE_HINT" ]; then
+    POST_ATTACH_DEVICE_HINT="$FINAL_ATTACH_DEVICE"
+  fi
+
+  VALIDATE_LOG="$JOB_ART/post_attach_validate_${FLEX_VOL_ID}.log"
+  VALIDATE_JSON="$JOB_ART/post_attach_validate_${FLEX_VOL_ID}.json"
+  REMOTE_VALIDATE_SCRIPT="/tmp/osflex_post_attach_pg_mount_validate.sh"
+  log "[VOL_POST_ATTACH_VALIDATE] Target SSH: ${POST_ATTACH_SSH_USER}@${TARGET_SSH_IP}"
+  log "[VOL_POST_ATTACH_VALIDATE] Device hint: ${POST_ATTACH_DEVICE_HINT:-auto}"
+  log "[VOL_POST_ATTACH_VALIDATE] Mount override: ${POST_ATTACH_MOUNT_POINT:-auto}"
+  log "[VOL_POST_ATTACH_VALIDATE] DB validator: ${POST_ATTACH_DB_VALIDATOR}"
+
+  scp -i "$POST_ATTACH_SSH_KEY_PATH" \
+    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
+    -o BatchMode=yes -o ConnectTimeout=30 \
+    "$POST_ATTACH_SCRIPT_PATH" "${POST_ATTACH_SSH_USER}@${TARGET_SSH_IP}:${REMOTE_VALIDATE_SCRIPT}" \
+    >>"$VALIDATE_LOG" 2>&1 || fail_exit "Failed to upload post-attach validation script"
+
+  set +e
+  ssh -i "$POST_ATTACH_SSH_KEY_PATH" \
+    -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
+    -o BatchMode=yes -o ConnectTimeout=30 \
+    "${POST_ATTACH_SSH_USER}@${TARGET_SSH_IP}" \
+    "sudo DEV_HINT='${POST_ATTACH_DEVICE_HINT}' MOUNT_POINT='${POST_ATTACH_MOUNT_POINT}' DB_NAME='${POST_ATTACH_PG_DB_NAME}' TABLE_NAME='${POST_ATTACH_PG_TABLE_NAME}' VALIDATE_PG='${POST_ATTACH_VALIDATE_PG}' DB_VALIDATOR='${POST_ATTACH_DB_VALIDATOR}' CUSTOM_VALIDATE_CMD='${POST_ATTACH_CUSTOM_VALIDATE_CMD}' ALLOW_LVM='${POST_ATTACH_ALLOW_LVM_ACTIVATE}' ALLOW_LUKS='${POST_ATTACH_ALLOW_LUKS_OPEN}' UPDATE_PG_CONF='${POST_ATTACH_UPDATE_POSTGRESQL_CONF}' START_POSTGRES='${POST_ATTACH_START_POSTGRESQL}' bash '$REMOTE_VALIDATE_SCRIPT'" \
+    2>&1 | tee -a "$VALIDATE_LOG"
+  VALIDATE_RC=${PIPESTATUS[0]}
+  set -e
+
+  ROW_COUNT="$(awk '/Row count:/{flag=1; next} flag && $0 ~ /^[[:space:]]*[0-9]+[[:space:]]*$/ {print; exit}' "$VALIDATE_LOG" 2>/dev/null | tr -d '[:space:]' || true)"
+  python3 - "$VALIDATE_JSON" "$VALIDATE_RC" "$FLEX_VOL_ID" "$POST_ATTACH_DEVICE_HINT" "$POST_ATTACH_MOUNT_POINT" "$POST_ATTACH_PG_DB_NAME" "$POST_ATTACH_PG_TABLE_NAME" "${ROW_COUNT:-}" <<'PY'
+import json, sys
+path, rc, vol, dev, mp, db, table, rows = sys.argv[1:]
+status = "success" if rc == "0" else "failed"
+payload = {
+    "post_attach_validation_status": status,
+    "flex_volume_id": vol,
+    "attached_device_hint": dev,
+    "post_attach_mount_point": mp,
+    "db_name": db,
+    "table_name": table,
+    "post_attach_query_row_count": int(rows) if rows.isdigit() else None,
+}
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump(payload, fh, indent=2, sort_keys=True)
+PY
+  log "[VOL_POST_ATTACH_VALIDATE] Log: $VALIDATE_LOG"
+  log "[VOL_POST_ATTACH_VALIDATE] Result JSON: $VALIDATE_JSON"
+  [ "$VALIDATE_RC" -eq 0 ] || fail_exit "Post-attach validation failed rc=$VALIDATE_RC"
+  log "[VOL_POST_ATTACH_VALIDATE] HIT validation complete"
+else
+  log "[VOL_POST_ATTACH_VALIDATE] skipped (post_attach_validate_mount=false)"
 fi
 
 # ── VS12: Cleanup — detach + optionally delete temp OSPC volume ───────────────

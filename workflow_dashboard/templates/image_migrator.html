@@ -826,11 +826,11 @@
                         </div>
 
                         <!-- Method Z (SNAPWIN) Stage Reference -->
-                        <div style="margin-top:18px;">
+                        <div id="snapwin-stage-reference" style="display:none;margin-top:18px;">
                             <div class="table-header" style="cursor:pointer;user-select:none;" onclick="(function(el){el.style.display=el.style.display==='none'?'':'none';})(document.getElementById('mz-stage-table-body'))">
                                 <h2 style="font-size:13px;color:#38bdf8;">&#9654; SNAPWIN (Method Z) — Stage Reference</h2>
                             </div>
-                            <div id="mz-stage-table-body">
+                            <div id="mz-stage-table-body" style="display:none;">
                             <div class="table-wrap" style="margin-top:6px;">
                                 <table class="adv-table" style="font-size:12px;">
                                     <thead>
@@ -907,71 +907,57 @@
 
                 <!-- Cold Image Migration Action Buttons -->
                 <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:18px 0 24px;">
-                    <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+                    <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
                         <button type="button" class="btn-primary img-mig-trigger" id="start-image-migration-btn"
-                            style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start;"
+                            style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-color: #8b5cf6; justify-content: flex-start; border-radius:6px; padding:14px 22px; font-size:18px; font-weight:700; gap:10px; min-width:300px;"
                             title="Glance → jumphost → FLEX for images checked in OSPC Image List (run scan above first)"
                             onclick="document.getElementById('mig_mode_value').value='live';">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                             <span>🖼 LinuxSnapshot-Mig</span>
                         </button>
-                        <label style="display:flex;align-items:center;gap:6px;color:#c4b5fd;font-size:11px;font-weight:800;cursor:pointer;" title="Kill existing Linux snapshot migration processes on the jumphost before launching this batch.">
+                        <label style="display:flex;align-items:center;gap:7px;color:#c4b5fd;font-size:16px;font-weight:800;cursor:pointer;" title="Kill existing Linux snapshot migration processes on the jumphost before launching this batch.">
                             <input type="checkbox" id="linux_snap_start_fresh_kill" style="accent-color:#8b5cf6;"> START FRESH
                         </label>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+                    <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
                         <button type="button" class="btn-primary img-mig-trigger" id="start-snapwin-migration-btn"
                             data-windows-repair-method="windows_method_z_snapshot_existing"
-                            style="background: linear-gradient(135deg, #075985 0%, #0e7490 100%); border-color: #38bdf8; justify-content: flex-start;"
+                            style="background: linear-gradient(135deg, #075985 0%, #0e7490 100%); border-color: #38bdf8; justify-content: flex-start; border-radius:6px; padding:14px 22px; font-size:18px; font-weight:700; gap:10px; min-width:300px;"
                             title="SNAPWIN: existing OSPC Windows snapshot/image → download → qcow2 → offline Windows repair → FLEX rescue/final boot"
                             onclick="document.getElementById('mig_mode_value').value='live';">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
                             <span>Windows Snapshot Mig</span>
                         </button>
-                        <label style="display:flex;align-items:center;gap:6px;color:#7dd3fc;font-size:11px;font-weight:800;cursor:pointer;" title="Kill existing Windows SNAPWIN processes on the jumphost before launching this batch.">
+                        <label style="display:flex;align-items:center;gap:7px;color:#7dd3fc;font-size:16px;font-weight:800;cursor:pointer;" title="Kill existing Windows SNAPWIN processes on the jumphost before launching this batch.">
                             <input type="checkbox" id="snapwin_start_fresh_kill" style="accent-color:#38bdf8;"> START FRESH
                         </label>
                     </div>
-                    <div style="display:flex;align-items:center;gap:6px;background:rgba(52,211,153,0.07);border:1px solid #065f46;border-radius:8px;padding:4px 10px 4px 4px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex:1 1 100%;width:100%;min-height:132px;background:rgba(52,211,153,0.07);border:1px solid #065f46;border-radius:8px;padding:8px 14px 8px 8px;">
                         <button type="button" id="start-volsnap-mig-btn"
-                            style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); border: 1px solid #34d399; border-radius:6px; padding:10px 18px; color:white; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;"
-                            title="Volume-Snapshot-Mig: auto-pair OSPC volume snapshots to migrated FLEX VMs, then stream-migrate">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                            style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); border: 1px solid #34d399; border-radius:6px; padding:14px 22px; color:white; font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:10px; min-width:300px;"
+                            title="Volume-Snapshot-Mig: stream selected OSPC volume snapshots to the target FLEX VM">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
                             <span>📦 Volume-Snapshot-Mig</span>
                         </button>
-                        <label style="display:flex;align-items:center;gap:6px;color:#6ee7b7;font-size:11px;font-weight:800;cursor:pointer;" title="Kill existing volume snapshot migration processes on the jumphost before launching this batch.">
-                            <input type="checkbox" id="volsnap_start_fresh_kill" style="accent-color:#34d399;"> START FRESH
-                        </label>
-                        <div style="display:flex;flex-direction:column;gap:2px;">
-                            <label for="volsnap-attach-mode" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Attach Mode</label>
-                            <select id="volsnap-attach-mode"
-                                style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#34d399;font-size:12px;font-weight:600;padding:4px 8px;cursor:pointer;outline:none;"
-                                title="review = auto-pair + show preflight modal before migration&#10;auto = auto-pair high-confidence only, no modal&#10;manual = choose OSPC snapshot and FLEX VM for each row">
-                                <option value="direct" selected>Direct Launch</option>
-                                <option value="review">Review Before Attach</option>
-                                <option value="auto">Auto Attach</option>
-                                <option value="manual">Manual Target</option>
-                            </select>
-                        </div>
-                        <div style="display:flex;flex-direction:column;gap:6px;border-left:2px solid #34d399;padding-left:10px;">
-                            <span style="color:#34d399;font-size:10px;font-weight:800;letter-spacing:.08em;white-space:nowrap;text-transform:uppercase;">Target Flex VM to Attach</span>
-                            <div style="display:flex;flex-direction:column;gap:2px;" title="UUID of the FLEX VM the volume will be attached to and block-streamed into">
-                                <label for="volsnap_flex_helper_vm_id" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Target Flex VM ID <span style="color:#f87171;font-weight:600;">(mandatory)</span></label>
-                                <input type="text" id="volsnap_flex_helper_vm_id" placeholder="FLEX VM uuid"
-                                    style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 7px;width:210px;outline:none;"
+                        <div style="display:flex;flex-direction:column;gap:8px;border-left:2px solid #34d399;padding-left:14px;min-width:320px;">
+                            <span style="color:#34d399;font-size:14px;font-weight:800;letter-spacing:.08em;white-space:nowrap;text-transform:uppercase;">Windows Vol Flex Helper</span>
+                            <div style="display:flex;flex-direction:column;gap:4px;" title="Linux FLEX server/instance UUID used only for Windows volume byte streaming. Final attach uses each row's target_flex value.">
+                                <label for="volsnap_flex_helper_vm_id" style="color:#6ee7b7;font-size:14px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Windows Vol Helper Server ID <span style="color:#f87171;font-weight:600;">(Linux VM)</span></label>
+                                <input type="text" id="volsnap_flex_helper_vm_id" placeholder="Linux helper server uuid for Windows volume"
+                                    style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:16px;padding:8px 9px;width:100%;outline:none;"
                                     oninput="localStorage.setItem('volsnap_flex_helper_vm_id',this.value)">
                             </div>
-                            <div style="display:flex;gap:8px;">
-                                <div style="display:flex;flex-direction:column;gap:2px;" title="SSH IP of the target FLEX VM — jumphost streams block data here">
-                                    <label for="volsnap_flex_helper_ip" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Target Flex VM IP</label>
+                            <div style="display:flex;gap:10px;">
+                                <div style="display:flex;flex-direction:column;gap:4px;flex:1;" title="SSH IP of the Windows volume Linux helper. The jumphost streams block data to this host before final attach.">
+                                    <label for="volsnap_flex_helper_ip" style="color:#6ee7b7;font-size:14px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Windows Vol Helper IP</label>
                                     <input type="text" id="volsnap_flex_helper_ip" placeholder="e.g. 10.0.0.5"
-                                        style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 7px;width:120px;outline:none;"
+                                        style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:16px;padding:8px 9px;width:100%;outline:none;"
                                         oninput="localStorage.setItem('volsnap_flex_helper_ip',this.value)">
                                 </div>
-                                <div style="display:flex;flex-direction:column;gap:2px;" title="SSH username on the target FLEX VM. Defaults to ubuntu.">
-                                    <label for="volsnap_flex_helper_user" style="color:#6ee7b7;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">SSH Username</label>
+                                <div style="display:flex;flex-direction:column;gap:4px;flex:0 0 120px;" title="SSH username on the Windows volume helper. Defaults to ubuntu.">
+                                    <label for="volsnap_flex_helper_user" style="color:#6ee7b7;font-size:14px;font-weight:700;letter-spacing:.05em;white-space:nowrap;">Helper SSH User</label>
                                     <input type="text" id="volsnap_flex_helper_user" placeholder="ubuntu"
-                                        style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:11px;padding:4px 7px;width:90px;outline:none;"
+                                        style="background:#0f172a;border:1px solid #34d399;border-radius:5px;color:#e2e8f0;font-size:16px;padding:8px 9px;width:100%;outline:none;"
                                         oninput="localStorage.setItem('volsnap_flex_helper_user',this.value)">
                                 </div>
                             </div>
@@ -986,7 +972,7 @@
                     if(v){var e=document.getElementById('volsnap_flex_helper_vm_id');if(e)e.value=v;}
                     if(i){var e=document.getElementById('volsnap_flex_helper_ip');if(e)e.value=i;}
                     if(u){var e=document.getElementById('volsnap_flex_helper_user');if(e)e.value=u;}
-                    ['linux_snap_start_fresh_kill','snapwin_start_fresh_kill','volsnap_start_fresh_kill'].forEach(function(id){
+                    ['linux_snap_start_fresh_kill','snapwin_start_fresh_kill'].forEach(function(id){
                         var el=document.getElementById(id);
                         if(!el) return;
                         el.checked = localStorage.getItem(id) === '1';
@@ -1725,10 +1711,13 @@
                     window._volsnapPairingMap = window._volsnapPairingMap || {}; // snapshot_id → VolumePairingResult
                     // Parallel to headers array — keys used for sorting
                     const _IMG_SORT_KEYS = ['start_fresh','asset_type','snapshot_name','attached_to','vm_glance_snap','snapshot_id','source_vm_name','os_distro','size_gb','disk_format','status','migratable','licensed_restricted','migration_method','reason','created_at'];
+                    const _VOLSNAP_SORT_KEYS = ['snapshot_name','snapshot_id','volume_id','size_gb','status','flex_target_vm_id','flex_target_ip','flex_target_user','post_attach_db_validator','windows_helper_vm_id','windows_helper_ip','windows_helper_user'];
                     const LS_OSPC_IMAGE_SCAN = 'mig_ospc_image_scan_cache_v1';
                     const LS_OSPC_IMAGE_SELECTION = 'mig_ospc_image_selection_v1';
                     const LS_OSPC_IMAGE_SEARCH = 'mig_ospc_image_search_v1';
                     const LS_OSPC_IMAGE_FRESH = 'mig_ospc_image_fresh_v1';
+                    const LS_VOLSNAP_TARGETS = 'mig_volsnap_target_map_v1';
+                    const VOLSNAP_CACHE_ENABLED = true;
 
                     function _loadImageSelectionMap() {
                         try { return JSON.parse(localStorage.getItem(LS_OSPC_IMAGE_SELECTION) || '{}') || {}; }
@@ -1745,6 +1734,86 @@
                     function _saveFreshMap(map) {
                         try { localStorage.setItem(LS_OSPC_IMAGE_FRESH, JSON.stringify(map || {})); }
                         catch (e) { /* ignore quota/private mode */ }
+                    }
+                    function _loadVolsnapTargetMap() {
+                        if (!VOLSNAP_CACHE_ENABLED) return {};
+                        try { return JSON.parse(localStorage.getItem(LS_VOLSNAP_TARGETS) || '{}') || {}; }
+                        catch (e) { return {}; }
+                    }
+                    function _saveVolsnapTargetMap(map) {
+                        if (!VOLSNAP_CACHE_ENABLED) return;
+                        try { localStorage.setItem(LS_VOLSNAP_TARGETS, JSON.stringify(map || {})); }
+                        catch (e) { /* ignore quota/private mode */ }
+                    }
+                    function _volsnapPairedFlexId(snapshotId) {
+                        const pairing = (window._volsnapPairingMap || {})[snapshotId];
+                        return pairing ? String(pairing.flex_server_id || pairing.flex_target_server_id || '').trim() : '';
+                    }
+	                    function _volsnapStripSourcePrefix(value) {
+	                        return String(value || '').replace(/^(ospc|opsc)/i, '').trim();
+	                    }
+	                    function _volsnapDefaultTarget(row, pairedFlexId) {
+	                        if (!row) return '';
+	                        const explicitTarget = String(
+	                            row.flex_server_id ||
+	                            row.flex_target_server_id ||
+	                            row.flex_target_vm_id ||
+	                            row.flex_target_vm ||
+	                            row.target_flex ||
+	                            row.target_flex_vm ||
+	                            pairedFlexId ||
+	                            ''
+	                        ).trim();
+		                        if (explicitTarget) {
+		                            return _volsnapIsWindowsRow(row) ? _volsnapStripSourcePrefix(explicitTarget) : explicitTarget;
+		                        }
+	                        const attachedName = String(row.attached_to || '').trim();
+	                        if (_volsnapIsWindowsRow(row)) {
+		                            return _volsnapStripSourcePrefix(attachedName);
+	                        }
+	                        return String(
+	                            attachedName ||
+	                            ''
+	                        ).trim();
+	                    }
+		                    function _volsnapDefaultTargetIp(row) {
+		                        if (!row) return '';
+			                        const explicitIp = String(
+			                            row.flex_target_vm_ip ||
+				                            row.flex_target_ip ||
+				                            row.target_flex_ip ||
+				                            row.target_flex_vm_ip ||
+				                            ''
+				                        ).trim();
+				                        if (_volsnapIsWindowsRow(row)) return '';
+				                        const sourceIp = String(row.attached_vm_ip || '').trim();
+				                        if (explicitIp && explicitIp !== sourceIp) return explicitIp;
+				                        return '';
+			                    }
+	                    function _volsnapLooksLikeSourceTarget(row, targetVm, targetIp) {
+	                        if (!row) return false;
+	                        const vm = String(targetVm || '').trim();
+	                        const ip = String(targetIp || '').trim();
+	                        const sourceVm = String(row.attached_to || '').trim();
+	                        const sourceIp = String(row.attached_vm_ip || '').trim();
+	                        return !!((vm && sourceVm && vm === sourceVm) || (ip && sourceIp && ip === sourceIp));
+	                    }
+	                    function _volsnapAutoSelectSignal(row, pairedFlexId) {
+	                        if (!row) return '';
+	                        return String(
+	                            _volsnapDefaultTarget(row, pairedFlexId) ||
+	                            ''
+	                        ).trim();
+	                    }
+                    function _volsnapIsWindowsRow(row) {
+                        if (!row) return false;
+                        const text = [
+                            row.snapshot_name,
+                            row.source_vm_name,
+                            row.os_distro,
+                            row.os_type,
+                        ].map(v => String(v || '').toLowerCase()).join(' ');
+                        return text.includes('windows') || /(^|[^a-z0-9])win(?:20|2k|dows)?/i.test(text) || /snapwin|opscwin|ospcwin|win20|win2k/i.test(text);
                     }
                     function _persistCurrentImageSelectionFromDom() {
                         const map = _loadImageSelectionMap();
@@ -1855,13 +1924,17 @@
                         filterImageRows();
                         const table = document.getElementById('ospc-image-table');
                         if (!table) return;
-                        const headers = ['No image resume', 'type', 'snapshot_name', 'attached_to', 'vm_glance_snap', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at', 'Pairing'];
+                        const isVolumeTable = imageScanState.activeTab === 'volume';
+                        const headers = isVolumeTable
+                            ? ['snapshot_name', 'ospc_snapshot_id', 'ospc_source_volume_id', 'snapshot_size', 'snapshot_status', 'target_flex_vm_id', 'target_flex_vm_ip', 'target_flex_user', 'test_method', 'windows_helper_vm_id', 'windows_helper_ip', 'windows_helper_user']
+                            : ['No image resume', 'type', 'snapshot_name', 'attached_to', 'vm_glance_snap', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at', 'Pairing'];
+                        const sortKeys = isVolumeTable ? _VOLSNAP_SORT_KEYS : _IMG_SORT_KEYS;
                         const rows = imageScanState.filtered || [];
                         // Row 1 — column name labels
                         const labelRow = '<tr>'
                             + '<th style="text-align:center;color:#94a3b8;font-size:11px;font-weight:600;white-space:nowrap;">Select</th>'
                             + headers.map((h, i) => {
-                                const key = _IMG_SORT_KEYS[i];
+                                const key = sortKeys[i];
                                 if (h === 'Pairing') return `<th style="color:#a78bfa;font-size:11px;font-weight:700;white-space:nowrap;text-align:center;">Pairing</th>`;
                                 const isActive = imageScanState.sortCol === key;
                                 const arrow = isActive ? (imageScanState.sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
@@ -1869,11 +1942,12 @@
                             }).join('')
                             + '</tr>';
                         // Row 2 — select-all controls under col 1 & col 2
-                        const ctrlRow = '<tr>'
-                            + '<th style="text-align:center;padding:3px 0;border-bottom:1px solid #334155;"><input type="checkbox" id="ospc-select-all-cb" title="Select / deselect all migratable rows"></th>'
-                            + '<th style="text-align:center;padding:3px 0;border-bottom:1px solid #334155;"><input type="checkbox" id="ospc-fresh-all-cb" style="accent-color:#34d399;" title="Check / uncheck all No image resume"></th>'
-                            + headers.slice(1).map(() => '<th style="border-bottom:1px solid #334155;"></th>').join('')
-                            + '</tr>';
+	                        const ctrlRow = '<tr>'
+	                            + '<th style="text-align:center;padding:3px 0;border-bottom:1px solid #334155;"><input type="checkbox" id="ospc-select-all-cb" title="Select / deselect all migratable rows"></th>'
+	                            + (isVolumeTable
+	                                ? headers.map(() => '<th style="border-bottom:1px solid #334155;"></th>').join('')
+	                                : '<th style="text-align:center;padding:3px 0;border-bottom:1px solid #334155;"><input type="checkbox" id="ospc-fresh-all-cb" style="accent-color:#34d399;" title="Check / uncheck all No image resume"></th>' + headers.slice(1).map(() => '<th style="border-bottom:1px solid #334155;"></th>').join(''))
+	                            + '</tr>';
                         const th = labelRow + ctrlRow;
                         const methodBadge = m => {
                             if (m === 'cinder-only')      return '<span style="color:#e74c3c;font-weight:bold">⛔ cinder-only</span>';
@@ -1897,9 +1971,77 @@
                             vmGlanceMap[snapName].push({ name: snapName, id: String(row.snapshot_id || '') });
                         });
 
+                        const volsnapTargetMap = _loadVolsnapTargetMap();
                         const body = rows.map(({ row: r, idx }) => {
                             const isMigratable = !!r.migratable;
                             const rowClass = r.asset_type === 'volume_snapshot' ? 'snapshot-row-volsnap' : (r.licensed_restricted ? 'snapshot-row-restricted' : (r.is_windows ? 'snapshot-row-windows' : ''));
+                            const isWindowsVolRow = r.asset_type === 'volume_snapshot' && _volsnapIsWindowsRow(r);
+	                            const pairedFlexId = _volsnapPairedFlexId(r.snapshot_id);
+	                            const targetValues = volsnapTargetMap[String(r.snapshot_id || '')] || {};
+	                            const targetVmId = String(targetValues.flex_target_vm || _volsnapDefaultTarget(r, pairedFlexId)).trim();
+	                            const targetVmIp = String(targetValues.flex_target_ip || _volsnapDefaultTargetIp(r)).trim();
+	                            const targetUser = String(targetValues.flex_target_user || 'ubuntu').trim() || 'ubuntu';
+                            const windowsHelperVmId = String(targetValues.windows_helper_vm_id || (document.getElementById('volsnap_flex_helper_vm_id') || {}).value || localStorage.getItem('volsnap_flex_helper_vm_id') || '').trim();
+                            const windowsHelperIp = String(targetValues.windows_helper_ip || (document.getElementById('volsnap_flex_helper_ip') || {}).value || localStorage.getItem('volsnap_flex_helper_ip') || '').trim();
+	                            const windowsHelperUser = String(targetValues.windows_helper_user || (document.getElementById('volsnap_flex_helper_user') || {}).value || localStorage.getItem('volsnap_flex_helper_user') || 'ubuntu').trim() || 'ubuntu';
+	                            const rowDbValidator = String(targetValues.post_attach_db_validator || 'none').trim().toLowerCase() || 'none';
+	                            const validatorOption = (value, label) => `<option value="${value}" ${rowDbValidator === value ? 'selected' : ''}>${label}</option>`;
+	                            if (isVolumeTable) {
+	                                const snapId = escapeHTML(String(r.snapshot_id || ''));
+	                                const sourceVolId = escapeHTML(String(r.volume_id || r.source_volume_id || ''));
+	                                const helperVmCell = isWindowsVolRow
+	                                    ? `<input type="text" class="volsnap-helper-vm-id" data-snap-id="${snapId}" placeholder="Linux helper server ID" value="${escapeHTML(windowsHelperVmId)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #0e7490;background:#0f172a;color:#e2e8f0;border-radius:6px;" />`
+	                                    : '<span style="color:#475569">—</span>';
+	                                const helperIpCell = isWindowsVolRow
+	                                    ? `<input type="text" class="volsnap-helper-ip" data-snap-id="${snapId}" placeholder="Helper IP" value="${escapeHTML(windowsHelperIp)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #0e7490;background:#0f172a;color:#e2e8f0;border-radius:6px;" />`
+	                                    : '<span style="color:#475569">—</span>';
+	                                const helperUserCell = isWindowsVolRow
+	                                    ? `<input type="text" class="volsnap-helper-user" data-snap-id="${snapId}" placeholder="Helper user" value="${escapeHTML(windowsHelperUser)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #0e7490;background:#0f172a;color:#e2e8f0;border-radius:6px;" />`
+	                                    : '<span style="color:#475569">—</span>';
+	                                return `<tr class="${rowClass}">`
+	                                    + `<td><input type="checkbox" class="ospc-image-cb" data-idx="${idx}" ${isMigratable ? '' : 'disabled'}></td>`
+	                                    + `<td><div class="snap-name-wrap">${escapeHTML(String(r.snapshot_name || ''))}</div></td>`
+	                                    + `<td class="snapshot-id-cell" style="font-size:0.8em">${snapId}</td>`
+	                                    + `<td style="font-size:0.8em;font-family:monospace">${sourceVolId || '<span style="color:#475569">—</span>'}</td>`
+	                                    + `<td class="snapshot-size-cell">${escapeHTML(String(r.size_gb || 0))} GB</td>`
+	                                    + `<td>${escapeHTML(String(r.status || ''))}</td>`
+	                                    + `<td style="min-width:190px;"><input type="text" class="volsnap-target-vm-id" data-snap-id="${snapId}" placeholder="FLEX VM ID" value="${escapeHTML(targetVmId)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:6px;" /></td>`
+	                                    + `<td style="min-width:160px;"><input type="text" class="volsnap-target-ip" data-snap-id="${snapId}" placeholder="FLEX VM IP" value="${escapeHTML(targetVmIp)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:6px;" /></td>`
+	                                    + `<td style="min-width:110px;"><input type="text" class="volsnap-target-user" data-snap-id="${snapId}" placeholder="SSH user" value="${escapeHTML(targetUser)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:6px;" /></td>`
+	                                    + `<td style="min-width:150px;"><select class="volsnap-test-method" data-snap-id="${snapId}" title="Post-attach test method" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #065f46;background:#0f172a;color:#6ee7b7;border-radius:6px;">${validatorOption('none', 'No test')}${validatorOption('mount', 'Mount test')}${validatorOption('postgresql', 'PostgreSQL')}${validatorOption('mysql', 'MySQL')}${validatorOption('mariadb', 'MariaDB')}${validatorOption('mongodb', 'MongoDB')}${validatorOption('redis', 'Redis')}</select></td>`
+	                                    + `<td style="min-width:190px;">${helperVmCell}</td>`
+	                                    + `<td style="min-width:150px;">${helperIpCell}</td>`
+	                                    + `<td style="min-width:110px;">${helperUserCell}</td>`
+	                                    + '</tr>';
+	                            }
+		                            const targetCell = r.asset_type === 'volume_snapshot' ? `
+	                                <td style="min-width:190px;">
+	                                    <input type="text" class="volsnap-target-vm-id" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" placeholder="FLEX VM ID" value="${escapeHTML(targetVmId)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:6px;" />
+	                                    ${isWindowsVolRow ? `
+	                                        <div style="margin-top:5px;padding-top:5px;border-top:1px solid #334155;color:#38bdf8;font-size:0.72em;font-weight:800;text-transform:uppercase;">Windows helper</div>
+	                                        <input type="text" class="volsnap-helper-vm-id" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" placeholder="Linux helper server ID" value="${escapeHTML(windowsHelperVmId)}" style="width:100%;font-size:0.78em;padding:6px 8px;border:1px solid #0e7490;background:#0f172a;color:#e2e8f0;border-radius:6px;" />
+	                                    ` : ''}
+	                                </td>
+	                                <td style="min-width:220px;">
+	                                    <div style="display:flex;gap:4px;">
+	                                        <input type="text" class="volsnap-target-ip" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" placeholder="FLEX VM IP" value="${escapeHTML(targetVmIp)}" style="width:58%;font-size:0.78em;padding:6px 8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:6px;" />
+	                                        <input type="text" class="volsnap-target-user" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" placeholder="SSH user" value="${escapeHTML(targetUser)}" style="width:42%;font-size:0.78em;padding:6px 8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;border-radius:6px;" />
+	                                    </div>
+	                                    <select class="volsnap-row-db-validator" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" title="Post-attach validation for this migrated volume" style="width:100%;margin-top:4px;font-size:0.78em;padding:6px 8px;border:1px solid #065f46;background:#0f172a;color:#6ee7b7;border-radius:6px;">
+	                                        ${validatorOption('none', 'No DB validation')}
+	                                        ${validatorOption('postgresql', 'PostgreSQL')}
+	                                        ${validatorOption('mysql', 'MySQL')}
+	                                        ${validatorOption('mariadb', 'MariaDB')}
+	                                        ${validatorOption('mongodb', 'MongoDB')}
+	                                        ${validatorOption('redis', 'Redis')}
+	                                    </select>
+	                                    ${isWindowsVolRow ? `
+	                                        <div style="display:flex;gap:4px;margin-top:5px;padding-top:5px;border-top:1px solid #334155;">
+	                                            <input type="text" class="volsnap-helper-ip" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" placeholder="Helper IP" value="${escapeHTML(windowsHelperIp)}" style="width:58%;font-size:0.78em;padding:6px 8px;border:1px solid #0e7490;background:#0f172a;color:#e2e8f0;border-radius:6px;" />
+	                                            <input type="text" class="volsnap-helper-user" data-snap-id="${escapeHTML(String(r.snapshot_id || ''))}" placeholder="Helper user" value="${escapeHTML(windowsHelperUser)}" style="width:42%;font-size:0.78em;padding:6px 8px;border:1px solid #0e7490;background:#0f172a;color:#e2e8f0;border-radius:6px;" />
+	                                        </div>
+	                                    ` : ''}
+	                                </td>` : `<td></td><td></td>`;
                             return `<tr class="${rowClass}">`
                                 + `<td><input type="checkbox" class="ospc-image-cb" data-idx="${idx}" ${isMigratable ? '' : 'disabled'}></td>`
                                 + `<td style="text-align:center"><input type="checkbox" class="ospc-fresh-cb" data-idx="${idx}" ${isMigratable ? 'checked' : 'disabled'} title="No image resume — force re-download from OSPC, ignore any existing artifacts"></td>`
@@ -1908,6 +2050,7 @@
                                 + (r.asset_type === 'volume_snapshot'
                                     ? `<td style="font-size:0.82em;color:${r.attached_to ? '#6ee7b7' : '#475569'}">${r.attached_to ? '🖥 ' + escapeHTML(r.attached_to) : '—'}</td>`
                                     : `<td></td>`)
+                                + targetCell
                                 + (r.asset_type === 'volume_snapshot' ? (() => {
                                     const vm = r.attached_to || '';
                                     const snaps = vm ? (vmGlanceMap[vm] || []) : [];
@@ -1949,6 +2092,45 @@
                                 + '</tr>';
                         }).join('');
                         table.innerHTML = `<thead>${th}</thead><tbody>${body}</tbody>`;
+                        if (!table._volsnapTargetListenerInstalled) {
+                            const persistVolsnapRowInput = function(event) {
+                                const target = event.target;
+                                const snapId = target && target.dataset && target.dataset.snapId ? String(target.dataset.snapId) : '';
+                                if (!snapId) return;
+                                const map = _loadVolsnapTargetMap();
+                                const row = map[snapId] || {};
+                                const stateRow = (imageScanState.rows || []).find(r => String(r.snapshot_id || '') === snapId);
+	                                if (target.classList.contains('volsnap-target-vm-id')) {
+	                                    row.flex_target_vm = String(target.value || '').trim();
+	                                    if (stateRow) stateRow.flex_target_vm = row.flex_target_vm;
+	                                } else if (target.classList.contains('volsnap-target-ip')) {
+                                    row.flex_target_ip = String(target.value || '').trim();
+                                    if (stateRow) stateRow.flex_target_ip = row.flex_target_ip;
+                                } else if (target.classList.contains('volsnap-target-user')) {
+                                    row.flex_target_user = String(target.value || '').trim() || 'ubuntu';
+                                    if (stateRow) stateRow.flex_target_user = row.flex_target_user;
+	                                } else if (target.classList.contains('volsnap-row-db-validator') || target.classList.contains('volsnap-test-method')) {
+	                                    row.post_attach_db_validator = String(target.value || 'none').trim().toLowerCase() || 'none';
+	                                    if (stateRow) stateRow.post_attach_db_validator = row.post_attach_db_validator;
+	                                } else if (target.classList.contains('volsnap-helper-vm-id')) {
+	                                    row.windows_helper_vm_id = String(target.value || '').trim();
+	                                    if (stateRow) stateRow.windows_helper_vm_id = row.windows_helper_vm_id;
+	                                } else if (target.classList.contains('volsnap-helper-ip')) {
+	                                    row.windows_helper_ip = String(target.value || '').trim();
+	                                    if (stateRow) stateRow.windows_helper_ip = row.windows_helper_ip;
+	                                } else if (target.classList.contains('volsnap-helper-user')) {
+	                                    row.windows_helper_user = String(target.value || '').trim() || 'ubuntu';
+	                                    if (stateRow) stateRow.windows_helper_user = row.windows_helper_user;
+	                                } else {
+	                                    return;
+	                                }
+                                map[snapId] = row;
+                                _saveVolsnapTargetMap(map);
+                            };
+                            table.addEventListener('input', persistVolsnapRowInput);
+                            table.addEventListener('change', persistVolsnapRowInput);
+                            table._volsnapTargetListenerInstalled = true;
+                        }
                         // Column sort — delegated on thead so it survives innerHTML rewrites
                         table.querySelector('thead').addEventListener('click', e => {
                             if (e.target && e.target.id === 'ospc-fresh-all-cb') return; // checkbox handles itself
@@ -1977,7 +2159,8 @@
                             const idx = Number(cb.dataset.idx || -1);
                             const row = imageScanState.rows[idx];
                             const id = String((row && row.snapshot_id) || '').trim();
-                            cb.checked = !!(id && row && row.migratable && selectedMap[id]);
+	                            const isVolsnapRow = !!(row && row.asset_type === 'volume_snapshot');
+	                            cb.checked = !!(id && row && row.migratable && (isVolsnapRow ? selectedMap[id] === true : selectedMap[id]));
                             cb.addEventListener('change', () => {
                                 if (!id) return;
                                 if (!row || !row.migratable) {
@@ -2069,11 +2252,21 @@
                         if (imageFilterModeEl) {
                             imageFilterModeEl.addEventListener('change', () => renderImageTable());
                         }
+                        function updateSnapwinStageReferenceVisibility() {
+                            const ref = document.getElementById('snapwin-stage-reference');
+                            const body = document.getElementById('mz-stage-table-body');
+                            if (!ref) return;
+                            const isWindowsTab = imageScanState.activeTab === 'windows';
+                            ref.style.display = isWindowsTab ? '' : 'none';
+                            if (body) body.style.display = 'none';
+                        }
+                        updateSnapwinStageReferenceVisibility();
                         document.querySelectorAll('#snapshot-tab-bar [data-tab]').forEach(btn => {
                             btn.addEventListener('click', () => {
                                 imageScanState.activeTab = btn.dataset.tab;
                                 document.querySelectorAll('#snapshot-tab-bar [data-tab]').forEach(b =>
                                     b.classList.toggle('snap-tab-active', b === btn));
+                                updateSnapwinStageReferenceVisibility();
                                 renderImageTable();
                             });
                         });
@@ -2139,9 +2332,12 @@
                                         btn.textContent = '🔍 Start Private Snapshot Scan';
                                         throw new Error('Missing OSPC credentials');
                                     }
+                                    const scanAbort = new AbortController();
+                                    const scanTimer = setTimeout(() => scanAbort.abort(), 180000);
                                     const resp = await fetch('/api/image_migrator/images/scan', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
+                                        signal: scanAbort.signal,
                                         body: JSON.stringify({
                                             region,
                                             ospc_username: ospcUser,
@@ -2150,7 +2346,7 @@
                                             ospc_account_id: ospcTenant,
                                             ospc_region: (region && region !== 'ALL') ? region : ((document.getElementById('ospc_cloud_region') || document.getElementById('jh_region_select') || {}).value || '')
                                         })
-                                    });
+                                    }).finally(() => clearTimeout(scanTimer));
                                     const ct = (resp.headers.get('content-type') || '').toLowerCase();
                                     let data;
                                     if (ct.includes('application/json')) {
@@ -2171,7 +2367,10 @@
                                     const lines = Array.isArray(data.logs) ? data.logs : [];
                                     logEl.textContent = (['✅ Private snapshot scan complete.'].concat(lines)).join('\n');
                                 } catch (err) {
-                                    logEl.textContent = `[ERROR] ${err.message}`;
+                                    const msg = err && err.name === 'AbortError'
+                                        ? 'Scanner timed out before the backend returned. Check Cinder/Nova endpoint reachability for the selected region, then retry.'
+                                        : (err && err.message ? err.message : String(err));
+                                    logEl.textContent = `[ERROR] ${msg}`;
                                 } finally {
                                     if (spinner) spinner.style.display = 'none';
                                     btn.disabled = false;
@@ -2905,8 +3104,111 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                     <div class="console-body" id="console-output" style="padding: 26px; background: #000a00; color: #00ff41; font-family: 'VT323','Share Tech Mono','Courier New', monospace; font-size: 18px; font-weight: 400; height: 460px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; word-break: break-all; white-space: pre-wrap; display: flex; flex-direction: column; gap: 4px; min-width: 0; box-sizing: border-box; text-shadow: 0 0 5px rgba(0,255,65,0.7);">
                         <div class="log-line system" style="color: #005500; font-style: italic;">Waiting for batch execution...</div>
                     </div>
+                    <div id="operator-terminal-panel" style="border-top:1px solid rgba(0,255,65,.28);background:#020802;padding:10px 12px 12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                            <div style="display:flex;align-items:center;gap:8px;color:#67e8f9;font-family:'Share Tech Mono','Courier New',monospace;font-size:12px;font-weight:700;letter-spacing:.05em;">
+                                <span>LOCAL COMMAND CONSOLE</span>
+                                <span id="operator-terminal-status" style="color:#64748b;font-weight:500;">ready</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <select id="operator-terminal-shell" style="background:#06111f;border:1px solid #22d3ee;border-radius:6px;color:#e0f2fe;font-size:12px;padding:5px 8px;outline:none;">
+                                    <option value="powershell">PowerShell</option>
+                                    <option value="cmd">CMD</option>
+                                    <option value="bash">Ubuntu Bash</option>
+                                </select>
+                                <button type="button" id="operator-terminal-clear" style="background:#0f172a;border:1px solid #334155;border-radius:6px;color:#cbd5e1;font-size:12px;padding:5px 10px;cursor:pointer;">Clear</button>
+                            </div>
+                        </div>
+                        <pre id="operator-terminal-output" style="height:170px;overflow:auto;margin:0 0 8px;background:#000;border:1px solid rgba(34,211,238,.35);border-radius:8px;padding:10px;color:#d1fae5;font-family:'Consolas','Cascadia Mono','Courier New',monospace;font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word;"># Runs one command at a time from the dashboard host.
+# Select PowerShell, CMD, or Ubuntu Bash, then press Enter.
+</pre>
+                        <div style="display:flex;gap:8px;align-items:flex-end;">
+                            <textarea id="operator-terminal-input" rows="1" spellcheck="false" placeholder="Enter command, e.g. Get-Date or ls -la"
+                                style="flex:1;min-height:34px;max-height:120px;resize:vertical;background:#020617;border:1px solid #22d3ee;border-radius:7px;color:#e2e8f0;font-family:'Consolas','Cascadia Mono','Courier New',monospace;font-size:13px;padding:8px 10px;outline:none;"></textarea>
+                            <button type="button" id="operator-terminal-run" style="background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:7px;color:#fff;font-weight:700;padding:9px 16px;cursor:pointer;">Run</button>
+                        </div>
+                    </div>
                 </section>
             </div>
+            <script>
+            (function initOperatorTerminal(){
+                const shellEl = document.getElementById('operator-terminal-shell');
+                const inputEl = document.getElementById('operator-terminal-input');
+                const outputEl = document.getElementById('operator-terminal-output');
+                const runBtn = document.getElementById('operator-terminal-run');
+                const clearBtn = document.getElementById('operator-terminal-clear');
+                const statusEl = document.getElementById('operator-terminal-status');
+                if (!shellEl || !inputEl || !outputEl || !runBtn) return;
+
+                const histKey = 'operator_terminal_history_v1';
+                const shellKey = 'operator_terminal_shell_v1';
+                let history = [];
+                let histIdx = -1;
+                try { history = JSON.parse(localStorage.getItem(histKey) || '[]') || []; } catch(e) { history = []; }
+                shellEl.value = localStorage.getItem(shellKey) || 'powershell';
+                shellEl.addEventListener('change', () => localStorage.setItem(shellKey, shellEl.value));
+
+                function append(text, cls) {
+                    outputEl.textContent += text;
+                    outputEl.scrollTop = outputEl.scrollHeight;
+                }
+                function setBusy(busy) {
+                    runBtn.disabled = busy;
+                    inputEl.disabled = busy;
+                    statusEl.textContent = busy ? 'running...' : 'ready';
+                    statusEl.style.color = busy ? '#facc15' : '#64748b';
+                }
+                async function runCommand() {
+                    const command = inputEl.value.trim();
+                    if (!command) return;
+                    const shell = shellEl.value || 'powershell';
+                    append(`\n$ ${shell}> ${command}\n`, 'cmd');
+                    inputEl.value = '';
+                    if (!history.length || history[history.length - 1] !== command) {
+                        history.push(command);
+                        history = history.slice(-80);
+                        localStorage.setItem(histKey, JSON.stringify(history));
+                    }
+                    histIdx = history.length;
+                    setBusy(true);
+                    try {
+                        const resp = await fetch('/api/local-terminal/run', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ shell, command, timeout: 180 })
+                        });
+                        const data = await resp.json().catch(() => ({}));
+                        if (data.stdout) append(data.stdout.endsWith('\n') ? data.stdout : data.stdout + '\n');
+                        if (data.stderr) append(data.stderr.endsWith('\n') ? data.stderr : data.stderr + '\n');
+                        if (!resp.ok || data.ok === false) append(`[exit ${data.returncode ?? resp.status}] ${data.error || ''}\n`);
+                    } catch (e) {
+                        append(`[network error] ${e.message || e}\n`);
+                    } finally {
+                        setBusy(false);
+                        inputEl.focus();
+                    }
+                }
+                runBtn.addEventListener('click', runCommand);
+                clearBtn && clearBtn.addEventListener('click', () => {
+                    outputEl.textContent = '# Command console cleared.\n';
+                    inputEl.focus();
+                });
+                inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        runCommand();
+                    } else if (e.key === 'ArrowUp' && !e.shiftKey && history.length) {
+                        e.preventDefault();
+                        histIdx = Math.max(0, histIdx < 0 ? history.length - 1 : histIdx - 1);
+                        inputEl.value = history[histIdx] || '';
+                    } else if (e.key === 'ArrowDown' && !e.shiftKey && history.length) {
+                        e.preventDefault();
+                        histIdx = Math.min(history.length, histIdx + 1);
+                        inputEl.value = history[histIdx] || '';
+                    }
+                });
+            })();
+            </script>
 
             <!-- hidden shims for manual-repair-card JS references -->
             <div id="manual-repair-card" style="display:none;">
@@ -4317,13 +4619,13 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 }
             }
             if (t.includes('ERROR') || t.includes('FAIL') || t.includes('[FATAL]')) job.errors++;
-            if (t.includes('[FATAL]') || (t.includes('[PROCESS EXITED WITH CODE') && !t.includes('CODE 0'))) {
+            if (t.includes('[FATAL]') || t.includes('[VOLSNAP] FAILED') || t.includes('FAILED:') || (t.includes('[PROCESS EXITED WITH CODE') && !t.includes('CODE 0'))) {
                 if (job.status !== 'failed' && typeof jarvisAnnounce === 'function') {
                     jarvisAnnounce(`Image job failed: ${job.label.replace(/-/g, ' ')}. Operator intervention required.`);
                 }
                 job.status = 'failed';
                 job.stage = '❌ Failed';
-            } else if (t.includes('=== PIPELINE DONE ===') || t.includes('[PROCESS EXITED WITH CODE 0]') || (t.includes('[OK]') && t.includes('FLEX image upload'))) {
+            } else if (t.includes('=== PIPELINE DONE ===') || t.includes('[VOLSNAP] Complete.') || t.includes('[PROCESS EXITED WITH CODE 0]') || (t.includes('[OK]') && t.includes('FLEX image upload'))) {
                 if (job.status !== 'success' && typeof jarvisAnnounce === 'function') {
                     jarvisAnnounce(`Image job complete: ${job.label.replace(/-/g, ' ')} uploaded to FLEX successfully.`);
                 }
@@ -6440,13 +6742,27 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const icon = document.getElementById('img-status-icon-' + safeId);
             const block = document.getElementById('img-block-' + safeId);
             const t = String(text || '');
-            if (t.includes('[FATAL]') || (t.includes('PROCESS EXITED') && !t.includes('CODE 0'))) {
-                if (icon) icon.textContent = '❌';
+            const isFailureLine = t.includes('[FATAL]') ||
+                t.includes('[VOLSNAP] FAILED') ||
+                t.includes('FAILED:') ||
+                (t.includes('PROCESS EXITED') && !t.includes('CODE 0'));
+            const isSuccessLine = t.includes('=== PIPELINE DONE ===') ||
+                t.includes('[VOLSNAP] Complete.') ||
+                (t.includes('[OK]') && t.includes('FLEX image upload')) ||
+                t.includes('PROCESS EXITED WITH CODE 0');
+            if (isFailureLine) {
+                if (icon) {
+                    icon.textContent = 'ERR';
+                    icon.style.color = '#f87171';
+                }
                 if (block) block.style.borderColor = '#f472b6';
                 const te = document.getElementById('img-timer-' + safeId);
                 if (te) te.dataset.stopped = 'true';
-            } else if (t.includes('=== PIPELINE DONE ===') || (t.includes('[OK]') && t.includes('FLEX image upload')) || (t.includes('PROCESS EXITED WITH CODE 0'))) {
-                if (icon) icon.textContent = '✅';
+            } else if (isSuccessLine) {
+                if (icon) {
+                    icon.textContent = 'COMP';
+                    icon.style.color = '#4ade80';
+                }
                 if (block) block.style.borderColor = '#a78bfa';
                 const te = document.getElementById('img-timer-' + safeId);
                 if (te) te.dataset.stopped = 'true';
@@ -7613,21 +7929,27 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             // ── helpers ──────────────────────────────────────────────────────
             const gv = id => (document.getElementById(id) || {}).value || '';
 
-            function _volSnapRows() {
-                // Read from localStorage so selection survives tab switches and table re-renders
-                let selMap = {};
-                try { selMap = JSON.parse(localStorage.getItem('mig_ospc_image_selection_v1') || '{}'); } catch(e) {}
-                const allRows = (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows))
-                    ? imageScanState.rows : [];
-                return allRows.filter(r =>
-                    r &&
-                    r.migratable &&
-                    selMap[String(r.snapshot_id || '').trim()] === true &&
-                    (r.asset_type === 'volume_snapshot' ||
-                     /vol/i.test(r.snapshot_name || '') ||
-                     /vol/i.test(r.source_vm_name || ''))
-                );
-            }
+	            function _volSnapRows() {
+	                // Read from localStorage so selection survives tab switches and table re-renders
+	                let selMap = {};
+	                try { selMap = JSON.parse(localStorage.getItem('mig_ospc_image_selection_v1') || '{}'); } catch(e) {}
+	                const allRows = (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows))
+	                    ? imageScanState.rows : [];
+	                const rows = [];
+	                allRows.forEach(r => {
+	                    if (!r || !r.migratable) return;
+	                    const id = String(r.snapshot_id || '').trim();
+	                    if (!id) return;
+	                    const isVol = r.asset_type === 'volume_snapshot' ||
+	                        /vol/i.test(r.snapshot_name || '') ||
+	                        /vol/i.test(r.source_vm_name || '');
+	                    if (!isVol) return;
+	                    if (selMap[id] === true) {
+	                        rows.push(r);
+	                    }
+	                });
+	                return rows;
+	            }
 
             function _sharedPayload() {
                 return {
@@ -7641,17 +7963,18 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     flex_app_cred_id:     gv('credFlexAppCredId'),
                     flex_app_cred_secret: gv('credFlexAppCredSecret'),
                     flex_project_id:      gv('credFlexProjectId'),
-                    flex_region:          gv('credFlexRegion')  || 'DFW3',
+	                    flex_region:          gv('image_scan_region') || gv('credFlexRegion') || 'IAD',
                     flex_domain:          gv('credFlexDomain')  || 'rackspace_cloud_domain',
                     flex_auth_url:        gv('credFlexAuthUrl'),
                     process_host_ip:      gv('process_host_ip')  || gv('nbd_jumphost_ip'),
                     process_ssh_user:     gv('process_ssh_user') || gv('nbd_jumphost_user') || 'ubuntu',
                     process_ssh_key:      gv('process_ssh_key')  || gv('nbd_jumphost_key')  || '~/.ssh/id_rsa',
-                    // Direct Cinder stream fields
-                    flex_helper_vm_id:    gv('volsnap_flex_helper_vm_id'),
-                    flex_helper_ip:       gv('volsnap_flex_helper_ip'),
-                    flex_helper_user:     gv('volsnap_flex_helper_user') || 'ubuntu',
-                    start_fresh_kill:     !!(document.getElementById('volsnap_start_fresh_kill') || {}).checked,
+                    start_fresh_kill:     true,
+                    post_attach_pg_db_name: 'openstack_drinks',
+                    post_attach_pg_table_name: '',
+                    post_attach_custom_validate_cmd: '',
+                    post_attach_mount_point: '',
+                    post_attach_device_hint: '',
                 };
             }
 
@@ -7661,13 +7984,47 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const label = r.snapshot_name || iid;
                 getOrCreateImagePanel(iid, label, label);
                 appendImageLog(iid, `[VOLSNAP] Starting: ${label} (${iid})`);
-                if (flexTargetVmId) appendImageLog(iid, `[VOLSNAP] Target FLEX VM: ${flexTargetVmId}`);
+                if (flexTargetVmId) appendImageLog(iid, `[VOLSNAP] Final target FLEX VM: ${flexTargetVmId}`);
                 const payload = { ..._sharedPayload(), snapshot_id: iid, snapshot_name: label };
-                if (flexTargetVmId) payload.flex_target_vm = flexTargetVmId;
+                const rowDbValidator = String(r.post_attach_db_validator || 'none').trim().toLowerCase() || 'none';
+                const isWinVol = _volsnapIsWindowsRow(r);
+	                const rowHelperVmId = isWinVol ? String(r.windows_helper_vm_id || gv('volsnap_flex_helper_vm_id') || '').trim() : flexTargetVmId;
+	                const rowHelperIp = isWinVol ? String(r.windows_helper_ip || gv('volsnap_flex_helper_ip') || '').trim() : String(r.final_target_ssh_ip || '').trim();
+	                const rowHelperUser = isWinVol ? String(r.windows_helper_user || gv('volsnap_flex_helper_user') || 'ubuntu').trim() : (r.final_target_ssh_user || 'ubuntu');
+                appendImageLog(iid, `[VOLSNAP] ${isWinVol ? 'Windows volume helper' : 'Linux target'}: ${rowHelperVmId || '(missing)'} (${rowHelperIp || 'no ssh ip'})`);
+                appendImageLog(iid, `[VOLSNAP] Target FLEX: ${flexTargetVmId || '(missing)'} (${r.final_target_ssh_ip || 'no ip'}) user=${r.final_target_ssh_user || 'ubuntu'}`);
+                payload.os_type = isWinVol ? 'windows' : 'linux';
+                payload.flex_helper_vm_id = rowHelperVmId;
+                payload.flex_helper_ip = rowHelperIp;
+                payload.flex_helper_user = rowHelperUser || 'ubuntu';
+                if (flexTargetVmId) {
+                    payload.flex_target_vm = flexTargetVmId;
+                    payload.flex_target_vm_id = flexTargetVmId;
+                }
+                if (r.final_target_ssh_ip) {
+                    payload.flex_target_ip = r.final_target_ssh_ip;
+                    payload.post_attach_ssh_ip = r.final_target_ssh_ip;
+                }
+                if (r.final_target_ssh_user) {
+                    payload.flex_target_user = r.final_target_ssh_user;
+                    payload.post_attach_ssh_user = r.final_target_ssh_user;
+                }
+	                    payload.post_attach_validate_mount = rowDbValidator !== 'none';
+	                    payload.post_attach_db_validator = rowDbValidator;
+	                    payload.post_attach_validate_pg = rowDbValidator === 'postgresql';
+	                    payload.snap_size_gb = String(r.size_gb || '').trim();
+	                    payload.source_volume_id = String(r.volume_id || r.source_volume_id || '').trim();
                 try {
-                    const resp = await fetch('/api/volsnap/run', {
+                    if (!rowHelperVmId || !rowHelperIp) {
+                        appendImageLog(iid, `[ERROR] Missing ${isWinVol ? 'Windows helper' : 'Linux target'} VM ID or IP for ${label}`);
+                        return;
+                    }
+                    const volsnapUrl = new URL('/api/volsnap/run', window.location.href).toString();
+                    appendImageLog(iid, `[VOLSNAP] Dashboard endpoint: ${volsnapUrl}`);
+                    const resp = await fetch(volsnapUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        cache: 'no-store',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
                         signal: window.volsnapAbortController ? window.volsnapAbortController.signal : undefined,
                         body: JSON.stringify(payload),
                     });
@@ -7699,7 +8056,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     if (e && e.name === 'AbortError') {
                         appendImageLog(iid, '[SYSTEM] Aborted.');
                     } else {
-                        appendImageLog(iid, `[ERROR] ${e && e.message ? e.message : String(e)}`);
+                        const detail = e && (e.stack || e.message) ? (e.stack || e.message) : String(e);
+                        appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
                         jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
                         if (window._volsnapPairingMap && window._volsnapPairingMap[iid]) {
                             window._volsnapPairingMap[iid].pairing_status = 'failed';
@@ -7721,6 +8079,27 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             // ── launch approved jobs list ─────────────────────────────────────
             function launchApproved(approvedJobs) {
                 if (!approvedJobs.length) { alert('No jobs to run — all rows are blocked or unapproved.'); return; }
+                const rowMap = {};
+                (typeof imageScanState !== 'undefined' ? imageScanState.rows : []).forEach(r => { rowMap[r.snapshot_id] = r; });
+                const volsnapTargetMap = _loadVolsnapTargetMap();
+	                const jobs = approvedJobs.map(p => {
+	                    const r = rowMap[p.snapshot_id] || { snapshot_id: p.snapshot_id, snapshot_name: p.snapshot_name || p.snapshot_id };
+		                    const override = volsnapTargetMap[String(p.snapshot_id || '')] || {};
+	                    const pairedTarget = String(p.flex_server_id || p.flex_target_server_id || '').trim();
+	                    const requestedTargetId = String(override.flex_target_vm || _volsnapDefaultTarget(r, pairedTarget)).trim();
+	                    if (requestedTargetId) {
+	                        r.flex_target_vm = requestedTargetId;
+	                    }
+	                    r.final_target_ssh_ip = String(override.flex_target_ip || _volsnapDefaultTargetIp(r)).trim();
+	                    r.final_target_ssh_user = String(override.flex_target_user || 'ubuntu').trim() || 'ubuntu';
+                    r.post_attach_db_validator = String(override.post_attach_db_validator || 'none').trim().toLowerCase() || 'none';
+                    return { row: r, targetId: requestedTargetId };
+                });
+                const windowsJobs = jobs.filter(j => _volsnapIsWindowsRow(j.row));
+                if (windowsJobs.length && (!gv('volsnap_flex_helper_vm_id') || !gv('volsnap_flex_helper_ip'))) {
+                    alert('Set the Windows Vol Flex Helper Server ID and IP before launching selected Windows volume snapshot jobs.');
+                    return;
+                }
                 appendLog(`📦 Volume-Snapshot-Mig — ${approvedJobs.length} approved snapshot(s)`, 'system');
                 jarvisAnnounce(`Initializing Volume Snapshot Migration Batch. ${approvedJobs.length} snapshot${approvedJobs.length === 1 ? '' : 's'} queued.`);
                 window.volsnapAbortController = new AbortController();
@@ -7728,11 +8107,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 window._vsTotal = approvedJobs.length;
                 isVolsnapRunning = true;
                 refreshMigrationToolbar();
-                const rowMap = {};
-                (typeof imageScanState !== 'undefined' ? imageScanState.rows : []).forEach(r => { rowMap[r.snapshot_id] = r; });
-                approvedJobs.forEach(p => {
-                    const r = rowMap[p.snapshot_id] || { snapshot_id: p.snapshot_id, snapshot_name: p.snapshot_name || p.snapshot_id };
-                    streamOne(r, p.flex_server_id || '', approvedJobs.length);
+                jobs.forEach(j => {
+                    streamOne(j.row, j.targetId, approvedJobs.length);
                 });
             }
 
@@ -7984,50 +8360,88 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     alert('No volume snapshots selected. Select rows tagged 📦 vol-snap in the Private Server Volume Snapshot Migration Table.');
                     return;
                 }
-                const attachMode = (document.getElementById('volsnap-attach-mode') || {}).value || 'direct';
+                const attachMode = 'direct';
 
                 const ospcUser   = gv('ospc_cloud_user');
                 const ospcApiKey = gv('ospc_cloud_key');
                 const jhIp       = gv('process_host_ip') || gv('nbd_jumphost_ip');
                 const jhUser     = gv('process_ssh_user') || gv('nbd_jumphost_user') || 'ubuntu';
                 const jhKey      = gv('process_ssh_key')  || gv('nbd_jumphost_key')  || '~/.ssh/id_rsa';
+                const linuxHelperVmId = gv('volsnap_flex_helper_vm_id');
+                const linuxHelperIp   = gv('volsnap_flex_helper_ip');
+                const linuxHelperUser = gv('volsnap_flex_helper_user') || 'ubuntu';
+                let isDryRun = String(gv('mig_mode_value') || '').toLowerCase() === 'dryrun';
 
                 if (!ospcUser || !ospcApiKey) { alert('Fill OSPC credentials first.'); return; }
                 if (!jhIp) { alert('Set Jumphost IP.'); return; }
-
-                // ── auto: silent preflight, launch high-confidence only ────────
-                if (attachMode === 'auto') {
-                    appendLog('📦 Auto Attach — running pairing preflight…', 'system');
-                    try {
-                        const resp = await fetch('/migration/volume-snapshot/pairing/preflight', {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ selected_snapshot_ids: snaps.map(r => r.snapshot_id), attach_mode: 'auto', ospc_username: ospcUser, ospc_apikey: ospcApiKey, ospc_region: gv('image_scan_region') || 'IAD', ospc_account_id: gv('ospc_cloud_account'), migration_map_path: './migration_map.json', allow_name_fallback: true }),
-                        });
-                        const data = await resp.json();
-                        const pairings = data.pairings || [];
-                        pairings.forEach(p => { window._volsnapPairingMap[p.snapshot_id] = p; });
-                        if (typeof renderImageTable === 'function') renderImageTable();
-                        const autoSafe = pairings.filter(p => p.pairing_status === 'matched' && p.confidence === 'high' && p.flex_server_id);
-                        const skipped  = pairings.length - autoSafe.length;
-                        if (skipped) appendLog(`⚠ Auto mode skipped ${skipped} non-high-confidence row(s) — switch to Review for details`, 'system');
-                        launchApproved(autoSafe);
-                    } catch (e) { appendLog(`[ERROR] Pairing preflight failed: ${e}`, 'error'); }
+	                const snapsWithTargets = snaps.map(r => {
+                    const iid = String(r.snapshot_id || '').trim();
+                    const target = {};
+                    const domTarget = document.querySelector(`.volsnap-target-vm-id[data-snap-id="${CSS.escape(iid)}"]`);
+                    const domIp = document.querySelector(`.volsnap-target-ip[data-snap-id="${CSS.escape(iid)}"]`);
+                    const domUser = document.querySelector(`.volsnap-target-user[data-snap-id="${CSS.escape(iid)}"]`);
+                    const domHelperVm = document.querySelector(`.volsnap-helper-vm-id[data-snap-id="${CSS.escape(iid)}"]`);
+                    const domHelperIp = document.querySelector(`.volsnap-helper-ip[data-snap-id="${CSS.escape(iid)}"]`);
+                    const domHelperUser = document.querySelector(`.volsnap-helper-user[data-snap-id="${CSS.escape(iid)}"]`);
+	                    const domValidator = document.querySelector(`.volsnap-test-method[data-snap-id="${CSS.escape(iid)}"]`) || document.querySelector(`.volsnap-row-db-validator[data-snap-id="${CSS.escape(iid)}"]`);
+                    if (domTarget) target.flex_target_vm = String(domTarget.value || '').trim();
+                    if (domIp) target.flex_target_ip = String(domIp.value || '').trim();
+                    if (domUser) target.flex_target_user = String(domUser.value || '').trim();
+                    if (domHelperVm) target.windows_helper_vm_id = String(domHelperVm.value || '').trim();
+                    if (domHelperIp) target.windows_helper_ip = String(domHelperIp.value || '').trim();
+                    if (domHelperUser) target.windows_helper_user = String(domHelperUser.value || '').trim();
+                    if (domValidator) target.post_attach_db_validator = String(domValidator.value || 'none').trim().toLowerCase();
+                    const pairedTarget = (typeof _volsnapPairedFlexId === 'function') ? _volsnapPairedFlexId(iid) : '';
+                    const inferredTarget = (typeof _volsnapDefaultTarget === 'function')
+                        ? _volsnapDefaultTarget(r, pairedTarget)
+                        : String(r.flex_server_id || r.flex_target_server_id || r.flex_target_vm_id || r.flex_target_vm || pairedTarget || '').trim();
+                    const inferredIp = (typeof _volsnapDefaultTargetIp === 'function')
+                        ? _volsnapDefaultTargetIp(r)
+	                        : String(r.flex_target_vm_ip || r.flex_target_ip || r.target_flex_ip || '').trim();
+		                    const isWindowsVol = _volsnapIsWindowsRow(r);
+		                    let finalTarget = String(target.flex_target_vm || inferredTarget).trim();
+		                    let finalIp = String(target.flex_target_ip || r.flex_target_ip || inferredIp).trim();
+		                    if (isWindowsVol) {
+		                        finalTarget = _volsnapStripSourcePrefix(finalTarget);
+		                        const sourceIp = String(r.attached_vm_ip || '').trim();
+		                        if (sourceIp && finalIp === sourceIp) finalIp = '';
+		                    }
+			                    return {
+		                        ...r,
+		                        is_windows_volume: isWindowsVol,
+	                        flex_target_vm: finalTarget,
+                        windows_helper_vm_id: String(target.windows_helper_vm_id || linuxHelperVmId || '').trim(),
+                        windows_helper_ip: String(target.windows_helper_ip || linuxHelperIp || '').trim(),
+                        windows_helper_user: String(target.windows_helper_user || linuxHelperUser || 'ubuntu').trim() || 'ubuntu',
+                        flex_target_is_source_fallback: false,
+	                        final_target_ssh_ip: finalIp,
+	                        final_target_ssh_user: String(target.flex_target_user || r.flex_target_user || 'ubuntu').trim() || 'ubuntu',
+                        post_attach_db_validator: String(target.post_attach_db_validator || r.post_attach_db_validator || 'none').trim().toLowerCase() || 'none',
+                    };
+                });
+                const runnableSnaps = snapsWithTargets.filter(r =>
+                    String(r.flex_target_vm || '').trim()
+                );
+                const skippedSnaps = snapsWithTargets.filter(r => !runnableSnaps.includes(r));
+                const windowsSnaps = runnableSnaps.filter(r => r.is_windows_volume);
+                if (windowsSnaps.some(r => !r.windows_helper_vm_id || !r.windows_helper_ip)) {
+                    alert('Set the Windows helper Server ID and IP in each selected Windows volume snapshot row.');
                     return;
                 }
-
-                // ── review / manual: show pairing preflight modal ─────────────
-                if (attachMode === 'review' || attachMode === 'manual') {
-                    _currentAttachMode = attachMode;
-                    await runPreflight(snaps, attachMode);
-                    _currentPairings = Object.values(window._volsnapPairingMap || {}).filter(p =>
-                        snaps.some(s => s.snapshot_id === p.snapshot_id)
-                    );
+                if (!runnableSnaps.length) {
+                    alert('No selected volume snapshot has a Target Flex value in the row.');
+                    if (typeof imageScanState !== 'undefined') imageScanState.activeTab = 'volume';
+                    if (typeof renderImageTable === 'function') renderImageTable();
                     return;
                 }
+                if (skippedSnaps.length) {
+                    appendLog(`📦 Volume-Snapshot-Mig — skipping ${skippedSnaps.length} selected row(s) without a real Target Flex Server ID: ${skippedSnaps.map(r => r.snapshot_name || r.snapshot_id).join(', ')}`, 'system');
+                }
 
-                // ── direct (default): launch immediately, no pairing ──────────
-                appendLog(`📦 Volume-Snapshot-Mig — ${snaps.length} snapshot(s)`, 'system');
-                jarvisAnnounce(`Initializing Volume Snapshot Migration Batch. ${snaps.length} snapshot${snaps.length === 1 ? '' : 's'} queued.`);
+                // ── direct: launch immediately to the configured target FLEX VM ─
+                appendLog(`📦 Volume-Snapshot-Mig — ${runnableSnaps.length} snapshot(s)`, 'system');
+                if (isDryRun) appendLog('📦 Volume-Snapshot-Mig — DRY RUN mode: source pairing names/IPs are allowed for validation only.', 'system');
+                jarvisAnnounce(`Initializing Volume Snapshot Migration Batch. ${runnableSnaps.length} snapshot${runnableSnaps.length === 1 ? '' : 's'} queued.`);
                 window.volsnapAbortController = new AbortController();
                 isVolsnapRunning = true;
                 refreshMigrationToolbar();
@@ -8043,30 +8457,66 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     flex_app_cred_id:     gv('credFlexAppCredId'),
                     flex_app_cred_secret: gv('credFlexAppCredSecret'),
                     flex_project_id:      gv('credFlexProjectId'),
-                    flex_region:          gv('credFlexRegion')  || 'DFW3',
+	                    flex_region:          gv('image_scan_region') || gv('credFlexRegion') || 'IAD',
                     flex_domain:          gv('credFlexDomain')  || 'rackspace_cloud_domain',
                     flex_auth_url:        gv('credFlexAuthUrl'),
                     process_host_ip:      jhIp,
                     process_ssh_user:     jhUser,
                     process_ssh_key:      jhKey,
-                    flex_helper_vm_id:    gv('volsnap_flex_helper_vm_id'),
-                    flex_helper_ip:       gv('volsnap_flex_helper_ip'),
-                    flex_helper_user:     gv('volsnap_flex_helper_user') || 'ubuntu',
-                    start_fresh_kill:     !!(document.getElementById('volsnap_start_fresh_kill') || {}).checked,
+                    dry_run:              isDryRun,
+                    start_fresh_kill:     true,
+                    post_attach_pg_db_name: 'openstack_drinks',
+                    post_attach_pg_table_name: '',
+                    post_attach_custom_validate_cmd: '',
+                    post_attach_mount_point: '',
+                    post_attach_device_hint: '',
                 };
 
                 let volsnapCompleted = 0;
                 const streamOneDirect = async (r) => {
                     const iid   = String(r.snapshot_id || '').trim();
                     const label = r.snapshot_name || iid;
+                    const rowHelperVmId = r.is_windows_volume ? r.windows_helper_vm_id : r.flex_target_vm;
+                    const rowHelperIp = r.is_windows_volume ? r.windows_helper_ip : r.final_target_ssh_ip;
+                    const rowHelperUser = r.is_windows_volume ? r.windows_helper_user : (r.final_target_ssh_user || 'ubuntu');
                     getOrCreateImagePanel(iid, label, label);
                     appendImageLog(iid, `[VOLSNAP] Starting: ${label} (${iid})`);
+                    appendImageLog(iid, `[VOLSNAP] ${r.is_windows_volume ? 'Windows volume helper' : 'Linux target'}: ${rowHelperVmId} (${rowHelperIp || 'no ssh ip'})`);
+                    appendImageLog(iid, `[VOLSNAP] Final target FLEX VM from table: ${r.flex_target_vm}`);
+                    appendImageLog(iid, `[VOLSNAP] Final target FLEX IP/User: ${r.final_target_ssh_ip || 'no ip'} / ${r.final_target_ssh_user || 'ubuntu'}`);
+                    appendImageLog(iid, `[VOLSNAP] Row DB validator: ${r.post_attach_db_validator || 'none'}`);
                     try {
-                        const resp = await fetch('/api/volsnap/run', {
+                        if (!rowHelperVmId || !rowHelperIp) {
+                            appendImageLog(iid, `[ERROR] Missing ${r.is_windows_volume ? 'Windows helper' : 'Linux target'} VM ID or IP for ${label}`);
+                            return;
+                        }
+                        const volsnapUrl = new URL('/api/volsnap/run', window.location.href).toString();
+                        appendImageLog(iid, `[VOLSNAP] Dashboard endpoint: ${volsnapUrl}`);
+                        const resp = await fetch(volsnapUrl, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            cache: 'no-store',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
                             signal: window.volsnapAbortController ? window.volsnapAbortController.signal : undefined,
-                            body: JSON.stringify({ ...sharedPayload, snapshot_id: iid, snapshot_name: label }),
+                            body: JSON.stringify({
+                                ...sharedPayload,
+                                snapshot_id: iid,
+                                snapshot_name: label,
+                                os_type: r.is_windows_volume ? 'windows' : 'linux',
+                                flex_helper_vm_id: rowHelperVmId,
+                                flex_helper_ip: rowHelperIp,
+                                flex_helper_user: rowHelperUser || 'ubuntu',
+                                flex_target_vm: r.flex_target_vm,
+                                flex_target_vm_id: r.flex_target_vm,
+                                flex_target_ip: r.final_target_ssh_ip,
+                                flex_target_user: r.final_target_ssh_user || 'ubuntu',
+                                post_attach_ssh_ip: r.final_target_ssh_ip,
+                                post_attach_ssh_user: r.final_target_ssh_user || 'ubuntu',
+	                                post_attach_validate_mount: (r.post_attach_db_validator || 'none') !== 'none',
+	                                post_attach_db_validator: r.post_attach_db_validator || 'none',
+	                                post_attach_validate_pg: (r.post_attach_db_validator === 'postgresql'),
+	                                snap_size_gb: String(r.size_gb || '').trim(),
+	                                source_volume_id: String(r.volume_id || r.source_volume_id || '').trim(),
+	                            }),
                         });
                         if (!resp.ok || !resp.body) { appendImageLog(iid, `[ERROR] HTTP ${resp.status} — failed to start for ${label}`); return; }
                         const reader = resp.body.getReader();
@@ -8088,12 +8538,13 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         if (e && e.name === 'AbortError') {
                             appendImageLog(iid, '[SYSTEM] Aborted.');
                         } else {
-                            appendImageLog(iid, `[ERROR] ${e && e.message ? e.message : String(e)}`);
+                            const detail = e && (e.stack || e.message) ? (e.stack || e.message) : String(e);
+                            appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
                             jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
                         }
                     } finally {
                         volsnapCompleted++;
-                        if (volsnapCompleted >= snaps.length) {
+                        if (volsnapCompleted >= runnableSnaps.length) {
                             isVolsnapRunning = false;
                             window.volsnapAbortController = null;
                             refreshMigrationToolbar();
@@ -8101,7 +8552,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         }
                     }
                 };
-                snaps.forEach(r => streamOneDirect(r));
+                runnableSnaps.forEach(r => streamOneDirect(r));
             });
         })();
 
@@ -8131,13 +8582,39 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             const jhKey  = (document.getElementById('process_ssh_key')  || document.getElementById('nbd_jumphost_key')  || {}).value || '';
 
             // Rows use snapshot_id / snapshot_name (not image_id / image_name).
-            const allChecked = Array.from(document.querySelectorAll('.ospc-image-cb:checked')).map(cb => {
+            // Keep Linux and Windows launch buttons isolated even when rows from
+            // multiple tabs remain checked in localStorage/the rendered table.
+            const scanRows = (typeof imageScanState !== 'undefined' && imageScanState.rows) ? imageScanState.rows : [];
+            const selectedMap = _loadImageSelectionMap();
+            const cachedRows = scanRows.filter(r => {
+                const id = String((r && r.snapshot_id) || '').trim();
+                return id && !!selectedMap[id];
+            });
+            const domCheckedRows = Array.from(document.querySelectorAll('.ospc-image-cb:checked')).map(cb => {
                 const i = Number(cb.dataset.idx || -1);
-                return (typeof imageScanState !== 'undefined' && imageScanState.rows) ? imageScanState.rows[i] : null;
-            }).filter(r => r && r.migratable && String(r.snapshot_id || '').trim());
+                return scanRows[i] || null;
+            });
+            const rowById = new Map();
+            [...cachedRows, ...domCheckedRows].forEach(r => {
+                const id = String((r && r.snapshot_id) || '').trim();
+                if (id && r && r.migratable) rowById.set(id, r);
+            });
+            const checkedRows = Array.from(rowById.values());
+            const allChecked = checkedRows.filter(r => {
+                const isVol = r.asset_type === 'volume_snapshot';
+                const isWin = !!r.is_windows;
+                if (isVol) return false;
+                return isSnapWinButton ? isWin : !isWin;
+            });
 
+            if (!checkedRows.length) {
+                alert('Select at least one migratable private snapshot in the Private Snapshot table.');
+                return;
+            }
             if (!allChecked.length) {
-                alert('Select at least one migratable private snapshot from Private Server Volume Snapshot Migration Table.');
+                alert(isSnapWinButton
+                    ? 'No Windows snapshots selected. Use the Windows Snapshots tab or uncheck Linux/Volume rows.'
+                    : 'No Linux snapshots selected. Use the Linux Snapshots tab or uncheck Windows/Volume rows.');
                 return;
             }
 
@@ -8172,6 +8649,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             if (btn && btn.id === 'start-snapwin-migration-btn') isWindowsSnapRunning = true;
             else isLinuxSnapRunning = true;
             refreshMigrationToolbar();
+            const activeStopBtn = document.getElementById(isSnapWinButton ? 'stop-windows-snap-btn' : 'stop-linux-snap-btn');
+            if (activeStopBtn) activeStopBtn.style.display = 'flex';
             window.imagePipelineAbortController = new AbortController();
 
             // Create a terminal panel for each image upfront
@@ -8246,7 +8725,8 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             asset_type:    r.asset_type || 'image_snapshot',
                             is_windows:    !!r.is_windows,
                             os_type:       r.os_distro || r.os_type || '',
-                            start_fresh:   typeStartFreshKill ? true : startFresh,
+                            start_fresh:   startFresh,
+                            no_image_resume: startFresh,
                             start_fresh_kill: typeStartFreshKill
                         })
                     });

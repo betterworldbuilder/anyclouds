@@ -108,6 +108,105 @@ MIGRATION_JOBS: Dict[str, Dict[str, Any]] = {}
 MIGRATION_JOBS_LOCK = threading.Lock()
 
 
+def _windows_unc_from_wsl_path(path: str) -> str:
+    """Best-effort WSL path to Windows UNC path for powershell.exe/cmd.exe."""
+    p = str(path or "").strip()
+    if not p.startswith("/"):
+        return p
+    parts = [part for part in p.split("/") if part]
+    if len(parts) >= 2 and parts[0] == "mnt" and len(parts[1]) == 1:
+        drive = parts[1].upper() + ":"
+        return "\\".join([drive, *parts[2:]])
+    distro = os.environ.get("WSL_DISTRO_NAME", "Ubuntu")
+    return "\\\\wsl.localhost\\" + distro + "\\" + "\\".join(parts)
+
+
+def _ps_single_quote(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+@app.post("/api/local-terminal/run")
+def local_terminal_run():
+    """Run one operator command from the dashboard command console.
+
+    This intentionally uses short-lived commands rather than a persistent PTY,
+    so it works through the existing HTTPS/nginx setup without WebSockets.
+    """
+    remote = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    if remote not in {"127.0.0.1", "::1", "localhost"} and os.environ.get("ENABLE_WEB_COMMAND_CONSOLE") != "1":
+        return jsonify({"ok": False, "error": "Local terminal is restricted to localhost."}), 403
+
+    data = request.get_json(silent=True) or {}
+    shell_name = str(data.get("shell") or "powershell").strip().lower()
+    command = str(data.get("command") or "").strip()
+    cwd = str(data.get("cwd") or BASE_DIR).strip()
+    timeout = min(max(int(data.get("timeout") or 120), 1), 600)
+
+    if not command:
+        return jsonify({"ok": False, "error": "No command provided."}), 400
+
+    wsl_cwd = cwd if cwd.startswith("/") else str(BASE_DIR)
+    win_cwd = _windows_unc_from_wsl_path(wsl_cwd)
+
+    run_cwd = wsl_cwd if os.path.isdir(wsl_cwd) else str(BASE_DIR)
+
+    if shell_name in {"powershell", "ps"}:
+        argv = [
+            "powershell.exe",
+            "-NoLogo",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            f"Set-Location -LiteralPath {_ps_single_quote(win_cwd)}; {command}",
+        ]
+        if os.path.isdir("/mnt/c/Windows"):
+            run_cwd = "/mnt/c/Windows"
+    elif shell_name in {"cmd", "cmd.exe"}:
+        # Windows CMD cannot reliably use WSL UNC paths as its current directory.
+        # Keep it as a plain Windows console; use PowerShell or Bash for repo-aware cwd.
+        argv = ["cmd.exe", "/d", "/s", "/c", command]
+        if os.path.isdir("/mnt/c/Windows"):
+            run_cwd = "/mnt/c/Windows"
+    elif shell_name in {"bash", "wsl", "ubuntu"}:
+        argv = ["/bin/bash", "-lc", f"cd {shlex.quote(wsl_cwd)} && {command}"]
+    else:
+        return jsonify({"ok": False, "error": f"Unsupported shell: {shell_name}"}), 400
+
+    started = time.time()
+    try:
+        proc = subprocess.run(
+            argv,
+            cwd=run_cwd,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+        return jsonify({
+            "ok": proc.returncode == 0,
+            "shell": shell_name,
+            "command": command,
+            "cwd": wsl_cwd,
+            "returncode": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "elapsed_sec": round(time.time() - started, 3),
+        })
+    except subprocess.TimeoutExpired as exc:
+        return jsonify({
+            "ok": False,
+            "shell": shell_name,
+            "command": command,
+            "cwd": wsl_cwd,
+            "returncode": 124,
+            "stdout": exc.stdout or "",
+            "stderr": (exc.stderr or "") + f"\nCommand timed out after {timeout}s.",
+            "elapsed_sec": round(time.time() - started, 3),
+        }), 408
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc), "shell": shell_name, "command": command}), 500
+
+
 def _mig_job_create(job_id: str, label: str, job_type: str, script_path: str) -> None:
     with MIGRATION_JOBS_LOCK:
         MIGRATION_JOBS[job_id] = {
@@ -1334,9 +1433,10 @@ def image_migrator_scan_images():
         for c_region, c_url in cinder_endpoints:
             logs.append(f"[INFO] Querying Cinder endpoint {c_region}: {c_url}")
 
-            # Build server_id → server_name and server_name → best_ip maps via Nova (one call per region)
+            # Build server_id → server_name plus source lookup maps via Nova (one call per region)
             server_name_map: dict = {}
             server_name_ip_map: dict = {}  # server_name → first usable IP
+            server_name_id_map: dict = {}  # server_name → source server ID
             nova_endpoints = _extract_nova_endpoints_from_catalog(auth_body, c_region)
             if nova_endpoints:
                 nova_url = nova_endpoints[0][1]
@@ -1352,6 +1452,7 @@ def image_migrator_scan_images():
                         svname = str((srv or {}).get("name", "") or "").strip()
                         if svid and svname:
                             server_name_map[svid] = svname
+                            server_name_id_map[svname] = svid
                         # Extract best IP — prefer accessIPv4, then first address entry
                         best_ip = str((srv or {}).get("accessIPv4", "")).strip()
                         if not best_ip:
@@ -1370,6 +1471,7 @@ def image_migrator_scan_images():
             # Fetch volume name + attachment map (volume_id → name, volume_id → attached VM name)
             vol_name_map: dict = {}
             vol_attached_map: dict = {}  # volume_id → VM name if currently attached
+            vol_attached_id_map: dict = {}  # volume_id → source VM ID if currently attached
             vol_proc = subprocess.run(
                 ["curl", "-sS", "-k", f"{c_url}/volumes/detail?limit=1000",
                  "-H", f"X-Auth-Token: {token}", "-H", "Accept: application/json"],
@@ -1389,6 +1491,7 @@ def image_migrator_scan_images():
                         if svid and vid:
                             svname = server_name_map.get(svid, svid[:8])
                             vol_attached_map[vid] = svname
+                            vol_attached_id_map[vid] = svid
                             break
 
             snap_url = f"{c_url}/snapshots/detail?limit=1000"
@@ -1435,6 +1538,7 @@ def image_migrator_scan_images():
                     volume_snapshots_found += 1
                 _attached_vm = vol_attached_map.get(s_vol_id, "")
                 _attached_vm_ip = server_name_ip_map.get(_attached_vm, "") if _attached_vm else ""
+                _attached_vm_id = vol_attached_id_map.get(s_vol_id, "") or (server_name_id_map.get(_attached_vm, "") if _attached_vm else "")
                 rows.append({
                     "asset_type": "volume_snapshot",
                     "snapshot_name": sname,
@@ -1442,6 +1546,9 @@ def image_migrator_scan_images():
                     "source_vm_name": _vol_name or s_desc or s_vol_id,
                     "attached_to": _attached_vm,
                     "attached_vm_ip": _attached_vm_ip,
+                    "attached_vm_id": _attached_vm_id,
+                    "source_server_id": _attached_vm_id,
+                    "source_server_ip": _attached_vm_ip,
                     "created_at": s_created,
                     "updated_at": s_updated,
                     "disk_format": "raw",
@@ -3145,7 +3252,7 @@ init_tracker_db()
 
 @app.get("/")
 def index():
-    return render_template("combined.html")
+    return render_template("combined.html", cache_bust=_CACHE_BUST)
 
 
 @app.get("/run/")
@@ -3188,6 +3295,9 @@ def rehost_manual_ui():
 
 @app.get("/image_migrator/")
 def image_migrator_ui():
+    from flask import make_response, request, redirect
+    if request.args.get("v") != _CACHE_BUST:
+        return redirect(f"/image_migrator/?v={_CACHE_BUST}", code=302)
     # Preload map files (filename + content) so labels and tables render without any JS fetch
     preloaded: dict = {}
     for pattern, key in [('*_overview.csv', 'overviewmap'), ('*_flavormap.csv', 'flavormap'), ('*_blockmap.csv', 'blockmap')]:
@@ -3204,13 +3314,17 @@ def image_migrator_ui():
             _jh.update(_json.load(open(_cache_path)))
     except Exception:
         pass
-    return render_template(
+    resp = make_response(render_template(
         "image_migrator.html",
         preloaded_maps=preloaded,
         default_jh_ip=getattr(app, '_last_jumphost_ip', '') or os.environ.get('NBD_JUMPHOST_IP', '') or _jh['jumphost_ip'],
         default_jh_user=getattr(app, '_last_jumphost_user', '') or os.environ.get('NBD_JUMPHOST_USER', '') or _jh['jumphost_user'],
         default_jh_key=os.environ.get('NBD_JUMPHOST_KEY', '') or _jh['ssh_key'],
-    )
+    ))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.get("/dashboard/")
@@ -7529,7 +7643,8 @@ def run_image_migrator():
         return Response(stream_with_context(_linux_snap_generator()), mimetype='text/event-stream')
 
     if _windows_method == 'windows_method_z_snapshot_existing':
-        method_z_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_windows_method_z_snapshot_existing.sh")
+        method_z_script_name = "ospc2flex_windows_method_z_snapshot_existing.sh"
+        method_z_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / method_z_script_name)
         method_z_files = [method_z_script]
         missing_z = [p for p in method_z_files if not os.path.isfile(p)]
         if missing_z:
@@ -7551,7 +7666,7 @@ def run_image_migrator():
         remote_ospc = f"/tmp/ospc2flex_method_z_{label_safe_z}_ospc.sh"
         remote_flex = f"/tmp/ospc2flex_method_z_{label_safe_z}_flex.sh"
         remote_log = f"/tmp/mig_{label_safe_z}.log"
-        remote_script = "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh"
+        remote_script = f"/tmp/{method_z_script_name}"
 
         ssh_key_raw_z = (
             req.get('process_ssh_key')
@@ -7676,8 +7791,15 @@ def run_image_migrator():
 
                 if start_fresh_kill and not req.get('dry_run'):
                     yield "data: [METHOD_Z] START FRESH: killing existing Windows SNAPWIN jobs on jumphost.\n\n"
+                    _label_q = shlex.quote(label_safe_z)
                     kill_cmd = (
-                        "pids=$(pgrep -f 'ospc2flex_windows_method_z_snapshot_existing.sh|snapwin_run_' | grep -v \"^$$$\" || true); "
+                        f"label={_label_q}; self=$$; "
+                        "pids=$(ps -eo pid=,cmd= | awk -v label=\"$label\" -v self=\"$self\" '"
+                        "$1 != self && "
+                        "($0 ~ \"snapwin_run_\" label \"_\" || "
+                        "($0 ~ \"ospc2flex_windows_method_z_snapshot_existing\" && $0 ~ \"--label \" label) || "
+                        "($0 ~ \"openstack image create\" && $0 ~ label \"-snapwin\")) "
+                        "{print $1}' || true); "
                         "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
                         "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
                     )
@@ -7708,9 +7830,9 @@ def run_image_migrator():
                     remote_method_z_md5 = ""
 
                 if remote_method_z_md5 == local_method_z_md5:
-                    yield "data: [METHOD_Z] SNAPWIN script already current on jumphost; skipped script upload.\n\n"
+                    yield f"data: [METHOD_Z] SNAPWIN script already current on jumphost ({method_z_script_name}); skipped script upload.\n\n"
                 else:
-                    yield "data: [METHOD_Z] Uploading SNAPWIN script to jumphost.\n\n"
+                    yield f"data: [METHOD_Z] Uploading SNAPWIN script to jumphost ({method_z_script_name}).\n\n"
                     yield from _run_stage_cmd(
                         "SNAPWIN script upload",
                         scp_base_z + [method_z_script, f"{ssh_usr_z}@{process_ip}:{remote_script}"],
@@ -7798,9 +7920,11 @@ def run_image_migrator():
                 run_script = f"/tmp/snapwin_run_{label_safe_z}_{_launch_ts}.sh"
                 remote_inner = " ".join(shlex.quote(x) for x in z_cmd)
                 _snapwin_env = "OSPC2FLEX_ARTIFACT_SEARCH_DIRS=/mnt/migration/ospc2flex_image"
-                if req.get('start_fresh'):
+                no_image_resume = bool(req.get('no_image_resume') if 'no_image_resume' in req else req.get('start_fresh'))
+                if no_image_resume:
                     _snapwin_env += " OSPC2FLEX_SNAPWIN_AUTO_RESUME=0"
                 remote_run = f"cp {shlex.quote(remote_script)} {shlex.quote(run_script)} && set -o pipefail; {_snapwin_env} {remote_inner.replace(shlex.quote(remote_script), shlex.quote(run_script), 1)} 2>&1 | tee {shlex.quote(remote_log)}"
+                yield f"data: [METHOD_Z] No image resume: {'ON — existing qcow2 artifacts ignored' if no_image_resume else 'OFF — valid unrepaired qcow2 may resume to repair'}\n\n"
                 yield f"data: [METHOD_Z] Launching selected cold snapshot/image ID: {snapshot_id or local_artifact}\n\n"
                 process = subprocess.Popen(
                     ssh_base_z + [remote_run],
@@ -8020,6 +8144,9 @@ def run_volsnap_migrator():
     """
     import re as _re
     req = request.get_json(force=True, silent=True) or {}
+    def _truthy(value):
+        return str(value).strip().lower() in ("1", "true", "yes", "on")
+    dry_run_requested = _truthy(req.get('dry_run'))
 
     snapshot_id = str(req.get('snapshot_id') or req.get('ospc_snapshot_id') or '').strip()
     if not snapshot_id:
@@ -8066,12 +8193,17 @@ def run_volsnap_migrator():
     local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_volsnap_migrate.sh")
     if not os.path.isfile(local_script):
         return jsonify({"error": f"ospc2flex_volsnap_migrate.sh not found at {local_script}"}), 500
+    local_pg_validate_script = str(BASE_DIR / "scripts" / "osflex_post_attach_pg_mount_validate.sh")
+    if not os.path.isfile(local_pg_validate_script):
+        return jsonify({"error": f"osflex_post_attach_pg_mount_validate.sh not found at {local_pg_validate_script}"}), 500
 
     import time as _vs_time
     _ts = int(_vs_time.time())
     remote_script = "/tmp/ospc2flex_volsnap_migrate.sh"
+    remote_pg_validate_script = "/tmp/osflex_post_attach_pg_mount_validate.sh"
     remote_ospc   = f"/tmp/volsnap_{label_safe}_{_ts}_ospc.sh"
-    remote_flex   = "/tmp/ospc2flex_flex.sh"  # reuse linsnap-staged FLEX openrc (correct IAD3 region)
+    remote_flex   = f"/tmp/volsnap_{label_safe}_{_ts}_flex.sh"
+    remote_target_ssh_key = f"/tmp/volsnap_{label_safe}_{_ts}_target_ssh_key"
     remote_log    = f"/tmp/volsnap_{label_safe}_{_ts}.log"
 
     # Synthesize OSPC openrc (reuse same logic as run_image_migrator)
@@ -8122,8 +8254,26 @@ def run_volsnap_migrator():
     if (_flex_app_id and _flex_app_secret or _flex_user and _flex_pass) and not flex_path:
         import tempfile, shlex as _shlex3
         fd2, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_vs_")
-        flex_auth_url   = str(req.get('flex_auth_url', '') or '').strip()
-        flex_region     = str(req.get('flex_region', 'DFW3') or 'DFW3').strip()
+        _requested_flex_region = str(req.get('flex_region') or '').strip()
+        _requested_ospc_region = str(req.get('ospc_region') or '').strip()
+        _requested_target = str(
+            req.get('flex_target_vm_id') or req.get('flex_target_vm') or req.get('flex_target_server_id') or ''
+        ).strip()
+        _target_looks_like_ospc_source = (
+            os_type.strip().lower() == 'windows'
+            and _requested_target.lower().startswith(('ospc', 'opsc'))
+            and bool(_requested_ospc_region)
+        )
+        if _target_looks_like_ospc_source:
+            _requested_flex_region = _requested_ospc_region
+        flex_region     = normalize_flex_region(
+            _requested_flex_region or _requested_ospc_region or 'IAD',
+            str(req.get('flex_auth_url', '') or '').strip(),
+        )
+        flex_auth_url   = normalize_flex_auth_url(
+            str(req.get('flex_auth_url', '') or '').strip() or f"https://keystone.api.{flex_region.lower()}.rackspacecloud.com/v3/",
+            flex_region,
+        )
         flex_project    = str(req.get('flex_project_id', '') or '').strip()
         flex_domain     = str(req.get('flex_domain', 'rackspace_cloud_domain') or 'rackspace_cloud_domain').strip()
         with os.fdopen(fd2, 'w') as f:
@@ -8162,7 +8312,7 @@ def run_volsnap_migrator():
             return proc
 
         try:
-            if start_fresh_kill and not req.get('dry_run'):
+            if start_fresh_kill and not dry_run_requested:
                 kill_cmd = (
                     "pids=$(pgrep -f 'ospc2flex_volsnap_migrate.sh' | grep -v \"^$$$\" || true); "
                     "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
@@ -8192,22 +8342,157 @@ def run_volsnap_migrator():
                 yield "data: [VOLSNAP] Uploading ospc2flex_volsnap_migrate.sh to jumphost.\n\n"
                 _run("script upload", scp_base + [local_script, f"{ssh_user}@{process_ip}:{remote_script}"], timeout=120)
 
-            # Upload OSPC openrc; reuse linsnap's /tmp/ospc2flex_flex.sh for FLEX (correct IAD3 region)
+            with open(local_pg_validate_script, "rb") as _fh:
+                local_pg_md5 = _vshash.md5(_fh.read()).hexdigest()
+            try:
+                _pg_chk = subprocess.run(
+                    ssh_base + [f"test -f {_vsshlex.quote(remote_pg_validate_script)} && md5sum {_vsshlex.quote(remote_pg_validate_script)} | awk '{{print $1}}' || true"],
+                    check=False, timeout=30, capture_output=True, text=True)
+                remote_pg_md5 = (_pg_chk.stdout or '').strip().splitlines()[-1] if (_pg_chk.stdout or '').strip() else ''
+            except Exception:
+                remote_pg_md5 = ''
+
+            if remote_pg_md5 == local_pg_md5:
+                yield "data: [VOLSNAP] Post-attach PG validation script already current on jumphost; skipped upload.\n\n"
+            else:
+                yield "data: [VOLSNAP] Uploading post-attach PG validation script to jumphost.\n\n"
+                _run("post-attach pg script upload", scp_base + [local_pg_validate_script, f"{ssh_user}@{process_ip}:{remote_pg_validate_script}"], timeout=120)
+
+            # Upload scoped OSPC and FLEX OpenRC files for this VOLSNAP run.
             _run(f"openrc upload {os.path.basename(remote_ospc)}",
                  scp_base + [ospc_path, f"{ssh_user}@{process_ip}:{remote_ospc}"], timeout=60)
+            _run(f"openrc upload {os.path.basename(remote_flex)}",
+                 scp_base + [flex_path, f"{ssh_user}@{process_ip}:{remote_flex}"], timeout=60)
             _run("chmod openrc",
-                 ssh_base + [f"chmod 600 {_vsshlex.quote(remote_ospc)}; chmod +x {_vsshlex.quote(remote_script)}"],
+                 ssh_base + [
+                     f"chmod 600 {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)}; "
+                     f"chmod +x {_vsshlex.quote(remote_script)} {_vsshlex.quote(remote_pg_validate_script)}"
+                 ],
                  timeout=30)
+            target_ssh_key_path = "/home/ubuntu/.ssh/id_rsa"
+            if os_type.strip().lower() != "windows":
+                _run("target ssh key upload",
+                     scp_base + [ssh_key, f"{ssh_user}@{process_ip}:{remote_target_ssh_key}"], timeout=60)
+                _run("chmod target ssh key",
+                     ssh_base + [f"chmod 600 {_vsshlex.quote(remote_target_ssh_key)}"], timeout=30)
+                target_ssh_key_path = remote_target_ssh_key
+                yield "data: [VOLSNAP] Linux target SSH key staged on jumphost from dashboard key.\n\n"
             yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
 
             # Build remote command — pass FLEX helper args for direct Cinder path
             flex_helper_vm_id = str(req.get('flex_helper_vm_id') or '').strip()
             flex_helper_ip    = str(req.get('flex_helper_ip')    or '').strip()
             flex_helper_user  = str(req.get('flex_helper_user')  or 'ubuntu').strip() or 'ubuntu'
-            flex_target_vm_id = str(req.get('flex_target_vm_id') or '').strip()
+            flex_target_vm_id = str(req.get('flex_target_vm_id') or req.get('flex_target_vm') or req.get('flex_target_server_id') or '').strip()
+            flex_target_ip    = str(req.get('flex_target_ip') or req.get('target_flex_ip') or req.get('post_attach_ssh_ip') or '').strip()
+            flex_target_user  = str(req.get('flex_target_user') or req.get('target_flex_user') or req.get('post_attach_ssh_user') or '').strip()
             flex_volume_name  = str(req.get('flex_volume_name')  or '').strip()
+            snap_size_gb      = str(req.get('snap_size_gb') or req.get('snapshot_size_gb') or req.get('size_gb') or '').strip()
+            source_volume_id  = str(req.get('source_volume_id') or req.get('volume_id') or '').strip()
             cleanup_temp      = str(req.get('cleanup_temp',  'true')).strip().lower()
             attach_to_final   = str(req.get('attach_to_final','true')).strip().lower()
+            post_attach_validate_mount = bool(req.get('post_attach_validate_mount') or req.get('post_attach_validate_pg'))
+            post_attach_validate_pg = bool(req.get('post_attach_validate_pg'))
+            post_attach_db_validator = str(req.get('post_attach_db_validator') or ('postgresql' if post_attach_validate_pg else 'none')).strip().lower() or 'none'
+            if post_attach_db_validator == 'mount':
+                post_attach_validate_mount = True
+                post_attach_db_validator = 'none'
+            elif post_attach_db_validator != 'none':
+                post_attach_validate_mount = True
+                if post_attach_db_validator == 'postgresql':
+                    post_attach_validate_pg = True
+            post_attach_custom_validate_cmd = str(req.get('post_attach_custom_validate_cmd') or '').strip()
+            post_attach_pg_db_name = str(req.get('post_attach_pg_db_name') or 'openstack_drinks').strip() or 'openstack_drinks'
+            post_attach_pg_table_name = str(req.get('post_attach_pg_table_name') or 'preferred_drinks').strip() or 'preferred_drinks'
+            post_attach_mount_point = str(req.get('post_attach_mount_point') or '').strip()
+            post_attach_device_hint = str(req.get('post_attach_device_hint') or '').strip()
+            post_attach_ssh_user = str(req.get('post_attach_ssh_user') or flex_target_user or flex_helper_user or 'ubuntu').strip() or 'ubuntu'
+            post_attach_ssh_key_path = str(req.get('post_attach_ssh_key_path') or target_ssh_key_path).strip() or target_ssh_key_path
+            post_attach_ssh_ip = str(req.get('post_attach_ssh_ip') or '').strip()
+            post_attach_allow_luks_open = str(req.get('post_attach_allow_luks_open', 'true')).strip().lower()
+            post_attach_allow_lvm_activate = str(req.get('post_attach_allow_lvm_activate', 'true')).strip().lower()
+            post_attach_update_postgresql_conf = str(req.get('post_attach_update_postgresql_conf', 'true')).strip().lower()
+            post_attach_start_postgresql = str(req.get('post_attach_start_postgresql', 'true')).strip().lower()
+
+            if os_type.strip().lower() != "windows" and flex_target_vm_id:
+                resolve_region = normalize_flex_region(
+                    str(req.get('flex_region') or req.get('ospc_region') or 'IAD').strip() or 'IAD',
+                    str(req.get('flex_auth_url', '') or '').strip(),
+                )
+                resolve_auth_url = normalize_flex_auth_url(
+                    str(req.get('flex_auth_url', '') or '').strip() or f"https://keystone.api.{resolve_region.lower()}.rackspacecloud.com/v3/",
+                    resolve_region,
+                )
+                resolve_ref = _vsshlex.quote(flex_target_vm_id)
+                resolve_ip = _vsshlex.quote(flex_target_ip)
+                resolve_region_q = _vsshlex.quote(resolve_region)
+                resolve_auth_url_q = _vsshlex.quote(resolve_auth_url)
+                resolve_cmd = f"""
+set +e
+. {_vsshlex.quote(remote_flex)} >/dev/null 2>&1
+export OS_REGION_NAME={resolve_region_q}
+export OS_AUTH_URL={resolve_auth_url_q}
+ref={resolve_ref}
+ip={resolve_ip}
+resolved="$(openstack server show "$ref" -f value -c id 2>/dev/null | head -1 | tr -d '[:space:]')"
+if [ -z "$resolved" ] && [ -n "$ip" ]; then
+  resolved="$(openstack server list --ip "$ip" -f value -c ID 2>/dev/null | head -1 | tr -d '[:space:]')"
+fi
+if [ -z "$resolved" ]; then
+  resolved="$(openstack server list -f value -c ID -c Name -c Status 2>/dev/null | awk -v ref="$ref" '
+    BEGIN {{ r=tolower(ref) }}
+    {{
+      id=$1; status=$NF; name=$0;
+      sub(/^[^ ]+[[:space:]]+/, "", name);
+      sub(/[[:space:]][^[:space:]]+$/, "", name);
+      n=tolower(name);
+      if (r != "" && index(n, r) > 0 && status == "ACTIVE") {{ print id; exit }}
+    }}
+  ')"
+fi
+if [ -n "$resolved" ]; then
+  resolved_ip="$(openstack server show "$resolved" -f value -c addresses 2>/dev/null \
+    | grep -Eo '([0-9]{{1,3}}\\.){{3}}[0-9]{{1,3}}' \
+    | awk '!/^(10|192\\\\.168|172\\\\.(1[6-9]|2[0-9]|3[0-1]))\\\\./ {{ print; exit }}')"
+  if [ -z "$resolved_ip" ]; then
+    resolved_ip="$(openstack server show "$resolved" -f value -c addresses 2>/dev/null \
+      | grep -Eo '([0-9]{{1,3}}\\.){{3}}[0-9]{{1,3}}' | head -1)"
+  fi
+  printf '%s %s\n' "$resolved" "$resolved_ip"
+fi
+"""
+                resolved = subprocess.run(
+                    ssh_base + [resolve_cmd],
+                    check=False, timeout=90, capture_output=True, text=True,
+                )
+                resolved_line = (resolved.stdout or "").strip().splitlines()[-1].strip() if (resolved.stdout or "").strip() else ""
+                resolved_parts = resolved_line.split()
+                resolved_id = resolved_parts[0] if resolved_parts else ""
+                resolved_ip = resolved_parts[1] if len(resolved_parts) > 1 else ""
+                if resolved_id:
+                    yield f"data: [VOLSNAP] Linux target resolved: {flex_target_vm_id} -> {resolved_id}\n\n"
+                    flex_target_vm_id = resolved_id
+                    flex_helper_vm_id = resolved_id
+                else:
+                    detail = ((resolved.stderr or "") + (resolved.stdout or "")).strip()[-300:]
+                    raise RuntimeError(
+                        "Linux FLEX target could not be resolved to a server ID "
+                        f"from row target '{flex_target_vm_id}' / row target IP '{flex_target_ip}'. {detail}"
+                    )
+                if flex_target_ip:
+                    if resolved_ip and resolved_ip != flex_target_ip:
+                        yield f"data: [VOLSNAP] Linux target SSH IP kept from table: {flex_target_ip} (OpenStack also reported {resolved_ip})\n\n"
+                    else:
+                        yield f"data: [VOLSNAP] Linux target SSH IP kept from table: {flex_target_ip}\n\n"
+                    flex_helper_ip = flex_target_ip
+                    post_attach_ssh_ip = flex_target_ip
+                elif resolved_ip:
+                    yield f"data: [VOLSNAP] Linux target SSH IP resolved from OpenStack: {resolved_ip}\n\n"
+                    flex_target_ip = resolved_ip
+                    flex_helper_ip = resolved_ip
+                    post_attach_ssh_ip = resolved_ip
+                if flex_target_user:
+                    flex_helper_user = flex_target_user
 
             vs_cmd = [
                 "bash", remote_script,
@@ -8216,6 +8501,12 @@ def run_volsnap_migrator():
                 "--ospc-openrc", remote_ospc,
                 "--flex-openrc", remote_flex,
             ]
+            if dry_run_requested:
+                vs_cmd += ["--dry-run"]
+            if source_volume_id:
+                yield f"data: [VOLSNAP] OSPC source volume ID: {source_volume_id}\n\n"
+            if snap_size_gb:
+                vs_cmd += ["--snap-size-gb", snap_size_gb]
             if flex_helper_vm_id:
                 vs_cmd += ["--flex-helper-vm-id", flex_helper_vm_id]
             if flex_helper_ip:
@@ -8227,10 +8518,31 @@ def run_volsnap_migrator():
             if flex_volume_name:
                 vs_cmd += ["--flex-volume-name", flex_volume_name]
             vs_cmd += ["--cleanup-temp", cleanup_temp, "--attach-to-final", attach_to_final]
-            # ssh key used on jumphost to reach FLEX helper
-            vs_cmd += ["--ssh-key-path", "~/.ssh/id_rsa"]
+            vs_cmd += [
+                "--post-attach-validate-mount", "true" if post_attach_validate_mount else "false",
+                "--post-attach-validate-pg", "true" if post_attach_validate_pg else "false",
+                "--post-attach-db-validator", post_attach_db_validator,
+                "--post-attach-custom-validate-cmd", post_attach_custom_validate_cmd,
+                "--post-attach-pg-db-name", post_attach_pg_db_name,
+                "--post-attach-pg-table-name", post_attach_pg_table_name,
+                "--post-attach-mount-point", post_attach_mount_point,
+                "--post-attach-device-hint", post_attach_device_hint,
+                "--post-attach-ssh-user", post_attach_ssh_user,
+                "--post-attach-ssh-key-path", post_attach_ssh_key_path,
+                "--post-attach-ssh-ip", post_attach_ssh_ip,
+                "--post-attach-allow-luks-open", post_attach_allow_luks_open,
+                "--post-attach-allow-lvm-activate", post_attach_allow_lvm_activate,
+                "--post-attach-update-postgresql-conf", post_attach_update_postgresql_conf,
+                "--post-attach-start-postgresql", post_attach_start_postgresql,
+                "--post-attach-script-path", remote_pg_validate_script,
+            ]
+            # ssh key used on jumphost to reach the FLEX helper/target VM
+            vs_cmd += ["--ssh-key-path", target_ssh_key_path]
+            cleanup_prefix = ""
+            if os_type.strip().lower() != "windows" and target_ssh_key_path == remote_target_ssh_key:
+                cleanup_prefix = f"trap 'rm -f {_vsshlex.quote(remote_target_ssh_key)}' EXIT; "
             remote_run = (
-                f"set -o pipefail; {' '.join(_vsshlex.quote(x) for x in vs_cmd)}"
+                f"{cleanup_prefix}set -o pipefail; {' '.join(_vsshlex.quote(x) for x in vs_cmd)}"
                 f" 2>&1 | tee {_vsshlex.quote(remote_log)}"
             )
             yield f"data: [VOLSNAP] Launching on jumphost: snapshot={snapshot_id}\n\n"
@@ -8257,7 +8569,7 @@ def run_volsnap_migrator():
         finally:
             try:
                 subprocess.run(
-                    ssh_base + [f"rm -f {_vsshlex.quote(remote_ospc)} 2>/dev/null || true"],
+                    ssh_base + [f"rm -f {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)} 2>/dev/null || true"],
                     timeout=30, check=False)
             except Exception:
                 pass
