@@ -709,11 +709,11 @@
                 <div style="margin-top: 40px; margin-bottom: 25px;">
                     <div style="cursor: pointer; display: inline-block; padding: 12px 28px; border: 4px solid #00cfff; border-radius: 16px; background: rgba(0,8,20,.9); animation: frameBluePulse 3s infinite ease-in-out;" onclick="(function(btn){var b=document.getElementById('coldMigrationMethodBody');b.classList.toggle('collapsed');var h=btn.querySelector('.cold-mig-toggle-hint');if(h)h.textContent=b.classList.contains('collapsed')?'▶ Toggle':'▼ Toggle';})(this);">
                         <span style="font-family: 'Orbitron', monospace; font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; animation: neonBlueTextPulse 2s infinite ease-in-out;">
-                            Cold VM snapshot migration ( under test ) <span class="cold-mig-toggle-hint" style="font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; text-transform: none; animation: none; text-shadow: none; vertical-align: middle; margin-left: 10px;">▶ Toggle</span>
+                            SNAPSHOT migration <span class="cold-mig-toggle-hint" style="font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; text-transform: none; animation: none; text-shadow: none; vertical-align: middle; margin-left: 10px;">▼ Toggle</span>
                         </span>
                     </div>
                 </div>
-                <div id="coldMigrationMethodBody" class="collapsed">
+                <div id="coldMigrationMethodBody">
                 <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(0,207,255,0.4);border-radius:12px;padding:20px;margin-top:20px;margin-bottom:25px;display:grid;grid-template-columns:minmax(180px, 1fr) 2fr 1fr 1fr;gap:20px;align-items:start;">
                     <div>
                         <div style="color:#a855f7;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🖼 OSPC Snapshot Discovery &amp; Cold Migration</div>
@@ -1017,11 +1017,11 @@
                     <div style="margin-top: 35px; margin-bottom: 25px;">
                         <div style="cursor: pointer; display: inline-block; padding: 12px 28px; border: 4px solid #ff2d78; border-radius: 16px; background: rgba(0,2,12,.7); animation: framePinkPulse 3s infinite ease-in-out;" onclick="(function(btn){var b=document.getElementById('liveMigrationMethodBody');b.classList.toggle('collapsed');var h=btn.querySelector('.live-mig-toggle-hint');if(h)h.textContent=b.classList.contains('collapsed')?'▶ Toggle':'▼ Toggle';})(this);">
                             <span style="font-family: 'Orbitron', monospace; font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; animation: neonPinkTextPulse 2s infinite ease-in-out;">
-                                Live Server VM Migration method <span class="live-mig-toggle-hint" style="font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; text-transform: none; animation: none; text-shadow: none; vertical-align: middle; margin-left: 10px;">▼ Toggle</span>
+                                Live Server VM Migration method <span class="live-mig-toggle-hint" style="font-size: 0.8rem; opacity: 0.7; font-family: sans-serif; text-transform: none; animation: none; text-shadow: none; vertical-align: middle; margin-left: 10px;">▶ Toggle</span>
                             </span>
                         </div>
                     </div>
-                    <div id="liveMigrationMethodBody">
+                    <div id="liveMigrationMethodBody" class="collapsed">
                     <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,45,120,0.3);border-radius:12px;padding:20px;margin-top:20px;margin-bottom:25px;display:grid;grid-template-columns:minmax(180px, 1fr) 2fr 1fr 1fr;gap:20px;align-items:start;">
                         <div>
                             <div style="color:#22c55e;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🚀 OSPC Server Batch NBD</div>
