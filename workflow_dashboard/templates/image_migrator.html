@@ -7929,27 +7929,24 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             // ── helpers ──────────────────────────────────────────────────────
             const gv = id => (document.getElementById(id) || {}).value || '';
 
-	            function _volSnapRows() {
-	                // Read from localStorage so selection survives tab switches and table re-renders
-	                let selMap = {};
-	                try { selMap = JSON.parse(localStorage.getItem('mig_ospc_image_selection_v1') || '{}'); } catch(e) {}
-	                const allRows = (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows))
-	                    ? imageScanState.rows : [];
-	                const rows = [];
-	                allRows.forEach(r => {
-	                    if (!r || !r.migratable) return;
-	                    const id = String(r.snapshot_id || '').trim();
-	                    if (!id) return;
-	                    const isVol = r.asset_type === 'volume_snapshot' ||
-	                        /vol/i.test(r.snapshot_name || '') ||
-	                        /vol/i.test(r.source_vm_name || '');
-	                    if (!isVol) return;
-	                    if (selMap[id] === true) {
-	                        rows.push(r);
-	                    }
-	                });
-	                return rows;
-	            }
+            function _volSnapRows() {
+                const allRows = (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows))
+                    ? imageScanState.rows : [];
+                const rows = [];
+                document.querySelectorAll('#ospc-image-table tbody .ospc-image-cb:checked').forEach(cb => {
+                    const tr = cb.closest('tr');
+                    if (!tr) return;
+                    const snapInput = tr.querySelector('.volsnap-target-vm-id, .volsnap-target-ip, .volsnap-helper-vm-id, .volsnap-test-method, .volsnap-row-db-validator');
+                    if (!snapInput) return;
+                    const idx = Number(cb.dataset.idx || -1);
+                    const r = allRows[idx];
+                    const id = String((r && r.snapshot_id) || '').trim();
+                    if (!id || String(snapInput.dataset.snapId || '').trim() !== id || !r || !r.migratable) return;
+                    if (r.asset_type !== 'volume_snapshot') return;
+                    rows.push(r);
+                });
+                return rows;
+            }
 
             function _sharedPayload() {
                 return {
