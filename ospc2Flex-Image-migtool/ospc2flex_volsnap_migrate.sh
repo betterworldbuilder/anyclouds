@@ -246,10 +246,83 @@ flex_wait_volume() {
   done
   log "[FLEX] TIMEOUT vol=$vid target=$want after ${timeout}s"; return 1
 }
+flex_wait_volume_deleted() {
+  local vid="$1" timeout="${2:-300}" waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    if ! openstack volume show "$vid" >/dev/null 2>&1; then
+      return 0
+    fi
+    [ $((waited % 60)) -eq 0 ] && log "[FLEX] vol=$vid waiting for delete (${waited}s)"
+    sleep 10
+    waited=$((waited + 10))
+  done
+  log "[FLEX] TIMEOUT vol=$vid delete after ${timeout}s"; return 1
+}
 flex_volume_device() {
   openstack volume show "$1" -f json 2>/dev/null | python3 -c \
     'import json,sys; v=json.load(sys.stdin); a=v.get("attachments") or []; print(a[0].get("device","") if a else "")' \
     2>/dev/null || true
+}
+flex_cleanup_existing_mig_volumes() {
+  local name="$1" out="$JOB_TMP/flex_existing_${LABEL_SAFE}.tsv"
+  : >"$out"
+  openstack volume list --name "$name" -f json 2>>"$JOB_LOG/flex_cinder.log" | python3 - "$name" >"$out" <<'PY' 2>>"$JOB_LOG/flex_cinder.log" || true
+import json, sys
+name = sys.argv[1]
+try:
+    rows = json.load(sys.stdin)
+except Exception:
+    rows = []
+for row in rows:
+    row_name = row.get("Name") or row.get("name") or ""
+    if row_name != name:
+        continue
+    vid = row.get("ID") or row.get("Id") or row.get("id") or ""
+    status = row.get("Status") or row.get("status") or ""
+    attachments = row.get("Attachments") or row.get("attachments") or ""
+    if isinstance(attachments, list):
+        servers = []
+        for item in attachments:
+            if isinstance(item, dict):
+                servers.append(item.get("server_id") or item.get("serverId") or item.get("server") or "")
+        attachments = ",".join(x for x in servers if x)
+    print(f"{vid}\t{status}\t{attachments}")
+PY
+  [ -s "$out" ] || return 0
+  while IFS=$'\t' read -r vid status attachments; do
+    [ -n "$vid" ] || continue
+    log "[VS4] START FRESH: removing existing FLEX volume name=$name id=$vid status=${status:-unknown}"
+    if [ -n "${attachments:-}" ] || [ "${status:-}" = "in-use" ]; then
+      local servers="$attachments"
+      if [ -z "$servers" ]; then
+        servers="$(openstack volume show "$vid" -f json 2>>"$JOB_LOG/flex_cinder.log" | python3 - <<'PY' 2>>"$JOB_LOG/flex_cinder.log" || true
+import json, sys
+try:
+    v=json.load(sys.stdin)
+except Exception:
+    v={}
+servers=[]
+for item in (v.get("attachments") or []):
+    if isinstance(item, dict):
+        sid=item.get("server_id") or item.get("serverId") or item.get("server") or ""
+        if sid:
+            servers.append(sid)
+print(",".join(servers))
+PY
+)"
+      fi
+      IFS=',' read -r -a server_arr <<<"$servers"
+      for sid in "${server_arr[@]}"; do
+        [ -n "$sid" ] || continue
+        log "[VS4] START FRESH: detaching old FLEX volume $vid from $sid"
+        openstack server remove volume "$sid" "$vid" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+      done
+      flex_wait_volume "$vid" "available" 300 || true
+    fi
+    log "[VS4] START FRESH: deleting old FLEX volume $vid"
+    openstack volume delete "$vid" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+    flex_wait_volume_deleted "$vid" 300 || true
+  done <"$out"
 }
 flex_server_first_ip() {
   openstack server show "$1" -f json 2>/dev/null | python3 -c '
@@ -546,6 +619,7 @@ FLEX_VOL_NAME="${FLEX_VOLUME_NAME_OVERRIDE:-mig-${LABEL_SAFE}-flex}"
 kv "FLEX volume name" "$FLEX_VOL_NAME"
 kv "FLEX volume size" "${FLEX_VOL_SIZE_GB}GB"
 log "[VS4] FLEX volume includes +1GB safety headroom for encrypted Cinder presented-size differences"
+flex_cleanup_existing_mig_volumes "$FLEX_VOL_NAME"
 
 FLEX_VOL_ID="$(openstack volume create \
   --size "$FLEX_VOL_SIZE_GB" \
