@@ -8324,15 +8324,14 @@ def run_volsnap_migrator():
                     "fi' >/tmp/volsnap_start_fresh_kill.log 2>&1 < /dev/null & "
                     "echo STARTED"
                 )
-                killed = subprocess.run(
+                subprocess.Popen(
                     ssh_base + [kill_cmd],
-                    check=False, timeout=20, capture_output=True, text=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True,
                 )
-                if killed.returncode == 0:
-                    yield "data: [VOLSNAP] START FRESH: kill sweep launched on jumphost.\n\n"
-                else:
-                    detail = ((killed.stderr or '') + (killed.stdout or '')).strip()[-300:]
-                    yield f"data: [VOLSNAP] START FRESH: kill sweep launch warning rc={killed.returncode} {detail}\n\n"
+                yield "data: [VOLSNAP] START FRESH: kill sweep launched on jumphost.\n\n"
 
             # Stage script (MD5 check)
             with open(local_script, "rb") as _fh:
