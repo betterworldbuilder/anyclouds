@@ -8175,8 +8175,8 @@ def run_volsnap_migrator():
         "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
         "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
-        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
-        "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
+        "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
+        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
         "-o", "IPQoS=none",
         f"{ssh_user}@{process_ip}",
     ]
@@ -8185,8 +8185,8 @@ def run_volsnap_migrator():
         "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
         "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
-        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
-        "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
+        "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
+        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
         "-o", "IPQoS=none",
     ]
 
