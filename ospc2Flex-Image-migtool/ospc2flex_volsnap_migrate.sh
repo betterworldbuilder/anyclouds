@@ -729,11 +729,40 @@ log "[VS8] Pipeline: dd | gzip -1 | ssh | gunzip | dd"
 
 _DD_COUNT=$(( SNAP_SIZE_ORIG_GB * 16 ))  # 64M * 16 = 1 GiB → count = orig GB * 16
 log "[VS8] Streaming ${SNAP_SIZE_ORIG_GB}GB (${_DD_COUNT} blocks of 64M)"
-sudo dd if="$SOURCE_DEV" bs=64M count="$_DD_COUNT" status=progress conv=sync,noerror 2>>"$JOB_LOG/stream_src.log" \
-  | gzip -1 \
-  | "${SSH_FLEX_BASE[@]}" "gunzip | sudo dd of='$FLEX_TARGET_DEV' bs=64M status=progress conv=fsync 2>>/tmp/volsnap_stream_dst_${LABEL_SAFE}.log" \
-  2>&1 | tee -a "$JOB_LOG/stream.log" || \
-  fail_exit "Block stream failed — check $JOB_LOG/stream.log"
+set +e
+(
+  set -o pipefail
+  sudo dd if="$SOURCE_DEV" bs=64M count="$_DD_COUNT" status=progress conv=sync,noerror 2>>"$JOB_LOG/stream_src.log" \
+    | gzip -1 \
+    | "${SSH_FLEX_BASE[@]}" "gunzip | sudo dd of='$FLEX_TARGET_DEV' bs=64M status=progress conv=fsync 2>>/tmp/volsnap_stream_dst_${LABEL_SAFE}.log" \
+    2>&1 | tee -a "$JOB_LOG/stream.log"
+) &
+STREAM_PID=$!
+while kill -0 "$STREAM_PID" 2>/dev/null; do
+  sleep 60
+  if kill -0 "$STREAM_PID" 2>/dev/null; then
+    STREAM_DONE_BYTES="$(python3 - "$JOB_LOG/stream_src.log" <<'PY' 2>/dev/null || true
+import re, sys
+path = sys.argv[1]
+try:
+    data = open(path, "rb").read().decode("utf-8", "ignore")
+except Exception:
+    data = ""
+matches = re.findall(r"(\d+)\s+bytes", data)
+print(matches[-1] if matches else "")
+PY
+)"
+    if [ -n "$STREAM_DONE_BYTES" ]; then
+      log "[VS8] Streaming progress: ${STREAM_DONE_BYTES}/${STREAM_BYTES} bytes"
+    else
+      log "[VS8] Streaming progress: active"
+    fi
+  fi
+done
+wait "$STREAM_PID"
+STREAM_RC=$?
+set -e
+[ "$STREAM_RC" -eq 0 ] || fail_exit "Block stream failed rc=$STREAM_RC — check $JOB_LOG/stream.log"
 log "[VS8] HIT block stream complete"
 
 # ── VS9: Validate FLEX target disk ────────────────────────────────────────────
