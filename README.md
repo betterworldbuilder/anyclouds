@@ -77,6 +77,45 @@ The dashboard is not only a launcher. It is an evidence machine. Every scan, map
 | **Step 8** | Assign floating IP | FLEX cloud (server-side) | < 1 min |
 | **TOTAL** | | | ~45–70 min |
 
+## Current Migration Method Tables
+
+### VM Migration Methods
+
+| OS type | Versions covered | Current method | Dashboard section | Main script/path | Status |
+|---|---|---|---|---|---|
+| Linux VM | Ubuntu 20.04, Ubuntu 22.04, Ubuntu 24.04, Debian 10/11/12, CentOS 7, RedHat 6/8, Rocky 8/9, AlmaLinux 8/9 | Live VM/NBD migration | Live Server VM Migration method | `mig_worker_v4.sh` / Linux live VM path | Ready |
+| Windows VM | Windows Server 2016, Windows Server 2019 | Windows live VM migration | Live Server VM Migration method | `ospc2flex_windows_migrate.sh` | Under test |
+
+### Snapshot Migration Methods
+
+| Snapshot type | OS versions covered | Current method | Dashboard section | Main script/path | Status |
+|---|---|---|---|---|---|
+| Linux private VM snapshot | Ubuntu 20.04, Ubuntu 22.04, Debian 10/11/12, CentOS 7, RedHat 6/8, Rocky 8/9, AlmaLinux 8/9 | Linux snapshot migration | SNAPSHOT migration → Linux Snapshots | `ospc2flex_linux_snap_migrate.sh` | Ready |
+| Ubuntu 24 private VM snapshot | Ubuntu 24.04 | Use VM migration instead | Live Server VM Migration method | `mig_worker_v4.sh` / Linux live VM path | Use VM path |
+| Windows private VM snapshot | Windows Server 2016, Windows Server 2019 | SNAPWIN / Method Z existing snapshot | SNAPSHOT migration → Windows Snapshots | `ospc2flex_windows_method_z_snapshot_existing.sh` | Ready |
+| Linux volume snapshot | Linux volume snapshots for the supported Linux target set | Volume-Snapshot-Mig direct Cinder stream | SNAPSHOT migration → Volume Snapshots | `ospc2flex_volsnap_migrate.sh` | Ready |
+| Windows volume snapshot | Windows Server 2016, Windows Server 2019 volume snapshots | Volume-Snapshot-Mig using Windows volume helper | SNAPSHOT migration → Volume Snapshots | `ospc2flex_volsnap_migrate.sh` | Under test |
+
+### OS Coverage Matrix
+
+| OS / version | VM migration | Private snapshot migration | Volume snapshot migration |
+|---|---|---|---|
+| Ubuntu 20.04 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Ubuntu 22.04 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Ubuntu 24.04 | Live VM/NBD primary | Use VM migration instead | Linux Volume-Snapshot-Mig when target VM ID/IP are supplied |
+| Debian 10 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Debian 11 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Debian 12 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| CentOS 7 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| RedHat 6 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| RedHat 8 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Rocky 8 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Rocky 9 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| AlmaLinux 8 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| AlmaLinux 9 | Live VM/NBD | Linux snapshot migration | Linux Volume-Snapshot-Mig |
+| Windows Server 2016 | Windows live VM migration under test | SNAPWIN / Method Z | Windows Volume-Snapshot-Mig under test |
+| Windows Server 2019 | Windows live VM migration under test | SNAPWIN / Method Z | Windows Volume-Snapshot-Mig under test |
+
 ### 3. Private Server Volume Snapshot Migration
 
 The **Private Server Volume Snapshot Migration Table** (`image_migrator.html`) is a browser-native snapshot migration cockpit. It scans all OSPC private snapshots and organises them into three dedicated tabs:
