@@ -8313,7 +8313,26 @@ def run_volsnap_migrator():
 
         try:
             if start_fresh_kill and not dry_run_requested:
-                yield "data: [VOLSNAP] START FRESH: skipping dashboard pre-kill; script will clean same-name FLEX volumes before create.\n\n"
+                kill_cmd = (
+                    "nohup sh -c '"
+                    "pids=$(pgrep -f \"ospc2flex_volsnap_migrate.sh\" | grep -v \"^$$\" || true); "
+                    "if [ -n \"$pids\" ]; then "
+                    "printf \"%s\\n\" \"$pids\"; "
+                    "printf \"%s\\n\" \"$pids\" | xargs -r kill -TERM >/dev/null 2>&1; "
+                    "sleep 2; "
+                    "printf \"%s\\n\" \"$pids\" | xargs -r kill -KILL >/dev/null 2>&1; "
+                    "fi' >/tmp/volsnap_start_fresh_kill.log 2>&1 < /dev/null & "
+                    "echo STARTED"
+                )
+                killed = subprocess.run(
+                    ssh_base + [kill_cmd],
+                    check=False, timeout=20, capture_output=True, text=True,
+                )
+                if killed.returncode == 0:
+                    yield "data: [VOLSNAP] START FRESH: kill sweep launched on jumphost.\n\n"
+                else:
+                    detail = ((killed.stderr or '') + (killed.stdout or '')).strip()[-300:]
+                    yield f"data: [VOLSNAP] START FRESH: kill sweep launch warning rc={killed.returncode} {detail}\n\n"
 
             # Stage script (MD5 check)
             with open(local_script, "rb") as _fh:
