@@ -8313,23 +8313,7 @@ def run_volsnap_migrator():
 
         try:
             if start_fresh_kill and not dry_run_requested:
-                kill_cmd = (
-                    "set +e; "
-                    "pids=$(pgrep -f 'ospc2flex_volsnap_migrate.sh' | grep -v \"^$$$\" || true); "
-                    "if [ -n \"$pids\" ]; then "
-                    "printf '%s\\n' \"$pids\"; "
-                    "printf '%s\\n' \"$pids\" | xargs -r kill -TERM >/dev/null 2>&1; "
-                    "sleep 1; "
-                    "printf '%s\\n' \"$pids\" | xargs -r kill -KILL >/dev/null 2>&1; "
-                    "fi; "
-                    "exit 0"
-                )
-                killed = subprocess.run(
-                    ssh_base + [kill_cmd],
-                    check=False, timeout=12, capture_output=True, text=True,
-                )
-                killed_pids = " ".join((killed.stdout or "").split())
-                yield f"data: [VOLSNAP] START FRESH: killed existing volume snapshot job pid(s): {killed_pids or 'none'}\n\n"
+                yield "data: [VOLSNAP] START FRESH: skipping dashboard pre-kill; script will clean same-name FLEX volumes before create.\n\n"
 
             # Stage script (MD5 check)
             with open(local_script, "rb") as _fh:
