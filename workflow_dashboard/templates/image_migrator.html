@@ -170,13 +170,124 @@
           letter-spacing: 2px;
           z-index: 5;
       }
+
+      body.flex-light-mode {
+        background: #f3f5f8 !important;
+        color: #111827 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      }
+      body.flex-light-mode .background-orbs { display: none !important; }
+      body.flex-light-mode #top-theme-dropdown { display: none !important; }
+      body.flex-light-mode .app-container {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 16px !important;
+        background: #f3f5f8 !important;
+      }
+      body.flex-light-mode .panel,
+      body.flex-light-mode .adv-panel,
+      body.flex-light-mode #mig-progress-panel,
+      body.flex-light-mode details {
+        background: #fff !important;
+        border: 1px solid #e6e9ee !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+        color: #111827 !important;
+        backdrop-filter: none !important;
+      }
+      body.flex-light-mode .section-title,
+      body.flex-light-mode .section-title-wrapper,
+      body.flex-light-mode h1,
+      body.flex-light-mode h2,
+      body.flex-light-mode h3,
+      body.flex-light-mode h4,
+      body.flex-light-mode h5 {
+        color: #111827 !important;
+        text-shadow: none !important;
+        letter-spacing: 0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      }
+      body.flex-light-mode .mission-control {
+        animation: none !important;
+        color: #111827 !important;
+        text-shadow: none !important;
+        letter-spacing: 0 !important;
+      }
+      body.flex-light-mode .section-title::before {
+        background: #a33e3e !important;
+        border-radius: 2px !important;
+      }
+      body.flex-light-mode p,
+      body.flex-light-mode li,
+      body.flex-light-mode label,
+      body.flex-light-mode summary,
+      body.flex-light-mode .form-group label {
+        color: #344054 !important;
+        text-shadow: none !important;
+      }
+      body.flex-light-mode input,
+      body.flex-light-mode select,
+      body.flex-light-mode textarea {
+        background: #fff !important;
+        color: #111827 !important;
+        border: 1px solid #d6dbe3 !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+      }
+      body.flex-light-mode input[type="file"] { color: #344054 !important; }
+      body.flex-light-mode button {
+        border-radius: 4px !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      }
+      body.flex-light-mode table,
+      body.flex-light-mode .batch-table,
+      body.flex-light-mode .adv-table {
+        background: #fff !important;
+        color: #111827 !important;
+        border-color: #e6e9ee !important;
+      }
+      body.flex-light-mode th,
+      body.flex-light-mode .batch-table th,
+      body.flex-light-mode .adv-table th {
+        background: #fafbfc !important;
+        color: #111827 !important;
+        border-color: #e6e9ee !important;
+      }
+      body.flex-light-mode td,
+      body.flex-light-mode .batch-table td,
+      body.flex-light-mode .adv-table td {
+        background: #fff !important;
+        color: #111827 !important;
+        border-color: #e6e9ee !important;
+      }
+      body.flex-light-mode tr:hover td { background: #f7f9fc !important; color: #111827 !important; }
+      body.flex-light-mode [style*="background:rgba"],
+      body.flex-light-mode [style*="background: rgba"],
+      body.flex-light-mode [style*="background:#0f172a"],
+      body.flex-light-mode [style*="background: #0f172a"] {
+        background: #fff !important;
+      }
+      body.flex-light-mode [style*="color:#94a3b8"],
+      body.flex-light-mode [style*="color: #94a3b8"],
+      body.flex-light-mode [style*="color:#cbd5e1"],
+      body.flex-light-mode [style*="color: #cbd5e1"],
+      body.flex-light-mode [style*="color:#e2e8f0"],
+      body.flex-light-mode [style*="color: #e2e8f0"] {
+        color: #344054 !important;
+      }
     </style>
     <script>
         window.LUNAR_SVG = `<img src="/static/lunar_module_sprite.png" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 6px rgba(56,189,248,0.8)) brightness(1.1);" />`;
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="{% if flex_light_mode %}flex-light-mode{% endif %}">
+    <script>
+      window.FLEXANYWHERE_UI = {{ 'true' if flexanywhere_mode else 'false' }};
+      window.FLEX2FLEX_UI = {{ 'true' if flex2flex_mode or flexanywhere_mode else 'false' }};
+    </script>
     <div class="background-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 
     <div class="app-container" style="max-width: 1560px; margin: 0 auto; padding: 28px 16px 40px;">
@@ -184,12 +295,16 @@
         <main class="main-content dashboard-layout">
             <div class="panel" style="border-color: #10b981;">
                 <h2 class="section-title">
-                    <div class="section-title-wrapper">OSPC TO FLEX MIGRATION FULL CYCLE <span class="mission-control">MISSION CONTROL</span> –</div>
+                    <div class="section-title-wrapper" style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+                        <span style="font-weight:900; letter-spacing:1px; color:#ffffff; padding:6px 16px; border-radius:8px; background:#ef4444; border:1px solid #dc2626; box-shadow:0 2px 4px rgba(0,0,0,0.1);">OSPC TO FLEX MIGRATION</span>
+                        <span style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #00f0ff, #0284c7); color:#fff; padding:3px 12px; border-radius:999px; font-size:0.72rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; box-shadow:0 4px 15px rgba(0,240,255,0.4), inset 0 1px 0 rgba(255,255,255,0.25); border:1px solid rgba(0,240,255,0.8); text-shadow:0 1px 2px rgba(0,0,0,0.3); margin-left:4px; transform:translateY(-1px);">For Flex Anywhere Members</span>
+                    </div>
                     <div style="position:relative; display:inline-block;" id="top-theme-dropdown">
                         <button onclick="document.getElementById('top-theme-menu').style.display = document.getElementById('top-theme-menu').style.display === 'block' ? 'none' : 'block';" style="background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#fff; padding:6px 12px; border-radius:6px; font-family:'Orbitron'; font-size:12px; cursor:pointer; box-shadow:0 0 10px rgba(59,130,246,0.5); display:flex; align-items:center; gap:5px;">🎨 Theme ▾</button>
                         <div id="top-theme-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; background:#0f172a; border:1px solid #3b82f6; border-radius:6px; box-shadow:0 4px 20px rgba(0,0,0,0.8); z-index:999; min-width:180px; overflow:hidden;">
                             <button class="theme-btn" onclick="if(!document.body.classList.contains('theme-apollo'))toggleTheme(); document.getElementById('top-theme-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; border-bottom:1px solid #1e293b; color:#60a5fa; padding:10px 14px; font-family:'Orbitron'; font-size:11px; cursor:pointer; text-align:left;" id="top-apollo-btn">🚀 Apollo Theme</button>
                             <button onclick="if(document.body.classList.contains('theme-apollo'))toggleTheme(); document.getElementById('top-theme-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; border-bottom:1px solid #1e293b; color:#fbbf24; padding:10px 14px; font-family:'Orbitron'; font-size:11px; cursor:pointer; text-align:left;" id="top-sweet70-btn">🎵 Sweet 70s ✓</button>
+                            <button onclick="document.body.classList.toggle('flex-light-mode'); document.getElementById('top-theme-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; color:#10b981; padding:10px 14px; font-family:'Orbitron'; font-size:11px; cursor:pointer; text-align:left;">🌗 Dark / Light Mode</button>
                         </div>
                     </div>
                     <script>document.addEventListener('click', function(e) { var dd = document.getElementById('top-theme-dropdown'); var m = document.getElementById('top-theme-menu'); if (dd && m && !dd.contains(e.target)) m.style.display = 'none'; });</script>
@@ -301,6 +416,117 @@
           </div>
         </div>
 
+        <!-- FLEX ANYWHERE / HYPERSCALER -->
+        <div id="flexanywhere-hyperscaler-credentials" style="display:none;grid-column:1 / -1;margin-top:6px;border:1px solid rgba(56,189,248,.28);border-radius:10px;padding:14px;background:rgba(15,30,62,.34);">
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#67e8f9;border-bottom:1px solid rgba(56,189,248,.22);padding-bottom:8px;">Hyperscaler Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(AWS / Azure / GCP side)</span></h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 14px;padding:10px 12px;border:1px solid rgba(96,165,250,.22);border-radius:8px;background:rgba(15,23,42,.42);">
+            <span style="font-size:.78rem;color:#93c5fd;font-weight:800;text-transform:uppercase;letter-spacing:.04em;">Rackspace account access</span>
+            <a href="https://manage.rackspace.com/aws/accounts" target="_blank" rel="noopener" style="padding:7px 10px;border-radius:6px;background:#0f172a;border:1px solid rgba(59,130,246,.55);color:#bfdbfe;text-decoration:none;font-size:.78rem;font-weight:800;">AWS Accounts</a>
+            <a href="https://manage.rackspace.com/gcp" target="_blank" rel="noopener" style="padding:7px 10px;border-radius:6px;background:#0f172a;border:1px solid rgba(59,130,246,.55);color:#bfdbfe;text-decoration:none;font-size:.78rem;font-weight:800;">GCP Accounts</a>
+            <a href="https://manage.rackspace.com/azure/enrollment" target="_blank" rel="noopener" style="padding:7px 10px;border-radius:6px;background:#0f172a;border:1px solid rgba(59,130,246,.55);color:#bfdbfe;text-decoration:none;font-size:.78rem;font-weight:800;">Azure Enrollment</a>
+            <span style="font-size:.75rem;color:#64748b;">Use these links to verify the hyperscaler account before running FLEX Anywhere migration.</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:12px;margin-bottom:14px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Migration Direction
+              <select id="flexanywhere_direction" style="background:rgba(15,30,62,0.9);border:1px solid rgba(56,189,248,.45);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="hyperscaler_to_flex">AWS / Azure / GCP → FLEX</option>
+                <option value="flex_to_hyperscaler">FLEX → AWS / Azure / GCP</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Hyperscaler Provider
+              <select id="flexanywhere_provider" style="background:rgba(15,30,62,0.9);border:1px solid rgba(56,189,248,.45);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="aws">AWS</option>
+                <option value="azure">Azure</option>
+                <option value="gcp">GCP</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Account / Project / Subscription
+              <input id="flexanywhere_account_id" type="text" placeholder="AWS account, Azure subscription, or GCP project" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Hyperscaler Source Region
+              <input id="flexanywhere_source_region" type="text" placeholder="e.g. us-east-1 / eastus / us-central1" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Hyperscaler Target Region
+              <input id="flexanywhere_target_region" type="text" placeholder="e.g. us-east-2 / westus3 / europe-west1" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+          </div>
+
+          <div id="flexanywhere-aws-fields" class="flexanywhere-provider-fields" style="display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Access Key ID<input id="flexanywhere_aws_access_key_id" type="text" placeholder="AKIA..." style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Secret Access Key<input id="flexanywhere_aws_secret_access_key" type="password" autocomplete="off" placeholder="AWS secret key" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Session Token<input id="flexanywhere_aws_session_token" type="password" autocomplete="off" placeholder="Optional STS token" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Profile<input id="flexanywhere_aws_profile" type="text" placeholder="default / migration-profile" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Role ARN<input id="flexanywhere_aws_role_arn" type="text" placeholder="arn:aws:iam::123:role/..." style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">S3 Staging Bucket<input id="flexanywhere_aws_bucket" type="text" placeholder="migration-staging-bucket" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+          </div>
+
+          <div id="flexanywhere-azure-fields" class="flexanywhere-provider-fields" style="display:none;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Tenant ID<input id="flexanywhere_azure_tenant_id" type="text" placeholder="Azure tenant UUID" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Subscription ID<input id="flexanywhere_azure_subscription_id" type="text" placeholder="Azure subscription UUID" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Client ID<input id="flexanywhere_azure_client_id" type="text" placeholder="Service principal app/client ID" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Client Secret<input id="flexanywhere_azure_client_secret" type="password" autocomplete="off" placeholder="Service principal secret" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Resource Group<input id="flexanywhere_azure_resource_group" type="text" placeholder="rg-migration" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Storage Account / Container<input id="flexanywhere_azure_storage" type="text" placeholder="storageacct/container" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+          </div>
+
+          <div id="flexanywhere-gcp-fields" class="flexanywhere-provider-fields" style="display:none;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">GCP Project ID<input id="flexanywhere_gcp_project_id" type="text" placeholder="my-gcp-project" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Service Account JSON Path<input id="flexanywhere_gcp_credentials_file" type="text" placeholder="/path/to/service-account.json" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">GCS Staging Bucket<input id="flexanywhere_gcp_bucket" type="text" placeholder="gs://migration-staging" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" /></label>
+            <label style="grid-column:1 / -1;display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Service Account JSON Inline<textarea id="flexanywhere_gcp_service_account_json" rows="4" placeholder='{"type":"service_account", ...}' style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.85rem;font-family:monospace;"></textarea></label>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:12px;margin-top:14px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Source Artifact Type
+              <select id="flexanywhere_source_artifact_type" style="background:rgba(15,30,62,0.9);border:1px solid rgba(56,189,248,.45);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="image_snapshot">Image snapshot</option>
+                <option value="volume_snapshot">Volume snapshot</option>
+                <option value="boot_volume_snapshot">Bootable volume snapshot</option>
+                <option value="aws_ami">AWS AMI</option>
+                <option value="aws_ebs_snapshot">AWS EBS snapshot</option>
+                <option value="azure_managed_disk">Azure managed disk</option>
+                <option value="azure_snapshot">Azure snapshot</option>
+                <option value="gcp_image">GCP image</option>
+                <option value="gcp_disk_snapshot">GCP disk snapshot</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Source Artifact ID / Name
+              <input id="flexanywhere_source_artifact_id" type="text" placeholder="AMI ID, snapshot ID, disk image, or FLEX image ID" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Target Image / Disk Name
+              <input id="flexanywhere_target_artifact_name" type="text" placeholder="target image / disk name" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Image Format
+              <select id="flexanywhere_image_format" style="background:rgba(15,30,62,0.9);border:1px solid rgba(56,189,248,.45);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="qcow2">qcow2</option>
+                <option value="raw">raw</option>
+                <option value="vhd">vhd</option>
+                <option value="vmdk">vmdk</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Guest OS
+              <select id="flexanywhere_guest_os" style="background:rgba(15,30,62,0.9);border:1px solid rgba(56,189,248,.45);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="linux">Linux</option>
+                <option value="windows">Windows</option>
+                <option value="unknown">Unknown / auto-detect</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Target VM Size / Instance Type
+              <input id="flexanywhere_target_instance_type" type="text" placeholder="gp.0.4.4 / t3.large / Standard_D4s_v5 / n2-standard-4" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Target Network / VPC / VNet
+              <input id="flexanywhere_target_network" type="text" placeholder="tenant-net / vpc-id / vnet / subnet" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Target SSH Key / Key Pair
+              <input id="flexanywhere_target_key_name" type="text" placeholder="keypair name" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Staging Path / Prefix
+              <input id="flexanywhere_staging_prefix" type="text" placeholder="hyperflex/YYYYMMDD/customer" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+          </div>
+          <p style="margin:12px 0 0;font-size:.75rem;color:#64748b;font-style:italic;">✦ These fields are cached locally and passed with FLEX Anywhere jobs. Provider-specific adapters should read these values before export/import.</p>
+        </div>
+
       </div>
 
       <!-- Auto-propagate hint -->
@@ -325,6 +551,37 @@
       credFlexRegion:    'cred_flex_region',
       credFlexAppCredId: 'cred_flex_app_cred_id',
       credFlexAppCredSecret: 'cred_flex_app_cred_secret',
+      // FLEX Anywhere / hyperscaler bridge
+      flexanywhere_direction: 'cred_flexanywhere_direction',
+      flexanywhere_provider: 'cred_flexanywhere_provider',
+      flexanywhere_account_id: 'cred_flexanywhere_account_id',
+      flexanywhere_source_region: 'cred_flexanywhere_source_region',
+      flexanywhere_target_region: 'cred_flexanywhere_target_region',
+      flexanywhere_aws_access_key_id: 'cred_flexanywhere_aws_access_key_id',
+      flexanywhere_aws_secret_access_key: 'cred_flexanywhere_aws_secret_access_key',
+      flexanywhere_aws_session_token: 'cred_flexanywhere_aws_session_token',
+      flexanywhere_aws_profile: 'cred_flexanywhere_aws_profile',
+      flexanywhere_aws_role_arn: 'cred_flexanywhere_aws_role_arn',
+      flexanywhere_aws_bucket: 'cred_flexanywhere_aws_bucket',
+      flexanywhere_azure_tenant_id: 'cred_flexanywhere_azure_tenant_id',
+      flexanywhere_azure_subscription_id: 'cred_flexanywhere_azure_subscription_id',
+      flexanywhere_azure_client_id: 'cred_flexanywhere_azure_client_id',
+      flexanywhere_azure_client_secret: 'cred_flexanywhere_azure_client_secret',
+      flexanywhere_azure_resource_group: 'cred_flexanywhere_azure_resource_group',
+      flexanywhere_azure_storage: 'cred_flexanywhere_azure_storage',
+      flexanywhere_gcp_project_id: 'cred_flexanywhere_gcp_project_id',
+      flexanywhere_gcp_credentials_file: 'cred_flexanywhere_gcp_credentials_file',
+      flexanywhere_gcp_bucket: 'cred_flexanywhere_gcp_bucket',
+      flexanywhere_gcp_service_account_json: 'cred_flexanywhere_gcp_service_account_json',
+      flexanywhere_source_artifact_type: 'cred_flexanywhere_source_artifact_type',
+      flexanywhere_source_artifact_id: 'cred_flexanywhere_source_artifact_id',
+      flexanywhere_target_artifact_name: 'cred_flexanywhere_target_artifact_name',
+      flexanywhere_image_format: 'cred_flexanywhere_image_format',
+      flexanywhere_guest_os: 'cred_flexanywhere_guest_os',
+      flexanywhere_target_instance_type: 'cred_flexanywhere_target_instance_type',
+      flexanywhere_target_network: 'cred_flexanywhere_target_network',
+      flexanywhere_target_key_name: 'cred_flexanywhere_target_key_name',
+      flexanywhere_staging_prefix: 'cred_flexanywhere_staging_prefix',
     };
 
     // Load saved values on page init
@@ -360,6 +617,26 @@
         localStorage.setItem(lsKey, this.value);
       });
     });
+
+    function updateFlexAnywhereProviderFields() {
+      const panel = document.getElementById('flexanywhere-hyperscaler-credentials');
+      if (panel) panel.style.display = window.FLEXANYWHERE_UI ? 'block' : 'none';
+      const providerEl = document.getElementById('flexanywhere_provider');
+      const provider = (providerEl && providerEl.value) || 'aws';
+      ['aws', 'azure', 'gcp'].forEach(function (name) {
+        const box = document.getElementById('flexanywhere-' + name + '-fields');
+        if (box) box.style.display = (name === provider) ? 'grid' : 'none';
+      });
+      const inlineProvider = document.getElementById('flexanywhere_provider_inline');
+      if (inlineProvider && providerEl && inlineProvider.value !== providerEl.value) inlineProvider.value = providerEl.value;
+      const directionEl = document.getElementById('flexanywhere_direction');
+      const inlineDirection = document.getElementById('flexanywhere_direction_inline');
+      if (inlineDirection && directionEl && inlineDirection.value !== directionEl.value) inlineDirection.value = directionEl.value;
+    }
+    window.updateFlexAnywhereProviderFields = updateFlexAnywhereProviderFields;
+    document.getElementById('flexanywhere_provider')?.addEventListener('change', updateFlexAnywhereProviderFields);
+    document.getElementById('flexanywhere_direction')?.addEventListener('change', updateFlexAnywhereProviderFields);
+    updateFlexAnywhereProviderFields();
 
 
     // ── OpenRC file parser → FLEX fields + localStorage ───────────────────────
@@ -1713,28 +1990,49 @@
                     const _IMG_SORT_KEYS = ['start_fresh','asset_type','snapshot_name','attached_to','vm_glance_snap','snapshot_id','source_vm_name','os_distro','size_gb','disk_format','status','migratable','licensed_restricted','migration_method','reason','created_at'];
                     const _VOLSNAP_SORT_KEYS = ['snapshot_name','snapshot_id','volume_id','size_gb','status','flex_target_vm_id','flex_target_ip','flex_target_user','post_attach_db_validator','windows_helper_vm_id','windows_helper_ip','windows_helper_user'];
                     const LS_OSPC_IMAGE_SCAN = 'mig_ospc_image_scan_cache_v1';
+                    const LS_FLEX2FLEX_IMAGE_SCAN = 'mig_flex2flex_image_scan_cache_v1';
                     const LS_OSPC_IMAGE_SELECTION = 'mig_ospc_image_selection_v1';
+                    const LS_FLEX2FLEX_IMAGE_SELECTION = 'mig_flex2flex_image_selection_v1';
                     const LS_OSPC_IMAGE_SEARCH = 'mig_ospc_image_search_v1';
+                    const LS_FLEX2FLEX_IMAGE_SEARCH = 'mig_flex2flex_image_search_v1';
                     const LS_OSPC_IMAGE_FRESH = 'mig_ospc_image_fresh_v1';
+                    const LS_FLEX2FLEX_IMAGE_FRESH = 'mig_flex2flex_image_fresh_v1';
                     const LS_VOLSNAP_TARGETS = 'mig_volsnap_target_map_v1';
                     const VOLSNAP_CACHE_ENABLED = true;
 
+                    function _imageSelectionStorageKey() {
+                        return window.FLEX2FLEX_UI ? LS_FLEX2FLEX_IMAGE_SELECTION : LS_OSPC_IMAGE_SELECTION;
+                    }
+                    function _imageSearchStorageKey() {
+                        return window.FLEX2FLEX_UI ? LS_FLEX2FLEX_IMAGE_SEARCH : LS_OSPC_IMAGE_SEARCH;
+                    }
+                    function _imageFreshStorageKey() {
+                        return window.FLEX2FLEX_UI ? LS_FLEX2FLEX_IMAGE_FRESH : LS_OSPC_IMAGE_FRESH;
+                    }
                     function _loadImageSelectionMap() {
-                        try { return JSON.parse(localStorage.getItem(LS_OSPC_IMAGE_SELECTION) || '{}') || {}; }
+                        try { return JSON.parse(localStorage.getItem(_imageSelectionStorageKey()) || '{}') || {}; }
                         catch (e) { return {}; }
                     }
                     function _saveImageSelectionMap(map) {
-                        try { localStorage.setItem(LS_OSPC_IMAGE_SELECTION, JSON.stringify(map || {})); }
+                        try { localStorage.setItem(_imageSelectionStorageKey(), JSON.stringify(map || {})); }
                         catch (e) { /* ignore quota/private mode */ }
                     }
                     function _loadFreshMap() {
-                        try { return JSON.parse(localStorage.getItem(LS_OSPC_IMAGE_FRESH) || '{}') || {}; }
+                        try { return JSON.parse(localStorage.getItem(_imageFreshStorageKey()) || '{}') || {}; }
                         catch (e) { return {}; }
                     }
                     function _saveFreshMap(map) {
-                        try { localStorage.setItem(LS_OSPC_IMAGE_FRESH, JSON.stringify(map || {})); }
+                        try { localStorage.setItem(_imageFreshStorageKey(), JSON.stringify(map || {})); }
                         catch (e) { /* ignore quota/private mode */ }
                     }
+                    // Flex2Flex deliberately copies the OSPC->Flex snapshot table and
+                    // selected-row wiring. Expose the proven helpers to the standalone
+                    // Flex2Flex shim at the bottom of this template.
+                    window.imageScanState = imageScanState;
+                    window._loadImageSelectionMap = _loadImageSelectionMap;
+                    window._saveImageSelectionMap = _saveImageSelectionMap;
+                    window._loadFreshMap = _loadFreshMap;
+                    window._saveFreshMap = _saveFreshMap;
                     function _loadVolsnapTargetMap() {
                         if (!VOLSNAP_CACHE_ENABLED) return {};
                         try { return JSON.parse(localStorage.getItem(LS_VOLSNAP_TARGETS) || '{}') || {}; }
@@ -1805,8 +2103,25 @@
 	                            ''
 	                        ).trim();
 	                    }
+                    function _volsnapExplicitTarget(row, pairedFlexId) {
+                        if (!row) return '';
+                        const targetValues = _loadVolsnapTargetMap()[String(row.snapshot_id || '')] || {};
+                        const explicitTarget = String(
+                            targetValues.flex_target_vm ||
+                            row.flex_server_id ||
+                            row.flex_target_server_id ||
+                            row.flex_target_vm_id ||
+                            row.flex_target_vm ||
+                            row.target_flex ||
+                            row.target_flex_vm ||
+                            pairedFlexId ||
+                            ''
+                        ).trim();
+                        return _volsnapIsWindowsRow(row) ? _volsnapStripSourcePrefix(explicitTarget) : explicitTarget;
+                    }
                     function _volsnapIsWindowsRow(row) {
                         if (!row) return false;
+                        if (row.is_windows === true) return true;
                         const text = [
                             row.snapshot_name,
                             row.source_vm_name,
@@ -1814,6 +2129,9 @@
                             row.os_type,
                         ].map(v => String(v || '').toLowerCase()).join(' ');
                         return text.includes('windows') || /(^|[^a-z0-9])win(?:20|2k|dows)?/i.test(text) || /snapwin|opscwin|ospcwin|win20|win2k/i.test(text);
+                    }
+                    function _imageRowIsWindows(row) {
+                        return _volsnapIsWindowsRow(row);
                     }
                     function _persistCurrentImageSelectionFromDom() {
                         const map = _loadImageSelectionMap();
@@ -1861,8 +2179,8 @@
                             if (mode === 'rejected' && !!r.migratable) return false;
                             return true;
                         });
-                        const tcL = document.getElementById('tab-count-linux');   if (tcL) tcL.textContent = modePassed.filter(r => r.asset_type !== 'volume_snapshot' && !r.is_windows).length;
-                        const tcW = document.getElementById('tab-count-windows'); if (tcW) tcW.textContent = modePassed.filter(r => r.asset_type !== 'volume_snapshot' && !!r.is_windows).length;
+                        const tcL = document.getElementById('tab-count-linux');   if (tcL) tcL.textContent = modePassed.filter(r => r.asset_type !== 'volume_snapshot' && !_imageRowIsWindows(r)).length;
+                        const tcW = document.getElementById('tab-count-windows'); if (tcW) tcW.textContent = modePassed.filter(r => r.asset_type !== 'volume_snapshot' && _imageRowIsWindows(r)).length;
                         const tcV = document.getElementById('tab-count-volume');  if (tcV) tcV.textContent = modePassed.filter(r => r.asset_type === 'volume_snapshot').length;
 
                         imageScanState.filtered = rows
@@ -1872,7 +2190,7 @@
                                 if (mode === 'rejected' && !!row.migratable) return false;
                                 // Tab filter
                                 const isVol = row.asset_type === 'volume_snapshot';
-                                const isWin = !!row.is_windows;
+                                const isWin = _imageRowIsWindows(row);
                                 if (activeTab === 'linux'   && (isVol || isWin))  return false;
                                 if (activeTab === 'windows' && (isVol || !isWin)) return false;
                                 if (activeTab === 'volume'  && !isVol)            return false;
@@ -1926,7 +2244,9 @@
                         if (!table) return;
                         const isVolumeTable = imageScanState.activeTab === 'volume';
                         const headers = isVolumeTable
-                            ? ['snapshot_name', 'ospc_snapshot_id', 'ospc_source_volume_id', 'snapshot_size', 'snapshot_status', 'target_flex_vm_id', 'target_flex_vm_ip', 'target_flex_user', 'test_method', 'windows_helper_vm_id', 'windows_helper_ip', 'windows_helper_user']
+                            ? (window.FLEX2FLEX_UI
+                                ? ['snapshot_name', 'source_flex_snapshot_id', 'source_flex_volume_id', 'snapshot_size', 'snapshot_status', 'target_flex_vm_id', 'target_flex_vm_ip', 'target_flex_user', 'test_method', 'windows_helper_vm_id', 'windows_helper_ip', 'windows_helper_user']
+                                : ['snapshot_name', 'ospc_snapshot_id', 'ospc_source_volume_id', 'snapshot_size', 'snapshot_status', 'target_flex_vm_id', 'target_flex_vm_ip', 'target_flex_user', 'test_method', 'windows_helper_vm_id', 'windows_helper_ip', 'windows_helper_user'])
                             : ['No image resume', 'type', 'snapshot_name', 'attached_to', 'vm_glance_snap', 'snapshot_id', 'source_vm_name', 'os_distro', 'size_gb', 'disk_format', 'status', 'migratable', 'licensed', 'migration_method', 'reason', 'created_at', 'Pairing'];
                         const sortKeys = isVolumeTable ? _VOLSNAP_SORT_KEYS : _IMG_SORT_KEYS;
                         const rows = imageScanState.filtered || [];
@@ -1974,7 +2294,7 @@
                         const volsnapTargetMap = _loadVolsnapTargetMap();
                         const body = rows.map(({ row: r, idx }) => {
                             const isMigratable = !!r.migratable;
-                            const rowClass = r.asset_type === 'volume_snapshot' ? 'snapshot-row-volsnap' : (r.licensed_restricted ? 'snapshot-row-restricted' : (r.is_windows ? 'snapshot-row-windows' : ''));
+                            const rowClass = r.asset_type === 'volume_snapshot' ? 'snapshot-row-volsnap' : (r.licensed_restricted ? 'snapshot-row-restricted' : (_imageRowIsWindows(r) ? 'snapshot-row-windows' : ''));
                             const isWindowsVolRow = r.asset_type === 'volume_snapshot' && _volsnapIsWindowsRow(r);
 	                            const pairedFlexId = _volsnapPairedFlexId(r.snapshot_id);
 	                            const targetValues = volsnapTargetMap[String(r.snapshot_id || '')] || {};
@@ -2147,6 +2467,7 @@
                         });
                         // Restore selection state by stable key (image_id), not row index.
                         const selectedMap = _loadImageSelectionMap();
+                        let selectionMapChanged = false;
                         const _syncSelectAll = () => {
                             const allCbs = [...table.querySelectorAll('.ospc-image-cb:not([disabled])')];
                             const hdr = document.getElementById('ospc-select-all-cb');
@@ -2160,7 +2481,18 @@
                             const row = imageScanState.rows[idx];
                             const id = String((row && row.snapshot_id) || '').trim();
 	                            const isVolsnapRow = !!(row && row.asset_type === 'volume_snapshot');
-	                            cb.checked = !!(id && row && row.migratable && (isVolsnapRow ? selectedMap[id] === true : selectedMap[id]));
+                            const hasCachedSelection = Object.prototype.hasOwnProperty.call(selectedMap, id);
+                            const pairedFlexId = isVolsnapRow ? _volsnapPairedFlexId(id) : '';
+                            const explicitVolTarget = isVolsnapRow ? _volsnapExplicitTarget(row, pairedFlexId) : '';
+                            if (isVolsnapRow && id && row && row.migratable && !hasCachedSelection && explicitVolTarget) {
+                                selectedMap[id] = true;
+                                selectionMapChanged = true;
+                            }
+	                            cb.checked = !!(id && row && row.migratable && (
+                                isVolsnapRow
+                                    ? (selectedMap[id] === true)
+                                    : selectedMap[id]
+                            ));
                             cb.addEventListener('change', () => {
                                 if (!id) return;
                                 if (!row || !row.migratable) {
@@ -2173,6 +2505,7 @@
                                 _syncSelectAll();
                             });
                         });
+                        if (selectionMapChanged) _saveImageSelectionMap(selectedMap);
                         _syncSelectAll();
                         const selectAllCb = document.getElementById('ospc-select-all-cb');
                         if (selectAllCb) {
@@ -2240,11 +2573,11 @@
                         const imageTableSearchEl = document.getElementById('imageTableSearch');
                         if (imageTableSearchEl) {
                             try {
-                                const cachedQ = localStorage.getItem(LS_OSPC_IMAGE_SEARCH);
+                                const cachedQ = localStorage.getItem(_imageSearchStorageKey());
                                 if (typeof cachedQ === 'string') imageTableSearchEl.value = cachedQ;
                             } catch (e) { /* ignore */ }
                             imageTableSearchEl.addEventListener('input', () => {
-                                try { localStorage.setItem(LS_OSPC_IMAGE_SEARCH, imageTableSearchEl.value || ''); } catch (e) {}
+                                try { localStorage.setItem(_imageSearchStorageKey(), imageTableSearchEl.value || ''); } catch (e) {}
                                 renderImageTable();
                             });
                         }
@@ -2427,17 +2760,24 @@
                         // Restore snapshot table from localStorage cache on page load
                         (function _restoreImageScanCache() {
                             try {
-                                const raw = localStorage.getItem(LS_OSPC_IMAGE_SCAN);
+                                const flexMode = !!window.FLEX2FLEX_UI;
+                                if (flexMode) {
+                                    localStorage.removeItem(LS_OSPC_IMAGE_SCAN);
+                                    localStorage.removeItem(LS_OSPC_IMAGE_SEARCH);
+                                }
+                                const raw = localStorage.getItem(flexMode ? LS_FLEX2FLEX_IMAGE_SCAN : LS_OSPC_IMAGE_SCAN);
                                 if (!raw) return;
                                 const c = JSON.parse(raw);
                                 if (!c || !Array.isArray(c.rows) || !c.rows.length) return;
-                                imageScanState.rows = c.rows;
-                                imageScanState.summary = {
+                                imageScanState.rows = flexMode
+                                    ? c.rows.map(r => Object.assign({workflow_mode: 'flex2flex', source_cloud: 'rackspace_flex'}, r || {}))
+                                    : c.rows;
+                                imageScanState.summary = c.summary || {
                                     private_images_found:    c.rows.length,
                                     migratable_snapshots:    c.rows.filter(r => r.migratable).length,
                                     volume_snapshots_found:  c.rows.filter(r => r.asset_type === 'volume_snapshot').length,
                                     licensed_restricted:     c.rows.filter(r => r.licensed_restricted).length,
-                                    windows_images:          c.rows.filter(r => r.is_windows).length,
+                                    windows_images:          c.rows.filter(r => _imageRowIsWindows(r)).length,
                                     excluded_private_images: 0,
                                 };
                                 renderImageTable();
@@ -2686,6 +3026,7 @@
                             <div class="ps-time" style="color:#334155; font-size:10px; margin-top:3px;">~1–2 min</div>
                         </div>
                     </div>
+
                 </div>
 
                 <!-- OS Repair Table -->
@@ -3028,7 +3369,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         <button type="button" class="btn-danger" id="stop-batch-btn"
                             style="display:none; background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); border:none; border-radius:6px; padding:10px 20px; color:white; font-weight:600; cursor:pointer; align-items:center; gap:8px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-                            ⏹ STOP VM Batch
+                            ⏹ STOP BATCH
                         </button>
                     </div>
 
@@ -4618,14 +4959,24 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                     job.stageTs = now;
                 }
             }
-            if (t.includes('ERROR') || t.includes('FAIL') || t.includes('[FATAL]')) job.errors++;
-            if (t.includes('[FATAL]') || t.includes('[VOLSNAP] FAILED') || t.includes('FAILED:') || (t.includes('[PROCESS EXITED WITH CODE') && !t.includes('CODE 0'))) {
+            const volsnapAttachFailed = t.includes('[FLEX] TIMEOUT') ||
+                t.includes('FLEX volume did not reach in-use after final attach') ||
+                t.includes('Final attach') && t.includes('did not stick');
+            const flex2flexFallbackPending = /DG2B_JUMPHOST_FALLBACK_REQUIRED|fallback_required|Direct path requires fallback|PROCESS EXITED WITH CODE 86/i.test(t);
+            if (flex2flexFallbackPending && job.status !== 'success') {
+                job.status = 'running';
+                job.stage = '↪ Jumphost fallback';
+                this.render();
+                return;
+            }
+            if (t.includes('ERROR') || t.includes('FAIL') || t.includes('[FATAL]') || volsnapAttachFailed) job.errors++;
+            if (volsnapAttachFailed || t.includes('[FATAL]') || t.includes('[VOLSNAP] FAILED') || t.includes('FAILED:') || (t.includes('[PROCESS EXITED WITH CODE') && !t.includes('CODE 0'))) {
                 if (job.status !== 'failed' && typeof jarvisAnnounce === 'function') {
                     jarvisAnnounce(`Image job failed: ${job.label.replace(/-/g, ' ')}. Operator intervention required.`);
                 }
                 job.status = 'failed';
                 job.stage = '❌ Failed';
-            } else if (t.includes('=== PIPELINE DONE ===') || t.includes('[VOLSNAP] Complete.') || t.includes('[PROCESS EXITED WITH CODE 0]') || (t.includes('[OK]') && t.includes('FLEX image upload'))) {
+            } else if (job.status !== 'failed' && (t.includes('=== PIPELINE DONE ===') || t.includes('[VOLSNAP] Complete.') || t.includes('[PROCESS EXITED WITH CODE 0]') || (t.includes('[OK]') && t.includes('FLEX image upload')))) {
                 if (job.status !== 'success' && typeof jarvisAnnounce === 'function') {
                     jarvisAnnounce(`Image job complete: ${job.label.replace(/-/g, ' ')} uploaded to FLEX successfully.`);
                 }
@@ -4738,7 +5089,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 if (found) vm.failedStageKey = failKey;
                 else {
                     // Try mapping stage number to step keys
-                    const stageNumMap = {'1':'step1','2':'step2','2.5':'step2','3':'step3','4':'step4','5':'step5','6':'step6','7':'step7'};
+                    const stageNumMap = {'1':'step1','2':'step2','2.5':'step2','3':'step3','4':'step4','5':'step5','6':'step6','7':'step7','8':'step8'};
                     if (stageNumMap[stageFailMatch[1]]) vm.failedStageKey = stageNumMap[stageFailMatch[1]];
                 }
             }
@@ -4769,7 +5120,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         _renderMatrix() {
             const names = Object.keys(this.vms);
             const imageIds = Object.keys(this.images || {});
-            const IMG_STAGE_MAP = { 'step0':null,'step0.5':null,'step1':'img1','step2':null,'step3':'img2','step4':'img3','step5':'img4','step6':null,'step7':null };
+            const IMG_STAGE_MAP = { 'step0':null,'step0.5':null,'step1':'img1','step2':null,'step3':'img2','step4':'img3','step5':'img4','step6':null,'step7':null,'step8':null };
             const thead = document.getElementById('mig-matrix-thead');
             const tbody = document.getElementById('mig-matrix-tbody');
             if (!thead || !tbody) return;
@@ -5486,6 +5837,60 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             catch (_) {}
         }
 
+        const LS_TABLE_INPUT_CACHE = 'ospc2flex_table_input_cache_v1';
+        function _loadTableInputCache() {
+            try { return JSON.parse(localStorage.getItem(LS_TABLE_INPUT_CACHE) || '{}') || {}; }
+            catch (_) { return {}; }
+        }
+        function _saveTableInputCache(cache) {
+            try { localStorage.setItem(LS_TABLE_INPUT_CACHE, JSON.stringify(cache || {})); }
+            catch (_) {}
+        }
+        function _normalizeTableCacheKey(el) {
+            if (!el || !(el instanceof HTMLElement)) return null;
+            if (el.dataset.tableCacheKey) return `table:${String(el.dataset.tableCacheKey)}`;
+            if (el.id) return `id:${el.id}`;
+            const ds = el.dataset;
+            if (ds.row && ds.col) return `cell:${ds.row}:${ds.col}`;
+            if (ds.snapId) return `snapid:${ds.snapId}:${el.tagName.toLowerCase()}:${el.className || ''}`;
+            if (ds.sourceName) return `source:${ds.sourceName}:${el.tagName.toLowerCase()}:${el.className || ''}`;
+            if (ds.sourceId) return `sourceId:${ds.sourceId}:${el.tagName.toLowerCase()}:${el.className || ''}`;
+            if (ds.sourceVolumeId) return `sourceVol:${ds.sourceVolumeId}:${el.tagName.toLowerCase()}:${el.className || ''}`;
+            return null;
+        }
+        function _persistTableElementValue(el) {
+            const key = _normalizeTableCacheKey(el);
+            if (!key) return;
+            const cache = _loadTableInputCache();
+            if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {
+                cache[key] = el.checked ? '1' : '0';
+            } else if (el.tagName === 'TD' && el.isContentEditable) {
+                cache[key] = String(el.textContent || '').replace(/\r?\n/g, '').trim();
+            } else if ('value' in el) {
+                cache[key] = String(el.value || '');
+            } else {
+                cache[key] = String(el.textContent || '');
+            }
+            _saveTableInputCache(cache);
+        }
+        function _restoreTableInputs(root=document) {
+            const cache = _loadTableInputCache();
+            if (!cache || typeof cache !== 'object') return;
+            const elements = root.querySelectorAll('input,select,textarea,[contenteditable="true"]');
+            elements.forEach(el => {
+                const key = _normalizeTableCacheKey(el);
+                if (!key || !(key in cache)) return;
+                const saved = cache[key];
+                if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {
+                    el.checked = saved === '1';
+                } else if (el.tagName === 'TD' && el.isContentEditable) {
+                    el.textContent = String(saved);
+                } else if ('value' in el) {
+                    el.value = String(saved);
+                }
+            });
+        }
+
         function getVmAuthCached(sourceName) {
             const key = String(sourceName || '');
             if (!key) return {};
@@ -5502,6 +5907,28 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             saveVmAuthCache(cache);
         }
         window._setVmAuthCached = setVmAuthCached;
+
+        document.body.addEventListener('input', function(e) {
+            const el = e.target;
+            if (!(el instanceof HTMLElement) || !el.closest('table')) return;
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+                _persistTableElementValue(el);
+            }
+        });
+        document.body.addEventListener('change', function(e) {
+            const el = e.target;
+            if (!(el instanceof HTMLElement) || !el.closest('table')) return;
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+                _persistTableElementValue(el);
+            }
+        });
+        document.body.addEventListener('focusout', function(e) {
+            const el = e.target;
+            if (!(el instanceof HTMLElement) || !el.closest('table')) return;
+            if (el.isContentEditable) {
+                _persistTableElementValue(el);
+            }
+        });
 
         function refreshMethodDPasswordBadges() {
             const winM = (document.getElementById('windows_repair_method') || {}).value || '';
@@ -5615,6 +6042,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 // Inject the mandatory Checkboxes the backend API hunts for (Data attributes bind the row identifiers mapping)
                 const sname = row.source_server_name || row.server_name || row.name || row.source_volume_id || "Unknown";
                 const sourceServerId = (row.source_server_id || row.server_id || row.id || '').toString().trim();
+                const cacheRowKey = String(row.source_server_name || row.server_name || row.name || row.source_volume_id || row.source_ip || row.source_volume || row.volume || rowIndex).trim() || String(rowIndex);
                 const tname = row.target_server_name || row.server_name || "Unknown";
                 // Check many common flavormap column name variants
                 const tflavor = (
@@ -5657,7 +6085,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                     else                                  sshUser = 'ubuntu';
                 }
 
-                tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-source-name="${escapeHTML(sname)}" data-source-id="${escapeHTML(sourceServerId)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-snet-ip="${escapeHTML(snetIp)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
+                tbody += `<td style="position:sticky;left:0;background:rgba(23,34,65,0.95);z-index:1;border-right:1px solid rgba(184,196,255,0.15);"><input type="checkbox" class="${cname}" data-table-cache-key="source:${escapeHTML(cacheRowKey)}" data-source-name="${escapeHTML(sname)}" data-source-id="${escapeHTML(sourceServerId)}" data-target-name="${escapeHTML(tname)}" data-flavor="${escapeHTML(tflavor)}" data-vol="${escapeHTML(sname)}" data-source-ip="${escapeHTML(sourceIp)}" data-ssh-user="${escapeHTML(sshUser)}" data-ssh-key="${escapeHTML(sshKeyPath)}" data-password="${escapeHTML(instancePassword)}" data-snet-ip="${escapeHTML(snetIp)}" data-os-family="${escapeHTML(osF)}" data-os-type="${escapeHTML(osV)}"></td>`;
 
                 // Row cells — Source & Fresh Sync first, then CSV cols, then Target Flavor, then OS/SSH cols
                 if (!isBlock) {
@@ -5677,14 +6105,14 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
                     // Fresh Sync — SECOND
                     tbody += `<td style="text-align:center;background:rgba(244,63,94,0.05);border-right:1px solid rgba(244,63,94,0.1);">
-                        <input type="checkbox" class="force-sync-cb" style="cursor:pointer;" title="Delete old qcow2 and re-download"
+                        <input type="checkbox" class="force-sync-cb" data-table-cache-key="force_sync:${escapeHTML(cacheRowKey)}" style="cursor:pointer;" title="Delete old qcow2 and re-download"
                             onchange="const cb=document.querySelector('.vm-checkbox[data-source-name=\\'${escapeHTML(sname)}\\']'); if(cb) cb.dataset.forceSync=this.checked;">
                     </td>`;
                 }
                 // Print CSV visible columns (service_type, name, public_ips) — THIRD
                 visibleHeaders.forEach(h => {
                     const val = row[h] || '';
-                    tbody += `<td class="editable-cell" contenteditable="true" data-row="${rowIndex}" data-col="${escapeHTML(h)}">${escapeHTML(val)}</td>`;
+                    tbody += `<td class="editable-cell" contenteditable="true" data-row="${rowIndex}" data-col="${escapeHTML(h)}" data-table-cache-key="editable:${escapeHTML(cacheRowKey)}:${escapeHTML(h)}">${escapeHTML(val)}</td>`;
                 });
                 // Target Flavor — FOURTH
                 if (!isBlock) {
@@ -5769,6 +6197,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             });
             tbody += '</tbody>';
             table.innerHTML = thead + tbody;
+            _restoreTableInputs(table);
 
             // Attach core functionality post-DOM insertion
             const caBox = document.getElementById(checkAllId);
@@ -5811,6 +6240,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                             const origMatch = state.rows.find(or => or === state.filtered[rIdx]);
                             if (origMatch) origMatch[colName] = updatedContent;
                         }
+                        _persistTableElementValue(this);
                     });
                 });
             }
@@ -6584,7 +7014,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
             block.innerHTML = `
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#0f172a; border:1px solid #2d1b69; border-radius:8px; gap:12px;">
-                    <div style="color:#fbff00; text-shadow:0 0 6px rgba(251,255,0,0.4); font-family:'Share Tech Mono',monospace; font-size:12px; font-weight:bold; letter-spacing:0.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <div style="color:#39ff14; text-shadow:0 0 6px rgba(57,255,20,0.4); font-family:'Share Tech Mono',monospace; font-size:12px; font-weight:bold; letter-spacing:0.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                         ${display} &mdash; IP: <span style="color:#38bdf8;">N/A</span> &nbsp;|&nbsp; MODE: <span style="color:#4ade80;">${migMode}</span> &nbsp;//&nbsp; TYPE: <span style="color:#c084fc;">GLANCE EXPORT</span>
                     </div>
                     <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;">
@@ -6745,6 +7175,9 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const isFailureLine = t.includes('[FATAL]') ||
                 t.includes('[VOLSNAP] FAILED') ||
                 t.includes('FAILED:') ||
+                t.includes('[FLEX] TIMEOUT') ||
+                t.includes('FLEX volume did not reach in-use after final attach') ||
+                (t.includes('Final attach') && t.includes('did not stick')) ||
                 (t.includes('PROCESS EXITED') && !t.includes('CODE 0'));
             const isSuccessLine = t.includes('=== PIPELINE DONE ===') ||
                 t.includes('[VOLSNAP] Complete.') ||
@@ -6758,7 +7191,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 if (block) block.style.borderColor = '#f472b6';
                 const te = document.getElementById('img-timer-' + safeId);
                 if (te) te.dataset.stopped = 'true';
-            } else if (isSuccessLine) {
+            } else if (isSuccessLine && !(icon && icon.textContent === 'ERR')) {
                 if (icon) {
                     icon.textContent = 'COMP';
                     icon.style.color = '#4ade80';
@@ -6793,6 +7226,12 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             panel.scrollTop = panel.scrollHeight;
             _persistLogs();
         }
+
+        // Export the proven OSPC->Flex snapshot terminal helpers so copied Flex2Flex
+        // wiring can use the exact same per-job output panels.
+        window.imagePanelSafeId = imagePanelSafeId;
+        window.getOrCreateImagePanel = getOrCreateImagePanel;
+        window.appendImageLog = appendImageLog;
 
         function getOrCreateVmPanel(vmName, ipHint, flavorHint) {
             const state = getBatchJobState(vmName);
@@ -6830,7 +7269,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
             block.innerHTML = `
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#0f172a; border:1px solid #1e3a5f; border-radius:8px; gap:12px;">
-                    <div style="color:#fbff00; text-shadow:0 0 6px rgba(251,255,0,0.4); font-family:'Share Tech Mono',monospace; font-size:12px; font-weight:bold; letter-spacing:0.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <div style="color:#39ff14; text-shadow:0 0 6px rgba(57,255,20,0.4); font-family:'Share Tech Mono',monospace; font-size:12px; font-weight:bold; letter-spacing:0.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                         ${vmName} &mdash; IP: <span style="color:#38bdf8;">${ipHint || 'UNKNOWN'}</span> &nbsp;|&nbsp; MODE: <span style="color:#4ade80;">${migMode}</span> &nbsp;//&nbsp; TYPE: <span style="color:#c084fc;">${migMethod}</span>
                     </div>
                     <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;">
@@ -6914,7 +7353,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             if (String(text || '').includes('[RUN]')) return null;
 
             if (text.includes('=== NBD Worker:')) {
-                el.innerHTML = `<span style="color:#fbff00; text-shadow:0 0 8px rgba(251,255,0,0.8); font-weight:bold;">${safe}</span>`;
+                el.innerHTML = `<span style="color:#39ff14; text-shadow:0 0 8px rgba(57,255,20,0.8); font-weight:bold;">${safe}</span>`;
                 return el;
             }
 
@@ -7103,8 +7542,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const imgM = document.getElementById('start-image-migration-btn');
             const imgD = document.getElementById('start-image-migration-dryrun-btn');
             const imgOs = document.getElementById('image_os_type_override');
-            // VM stop: only visible when VM batch is running
-            if (sb)   sb.style.display   = isVmBatchRunning    ? 'flex' : 'none';
+            // Global stop: visible when any active batch is running
+            if (sb)   sb.style.display   = (isVmBatchRunning || isImageBatchRunning || isLinuxSnapRunning || isWindowsSnapRunning || isVolsnapRunning) ? 'flex' : 'none';
             // Image stop: only visible when image batch is running
             if (sibI) sibI.style.display = isImageBatchRunning ? 'flex' : 'none';
             // Start VM buttons: hidden while VM batch running
@@ -7138,40 +7577,30 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         }, 1000);
 
         if (stopBtn) stopBtn.addEventListener('click', async () => {
-            if (!isVmBatchRunning) return;
             appendLog(`[SYSTEM] Attempting to interrupt active migration stream(s)...`, 'system');
             try {
-                if (isVmBatchRunning) {
-                    await fetch('/api/image_migrator/stop', { method: 'POST' });
-                    if (window.activeBatchReaders && window.activeBatchReaders.length > 0) {
-                        window.activeBatchReaders.forEach(r => r.cancel());
-                        window.activeBatchReaders = [];
-                    }
-                    if (window._nbdJumphostParams && window._nbdJumphostParams.jumphost_ip) {
-                        try {
-                            await fetch('/api/vm_migrator/nbd/stop', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(window._nbdJumphostParams)
-                            });
-                            appendLog('[SYSTEM] NBD workers on jumphost killed.', 'system');
-                        } catch(e) {}
-                    }
-                    if (window._nbdEventSources) {
-                        window._nbdEventSources.forEach(es => { try { es.close(); } catch(e) {} });
-                        window._nbdEventSources = [];
-                    }
-                    if (window._nbdPollIval) { clearInterval(window._nbdPollIval); window._nbdPollIval = null; }
-                    isVmBatchRunning = false;
+                try { await fetch('/api/image_migrator/stop', { method: 'POST' }); } catch (e) {}
+                await hardStopSnapshotBatches('snapshot/image migration pipeline', false);
+                if (window.activeBatchReaders && window.activeBatchReaders.length > 0) {
+                    window.activeBatchReaders.forEach(r => r.cancel());
+                    window.activeBatchReaders = [];
                 }
-                if (isImageBatchRunning) {
-                    try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
-                    if (window.imagePipelineAbortController) {
-                        try { window.imagePipelineAbortController.abort(); } catch (e) {}
-                        window.imagePipelineAbortController = null;
-                    }
-                    isImageBatchRunning = false;
+                if (window._nbdJumphostParams && window._nbdJumphostParams.jumphost_ip) {
+                    try {
+                        await fetch('/api/vm_migrator/nbd/stop', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(window._nbdJumphostParams)
+                        });
+                        appendLog('[SYSTEM] NBD workers on jumphost killed.', 'system');
+                    } catch(e) {}
                 }
+                if (window._nbdEventSources) {
+                    window._nbdEventSources.forEach(es => { try { es.close(); } catch(e) {} });
+                    window._nbdEventSources = [];
+                }
+                if (window._nbdPollIval) { clearInterval(window._nbdPollIval); window._nbdPollIval = null; }
+                isVmBatchRunning = false;
                 refreshMigrationToolbar();
                 jarvisAnnounce(`Migration streams halted. Operator controls restored.`);
                 if (startBtn) startBtn.disabled = false;
@@ -7181,21 +7610,59 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             }
         });
 
+        function buildImageMigrationStopPayload(jobType = 'all') {
+            return {
+                job_type: jobType || 'all',
+                process_host_ip: (document.getElementById('process_host_ip') || document.getElementById('nbd_jumphost_ip') || {}).value || '',
+                process_ssh_user: (document.getElementById('process_ssh_user') || document.getElementById('nbd_jumphost_user') || {}).value || 'ubuntu',
+                process_ssh_key: (document.getElementById('process_ssh_key') || document.getElementById('nbd_jumphost_key') || {}).value || '~/.ssh/id_rsa'
+            };
+        }
+
+        async function stopFlex2FlexJobs(jobType = 'all') {
+            const body = buildImageMigrationStopPayload(jobType);
+            try {
+                await fetch('/api/flex2flex_region/stop', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+            } catch (e) {}
+        }
+
+        async function hardStopSnapshotBatches(label, announce = true, jobType = 'all') {
+            appendLog(`[SYSTEM] Stopping ${label}...`, 'system');
+            if (jobType === 'all') {
+                try { await fetch('/api/image_migrator/stop', { method: 'POST' }); } catch (e) {}
+            }
+            try { await fetch('/api/image_migrator/images/stop', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(buildImageMigrationStopPayload(jobType))
+            }); } catch (e) {}
+            if (jobType !== 'volume') await stopFlex2FlexJobs(jobType);
+            if (window.imagePipelineAbortController) {
+                try { window.imagePipelineAbortController.abort(); } catch (e) {}
+                window.imagePipelineAbortController = null;
+            }
+            if (window.volsnapAbortController) {
+                try { window.volsnapAbortController.abort(); } catch (e) {}
+                window.volsnapAbortController = null;
+            }
+            isImageBatchRunning = false;
+            isLinuxSnapRunning = false;
+            isWindowsSnapRunning = false;
+            isVolsnapRunning = false;
+            refreshMigrationToolbar();
+            if (announce) jarvisAnnounce(`${label} halted.`);
+            appendLog(`[SYSTEM] ${label} stopped.`, 'error');
+        }
+
         // ── Stop Image Batch — dedicated handler ──────────────────────
         const stopImageBtn = document.getElementById('stop-image-batch-btn');
         if (stopImageBtn) stopImageBtn.addEventListener('click', async () => {
-            if (!isImageBatchRunning) return;
-            appendLog('[SYSTEM] Stopping image migration pipeline...', 'system');
             try {
-                try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
-                if (window.imagePipelineAbortController) {
-                    try { window.imagePipelineAbortController.abort(); } catch (e) {}
-                    window.imagePipelineAbortController = null;
-                }
-                isImageBatchRunning = false;
-                refreshMigrationToolbar();
-                jarvisAnnounce('Image pipeline halted.');
-                appendLog('[SYSTEM] Image batch stopped.', 'error');
+                await hardStopSnapshotBatches('image migration pipeline', true, 'image');
             } catch (err) {
                 appendLog(`[ERROR] Failed to stop image pipeline: ${err}`, 'error');
             }
@@ -7204,19 +7671,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         // ── Stop Linux Batch ──────────────────────────────────────────
         const stopLinuxSnapBtn = document.getElementById('stop-linux-snap-btn');
         if (stopLinuxSnapBtn) stopLinuxSnapBtn.addEventListener('click', async () => {
-            if (!isLinuxSnapRunning) return;
-            appendLog('[SYSTEM] Stopping Linux snapshot batch...', 'system');
             try {
-                try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
-                if (window.imagePipelineAbortController) {
-                    try { window.imagePipelineAbortController.abort(); } catch (e) {}
-                    window.imagePipelineAbortController = null;
-                }
-                isImageBatchRunning = false;
-                isLinuxSnapRunning = false;
-                refreshMigrationToolbar();
-                jarvisAnnounce('Linux snapshot batch halted.');
-                appendLog('[SYSTEM] Linux snapshot batch stopped.', 'error');
+                await hardStopSnapshotBatches('Linux snapshot batch', true, 'linux');
             } catch (err) {
                 appendLog(`[ERROR] Failed to stop Linux snapshot batch: ${err}`, 'error');
             }
@@ -7225,19 +7681,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         // ── Stop Windows Batch ───────────────────────────────────────
         const stopWindowsSnapBtn = document.getElementById('stop-windows-snap-btn');
         if (stopWindowsSnapBtn) stopWindowsSnapBtn.addEventListener('click', async () => {
-            if (!isWindowsSnapRunning) return;
-            appendLog('[SYSTEM] Stopping Windows snapshot batch...', 'system');
             try {
-                try { await fetch('/api/image_migrator/images/stop', { method: 'POST' }); } catch (e) {}
-                if (window.imagePipelineAbortController) {
-                    try { window.imagePipelineAbortController.abort(); } catch (e) {}
-                    window.imagePipelineAbortController = null;
-                }
-                isImageBatchRunning = false;
-                isWindowsSnapRunning = false;
-                refreshMigrationToolbar();
-                jarvisAnnounce('Windows snapshot batch halted.');
-                appendLog('[SYSTEM] Windows snapshot batch stopped.', 'error');
+                await hardStopSnapshotBatches('Windows snapshot batch', true, 'windows');
             } catch (err) {
                 appendLog(`[ERROR] Failed to stop Windows snapshot batch: ${err}`, 'error');
             }
@@ -7245,17 +7690,12 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
         // ── Stop Volume Batch ─────────────────────────────────────────
         const stopVolsnapBtn = document.getElementById('stop-volsnap-btn');
-        if (stopVolsnapBtn) stopVolsnapBtn.addEventListener('click', () => {
-            if (!isVolsnapRunning) return;
-            appendLog('[SYSTEM] Stopping Volume snapshot batch...', 'system');
-            if (window.volsnapAbortController) {
-                try { window.volsnapAbortController.abort(); } catch (e) {}
-                window.volsnapAbortController = null;
+        if (stopVolsnapBtn) stopVolsnapBtn.addEventListener('click', async () => {
+            try {
+                await hardStopSnapshotBatches('Volume snapshot batch', true, 'volume');
+            } catch (err) {
+                appendLog(`[ERROR] Failed to stop Volume snapshot batch: ${err}`, 'error');
             }
-            isVolsnapRunning = false;
-            refreshMigrationToolbar();
-            jarvisAnnounce('Volume snapshot batch halted.');
-            appendLog('[SYSTEM] Volume snapshot batch stopped.', 'error');
         });
 
 
@@ -7932,35 +8372,60 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             function _volSnapRows() {
                 const allRows = (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows))
                     ? imageScanState.rows : [];
-                const rows = [];
-                document.querySelectorAll('#ospc-image-table tbody .ospc-image-cb:checked').forEach(cb => {
-                    const tr = cb.closest('tr');
-                    if (!tr) return;
-                    const snapInput = tr.querySelector('.volsnap-target-vm-id, .volsnap-target-ip, .volsnap-helper-vm-id, .volsnap-test-method, .volsnap-row-db-validator');
-                    if (!snapInput) return;
-                    const idx = Number(cb.dataset.idx || -1);
-                    const r = allRows[idx];
+                const selectedMap = _loadImageSelectionMap();
+                const rowById = new Map();
+                const addRow = (r) => {
                     const id = String((r && r.snapshot_id) || '').trim();
-                    if (!id || String(snapInput.dataset.snapId || '').trim() !== id || !r || !r.migratable) return;
-                    if (r.asset_type !== 'volume_snapshot') return;
-                    rows.push(r);
+                    if (!id || !r || !r.migratable || r.asset_type !== 'volume_snapshot') return;
+                    if (window.FLEX2FLEX_UI) {
+                        const isSupportedSource = r.workflow_mode === 'flex2flex'
+                            || r.workflow_mode === 'ospc2flex'
+                            || r.source_cloud === 'rackspace_flex'
+                            || r.source_cloud === 'rackspace_ospc'
+                            || String(r.migration_method || '').indexOf('flex2flex-') === 0
+                            || String(r.migration_method || '') === 'cinder-export';
+                        if (!isSupportedSource) return;
+                    }
+                    rowById.set(id, r);
+                };
+                allRows.forEach(r => {
+                    const id = String((r && r.snapshot_id) || '').trim();
+                    if (id && selectedMap[id]) addRow(r);
                 });
-                return rows;
+                document.querySelectorAll('#ospc-image-table tbody .ospc-image-cb:checked').forEach(cb => {
+                    const idx = Number(cb.dataset.idx || -1);
+                    addRow(allRows[idx]);
+                });
+                return Array.from(rowById.values());
             }
 
             function _sharedPayload() {
+                const flex2flexMode = !!window.FLEX2FLEX_UI;
+                const sourceFlexRegionRaw = String(gv('image_scan_region') || 'IAD3').trim().toLowerCase();
+                const sourceFlexRegion = /^[a-z]{3}$/.test(sourceFlexRegionRaw) ? (sourceFlexRegionRaw + '3') : sourceFlexRegionRaw;
                 return {
+                    workflow_mode:       flex2flexMode ? 'flex2flex' : 'ospc2flex',
+                    source_region:       sourceFlexRegion,
+                    source_flex_auth_url: flex2flexMode ? (gv('flex2flexSourceAuthUrl') || ('https://keystone.api.' + sourceFlexRegion + '.rackspacecloud.com/v3/')) : '',
+                    source_flex_username: flex2flexMode ? (gv('credFlexUsername') || gv('ospc_cloud_user')) : '',
+                    source_flex_password: flex2flexMode ? (gv('credFlexPassword') || gv('ospc_cloud_key')) : '',
+                    source_flex_app_cred_id: flex2flexMode ? gv('credFlexAppCredId') : '',
+                    source_flex_app_cred_secret: flex2flexMode ? gv('credFlexAppCredSecret') : '',
+                    source_flex_project_id: flex2flexMode ? (/^\d+$/.test(String(gv('ospc_cloud_account') || '').trim()) ? (gv('credFlexProjectId') || gv('ospc_cloud_account')) : gv('ospc_cloud_account')) : '',
+                    source_flex_domain: flex2flexMode ? (gv('flex2flexSourceDomain') || gv('credFlexDomain') || 'rackspace_cloud_domain') : '',
                     ospc_username:        gv('ospc_cloud_user'),
                     ospc_apikey:          gv('ospc_cloud_key'),
                     ospc_region:          gv('image_scan_region') || 'IAD',
-                    ospc_auth_url:        'https://identity.api.rackspacecloud.com/v2.0/',
+                    ospc_auth_url:        flex2flexMode
+                        ? (gv('flex2flexSourceAuthUrl') || ('https://keystone.api.' + sourceFlexRegion + '.rackspacecloud.com/v3/'))
+                        : 'https://identity.api.rackspacecloud.com/v2.0/',
                     ospc_account_id:      gv('ospc_cloud_account'),
                     flex_username:        gv('credFlexUsername'),
                     flex_password:        gv('credFlexPassword'),
                     flex_app_cred_id:     gv('credFlexAppCredId'),
                     flex_app_cred_secret: gv('credFlexAppCredSecret'),
                     flex_project_id:      gv('credFlexProjectId'),
-	                    flex_region:          gv('image_scan_region') || gv('credFlexRegion') || 'IAD',
+	                    flex_region:          flex2flexMode ? (gv('credFlexRegion') || 'IAD3') : (gv('image_scan_region') || gv('credFlexRegion') || 'IAD'),
                     flex_domain:          gv('credFlexDomain')  || 'rackspace_cloud_domain',
                     flex_auth_url:        gv('credFlexAuthUrl'),
                     process_host_ip:      gv('process_host_ip')  || gv('nbd_jumphost_ip'),
@@ -7976,13 +8441,27 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             }
 
             // ── stream one approved snapshot ──────────────────────────────────
-            async function streamOne(r, flexTargetVmId, totalCount) {
+            async function streamOne(r, flexTargetVmId, totalCount, startFreshKill = false) {
                 const iid   = String(r.snapshot_id || '').trim();
                 const label = r.snapshot_name || iid;
                 getOrCreateImagePanel(iid, label, label);
                 appendImageLog(iid, `[VOLSNAP] Starting: ${label} (${iid})`);
                 if (flexTargetVmId) appendImageLog(iid, `[VOLSNAP] Final target FLEX VM: ${flexTargetVmId}`);
                 const payload = { ..._sharedPayload(), snapshot_id: iid, snapshot_name: label };
+                payload.start_fresh_kill = !!startFreshKill;
+                const isClassicSource = r.workflow_mode === 'ospc2flex'
+                    || r.source_cloud === 'rackspace_ospc'
+                    || String(r.migration_method || '') === 'cinder-export';
+                if (isClassicSource) {
+                    payload.workflow_mode = 'ospc2flex';
+                    payload.source_mode = 'ospc';
+                    payload.ospc_auth_url = 'https://identity.api.rackspacecloud.com/v2.0/';
+                    payload.ospc_region = String(r.source_region || payload.ospc_region || 'IAD').replace(/\d+$/, '');
+                } else {
+                    payload.workflow_mode = r.workflow_mode || payload.workflow_mode;
+                    payload.source_mode = 'flex';
+                    payload.source_region = r.source_region || payload.source_region;
+                }
                 const rowDbValidator = String(r.post_attach_db_validator || 'none').trim().toLowerCase() || 'none';
                 const isWinVol = _volsnapIsWindowsRow(r);
 	                const rowHelperVmId = isWinVol ? String(r.windows_helper_vm_id || gv('volsnap_flex_helper_vm_id') || '').trim() : flexTargetVmId;
@@ -8006,11 +8485,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                     payload.flex_target_user = r.final_target_ssh_user;
                     payload.post_attach_ssh_user = r.final_target_ssh_user;
                 }
-	                    payload.post_attach_validate_mount = rowDbValidator !== 'none';
-	                    payload.post_attach_db_validator = rowDbValidator;
-	                    payload.post_attach_validate_pg = rowDbValidator === 'postgresql';
-	                    payload.snap_size_gb = String(r.size_gb || '').trim();
-	                    payload.source_volume_id = String(r.volume_id || r.source_volume_id || '').trim();
+                payload.post_attach_validate_mount = isWinVol ? false : (rowDbValidator !== 'none');
+                payload.post_attach_db_validator = isWinVol ? 'none' : rowDbValidator;
+                payload.post_attach_validate_pg = isWinVol ? false : (rowDbValidator === 'postgresql');
+                payload.snap_size_gb = String(r.size_gb || '').trim();
+                payload.source_volume_id = String(r.volume_id || r.source_volume_id || '').trim();
                 try {
                     if (!rowHelperVmId || !rowHelperIp) {
                         appendImageLog(iid, `[ERROR] Missing ${isWinVol ? 'Windows helper' : 'Linux target'} VM ID or IP for ${label}`);
@@ -8054,11 +8533,16 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         appendImageLog(iid, '[SYSTEM] Aborted.');
                     } else {
                         const detail = e && (e.stack || e.message) ? (e.stack || e.message) : String(e);
-                        appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
-                        jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
-                        if (window._volsnapPairingMap && window._volsnapPairingMap[iid]) {
-                            window._volsnapPairingMap[iid].pairing_status = 'failed';
-                            window._volsnapPairingMap[iid].final_attach_status = 'failed';
+                        const streamDrop = /network error|failed to fetch|load failed|connection|socket|terminated/i.test(detail);
+                        if (streamDrop) {
+                            appendImageLog(iid, `[WARN] VOLSNAP dashboard stream disconnected from ${window.location.origin}; the migration may still be running on the jumphost. Check the jumphost log before starting another run.`);
+                        } else {
+                            appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
+                            jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
+                            if (window._volsnapPairingMap && window._volsnapPairingMap[iid]) {
+                                window._volsnapPairingMap[iid].pairing_status = 'failed';
+                                window._volsnapPairingMap[iid].final_attach_status = 'failed';
+                            }
                         }
                     }
                 } finally {
@@ -8074,21 +8558,21 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             }
 
             // ── launch approved jobs list ─────────────────────────────────────
-            function launchApproved(approvedJobs) {
+            async function launchApproved(approvedJobs) {
                 if (!approvedJobs.length) { alert('No jobs to run — all rows are blocked or unapproved.'); return; }
                 const rowMap = {};
                 (typeof imageScanState !== 'undefined' ? imageScanState.rows : []).forEach(r => { rowMap[r.snapshot_id] = r; });
                 const volsnapTargetMap = _loadVolsnapTargetMap();
-	                const jobs = approvedJobs.map(p => {
-	                    const r = rowMap[p.snapshot_id] || { snapshot_id: p.snapshot_id, snapshot_name: p.snapshot_name || p.snapshot_id };
-		                    const override = volsnapTargetMap[String(p.snapshot_id || '')] || {};
-	                    const pairedTarget = String(p.flex_server_id || p.flex_target_server_id || '').trim();
-	                    const requestedTargetId = String(override.flex_target_vm || _volsnapDefaultTarget(r, pairedTarget)).trim();
-	                    if (requestedTargetId) {
-	                        r.flex_target_vm = requestedTargetId;
-	                    }
-	                    r.final_target_ssh_ip = String(override.flex_target_ip || _volsnapDefaultTargetIp(r)).trim();
-	                    r.final_target_ssh_user = String(override.flex_target_user || 'ubuntu').trim() || 'ubuntu';
+                const jobs = approvedJobs.map(p => {
+                    const r = rowMap[p.snapshot_id] || { snapshot_id: p.snapshot_id, snapshot_name: p.snapshot_name || p.snapshot_id };
+                    const override = volsnapTargetMap[String(p.snapshot_id || '')] || {};
+                    const pairedTarget = String(p.flex_server_id || p.flex_target_server_id || '').trim();
+                    const requestedTargetId = String(override.flex_target_vm || _volsnapDefaultTarget(r, pairedTarget)).trim();
+                    if (requestedTargetId) {
+                        r.flex_target_vm = requestedTargetId;
+                    }
+                    r.final_target_ssh_ip = String(override.flex_target_ip || _volsnapDefaultTargetIp(r)).trim();
+                    r.final_target_ssh_user = String(override.flex_target_user || 'ubuntu').trim() || 'ubuntu';
                     r.post_attach_db_validator = String(override.post_attach_db_validator || 'none').trim().toLowerCase() || 'none';
                     return { row: r, targetId: requestedTargetId };
                 });
@@ -8104,16 +8588,27 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 window._vsTotal = approvedJobs.length;
                 isVolsnapRunning = true;
                 refreshMigrationToolbar();
-                jobs.forEach(j => {
-                    streamOne(j.row, j.targetId, approvedJobs.length);
-                });
+                const volsnapPromises = [];
+                if (jobs.length) {
+                    volsnapPromises.push(streamOne(jobs[0].row, jobs[0].targetId, approvedJobs.length, true));
+                    if (jobs.length > 1) {
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        jobs.slice(1).forEach(j => {
+                            volsnapPromises.push(streamOne(j.row, j.targetId, approvedJobs.length, false));
+                        });
+                    }
+                }
+                await Promise.allSettled(volsnapPromises);
             }
 
             // ── preflight + modal ─────────────────────────────────────────────
             async function runPreflight(snaps, attachMode) {
                 const ospcUser   = gv('ospc_cloud_user');
                 const ospcApiKey = gv('ospc_cloud_key');
-                if (!ospcUser || !ospcApiKey) { alert('Fill OSPC credentials first.'); return; }
+                if (!ospcUser || !ospcApiKey) {
+                    alert(window.FLEX2FLEX_UI ? 'Fill Source FLEX credentials first.' : 'Fill OSPC credentials first.');
+                    return;
+                }
 
                 const snapIds = snaps.map(r => r.snapshot_id);
                 let pairings = [], summary = {};
@@ -8227,6 +8722,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 }).join('');
 
                 document.getElementById('vsp-pairing-tbody').innerHTML = rows || '<tr><td colspan="8" style="color:#64748b;text-align:center;padding:14px">No snapshots to display.</td></tr>';
+                _restoreTableInputs(document.getElementById('vsp-pairing-tbody'));
 
                 // Delegate: when source dropdown changes, auto-fill flex dropdown
                 document.getElementById('vsp-pairing-tbody').addEventListener('change', e => {
@@ -8369,11 +8865,15 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 const linuxHelperUser = gv('volsnap_flex_helper_user') || 'ubuntu';
                 let isDryRun = String(gv('mig_mode_value') || '').toLowerCase() === 'dryrun';
 
-                if (!ospcUser || !ospcApiKey) { alert('Fill OSPC credentials first.'); return; }
+                if (!ospcUser || !ospcApiKey) {
+                    alert(window.FLEX2FLEX_UI ? 'Fill Source FLEX credentials first.' : 'Fill OSPC credentials first.');
+                    return;
+                }
                 if (!jhIp) { alert('Set Jumphost IP.'); return; }
 	                const snapsWithTargets = snaps.map(r => {
                     const iid = String(r.snapshot_id || '').trim();
-                    const target = {};
+                    const cachedTarget = _loadVolsnapTargetMap()[iid] || {};
+                    const target = { ...cachedTarget };
                     const domTarget = document.querySelector(`.volsnap-target-vm-id[data-snap-id="${CSS.escape(iid)}"]`);
                     const domIp = document.querySelector(`.volsnap-target-ip[data-snap-id="${CSS.escape(iid)}"]`);
                     const domUser = document.querySelector(`.volsnap-target-user[data-snap-id="${CSS.escape(iid)}"]`);
@@ -8443,18 +8943,32 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 isVolsnapRunning = true;
                 refreshMigrationToolbar();
 
+                const flex2flexMode = !!window.FLEX2FLEX_UI;
+                const sourceFlexRegionRaw = String(gv('image_scan_region') || 'IAD3').trim().toLowerCase();
+                const sourceFlexRegion = /^[a-z]{3}$/.test(sourceFlexRegionRaw) ? (sourceFlexRegionRaw + '3') : sourceFlexRegionRaw;
                 const sharedPayload = {
+                    workflow_mode:       flex2flexMode ? 'flex2flex' : 'ospc2flex',
+                    source_region:       sourceFlexRegion,
+                    source_flex_auth_url: flex2flexMode ? (gv('flex2flexSourceAuthUrl') || ('https://keystone.api.' + sourceFlexRegion + '.rackspacecloud.com/v3/')) : '',
+                    source_flex_username: flex2flexMode ? (gv('credFlexUsername') || ospcUser) : '',
+                    source_flex_password: flex2flexMode ? (gv('credFlexPassword') || ospcApiKey) : '',
+                    source_flex_app_cred_id: flex2flexMode ? gv('credFlexAppCredId') : '',
+                    source_flex_app_cred_secret: flex2flexMode ? gv('credFlexAppCredSecret') : '',
+                    source_flex_project_id: flex2flexMode ? (/^\d+$/.test(String(gv('ospc_cloud_account') || '').trim()) ? (gv('credFlexProjectId') || gv('ospc_cloud_account')) : gv('ospc_cloud_account')) : '',
+                    source_flex_domain: flex2flexMode ? (gv('flex2flexSourceDomain') || gv('credFlexDomain') || 'rackspace_cloud_domain') : '',
                     ospc_username:        ospcUser,
                     ospc_apikey:          ospcApiKey,
                     ospc_region:          gv('image_scan_region') || 'IAD',
-                    ospc_auth_url:        'https://identity.api.rackspacecloud.com/v2.0/',
+                    ospc_auth_url:        flex2flexMode
+                        ? (gv('flex2flexSourceAuthUrl') || ('https://keystone.api.' + sourceFlexRegion + '.rackspacecloud.com/v3/'))
+                        : 'https://identity.api.rackspacecloud.com/v2.0/',
                     ospc_account_id:      gv('ospc_cloud_account'),
                     flex_username:        gv('credFlexUsername'),
                     flex_password:        gv('credFlexPassword'),
                     flex_app_cred_id:     gv('credFlexAppCredId'),
                     flex_app_cred_secret: gv('credFlexAppCredSecret'),
                     flex_project_id:      gv('credFlexProjectId'),
-	                    flex_region:          gv('image_scan_region') || gv('credFlexRegion') || 'IAD',
+	                    flex_region:          flex2flexMode ? (gv('credFlexRegion') || 'IAD3') : (gv('image_scan_region') || gv('credFlexRegion') || 'IAD'),
                     flex_domain:          gv('credFlexDomain')  || 'rackspace_cloud_domain',
                     flex_auth_url:        gv('credFlexAuthUrl'),
                     process_host_ip:      jhIp,
@@ -8470,9 +8984,12 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 };
 
                 let volsnapCompleted = 0;
-                const streamOneDirect = async (r) => {
+                const streamOneDirect = async (r, startFreshKill = false) => {
                     const iid   = String(r.snapshot_id || '').trim();
                     const label = r.snapshot_name || iid;
+                    const isClassicSource = r.workflow_mode === 'ospc2flex'
+                        || r.source_cloud === 'rackspace_ospc'
+                        || String(r.migration_method || '') === 'cinder-export';
                     const rowHelperVmId = r.is_windows_volume ? r.windows_helper_vm_id : r.flex_target_vm;
                     const rowHelperIp = r.is_windows_volume ? r.windows_helper_ip : r.final_target_ssh_ip;
                     const rowHelperUser = r.is_windows_volume ? r.windows_helper_user : (r.final_target_ssh_user || 'ubuntu');
@@ -8496,6 +9013,12 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             signal: window.volsnapAbortController ? window.volsnapAbortController.signal : undefined,
                             body: JSON.stringify({
                                 ...sharedPayload,
+                                start_fresh_kill: !!startFreshKill,
+                                workflow_mode: r.workflow_mode || sharedPayload.workflow_mode,
+                                source_mode: isClassicSource ? 'ospc' : 'flex',
+                                source_region: r.source_region || sharedPayload.source_region,
+                                ospc_region: isClassicSource ? String(r.source_region || sharedPayload.ospc_region || 'IAD').replace(/\d+$/, '') : (r.source_region || sharedPayload.ospc_region),
+                                ospc_auth_url: isClassicSource ? 'https://identity.api.rackspacecloud.com/v2.0/' : sharedPayload.ospc_auth_url,
                                 snapshot_id: iid,
                                 snapshot_name: label,
                                 os_type: r.is_windows_volume ? 'windows' : 'linux',
@@ -8508,12 +9031,12 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                                 flex_target_user: r.final_target_ssh_user || 'ubuntu',
                                 post_attach_ssh_ip: r.final_target_ssh_ip,
                                 post_attach_ssh_user: r.final_target_ssh_user || 'ubuntu',
-	                                post_attach_validate_mount: (r.post_attach_db_validator || 'none') !== 'none',
-	                                post_attach_db_validator: r.post_attach_db_validator || 'none',
-	                                post_attach_validate_pg: (r.post_attach_db_validator === 'postgresql'),
-	                                snap_size_gb: String(r.size_gb || '').trim(),
-	                                source_volume_id: String(r.volume_id || r.source_volume_id || '').trim(),
-	                            }),
+                                post_attach_validate_mount: r.is_windows_volume ? false : ((r.post_attach_db_validator || 'none') !== 'none'),
+                                post_attach_db_validator: r.is_windows_volume ? 'none' : (r.post_attach_db_validator || 'none'),
+                                post_attach_validate_pg: r.is_windows_volume ? false : (r.post_attach_db_validator === 'postgresql'),
+                                snap_size_gb: String(r.size_gb || '').trim(),
+                                source_volume_id: String(r.volume_id || r.source_volume_id || '').trim(),
+                            }),
                         });
                         if (!resp.ok || !resp.body) { appendImageLog(iid, `[ERROR] HTTP ${resp.status} — failed to start for ${label}`); return; }
                         const reader = resp.body.getReader();
@@ -8536,8 +9059,13 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             appendImageLog(iid, '[SYSTEM] Aborted.');
                         } else {
                             const detail = e && (e.stack || e.message) ? (e.stack || e.message) : String(e);
-                            appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
-                            jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
+                            const streamDrop = /network error|failed to fetch|load failed|connection|socket|terminated/i.test(detail);
+                            if (streamDrop) {
+                                appendImageLog(iid, `[WARN] VOLSNAP dashboard stream disconnected from ${window.location.origin}; the migration may still be running on the jumphost. Check the jumphost log before starting another run.`);
+                            } else {
+                                appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
+                                jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
+                            }
                         }
                     } finally {
                         volsnapCompleted++;
@@ -8549,11 +9077,24 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         }
                     }
                 };
-                runnableSnaps.forEach(r => streamOneDirect(r));
+                const volsnapPromises = [];
+                if (runnableSnaps.length) {
+                    volsnapPromises.push(streamOneDirect(runnableSnaps[0], true));
+                    if (runnableSnaps.length > 1) {
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        runnableSnaps.slice(1).forEach(r => {
+                            volsnapPromises.push(streamOneDirect(r, false));
+                        });
+                    }
+                }
+                await Promise.allSettled(volsnapPromises);
             });
         })();
 
         async function imageBatchInner(btn, dedupRunning = false) {
+            if (window.FLEX2FLEX_UI && typeof flex2flexImageBatchInner === 'function') {
+                return flex2flexImageBatchInner(btn, dedupRunning);
+            }
             const isDryRun = !!(btn && String(btn.id || '').includes('dryrun'));
             const imageWindowsMethod = String((btn && btn.dataset && btn.dataset.windowsRepairMethod) || '').trim();
             const isSnapWinButton = !!(btn && btn.id === 'start-snapwin-migration-btn');
@@ -8599,7 +9140,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
             const checkedRows = Array.from(rowById.values());
             const allChecked = checkedRows.filter(r => {
                 const isVol = r.asset_type === 'volume_snapshot';
-                const isWin = !!r.is_windows;
+                const isWin = _imageRowIsWindows(r);
                 if (isVol) return false;
                 return isSnapWinButton ? isWin : !isWin;
             });
@@ -8625,7 +9166,10 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                 appendLog('⚠ Add to Batch: all selected snapshots are already running.', 'system');
                 return;
             }
-            if (!ospcUser || !ospcApiKey || !ospcTenant) { alert('Fill OSPC credentials first.'); return; }
+            if (!ospcUser || !ospcApiKey || !ospcTenant) {
+                alert(window.FLEX2FLEX_UI ? 'Fill Source FLEX credentials first.' : 'Fill OSPC credentials first.');
+                return;
+            }
             if (!(flexUser && flexPass) && !(flexAppId && flexAppSec)) {
                 alert('Fill FLEX credentials (username + password) or FLEX application credential ID + secret.');
                 return;
@@ -8720,7 +9264,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             snapshot_name: label,
                             server_name:   r.source_vm_name || label,
                             asset_type:    r.asset_type || 'image_snapshot',
-                            is_windows:    !!r.is_windows,
+                            is_windows:    _imageRowIsWindows(r),
                             os_type:       r.os_distro || r.os_type || '',
                             start_fresh:   startFresh,
                             no_image_resume: startFresh,
@@ -10397,6 +10941,925 @@ document.addEventListener('keydown', function(e) {
 .vsp-tr:hover td { background:rgba(255,255,255,0.03); }
 .vsp-manual-sel { background:#0f172a;border:1px solid #475569;border-radius:4px;color:#e2e8f0;font-size:11px;padding:3px 6px;min-width:140px; }
 </style>
+
+<script>
+(function () {
+  if (!window.FLEX2FLEX_UI) return;
+
+  function byId(id) { return document.getElementById(id); }
+  function val(id) { return (byId(id) || {}).value || ''; }
+  function setText(sel, text) {
+    const el = document.querySelector(sel);
+    if (el) el.textContent = text;
+  }
+  function setHtml(sel, html) {
+    const el = document.querySelector(sel);
+    if (el) el.innerHTML = html;
+  }
+  function makeInput(id, label, value, placeholder) {
+    return '<div class="form-group"><label>' + label + '</label><input type="text" id="' + id + '" value="' + (value || '') + '" placeholder="' + (placeholder || '') + '" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>';
+  }
+  function normalizeFlexRegion(region) {
+    const raw = String(region || '').trim().toUpperCase();
+    if (!raw || raw === 'ALL') return 'DFW3';
+    if (/^[A-Z]{3}$/.test(raw)) return raw + '3';
+    return raw;
+  }
+  function flexRegionForSelect(region) {
+    return String(normalizeFlexRegion(region)).replace(/\d+$/, '');
+  }
+
+  function sourceRegion() {
+    return normalizeFlexRegion(val('image_scan_region') || val('ospc_cloud_region') || val('jh_region_select') || 'DFW3');
+  }
+
+  function sourceFlexUsername() {
+    return val('credFlexUsername') || val('ospc_cloud_user');
+  }
+
+  function sourceFlexPassword() {
+    return val('credFlexPassword') || val('ospc_cloud_key');
+  }
+
+  function sourceFlexProjectId() {
+    const sourceProject = String(val('ospc_cloud_account') || '').trim();
+    const targetProject = String(val('credFlexProjectId') || '').trim();
+    if (targetProject) return targetProject;
+    if (sourceProject && !/^\d+$/.test(sourceProject)) return sourceProject;
+    return sourceProject;
+  }
+
+  function sourceFlexAuthUrl(region) {
+    const sourceUrl = val('flex2flexSourceAuthUrl');
+    if (sourceUrl) return sourceUrl;
+    return 'https://keystone.api.' + normalizeFlexRegion(region || sourceRegion()).toLowerCase() + '.rackspacecloud.com/v3/';
+  }
+
+  function rowSourceRegion(row) {
+    return normalizeFlexRegion((row && row.source_region) || sourceRegion());
+  }
+
+  function targetRegion() {
+    return (val('credFlexRegion') || 'IAD3').trim();
+  }
+
+  function flex2flexCloneMethod() {
+    return (val('flex2flex_clone_method') || 'flex_glance_direct_region_copy').trim();
+  }
+
+  function flex2flexRowIsWindows(row) {
+    if (!row) return false;
+    if (row.is_windows === true) return true;
+    const text = [
+      row.snapshot_name,
+      row.source_vm_name,
+      row.os_distro,
+      row.os_type,
+    ].map(function (v) { return String(v || '').toLowerCase(); }).join(' ');
+    return text.indexOf('windows') >= 0 || /(^|[^a-z0-9])win(?:20|2k|dows)?/i.test(text) || /snapwin|opscwin|ospcwin|apwin|win20|win2k|w2k|w201|w202|safe-ide/i.test(text);
+  }
+
+  function selectedFlexRows() {
+    const scanState = window.imageScanState || (typeof imageScanState !== 'undefined' ? imageScanState : null);
+    const rows = (scanState && Array.isArray(scanState.rows)) ? scanState.rows : [];
+    const loadSelection = window._loadImageSelectionMap || (typeof _loadImageSelectionMap === 'function' ? _loadImageSelectionMap : null);
+    const selectedMap = loadSelection ? loadSelection() : {};
+    const cachedRows = rows.filter(function (r) {
+      const id = String((r && r.snapshot_id) || '').trim();
+      return id && !!selectedMap[id];
+    });
+    const domCheckedRows = Array.from(document.querySelectorAll('.ospc-image-cb:checked')).map(function (cb) {
+      const i = Number(cb.dataset.idx || -1);
+      return rows[i] || null;
+    });
+    const rowById = new Map();
+    const isFlexSourceRow = function (r) {
+      if (!r) return false;
+      if (
+        r.workflow_mode === 'flex2flex' ||
+        r.source_cloud === 'rackspace_flex' ||
+        String(r.migration_method || '').indexOf('flex2flex-') === 0
+      ) return true;
+      const id = String(r.snapshot_id || r.image_id || '').trim();
+      if (!id || r.asset_type === 'volume_snapshot') return false;
+      const typeText = String(r.asset_type || r.type || '').toLowerCase();
+      return !!window.FLEX2FLEX_UI && (
+        typeText.indexOf('image') >= 0 ||
+        typeText === 'glance' ||
+        !!String(r.snapshot_name || '').trim()
+      );
+    };
+    const addRow = function (r) {
+      const id = String((r && (r.snapshot_id || r.image_id)) || '').trim();
+      if (!id || !r || r.migratable === false || r.asset_type === 'volume_snapshot') return;
+      if (isFlexSourceRow(r)) {
+        if (!r.snapshot_id) r.snapshot_id = id;
+        if (!r.workflow_mode) r.workflow_mode = 'flex2flex';
+        if (!r.source_cloud) r.source_cloud = 'rackspace_flex';
+        if (!r.source_region) r.source_region = sourceRegion();
+        rowById.set(id, r);
+      }
+    };
+    cachedRows.forEach(addRow);
+    domCheckedRows.forEach(addRow);
+    return Array.from(rowById.values());
+  }
+
+  function bindFlex2FlexImageButton(buttonId, modeValue) {
+    const oldBtn = byId(buttonId);
+    if (!oldBtn || oldBtn.dataset.flex2flexBound) return;
+    const clone = oldBtn.cloneNode(true);
+    clone.dataset.flex2flexBound = '1';
+    clone.removeAttribute('onclick');
+    oldBtn.replaceWith(clone);
+    clone.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      const mode = byId('mig_mode_value');
+      if (mode) mode.value = modeValue || 'live';
+      const rows = selectedFlexRows();
+      if (!rows.length) {
+        const checked = document.querySelectorAll('.ospc-image-cb:checked').length;
+        alert(checked
+          ? 'Selected rows are not Source FLEX scan rows. Click Start Source FLEX Image Scan, then select rows from the refreshed table.'
+          : 'Select at least one source FLEX image/snapshot row in the table first.');
+        return;
+      }
+      if (typeof appendLog === 'function') appendLog('FLEX2FLEX launch: selected snapshot rows=' + rows.length, 'system');
+      window.flex2flexImageBatchInner(clone, false).catch(function (err) {
+        console.error('[FLEX2FLEX launch error]', err);
+        alert('Flex2Flex launch failed: ' + ((err && err.message) || String(err)));
+      });
+    });
+  }
+
+  window.flex2flexImageBatchInner = async function (btn, dedupRunning) {
+    const isDryRun = !!((btn && String(btn.id || '').includes('dryrun')) || String(val('mig_mode_value')).toLowerCase() === 'dryrun');
+    const isSnapWinButton = !!(btn && btn.id === 'start-snapwin-migration-btn');
+    const typeStartFreshKill = isSnapWinButton
+      ? !!((byId('snapwin_start_fresh_kill') || {}).checked)
+      : !!((byId('linux_snap_start_fresh_kill') || {}).checked);
+    const checkedRows = selectedFlexRows();
+    if (!checkedRows.length) {
+      const checked = document.querySelectorAll('.ospc-image-cb:checked').length;
+      alert(checked
+        ? 'Selected rows are not Source FLEX scan rows. Click Start Source FLEX Image Scan, then select rows from the refreshed table.'
+        : 'No Source FLEX image row selected. Run the Source FLEX Image Scan first, then select rows from that refreshed table.');
+      return;
+    }
+    const allChecked = checkedRows.filter(function (r) {
+      const isWin = flex2flexRowIsWindows(r);
+      return isSnapWinButton ? isWin : !isWin;
+    });
+    if (!allChecked.length) {
+      alert(isSnapWinButton
+        ? 'No Windows snapshots selected. Use the Windows Snapshots tab or uncheck Linux rows.'
+        : 'No Linux snapshots selected. Use the Linux Snapshots tab or uncheck Windows rows.');
+      return;
+    }
+    let rows = dedupRunning
+      ? allChecked.filter(function (r) {
+          const id = String((r && r.snapshot_id) || '').trim();
+          const safe = window.imagePanelSafeId ? window.imagePanelSafeId(id) : ('img_' + id.replace(/[^a-zA-Z0-9]/g, '_'));
+          return !(id && document.getElementById('img-panel-' + safe));
+        })
+      : allChecked;
+    if (!rows.length) {
+      if (typeof appendLog === 'function') appendLog('FLEX2FLEX: all selected snapshots are already running.', 'system');
+      return;
+    }
+    if (!(sourceFlexUsername() && sourceFlexPassword()) && !(val('credFlexAppCredId') && val('credFlexAppCredSecret'))) {
+      alert('Fill Source FLEX credentials first.');
+      return;
+    }
+    if (!(val('credFlexUsername') && val('credFlexPassword')) && !(val('credFlexAppCredId') && val('credFlexAppCredSecret'))) {
+      alert('Fill Target FLEX credentials first.');
+      return;
+    }
+    if (flex2flexCloneMethod() !== 'flex_glance_direct_region_copy' && !String(val('process_host_ip') || val('nbd_jumphost_ip')).trim()) {
+      alert('Set Jumphost IP.');
+      return;
+    }
+    window.flex2flexActiveImageIds = window.flex2flexActiveImageIds || new Set();
+    const activeRows = [];
+    rows.forEach(function (r) {
+      const iid = String((r && r.snapshot_id) || '').trim();
+      if (!iid) return;
+      if (window.flex2flexActiveImageIds.has(iid)) {
+        if (typeof window.appendImageLog === 'function') {
+          window.appendImageLog(iid, '[R3-F2F] Already running for this selected snapshot; skipped duplicate launch.');
+        } else if (typeof appendLog === 'function') {
+          appendLog('FLEX2FLEX: skipped duplicate running snapshot ' + iid, 'system');
+        }
+        return;
+      }
+      activeRows.push(r);
+    });
+    rows = activeRows;
+    if (!rows.length) {
+      if (typeof appendLog === 'function') appendLog('FLEX2FLEX: selected snapshots are already running.', 'system');
+      return;
+    }
+    rows.forEach(function (r) {
+      const iid = String((r && r.snapshot_id) || '').trim();
+      if (iid) window.flex2flexActiveImageIds.add(iid);
+    });
+    if (btn) btn.disabled = true;
+
+    if (typeof appendLog === 'function') appendLog((window.FLEXANYWHERE_UI ? '🌈 FLEX Anywhere migration — ' : '🌐 FLEX2FLEX-Region Clone — ') + rows.length + ' selected snapshot job(s)', 'system');
+    const logEl = byId('image-scan-log');
+    const logWrap = byId('image-scan-console-wrap');
+    if (logWrap) logWrap.style.display = 'block';
+    if (logEl) logEl.textContent = 'Launching ' + (window.FLEXANYWHERE_UI ? 'FLEX Anywhere migration' : 'FLEX2FLEX region clone') + ' for ' + rows.length + ' selected snapshot(s). Output is in each job terminal below.\\n';
+
+    if (typeof isImageBatchRunning !== 'undefined') isImageBatchRunning = true;
+    if (isSnapWinButton && typeof isWindowsSnapRunning !== 'undefined') isWindowsSnapRunning = true;
+    else if (typeof isLinuxSnapRunning !== 'undefined') isLinuxSnapRunning = true;
+    if (typeof refreshMigrationToolbar === 'function') refreshMigrationToolbar();
+    const activeStopBtn = byId(isSnapWinButton ? 'stop-windows-snap-btn' : 'stop-linux-snap-btn');
+    if (activeStopBtn) activeStopBtn.style.display = 'flex';
+    window.imagePipelineAbortController = new AbortController();
+
+    rows.forEach(function (r) {
+      const iid = String(r.snapshot_id || '').trim();
+      if (!iid) return;
+      if (typeof window.getOrCreateImagePanel === 'function') window.getOrCreateImagePanel(iid, r.snapshot_name || iid, r.source_vm_name || r.snapshot_name || iid);
+      if (typeof window.appendImageLog === 'function') {
+        window.appendImageLog(iid, window.FLEXANYWHERE_UI ? '--- EXECUTING R3 FLEX ANYWHERE MIGRATION ---' : '--- EXECUTING R3 FLEX2FLEX-REGION CLONING ---');
+        window.appendImageLog(iid, window.FLEXANYWHERE_UI ? '[FLEX-ANYWHERE] Queued from selected snapshot table row' : '[R3-F2F] Queued from selected snapshot table row');
+        window.appendImageLog(iid, '[R3-F2F] Source=' + rowSourceRegion(r) + ' Target=' + targetRegion() + ' DryRun=' + String(isDryRun));
+      }
+    });
+
+    if (typeof migTracker !== 'undefined' && migTracker.initImages) {
+      migTracker.initImages(rows.map(function (r) { return {id: r.snapshot_id, label: r.snapshot_name || r.snapshot_id}; }), true);
+    }
+
+    const sharedPayload = {
+      workflow_mode: 'flex2flex',
+      flexanywhere_mode: !!window.FLEXANYWHERE_UI,
+      hyperscaler_provider: val('flexanywhere_provider'),
+      flexanywhere_direction: val('flexanywhere_direction'),
+      hyperscaler_direction: val('flexanywhere_direction'),
+      hyperscaler_account_id: val('flexanywhere_account_id'),
+      hyperscaler_source_region: val('flexanywhere_source_region'),
+      hyperscaler_target_region: val('flexanywhere_target_region'),
+      hyperscaler_source_artifact_type: val('flexanywhere_source_artifact_type'),
+      hyperscaler_source_artifact_id: val('flexanywhere_source_artifact_id'),
+      hyperscaler_target_artifact_name: val('flexanywhere_target_artifact_name'),
+      hyperscaler_image_format: val('flexanywhere_image_format'),
+      hyperscaler_guest_os: val('flexanywhere_guest_os'),
+      hyperscaler_target_instance_type: val('flexanywhere_target_instance_type'),
+      hyperscaler_target_network: val('flexanywhere_target_network'),
+      hyperscaler_target_key_name: val('flexanywhere_target_key_name'),
+      hyperscaler_staging_prefix: val('flexanywhere_staging_prefix'),
+      aws_access_key_id: val('flexanywhere_aws_access_key_id'),
+      aws_secret_access_key: val('flexanywhere_aws_secret_access_key'),
+      aws_session_token: val('flexanywhere_aws_session_token'),
+      aws_profile: val('flexanywhere_aws_profile'),
+      aws_role_arn: val('flexanywhere_aws_role_arn'),
+      aws_bucket: val('flexanywhere_aws_bucket'),
+      azure_tenant_id: val('flexanywhere_azure_tenant_id'),
+      azure_subscription_id: val('flexanywhere_azure_subscription_id'),
+      azure_client_id: val('flexanywhere_azure_client_id'),
+      azure_client_secret: val('flexanywhere_azure_client_secret'),
+      azure_resource_group: val('flexanywhere_azure_resource_group'),
+      azure_storage: val('flexanywhere_azure_storage'),
+      gcp_project_id: val('flexanywhere_gcp_project_id'),
+      gcp_credentials_file: val('flexanywhere_gcp_credentials_file'),
+      gcp_bucket: val('flexanywhere_gcp_bucket'),
+      gcp_service_account_json: val('flexanywhere_gcp_service_account_json'),
+      migration_mode: flex2flexCloneMethod(),
+      clone_method: flex2flexCloneMethod(),
+      target_region: targetRegion(),
+      dry_run: isDryRun,
+      boot_target: !isDryRun,
+      start_fresh_kill: typeStartFreshKill,
+      process_host_ip: String(val('process_host_ip') || val('nbd_jumphost_ip')).trim(),
+      process_ssh_user: String(val('process_ssh_user') || val('nbd_jumphost_user') || 'ubuntu').trim(),
+      process_ssh_key: String(val('process_ssh_key') || val('nbd_jumphost_key') || '~/.ssh/id_rsa').trim(),
+      source_flex_username: sourceFlexUsername(),
+      source_flex_password: sourceFlexPassword(),
+      source_flex_app_cred_id: val('credFlexAppCredId'),
+      source_flex_app_cred_secret: val('credFlexAppCredSecret'),
+      source_flex_project_id: sourceFlexProjectId(),
+      source_flex_domain: val('flex2flexSourceDomain') || val('credFlexDomain') || 'rackspace_cloud_domain',
+      target_flex_auth_url: val('credFlexAuthUrl') || ('https://keystone.api.' + targetRegion().toLowerCase() + '.rackspacecloud.com/v3/'),
+      target_flex_username: val('credFlexUsername'),
+      target_flex_password: val('credFlexPassword'),
+      target_flex_app_cred_id: val('credFlexAppCredId'),
+      target_flex_app_cred_secret: val('credFlexAppCredSecret'),
+      target_flex_project_id: val('credFlexProjectId'),
+      flex_project_id: val('credFlexProjectId'),
+      target_flex_domain: val('credFlexDomain') || 'rackspace_cloud_domain',
+      flex_flavor: val('flex_flavor_fallback') || 'gp.0.4.4',
+      flex_network_id: val('flex_network_id') || 'tenant-net',
+      flex_key_name: val('flex_key_name') || val('flex_key_name_quick') || ''
+    };
+
+    let completed = 0;
+    const total = rows.length;
+    const streamOne = async function (r, rowIndex) {
+      const iid = String(r.snapshot_id || '').trim();
+      const label = r.snapshot_name || iid;
+      const rowStartFreshKill = !!(typeStartFreshKill && rowIndex === 0);
+      let connectWarnTimer = null;
+      let needsJumphostFallback = false;
+      try {
+        const runStream = async function (modeOverride) {
+          const effectiveMode = modeOverride || sharedPayload.migration_mode;
+          const isAutoFallback = sharedPayload.migration_mode === 'flex_glance_direct_region_copy'
+            && effectiveMode === 'jumphost_glance_stream';
+          if (typeof window.appendImageLog === 'function') {
+            window.appendImageLog(iid, '[R3-F2F] Dashboard endpoint: ' + window.location.origin + '/api/flex2flex_region/run');
+            window.appendImageLog(iid, '[R3-F2F] Starting dashboard stream request...');
+          }
+          connectWarnTimer = setTimeout(function () {
+            if (typeof window.appendImageLog === 'function') {
+              window.appendImageLog(iid, '[R3-F2F][WARN] Waiting for dashboard endpoint response; SSH staging to jumphost or browser connection pool may be busy.');
+            }
+          }, 15000);
+          const resp = await fetch('/api/flex2flex_region/run', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            signal: window.imagePipelineAbortController ? window.imagePipelineAbortController.signal : undefined,
+            body: JSON.stringify({
+              ...sharedPayload,
+              migration_mode: effectiveMode,
+              clone_method: effectiveMode,
+              start_fresh_kill: rowStartFreshKill,
+              label,
+              source_image_id: iid,
+              source_region: rowSourceRegion(r),
+              source_flex_auth_url: sourceFlexAuthUrl(rowSourceRegion(r))
+            })
+          });
+          if (connectWarnTimer) {
+            clearTimeout(connectWarnTimer);
+            connectWarnTimer = null;
+          }
+          if (typeof window.appendImageLog === 'function') window.appendImageLog(iid, '[R3-F2F] Stream connected: HTTP ' + resp.status);
+          if (!resp.ok || !resp.body) {
+            if (typeof window.appendImageLog === 'function') window.appendImageLog(iid, '[ERROR] HTTP ' + resp.status + ' — failed to start Flex2Flex clone for ' + label);
+            return;
+          }
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = '';
+          while (true) {
+            const part = await reader.read();
+            if (part.done) break;
+            buf += decoder.decode(part.value, {stream: true});
+            const chunks = buf.split('\n\n');
+            buf = chunks.pop() || '';
+            chunks.forEach(function (chunk) {
+              chunk.split(/\r?\n/).forEach(function (rawLine) {
+                if (!rawLine.startsWith('data:')) return;
+                const line = rawLine.replace(/^data:\s?/, '').trim();
+                if (!line) return;
+                if (/DG2B_JUMPHOST_FALLBACK_REQUIRED|fallback_required|PROCESS EXITED WITH CODE 86/i.test(line)) {
+                  needsJumphostFallback = true;
+                }
+                if (typeof window.appendImageLog === 'function') window.appendImageLog(iid, line);
+                if (logEl) {
+                  const maxChars = (typeof IMAGE_SCAN_LOG_MAX_CHARS !== 'undefined') ? IMAGE_SCAN_LOG_MAX_CHARS : 60000;
+                  const next = (logEl.textContent || '') + line + '\n';
+                  logEl.textContent = next.length > maxChars ? next.slice(next.length - maxChars) : next;
+                  logEl.scrollTop = logEl.scrollHeight;
+                }
+              });
+            });
+          }
+        };
+        await runStream(sharedPayload.migration_mode);
+        if (needsJumphostFallback && sharedPayload.migration_mode === 'flex_glance_direct_region_copy') {
+          if (typeof window.appendImageLog === 'function') {
+            window.appendImageLog(iid, '[R3-F2F] Direct path requires fallback; retrying same selected row with jumphost temp-file stream.');
+          }
+          needsJumphostFallback = false;
+          await runStream('jumphost_glance_stream');
+        }
+      } catch (e) {
+        if (connectWarnTimer) clearTimeout(connectWarnTimer);
+        const msg = e && e.name === 'AbortError' ? '[SYSTEM] Aborted.' : '[FLEX2FLEX ERROR] ' + (e && e.message ? e.message : String(e));
+        if (typeof window.appendImageLog === 'function') window.appendImageLog(iid, msg);
+        if (logEl) logEl.textContent += label + ': ' + msg + '\n';
+      } finally {
+        if (window.flex2flexActiveImageIds) window.flex2flexActiveImageIds.delete(iid);
+        completed++;
+        if (logEl) logEl.textContent = (window.FLEXANYWHERE_UI ? 'FLEX Anywhere' : 'FLEX2FLEX') + ' selected snapshot jobs: ' + completed + '/' + total + ' completed. Output is in each job terminal below.\\n';
+        if (completed >= total) {
+          if (btn) btn.disabled = false;
+          const mode = byId('mig_mode_value');
+          if (mode) mode.value = 'live';
+          if (typeof isImageBatchRunning !== 'undefined') isImageBatchRunning = false;
+          if (typeof isLinuxSnapRunning !== 'undefined') isLinuxSnapRunning = false;
+          if (typeof isWindowsSnapRunning !== 'undefined') isWindowsSnapRunning = false;
+          window.imagePipelineAbortController = null;
+          if (typeof refreshMigrationToolbar === 'function') refreshMigrationToolbar();
+          if (typeof appendLog === 'function') appendLog((window.FLEXANYWHERE_UI ? '🌈 FLEX Anywhere' : '🌐 FLEX2FLEX') + ' image pipeline complete.', 'system');
+        }
+      }
+    };
+
+    rows.forEach(function (r, idx) { streamOne(r, idx); });
+  };
+
+  async function flex2flexScanSourceImages() {
+    const btn = byId('image-scan-btn');
+    const logWrap = byId('image-scan-console-wrap');
+    const logEl = byId('image-scan-log');
+    const spinner = byId('image-scan-spinner');
+    if (logWrap) logWrap.style.display = 'block';
+    if (spinner) spinner.style.display = 'inline';
+    if (logEl) logEl.textContent = window.FLEXANYWHERE_UI
+      ? 'Connecting to FLEX / Hyperscaler source scanner shell...\n'
+      : 'Connecting to Source FLEX image scanner...\n';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = window.FLEXANYWHERE_UI ? '⏳ Scanning Source…' : '⏳ Scanning Source FLEX…';
+    }
+    try {
+      if (typeof imageScanState !== 'undefined') {
+        imageScanState.rows = [];
+        imageScanState.filtered = [];
+        imageScanState.summary = {};
+      }
+      if (typeof renderImageTable === 'function') renderImageTable();
+      if (!(sourceFlexUsername() && sourceFlexPassword()) && !(val('credFlexAppCredId') && val('credFlexAppCredSecret'))) {
+        throw new Error('Missing Source FLEX credentials');
+      }
+      const processHost = String(val('process_host_ip') || val('nbd_jumphost_ip')).trim();
+      if (!processHost) throw new Error('Missing jumphost IP');
+      const scanAbort = new AbortController();
+      const scanTimer = setTimeout(() => scanAbort.abort(), 180000);
+      const resp = await fetch('/api/flex2flex_region/images/scan', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        signal: scanAbort.signal,
+        body: JSON.stringify({
+          source_region: sourceRegion(),
+          process_host_ip: processHost,
+          process_ssh_user: String(val('process_ssh_user') || val('nbd_jumphost_user') || 'ubuntu').trim(),
+          process_ssh_key: String(val('process_ssh_key') || val('nbd_jumphost_key') || '~/.ssh/id_rsa').trim(),
+          source_flex_auth_url: sourceFlexAuthUrl(sourceRegion()),
+          source_flex_username: sourceFlexUsername(),
+          source_flex_password: sourceFlexPassword(),
+          source_flex_app_cred_id: val('credFlexAppCredId'),
+          source_flex_app_cred_secret: val('credFlexAppCredSecret'),
+          source_flex_project_id: sourceFlexProjectId(),
+          flex_project_id: val('credFlexProjectId'),
+          ospc_account_id: val('ospc_cloud_account'),
+          source_account_id: val('ospc_cloud_account'),
+          source_flex_domain: val('flex2flexSourceDomain') || val('credFlexDomain') || 'rackspace_cloud_domain'
+        })
+      }).finally(() => clearTimeout(scanTimer));
+      const data = await resp.json().catch(async () => {
+        const txt = await resp.text();
+        throw new Error('Non-JSON response (HTTP ' + resp.status + '): ' + txt.slice(0, 180));
+      });
+      if (!resp.ok || data.error) throw new Error(data.error || ('HTTP ' + resp.status));
+      if (typeof imageScanState !== 'undefined') {
+        imageScanState.rows = (data.rows || []).map(function (r) {
+          return Object.assign({workflow_mode: 'flex2flex', source_cloud: 'rackspace_flex'}, r || {});
+        });
+        imageScanState.summary = data.summary || {};
+        imageScanState.filtered = imageScanState.rows.map((row, idx) => ({row, idx}));
+      }
+      try {
+        localStorage.setItem(LS_FLEX2FLEX_IMAGE_SCAN, JSON.stringify({
+          rows: (imageScanState && imageScanState.rows) || [],
+          summary: data.summary || {},
+          sourceRegion: sourceRegion(),
+          ts: Date.now(),
+        }));
+      } catch (e) { /* ignore quota/private mode */ }
+      if (typeof renderImageTable === 'function') renderImageTable();
+      if (typeof _persistCurrentImageSelectionFromDom === 'function') _persistCurrentImageSelectionFromDom();
+      const ageEl = byId('image-scan-cache-age');
+      if (ageEl) {
+        ageEl.textContent = '🟢 live';
+        ageEl.style.display = 'inline';
+      }
+      if (logEl) logEl.textContent = (['✅ Source FLEX image scan complete.'].concat(data.logs || [])).join('\n');
+    } catch (err) {
+      const msg = err && err.name === 'AbortError'
+        ? ((window.FLEXANYWHERE_UI ? 'Source scanner' : 'Source FLEX scanner') + ' timed out before the backend returned.')
+        : (err && err.message ? err.message : String(err));
+      if (logEl) logEl.textContent = '[ERROR] ' + msg;
+    } finally {
+      if (spinner) spinner.style.display = 'none';
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = window.FLEXANYWHERE_UI ? '🔍 Start FLEX / Hyperscaler Source Scan' : '🔍 Start Source FLEX Image Scan';
+      }
+    }
+  }
+
+  function applyFlex2FlexUi() {
+    const isFlexAnywhere = !!window.FLEXANYWHERE_UI;
+    const missionTitle = isFlexAnywhere
+      ? 'HYPER FLEX MIGRATION'
+      : 'FLEX2FLEX REGION CLONING';
+    document.title = isFlexAnywhere ? 'R3 HYPER FLEX Hyperscaler Bridge' : 'R3 FLEX2FLEX-Region Cloning';
+    const flexTitle = document.querySelector('.section-title-wrapper');
+    if (flexTitle) {
+      flexTitle.style.cssText = 'display:flex; align-items:center; flex-wrap:wrap; gap:8px;';
+      flexTitle.innerHTML = '<span style="font-weight:900; letter-spacing:1px; color:#ffffff; padding:6px 16px; border-radius:8px; background:#ef4444; border:1px solid #dc2626; box-shadow:0 2px 4px rgba(0,0,0,0.1);">' + missionTitle + '</span> <span style="display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #00f0ff, #0284c7); color:#fff; padding:3px 12px; border-radius:999px; font-size:0.72rem; font-weight:800; letter-spacing:1px; text-transform:uppercase; box-shadow:0 4px 15px rgba(0,240,255,0.4), inset 0 1px 0 rgba(255,255,255,0.25); border:1px solid rgba(0,240,255,0.8); text-shadow:0 1px 2px rgba(0,0,0,0.3); margin-left:8px; transform:translateY(-1px);">For Flex Anywhere Members</span>';
+    }
+    setText('.panel > p', isFlexAnywhere
+      ? 'Move VM images, snapshots, and volume builds between FLEX and AWS, Azure, or GCP using the existing migration workflow shell.'
+      : 'Clone Flex images, snapshots, and VM builds between Flex regions using the existing snapshot migration workflow.');
+
+    const themeDrop = byId('top-theme-dropdown');
+    if (themeDrop) themeDrop.style.display = 'none';
+    document.querySelectorAll('.panel > details').forEach(function (el) {
+      if (String(el.textContent || '').toLowerCase().indexOf('how this tool works') >= 0) el.style.display = 'none';
+    });
+    const coldBody = byId('coldMigrationMethodBody');
+    if (coldBody) {
+      const legacyToggle = coldBody.previousElementSibling;
+      if (legacyToggle && String(legacyToggle.textContent || '').toLowerCase().indexOf('snapshot migration') >= 0) {
+        legacyToggle.style.display = 'none';
+      }
+      const legacyColdIntro = Array.from(coldBody.children).find(function (el) {
+        const txt = String(el.textContent || '').toLowerCase();
+        return el.tagName === 'DIV' && (txt.indexOf('cold migration') >= 0 || txt.indexOf('offline disk repair') >= 0 || txt.indexOf('ospc snapshot discovery') >= 0);
+      });
+      if (legacyColdIntro) legacyColdIntro.style.display = 'none';
+    }
+    if (!byId('flex2flex-head-card')) {
+      const subtitle = document.querySelector('.panel > p');
+      const card = document.createElement('div');
+      card.id = 'flex2flex-head-card';
+      card.style.cssText = 'margin:18px 0 22px;border:1px solid rgba(56,189,248,.8);border-radius:10px;padding:18px;background:rgba(15,23,42,.52);';
+      card.innerHTML = `
+        <div style="display:grid;grid-template-columns:1.05fr 1.15fr 1.05fr;gap:22px;align-items:start;">
+          <div style="grid-column:1 / -1;padding:10px 12px;border:1px solid rgba(16,185,129,.45);border-radius:8px;background:rgba(6,78,59,.22);color:#cbd5e1;font-size:0.84rem;line-height:1.55;">
+            <div><strong style="color:#6ee7b7;">Simple summary:</strong> FLEX2FLEX Region Cloning lets the Cloud Admin Team copy FLEX snapshots, images, and volumes from one FLEX region to another for DR, testing, recovery, or regional migration while keeping the source safe and recording every new target ID.</div>
+            <div style="margin-top:6px;"><strong style="color:#6ee7b7;">By Who:</strong> Rackspace and FlexMax Cloud Admin Team, OpenStack admins, migration engineers, DR operations, infrastructure engineers, platform operations, and managed cloud support. Requires access to both source and target FLEX regions.</div>
+          </div>
+          <div>
+            <div style="color:#a855f7;font-weight:800;font-size:1.08rem;margin-bottom:10px;">FLEX2FLEX Region Cloning</div>
+            <p style="margin:0 0 10px;color:#cbd5e1;font-size:0.86rem;line-height:1.6;">Clone FLEX snapshots, images, and volumes from one FLEX region to another for disaster recovery, regional backup, testing, cross-region restore, golden image replication, and moving boot or data volumes.</p>
+            <p style="margin:0;color:#cbd5e1;font-size:0.86rem;line-height:1.6;">Source resources are not deleted or changed. The workflow creates new target-region image, volume, or VM IDs.</p>
+          </div>
+          <div>
+            <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,.08);border-left:3px solid #f97316;color:#fdba74;font-size:0.78rem;line-height:1.45;">
+              <strong>How it works:</strong> Scan source FLEX snapshots, choose Linux / Windows / Volume rows, pick target FLEX region, then run the clone.
+            </div>
+            <ol style="margin:0;padding-left:18px;color:#cbd5e1;font-size:0.84rem;line-height:1.58;">
+              <li><strong style="color:#e2e8f0;">Discover:</strong> private Glance images, instance snapshots, Linux snapshots, Windows snapshots, and Cinder volume snapshots.</li>
+              <li><strong style="color:#e2e8f0;">Clone:</strong> direct Glance-to-Glance copy is tried first; jumphost stream fallback runs when direct import is blocked.</li>
+              <li><strong style="color:#e2e8f0;">Create:</strong> target images, boot volumes, data volumes, or attached volumes depending on selected source type.</li>
+              <li><strong style="color:#e2e8f0;">Record:</strong> source snapshot ID, target image/volume ID, target VM/server details, status, and mount result.</li>
+            </ol>
+          </div>
+          <div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem;color:#cbd5e1;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:6px 8px;color:#e2e8f0;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(148,163,184,.25);">Source type</th>
+                  <th style="text-align:left;padding:6px 8px;color:#e2e8f0;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(148,163,184,.25);">Target result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding:7px 8px;">Linux image snapshot</td><td style="padding:7px 8px;">New Linux image in target region</td></tr>
+                <tr><td style="padding:7px 8px;">Windows image snapshot</td><td style="padding:7px 8px;">New Windows image in target region</td></tr>
+                <tr><td style="padding:7px 8px;">Bootable volume snapshot</td><td style="padding:7px 8px;">New bootable volume</td></tr>
+                <tr><td style="padding:7px 8px;">Data / DB volume snapshot</td><td style="padding:7px 8px;">New target data volume</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      if (isFlexAnywhere) {
+        card.innerHTML = `
+        <div style="display:grid;grid-template-columns:1.05fr 1.2fr 1fr;gap:22px;align-items:start;">
+          <div style="grid-column:1 / -1;padding:10px 12px;border:1px solid rgba(16,185,129,.45);border-radius:8px;background:rgba(6,78,59,.22);color:#cbd5e1;font-size:0.84rem;line-height:1.55;">
+            <div><strong style="color:#6ee7b7;">Simple summary:</strong> HYPER FLEX lets the Cloud Admin Team move VM images, snapshots, and volumes between FLEX and AWS, Azure, or GCP for DR, testing, recovery, and cross-cloud migration while recording every new target ID.</div>
+            <div style="margin-top:6px;"><strong style="color:#6ee7b7;">By Who:</strong> Rackspace and HYPER FLEX Cloud Admin Team, OpenStack admins, hyperscaler admins, migration engineers, DR operations, infrastructure engineers, platform operations, and managed cloud support. Requires access to the selected hyperscaler account and the FLEX region.</div>
+          </div>
+          <div>
+            <div style="color:#a855f7;font-weight:800;font-size:1.08rem;margin-bottom:10px;">HYPER FLEX Hyperscaler Bridge</div>
+            <p style="margin:0 0 10px;color:#cbd5e1;font-size:0.86rem;line-height:1.6;">Use this cloned mission-control page for AWS, Azure, or GCP to FLEX migrations, and for FLEX export workflows back to a hyperscaler target.</p>
+            <p style="margin:0;color:#cbd5e1;font-size:0.86rem;line-height:1.6;">The page keeps the proven Flex2Flex scanner, table selection, per-job terminal, stop buttons, and batch controls so new provider adapters can plug into the existing workflow without changing the operator experience.</p>
+          </div>
+          <div>
+            <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,.08);border-left:3px solid #f97316;color:#fdba74;font-size:0.78rem;line-height:1.45;">
+              <strong>How it works:</strong> Choose direction, provider, source snapshot rows, target FLEX or hyperscaler region, then run the migration through the shared job terminal flow.
+            </div>
+            <ol style="margin:0;padding-left:18px;color:#cbd5e1;font-size:0.84rem;line-height:1.58;">
+              <li><strong style="color:#e2e8f0;">Discover:</strong> reuse the source snapshot table and provider controls to identify image or volume candidates.</li>
+              <li><strong style="color:#e2e8f0;">Convert:</strong> preserve the existing image/volume pipeline and add provider-specific import/export only where needed.</li>
+              <li><strong style="color:#e2e8f0;">Create:</strong> build target images, boot volumes, data volumes, or VM artifacts in the selected destination cloud.</li>
+              <li><strong style="color:#e2e8f0;">Record:</strong> source ID, converted artifact, target image/volume/server ID, status, and validation result.</li>
+            </ol>
+          </div>
+          <div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem;color:#cbd5e1;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:6px 8px;color:#e2e8f0;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(148,163,184,.25);">Source</th>
+                  <th style="text-align:left;padding:6px 8px;color:#e2e8f0;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(148,163,184,.25);">Target result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="padding:7px 8px;">AWS AMI / EBS snapshot</td><td style="padding:7px 8px;">FLEX image or volume</td></tr>
+                <tr><td style="padding:7px 8px;">Azure managed disk / snapshot</td><td style="padding:7px 8px;">FLEX image or volume</td></tr>
+                <tr><td style="padding:7px 8px;">GCP image / disk snapshot</td><td style="padding:7px 8px;">FLEX image or volume</td></tr>
+                <tr><td style="padding:7px 8px;">FLEX image / volume</td><td style="padding:7px 8px;">Hyperscaler image or disk</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+      }
+      if (subtitle) subtitle.insertAdjacentElement('afterend', card);
+    }
+
+    const ospcHeader = Array.from(document.querySelectorAll('h2.section-title')).find(h => h.textContent.includes('OSPC Cloud Credentials'));
+    if (ospcHeader) {
+      const sourcePanel = ospcHeader.closest('div');
+      if (sourcePanel) {
+        sourcePanel.style.display = 'none';
+        if (sourcePanel.parentElement) sourcePanel.parentElement.style.gridTemplateColumns = '1fr';
+      }
+    }
+    const flexHeader = Array.from(document.querySelectorAll('h3')).find(h => h.textContent.includes('V3 FLEX Cloud Credentials'));
+    if (flexHeader) flexHeader.innerHTML = isFlexAnywhere
+      ? 'FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(used for FLEX-side source or target)</span>'
+      : 'FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(used for source and target regions)</span>';
+    const hyperCredPanel = byId('flexanywhere-hyperscaler-credentials');
+    if (hyperCredPanel) hyperCredPanel.style.display = isFlexAnywhere ? 'block' : 'none';
+    if (isFlexAnywhere && typeof window.updateFlexAnywhereProviderFields === 'function') window.updateFlexAnywhereProviderFields();
+    const scannerTitle = document.querySelector('#imageScannerPanel div[style*="text-transform:uppercase"] span');
+    if (scannerTitle) scannerTitle.textContent = isFlexAnywhere
+      ? '🌈 FLEX Anywhere Source Discovery Tool'
+      : '🖼 Private Source FLEX Snapshot Discovery Tool';
+    const scannerHint = document.querySelector('#image-scan-btn + span');
+    if (scannerHint) scannerHint.innerHTML = isFlexAnywhere
+      ? 'Uses the working FLEX source scanner now · provider controls prepare AWS / Azure / GCP adapters'
+      : 'Scans private source Flex images only · region sets <code style="font-size:10px;">OS_REGION_NAME</code>';
+
+    const regionSelect = byId('credFlexRegion');
+    const regionLabel = regionSelect ? regionSelect.closest('label') : null;
+    const tableHeader = byId('ospcImageContainer') ? byId('ospcImageContainer').querySelector('.table-header') : null;
+    if (regionLabel && tableHeader && !byId('flex2flex-target-region-row')) {
+      const row = document.createElement('div');
+      row.id = 'flex2flex-target-region-row';
+      row.style.cssText = 'display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:10px 0 12px;padding:10px 12px;border:1px solid rgba(96,165,250,.25);border-radius:8px;background:rgba(15,30,62,.45);';
+      const note = document.createElement('div');
+      note.style.cssText = 'color:#94a3b8;font-size:12px;line-height:1.45;max-width:620px;';
+      note.innerHTML = isFlexAnywhere
+        ? '<b style="color:#67e8f9;">FLEX Anywhere Source / Target</b><br>Use the same scanner/table and per-job terminals. Select direction/provider, then choose the FLEX or hyperscaler destination.'
+        : '<b style="color:#67e8f9;">Flex2Flex Region Target</b><br>Source region is the scanner region. Target region below is the Flex Glance upload destination.';
+      const directionWrap = document.createElement('label');
+      directionWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;min-width:220px;flex:0 1 260px;color:#a5b4fc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
+      directionWrap.innerHTML = '<span>Direction</span><select id="flexanywhere_direction_inline" style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #38bdf8;border-radius:8px;color:#e2e8f0;font-size:14px;text-transform:none;font-weight:600;"><option value="hyperscaler_to_flex" selected>AWS / Azure / GCP → FLEX</option><option value="flex_to_hyperscaler">FLEX → AWS / Azure / GCP</option></select>';
+      const providerWrap = document.createElement('label');
+      providerWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;min-width:180px;flex:0 1 220px;color:#a5b4fc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
+      providerWrap.innerHTML = '<span>Hyperscaler</span><select id="flexanywhere_provider_inline" style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #38bdf8;border-radius:8px;color:#e2e8f0;font-size:14px;text-transform:none;font-weight:600;"><option value="aws" selected>AWS</option><option value="azure">Azure</option><option value="gcp">GCP</option></select>';
+      if (isFlexAnywhere) {
+        directionWrap.style.display = 'flex';
+        providerWrap.style.display = 'flex';
+      }
+      const methodWrap = document.createElement('label');
+      methodWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:320px;flex:0 1 420px;color:#a5b4fc;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
+      methodWrap.innerHTML = '<span>Migration Method</span><select id="flex2flex_clone_method" style="width:100%;padding:10px 12px;background:#0f172a;border:1px solid #38bdf8;border-radius:8px;color:#e2e8f0;font-size:14px;text-transform:none;font-weight:600;">' +
+        (isFlexAnywhere
+          ? '<option value="flex_glance_direct_region_copy" selected>Shared image/volume pipeline (provider bridge ready)</option><option value="jumphost_glance_stream">Jumphost stream fallback</option>'
+          : '<option value="flex_glance_direct_region_copy" selected>Direct inter-region Glance copy (auto-jumphost fallback)</option><option value="jumphost_glance_stream">Jumphost temp-file stream fallback</option>') +
+        '</select>';
+      regionLabel.style.margin = '0';
+      regionLabel.style.minWidth = '320px';
+      regionLabel.style.maxWidth = '520px';
+      regionLabel.style.flex = '0 1 420px';
+      row.appendChild(note);
+      row.appendChild(directionWrap);
+      row.appendChild(providerWrap);
+      row.appendChild(methodWrap);
+      row.appendChild(regionLabel);
+      tableHeader.insertAdjacentElement('afterend', row);
+      const dirInline = byId('flexanywhere_direction_inline');
+      const dirMain = byId('flexanywhere_direction');
+      if (dirInline && dirMain) {
+        dirInline.value = dirMain.value;
+        dirInline.addEventListener('change', function () {
+          dirMain.value = this.value;
+          dirMain.dispatchEvent(new Event('change'));
+        });
+      }
+      const providerInline = byId('flexanywhere_provider_inline');
+      const providerMain = byId('flexanywhere_provider');
+      if (providerInline && providerMain) {
+        providerInline.value = providerMain.value;
+        providerInline.addEventListener('change', function () {
+          providerMain.value = this.value;
+          providerMain.dispatchEvent(new Event('change'));
+        });
+      }
+      if (typeof window.updateFlexAnywhereProviderFields === 'function') window.updateFlexAnywhereProviderFields();
+    }
+
+    const scanBtn = byId('image-scan-btn');
+    if (scanBtn && !scanBtn.dataset.flex2flexBound) {
+      const clone = scanBtn.cloneNode(true);
+      clone.dataset.flex2flexBound = '1';
+      clone.removeAttribute('onclick');
+      clone.innerHTML = isFlexAnywhere ? '🔍 Start FLEX / Hyperscaler Source Scan' : '🔍 Start Source FLEX Image Scan';
+      scanBtn.replaceWith(clone);
+      clone.onclick = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        flex2flexScanSourceImages().catch(function (err) {
+          console.error('[FLEX2FLEX scan error]', err);
+          const logEl = byId('image-scan-log');
+          if (logEl) logEl.textContent = '[ERROR] ' + ((err && err.message) || String(err));
+        });
+        return false;
+      };
+      const refreshBtn = byId('refresh-private-snapshots-btn');
+      if (refreshBtn && !refreshBtn.dataset.flex2flexBound) {
+        const refreshClone = refreshBtn.cloneNode(true);
+        refreshClone.dataset.flex2flexBound = '1';
+        refreshClone.removeAttribute('onclick');
+        refreshBtn.replaceWith(refreshClone);
+        refreshClone.onclick = function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          clone.click();
+          return false;
+        };
+      }
+    }
+
+    const regionSel = byId('image_scan_region');
+    if (regionSel && !regionSel.dataset.flex2flexBound) {
+      regionSel.dataset.flex2flexBound = '1';
+      Array.from(regionSel.options).forEach(function (opt) {
+        if (opt.value && opt.value !== 'ALL') opt.textContent = flexRegionForSelect(opt.value) + ' / ' + normalizeFlexRegion(opt.value);
+      });
+    }
+
+    bindFlex2FlexImageButton('start-image-migration-btn', 'live');
+    bindFlex2FlexImageButton('start-snapwin-migration-btn', 'live');
+
+    const dryRunBtn = byId('start-batch-dryrun-btn');
+    if (dryRunBtn && !dryRunBtn.dataset.flex2flexBound) {
+      const dryRunClone = dryRunBtn.cloneNode(true);
+      dryRunClone.dataset.flex2flexBound = '1';
+      dryRunClone.removeAttribute('onclick');
+      dryRunBtn.replaceWith(dryRunClone);
+      dryRunClone.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const mode = byId('mig_mode_value');
+        if (mode) mode.value = 'dryrun';
+        const rows = selectedFlexRows();
+        if (!rows.length) {
+          alert('Select at least one source FLEX image/snapshot row in the table first.');
+          return;
+        }
+        if (typeof appendLog === 'function') appendLog('FLEX2FLEX dry run: selected snapshot rows=' + rows.length, 'system');
+        window.flex2flexImageBatchInner(dryRunClone, false).catch(function (err) {
+          console.error('[FLEX2FLEX dry-run error]', err);
+          alert('Flex2Flex dry run failed: ' + ((err && err.message) || String(err)));
+        });
+      });
+    }
+
+    setText('#start-image-migration-btn span', isFlexAnywhere ? '🌈 FLEX Anywhere Image Migration' : '🌐 Flex2Flex Snapshot Clone');
+    setText('#start-batch-dryrun-btn span', isFlexAnywhere ? '🔍 FLEX Anywhere Image Migration — Dry Run' : '🔍 Flex2Flex Snapshot Clone — Dry Run');
+    setText('#start-snapwin-migration-btn span', isFlexAnywhere ? 'Windows Image Migration' : 'Windows Snapshot Clone');
+    setText('#start-volsnap-mig-btn span', isFlexAnywhere ? '📦 FLEX Anywhere Volume Migration' : '📦 Flex Volume Snapshot Clone');
+    setText('.cold-mig-toggle-hint', isFlexAnywhere ? '▼ FLEX Anywhere' : '▼ Flex2Flex');
+    document.querySelectorAll('p, li, span, div').forEach(function (el) {
+      if (el.childElementCount) return;
+      el.textContent = el.textContent
+        .replaceAll('OSPC Snapshot Discovery & Cold Migration', 'Source FLEX Snapshot Discovery & Region Clone')
+        .replaceAll('OSPC Glance', 'Source FLEX Glance')
+        .replaceAll('OSPC region', 'source FLEX region')
+        .replaceAll('OSPC credentials', 'source FLEX credentials')
+        .replaceAll('OSPC', 'Source FLEX');
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyFlex2FlexUi);
+  } else {
+    applyFlex2FlexUi();
+  }
+})();
+</script>
+
+<script>
+(function () {
+  const LS_ALL_FIELDS = 'osflex_all_field_cache_v1';
+  const SKIP_TYPES = new Set(['file', 'button', 'submit', 'reset', 'image']);
+
+  function loadFieldCache() {
+    try { return JSON.parse(localStorage.getItem(LS_ALL_FIELDS) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+
+  function saveFieldCache(cache) {
+    try { localStorage.setItem(LS_ALL_FIELDS, JSON.stringify(cache || {})); }
+    catch (_) {}
+  }
+
+  function fieldCacheKey(el) {
+    if (!el || !el.tagName) return '';
+    const tag = String(el.tagName || '').toLowerCase();
+    if (!['input', 'select', 'textarea'].includes(tag)) return '';
+    const type = String(el.type || '').toLowerCase();
+    if (SKIP_TYPES.has(type)) return '';
+    if (type === 'hidden') return '';
+    if (el.classList && el.classList.contains('ospc-image-cb')) return '';
+    if (el.dataset && el.dataset.noCache === '1') return '';
+
+    if (el.id) return 'id:' + el.id;
+    if (el.name) {
+      return type === 'radio'
+        ? 'name:' + el.name + ':radio:' + String(el.value || '')
+        : 'name:' + el.name;
+    }
+
+    const ds = el.dataset || {};
+    const cls = String(el.className || '').replace(/\s+/g, '.').slice(0, 120);
+    if (ds.tableCacheKey) return 'table:' + ds.tableCacheKey;
+    if (ds.snapId) return 'snap:' + ds.snapId + ':' + tag + ':' + cls;
+    if (ds.sourceName) return 'source:' + ds.sourceName + ':' + tag + ':' + cls;
+    if (ds.sourceId) return 'sourceId:' + ds.sourceId + ':' + tag + ':' + cls;
+    if (ds.sourceVolumeId) return 'sourceVol:' + ds.sourceVolumeId + ':' + tag + ':' + cls;
+    if (ds.idx && el.closest && el.closest('table')) return '';
+    return '';
+  }
+
+  function readField(el) {
+    const type = String(el.type || '').toLowerCase();
+    if (type === 'checkbox' || type === 'radio') return el.checked ? '1' : '0';
+    if (el.tagName === 'SELECT' && el.multiple) {
+      return Array.from(el.selectedOptions || []).map(opt => opt.value);
+    }
+    return String(el.value || '');
+  }
+
+  function writeField(el, value) {
+    const type = String(el.type || '').toLowerCase();
+    if (type === 'checkbox' || type === 'radio') {
+      el.checked = value === '1' || value === true;
+      return;
+    }
+    if (el.tagName === 'SELECT' && el.multiple && Array.isArray(value)) {
+      Array.from(el.options || []).forEach(opt => { opt.selected = value.includes(opt.value); });
+      return;
+    }
+    el.value = String(value ?? '');
+  }
+
+  function persistField(el) {
+    const key = fieldCacheKey(el);
+    if (!key) return;
+    const cache = loadFieldCache();
+    cache[key] = { value: readField(el), ts: Date.now() };
+    saveFieldCache(cache);
+  }
+
+  function restoreFields(root) {
+    const cache = loadFieldCache();
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('input,select,textarea').forEach(el => {
+      const key = fieldCacheKey(el);
+      if (!key || !(key in cache)) return;
+      const entry = cache[key];
+      const value = entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
+      writeField(el, value);
+    });
+  }
+
+  function installFieldCache() {
+    restoreFields(document);
+    document.body.addEventListener('input', event => persistField(event.target), true);
+    document.body.addEventListener('change', event => persistField(event.target), true);
+    let pending = false;
+    const observer = new MutationObserver(() => {
+      if (pending) return;
+      pending = true;
+      setTimeout(() => {
+        pending = false;
+        restoreFields(document);
+      }, 80);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.osflexRestoreCachedFields = restoreFields;
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installFieldCache);
+  } else {
+    installFieldCache();
+  }
+})();
+</script>
 
 </body>
 </html>

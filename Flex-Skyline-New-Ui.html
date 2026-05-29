@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rackspace Cloud | FLEX Region DR Creation</title>
+  <style>
+    :root {
+      --topbar: #1f232b;
+      --sidebar: #ffffff;
+      --page: #f4f6f8;
+      --panel: #ffffff;
+      --line: #e6e9ee;
+      --line-strong: #d6dbe3;
+      --text: #111827;
+      --muted: #687385;
+      --red: #b13a3d;
+      --red-dark: #9f3033;
+      --green: #2b9b63;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--page);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+    }
+    button, input, select { font: inherit; }
+    .topbar {
+      position: fixed;
+      z-index: 30;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      background: var(--topbar);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .hamburger {
+      width: 43px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      background: #222936;
+      border-right: 1px solid rgba(255,255,255,.06);
+      font-size: 24px;
+      line-height: 1;
+    }
+    .brand {
+      width: 140px;
+      text-align: center;
+      font-weight: 700;
+      font-style: italic;
+      letter-spacing: -.5px;
+    }
+    .brand small {
+      display: block;
+      margin-top: -5px;
+      font-size: 7px;
+      font-style: normal;
+      letter-spacing: .2px;
+      opacity: .9;
+    }
+    .project {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: 100%;
+      padding: 0 18px;
+      border-left: 1px solid rgba(255,255,255,.08);
+      color: #f7f7f8;
+      white-space: nowrap;
+    }
+    .grid-icon { color: #cfd4dc; font-size: 15px; }
+    .domain {
+      margin-left: 8px;
+      padding-left: 22px;
+      border-left: 1px solid rgba(255,255,255,.25);
+      font-weight: 600;
+    }
+    .profile {
+      margin-left: auto;
+      margin-right: 16px;
+      width: 31px;
+      height: 31px;
+      border-radius: 50%;
+      background: #fff;
+      color: #20242c;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .sidebar {
+      position: fixed;
+      z-index: 20;
+      top: 42px;
+      bottom: 0;
+      left: 0;
+      width: 212px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--line);
+      overflow-y: auto;
+    }
+    .nav-item {
+      height: 47px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 18px;
+      color: #1f2937;
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      white-space: nowrap;
+    }
+    .nav-item.section {
+      font-weight: 500;
+      justify-content: space-between;
+    }
+    .nav-item.active {
+      background: #f2f4f7;
+      border-left-color: var(--red);
+      color: #111827;
+    }
+    .nav-child {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-left: 40px;
+      color: #344054;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .nav-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #c9ced6;
+    }
+    .nav-child.active .nav-dot { background: var(--red); }
+    .main {
+      position: fixed;
+      top: 42px;
+      left: 212px;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--page);
+    }
+    .breadcrumb {
+      display: none;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      color: #7a8494;
+    }
+    .breadcrumb strong { color: #111827; font-weight: 500; }
+    .toolbar {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 28px;
+      background: #eef1f5;
+      border-bottom: 1px solid var(--line);
+    }
+    .btn {
+      border: 0;
+      border-radius: 4px;
+      height: 33px;
+      padding: 0 16px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-red {
+      background: var(--red);
+      color: #fff;
+    }
+    .btn-red:hover { background: var(--red-dark); }
+    .btn-disabled {
+      background: #fff;
+      color: #b9c0ca;
+      border: 1px solid var(--line);
+      cursor: default;
+    }
+    .btn-dr {
+      background: #fff;
+      color: #111827;
+      margin-left: 0;
+      box-shadow: 0 10px 22px rgba(37,99,235,.16);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      height: auto;
+      min-height: 0;
+      padding: 0;
+      line-height: 1.1;
+      border: 1px solid #dbeafe;
+      overflow: hidden;
+    }
+    .btn-dr:hover {
+      background: #fff;
+      border-color: #2563eb;
+      box-shadow: 0 12px 26px rgba(37,99,235,.24);
+      transform: translateY(-1px);
+    }
+    .nav-dr {
+      width: calc(100% - 28px);
+      margin: 6px 14px 14px;
+      justify-content: center;
+      border-radius: 7px;
+    }
+    .nav-dr-secondary {
+      margin-top: -6px;
+    }
+    .dr-logo {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 116px;
+    }
+    .dr-logo-text {
+      font-family: Arial, Helvetica, sans-serif;
+      fill: #0f172a;
+      font-weight: 800;
+    }
+    .toolbar-cleanup { display: none !important; }
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(43,155,99,.12);
+    }
+    .spacer { flex: 1; }
+    .search {
+      width: min(350px, 28vw);
+      height: 33px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 10px;
+      background: #fff;
+      color: #b3bbc7;
+      border: 1px solid var(--line);
+    }
+    .icon-btn {
+      width: 34px;
+      height: 33px;
+      border: 0;
+      border-radius: 4px;
+      background: #fff;
+      color: #222832;
+      cursor: pointer;
+    }
+    .content {
+      flex: 1;
+      min-height: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .workflow-frame-wrap {
+      height: 100%;
+      background: #eef1f5;
+      border-top: 1px solid var(--line);
+      overflow: hidden;
+    }
+    .workflow-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #f4f6f8;
+    }
+    .table-card {
+      height: 100%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      min-width: 1280px;
+      border-collapse: collapse;
+      background: #fff;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 14px 16px;
+      vertical-align: middle;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f8f9fb;
+      color: #111827;
+      font-weight: 600;
+      height: 50px;
+    }
+    td { height: 104px; }
+    .check { width: 44px; }
+    input[type="checkbox"] {
+      width: 13px;
+      height: 13px;
+      accent-color: var(--red);
+    }
+    .id {
+      color: var(--red);
+      font-size: 12px;
+      margin-bottom: 5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .name {
+      color: #000;
+      font-weight: 700;
+      line-height: 1.45;
+      max-width: 230px;
+      word-break: break-word;
+    }
+    .image-icon { color: #e23d42; font-size: 18px; }
+    .status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 8px;
+    }
+    .actions {
+      color: var(--red);
+      white-space: nowrap;
+    }
+    .pager {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 14px;
+      padding: 0 20px;
+      background: #fff;
+      border-top: 1px solid var(--line);
+      color: #9aa3b1;
+      font-size: 13px;
+    }
+    .overlay {
+      position: fixed;
+      z-index: 80;
+      inset: 0;
+      display: none;
+      background: rgba(20, 24, 32, .58);
+    }
+    .overlay.open { display: block; }
+    .drawer {
+      position: absolute;
+      top: 28px;
+      right: 28px;
+      bottom: 28px;
+      left: 28px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 24px 70px rgba(0,0,0,.32);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .drawer-head {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .drawer-title {
+      font-weight: 700;
+      color: #111827;
+    }
+    .drawer-sub {
+      color: #7a8494;
+      font-size: 12px;
+    }
+    .drawer-close {
+      margin-left: auto;
+      width: 32px;
+      height: 32px;
+      border: 0;
+      border-radius: 4px;
+      background: #f1f3f6;
+      color: #1f2937;
+      cursor: pointer;
+      font-size: 20px;
+    }
+    iframe { border: 0; }
+    @media (max-width: 900px) {
+      .sidebar { width: 58px; }
+      .nav-item span:not(.chev), .nav-child { display: none; }
+      .main { left: 58px; }
+      .brand { width: 104px; }
+      .project { display: none; }
+      .toolbar { flex-wrap: wrap; }
+      .search { width: 100%; order: 2; }
+      .drawer { inset: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="hamburger">☰</div>
+    <div class="brand">rackspace<small>technology</small></div>
+    <div class="project"><span class="grid-icon">▦</span><span>a5dce7f3-1a91-4219-9277-49ecf9e45a78</span><span>↔</span><span class="domain">rackspace_cloud_domain</span></div>
+    <div class="profile">⌾</div>
+  </header>
+
+  <aside class="sidebar">
+    <a class="nav-item" href="#"><span>⌂</span><span>Home</span></a>
+    <a class="nav-item section active" href="#"><span>▱ Compute</span><span class="chev">⌃</span></a>
+    <a class="nav-child" href="#"><span class="nav-dot"></span><span>Instances</span></a>
+    <a class="nav-child active" href="#"><span class="nav-dot"></span><span>Instance Snapshots</span></a>
+    <a class="nav-child" href="#"><span class="nav-dot"></span><span>Flavors</span></a>
+    <a class="nav-child" href="#"><span class="nav-dot"></span><span>Server Groups</span></a>
+    <a class="nav-child" href="#"><span class="nav-dot"></span><span>Images</span></a>
+    <a class="nav-child" href="#"><span class="nav-dot"></span><span>Key Pairs</span></a>
+    <a class="nav-item section" href="#"><span>▤ Storage</span><span class="chev">⌄</span></a>
+    <a class="nav-item section" href="#"><span>◉ Network</span><span class="chev">⌄</span></a>
+    <a class="nav-item section" href="#"><span>▣ Orchestration</span><span class="chev">⌄</span></a>
+    <a class="nav-item section" href="#"><span>▧ Container</span><span class="chev">⌄</span></a>
+    <a class="nav-item section" href="#" onclick="toggleDrButtons(event)"><span>🌈 FLEX Migrations</span><span class="chev" id="flex-tools-chev">⌄</span></a>
+    <div id="dr-buttons-container" style="display: none; padding-top: 6px;">
+    <button id="ospc2flex-dr-btn" class="btn btn-dr nav-dr nav-dr-primary" type="button" title="Open OSPC2FLEX migration workflow" aria-label="Open OSPC2FLEX migration workflow">
+      <svg class="dr-logo" viewBox="0 0 190 156" role="img" aria-hidden="true" focusable="false">
+        <rect width="190" height="156" rx="7" fill="#ffffff"/>
+        <path d="M35 58 C61 22 129 22 155 58" fill="none" stroke="#ef4444" stroke-width="5" stroke-linecap="round"/>
+        <path d="M42 58 C65 32 125 32 148 58" fill="none" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+        <path d="M49 58 C70 41 120 41 141 58" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+        <path d="M56 58 C75 49 115 49 134 58" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>
+        <path d="M95 13 L111 21 V37 C111 48 104 57 95 61 C86 57 79 48 79 37 V21 Z" fill="#22c55e" stroke="#dcfce7" stroke-width="3"/>
+        <path d="M87 36 L93 42 L104 29" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text class="dr-logo-text" x="52" y="84" font-size="24" text-anchor="middle" fill="#2563eb" stroke="#ffffff" stroke-width="4" paint-order="stroke fill">OSPC</text>
+        <path d="M82 78 H112" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+        <path d="M109 69 L122 78 L109 87" fill="none" stroke="#7c3aed" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text class="dr-logo-text" x="142" y="84" font-size="24" text-anchor="middle" fill="#6d28d9" stroke="#ffffff" stroke-width="4" paint-order="stroke fill">FLEX</text>
+        <g transform="translate(15, 126)">
+          <rect width="160" height="24" rx="12" fill="#0ea5e9" filter="drop-shadow(0px 4px 6px rgba(14,165,233,0.4))"/>
+          <rect width="160" height="24" rx="12" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+          <text x="80" y="16.5" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#ffffff" font-weight="800" letter-spacing="0.5">FOR FLEX ANYWHERE MEMBERS</text>
+        </g>
+      </svg>
+    </button>
+    <button id="flex-region-dr-btn" class="btn btn-dr nav-dr" type="button" title="Open FLEX2FLEX region cloning workflow" aria-label="Open FLEX2FLEX region cloning workflow">
+      <svg class="dr-logo" viewBox="0 0 190 156" role="img" aria-hidden="true" focusable="false">
+        <rect width="190" height="156" rx="7" fill="#ffffff"/>
+        <path d="M40 74 C65 32 125 32 150 74" fill="none" stroke="#ef4444" stroke-width="5" stroke-linecap="round"/>
+        <path d="M46 72 C68 40 122 40 144 72" fill="none" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+        <path d="M52 70 C71 48 119 48 138 70" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round"/>
+        <path d="M58 68 C75 55 115 55 132 68" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>
+        <path d="M95 13 L111 21 V37 C111 48 104 57 95 61 C86 57 79 48 79 37 V21 Z" fill="#2563eb" stroke="#dbeafe" stroke-width="3"/>
+        <path d="M87 36 L93 42 L104 29" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text class="dr-logo-text" x="95" y="93" font-size="19" text-anchor="middle" stroke="#ffffff" stroke-width="4" paint-order="stroke fill">Flex2Flex</text>
+        <text class="dr-logo-text" x="95" y="112" font-size="16" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke fill">Region Cloning</text>
+        <g transform="translate(15, 126)">
+          <rect width="160" height="24" rx="12" fill="#0ea5e9" filter="drop-shadow(0px 4px 6px rgba(14,165,233,0.4))"/>
+          <rect width="160" height="24" rx="12" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+          <text x="80" y="16.5" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#ffffff" font-weight="800" letter-spacing="0.5">FOR FLEX ANYWHERE MEMBERS</text>
+        </g>
+      </svg>
+    </button>
+    <button id="flexanywhere-cross-cloud-btn" class="btn btn-dr nav-dr nav-dr-secondary" type="button" title="Open Flex Anywhere cross-cloud solutions workflow" aria-label="Open Flex Anywhere cross-cloud solutions workflow">
+      <svg class="dr-logo" viewBox="0 0 190 156" role="img" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="flexanywhereShield" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stop-color="#ef4444"/>
+            <stop offset="1" stop-color="#dc2626"/>
+          </linearGradient>
+        </defs>
+        <rect width="190" height="156" rx="7" fill="#ffffff"/>
+        <path d="M32 71 C58 18 132 18 158 71" fill="none" stroke="#ef4444" stroke-width="11" stroke-linecap="round"/>
+        <path d="M42 71 C64 32 126 32 148 71" fill="none" stroke="#fbbf24" stroke-width="11" stroke-linecap="round"/>
+        <path d="M52 72 C69 48 121 48 138 72" fill="none" stroke="#9f1239" stroke-width="11" stroke-linecap="round"/>
+        <path d="M95 10 L113 20 V37 C113 49 105 59 95 64 C85 59 77 49 77 37 V20 Z" fill="url(#flexanywhereShield)" stroke="#ffffff" stroke-width="3"/>
+        <path d="M86 36 L93 44 L105 29" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <text class="dr-logo-text" x="95" y="94" font-size="24" text-anchor="middle" stroke="#ffffff" stroke-width="5" paint-order="stroke fill">HYPERFLEX</text>
+        <text class="dr-logo-text" x="95" y="113" font-size="14.5" text-anchor="middle" stroke="#ffffff" stroke-width="3" paint-order="stroke fill">Cross Cloud migration</text>
+        <g transform="translate(15, 126)">
+          <rect width="160" height="24" rx="12" fill="#0ea5e9" filter="drop-shadow(0px 4px 6px rgba(14,165,233,0.4))"/>
+          <rect width="160" height="24" rx="12" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+          <text x="80" y="16.5" font-family="Arial, sans-serif" font-size="10.5" text-anchor="middle" fill="#ffffff" font-weight="800" letter-spacing="0.5">FOR FLEX ANYWHERE MEMBERS</text>
+        </g>
+      </svg>
+    </button>
+    </div>
+    <a class="nav-item" href="#"><span>□</span><span>Documentation</span></a>
+    <a class="nav-item" href="#"><span>▷</span><span>Getting Started</span></a>
+  </aside>
+
+  <main class="main">
+    <div class="breadcrumb"><span>Compute</span><span>/</span><strong>Instance Snapshots</strong></div>
+    <div class="toolbar">
+      <div class="spacer"></div>
+    </div>
+    <section class="content">
+      <div class="workflow-frame-wrap">
+        <iframe id="dr-frame" class="workflow-frame" title="FLEX2FLEX Snapshot Migration" src="./The Rackspace Cloud_files/saved_resource.html"></iframe>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const flex2flexWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?mode=flex2flex&skin=flexlight';
+      const hyperFlexWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?mode=flexanywhere&skin=flexlight';
+      const ospcWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?skin=flexlight';
+      const frame = document.getElementById('dr-frame');
+      const ospcBtn = document.getElementById('ospc2flex-dr-btn');
+      const openBtn = document.getElementById('flex-region-dr-btn');
+      const crossCloudBtn = document.getElementById('flexanywhere-cross-cloud-btn');
+
+      function loadDr() {
+        if (frame) frame.src = flex2flexWorkflowUrl;
+      }
+
+      function refreshFlex2FlexDr() {
+        if (frame) frame.src = flex2flexWorkflowUrl + '&_=' + Date.now();
+      }
+
+      function refreshHyperFlexDr() {
+        if (frame) frame.src = hyperFlexWorkflowUrl + '&_=' + Date.now();
+      }
+
+      function refreshOspcDr() {
+        if (frame) frame.src = ospcWorkflowUrl + (ospcWorkflowUrl.includes('?') ? '&' : '?') + '_=' + Date.now();
+      }
+
+      loadDr();
+      if (ospcBtn) ospcBtn.addEventListener('click', refreshOspcDr);
+      if (openBtn) openBtn.addEventListener('click', refreshFlex2FlexDr);
+      if (crossCloudBtn) crossCloudBtn.addEventListener('click', refreshHyperFlexDr);
+    })();
+    function toggleDrButtons(e) {
+      e.preventDefault();
+      const container = document.getElementById('dr-buttons-container');
+      const chev = document.getElementById('flex-tools-chev');
+      if (container.style.display === 'none') {
+        container.style.display = 'block';
+        chev.textContent = '⌃';
+      } else {
+        container.style.display = 'none';
+        chev.textContent = '⌄';
+      }
+    }
+  </script>
+</body>
+</html>

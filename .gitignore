@@ -60,6 +60,10 @@ ospc2flexlast.json
 cred-cache.js
 
 # Runtime outputs
+.dashboard.pid
+.tmp_runs/
+.tmp_dashboard_*.log
+flex_mockup_5005.log
 inventory-csv/
 ospc-discovery/outputs/
 outputs/
@@ -93,3 +97,18 @@ ospc2Flex-Image-migtool/web_ui_python/venv/
 # Local agent/editor state
 .claude/
 **/.claude/
+.codex/
+
+# Local throwaway repair/probe scripts
+;
+_rb_run_*.sh
+_restart.sh
+_test*.sh
+boot_fixed_centos5_final.sh
+codex_remote_extract.sh
+fix_grub_install_once.sh
+inspect_centos7_pattern.sh
+install_grub2_for_centos5_boot.sh
+quick_c5_repair_and_boot.sh
+recreate_like_centos7.sh
+run_centos5_module_repair_boot.sh

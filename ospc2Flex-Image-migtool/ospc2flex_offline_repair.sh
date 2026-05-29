@@ -764,6 +764,97 @@ IF_EOF
 #   4. /boot is ON ROOT (not separate) — BLS + grubenv inside root partition
 #   5. v9+: also write NM keyfile (RHEL 9 migrating from ifcfg→keyfile format)
 # ─────────────────────────────────────────────────────────────────────────────
+  centos_python_experimental_disabled)
+    echo "── [CENTOS $OS_MAJOR] OS-aware Flex KVM repair ─────────────────────────"
+    if [ $DRY_RUN -eq 0 ]; then
+      _centos_repair_py="/tmp/ospc2flex_centos_repair.py"
+      if [ ! -f "$_centos_repair_py" ]; then
+        _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        [ -f "$_script_dir/ospc2flex_centos_repair.py" ] && _centos_repair_py="$_script_dir/ospc2flex_centos_repair.py"
+      fi
+      if [ -f "$_centos_repair_py" ]; then
+        sudo mount --bind /proc "$MNT/proc" 2>/dev/null || true
+        sudo mount --bind /sys  "$MNT/sys"  2>/dev/null || true
+        sudo mount --bind /dev  "$MNT/dev"  2>/dev/null || true
+        sudo mkdir -p "$MNT/run"
+        sudo mount --bind /run  "$MNT/run"  2>/dev/null || true
+        sudo python3 "$_centos_repair_py" repair-centos --root-mount "$MNT" 2>&1 \
+          | tee /tmp/ospc2flex_centos_repair_$$.log
+        _centos_rc=${PIPESTATUS[0]}
+        sudo umount "$MNT/run"  2>/dev/null || true
+        sudo umount "$MNT/dev"  2>/dev/null || true
+        sudo umount "$MNT/sys"  2>/dev/null || true
+        sudo umount "$MNT/proc" 2>/dev/null || true
+        if [ "$_centos_rc" -eq 0 ]; then
+          PASS "CentOS $OS_MAJOR OS-aware repair completed"
+        else
+          WARN "CentOS $OS_MAJOR OS-aware repair returned rc=$_centos_rc"
+        fi
+        if [ "${OS_MAJOR:-0}" -eq 5 ] && [ $DRY_RUN -eq 0 ]; then
+          if ! find "$MNT/lib/modules" -type f -name 'virtio*.ko*' 2>/dev/null | grep -q .; then
+            WARN "CentOS 5 guest has no virtio modules; using IDE disk + e1000 NIC compatibility path"
+            sudo sed -i \
+              -e 's/root=\/dev\/vda/root=\/dev\/sda/g' \
+              -e 's/root=\/dev\/xvda/root=\/dev\/sda/g' \
+              "$MNT/boot/grub/grub.conf" "$MNT/etc/grub.conf" 2>/dev/null || true
+            if [ -f "$MNT/etc/modprobe.conf" ] && ! sudo grep -q '^alias eth0 e1000' "$MNT/etc/modprobe.conf"; then
+              echo 'alias eth0 e1000' | sudo tee -a "$MNT/etc/modprobe.conf" >/dev/null
+            fi
+          fi
+          if command -v grub-install >/dev/null 2>&1; then
+            _c5_k="$(basename "$(find "$MNT/boot" -maxdepth 1 -name 'vmlinuz-*' | sort | tail -1)")"
+            _c5_i="$(basename "$(find "$MNT/boot" -maxdepth 1 \( -name 'initrd*.img*' -o -name 'initramfs*.img*' \) | sort | tail -1)")"
+            if [ -n "$_c5_k" ] && [ -n "$_c5_i" ]; then
+              sudo mkdir -p "$MNT/boot/grub"
+              _c5_root_uuid="$(sudo blkid -s UUID -o value "$ROOT_PART" 2>/dev/null || true)"
+              if [ -n "$_c5_root_uuid" ]; then
+                _c5_root_arg="UUID=$_c5_root_uuid"
+              else
+                _c5_root_arg="/dev/sda1"
+              fi
+              sudo tee "$MNT/boot/grub/grub.conf" >/dev/null <<C5_GRUB_LEGACY_EOF
+default=0
+timeout=5
+serial --unit=0 --speed=115200
+terminal --timeout=5 console serial
+title CentOS 5 Flex compatibility
+    root (hd0,0)
+    kernel /$_c5_k ro root=$_c5_root_arg console=tty0 console=ttyS0,115200n8 no_timer_check selinux=0
+    initrd /$_c5_i
+C5_GRUB_LEGACY_EOF
+              sudo cp "$MNT/boot/grub/grub.conf" "$MNT/boot/grub/menu.lst"
+              sudo ln -sf ../boot/grub/grub.conf "$MNT/etc/grub.conf" 2>/dev/null || true
+              printf '(hd0)\t/dev/sda\n' | sudo tee "$MNT/boot/grub/device.map" >/dev/null
+              PASS "Wrote CentOS 5 legacy GRUB config with root=$_c5_root_arg"
+              sudo tee "$MNT/boot/grub/grub.cfg" >/dev/null <<C5_GRUB2_EOF
+set timeout=5
+set default=0
+menuentry 'CentOS 5 Flex compatibility' {
+    set root=(hd0,1)
+    linux /$_c5_k ro root=$_c5_root_arg console=tty0 console=ttyS0,115200n8 no_timer_check selinux=0
+    initrd /$_c5_i
+}
+C5_GRUB2_EOF
+              sudo grub-install --target=i386-pc --boot-directory="$MNT/boot" \
+                --modules='part_msdos ext2 biosdisk search search_fs_uuid normal linux' \
+                "$NBD_DEV" >/tmp/ospc2flex_centos5_grub_$$.log 2>&1 \
+                && PASS "Installed BIOS GRUB boot code for CentOS 5 on $NBD_DEV" \
+                || { WARN "CentOS 5 grub-install failed"; tail -20 /tmp/ospc2flex_centos5_grub_$$.log | sed 's/^/  /'; }
+            else
+              WARN "CentOS 5 kernel/initrd not found; skipped GRUB boot-code fallback"
+            fi
+          else
+            WARN "host grub-install not available; skipped CentOS 5 MBR boot-code fallback"
+          fi
+        fi
+      else
+        WARN "ospc2flex_centos_repair.py not found; falling back to built-in RHEL-family repair"
+      fi
+    else
+      INFO "[DRY-RUN] Would run ospc2flex_centos_repair.py repair-centos --root-mount $MNT"
+    fi
+    ;;
+
   almalinux|rocky|centos|rhel)
     echo "── [RHEL-FAMILY: $OS_ID $OS_MAJOR] Network config ──────────────────────"
     if [ $DRY_RUN -eq 0 ]; then
@@ -1210,33 +1301,50 @@ IFCFG7_EOF
           [ -f "$_real_gc" ] || continue
           [ "$_patched_grubconf" -eq 1 ] && { INFO "$(basename $_gc) is a symlink already patched — skipping"; continue; }
 
-          # xvda → vda in the kernel root= arg (the critical one — wrong device = grub shell)
-          sudo sed -i 's|root=/dev/xvda|root=/dev/vda|g' "$_real_gc"
+          if [ "${OS_MAJOR:-0}" -le 5 ] && [ "$OS_ID" = "centos" -o "$OS_ID" = "rhel" ]; then
+            # CentOS/RHEL 5 guests often lack virtio modules. The upload path uses
+            # IDE/e1000 compatibility, so keep boot device semantics on /dev/sda
+            # and prefer UUID to avoid device-name drift.
+            _legacy_root_uuid="$(sudo blkid -s UUID -o value "$ROOT_PART" 2>/dev/null || true)"
+            if [ -n "$_legacy_root_uuid" ]; then
+              sudo sed -E -i "s#root=/dev/(xv|v|s)d[a-z][0-9]*#root=UUID=$_legacy_root_uuid#g" "$_real_gc"
+            else
+              sudo sed -E -i 's#root=/dev/(xv|v)d([a-z][0-9]*)#root=/dev/sd\2#g' "$_real_gc"
+            fi
+          else
+            # xvda → vda in the kernel root= arg (the critical one — wrong device = grub shell)
+            sudo sed -i 's|root=/dev/xvda|root=/dev/vda|g' "$_real_gc"
+          fi
           # Remove rhgb quiet (hides console output on FLEX serial console)
           sudo sed -i 's/ rhgb//g; s/ quiet//g' "$_real_gc"
           # Strip any existing copies of FLEX params (idempotent — prevents 4x duplication on re-run)
           sudo sed -i '/^\s*kernel .*vmlinuz/{ s/biosdevname=[01]//g; s/no_timer_check//g; s/console=ttyS0[^ ]*//g; s/console=tty0//g; s/  */ /g; s/ $//; }' "$_real_gc"
           # Append FLEX params once cleanly
           sudo sed -i '/^\s*kernel .*vmlinuz/s/$/ biosdevname=0 console=ttyS0,115200 console=tty0 no_timer_check/' "$_real_gc"
-          PASS "Patched GRUB Legacy grub.conf: root=vda + biosdevname=0 + console=ttyS0 + no_timer_check"
+          PASS "Patched GRUB Legacy grub.conf: root device + biosdevname=0 + console=ttyS0 + no_timer_check"
           INFO "$(basename $_gc) kernel line: $(sudo grep '^\s*kernel ' "$_real_gc" | head -1)"
           _patched_grubconf=1
         done
         [ "$_patched_grubconf" -eq 0 ] && WARN "No grub.conf found — GRUB Legacy config not patched"
 
         # Patch device.map: GRUB Legacy maps (hd0) → /dev/xvda (Xen).
-        # On KVM FLEX the disk is /dev/vda — device.map must reflect this or GRUB
+        # On KVM FLEX the disk is /dev/vda, except CentOS/RHEL 5 IDE compatibility
+        # boots use /dev/sda. device.map must reflect this or GRUB
         # will fail to find stage2 and drop to a rescue prompt.
+        _grub_disk="/dev/vda"
+        if [ "${OS_MAJOR:-0}" -le 5 ] && [ "$OS_ID" = "centos" -o "$OS_ID" = "rhel" ]; then
+          _grub_disk="/dev/sda"
+        fi
         _dmap="$MNT/boot/grub/device.map"
         if [ -f "$_dmap" ]; then
-          sudo sed -i 's|/dev/xvda|/dev/vda|g' "$_dmap"
-          PASS "Patched /boot/grub/device.map: /dev/xvda → /dev/vda"
+          sudo sed -E -i "s#/dev/(xv|v|s)da#$_grub_disk#g" "$_dmap"
+          PASS "Patched /boot/grub/device.map: (hd0) → $_grub_disk"
           INFO "device.map: $(sudo cat "$_dmap")"
         else
           # device.map missing — create it so GRUB can find (hd0)
           sudo mkdir -p "$MNT/boot/grub"
-          printf '(hd0)\t/dev/vda\n' | sudo tee "$MNT/boot/grub/device.map" >/dev/null
-          PASS "Created /boot/grub/device.map: (hd0) → /dev/vda"
+          printf '(hd0)\t%s\n' "$_grub_disk" | sudo tee "$MNT/boot/grub/device.map" >/dev/null
+          PASS "Created /boot/grub/device.map: (hd0) → $_grub_disk"
         fi
 
         # ── GRUB stage files check ──────────────────────────────────────────
@@ -1249,6 +1357,13 @@ IFCFG7_EOF
             WARN "GRUB $_stg MISSING from /boot/grub/ — GRUB may drop to rescue shell; run grub-install manually after boot"
           fi
         done
+        if [ "${OS_MAJOR:-0}" -le 5 ] && [ "$OS_ID" = "centos" -o "$OS_ID" = "rhel" ] && command -v grub-install >/dev/null 2>&1; then
+          sudo grub-install --target=i386-pc --boot-directory="$MNT/boot" \
+            --modules='part_msdos ext2 biosdisk search search_fs_uuid normal linux' \
+            "$NBD_DEV" >/tmp/ospc2flex_legacy_grub_$$.log 2>&1 \
+            && PASS "Installed BIOS GRUB boot code for CentOS/RHEL 5 on $NBD_DEV" \
+            || { WARN "CentOS/RHEL 5 grub-install failed"; tail -20 /tmp/ospc2flex_legacy_grub_$$.log | sed 's/^/  /'; }
+        fi
 
         # ── grub.conf initrd line vs actual initramfs file ──────────────────
         # If dracut rebuilt initramfs-<new-kver>.img but grub.conf still has an

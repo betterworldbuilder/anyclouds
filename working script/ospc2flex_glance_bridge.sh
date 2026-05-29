@@ -519,7 +519,7 @@ PY
           log "[INFO] Stale CF object not downloadable — deleting: $container/$object_name"
           openstack object delete "$container" "$object_name" >/dev/null 2>&1 || true
         fi
-        if printf '%s' "$task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported'; then
+        if printf '%s' "$task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|exported by the image owner|only be exported by the image owner'; then
           CF_EXPORT_BLOCKED_REASON=$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("message","Cloud Files export blocked by image policy"))' 2>/dev/null || true)
           [ -n "$CF_EXPORT_BLOCKED_REASON" ] || CF_EXPORT_BLOCKED_REASON="Cloud Files export blocked by image policy"
           warn "Cloud Files export is blocked by Rackspace image policy: $CF_EXPORT_BLOCKED_REASON"

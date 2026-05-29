@@ -949,7 +949,7 @@ PY
       failure|error)
         task_msg="$(printf '%s' "$task_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("result") or "")' 2>/dev/null || true)"
         log "[ZS3_DOWNLOAD_SNAPSHOT] WARN Cloud Files export task failed: ${task_msg:-<no message>}"
-        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|com\.rackspace__1__options'; then
+        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|exported by the image owner|only be exported by the image owner|com\.rackspace__1__options'; then
           DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_EXPORT_BLOCKED_LICENSED_CINDER_ONLY"
           DOWNLOAD_NEXT_ACTION="This OSPC image is licensed/cinder-only (com.rackspace__1__options=4). Use the Cinder volume migration path or provide an operator-exported local artifact; Glance/Cloud Files export is blocked by Rackspace policy."
           if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ]; then

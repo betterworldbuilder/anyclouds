@@ -471,7 +471,7 @@
   <button class="stage-btn stage-promo-btn active" data-stage="s_why">Stage 0 — Strategy &amp; Business Case<br><small>Justification, scope &amp; business drivers</small></button>
   <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Customer Migration Tracker<br><small>Customer &amp; project selector</small></button>
   <button class="stage-btn" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
-  <button class="stage-btn" data-stage="s2">Stage 2<br><small>R-Path Execution</small></button>
+  <button class="stage-btn" data-stage="s2">Stage 2<br><small>Migrations</small></button>
   <button class="stage-btn" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s5">Stage 4<br><small>Cutover &amp; Traffic Transition</small></button>
   <button class="stage-btn" data-stage="s6">Stage 5<br><small>Stabilization &amp; Handover</small></button>
@@ -498,6 +498,8 @@
   <button class="sub-btn" data-sub="s2rehost_p1">🛠 R5 Replatform — Infra Clone & Adapt</button>
   <button class="sub-btn" data-sub="s2cloudboot">🪟 R3 Windows boot conversion</button>
   <button class="sub-btn active" data-sub="s2image">🚀 R3 Rehost / Relocate — VM Lift & Shift</button>
+  <button class="sub-btn" data-sub="s2flex2flex">🌐 R3 FLEX2FLEX-Region Cloning</button>
+  <button class="sub-btn" data-sub="s2flexanywhere">🌈 R3 HYPER FLEX — Hyperscaler Bridge</button>
   <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
   <button class="sub-btn" data-sub="s2rehost_manual">📋 R5 Data Replatform — Full Data Move</button>
   <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ R6 Refactor / Rearchitect — K8s Modernization</button>
@@ -963,7 +965,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
   </div>
 
-  <!-- Stage 2 — R-Path Execution -->
+  <!-- Stage 2 — Migrations -->
   <div class="panel" id="panel-s2">
     <!-- R1 Retain -->
     <div id="s2retain-pane" class="gov-page path-retain" style="display:none;">
@@ -1127,6 +1129,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     <iframe id="s2rehost_p1-pane" src="/designer/" title="REHOST Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2cloudboot-pane" src="/cloudboot_migrator/" title="R3 Windows boot conversion" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2image-pane" src="/image_migrator/?v={{ cache_bust|default('') }}" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2flex2flex-pane" src="/image_migrator/?mode=flex2flex&v={{ cache_bust|default('') }}" title="R3 FLEX2FLEX-Region Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2flexanywhere-pane" src="/image_migrator/?mode=flexanywhere&v={{ cache_bust|default('') }}" title="R3 FLEX Anywhere Hyperscaler Bridge" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_manual-pane" src="/rehost_manual/" title="REHOST Full Manual Runbook" style="display:none; width:100%; height:100%; border:none;"></iframe>
@@ -2808,7 +2812,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1analyze','s1flavors','s1k8s'];
-  const s2Panes = ['s2retain','s2retire','s2rehost_p1','s2cloudboot','s2image','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual','s2repurchase'];
+  const s2Panes = ['s2retain','s2retire','s2rehost_p1','s2cloudboot','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual','s2repurchase'];
   
   function addWorkloadRow(bodyId) {
     const body = document.getElementById(bodyId);
@@ -2885,6 +2889,110 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     statusEl.innerText = 'Status: Approved';
     JarvisBritishSpeak?.speak(`${path} governance record has been saved and approved.`);
   }
+
+  function f2fVal(id) {
+    return (document.getElementById(id) || {}).value || '';
+  }
+
+  function f2fAppend(line) {
+    const log = document.getElementById('f2f-log');
+    if (!log) return;
+    log.textContent += line + '\n';
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function f2fSetStatus(text, done) {
+    const el = document.getElementById('r3-flex2flex-status');
+    if (!el) return;
+    el.innerText = text;
+    el.className = done ? 'gov-status-badge status-done' : 'gov-status-badge status-pending';
+  }
+
+  function f2fLoadExample() {
+    document.getElementById('f2f-source-region').value = 'DFW3';
+    document.getElementById('f2f-target-region').value = 'IAD3';
+    document.getElementById('f2f-source-server-id').value = 'source-flex-server-uuid';
+    document.getElementById('f2f-target-flavor').value = 'gp.0.4.4';
+    document.getElementById('f2f-target-network').value = 'tenant-net';
+    document.getElementById('f2f-jumphost-user').value = 'ubuntu';
+    document.getElementById('f2f-jumphost-key').value = '~/.ssh/id_rsa';
+    f2fAppend('[EXAMPLE] Loaded DFW3 -> IAD3 Flex2Flex region clone template.');
+  }
+
+  async function runFlex2FlexRegionClone() {
+    const log = document.getElementById('f2f-log');
+    if (log) log.textContent = 'Launching R3 FLEX2FLEX-Region Cloning...\n';
+    const btn = document.getElementById('f2f-run-btn');
+    const sourceServer = f2fVal('f2f-source-server-id').trim();
+    const sourceImage = f2fVal('f2f-source-image-id').trim();
+    if (!sourceServer && !sourceImage) {
+      alert('Enter Source Server ID or Existing Source Image/Snapshot ID.');
+      return;
+    }
+    if (!f2fVal('f2f-jumphost-ip').trim()) {
+      alert('Enter Jumphost IP.');
+      return;
+    }
+    if (!(f2fVal('f2f-flex-username') && f2fVal('f2f-flex-password')) && !(f2fVal('f2f-flex-app-id') && f2fVal('f2f-flex-app-secret'))) {
+      alert('Enter Flex username/password or application credential ID/secret.');
+      return;
+    }
+    if (btn) btn.disabled = true;
+    f2fSetStatus('Status: Running', false);
+    try {
+      const resp = await fetch('/api/flex2flex_region/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          label: sourceServer || sourceImage,
+          source_region: f2fVal('f2f-source-region'),
+          target_region: f2fVal('f2f-target-region'),
+          source_server_id: sourceServer,
+          source_image_id: sourceImage,
+          dry_run: !!(document.getElementById('f2f-dry-run') || {}).checked,
+          boot_target: !!(document.getElementById('f2f-boot-target') || {}).checked,
+          process_host_ip: f2fVal('f2f-jumphost-ip'),
+          process_ssh_user: f2fVal('f2f-jumphost-user') || 'ubuntu',
+          process_ssh_key: f2fVal('f2f-jumphost-key') || '~/.ssh/id_rsa',
+          flex_auth_url: f2fVal('f2f-flex-auth-url'),
+          flex_username: f2fVal('f2f-flex-username'),
+          flex_password: f2fVal('f2f-flex-password'),
+          flex_app_cred_id: f2fVal('f2f-flex-app-id'),
+          flex_app_cred_secret: f2fVal('f2f-flex-app-secret'),
+          flex_project_id: f2fVal('f2f-flex-project-id'),
+          flex_domain: f2fVal('f2f-flex-domain') || 'rackspace_cloud_domain',
+          flex_flavor: f2fVal('f2f-target-flavor') || 'gp.0.4.4',
+          flex_network_id: f2fVal('f2f-target-network') || 'tenant-net',
+          flex_key_name: f2fVal('f2f-target-key-name')
+        })
+      });
+      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const chunks = buf.split('\n\n');
+        buf = chunks.pop() || '';
+        for (const chunk of chunks) {
+          if (!chunk.startsWith('data:')) continue;
+          const line = chunk.replace(/^data:\s?/, '').trim();
+          if (line) f2fAppend(line);
+        }
+      }
+      f2fSetStatus('Status: Completed', true);
+    } catch (e) {
+      f2fAppend(`[ERROR] ${e && e.message ? e.message : String(e)}`);
+      f2fSetStatus('Status: Failed', false);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  document.getElementById('f2f-load-example-btn')?.addEventListener('click', f2fLoadExample);
+  document.getElementById('f2f-run-btn')?.addEventListener('click', runFlex2FlexRegionClone);
 
   window.lastMigrationBundle = null;
   window._s7LastBundleData = null;
@@ -4209,7 +4317,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   window.renderGlobalStageHeaders = function(cName = "No Active Customer Selected") {
       const panels = [
         {id: 'panel-s1', key: 's1', label: 'Stage 1 — Discovery \u0026 Assessment'},
-        {id: 'panel-s2', key: 's2', label: 'Stage 2 — R-Path Execution'},
+        {id: 'panel-s2', key: 's2', label: 'Stage 2 — Migrations'},
         {id: 'panel-s4', key: 's4', label: 'Stage 3 — Validation \u0026 UAT'},
         {id: 'panel-s5', key: 's5', label: 'Stage 4 — Cutover \u0026 Traffic Transition'},
         {id: 'panel-s6', key: 's6', label: 'Stage 5 — Stabilization \u0026 Handover'},
@@ -4259,7 +4367,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       
       const niceStageMap = {
           's1': 'Stage 1 — Discovery \u0026 Assessment',
-          's2': 'Stage 2 — R-Path Execution',
+          's2': 'Stage 2 — Migrations',
           's4': 'Stage 3 — Validation \u0026 UAT',
           's5': 'Stage 4 — Cutover \u0026 Traffic Transition',
           's6': 'Stage 5 — Stabilization \u0026 Handover',

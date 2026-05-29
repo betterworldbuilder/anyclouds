@@ -102,7 +102,7 @@ BACKGROUND_LOG="$JOB_LOG/linux_snap.background.log"
 QCOW="$JOB_ART/${LABEL_SAFE}.qcow2"
 REPAIR_MARKER="${QCOW}.linux_repaired"
 REPAIR_LOG="$JOB_ART/${LABEL_SAFE}.repair.log"
-NBD_DEV="${NBD_DEV:-}"
+NBD_DEV="${NBD_DEV:-/dev/nbd0}"
 CURRENT_STAGE="LS0_PREFLIGHT"
 DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_DOWNLOAD_UNAVAILABLE"
 
@@ -557,14 +557,14 @@ PY
       failure|error)
         task_msg="$(printf '%s' "$task_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("result") or "")' 2>/dev/null || true)"
         log "[ZS3] WARN CF task failed: ${task_msg:-<no message>}"
-        mkdir -p "$cf_fail_dir" 2>/dev/null || true
-        printf 'task_failed task=%s message=%s\n' "$task_id" "${task_msg:-<no message>}" >"$cf_fail_marker" 2>/dev/null || true
-        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|com\.rackspace__1__options'; then
+        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|exported by the image owner|only be exported by the image owner|com\.rackspace__1__options'; then
           DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_EXPORT_BLOCKED_LICENSED"
-          log "[ZS3] Licensed image — Cinder fallback"
+          log "[ZS3] Licensed image — Cinder fallback (not caching CF failure marker)"
           cinder_volume_raw_export "$image_id" "$dest" && return 0
           return 1
         fi
+        mkdir -p "$cf_fail_dir" 2>/dev/null || true
+        printf 'task_failed task=%s message=%s\n' "$task_id" "${task_msg:-<no message>}" >"$cf_fail_marker" 2>/dev/null || true
         if printf '%s' "$task_msg $task_json" | grep -qi 'Object already exists'; then
           _actual_obj="$(printf '%s' "$task_msg" | python3 -c '
 import sys, re
@@ -731,8 +731,22 @@ rackspace_delete_volume() {
   curl -sS -X DELETE "$base/volumes/$vol_id" -H "X-Auth-Token: $token" -o /dev/null >>"$JOB_LOG/cinder.log" 2>&1 || true
 }
 discover_ospc_helper_server_id() {
-  local ips_json server_json
-  ips_json="$(hostname -I 2>/dev/null | tr ' ' '\n' | awk 'NF' | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')"
+  local ips_json server_json meta_id
+  if [ -n "${OSPC2FLEX_OSPC_HELPER_SERVER_ID:-${OSPC2FLEX_CINDER_HELPER_SERVER_ID:-}}" ]; then
+    printf '%s\n' "${OSPC2FLEX_OSPC_HELPER_SERVER_ID:-${OSPC2FLEX_CINDER_HELPER_SERVER_ID:-}}"
+    return 0
+  fi
+  meta_id="$(curl -fsS --connect-timeout 2 --max-time 4 http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || true)"
+  if [ -n "$meta_id" ]; then
+    printf '%s\n' "$meta_id"
+    return 0
+  fi
+  ips_json="$(
+    {
+      [ -n "${OSPC2FLEX_JUMPHOST_IP:-}" ] && printf '%s\n' "$OSPC2FLEX_JUMPHOST_IP"
+      hostname -I 2>/dev/null | tr ' ' '\n'
+    } | awk 'NF' | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))'
+  )"
   server_json="$(openstack server list --long -f json 2>/dev/null || true)"
   LOCAL_IPS_JSON="$ips_json" SERVER_JSON="$server_json" python3 - <<'PY' 2>/dev/null || true
 import json, os
@@ -745,6 +759,113 @@ for row in rows:
     if any(ip and ip.lower() in blob for ip in ips):
         print(row.get("ID") or row.get("Id") or row.get("id") or ""); raise SystemExit
 PY
+}
+discover_remote_ospc_helper() {
+  local server_json
+  if [ -n "${OSPC2FLEX_REMOTE_OSPC_HELPER_SERVER_ID:-}" ] && [ -n "${OSPC2FLEX_REMOTE_OSPC_HELPER_IP:-}" ]; then
+    printf '%s %s\n' "$OSPC2FLEX_REMOTE_OSPC_HELPER_SERVER_ID" "$OSPC2FLEX_REMOTE_OSPC_HELPER_IP"
+    return 0
+  fi
+  server_json="$(openstack server list --long -f json 2>/dev/null || true)"
+  SERVER_JSON="$server_json" python3 - <<'PY' 2>/dev/null || true
+import json, re, sys
+try:
+    rows = json.loads(__import__("os").environ.get("SERVER_JSON") or "[]")
+except Exception:
+    rows = []
+for row in rows:
+    name = str(row.get("Name") or row.get("name") or "")
+    status = str(row.get("Status") or row.get("status") or "").upper()
+    if status != "ACTIVE" or not re.search(r"(codex|ospc2flex|linsnap).*helper", name, re.I):
+        continue
+    blob = json.dumps(row)
+    ips = re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", blob)
+    public = [ip for ip in ips if not ip.startswith(("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2", "172.30.", "172.31."))]
+    ip = (public or ips or [""])[0]
+    sid = row.get("ID") or row.get("Id") or row.get("id") or ""
+    if sid and ip:
+        print(sid, ip)
+        raise SystemExit(0)
+PY
+}
+remote_ospc_helper_volume_export() {
+  local image_id="$1" dest="$2"
+  local helper_line helper_id helper_ip size_gb volume_name volume_id helper_tmp dev dev_size ssh_key_file
+  helper_line="$(discover_remote_ospc_helper | head -1 || true)"
+  helper_id="$(printf '%s' "$helper_line" | awk '{print $1}')"
+  helper_ip="$(printf '%s' "$helper_line" | awk '{print $2}')"
+  [ -n "$helper_id" ] && [ -n "$helper_ip" ] || {
+    log "[CINDER] FAILED remote helper discovery"
+    log "[CINDER] ICF Issue=Cinder fallback needs an OSPC helper VM Cause=jumpshost is not an OSPC server Fix=create/reuse codex-linsnap-helper or set OSPC2FLEX_REMOTE_OSPC_HELPER_SERVER_ID and OSPC2FLEX_REMOTE_OSPC_HELPER_IP"
+    return 1
+  }
+  size_gb="$(image_cinder_size_gb "$image_id")"
+  [ "$size_gb" -lt 75 ] 2>/dev/null && size_gb=75
+  volume_name="${LABEL_SAFE}-linsnap-remote-cinder-${RUN_ID}"
+  helper_tmp="/tmp/ospc2flex_${LABEL_SAFE}_${RUN_ID}.qcow2"
+  ssh_key_file="${SSH_KEY_PATH/#\~/$HOME}"
+  log "[CINDER] Remote OSPC helper fallback: helper=$helper_id ip=$helper_ip size=${size_gb}GB"
+
+  volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || return 1
+  volume_id="$(printf '%s' "$volume_id" | tr -d '\r' | tail -1)"
+  [ -n "$volume_id" ] || return 1
+  log "[CINDER] volume=$volume_id — waiting available"
+  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" || {
+    log "[CINDER] FAILED remote helper volume create timeout"
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
+
+  rackspace_attach_volume "$helper_id" "$volume_id" || { rackspace_delete_volume "$volume_id" || true; return 1; }
+  cinder_wait_volume_status "$volume_id" "in-use" 900 || {
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
+
+  dev=""
+  for _i in $(seq 1 60); do
+    dev="$(rackspace_attachment_device "$helper_id" "$volume_id" | tail -1 | tr -d '\r' || true)"
+    if [ -n "$dev" ]; then
+      ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o IdentitiesOnly=yes "ubuntu@$helper_ip" "test -b '$dev'" >/dev/null 2>&1 && break
+    fi
+    sleep 5
+  done
+  if [ -z "$dev" ]; then
+    dev="$(ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o IdentitiesOnly=yes "ubuntu@$helper_ip" "lsblk -dnpo NAME,TYPE,SIZE | awk '\$2==\"disk\" && \$1!~/xvda/ && \$3!~/64M/{print \$1; exit}'" 2>/dev/null || true)"
+  fi
+  [ -n "$dev" ] || {
+    log "[CINDER] FAILED remote helper attached device discovery"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
+  dev_size="$(ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o IdentitiesOnly=yes "ubuntu@$helper_ip" "sudo blockdev --getsize64 '$dev'" 2>/dev/null || echo 0)"
+  log "[CINDER] remote helper device=$dev bytes=$dev_size"
+  [ "$dev_size" -gt 1073741824 ] 2>/dev/null || return 1
+
+  ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o IdentitiesOnly=yes "ubuntu@$helper_ip" \
+    "if ! command -v qemu-img >/dev/null 2>&1; then sudo apt-get update -y >/dev/null 2>&1 && sudo apt-get install -y qemu-utils >/dev/null 2>&1; fi; sudo rm -f '$helper_tmp'; sudo qemu-img convert -p -f raw -O qcow2 -c '$dev' '$helper_tmp' && sudo chown ubuntu:ubuntu '$helper_tmp' && qemu-img check '$helper_tmp'" \
+    >>"$JOB_LOG/cinder.log" 2>&1 || {
+      log "[CINDER] FAILED remote helper qemu-img convert"
+      rackspace_detach_volume "$helper_id" "$volume_id" || true
+      rackspace_delete_volume "$volume_id" || true
+      return 1
+    }
+  rm -f "$dest"
+  scp -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o IdentitiesOnly=yes "ubuntu@$helper_ip:$helper_tmp" "$dest" >>"$JOB_LOG/cinder.log" 2>&1 || {
+    log "[CINDER] FAILED copy from remote helper"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
+  qemu-img check "$dest" >>"$JOB_LOG/cinder.log" 2>&1 || return 1
+  log "[CINDER] HIT remote helper artifact: $dest ($(stat -c%s "$dest" 2>/dev/null || echo 0) bytes)"
+  ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o IdentitiesOnly=yes "ubuntu@$helper_ip" "rm -f '$helper_tmp'" >/dev/null 2>&1 || true
+  rackspace_detach_volume "$helper_id" "$volume_id" || true
+  cinder_wait_volume_status "$volume_id" "available" 120 || log "[CINDER] WARN temp volume detach still pending; delete requested anyway"
+  rackspace_delete_volume "$volume_id" || true
+  return 0
 }
 image_cinder_size_gb() {
   local image_id="$1" meta="$JOB_TMP/cinder_img_meta.json"
@@ -774,7 +895,13 @@ cinder_volume_raw_export() {
   local image_id="$1" dest="$2"
   local helper_id volume_name volume_id before_file after_file dev dev_size dd_rc
   helper_id="$(discover_ospc_helper_server_id | head -1 | tr -d '[:space:]')"
-  [ -n "$helper_id" ] || return 1
+  [ -n "$helper_id" ] || {
+    log "[CINDER] FAILED helper server discovery"
+    log "[CINDER] Local jumphost is not an OSPC server; trying remote OSPC helper"
+    remote_ospc_helper_volume_export "$image_id" "$dest" && return 0
+    log "[CINDER] ICF Issue=Cinder fallback could not identify/use an OSPC helper Cause=metadata/openstack server list did not expose local helper and remote helper failed Fix=reuse codex-linsnap-helper or set OSPC2FLEX_REMOTE_OSPC_HELPER_SERVER_ID/IP"
+    return 1
+  }
   local size_gb; size_gb="$(image_cinder_size_gb "$image_id")"
   if [ "${CINDER_MIN_VOLUME_SIZE_GB:-0}" -gt 0 ] && [ "$size_gb" -lt "$CINDER_MIN_VOLUME_SIZE_GB" ]; then
     size_gb="$CINDER_MIN_VOLUME_SIZE_GB"
@@ -1144,14 +1271,25 @@ kv "File size"     "${QCOW_BYTES}B (${QCOW_MIB} MiB)"
 kv "Virtual size"  "~${QCOW_VIRTUAL_GIB} GiB"
 kv "os_family"     "$IMG_OS_FAMILY / distro=${IMG_OS_DISTRO:-unset}"
 
+IMG_DISK_BUS="virtio"
+IMG_VIF_MODEL="virtio"
+IMG_QGA="yes"
+if printf '%s\n%s\n' "${OS_TYPE:-}" "$(cat "$REPAIR_LOG" 2>/dev/null || true)" \
+   | grep -Eiq 'centos[[:space:]-]*5|"major_version"[[:space:]]*:[[:space:]]*5|CentOS release 5'; then
+  IMG_DISK_BUS="ide"
+  IMG_VIF_MODEL="e1000"
+  IMG_QGA="no"
+  log "[LS6] CentOS 5 compatibility image properties: hw_disk_bus=$IMG_DISK_BUS hw_vif_model=$IMG_VIF_MODEL hw_qemu_guest_agent=$IMG_QGA"
+fi
+
 IMAGE_CREATE_ARGS=(
   --disk-format qcow2 --container-format bare --file "$QCOW" --private
   --property "architecture=x86_64"
   --property "vm_mode=hvm"
   --property "os_type=$IMG_OS_FAMILY"
-  --property "hw_disk_bus=virtio"
-  --property "hw_vif_model=virtio"
-  --property "hw_qemu_guest_agent=yes"
+  --property "hw_disk_bus=$IMG_DISK_BUS"
+  --property "hw_vif_model=$IMG_VIF_MODEL"
+  --property "hw_qemu_guest_agent=$IMG_QGA"
 )
 [ -n "$IMG_OS_DISTRO" ] && IMAGE_CREATE_ARGS+=(--property "os_distro=$IMG_OS_DISTRO")
 

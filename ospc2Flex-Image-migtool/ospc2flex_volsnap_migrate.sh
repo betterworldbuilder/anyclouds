@@ -31,11 +31,13 @@ LABEL=""
 SNAPSHOT_ID=""
 OSPC_OPENRC=""
 FLEX_OPENRC=""
+SOURCE_MODE="${OSPC2FLEX_SOURCE_MODE:-ospc}"
 FLEX_HELPER_VM_ID=""
 FLEX_HELPER_IP=""
 FLEX_HELPER_USER="ubuntu"
 SSH_KEY_PATH="${HOME}/.ssh/id_rsa"
 FLEX_TARGET_VM_ID=""
+OS_TYPE="linux"
 FLEX_VOLUME_NAME_OVERRIDE=""
 SNAP_SIZE_GB=0                      # 0 = auto-detect from snapshot
 CLEANUP_TEMP="true"
@@ -67,11 +69,13 @@ while [[ $# -gt 0 ]]; do
     --snapshot-id)         SNAPSHOT_ID="$2";             shift 2 ;;
     --ospc-openrc)         OSPC_OPENRC="$2";             shift 2 ;;
     --flex-openrc)         FLEX_OPENRC="$2";             shift 2 ;;
+    --source-mode)         SOURCE_MODE="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
     --flex-helper-vm-id)   FLEX_HELPER_VM_ID="$2";       shift 2 ;;
     --flex-helper-ip)      FLEX_HELPER_IP="$2";          shift 2 ;;
     --flex-helper-user)    FLEX_HELPER_USER="$2";        shift 2 ;;
     --ssh-key-path)        SSH_KEY_PATH="$2";            shift 2 ;;
     --flex-target-vm-id)   FLEX_TARGET_VM_ID="$2";       shift 2 ;;
+    --os-type)             OS_TYPE="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"; shift 2 ;;
     --flex-volume-name)    FLEX_VOLUME_NAME_OVERRIDE="$2"; shift 2 ;;
     --snap-size-gb)        SNAP_SIZE_GB="$2";            shift 2 ;;
     --cleanup-temp)        CLEANUP_TEMP="$2";            shift 2 ;;
@@ -97,13 +101,14 @@ while [[ $# -gt 0 ]]; do
     --base-dir)            BASE_DIR="$2";                shift 2 ;;
     --dry-run)             DRY_RUN=1;                    shift ;;
     # legacy compat — ignored
-    --os-type|--nbd-dev)   shift 2 ;;
+    --nbd-dev)             shift 2 ;;
     *) echo "ERROR: Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
 [ -n "$LABEL" ]             || { echo "ERROR: --label required" >&2; exit 2; }
 [ -n "$SNAPSHOT_ID" ]       || { echo "ERROR: --snapshot-id required" >&2; exit 2; }
+case "$SOURCE_MODE" in ospc|flex) ;; *) echo "ERROR: --source-mode must be ospc or flex" >&2; exit 2 ;; esac
 if [ "$DRY_RUN" != 1 ]; then
   [ -n "$OSPC_OPENRC" ]       || { echo "ERROR: --ospc-openrc required" >&2; exit 2; }
   [ -n "$FLEX_OPENRC" ]       || { echo "ERROR: --flex-openrc required" >&2; exit 2; }
@@ -111,6 +116,11 @@ if [ "$DRY_RUN" != 1 ]; then
 fi
 
 LABEL_SAFE="$(printf '%s' "$LABEL" | tr -c 'A-Za-z0-9._-' '_' | sed 's/_$//')"
+if [ "$OS_TYPE" = "linux" ]; then
+  case "$(printf '%s' "$LABEL_SAFE" | tr '[:upper:]' '[:lower:]')" in
+    *win*|*windows*) OS_TYPE="windows" ;;
+  esac
+fi
 RUN_ID="${OSPC2FLEX_RUN_ID:-$(date -u +%Y%m%d-%H%M%S)}"
 RUN_DIR="$BASE_DIR/runs/$LABEL_SAFE/$RUN_ID"
 JOB_ART="$RUN_DIR/artifacts"
@@ -122,6 +132,10 @@ FLEX_VOL_ID=""
 FLEX_TARGET_DEV=""
 CLEANUP_DONE=0
 FLEX_FINAL_ATTACHED=0
+RESUME_STREAM_DONE=0
+RESUME_FINAL_ATTACHED=0
+RESUME_SOURCE_RUN=""
+RESUME_SOURCE_STATUS=""
 
 mkdir -p "$JOB_ART" "$JOB_TMP" "$JOB_LOG"
 exec > >(tee -a "$JOB_LOG/volsnap_direct.log") 2>&1
@@ -132,10 +146,12 @@ fail_exit(){ log "FAILED: $*"; exit 1; }
 kv()       { log "  $(printf '%-24s' "$1"): $2"; }
 
 if [ "$DRY_RUN" = 1 ]; then
+  source_label="OSPC"
+  [ "$SOURCE_MODE" = "flex" ] && source_label="SOURCE_FLEX"
   for s in \
     VS0_LOAD_CREDENTIALS \
-    VS1_CREATE_TEMP_OSPC_VOLUME \
-    VS2_ATTACH_OSPC_VOLUME \
+    VS1_CREATE_TEMP_${source_label}_VOLUME \
+    VS2_ATTACH_${source_label}_VOLUME \
     VS3_GET_SOURCE_SIZE \
     VS4_CREATE_FLEX_CINDER_VOLUME \
     VS5_ATTACH_FLEX_VOLUME_TO_HELPER \
@@ -145,7 +161,7 @@ if [ "$DRY_RUN" = 1 ]; then
     VS9_VALIDATE_FLEX_DISK \
     VS10_DETACH_FLEX_FROM_HELPER \
     VOL_POST_ATTACH_VALIDATE \
-    VS12_CLEANUP_OSPC
+    VS12_CLEANUP_${source_label}
   do
     stage "$s"
     log "[$s] DRY-RUN volume snapshot stage; no Cinder volume create, attach, block stream, detach, or delete"
@@ -170,14 +186,14 @@ cleanup_on_exit() {
     log "[CLEANUP] Keeping migrated FLEX volume $FLEX_VOL_ID attached to final target after post-copy failure"
   fi
   if [ -n "${OSPC_VOL_ID:-}" ] && [ -n "${SELF_SERVER_ID:-}" ]; then
-    # shellcheck disable=SC1090
-    source "$OSPC_OPENRC" 2>/dev/null || true
-    log "[CLEANUP] Detaching OSPC temp volume $OSPC_VOL_ID from $SELF_SERVER_ID"
-    _compute_delete "servers/$SELF_SERVER_ID/os-volume_attachments/$OSPC_VOL_ID" || true
-    ospc_wait_volume "$OSPC_VOL_ID" "available" 300 || true
+    source_label="OSPC"
+    [ "$SOURCE_MODE" = "flex" ] && source_label="SOURCE FLEX"
+    log "[CLEANUP] Detaching $source_label temp volume $OSPC_VOL_ID from $SELF_SERVER_ID"
+    source_detach_volume "$SELF_SERVER_ID" "$OSPC_VOL_ID" || true
+    source_wait_volume "$OSPC_VOL_ID" "available" 300 || true
     if [ "$CLEANUP_TEMP" = "true" ]; then
-      log "[CLEANUP] Deleting OSPC temp volume $OSPC_VOL_ID"
-      _cinder_delete "volumes/$OSPC_VOL_ID" || true
+      log "[CLEANUP] Deleting $source_label temp volume $OSPC_VOL_ID"
+      source_delete_volume "$OSPC_VOL_ID" || true
     fi
   fi
   log "[CLEANUP] Failure cleanup complete"
@@ -231,6 +247,68 @@ ospc_wait_volume() {
   log "[OSPC] TIMEOUT vol=$vid target=$want after ${timeout}s"; return 1
 }
 
+source_openrc() {
+  unset OS_TOKEN OS_AUTH_TYPE OS_AUTH_URL OS_TENANT_ID OS_TENANT_NAME \
+        OS_REGION_NAME OS_IDENTITY_API_VERSION OS_INTERFACE \
+        OS_PROJECT_ID OS_PROJECT_NAME OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_NAME \
+        OS_PROJECT_DOMAIN_ID OS_USERNAME OS_PASSWORD \
+        OS_APPLICATION_CREDENTIAL_ID OS_APPLICATION_CREDENTIAL_SECRET
+  # shellcheck disable=SC1090
+  source "$OSPC_OPENRC"
+}
+source_volume_status() {
+  local vid="$1"
+  if [ "$SOURCE_MODE" = "flex" ]; then
+    source_openrc
+    openstack volume show "$vid" -f value -c status 2>/dev/null || echo unknown
+  else
+    ospc_volume_status "$vid"
+  fi
+}
+source_wait_volume() {
+  local vid="$1" want="$2" timeout="${3:-3600}" waited=0 status label="OSPC"
+  [ "$SOURCE_MODE" = "flex" ] && label="SOURCE-FLEX"
+  while [ "$waited" -lt "$timeout" ]; do
+    status="$(source_volume_status "$vid")"
+    [ "$status" = "$want" ] && return 0
+    [ "$status" = "error" ] && { log "[$label] vol=$vid error state"; return 1; }
+    [ $((waited % 60)) -eq 0 ] && log "[$label] vol=$vid status=$status → $want (${waited}s)"
+    sleep 10; waited=$((waited + 10))
+  done
+  log "[$label] TIMEOUT vol=$vid target=$want after ${timeout}s"; return 1
+}
+source_volume_device() {
+  local vid="$1"
+  if [ "$SOURCE_MODE" = "flex" ]; then
+    source_openrc
+    openstack volume show "$vid" -f json 2>/dev/null | python3 -c \
+      'import json,sys; v=json.load(sys.stdin); a=v.get("attachments") or []; print(a[0].get("device","") if a else "")' \
+      2>/dev/null || true
+  else
+    _cinder_get "volumes/$vid" | python3 -c \
+      'import json,sys; v=json.load(sys.stdin)["volume"]; a=v.get("attachments") or []; print(a[0]["device"] if a else "")' \
+      2>/dev/null || true
+  fi
+}
+source_detach_volume() {
+  local server_id="$1" vid="$2"
+  if [ "$SOURCE_MODE" = "flex" ]; then
+    source_openrc
+    openstack server remove volume "$server_id" "$vid" >>"$JOB_LOG/source_flex_cinder.log" 2>&1 || true
+  else
+    _compute_delete "servers/$server_id/os-volume_attachments/$vid"
+  fi
+}
+source_delete_volume() {
+  local vid="$1"
+  if [ "$SOURCE_MODE" = "flex" ]; then
+    source_openrc
+    openstack volume delete "$vid" >>"$JOB_LOG/source_flex_cinder.log" 2>&1 || true
+  else
+    _cinder_delete "volumes/$vid"
+  fi
+}
+
 # ── FLEX Cinder helpers (openstack CLI, requires FLEX openrc to be sourced) ──
 flex_volume_status() {
   openstack volume show "$1" -f value -c status 2>/dev/null || echo unknown
@@ -258,10 +336,184 @@ flex_wait_volume_deleted() {
   done
   log "[FLEX] TIMEOUT vol=$vid delete after ${timeout}s"; return 1
 }
+flex_server_status() {
+  openstack server show "$1" -f value -c status 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo unknown
+}
+flex_wait_server_status() {
+  local server_id="$1" want="$2" timeout="${3:-600}" waited=0 status
+  want="$(printf '%s' "$want" | tr '[:upper:]' '[:lower:]')"
+  while [ "$waited" -lt "$timeout" ]; do
+    status="$(flex_server_status "$server_id")"
+    [ "$status" = "$want" ] && return 0
+    [ "$status" = "error" ] && { log "[FLEX] server=$server_id error state"; return 1; }
+    [ $((waited % 60)) -eq 0 ] && log "[FLEX] server=$server_id status=${status:-unknown} → $want (${waited}s)"
+    sleep 10
+    waited=$((waited + 10))
+  done
+  log "[FLEX] TIMEOUT server=$server_id target=$want after ${timeout}s"; return 1
+}
 flex_volume_device() {
   openstack volume show "$1" -f json 2>/dev/null | python3 -c \
     'import json,sys; v=json.load(sys.stdin); a=v.get("attachments") or []; print(a[0].get("device","") if a else "")' \
     2>/dev/null || true
+}
+flex_volume_attached_to() {
+  local vid="$1" server_id="$2"
+  [ -n "$vid" ] && [ -n "$server_id" ] || return 1
+  openstack volume show "$vid" -f json 2>>"$JOB_LOG/flex_cinder.log" | python3 -c 'import json,sys
+server_id=sys.argv[1]
+try:
+    vol=json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for att in vol.get("attachments") or []:
+    if isinstance(att, dict) and (att.get("server_id") or att.get("serverId") or att.get("server") or "") == server_id:
+        sys.exit(0)
+sys.exit(1)
+' "$server_id" 2>>"$JOB_LOG/flex_cinder.log"
+}
+flex_attach_volume_to_server_verified() {
+  local server_id="$1" vid="$2" label="${3:-VS11}" attempt waited status
+  [ -n "$server_id" ] && [ -n "$vid" ] || return 1
+
+  for attempt in 1 2 3; do
+    if flex_volume_attached_to "$vid" "$server_id"; then
+      log "[$label] HIT FLEX volume attached to final VM $server_id"
+      return 0
+    fi
+
+    status="$(flex_volume_status "$vid")"
+    log "[$label] Attach attempt $attempt: $vid -> $server_id (status=${status:-unknown})"
+    openstack server add volume "$server_id" "$vid" \
+      >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+
+    waited=0
+    while [ "$waited" -lt 120 ]; do
+      sleep 10
+      waited=$((waited + 10))
+      if flex_volume_attached_to "$vid" "$server_id"; then
+        log "[$label] HIT FLEX volume attached to final VM $server_id"
+        return 0
+      fi
+      status="$(flex_volume_status "$vid")"
+      if [ "$status" = "available" ] && [ "$waited" -ge 20 ]; then
+        log "[$label] Attach attempt $attempt did not stick; volume returned to available"
+        break
+      fi
+      [ $((waited % 60)) -eq 0 ] && log "[$label] vol=$vid status=${status:-unknown} waiting for attachment to $server_id (${waited}s)"
+    done
+  done
+
+  openstack volume show "$vid" -f json >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+  return 1
+}
+flex_cold_attach_volume_to_server_verified() {
+  local server_id="$1" vid="$2" label="${3:-VS11}" was_active="false" status
+  [ -n "$server_id" ] && [ -n "$vid" ] || return 1
+  if flex_volume_attached_to "$vid" "$server_id"; then
+    log "[$label] HIT FLEX volume attached to final VM $server_id"
+    return 0
+  fi
+
+  status="$(flex_server_status "$server_id")"
+  log "[$label] Cold attach fallback: final VM $server_id status=${status:-unknown}"
+  if [ "$status" = "active" ]; then
+    was_active="true"
+    log "[$label] Cold attach fallback: stopping final VM $server_id"
+    openstack server stop "$server_id" >>"$JOB_LOG/flex_cinder.log" 2>&1 || return 1
+    flex_wait_server_status "$server_id" "shutoff" 900 || return 1
+  elif [ "$status" != "shutoff" ]; then
+    log "[$label] Cold attach fallback: waiting for final VM $server_id to settle before attach"
+    flex_wait_server_status "$server_id" "shutoff" 300 || return 1
+  fi
+
+  flex_wait_volume "$vid" "available" 300 || return 1
+  log "[$label] Cold attach fallback: attaching $vid -> $server_id while VM is shutoff"
+  openstack server add volume "$server_id" "$vid" >>"$JOB_LOG/flex_cinder.log" 2>&1 || return 1
+  for waited in $(seq 10 10 300); do
+    sleep 10
+    if flex_volume_attached_to "$vid" "$server_id"; then
+      log "[$label] HIT FLEX volume cold-attached to final VM $server_id"
+      if [ "$was_active" = "true" ]; then
+        log "[$label] Cold attach fallback: starting final VM $server_id"
+        openstack server start "$server_id" >>"$JOB_LOG/flex_cinder.log" 2>&1 || return 1
+        flex_wait_server_status "$server_id" "active" 900 || return 1
+      fi
+      return 0
+    fi
+    status="$(flex_volume_status "$vid")"
+    [ $((waited % 60)) -eq 0 ] && log "[$label] Cold attach fallback: vol=$vid status=${status:-unknown} waiting for attachment (${waited}s)"
+  done
+
+  openstack volume show "$vid" -f json >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+  return 1
+}
+flex_final_attach_volume_to_server_verified() {
+  local server_id="$1" vid="$2" label="${3:-VS11}"
+  flex_attach_volume_to_server_verified "$server_id" "$vid" "$label" && return 0
+  if [ "$OS_TYPE" = "windows" ]; then
+    log "[$label] Hot attach did not stick for Windows target; trying cold attach fallback"
+    flex_cold_attach_volume_to_server_verified "$server_id" "$vid" "$label" && return 0
+  fi
+  return 1
+}
+flex_find_resume_volume() {
+  local name="$1" stream_bytes="$2" base="$BASE_DIR/runs/$LABEL_SAFE"
+  local run log src vid bytes tmp vol_name status servers device
+  [ -d "$base" ] || return 1
+  while IFS= read -r run; do
+    [ -n "$run" ] || continue
+    [ "$run" = "$RUN_DIR" ] && continue
+    log="$run/logs/volsnap_direct.log"
+    src="$run/logs/stream_src.log"
+    [ -s "$log" ] && [ -s "$src" ] || continue
+    vid="$(awk -F': ' '/FLEX volume ID/{v=$NF} END{gsub(/[[:space:]\r]+/,"",v); print v}' "$log")"
+    [ -n "$vid" ] || continue
+    bytes="$(python3 -c 'import re,sys
+try:
+    data=open(sys.argv[1],"rb").read().decode("utf-8","ignore")
+except Exception:
+    data=""
+nums=[int(x) for x in re.findall(r"(\d+)\s+bytes", data)]
+print(max(nums) if nums else 0)
+' "$src" 2>/dev/null || echo 0)"
+    [ "${bytes:-0}" -ge "$stream_bytes" ] 2>/dev/null || continue
+    tmp="$JOB_TMP/resume_${vid}.json"
+    openstack volume show "$vid" -f json >"$tmp" 2>>"$JOB_LOG/flex_cinder.log" || continue
+    vol_name="$(python3 -c 'import json,sys; v=json.load(open(sys.argv[1])); print(v.get("name") or v.get("Name") or "")' "$tmp" 2>/dev/null || true)"
+    [ "$vol_name" = "$name" ] || continue
+    status="$(python3 -c 'import json,sys; v=json.load(open(sys.argv[1])); print(v.get("status") or v.get("Status") or "")' "$tmp" 2>/dev/null || true)"
+    servers="$(python3 -c 'import json,sys
+v=json.load(open(sys.argv[1]))
+out=[]
+for att in v.get("attachments") or []:
+    if isinstance(att, dict):
+        sid=att.get("server_id") or att.get("serverId") or att.get("server") or ""
+        if sid:
+            out.append(sid)
+print(",".join(out))
+' "$tmp" 2>/dev/null || true)"
+    case "$status" in
+      available) ;;
+      in-use)
+        case ",$servers," in
+          *",$FLEX_HELPER_VM_ID,"*|*",$FLEX_TARGET_VM_ID,"*) ;;
+          *) continue ;;
+        esac
+        ;;
+      *) continue ;;
+    esac
+    device="$(python3 -c 'import json,sys
+v=json.load(open(sys.argv[1]))
+for att in v.get("attachments") or []:
+    if isinstance(att, dict) and att.get("device"):
+        print(att.get("device"))
+        break
+' "$tmp" 2>/dev/null || true)"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$vid" "$status" "$servers" "$device" "$run"
+    return 0
+  done < <(ls -1td "$base"/* 2>/dev/null || true)
+  return 1
 }
 flex_cleanup_existing_mig_volumes() {
   local name="$1" out="$JOB_TMP/flex_existing_${LABEL_SAFE}.tsv"
@@ -323,6 +575,96 @@ PY
     openstack volume delete "$vid" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
     flex_wait_volume_deleted "$vid" 300 || true
   done <"$out"
+}
+flex_cleanup_helper_stale_mig_volumes() {
+  [ -n "${FLEX_HELPER_VM_ID:-}" ] || return 0
+  [ -n "${FLEX_TARGET_VM_ID:-}" ] || return 0
+  [ "$FLEX_HELPER_VM_ID" != "$FLEX_TARGET_VM_ID" ] || return 0
+
+  local out="$JOB_TMP/flex_helper_stale_${LABEL_SAFE}.tsv"
+  : >"$out"
+  openstack volume list -f value -c ID -c Name 2>>"$JOB_LOG/flex_cinder.log" \
+    | awk '$2 ~ /^mig-/ {print $1 "\t" $2}' >"$out" || true
+  [ -s "$out" ] || return 0
+
+  while IFS=$'\t' read -r vid vname; do
+    [ -n "$vid" ] || continue
+    [ -n "${FLEX_VOL_ID:-}" ] && [ "$vid" = "$FLEX_VOL_ID" ] && continue
+    local attached_to_helper=""
+    attached_to_helper="$(openstack volume show "$vid" -f json 2>>"$JOB_LOG/flex_cinder.log" \
+      | python3 -c 'import json,sys
+helper=sys.argv[1]
+try:
+    vol=json.load(sys.stdin)
+except Exception:
+    vol={}
+for att in vol.get("attachments") or []:
+    if isinstance(att, dict) and (att.get("server_id") or att.get("serverId") or att.get("server") or "") == helper:
+        print("yes")
+        break
+' "$FLEX_HELPER_VM_ID" 2>>"$JOB_LOG/flex_cinder.log" || true)"
+    [ "$attached_to_helper" = "yes" ] || continue
+    log "[VS5] START FRESH: removing stale helper FLEX volume name=$vname id=$vid from helper $FLEX_HELPER_VM_ID"
+    openstack server remove volume "$FLEX_HELPER_VM_ID" "$vid" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+    flex_wait_volume "$vid" "available" 300 || true
+    openstack volume delete "$vid" >>"$JOB_LOG/flex_cinder.log" 2>&1 || true
+    flex_wait_volume_deleted "$vid" 300 || true
+  done <"$out"
+}
+resume_finalize_and_exit() {
+  stage "VS8_STREAM_BLOCK_DATA"
+  log "[VS8] RESUME: previous run already copied ${STREAM_BYTES} bytes to FLEX volume $FLEX_VOL_ID; skipping block stream"
+
+  FINAL_ATTACH_DEVICE=""
+  FINAL_TARGET_VM_ID="${FLEX_TARGET_VM_ID:-$FLEX_HELPER_VM_ID}"
+  if [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_HELPER_VM_ID" ] && [ "$FLEX_HELPER_VM_ID" != "$FINAL_TARGET_VM_ID" ] && flex_volume_attached_to "$FLEX_VOL_ID" "$FLEX_HELPER_VM_ID"; then
+    stage "VS10_DETACH_FLEX_FROM_HELPER"
+    log "[VS10] RESUME: detaching $FLEX_VOL_ID from helper vm=$FLEX_HELPER_VM_ID"
+    openstack server remove volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" \
+      2>>"$JOB_LOG/flex_cinder.log" || log "[VS10] WARN: remove volume returned non-zero (continuing)"
+    flex_wait_volume "$FLEX_VOL_ID" "available" 300 || log "[VS10] WARN: FLEX volume did not return to available quickly"
+    log "[VS10] FLEX volume detached from helper"
+  fi
+
+  if [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FINAL_TARGET_VM_ID" ]; then
+    stage "VS11_ATTACH_TO_FINAL_FLEX_VM"
+    kv "Final FLEX VM" "$FINAL_TARGET_VM_ID"
+    if flex_volume_attached_to "$FLEX_VOL_ID" "$FINAL_TARGET_VM_ID"; then
+      log "[VS11] RESUME: FLEX volume $FLEX_VOL_ID is already attached to final VM $FINAL_TARGET_VM_ID"
+    else
+      flex_final_attach_volume_to_server_verified "$FINAL_TARGET_VM_ID" "$FLEX_VOL_ID" "VS11" || \
+        fail_exit "Final attach to $FINAL_TARGET_VM_ID did not stick; volume status=$(flex_volume_status "$FLEX_VOL_ID")"
+    fi
+    FLEX_FINAL_ATTACHED=1
+    FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
+    [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
+  else
+    log "[VS11] RESUME: skipped final attach (attach_to_final=$ATTACH_TO_FINAL final_target='${FINAL_TARGET_VM_ID}')"
+  fi
+
+  if [ "$POST_ATTACH_VALIDATE_MOUNT" = "true" ] || [ "$POST_ATTACH_VALIDATE_PG" = "true" ]; then
+    log "[VOL_POST_ATTACH_VALIDATE] RESUME: skipped early resume validation; rerun with normal path if validation is required"
+  else
+    log "[VOL_POST_ATTACH_VALIDATE] skipped (post_attach_validate_mount=false)"
+  fi
+
+  if [ "$SOURCE_MODE" = "flex" ]; then
+    stage "VS12_CLEANUP_SOURCE_FLEX"
+    log "[VS12] RESUME: no Source FLEX temp volume created; cleanup skipped"
+  else
+    stage "VS12_CLEANUP_OSPC"
+    log "[VS12] RESUME: no OSPC temp volume created; cleanup skipped"
+  fi
+  CLEANUP_DONE=1
+
+  log "══════════════════════════════════════════════════════"
+  log "  VOLSNAP DIRECT CINDER COMPLETE"
+  log "══════════════════════════════════════════════════════"
+  log "  $([ "$SOURCE_MODE" = "flex" ] && echo "Source FLEX snapshot" || echo "OSPC snapshot")         : $SNAPSHOT_ID"
+  log "  FLEX Cinder volume    : $FLEX_VOL_ID  ($FLEX_VOL_NAME, ${FLEX_VOL_SIZE_GB}GB)"
+  [ -n "$FINAL_TARGET_VM_ID" ] && log "  Attached to FLEX VM   : $FINAL_TARGET_VM_ID"
+  log "  Storage path          : Storage → Volumes (not Compute → Images)"
+  exit 0
 }
 flex_server_first_ip() {
   openstack server show "$1" -f json 2>/dev/null | python3 -c '
@@ -499,81 +841,145 @@ for row in rows:
 PY
 }
 
-# ── VS0: Load + validate OSPC credentials ─────────────────────────────────────
+# ── VS0: Load + validate source credentials ───────────────────────────────────
 stage "VS0_LOAD_CREDENTIALS"
-# shellcheck disable=SC1090
-source "$OSPC_OPENRC"
-OSPC_TOKEN="${OS_TOKEN:-}"
+source_openrc
 OSPC_TENANT="${OS_TENANT_ID:-${OS_PROJECT_ID:-}}"
-[ -n "$OSPC_TOKEN" ]  || fail_exit "OS_TOKEN not set in $OSPC_OPENRC"
-[ -n "$OSPC_TENANT" ] || fail_exit "OS_TENANT_ID not set in $OSPC_OPENRC"
 OSPC_API_REGION="$(region_short)"
-OSPC_BS_BASE="https://${OSPC_API_REGION}.blockstorage.api.rackspacecloud.com/v1/$OSPC_TENANT"
-OSPC_COMPUTE_BASE="https://${OSPC_API_REGION}.servers.api.rackspacecloud.com/v2/$OSPC_TENANT"
-kv "OSPC tenant"   "$OSPC_TENANT"
-kv "OSPC region"   "$OSPC_API_REGION"
+if [ "$SOURCE_MODE" = "flex" ]; then
+  openstack token issue >/dev/null 2>&1 || fail_exit "Source FLEX authentication failed — check $OSPC_OPENRC"
+  [ -n "$OSPC_TENANT" ] || OSPC_TENANT="${OS_PROJECT_NAME:-}"
+  kv "Source mode"   "flex"
+  kv "Source project" "${OSPC_TENANT:-unknown}"
+  kv "Source region" "$OSPC_API_REGION"
+else
+  OSPC_TOKEN="${OS_TOKEN:-}"
+  [ -n "$OSPC_TOKEN" ]  || fail_exit "OS_TOKEN not set in $OSPC_OPENRC"
+  [ -n "$OSPC_TENANT" ] || fail_exit "OS_TENANT_ID not set in $OSPC_OPENRC"
+  OSPC_BS_BASE="https://${OSPC_API_REGION}.blockstorage.api.rackspacecloud.com/v1/$OSPC_TENANT"
+  OSPC_COMPUTE_BASE="https://${OSPC_API_REGION}.servers.api.rackspacecloud.com/v2/$OSPC_TENANT"
+  kv "Source mode"   "ospc"
+  kv "OSPC tenant"   "$OSPC_TENANT"
+  kv "OSPC region"   "$OSPC_API_REGION"
+fi
 kv "Snapshot ID"   "$SNAPSHOT_ID"
 kv "Label"         "$LABEL_SAFE"
 validate_flex_helper_server
 select_flex_helper_ssh_user
 kv "FLEX helper"   "${FLEX_HELPER_USER}@${FLEX_HELPER_IP} (vm=${FLEX_HELPER_VM_ID:-none})"
 
-# ── VS1: Create temp OSPC Cinder volume from snapshot ─────────────────────────
-stage "VS1_CREATE_TEMP_OSPC_VOLUME"
+# ── VS1: Create temp source Cinder volume from snapshot ───────────────────────
+if [ "$SOURCE_MODE" = "flex" ]; then
+  stage "VS1_CREATE_TEMP_SOURCE_FLEX_VOLUME"
+else
+  stage "VS1_CREATE_TEMP_OSPC_VOLUME"
+fi
 
 # Auto-detect snapshot size if not overridden
 if [ "$SNAP_SIZE_GB" -le 0 ] 2>/dev/null; then
-  SNAP_SIZE_GB="$(_cinder_get "snapshots/$SNAPSHOT_ID" | python3 -c \
-    'import json,sys; print(json.load(sys.stdin)["snapshot"]["size"])' 2>/dev/null || echo 75)"
+  if [ "$SOURCE_MODE" = "flex" ]; then
+    source_openrc
+    SNAP_SIZE_GB="$(openstack volume snapshot show "$SNAPSHOT_ID" -f value -c size 2>/dev/null || echo 75)"
+    [ -n "$SNAP_SIZE_GB" ] || SNAP_SIZE_GB=75
+  else
+    SNAP_SIZE_GB="$(_cinder_get "snapshots/$SNAPSHOT_ID" | python3 -c \
+      'import json,sys; print(json.load(sys.stdin)["snapshot"]["size"])' 2>/dev/null || echo 75)"
+  fi
   log "[VS1] Auto-detected snapshot size: ${SNAP_SIZE_GB}GB"
 fi
 [ "$SNAP_SIZE_GB" -gt 0 ] 2>/dev/null || fail_exit "Could not determine snapshot size"
 SNAP_SIZE_ORIG_GB="$SNAP_SIZE_GB"
-# OSPC Cinder requires minimum 75 GB per volume; use 80 GB default floor for headroom
-if [ "$SNAP_SIZE_GB" -lt 80 ] 2>/dev/null; then
+# OSPC Cinder requires minimum 75 GB per volume; use 80 GB default floor for headroom.
+# Flex source Cinder does not need this old OSPC floor.
+if [ "$SOURCE_MODE" != "flex" ] && [ "$SNAP_SIZE_GB" -lt 80 ] 2>/dev/null; then
   log "[VS1] Snapshot size ${SNAP_SIZE_GB}GB below minimum — using 80GB for OSPC temp vol (FLEX vol stays ${SNAP_SIZE_ORIG_GB}GB)"
   SNAP_SIZE_GB=80
 fi
 
-SNAP_STATUS="$(_cinder_get "snapshots/$SNAPSHOT_ID" | python3 -c \
-  'import json,sys; print(json.load(sys.stdin)["snapshot"]["status"])' 2>/dev/null || echo unknown)"
+if [ "$SOURCE_MODE" = "flex" ]; then
+  source_openrc
+  SNAP_STATUS="$(openstack volume snapshot show "$SNAPSHOT_ID" -f value -c status 2>/dev/null || echo unknown)"
+else
+  SNAP_STATUS="$(_cinder_get "snapshots/$SNAPSHOT_ID" | python3 -c \
+    'import json,sys; print(json.load(sys.stdin)["snapshot"]["status"])' 2>/dev/null || echo unknown)"
+fi
 [ "$SNAP_STATUS" = "available" ] || fail_exit "Snapshot $SNAPSHOT_ID not available (status=$SNAP_STATUS)"
 kv "Snapshot status" "$SNAP_STATUS"
 kv "Snapshot size"   "${SNAP_SIZE_GB}GB"
+STREAM_BYTES=$(( SNAP_SIZE_ORIG_GB * 1073741824 ))
+
+# Try resume before creating any OSPC temp volume. If a previous run already
+# copied the full byte stream to FLEX, continue with final attach only.
+unset OS_TOKEN OS_AUTH_TYPE OS_AUTH_URL OS_TENANT_ID OS_TENANT_NAME \
+      OS_REGION_NAME OS_IDENTITY_API_VERSION OS_INTERFACE \
+      OS_PROJECT_ID OS_PROJECT_NAME OS_USER_DOMAIN_NAME OS_PROJECT_DOMAIN_ID
+# shellcheck disable=SC1090
+source "$FLEX_OPENRC"
+openstack token issue >/dev/null 2>&1 || fail_exit "FLEX authentication failed — check $FLEX_OPENRC"
+FLEX_VOL_SIZE_GB=$(( SNAP_SIZE_ORIG_GB + 1 ))
+FLEX_VOL_NAME="${FLEX_VOLUME_NAME_OVERRIDE:-mig-${LABEL_SAFE}-flex}"
+RESUME_INFO="$(flex_find_resume_volume "$FLEX_VOL_NAME" "$STREAM_BYTES" || true)"
+if [ -n "$RESUME_INFO" ]; then
+  stage "VS4_RESUME_FLEX_CINDER_VOLUME"
+  IFS=$'\t' read -r FLEX_VOL_ID RESUME_SOURCE_STATUS RESUME_SERVERS RESUME_DEVICE RESUME_SOURCE_RUN <<<"$RESUME_INFO"
+  RESUME_STREAM_DONE=1
+  log "[VS4] RESUME: reusing completed FLEX volume $FLEX_VOL_ID from $RESUME_SOURCE_RUN status=${RESUME_SOURCE_STATUS:-unknown}"
+  resume_finalize_and_exit
+fi
+source_openrc
 
 OSPC_VOL_NAME="tmp-osflex-${LABEL_SAFE}-${RUN_ID}"
-PAYLOAD="$(SNAP_ID="$SNAPSHOT_ID" SIZE="$SNAP_SIZE_GB" VNAME="$OSPC_VOL_NAME" python3 - <<'PY'
+if [ "$SOURCE_MODE" = "flex" ]; then
+  OSPC_VOL_ID="$(openstack volume create \
+    --snapshot "$SNAPSHOT_ID" \
+    --size "$SNAP_SIZE_GB" \
+    --format value -c id \
+    "$OSPC_VOL_NAME" 2>>"$JOB_LOG/source_flex_cinder.log" || true)"
+  [ -n "$OSPC_VOL_ID" ] || fail_exit "Source FLEX volume create failed — check $JOB_LOG/source_flex_cinder.log"
+else
+  PAYLOAD="$(SNAP_ID="$SNAPSHOT_ID" SIZE="$SNAP_SIZE_GB" VNAME="$OSPC_VOL_NAME" python3 - <<'PY'
 import json, os
 print(json.dumps({"volume":{"snapshot_id":os.environ["SNAP_ID"],"size":int(os.environ["SIZE"]),"display_name":os.environ["VNAME"]}},separators=(",",":")))
 PY
 )"
-RESP="$(_cinder_post "volumes" "$PAYLOAD")"
-HTTP="$(printf '%s' "$RESP" | awk -F= '/HTTP_CODE=/{print $2}' | tail -1)"
-BODY="$(printf '%s' "$RESP" | sed '/^HTTP_CODE=/d')"
-case "$HTTP" in 200|202) ;; *) fail_exit "Cinder volume create HTTP=$HTTP body=${BODY:0:200}" ;; esac
-OSPC_VOL_ID="$(printf '%s' "$BODY" | python3 -c \
-  'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("id",""))' 2>/dev/null || true)"
-[ -n "$OSPC_VOL_ID" ] || fail_exit "No volume ID in create response: ${BODY:0:300}"
-kv "OSPC temp vol"   "$OSPC_VOL_ID"
+  RESP="$(_cinder_post "volumes" "$PAYLOAD")"
+  HTTP="$(printf '%s' "$RESP" | awk -F= '/HTTP_CODE=/{print $2}' | tail -1)"
+  BODY="$(printf '%s' "$RESP" | sed '/^HTTP_CODE=/d')"
+  case "$HTTP" in 200|202) ;; *) fail_exit "Cinder volume create HTTP=$HTTP body=${BODY:0:200}" ;; esac
+  OSPC_VOL_ID="$(printf '%s' "$BODY" | python3 -c \
+    'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("id",""))' 2>/dev/null || true)"
+  [ -n "$OSPC_VOL_ID" ] || fail_exit "No volume ID in create response: ${BODY:0:300}"
+fi
+kv "$([ "$SOURCE_MODE" = "flex" ] && echo "Source FLEX temp vol" || echo "OSPC temp vol")" "$OSPC_VOL_ID"
 log "[VS1] Waiting for temp volume to become available…"
-ospc_wait_volume "$OSPC_VOL_ID" "available" 3600 || fail_exit "Temp volume $OSPC_VOL_ID never became available"
+source_wait_volume "$OSPC_VOL_ID" "available" 3600 || fail_exit "Temp volume $OSPC_VOL_ID never became available"
 log "[VS1] HIT temp volume available"
 
-# ── VS2: Attach temp OSPC volume to this jumphost ─────────────────────────────
-stage "VS2_ATTACH_OSPC_VOLUME"
+# ── VS2: Attach temp source volume to this jumphost ───────────────────────────
+if [ "$SOURCE_MODE" = "flex" ]; then
+  stage "VS2_ATTACH_SOURCE_FLEX_VOLUME"
+else
+  stage "VS2_ATTACH_OSPC_VOLUME"
+fi
 SELF_SERVER_ID="$(discover_self_server_id | head -1 | tr -d '[:space:]')"
 [ -n "$SELF_SERVER_ID" ] || fail_exit "Could not determine jumphost Nova server ID"
 kv "Jumphost server" "$SELF_SERVER_ID"
 
-ATTACH_PAYLOAD="$(VOL_ID="$OSPC_VOL_ID" python3 - <<'PY'
+if [ "$SOURCE_MODE" = "flex" ]; then
+  source_openrc
+  openstack server add volume "$SELF_SERVER_ID" "$OSPC_VOL_ID" \
+    >>"$JOB_LOG/source_flex_cinder.log" 2>&1 || fail_exit "Source FLEX server add volume failed"
+else
+  ATTACH_PAYLOAD="$(VOL_ID="$OSPC_VOL_ID" python3 - <<'PY'
 import json, os; print(json.dumps({"volumeAttachment":{"volumeId":os.environ["VOL_ID"]}},separators=(",",":")))
 PY
 )"
-ATTACH_RESP="$(_compute_post "servers/$SELF_SERVER_ID/os-volume_attachments" "$ATTACH_PAYLOAD")"
-ATTACH_HTTP="$(printf '%s' "$ATTACH_RESP" | awk -F= '/HTTP_CODE=/{print $2}' | tail -1)"
-case "$ATTACH_HTTP" in 200|202) ;; *) fail_exit "Volume attach HTTP=$ATTACH_HTTP" ;; esac
+  ATTACH_RESP="$(_compute_post "servers/$SELF_SERVER_ID/os-volume_attachments" "$ATTACH_PAYLOAD")"
+  ATTACH_HTTP="$(printf '%s' "$ATTACH_RESP" | awk -F= '/HTTP_CODE=/{print $2}' | tail -1)"
+  case "$ATTACH_HTTP" in 200|202) ;; *) fail_exit "Volume attach HTTP=$ATTACH_HTTP" ;; esac
+fi
 log "[VS2] Attach request OK — waiting in-use"
-ospc_wait_volume "$OSPC_VOL_ID" "in-use" 300 || fail_exit "Temp volume did not reach in-use"
+source_wait_volume "$OSPC_VOL_ID" "in-use" 300 || fail_exit "Temp volume did not reach in-use"
 
 # Detect source device from Cinder attachment record (avoids parallel-job race)
 if [ -n "$SOURCE_DEVICE_OVERRIDE" ]; then
@@ -583,9 +989,7 @@ else
   SOURCE_DEV=""
   for _i in $(seq 1 24); do
     sleep 5
-    SOURCE_DEV="$(_cinder_get "volumes/$OSPC_VOL_ID" | python3 -c \
-      'import json,sys; v=json.load(sys.stdin)["volume"]; a=v.get("attachments") or []; print(a[0]["device"] if a else "")' \
-      2>/dev/null || true)"
+    SOURCE_DEV="$(source_volume_device "$OSPC_VOL_ID")"
     [ -n "$SOURCE_DEV" ] && [ -b "$SOURCE_DEV" ] && break
     SOURCE_DEV=""
   done
@@ -619,34 +1023,56 @@ FLEX_VOL_NAME="${FLEX_VOLUME_NAME_OVERRIDE:-mig-${LABEL_SAFE}-flex}"
 kv "FLEX volume name" "$FLEX_VOL_NAME"
 kv "FLEX volume size" "${FLEX_VOL_SIZE_GB}GB"
 log "[VS4] FLEX volume includes +1GB safety headroom for encrypted Cinder presented-size differences"
-flex_cleanup_existing_mig_volumes "$FLEX_VOL_NAME"
+RESUME_INFO="$(flex_find_resume_volume "$FLEX_VOL_NAME" "$STREAM_BYTES" || true)"
+if [ -n "$RESUME_INFO" ]; then
+  IFS=$'\t' read -r FLEX_VOL_ID RESUME_SOURCE_STATUS RESUME_SERVERS RESUME_DEVICE RESUME_SOURCE_RUN <<<"$RESUME_INFO"
+  RESUME_STREAM_DONE=1
+  log "[VS4] RESUME: reusing completed FLEX volume $FLEX_VOL_ID from $RESUME_SOURCE_RUN status=${RESUME_SOURCE_STATUS:-unknown}"
+  if [ -n "${FLEX_TARGET_VM_ID:-}" ]; then
+    case ",$RESUME_SERVERS," in
+      *",$FLEX_TARGET_VM_ID,"*)
+        RESUME_FINAL_ATTACHED=1
+        FLEX_FINAL_ATTACHED=1
+        log "[VS4] RESUME: volume is already attached to final FLEX VM $FLEX_TARGET_VM_ID"
+        ;;
+    esac
+  fi
+else
+  flex_cleanup_existing_mig_volumes "$FLEX_VOL_NAME"
 
-FLEX_VOL_ID="$(openstack volume create \
-  --size "$FLEX_VOL_SIZE_GB" \
-  --format value -c id \
-  "$FLEX_VOL_NAME" 2>>"$JOB_LOG/flex_cinder.log" || true)"
-[ -n "$FLEX_VOL_ID" ] || fail_exit "openstack volume create failed — check $JOB_LOG/flex_cinder.log"
-kv "FLEX volume ID" "$FLEX_VOL_ID"
-log "[VS4] Waiting for FLEX volume to become available…"
-flex_wait_volume "$FLEX_VOL_ID" "available" 3600 || fail_exit "FLEX volume $FLEX_VOL_ID never became available"
-log "[VS4] HIT FLEX volume available"
+  FLEX_VOL_ID="$(openstack volume create \
+    --size "$FLEX_VOL_SIZE_GB" \
+    --format value -c id \
+    "$FLEX_VOL_NAME" 2>>"$JOB_LOG/flex_cinder.log" || true)"
+  [ -n "$FLEX_VOL_ID" ] || fail_exit "openstack volume create failed — check $JOB_LOG/flex_cinder.log"
+  kv "FLEX volume ID" "$FLEX_VOL_ID"
+  log "[VS4] Waiting for FLEX volume to become available…"
+  flex_wait_volume "$FLEX_VOL_ID" "available" 3600 || fail_exit "FLEX volume $FLEX_VOL_ID never became available"
+  log "[VS4] HIT FLEX volume available"
+fi
 
 # ── VS5: Attach blank FLEX volume to FLEX helper VM ───────────────────────────
+if [ "$RESUME_FINAL_ATTACHED" != "1" ]; then
 stage "VS5_ATTACH_FLEX_VOLUME_TO_HELPER"
 FLEX_PRE_ATTACH_DISKS=""
 if [ -n "$FLEX_HELPER_VM_ID" ]; then
+  flex_cleanup_helper_stale_mig_volumes
   FLEX_PRE_ATTACH_DISKS="$(flex_remote_block_disks | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
   if [ -n "$FLEX_PRE_ATTACH_DISKS" ]; then
     log "[VS5] FLEX helper disks before attach: $FLEX_PRE_ATTACH_DISKS"
   else
     log "[VS5] FLEX helper pre-attach disk scan empty; will still use Cinder-reported device"
   fi
-  log "[VS5] Attaching $FLEX_VOL_ID to FLEX helper vm=$FLEX_HELPER_VM_ID"
-  openstack server add volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" \
-    2>>"$JOB_LOG/flex_cinder.log" || fail_exit "openstack server add volume failed"
-  log "[VS5] Waiting for FLEX volume in-use…"
-  flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || fail_exit "FLEX volume did not reach in-use"
-  log "[VS5] FLEX volume in-use"
+  if [ "$RESUME_STREAM_DONE" = "1" ] && flex_volume_attached_to "$FLEX_VOL_ID" "$FLEX_HELPER_VM_ID"; then
+    log "[VS5] RESUME: completed FLEX volume $FLEX_VOL_ID already attached to helper vm=$FLEX_HELPER_VM_ID"
+  else
+    log "[VS5] Attaching $FLEX_VOL_ID to FLEX helper vm=$FLEX_HELPER_VM_ID"
+    openstack server add volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" \
+      2>>"$JOB_LOG/flex_cinder.log" || fail_exit "openstack server add volume failed"
+    log "[VS5] Waiting for FLEX volume in-use…"
+    flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || fail_exit "FLEX volume did not reach in-use"
+    log "[VS5] FLEX volume in-use"
+  fi
 else
   log "[VS5] No FLEX helper VM ID provided — skipping API attach (assuming volume pre-attached or TARGET_DEVICE_OVERRIDE set)"
 fi
@@ -716,7 +1142,6 @@ kv "Source bytes" "$SOURCE_BYTES"
 # Compare FLEX target against original snapshot size (not padded OSPC vol which may be 80GB).
 # The target must be large enough for the exact byte stream; otherwise dd fails
 # at the end and leaves a partial destination volume.
-STREAM_BYTES=$(( SNAP_SIZE_ORIG_GB * 1073741824 ))
 kv "Stream bytes (orig ${SNAP_SIZE_ORIG_GB}GB)" "$STREAM_BYTES"
 [ "${TARGET_BYTES}" -ge "${STREAM_BYTES}" ] || \
   fail_exit "FLEX target too small for exact stream: ${TARGET_BYTES}B < ${STREAM_BYTES}B (original snapshot ${SNAP_SIZE_ORIG_GB}GB; recreate FLEX volume with +1GB headroom)"
@@ -724,24 +1149,27 @@ log "[VS7] Size validation passed (target=${TARGET_BYTES}B stream=${STREAM_BYTES
 
 # ── VS8: Direct block stream ──────────────────────────────────────────────────
 stage "VS8_STREAM_BLOCK_DATA"
-log "[VS8] Streaming $SOURCE_DEV → ${FLEX_HELPER_USER}@${FLEX_HELPER_IP}:${FLEX_TARGET_DEV}"
-log "[VS8] Pipeline: dd | gzip -1 | ssh | gunzip | dd"
+if [ "$RESUME_STREAM_DONE" = "1" ]; then
+  log "[VS8] RESUME: previous run already copied ${STREAM_BYTES} bytes to FLEX volume $FLEX_VOL_ID; skipping block stream"
+else
+  log "[VS8] Streaming $SOURCE_DEV → ${FLEX_HELPER_USER}@${FLEX_HELPER_IP}:${FLEX_TARGET_DEV}"
+  log "[VS8] Pipeline: dd | gzip -1 | ssh | gunzip | dd"
 
-_DD_COUNT=$(( SNAP_SIZE_ORIG_GB * 16 ))  # 64M * 16 = 1 GiB → count = orig GB * 16
-log "[VS8] Streaming ${SNAP_SIZE_ORIG_GB}GB (${_DD_COUNT} blocks of 64M)"
-set +e
-(
-  set -o pipefail
-  sudo dd if="$SOURCE_DEV" bs=64M count="$_DD_COUNT" status=progress conv=sync,noerror 2>>"$JOB_LOG/stream_src.log" \
-    | gzip -1 \
-    | "${SSH_FLEX_BASE[@]}" "gunzip | sudo dd of='$FLEX_TARGET_DEV' bs=64M status=progress conv=fsync 2>>/tmp/volsnap_stream_dst_${LABEL_SAFE}.log" \
-    2>&1 | tee -a "$JOB_LOG/stream.log"
-) &
-STREAM_PID=$!
-while kill -0 "$STREAM_PID" 2>/dev/null; do
-  sleep 60
-  if kill -0 "$STREAM_PID" 2>/dev/null; then
-    STREAM_DONE_BYTES="$(python3 - "$JOB_LOG/stream_src.log" <<'PY' 2>/dev/null || true
+  _DD_COUNT=$(( SNAP_SIZE_ORIG_GB * 16 ))  # 64M * 16 = 1 GiB → count = orig GB * 16
+  log "[VS8] Streaming ${SNAP_SIZE_ORIG_GB}GB (${_DD_COUNT} blocks of 64M)"
+  set +e
+  (
+    set -o pipefail
+    sudo dd if="$SOURCE_DEV" bs=64M count="$_DD_COUNT" status=progress conv=sync,noerror 2>>"$JOB_LOG/stream_src.log" \
+      | gzip -1 \
+      | "${SSH_FLEX_BASE[@]}" "gunzip | sudo dd of='$FLEX_TARGET_DEV' bs=64M status=progress conv=fsync 2>>/tmp/volsnap_stream_dst_${LABEL_SAFE}.log" \
+      2>&1 | tee -a "$JOB_LOG/stream.log"
+  ) &
+  STREAM_PID=$!
+  while kill -0 "$STREAM_PID" 2>/dev/null; do
+    sleep 60
+    if kill -0 "$STREAM_PID" 2>/dev/null; then
+      STREAM_DONE_BYTES="$(python3 - "$JOB_LOG/stream_src.log" <<'PY' 2>/dev/null || true
 import re, sys
 path = sys.argv[1]
 try:
@@ -752,18 +1180,19 @@ matches = re.findall(r"(\d+)\s+bytes", data)
 print(matches[-1] if matches else "")
 PY
 )"
-    if [ -n "$STREAM_DONE_BYTES" ]; then
-      log "[VS8] Streaming progress: ${STREAM_DONE_BYTES}/${STREAM_BYTES} bytes"
-    else
-      log "[VS8] Streaming progress: active"
+      if [ -n "$STREAM_DONE_BYTES" ]; then
+        log "[VS8] Streaming progress: ${STREAM_DONE_BYTES}/${STREAM_BYTES} bytes"
+      else
+        log "[VS8] Streaming progress: active"
+      fi
     fi
-  fi
-done
-wait "$STREAM_PID"
-STREAM_RC=$?
-set -e
-[ "$STREAM_RC" -eq 0 ] || fail_exit "Block stream failed rc=$STREAM_RC — check $JOB_LOG/stream.log"
-log "[VS8] HIT block stream complete"
+  done
+  wait "$STREAM_PID"
+  STREAM_RC=$?
+  set -e
+  [ "$STREAM_RC" -eq 0 ] || fail_exit "Block stream failed rc=$STREAM_RC — check $JOB_LOG/stream.log"
+  log "[VS8] HIT block stream complete"
+fi
 
 # ── VS9: Validate FLEX target disk ────────────────────────────────────────────
 stage "VS9_VALIDATE_FLEX_DISK"
@@ -785,29 +1214,32 @@ if [ -n "$FLEX_HELPER_VM_ID" ]; then
 else
   log "[VS10] No FLEX helper VM ID — skipping API detach"
 fi
+fi
 
 # ── VS11: Attach FLEX volume to paired migrated FLEX VM ───────────────────────
 FINAL_ATTACH_DEVICE=""
 FINAL_TARGET_VM_ID="${FLEX_TARGET_VM_ID:-$FLEX_HELPER_VM_ID}"
-if [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_TARGET_VM_ID" ]; then
+if [ "$RESUME_FINAL_ATTACHED" = "1" ]; then
   stage "VS11_ATTACH_TO_FINAL_FLEX_VM"
   kv "Final FLEX VM" "$FLEX_TARGET_VM_ID"
-  openstack server add volume "$FLEX_TARGET_VM_ID" "$FLEX_VOL_ID" \
-    2>>"$JOB_LOG/flex_cinder.log" || fail_exit "Final attach to $FLEX_TARGET_VM_ID failed"
-  flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || \
-    log "[VS11] WARN: FLEX volume did not reach in-use after final attach"
-  log "[VS11] HIT FLEX volume attached to final VM $FLEX_TARGET_VM_ID"
+  flex_volume_attached_to "$FLEX_VOL_ID" "$FLEX_TARGET_VM_ID" || \
+    fail_exit "Resume expected FLEX volume $FLEX_VOL_ID attached to final VM $FLEX_TARGET_VM_ID, but attachment is missing"
+  log "[VS11] RESUME: FLEX volume $FLEX_VOL_ID is already attached to final VM $FLEX_TARGET_VM_ID"
+  FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
+  [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
+elif [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_TARGET_VM_ID" ]; then
+  stage "VS11_ATTACH_TO_FINAL_FLEX_VM"
+  kv "Final FLEX VM" "$FLEX_TARGET_VM_ID"
+  flex_final_attach_volume_to_server_verified "$FLEX_TARGET_VM_ID" "$FLEX_VOL_ID" "VS11" || \
+    fail_exit "Final attach to $FLEX_TARGET_VM_ID did not stick; volume status=$(flex_volume_status "$FLEX_VOL_ID")"
   FLEX_FINAL_ATTACHED=1
   FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
   [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
 elif [ "$ATTACH_TO_FINAL" = "true" ] && [ -n "$FLEX_HELPER_VM_ID" ]; then
   stage "VS11_ATTACH_TO_FINAL_FLEX_VM"
   kv "Final FLEX VM" "$FLEX_HELPER_VM_ID (helper reused as final target)"
-  openstack server add volume "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" \
-    2>>"$JOB_LOG/flex_cinder.log" || fail_exit "Final attach to helper/final target $FLEX_HELPER_VM_ID failed"
-  flex_wait_volume "$FLEX_VOL_ID" "in-use" 300 || \
-    log "[VS11] WARN: FLEX volume did not reach in-use after final attach"
-  log "[VS11] HIT FLEX volume attached to final VM $FLEX_HELPER_VM_ID"
+  flex_final_attach_volume_to_server_verified "$FLEX_HELPER_VM_ID" "$FLEX_VOL_ID" "VS11" || \
+    fail_exit "Final attach to helper/final target $FLEX_HELPER_VM_ID did not stick; volume status=$(flex_volume_status "$FLEX_VOL_ID")"
   FLEX_FINAL_ATTACHED=1
   FINAL_ATTACH_DEVICE="$(flex_volume_device "$FLEX_VOL_ID" || true)"
   [ -n "$FINAL_ATTACH_DEVICE" ] && log "[VS11] Final attachment device: $FINAL_ATTACH_DEVICE"
@@ -889,28 +1321,31 @@ else
   log "[VOL_POST_ATTACH_VALIDATE] skipped (post_attach_validate_mount=false)"
 fi
 
-# ── VS12: Cleanup — detach + optionally delete temp OSPC volume ───────────────
-stage "VS12_CLEANUP_OSPC"
-log "[VS12] Detaching temp OSPC vol=$OSPC_VOL_ID from server=$SELF_SERVER_ID"
-# Switch back to OSPC env for cleanup
-# shellcheck disable=SC1090
-source "$OSPC_OPENRC"
-_compute_delete "servers/$SELF_SERVER_ID/os-volume_attachments/$OSPC_VOL_ID"
-ospc_wait_volume "$OSPC_VOL_ID" "available" 300 || true
+# ── VS12: Cleanup — detach + optionally delete temp source volume ─────────────
+if [ "$SOURCE_MODE" = "flex" ]; then
+  stage "VS12_CLEANUP_SOURCE_FLEX"
+  source_label="Source FLEX"
+else
+  stage "VS12_CLEANUP_OSPC"
+  source_label="OSPC"
+fi
+log "[VS12] Detaching temp $source_label vol=$OSPC_VOL_ID from server=$SELF_SERVER_ID"
+source_detach_volume "$SELF_SERVER_ID" "$OSPC_VOL_ID"
+source_wait_volume "$OSPC_VOL_ID" "available" 300 || true
 
 if [ "$CLEANUP_TEMP" = "true" ]; then
-  log "[VS12] Deleting temp OSPC volume $OSPC_VOL_ID"
-  _cinder_delete "volumes/$OSPC_VOL_ID"
-  log "[VS12] Temp OSPC volume deleted"
+  log "[VS12] Deleting temp $source_label volume $OSPC_VOL_ID"
+  source_delete_volume "$OSPC_VOL_ID"
+  log "[VS12] Temp $source_label volume deleted"
 else
-  log "[VS12] cleanup_temp=false — temp OSPC volume $OSPC_VOL_ID left in available state"
+  log "[VS12] cleanup_temp=false — temp $source_label volume $OSPC_VOL_ID left in available state"
 fi
 CLEANUP_DONE=1
 
 log "══════════════════════════════════════════════════════"
 log "  VOLSNAP DIRECT CINDER COMPLETE"
 log "══════════════════════════════════════════════════════"
-log "  OSPC snapshot         : $SNAPSHOT_ID"
+log "  $source_label snapshot         : $SNAPSHOT_ID"
 log "  FLEX Cinder volume    : $FLEX_VOL_ID  ($FLEX_VOL_NAME, ${FLEX_VOL_SIZE_GB}GB)"
 [ -n "$FLEX_TARGET_VM_ID" ] && log "  Attached to FLEX VM   : $FLEX_TARGET_VM_ID"
 log "  Storage path          : Storage → Volumes (not Compute → Images)"

@@ -389,7 +389,7 @@ PY
       failure|error)
         task_msg="$(printf '%s' "$task_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("result") or "")' 2>/dev/null || true)"
         log "[ZS3] WARN CF task failed: ${task_msg:-<no message>}"
-        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|com\.rackspace__1__options'; then
+        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|exported by the image owner|only be exported by the image owner|com\.rackspace__1__options'; then
           DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_EXPORT_BLOCKED_LICENSED"
           log "[ZS3] Licensed image — Cinder fallback"
           cinder_volume_raw_export "$image_id" "$dest" && return 0

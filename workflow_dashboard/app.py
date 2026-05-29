@@ -3296,8 +3296,12 @@ def rehost_manual_ui():
 @app.get("/image_migrator/")
 def image_migrator_ui():
     from flask import make_response, request, redirect
+    from urllib.parse import urlencode
+    mode = (request.args.get("mode") or "").strip().lower()
     if request.args.get("v") != _CACHE_BUST:
-        return redirect(f"/image_migrator/?v={_CACHE_BUST}", code=302)
+        args = request.args.to_dict(flat=True)
+        args["v"] = _CACHE_BUST
+        return redirect(f"/image_migrator/?{urlencode(args)}", code=302)
     # Preload map files (filename + content) so labels and tables render without any JS fetch
     preloaded: dict = {}
     for pattern, key in [('*_overview.csv', 'overviewmap'), ('*_flavormap.csv', 'flavormap'), ('*_blockmap.csv', 'blockmap')]:
@@ -3320,7 +3324,20 @@ def image_migrator_ui():
         default_jh_ip=getattr(app, '_last_jumphost_ip', '') or os.environ.get('NBD_JUMPHOST_IP', '') or _jh['jumphost_ip'],
         default_jh_user=getattr(app, '_last_jumphost_user', '') or os.environ.get('NBD_JUMPHOST_USER', '') or _jh['jumphost_user'],
         default_jh_key=os.environ.get('NBD_JUMPHOST_KEY', '') or _jh['ssh_key'],
+        flex2flex_mode=(mode == "flex2flex"),
+        flexanywhere_mode=(mode == "flexanywhere"),
+        flex_light_mode=((request.args.get("skin") or "").strip().lower() == "flexlight"),
     ))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+@app.get("/flex_region_dr/")
+def flex_region_dr_ui():
+    from flask import make_response
+    resp = make_response(render_template("flex_region_dr.html", cache_bust=_CACHE_BUST))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
@@ -7205,6 +7222,102 @@ import subprocess
 
 ACTIVE_MIGRATOR_PROCESSES = set()
 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER = {}
+VOLSNAP_STAGING_LOCKS = {}
+VOLSNAP_STAGING_LOCKS_MU = threading.Lock()
+
+def _get_volsnap_staging_lock(key: str) -> threading.Lock:
+    with VOLSNAP_STAGING_LOCKS_MU:
+        lock = VOLSNAP_STAGING_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            VOLSNAP_STAGING_LOCKS[key] = lock
+        return lock
+
+def _stop_tracked_migrator_processes(match_terms: Optional[List[str]] = None) -> List[int]:
+    """Terminate dashboard-launched migration subprocesses, including their child process groups."""
+    killed = []
+    terms = [str(t) for t in (match_terms or []) if str(t)]
+    for process in list(ACTIVE_MIGRATOR_PROCESSES):
+        try:
+            args = process.args
+            cmdline = " ".join(args) if isinstance(args, (list, tuple)) else str(args)
+            if terms and not any(term in cmdline for term in terms):
+                continue
+            if process.poll() is None:
+                try:
+                    os.killpg(os.getpgid(process.pid), 15)
+                except Exception:
+                    try:
+                        process.terminate()
+                    except Exception:
+                        pass
+                killed.append(process.pid)
+        except Exception:
+            pass
+        finally:
+            try:
+                ACTIVE_MIGRATOR_PROCESSES.discard(process)
+            except Exception:
+                pass
+    if not terms:
+        ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.clear()
+    else:
+        for key, process in list(ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.items()):
+            try:
+                args = process.args
+                cmdline = " ".join(args) if isinstance(args, (list, tuple)) else str(args)
+                if any(term in cmdline for term in terms):
+                    ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(key, None)
+            except Exception:
+                pass
+    return killed
+
+def _kill_local_process_groups_by_terms(match_terms: List[str]) -> List[int]:
+    """Kill leftover local process groups by explicit migration-only command markers."""
+    terms = [str(t) for t in (match_terms or []) if str(t)]
+    if not terms:
+        return []
+    killed_pgids = []
+    try:
+        proc = subprocess.run(["ps", "-eo", "pid=,pgid=,args="], check=False, capture_output=True, text=True, timeout=10)
+    except Exception:
+        return killed_pgids
+    own_pid = os.getpid()
+    own_pgid = os.getpgrp()
+    for line in (proc.stdout or "").splitlines():
+        parts = line.strip().split(None, 2)
+        if len(parts) < 3:
+            continue
+        try:
+            pid = int(parts[0])
+            pgid = int(parts[1])
+        except ValueError:
+            continue
+        args = parts[2]
+        if pid == own_pid or pgid == own_pgid:
+            continue
+        if "ps -eo" in args or "workflow_dashboard/app.py" in args:
+            continue
+        if not any(term in args for term in terms):
+            continue
+        if pgid in killed_pgids:
+            continue
+        try:
+            os.killpg(pgid, 15)
+            killed_pgids.append(pgid)
+        except Exception:
+            try:
+                os.kill(pid, 15)
+                killed_pgids.append(pgid)
+            except Exception:
+                pass
+    time.sleep(1)
+    for pgid in list(killed_pgids):
+        try:
+            os.killpg(pgid, 9)
+        except Exception:
+            pass
+    return killed_pgids
 
 # ── Server-side map file cache (avoid disk read on every page refresh) ────────
 # Structure: { 'key': {'path': str, 'mtime': float, 'filename': str, 'content': str} }
@@ -7262,21 +7375,139 @@ def get_latest_maps():
 def stop_image_migrator():
     global ACTIVE_MIGRATOR_PROCESSES, ACTIVE_MIGRATOR_PROCESSES_BY_SERVER
     if ACTIVE_MIGRATOR_PROCESSES:
-        for p in list(ACTIVE_MIGRATOR_PROCESSES):
-            try:
-                import os, signal
-                pgid = os.getpgid(p.pid)
-                os.killpg(pgid, signal.SIGTERM)
-            except Exception:
-                pass
-            try:
-                p.kill()
-            except Exception:
-                pass
-        ACTIVE_MIGRATOR_PROCESSES.clear()
-        ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.clear()
+        _stop_tracked_migrator_processes()
         return jsonify({"status": "stopped", "message": "All migration processes and child processes killed."})
     return jsonify({"status": "idle", "message": "No active migration process found."})
+
+@app.post("/api/image_migrator/images/stop")
+def stop_image_migrator_images():
+    req = request.get_json(force=True, silent=True) or {}
+    job_type = str(req.get("job_type") or req.get("snapshot_type") or "all").strip().lower()
+    term_map = {
+        "linux": ["ospc2flex_linux_snap_migrate.sh", "flex_glance_direct_region_copy.sh", ".tmp_runs/flex_glance_direct", "flex2flex_region_migrate.sh"],
+        "windows": ["ospc2flex_snapwin_migrate", "windows_method_z_snapshot_existing", "flex_glance_direct_region_copy.sh", ".tmp_runs/flex_glance_direct", "flex2flex_region_migrate.sh"],
+        "volume": ["ospc2flex_volsnap_migrate.sh", "VOLSNAP_RUN_ROOT"],
+        "image": ["flex_glance_direct_region_copy.sh", ".tmp_runs/flex_glance_direct", "flex2flex_region_migrate.sh", "ospc2flex_linux_snap_migrate.sh", "ospc2flex_snapwin_migrate"],
+    }
+    local_terms = term_map.get(job_type) or [
+        "flex_glance_direct_region_copy.sh", ".tmp_runs/flex_glance_direct", "flex2flex_region_migrate.sh",
+        "ospc2flex_linux_snap_migrate.sh", "ospc2flex_snapwin_migrate", "ospc2flex_volsnap_migrate.sh", "VOLSNAP_RUN_ROOT",
+    ]
+    tracked = _stop_tracked_migrator_processes(local_terms if job_type != "all" else None)
+    local_pgids = _kill_local_process_groups_by_terms(local_terms)
+    remote = _stop_flex2flex_remote_jobs(req) if job_type in ("all", "linux", "windows", "image") else {"ok": True, "skipped": "not an image job type", "killed": []}
+    remote_linux = _stop_linux_snapshot_remote_jobs(req, job_type=job_type)
+    return jsonify({
+        "status": "stopped" if tracked or local_pgids or remote.get("killed") or remote_linux.get("killed") else "idle",
+        "job_type": job_type,
+        "tracked_pids": tracked,
+        "local_pgids": local_pgids,
+        "flex2flex_remote": remote,
+        "linux_snap_remote": remote_linux,
+    })
+
+@app.post("/api/flex2flex_region/stop")
+def stop_flex2flex_region_jobs():
+    req = request.get_json(force=True, silent=True) or {}
+    tracked = _stop_tracked_migrator_processes(["flex2flex_region_migrate.sh", "flex_glance_direct_region_copy.sh"])
+    local_pgids = _kill_local_process_groups_by_terms([
+        "flex_glance_direct_region_copy.sh",
+        ".tmp_runs/flex_glance_direct",
+        "flex2flex_region_migrate.sh",
+    ])
+    remote = _stop_flex2flex_remote_jobs(req)
+    return jsonify({
+        "status": "stopped" if tracked or local_pgids or remote.get("killed") else "idle",
+        "tracked_pids": tracked,
+        "local_pgids": local_pgids,
+        "remote": remote,
+    })
+
+def _stop_flex2flex_remote_jobs(req: dict) -> dict:
+    process_ip = str(req.get("process_host_ip") or req.get("jumphost_ip") or "").strip()
+    if not process_ip:
+        return {"ok": True, "skipped": "no jumphost supplied", "killed": []}
+    ssh_user = str(req.get("process_ssh_user") or req.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
+    ssh_key_raw = str(req.get("process_ssh_key") or req.get("ssh_key") or req.get("ssh_key_path") or "~/.ssh/id_rsa").strip()
+    if ssh_key_raw.startswith("/.ssh/"):
+        ssh_key_raw = "~" + ssh_key_raw
+    ssh_key = os.path.expanduser(ssh_key_raw)
+    if not os.path.exists(ssh_key):
+        fallback = os.path.expanduser("~/.ssh/id_rsa")
+        if os.path.exists(fallback):
+            ssh_key = fallback
+    ssh_base = [
+        "ssh", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=8", "-o", "ConnectionAttempts=1",
+        f"{ssh_user}@{process_ip}",
+    ]
+    kill_cmd = r"""
+set +e
+pids=$(pgrep -af 'flex2flex_region_migrate.sh|FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex' | grep -v 'pgrep -af' | awk '{print $1}' | sort -u)
+if [ -n "$pids" ]; then
+  echo "$pids" | xargs -r kill -TERM
+  sleep 2
+  echo "$pids" | xargs -r kill -KILL 2>/dev/null || true
+  echo "$pids"
+fi
+"""
+    try:
+        proc = subprocess.run(ssh_base + [kill_cmd], check=False, timeout=20, capture_output=True, text=True)
+        killed = [p for p in (proc.stdout or "").split() if p.isdigit()]
+        return {"ok": proc.returncode == 0, "jumphost": process_ip, "killed": killed, "stderr": (proc.stderr or "")[-500:]}
+    except Exception as exc:
+        return {"ok": False, "jumphost": process_ip, "killed": [], "error": str(exc)}
+
+
+def _stop_linux_snapshot_remote_jobs(req: dict, job_type: str = "all") -> dict:
+    process_ip = str(req.get("process_host_ip") or req.get("jumphost_ip") or "").strip()
+    if not process_ip:
+        return {"ok": True, "skipped": "no jumphost supplied", "killed": []}
+    ssh_user = str(req.get("process_ssh_user") or req.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
+    ssh_key_raw = str(req.get("process_ssh_key") or req.get("ssh_key") or req.get("ssh_key_path") or "~/.ssh/id_rsa").strip()
+    if ssh_key_raw.startswith("/.ssh/"):
+        ssh_key_raw = "~" + ssh_key_raw
+    ssh_key = os.path.expanduser(ssh_key_raw)
+    if not os.path.exists(ssh_key):
+        fallback = os.path.expanduser("~/.ssh/id_rsa")
+        if os.path.exists(fallback):
+            ssh_key = fallback
+    ssh_base = [
+        "ssh", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=8", "-o", "ConnectionAttempts=1",
+        f"{ssh_user}@{process_ip}",
+    ]
+    jt = (job_type or "all").lower()
+    if jt == "linux":
+        pattern = "ospc2flex_linux_snap_migrate.sh"
+    elif jt == "windows":
+        pattern = "ospc2flex_snapwin_migrate|windows_method_z_snapshot_existing"
+    elif jt == "volume":
+        pattern = "ospc2flex_volsnap_migrate.sh|VOLSNAP_RUN_ROOT"
+    else:
+        pattern = "ospc2flex_linux_snap_migrate.sh|ospc2flex_snapwin_migrate|windows_method_z_snapshot_existing|ospc2flex_volsnap_migrate.sh|VOLSNAP_RUN_ROOT"
+    kill_cmd = f"""
+set +e
+pids=$(pgrep -af '{pattern}' | grep -v 'pgrep -af' | awk '{{print $1}}' | sort -u)
+if [ -n "$pids" ]; then
+  echo "$pids" | xargs -r kill -TERM
+  sleep 2
+  echo "$pids" | xargs -r kill -KILL 2>/dev/null || true
+  echo "$pids"
+fi
+"""
+    try:
+        proc = subprocess.run(ssh_base + [kill_cmd], check=False, timeout=20, capture_output=True, text=True)
+        killed = [p for p in (proc.stdout or "").split() if p.isdigit()]
+        return {"ok": proc.returncode == 0, "jumphost": process_ip, "killed": killed, "stderr": (proc.stderr or "")[-500:]}
+    except Exception as exc:
+        return {"ok": False, "jumphost": process_ip, "killed": [], "error": str(exc)}
 
 
 @app.post("/api/image_migrator/kill_one")
@@ -7447,8 +7678,14 @@ def run_image_migrator():
         label_raw = str(req.get('snapshot_name') or req.get('server_name') or _snapshot_id_for_linux).strip()
         label_safe = _re.sub(r'[^A-Za-z0-9._-]+', '_', label_raw).strip('_') or "linux-snapshot"
         local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_linux_snap_migrate.sh")
+        local_repair_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_offline_repair.sh")
+        local_centos_bridge = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_centos_repair.py")
+        local_centos_module = str(BASE_DIR / "migration" / "os_repair" / "centos_repair.py")
         if not os.path.isfile(local_script):
             return jsonify({"error": f"ospc2flex_linux_snap_migrate.sh not found at {local_script}"}), 500
+        for _required in (local_repair_script, local_centos_bridge, local_centos_module):
+            if not os.path.isfile(_required):
+                return jsonify({"error": f"Linux snapshot helper not found at {_required}"}), 500
 
         ssh_key_raw = (req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip()
         if ssh_key_raw.startswith('/.ssh/'):
@@ -7540,8 +7777,9 @@ def run_image_migrator():
                     lcmd.append("--dry-run")
                 if start_fresh_kill:
                     lcmd.append("--start-fresh")
+                remote_env = f"OSPC2FLEX_JUMPHOST_IP={_shlex.quote(process_ip)}"
                 if req.get('dry_run'):
-                    remote_run = f"set -o pipefail; {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
+                    remote_run = f"set -o pipefail; {remote_env} {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
                     yield "data: [LINSNAP][DRY-RUN] Would stage ospc2flex_linux_snap_migrate.sh and OpenRC files on jumphost.\n\n"
                     if start_fresh_kill:
                         yield "data: [LINSNAP][DRY-RUN] START FRESH would kill existing Linux snapshot jobs and ignore/delete previous resume artifacts for this label.\n\n"
@@ -7599,8 +7837,12 @@ def run_image_migrator():
 
                 yield f"data: [LINSNAP] Queue job {_job_id}: no active prior Linux snapshot job for {label_safe}; starting.\n\n"
 
-                yield "data: [LINSNAP] Uploading ospc2flex_linux_snap_migrate.sh to jumphost.\n\n"
+                yield "data: [LINSNAP] Uploading Linux snapshot scripts to jumphost.\n\n"
                 _run("script upload", scp_base + [local_script, f"{ssh_usr}@{process_ip}:{remote_script}"], timeout=300)
+                _run("repair script upload", scp_base + [local_repair_script, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_offline_repair.sh"], timeout=300)
+                _run("centos repair bridge upload", scp_base + [local_centos_bridge, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_centos_repair.py"], timeout=120)
+                _run("centos repair mkdir", ssh_base + ["mkdir -p /tmp/migration/os_repair"], timeout=60)
+                _run("centos repair module upload", scp_base + [local_centos_module, f"{ssh_usr}@{process_ip}:/tmp/migration/os_repair/centos_repair.py"], timeout=120)
 
                 _run("OSPC OpenRC upload", scp_base + [ospc_path, f"{ssh_usr}@{process_ip}:{remote_ospc}"], timeout=120)
                 _run("FLEX OpenRC upload", scp_base + [flex_path, f"{ssh_usr}@{process_ip}:{remote_flex}"], timeout=120)
@@ -7609,13 +7851,14 @@ def run_image_migrator():
                     ssh_base + [
                         f"cp -f {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)}; "
                         f"chmod 600 {_shlex.quote(remote_ospc)} {_shlex.quote(remote_flex)}; "
-                        f"chmod +x {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)}"
+                        f"chmod +x {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)} "
+                        "/tmp/ospc2flex_offline_repair.sh /tmp/ospc2flex_centos_repair.py"
                     ],
                     timeout=60,
                 )
-                yield "data: [LINSNAP] Script and OpenRC files staged on jumphost.\n\n"
+                yield "data: [LINSNAP] Scripts and OpenRC files staged on jumphost.\n\n"
 
-                remote_run = f"set -o pipefail; {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
+                remote_run = f"set -o pipefail; {remote_env} {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
                 yield f"data: [LINSNAP] Launching Linux snapshot script with LS7/LS8/LS9 enabled.\n\n"
                 process = subprocess.Popen(
                     ssh_base + [remote_run],
@@ -8175,8 +8418,8 @@ def run_volsnap_migrator():
         "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
         "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
-        "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
-        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
+        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
+        "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
         "-o", "IPQoS=none",
         f"{ssh_user}@{process_ip}",
     ]
@@ -8185,8 +8428,8 @@ def run_volsnap_migrator():
         "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
         "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
         "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
-        "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
-        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
+        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
+        "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4",
         "-o", "IPQoS=none",
     ]
 
@@ -8206,13 +8449,30 @@ def run_volsnap_migrator():
     remote_target_ssh_key = f"/tmp/volsnap_{label_safe}_{_ts}_target_ssh_key"
     remote_log    = f"/tmp/volsnap_{label_safe}_{_ts}.log"
 
-    # Synthesize OSPC openrc (reuse same logic as run_image_migrator)
+    flex2flex_source_mode = str(req.get("workflow_mode") or req.get("source_mode") or "").strip().lower() in ("flex2flex", "flex")
+
+    # Synthesize source OpenRC. Normal OSPC->Flex uses OSPC v2; Flex2Flex
+    # reuses the same Volume-Snapshot-Mig runner with a source FLEX v3 OpenRC.
     ospc_path = req.get('ospc_openrc')
-    if req.get('ospc_username') and req.get('ospc_apikey') and not ospc_path:
+    if flex2flex_source_mode and not ospc_path:
+        source_region = normalize_flex_region(
+            str(req.get("source_region") or req.get("ospc_region") or req.get("flex_source_region") or "DFW3").strip() or "DFW3",
+            str(req.get("source_flex_auth_url") or req.get("ospc_auth_url") or "").strip(),
+        )
+        source_req = dict(req)
+        source_req.setdefault("source_flex_username", req.get("source_flex_username") or req.get("ospc_username"))
+        source_req.setdefault("source_flex_password", req.get("source_flex_password") or req.get("ospc_apikey"))
+        source_req.setdefault("source_flex_project_id", req.get("source_flex_project_id") or req.get("ospc_account_id"))
+        source_req.setdefault("source_flex_domain", req.get("source_flex_domain") or "rackspace_cloud_domain")
+        source_req.setdefault("source_flex_auth_url", req.get("source_flex_auth_url") or req.get("ospc_auth_url"))
+        ospc_path = _build_flex_region_openrc_from_req(source_req, source_region, "source_flex")
+    elif req.get('ospc_username') and req.get('ospc_apikey') and not ospc_path:
         import tempfile, shlex as _shlex2
         fd, ospc_path = tempfile.mkstemp(suffix=".sh", prefix="ospc_vs_")
         ospc_region   = str(req.get('ospc_region', 'IAD')).strip() or 'IAD'
         ospc_auth_url = str(req.get('ospc_auth_url', '') or '').strip()
+        if "/v3" in ospc_auth_url or "keystone.api." in ospc_auth_url:
+            ospc_auth_url = "https://identity.api.rackspacecloud.com/v2.0/"
         with os.fdopen(fd, 'w') as f:
             f.write("#!/usr/bin/env bash\n")
             f.write(f"export OS_REGION_NAME={_shlex2.quote(ospc_region)}\n")
@@ -8301,6 +8561,10 @@ def run_volsnap_migrator():
     def _volsnap_generator():
         import hashlib as _vshash, shlex as _vsshlex
         start_fresh_kill = bool(req.get('start_fresh_kill') or req.get('force_start_fresh_kill'))
+        process = None
+        client_disconnected = False
+        cleanup_deferred = False
+        staged_ok = False
         yield f"data: [VOLSNAP] Starting Volume-Snapshot-Mig: {label_safe} (snapshot={snapshot_id})\n\n"
         yield f"data: [VOLSNAP] Jumphost: {ssh_user}@{process_ip}  os_type={os_type}\n\n"
 
@@ -8311,81 +8575,106 @@ def run_volsnap_migrator():
                 raise RuntimeError(f"{label} failed (rc={proc.returncode}): {err}")
             return proc
 
+        def _run_retry(label, cmd, timeout=120, attempts=4, wait=8):
+            last_exc = None
+            for attempt in range(1, attempts + 1):
+                try:
+                    return _run(label, cmd, timeout=timeout)
+                except Exception as exc:
+                    last_exc = exc
+                    if attempt >= attempts:
+                        break
+                    yield f"data: [VOLSNAP WARN] {label} failed attempt {attempt}/{attempts}: {exc}; retrying in {wait}s\n\n"
+                    time.sleep(wait)
+            raise last_exc
+
         try:
-            if start_fresh_kill and not dry_run_requested:
-                kill_cmd = (
-                    "nohup sh -c '"
-                    "pids=$(pgrep -f \"ospc2flex_volsnap_migrate.sh\" | grep -v \"^$$\" || true); "
-                    "if [ -n \"$pids\" ]; then "
-                    "printf \"%s\\n\" \"$pids\"; "
-                    "printf \"%s\\n\" \"$pids\" | xargs -r kill -TERM >/dev/null 2>&1; "
-                    "sleep 2; "
-                    "printf \"%s\\n\" \"$pids\" | xargs -r kill -KILL >/dev/null 2>&1; "
-                    "fi' >/tmp/volsnap_start_fresh_kill.log 2>&1 < /dev/null & "
-                    "echo STARTED"
-                )
-                subprocess.Popen(
-                    ssh_base + [kill_cmd],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-                yield "data: [VOLSNAP] START FRESH: kill sweep launched on jumphost.\n\n"
-
-            # Stage script (MD5 check)
-            with open(local_script, "rb") as _fh:
-                local_md5 = _vshash.md5(_fh.read()).hexdigest()
+            stage_lock = _get_volsnap_staging_lock(f"{ssh_user}@{process_ip}")
+            if not stage_lock.acquire(blocking=False):
+                yield "data: [VOLSNAP] Waiting for another selected volume job to finish jumphost staging.\n\n"
+                stage_lock.acquire()
             try:
-                _chk = subprocess.run(
-                    ssh_base + [f"test -f {_vsshlex.quote(remote_script)} && md5sum {_vsshlex.quote(remote_script)} | awk '{{print $1}}' || true"],
-                    check=False, timeout=30, capture_output=True, text=True)
-                remote_md5 = (_chk.stdout or '').strip().splitlines()[-1] if (_chk.stdout or '').strip() else ''
-            except Exception:
-                remote_md5 = ''
+                try:
+                    _run("jumphost ssh preflight", ssh_base + ["true"], timeout=75)
+                except Exception as exc:
+                    yield "data: [VOLSNAP ERROR] ICF Issue=VOLSNAP jumphost SSH unavailable\n\n"
+                    yield "data: [VOLSNAP ERROR] ICF Cause=jumphost accepted TCP/22 but did not complete SSH banner/key exchange\n\n"
+                    yield "data: [VOLSNAP ERROR] ICF Fix=restart sshd or use a healthy same-region jumphost before launching volume snapshots\n\n"
+                    raise exc
 
-            if remote_md5 == local_md5:
-                yield "data: [VOLSNAP] Script already current on jumphost; skipped upload.\n\n"
-            else:
-                yield "data: [VOLSNAP] Uploading ospc2flex_volsnap_migrate.sh to jumphost.\n\n"
-                _run("script upload", scp_base + [local_script, f"{ssh_user}@{process_ip}:{remote_script}"], timeout=120)
+                if start_fresh_kill and not dry_run_requested:
+                    kill_cmd = (
+                        "pids=$(pgrep -af 'ospc2flex_volsnap_migrate.sh|VOLSNAP_RUN_ROOT' | "
+                        "grep -v 'pgrep -af' | awk '{print $1}' | grep -v \"^$$\" || true); "
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                        "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                    )
+                    killed = subprocess.run(
+                        ssh_base + [kill_cmd],
+                        check=False, timeout=75, capture_output=True, text=True,
+                    )
+                    killed_pids = " ".join((killed.stdout or "").split())
+                    yield f"data: [VOLSNAP] START FRESH: killed existing Volume snapshot job pid(s): {killed_pids or 'none'}\n\n"
 
-            with open(local_pg_validate_script, "rb") as _fh:
-                local_pg_md5 = _vshash.md5(_fh.read()).hexdigest()
-            try:
-                _pg_chk = subprocess.run(
-                    ssh_base + [f"test -f {_vsshlex.quote(remote_pg_validate_script)} && md5sum {_vsshlex.quote(remote_pg_validate_script)} | awk '{{print $1}}' || true"],
-                    check=False, timeout=30, capture_output=True, text=True)
-                remote_pg_md5 = (_pg_chk.stdout or '').strip().splitlines()[-1] if (_pg_chk.stdout or '').strip() else ''
-            except Exception:
-                remote_pg_md5 = ''
+                # Stage script (MD5 check) — serialized like the working snapshot paths.
+                with open(local_script, "rb") as _fh:
+                    local_md5 = _vshash.md5(_fh.read()).hexdigest()
+                try:
+                    _chk = subprocess.run(
+                        ssh_base + [f"test -f {_vsshlex.quote(remote_script)} && md5sum {_vsshlex.quote(remote_script)} | awk '{{print $1}}' || true"],
+                        check=False, timeout=75, capture_output=True, text=True)
+                    remote_md5 = (_chk.stdout or '').strip().splitlines()[-1] if (_chk.stdout or '').strip() else ''
+                except Exception:
+                    remote_md5 = ''
 
-            if remote_pg_md5 == local_pg_md5:
-                yield "data: [VOLSNAP] Post-attach PG validation script already current on jumphost; skipped upload.\n\n"
-            else:
-                yield "data: [VOLSNAP] Uploading post-attach PG validation script to jumphost.\n\n"
-                _run("post-attach pg script upload", scp_base + [local_pg_validate_script, f"{ssh_user}@{process_ip}:{remote_pg_validate_script}"], timeout=120)
+                if remote_md5 == local_md5:
+                    yield "data: [VOLSNAP] Script already current on jumphost; skipped upload.\n\n"
+                else:
+                    yield "data: [VOLSNAP] Uploading ospc2flex_volsnap_migrate.sh to jumphost.\n\n"
+                    yield from _run_retry("script upload", scp_base + [local_script, f"{ssh_user}@{process_ip}:{remote_script}"], timeout=240, attempts=4, wait=10)
 
-            # Upload scoped OSPC and FLEX OpenRC files for this VOLSNAP run.
-            _run(f"openrc upload {os.path.basename(remote_ospc)}",
-                 scp_base + [ospc_path, f"{ssh_user}@{process_ip}:{remote_ospc}"], timeout=60)
-            _run(f"openrc upload {os.path.basename(remote_flex)}",
-                 scp_base + [flex_path, f"{ssh_user}@{process_ip}:{remote_flex}"], timeout=60)
-            _run("chmod openrc",
-                 ssh_base + [
-                     f"chmod 600 {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)}; "
-                     f"chmod +x {_vsshlex.quote(remote_script)} {_vsshlex.quote(remote_pg_validate_script)}"
-                 ],
-                 timeout=30)
-            target_ssh_key_path = "/home/ubuntu/.ssh/id_rsa"
-            if os_type.strip().lower() != "windows":
-                _run("target ssh key upload",
-                     scp_base + [ssh_key, f"{ssh_user}@{process_ip}:{remote_target_ssh_key}"], timeout=60)
-                _run("chmod target ssh key",
-                     ssh_base + [f"chmod 600 {_vsshlex.quote(remote_target_ssh_key)}"], timeout=30)
-                target_ssh_key_path = remote_target_ssh_key
-                yield "data: [VOLSNAP] Linux target SSH key staged on jumphost from dashboard key.\n\n"
-            yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
+                with open(local_pg_validate_script, "rb") as _fh:
+                    local_pg_md5 = _vshash.md5(_fh.read()).hexdigest()
+                try:
+                    _pg_chk = subprocess.run(
+                        ssh_base + [f"test -f {_vsshlex.quote(remote_pg_validate_script)} && md5sum {_vsshlex.quote(remote_pg_validate_script)} | awk '{{print $1}}' || true"],
+                        check=False, timeout=75, capture_output=True, text=True)
+                    remote_pg_md5 = (_pg_chk.stdout or '').strip().splitlines()[-1] if (_pg_chk.stdout or '').strip() else ''
+                except Exception:
+                    remote_pg_md5 = ''
+
+                if remote_pg_md5 == local_pg_md5:
+                    yield "data: [VOLSNAP] Post-attach PG validation script already current on jumphost; skipped upload.\n\n"
+                else:
+                    yield "data: [VOLSNAP] Uploading post-attach PG validation script to jumphost.\n\n"
+                    yield from _run_retry("post-attach pg script upload", scp_base + [local_pg_validate_script, f"{ssh_user}@{process_ip}:{remote_pg_validate_script}"], timeout=240, attempts=4, wait=10)
+
+                # Upload scoped OSPC and FLEX OpenRC files for this VOLSNAP run.
+                yield from _run_retry(f"openrc upload {os.path.basename(remote_ospc)}",
+                     scp_base + [ospc_path, f"{ssh_user}@{process_ip}:{remote_ospc}"], timeout=180, attempts=4, wait=10)
+                yield from _run_retry(f"openrc upload {os.path.basename(remote_flex)}",
+                     scp_base + [flex_path, f"{ssh_user}@{process_ip}:{remote_flex}"], timeout=180, attempts=4, wait=10)
+                _run("chmod openrc",
+                     ssh_base + [
+                         f"chmod 600 {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)}; "
+                         f"chmod +x {_vsshlex.quote(remote_script)} {_vsshlex.quote(remote_pg_validate_script)}"
+                     ],
+                     timeout=75)
+                target_ssh_key_path = "/home/ubuntu/.ssh/id_rsa"
+                if os_type.strip().lower() != "windows":
+                    yield from _run_retry("target ssh key upload",
+                         scp_base + [ssh_key, f"{ssh_user}@{process_ip}:{remote_target_ssh_key}"], timeout=180, attempts=4, wait=10)
+                    _run("chmod target ssh key",
+                         ssh_base + [f"chmod 600 {_vsshlex.quote(remote_target_ssh_key)}"], timeout=75)
+                    target_ssh_key_path = remote_target_ssh_key
+                    yield "data: [VOLSNAP] Linux target SSH key staged on jumphost from dashboard key.\n\n"
+                yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
+                staged_ok = True
+            finally:
+                try:
+                    stage_lock.release()
+                except Exception:
+                    pass
 
             # Build remote command — pass FLEX helper args for direct Cinder path
             flex_helper_vm_id = str(req.get('flex_helper_vm_id') or '').strip()
@@ -8402,6 +8691,12 @@ def run_volsnap_migrator():
             post_attach_validate_mount = bool(req.get('post_attach_validate_mount') or req.get('post_attach_validate_pg'))
             post_attach_validate_pg = bool(req.get('post_attach_validate_pg'))
             post_attach_db_validator = str(req.get('post_attach_db_validator') or ('postgresql' if post_attach_validate_pg else 'none')).strip().lower() or 'none'
+            if os_type.strip().lower() == "windows":
+                if post_attach_validate_mount or post_attach_validate_pg or post_attach_db_validator != 'none':
+                    yield "data: [VOLSNAP] Windows volume snapshot: Linux mount/DB post-attach validation disabled.\n\n"
+                post_attach_validate_mount = False
+                post_attach_validate_pg = False
+                post_attach_db_validator = 'none'
             if post_attach_db_validator == 'mount':
                 post_attach_validate_mount = True
                 post_attach_db_validator = 'none'
@@ -8422,7 +8717,9 @@ def run_volsnap_migrator():
             post_attach_update_postgresql_conf = str(req.get('post_attach_update_postgresql_conf', 'true')).strip().lower()
             post_attach_start_postgresql = str(req.get('post_attach_start_postgresql', 'true')).strip().lower()
 
-            if os_type.strip().lower() != "windows" and flex_target_vm_id:
+            if dry_run_requested and os_type.strip().lower() != "windows" and flex_target_vm_id:
+                yield f"data: [VOLSNAP] DRY-RUN: skipping live Linux target resolution for {flex_target_vm_id}\n\n"
+            elif os_type.strip().lower() != "windows" and flex_target_vm_id:
                 resolve_region = normalize_flex_region(
                     str(req.get('flex_region') or req.get('ospc_region') or 'IAD').strip() or 'IAD',
                     str(req.get('flex_auth_url', '') or '').strip(),
@@ -8506,13 +8803,15 @@ fi
                 "bash", remote_script,
                 "--label",       label_safe,
                 "--snapshot-id", snapshot_id,
+                "--os-type", os_type.strip().lower(),
                 "--ospc-openrc", remote_ospc,
                 "--flex-openrc", remote_flex,
+                "--source-mode", "flex" if flex2flex_source_mode else "ospc",
             ]
             if dry_run_requested:
                 vs_cmd += ["--dry-run"]
             if source_volume_id:
-                yield f"data: [VOLSNAP] OSPC source volume ID: {source_volume_id}\n\n"
+                yield f"data: [VOLSNAP] {'Source FLEX' if flex2flex_source_mode else 'OSPC'} source volume ID: {source_volume_id}\n\n"
             if snap_size_gb:
                 vs_cmd += ["--snap-size-gb", snap_size_gb]
             if flex_helper_vm_id:
@@ -8572,18 +8871,905 @@ fi
             else:
                 yield "data: [VOLSNAP] Complete.\n\n"
 
+        except GeneratorExit:
+            client_disconnected = True
+            if process is not None and process.poll() is None:
+                proc = process
+                process = None
+                cleanup_deferred = True
+
+                def _drain_volsnap_after_disconnect():
+                    try:
+                        if proc.stdout:
+                            for _ in proc.stdout:
+                                pass
+                        proc.wait()
+                    finally:
+                        ACTIVE_MIGRATOR_PROCESSES.discard(proc)
+                        try:
+                            subprocess.run(
+                                ssh_base + [f"rm -f {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)} 2>/dev/null || true"],
+                                timeout=30, check=False)
+                        except Exception:
+                            pass
+
+                threading.Thread(
+                    target=_drain_volsnap_after_disconnect,
+                    name=f"volsnap-drain-{label_safe}",
+                    daemon=True,
+                ).start()
+            raise
         except Exception as exc:
             yield f"data: [VOLSNAP ERROR] {exc}\n\n"
         finally:
-            try:
-                subprocess.run(
-                    ssh_base + [f"rm -f {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)} 2>/dev/null || true"],
-                    timeout=30, check=False)
-            except Exception:
-                pass
-            yield "data: [DONE]\n\n"
+            if staged_ok and not cleanup_deferred:
+                try:
+                    subprocess.run(
+                        ssh_base + [f"rm -f {_vsshlex.quote(remote_ospc)} {_vsshlex.quote(remote_flex)} 2>/dev/null || true"],
+                        timeout=30, check=False)
+                except Exception:
+                    pass
+            if not client_disconnected:
+                yield "data: [DONE]\n\n"
 
     return Response(stream_with_context(_volsnap_generator()), mimetype='text/event-stream')
+
+
+def _build_flex_region_openrc_from_req(req: dict, region: str, prefix: str = "flex") -> Optional[str]:
+    """Write a temp Flex OpenRC for one region without logging secrets."""
+    import shlex as _sx
+
+    region = normalize_flex_region(str(region or req.get("flex_region") or "DFW3").strip() or "DFW3")
+    auth_url = normalize_flex_auth_url(
+        str(req.get(f"{prefix}_auth_url") or req.get("flex_auth_url") or "").strip()
+        or f"https://keystone.api.{region.lower()}.rackspacecloud.com/v3/",
+        region,
+    )
+    project_id = str(req.get(f"{prefix}_project_id") or req.get("flex_project_id") or "").strip()
+    flex_project_fallback = str(req.get("flex_project_id") or req.get("target_flex_project_id") or "").strip()
+    if prefix == "source_flex" and project_id.isdigit() and flex_project_fallback:
+        # Flex v3 wants the project UUID. The reused OSPC credential box may
+        # still contain the legacy numeric account id, so fall back to the
+        # known-good Flex project id from the target credential panel.
+        project_id = flex_project_fallback
+    project_name = str(req.get(f"{prefix}_project_name") or req.get("flex_project_name") or "").strip()
+    domain = str(req.get(f"{prefix}_domain") or req.get("flex_domain") or "rackspace_cloud_domain").strip() or "rackspace_cloud_domain"
+    app_id = str(req.get(f"{prefix}_app_cred_id") or req.get("flex_app_cred_id") or "").strip()
+    app_secret = str(req.get(f"{prefix}_app_cred_secret") or req.get("flex_app_cred_secret") or "").strip()
+    username = str(req.get(f"{prefix}_username") or req.get("flex_username") or "").strip()
+    password = str(req.get(f"{prefix}_password") or req.get("flex_password") or "").strip()
+
+    if not ((app_id and app_secret) or (username and password)):
+        return None
+
+    fd, path = tempfile.mkstemp(suffix=".sh", prefix=f"flex2flex_{prefix}_{region}_")
+    with os.fdopen(fd, "w") as f:
+        f.write("#!/usr/bin/env bash\n")
+        f.write(f"export OS_REGION_NAME={_sx.quote(region)}\n")
+        f.write(f"export OS_AUTH_URL={_sx.quote(auth_url)}\n")
+        f.write("export OS_INTERFACE=public\n")
+        f.write("export OS_IDENTITY_API_VERSION=3\n")
+        f.write(f"export OS_USER_DOMAIN_NAME={_sx.quote(domain)}\n")
+        f.write(f"export OS_PROJECT_DOMAIN_NAME={_sx.quote(domain)}\n")
+        if project_id:
+            f.write(f"export OS_PROJECT_ID={_sx.quote(project_id)}\n")
+        if project_name:
+            f.write(f"export OS_PROJECT_NAME={_sx.quote(project_name)}\n")
+        if app_id and app_secret:
+            f.write("export OS_AUTH_TYPE=v3applicationcredential\n")
+            f.write(f"export OS_APPLICATION_CREDENTIAL_ID={_sx.quote(app_id)}\n")
+            f.write(f"export OS_APPLICATION_CREDENTIAL_SECRET={_sx.quote(app_secret)}\n")
+        else:
+            f.write("export OS_AUTH_TYPE=password\n")
+            f.write(f"export OS_USERNAME={_sx.quote(username)}\n")
+            f.write(f"export OS_PASSWORD={_sx.quote(password)}\n")
+    os.chmod(path, 0o600)
+    return path
+
+
+@app.post("/api/flex2flex_region/images/scan")
+def flex2flex_region_scan_images():
+    """Scan source Flex Glance images using the same jumphost credential staging pattern."""
+    import json as _json
+    import re as _re
+    import shlex as _sx
+
+    req = request.get_json(force=True, silent=True) or {}
+    source_region = normalize_flex_region(str(req.get("source_region") or req.get("region") or "DFW3").strip() or "DFW3")
+    process_ip = str(req.get("process_host_ip") or req.get("jumphost_ip") or "").strip()
+    if not process_ip:
+        return jsonify({"error": "process_host_ip (jumphost IP) required for Flex image scan"}), 400
+
+    source_rc = _build_flex_region_openrc_from_req(req, source_region, "source_flex")
+    if not source_rc:
+        return jsonify({"error": "Source FLEX credentials required"}), 400
+
+    ssh_key_raw = str(req.get("process_ssh_key") or req.get("ssh_key") or "~/.ssh/id_rsa").strip()
+    if ssh_key_raw.startswith("/.ssh/"):
+        ssh_key_raw = "~" + ssh_key_raw
+    ssh_key = os.path.expanduser(ssh_key_raw)
+    if not os.path.exists(ssh_key):
+        fallback = os.path.expanduser("~/.ssh/id_rsa")
+        if os.path.exists(fallback):
+            ssh_key = fallback
+    ssh_user = str(req.get("process_ssh_user") or req.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
+    safe_region = _re.sub(r"[^A-Za-z0-9._-]+", "_", source_region)
+    remote_rc = f"/tmp/flex2flex_scan_{safe_region}_{int(time.time())}.sh"
+    def _flex_scan_is_windows(*values):
+        text = " ".join(str(v or "").lower() for v in values)
+        return (
+            "windows" in text
+            or bool(_re.search(r"(^|[^a-z0-9])win(?:20|2k|dows)?", text))
+            or bool(_re.search(r"(snapwin|opscwin|ospcwin|apwin|win20|win2k|w2k|w201|w202|safe-ide)", text))
+        )
+    ssh_base = [
+        "ssh", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
+        "-o", "IPQoS=none",
+        f"{ssh_user}@{process_ip}",
+    ]
+    scp_base = [
+        "scp", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
+        "-o", "IPQoS=none",
+    ]
+    logs = [f"[INFO] Source FLEX image scan started (region={source_region})"]
+    try:
+        up = subprocess.run(scp_base + [source_rc, f"{ssh_user}@{process_ip}:{remote_rc}"], capture_output=True, text=True, timeout=60)
+        if up.returncode != 0:
+            return jsonify({"error": "Failed to stage source Flex OpenRC on jumphost", "logs": logs}), 500
+        cmd = (
+            f"set +u; . {_sx.quote(remote_rc)}; export OS_REGION_NAME={_sx.quote(source_region)}; set -u; "
+            "openstack token issue >/dev/null && "
+            "python3 - <<'PY'\n"
+            "import json, subprocess\n"
+            "def run(cmd):\n"
+            "    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)\n"
+            "    if p.returncode != 0:\n"
+            "        return []\n"
+            "    try:\n"
+            "        return json.loads(p.stdout or '[]')\n"
+            "    except Exception:\n"
+            "        return []\n"
+            "def first(d, *keys):\n"
+            "    for k in keys:\n"
+            "        v = d.get(k) if isinstance(d, dict) else None\n"
+            "        if v not in (None, ''):\n"
+            "            return v\n"
+            "    return ''\n"
+            "def best_ip(text):\n"
+            "    import re\n"
+            "    ips = re.findall(r'(?:[0-9]{1,3}\\.){3}[0-9]{1,3}', str(text or ''))\n"
+            "    for ip in ips:\n"
+            "        if not (ip.startswith('10.') or ip.startswith('192.168.') or any(ip.startswith('172.%d.' % n) for n in range(16, 32))):\n"
+            "            return ip\n"
+            "    return ips[0] if ips else ''\n"
+            "images = run(['openstack','image','list','--private','--long','-f','json']) or run(['openstack','image','list','--private','-f','json']) or run(['openstack','image','list','--long','-f','json']) or run(['openstack','image','list','-f','json'])\n"
+            "servers = run(['openstack','server','list','--long','-f','json']) or run(['openstack','server','list','-f','json'])\n"
+            "server_by_id = {}\n"
+            "server_by_name = {}\n"
+            "for srv in servers if isinstance(servers, list) else []:\n"
+            "    sid = str(first(srv, 'ID', 'id')).strip()\n"
+            "    name = str(first(srv, 'Name', 'name')).strip()\n"
+            "    ip = best_ip(first(srv, 'Networks', 'networks', 'Addresses', 'addresses'))\n"
+            "    if sid:\n"
+            "        server_by_id[sid] = {'id': sid, 'name': name or sid[:8], 'ip': ip}\n"
+            "    if name:\n"
+            "        server_by_name[name] = {'id': sid, 'name': name, 'ip': ip}\n"
+            "volumes = run(['openstack','volume','list','--long','-f','json']) or run(['openstack','volume','list','-f','json'])\n"
+            "volume_map = {}\n"
+            "for vol in volumes if isinstance(volumes, list) else []:\n"
+            "    vid = str(first(vol, 'ID', 'id')).strip()\n"
+            "    if not vid:\n"
+            "        continue\n"
+            "    detail = run(['openstack','volume','show',vid,'-f','json']) or {}\n"
+            "    merged = dict(vol)\n"
+            "    if isinstance(detail, dict):\n"
+            "        merged.update(detail)\n"
+            "    vname = str(first(merged, 'Name', 'name', 'display_name')).strip()\n"
+            "    attachments = first(merged, 'attachments', 'Attachments', 'Attached to')\n"
+            "    attached_id = ''\n"
+            "    attached_name = ''\n"
+            "    if isinstance(attachments, list):\n"
+            "        for att in attachments:\n"
+            "            if isinstance(att, dict):\n"
+            "                attached_id = str(first(att, 'server_id', 'serverId', 'server')).strip()\n"
+            "                attached_name = str(first(att, 'server_name', 'serverName', 'host_name')).strip()\n"
+            "                if attached_id or attached_name:\n"
+            "                    break\n"
+            "    else:\n"
+            "        import re\n"
+            "        atext = str(attachments or '')\n"
+            "        m = re.search(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', atext)\n"
+            "        if m:\n"
+            "            attached_id = m.group(0)\n"
+            "        if not attached_name:\n"
+            "            attached_name = atext.split()[0] if atext and atext != '[]' else ''\n"
+            "    srv = server_by_id.get(attached_id) or server_by_name.get(attached_name) or {}\n"
+            "    volume_map[vid] = {\n"
+            "        'source_volume_name': vname,\n"
+            "        'attached_to': srv.get('name') or attached_name,\n"
+            "        'attached_vm_id': srv.get('id') or attached_id,\n"
+            "        'attached_vm_ip': srv.get('ip') or '',\n"
+            "    }\n"
+            "volsnaps = run(['openstack','volume','snapshot','list','--long','-f','json']) or run(['openstack','volume','snapshot','list','-f','json'])\n"
+            "for snap in volsnaps if isinstance(volsnaps, list) else []:\n"
+            "    vid = str(first(snap, 'Volume', 'Volume ID', 'volume_id', 'volume')).strip()\n"
+            "    if vid and vid in volume_map:\n"
+            "        snap.update(volume_map[vid])\n"
+            "print(json.dumps({'images': images, 'volume_snapshots': volsnaps}))\n"
+            "PY\n"
+            f"rc=$?; rm -f {_sx.quote(remote_rc)}; exit $rc"
+        )
+        proc = subprocess.run(ssh_base + [cmd], capture_output=True, text=True, timeout=180)
+        if proc.returncode != 0:
+            err = ((proc.stderr or "") + (proc.stdout or "")).strip()[-500:]
+            return jsonify({"error": f"Source Flex image scan failed: {err}", "logs": logs}), 500
+        scan_payload = _json.loads(proc.stdout or "{}")
+        if isinstance(scan_payload, list):
+            images = scan_payload
+            volume_snaps = []
+        else:
+            images = scan_payload.get("images") or []
+            volume_snaps = scan_payload.get("volume_snapshots") or []
+        if not volume_snaps:
+            classic_region = _re.sub(r"\d+$", "", source_region).upper()
+            classic_account = str(req.get("source_account_id") or req.get("ospc_account_id") or "").strip()
+            classic_user = str(req.get("source_flex_username") or req.get("ospc_username") or "").strip()
+            classic_key = str(req.get("source_flex_password") or req.get("ospc_apikey") or "").strip()
+            if classic_region and classic_account and classic_account.isdigit() and classic_user and classic_key:
+                try:
+                    logs.append(f"[INFO] Source FLEX Cinder returned 0 snapshots; trying classic Block Storage fallback region={classic_region}")
+                    classic_token, classic_auth = _rackspace_v2_auth(classic_user, classic_key, classic_account)
+                    cinder_endpoints = _extract_cinder_endpoints_from_catalog(classic_auth, classic_region)
+                    nova_endpoints = _extract_nova_endpoints_from_catalog(classic_auth, classic_region)
+                    server_name_map: dict = {}
+                    server_name_ip_map: dict = {}
+                    server_name_id_map: dict = {}
+                    if nova_endpoints:
+                        nova_url = nova_endpoints[0][1]
+                        nova_proc = subprocess.run(
+                            ["curl", "-sS", "-k", f"{nova_url}/servers/detail?limit=1000",
+                             "-H", f"X-Auth-Token: {classic_token}", "-H", "Accept: application/json"],
+                            cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
+                        )
+                        if nova_proc.returncode == 0:
+                            nova_payload = parse_json_mixed_output(nova_proc.stdout or "{}")
+                            for srv in ((nova_payload or {}).get("servers") or []):
+                                svid = str((srv or {}).get("id", "")).strip()
+                                svname = str((srv or {}).get("name", "") or "").strip()
+                                if svid and svname:
+                                    server_name_map[svid] = svname
+                                    server_name_id_map[svname] = svid
+                                best_ip = str((srv or {}).get("accessIPv4", "")).strip()
+                                if not best_ip:
+                                    addresses = (srv or {}).get("addresses") or {}
+                                    for _net, _entries in (addresses.items() if isinstance(addresses, dict) else []):
+                                        for _e in (_entries if isinstance(_entries, list) else []):
+                                            _ip = str((_e or {}).get("addr", "")).strip()
+                                            if _ip:
+                                                best_ip = _ip
+                                                break
+                                        if best_ip:
+                                            break
+                                if svname and best_ip:
+                                    server_name_ip_map[svname] = best_ip
+                    for c_region, c_url in cinder_endpoints:
+                        logs.append(f"[INFO] Querying classic Cinder endpoint {c_region}: {c_url}")
+                        vol_name_map: dict = {}
+                        vol_attached_map: dict = {}
+                        vol_attached_id_map: dict = {}
+                        vol_proc = subprocess.run(
+                            ["curl", "-sS", "-k", f"{c_url}/volumes/detail?limit=1000",
+                             "-H", f"X-Auth-Token: {classic_token}", "-H", "Accept: application/json"],
+                            cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
+                        )
+                        if vol_proc.returncode == 0:
+                            vol_payload = parse_json_mixed_output(vol_proc.stdout or "{}")
+                            for vol in ((vol_payload or {}).get("volumes") or []):
+                                vid = str((vol or {}).get("id", "")).strip()
+                                vname = str((vol or {}).get("name") or (vol or {}).get("display_name") or "").strip()
+                                if vid and vname:
+                                    vol_name_map[vid] = vname
+                                for att in ((vol or {}).get("attachments") or []):
+                                    svid = str((att or {}).get("server_id", "")).strip()
+                                    if svid and vid:
+                                        svname = server_name_map.get(svid, svid[:8])
+                                        vol_attached_map[vid] = svname
+                                        vol_attached_id_map[vid] = svid
+                                        break
+                        snap_proc = subprocess.run(
+                            ["curl", "-sS", "-k", f"{c_url}/snapshots/detail?limit=1000",
+                             "-H", f"X-Auth-Token: {classic_token}", "-H", "Accept: application/json"],
+                            cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
+                        )
+                        if snap_proc.returncode != 0:
+                            logs.append(f"[WARN] classic Cinder snapshot query failed rc={snap_proc.returncode}: {(snap_proc.stderr or '')[:220]}")
+                            continue
+                        snap_payload = parse_json_mixed_output(snap_proc.stdout or "{}")
+                        classic_snaps = (snap_payload or {}).get("snapshots") if isinstance(snap_payload, dict) else []
+                        if not isinstance(classic_snaps, list):
+                            classic_snaps = []
+                        logs.append(f"[INFO] {c_region}: {len(classic_snaps)} classic volume snapshots returned")
+                        for snap in classic_snaps:
+                            vid = str((snap or {}).get("volume_id", "")).strip()
+                            cinder_name = str((snap or {}).get("name") or (snap or {}).get("display_name") or "").strip()
+                            vol_name = vol_name_map.get(vid, "")
+                            attached_vm = vol_attached_map.get(vid, "")
+                            snap["_source_mode"] = "ospc"
+                            snap["_source_cloud"] = "rackspace_ospc"
+                            snap["_source_region"] = c_region
+                            snap["ID"] = str((snap or {}).get("id") or "").strip()
+                            snap["Name"] = cinder_name or vol_name or f"vol-snap-{snap['ID'][:8]}"
+                            snap["Volume ID"] = vid
+                            snap["source_volume_name"] = vol_name
+                            snap["attached_to"] = attached_vm
+                            snap["attached_vm_id"] = vol_attached_id_map.get(vid, "")
+                            snap["attached_vm_ip"] = server_name_ip_map.get(attached_vm, "") if attached_vm else ""
+                            volume_snaps.append(snap)
+                except Exception as exc:
+                    logs.append(f"[WARN] classic Block Storage fallback failed: {exc}")
+        rows = []
+        for img in images if isinstance(images, list) else []:
+            img_id = str(img.get("ID") or img.get("id") or "").strip()
+            name = str(img.get("Name") or img.get("name") or img_id).strip()
+            status = str(img.get("Status") or img.get("status") or "").strip()
+            disk_format = str(img.get("Disk Format") or img.get("disk_format") or "").strip()
+            props_text = str(img.get("Properties") or img.get("properties") or "")
+            os_distro_raw = str(img.get("os_distro") or img.get("OS Distro") or img.get("OS_DISTRO") or "")
+            os_type_raw = str(img.get("os_type") or img.get("OS Type") or img.get("OS_TYPE") or "")
+            is_windows = _flex_scan_is_windows(name, os_distro_raw, os_type_raw, props_text)
+            os_distro = (os_distro_raw or ("windows" if is_windows else "linux")).strip().lower()
+            size_raw = img.get("Size") or img.get("size") or 0
+            try:
+                size_gb = round(float(size_raw or 0) / 1024 / 1024 / 1024, 2)
+            except Exception:
+                size_gb = 0
+            if not img_id:
+                continue
+            status_lc = (status or "").strip().lower()
+            image_migratable = (status_lc == "active")
+            rows.append({
+                "asset_type": "image_snapshot",
+                "workflow_mode": "flex2flex",
+                "source_cloud": "rackspace_flex",
+                "snapshot_name": name,
+                "snapshot_id": img_id,
+                "source_region": source_region,
+                "source_vm_name": name,
+                "os_distro": os_distro,
+                "os_type": os_type_raw.strip().lower(),
+                "size_gb": size_gb,
+                "disk_format": disk_format or "qcow2",
+                "status": status or "active",
+                "migratable": image_migratable,
+                "licensed_restricted": False,
+                "is_windows": is_windows,
+                "migration_method": "flex2flex-glance-export",
+                "reason": "source Flex Glance image" if image_migratable else f"source Flex image status={status_lc or 'unknown'}; direct copy requires active",
+                "created_at": str(img.get("Created At") or img.get("created_at") or ""),
+            })
+        for snap in volume_snaps if isinstance(volume_snaps, list) else []:
+            snap_id = str(snap.get("ID") or snap.get("id") or "").strip()
+            name = str(snap.get("Name") or snap.get("name") or snap_id).strip()
+            status = str(snap.get("Status") or snap.get("status") or "").strip()
+            size_raw = snap.get("Size") or snap.get("size") or 0
+            volume_id = str(
+                snap.get("Volume") or snap.get("Volume ID") or snap.get("volume_id") or snap.get("Volume ID") or ""
+            ).strip()
+            snap_desc = str(snap.get("Description") or snap.get("description") or name)
+            source_volume_name = str(snap.get("source_volume_name") or "").strip()
+            attached_to = str(snap.get("attached_to") or "").strip()
+            attached_vm_id = str(snap.get("attached_vm_id") or "").strip()
+            attached_vm_ip = str(snap.get("attached_vm_ip") or "").strip()
+            is_windows = _flex_scan_is_windows(name, snap_desc, volume_id)
+            try:
+                size_gb = float(size_raw or 0)
+            except Exception:
+                size_gb = 0
+            if not snap_id:
+                continue
+            snap_status_lc = (status or "").strip().lower()
+            snap_migratable = (snap_status_lc in ("available", "active"))
+            rows.append({
+                "asset_type": "volume_snapshot",
+                "workflow_mode": "ospc2flex" if str(snap.get("_source_mode") or "").lower() == "ospc" else "flex2flex",
+                "source_cloud": str(snap.get("_source_cloud") or "rackspace_flex"),
+                "snapshot_name": name,
+                "snapshot_id": snap_id,
+                "source_region": str(snap.get("_source_region") or source_region),
+                "source_vm_name": source_volume_name or snap_desc or volume_id,
+                "attached_to": attached_to,
+                "attached_vm_ip": attached_vm_ip,
+                "attached_vm_id": attached_vm_id,
+                "source_server_id": attached_vm_id,
+                "source_server_ip": attached_vm_ip,
+                "source_volume_name": source_volume_name,
+                "volume_id": volume_id,
+                "source_volume_id": volume_id,
+                "os_distro": "windows" if is_windows else "linux",
+                "size_gb": size_gb,
+                "disk_format": "cinder",
+                "status": status or "available",
+                "migratable": snap_migratable,
+                "licensed_restricted": False,
+                "is_windows": is_windows,
+                "migration_method": "cinder-export" if str(snap.get("_source_mode") or "").lower() == "ospc" else "flex2flex-cinder-block-stream",
+                "reason": ("classic Block Storage volume snapshot" if str(snap.get("_source_mode") or "").lower() == "ospc" else "source Flex Cinder volume snapshot") if snap_migratable else f"source volume snapshot status={snap_status_lc or 'unknown'}; clone requires available",
+                "created_at": str(snap.get("Created At") or snap.get("created_at") or ""),
+            })
+        logs.append(f"[OK] {source_region}: {len(images)} source Flex images and {len(volume_snaps)} volume snapshots returned")
+        return jsonify({
+            "rows": rows,
+            "logs": logs,
+            "summary": {
+                "private_images_found": len(rows),
+                "migratable_snapshots": sum(1 for r in rows if r.get("migratable")),
+                "volume_snapshots_found": len(volume_snaps),
+                "licensed_restricted": 0,
+                "windows_images": sum(1 for r in rows if r.get("is_windows") and r.get("asset_type") != "volume_snapshot"),
+                "excluded_private_images": sum(1 for r in rows if not r.get("migratable")),
+            },
+        })
+    finally:
+        try:
+            os.unlink(source_rc)
+        except Exception:
+            pass
+
+
+@app.post("/api/flex2flex_region/run")
+def run_flex2flex_region_migrator():
+    """R3 FLEX2FLEX-Region Cloning: reuse the snapshot migration jumphost pattern for Flex→Flex."""
+    import re as _re
+    import hashlib as _hashlib
+    import shlex as _sx
+
+    req = request.get_json(force=True, silent=True) or {}
+
+    def _truthy(value, default=False):
+        if value is None:
+            return default
+        return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+    label_raw = str(req.get("label") or req.get("source_server_id") or req.get("source_image_id") or "flex2flex-region").strip()
+    label_safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", label_raw).strip("_") or "flex2flex-region"
+    source_region = normalize_flex_region(str(req.get("source_region") or req.get("flex_source_region") or req.get("flex_region") or "DFW3").strip() or "DFW3")
+    target_region = normalize_flex_region(str(req.get("target_region") or req.get("flex_target_region") or req.get("flex_region") or "IAD3").strip() or "IAD3")
+    source_server_id = str(req.get("source_server_id") or req.get("source_instance_id") or "").strip()
+    source_image_id = str(req.get("source_image_id") or req.get("source_snapshot_id") or "").strip()
+    dry_run_requested = _truthy(req.get("dry_run"), True)
+    boot_target = _truthy(req.get("boot_target"), False)
+    start_fresh_kill = _truthy(req.get("start_fresh_kill") or req.get("force_start_fresh_kill"), False)
+    migration_mode = str(
+        req.get("migration_mode")
+        or req.get("clone_method")
+        or req.get("flex2flex_clone_method")
+        or "jumphost_glance_stream"
+    ).strip().lower()
+    windows_source_hint = bool(
+        _re.search(
+            r"(windows|snapwin|win2012|win2016|win2019|win2022|virtio-ready)",
+            " ".join(
+                str(req.get(k) or "")
+                for k in (
+                    "label",
+                    "snapshot_name",
+                    "source_name",
+                    "source_vm_name",
+                    "os_type",
+                    "os_distro",
+                    "image_name",
+                )
+            ),
+            _re.I,
+        )
+    )
+
+    if not source_server_id and not source_image_id:
+        return jsonify({"error": "source_server_id or source_image_id required for R3 FLEX2FLEX-Region Cloning"}), 400
+
+    source_rc = _build_flex_region_openrc_from_req(req, source_region, "source_flex")
+    target_rc = _build_flex_region_openrc_from_req(req, target_region, "target_flex")
+    if not source_rc or not target_rc:
+        return jsonify({"error": "FLEX credentials required: username/password or application credential id/secret"}), 400
+
+    direct_preflight_fallback_reason = ""
+    if migration_mode == "flex_glance_direct_region_copy" and source_image_id and not dry_run_requested:
+        if windows_source_hint:
+            direct_preflight_fallback_reason = (
+                "Windows source detected; using jumphost fallback with the resumable source export/Cinder path instead of direct Glance import"
+            )
+            migration_mode = "jumphost_glance_stream"
+        else:
+            show_cmd = (
+                f"set +u; . {_sx.quote(source_rc)}; export OS_REGION_NAME={_sx.quote(source_region)}; "
+                f"set -u; openstack image show {_sx.quote(source_image_id)} -f json"
+            )
+            try:
+                show_proc = subprocess.run(["bash", "-lc", show_cmd], check=False, timeout=45, capture_output=True, text=True)
+                if show_proc.returncode == 0:
+                    image_meta = json.loads(show_proc.stdout or "{}")
+                    source_status = str(image_meta.get("status") or "").lower()
+                    if source_status and source_status != "active":
+                        direct_preflight_fallback_reason = (
+                            f"source image status={source_status}; active image required for direct copy"
+                        )
+                        migration_mode = "jumphost_glance_stream"
+            except Exception:
+                pass
+
+    if migration_mode == "flex_glance_direct_region_copy":
+        if not source_image_id:
+            return jsonify({"error": "source_image_id required for flex_glance_direct_region_copy"}), 400
+        local_direct_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "flex_glance_direct_region_copy.sh")
+        if not os.path.isfile(local_direct_script):
+            return jsonify({"error": f"flex_glance_direct_region_copy.sh not found at {local_direct_script}"}), 500
+
+        source_run_key = re.sub(r"[^A-Za-z0-9._-]+", "_", source_image_id or source_server_id or label_safe)[:12] or "source"
+        direct_run_id = f"direct-f2f-{time.time_ns()}-{uuid4().hex[:8]}-{source_run_key}"
+
+        def _direct_generator():
+            process = None
+            yield "data: [FLEX-DIRECT] Backend stream opened; running direct OpenStack API copy locally.\n\n"
+            yield ":" + (" " * 2048) + "\n\n"
+            yield "data: --- EXECUTING FLEX GLANCE DIRECT REGION COPY ---\n\n"
+            yield f"data: [FLEX-DIRECT] FLEX Glance Direct Region Copy — {label_safe}\n\n"
+            yield f"data: [FLEX-DIRECT] Source={source_region} Target={target_region} DryRun={str(dry_run_requested).lower()}\n\n"
+            yield "data: [FLEX-DIRECT] No jumphost, no SSH relay, no rescue VM, no intermediate target VM.\n\n"
+            yield "data: [FLEX-DIRECT] Streaming source Swift-backed Glance object to target Glance upload API; no local dashboard temp-file fallback is allowed.\n\n"
+            if start_fresh_kill and not dry_run_requested:
+                kill_terms = [source_image_id or label_safe]
+                tracked = _stop_tracked_migrator_processes(kill_terms)
+                local_pgids = _kill_local_process_groups_by_terms(kill_terms)
+                yield f"data: [FLEX-DIRECT] START FRESH: killed existing same-image Flex2Flex job pid(s): tracked={tracked or 'none'} local_pgids={local_pgids or 'none'} remote=skipped\n\n"
+            cmd = [
+                "bash",
+                local_direct_script,
+                "--label", label_safe,
+                "--run-id", direct_run_id,
+                "--source-openrc", source_rc,
+                "--target-openrc", target_rc,
+                "--source-region", source_region,
+                "--target-region", target_region,
+                "--source-image-id", source_image_id,
+                "--target-image-name", str(req.get("target_image_name") or ""),
+                "--target-flavor", str(req.get("target_flavor") or req.get("flex_flavor") or ""),
+                "--target-network", str(req.get("target_network") or req.get("flex_network_id") or req.get("flex_network") or ""),
+                "--target-key-name", str(req.get("target_key_name") or req.get("flex_key_name") or ""),
+                "--dry-run", "true" if dry_run_requested else "false",
+                "--boot-target", "true" if boot_target else "false",
+            ]
+            env = os.environ.copy()
+            env["FLEX_GLANCE_DIRECT_RUN_ROOT"] = str(BASE_DIR / ".tmp_runs" / "flex_glance_direct")
+            env["FLEX_GLANCE_DIRECT_ALLOW_LOCAL_FALLBACK"] = "0"
+            try:
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    start_new_session=True,
+                    env=env,
+                )
+                ACTIVE_MIGRATOR_PROCESSES.add(process)
+                for line in iter(process.stdout.readline, ""):
+                    if not line:
+                        break
+                    yield f"data: {line.rstrip()}\n\n"
+                process.wait()
+                ACTIVE_MIGRATOR_PROCESSES.discard(process)
+                yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
+                if process.returncode == 0:
+                    yield "data: [FLEX-DIRECT] FLEX Glance direct region copy complete.\n\n"
+                elif process.returncode == 86:
+                    yield "data: [FLEX-DIRECT] FALLBACK_REQUIRED — target Glance rejected direct import; continuing with jumphost stream fallback.\n\n"
+                else:
+                    yield "data: [FLEX-DIRECT] FAILED — check direct-copy log/mapping under .tmp_runs/flex_glance_direct.\n\n"
+            except GeneratorExit:
+                if process is not None and process.poll() is None:
+                    ACTIVE_MIGRATOR_PROCESSES.discard(process)
+                raise
+            except Exception as exc:
+                yield f"data: [FLEX-DIRECT][ERROR] {str(exc)}\n\n"
+            finally:
+                for path in (source_rc, target_rc):
+                    try:
+                        os.unlink(path)
+                    except Exception:
+                        pass
+                yield "data: [DONE]\n\n"
+
+        return Response(_direct_generator(), mimetype="text/event-stream")
+
+    process_ip = str(req.get("process_host_ip") or req.get("jumphost_ip") or "").strip()
+    if not process_ip:
+        return jsonify({"error": "process_host_ip (jumphost IP) required"}), 400
+
+    ssh_key_raw = str(req.get("process_ssh_key") or req.get("ssh_key") or "~/.ssh/id_rsa").strip()
+    if ssh_key_raw.startswith("/.ssh/"):
+        ssh_key_raw = "~" + ssh_key_raw
+    ssh_key = os.path.expanduser(ssh_key_raw)
+    if not os.path.exists(ssh_key):
+        fallback = os.path.expanduser("~/.ssh/id_rsa")
+        if os.path.exists(fallback):
+            ssh_key = fallback
+    ssh_user = str(req.get("process_ssh_user") or req.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
+
+    ssh_base = [
+        "ssh", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
+        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
+        "-o", "IPQoS=none",
+        f"{ssh_user}@{process_ip}",
+    ]
+    scp_base = [
+        "scp", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
+        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
+        "-o", "IPQoS=none",
+    ]
+
+    local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "flex2flex_region_migrate.sh")
+    if not os.path.isfile(local_script):
+        return jsonify({"error": f"flex2flex_region_migrate.sh not found at {local_script}"}), 500
+
+    source_run_key = re.sub(r"[^A-Za-z0-9._-]+", "_", source_image_id or source_server_id or label_safe)[:12] or "source"
+    run_token = f"{time.time_ns()}-{uuid4().hex[:8]}-{source_run_key}"
+    r3_run_id = f"r3-f2f-{run_token}"
+    remote_script = "/tmp/flex2flex_region_migrate.sh"
+    remote_source_rc = f"/tmp/flex2flex_{label_safe}_{run_token}_source.sh"
+    remote_target_rc = f"/tmp/flex2flex_{label_safe}_{run_token}_target.sh"
+    remote_log = f"/tmp/flex2flex_{label_safe}_{run_token}.log"
+
+    def _generator():
+        process = None
+        cleanup_deferred = False
+        stage_lock = None
+        stage_lock_acquired = False
+        # Send a padded first event so browsers/proxies flush the SSE stream
+        # before any SSH/scp staging command can block.
+        yield "data: [R3-F2F] Backend stream opened; starting jumphost staging.\n\n"
+        yield ":" + (" " * 2048) + "\n\n"
+        if direct_preflight_fallback_reason:
+            yield f"data: [R3-F2F] Direct mode bypassed: {direct_preflight_fallback_reason}; using jumphost fallback.\n\n"
+        yield "data: --- EXECUTING R3 FLEX2FLEX-REGION CLONING ---\n\n"
+        yield f"data: [R3-F2F] FLEX2FLEX-Region Cloning — {label_safe}\n\n"
+        yield f"data: [R3-F2F] Source={source_region} Target={target_region} DryRun={str(dry_run_requested).lower()}\n\n"
+        yield "data: [R3-F2F] Method=snapshot migration: source server snapshot/existing image → image save → target image create.\n\n"
+        yield "data: [R3-F2F] Source resources are preserved. No Xen repair, no VirtIO conversion, no DNS/FIP cutover.\n\n"
+
+        def _run(label, cmd, timeout=120):
+            proc = subprocess.run(cmd, check=False, timeout=timeout, capture_output=True, text=True)
+            if proc.returncode != 0:
+                err = ((proc.stderr or "") + (proc.stdout or "")).strip()[-500:]
+                raise RuntimeError(f"{label} failed (rc={proc.returncode}): {err}")
+            return proc
+
+        def _run_retry(label, cmd, timeout=120, attempts=4, wait=10):
+            last_exc = None
+            for attempt in range(1, attempts + 1):
+                try:
+                    return _run(label, cmd, timeout=timeout)
+                except Exception as exc:
+                    last_exc = exc
+                    if attempt >= attempts:
+                        break
+                    yield f"data: [R3-F2F WARN] {label} failed attempt {attempt}/{attempts}: {exc}; retrying in {wait}s\n\n"
+                    time.sleep(wait)
+            raise last_exc
+
+        try:
+            stage_lock = _get_volsnap_staging_lock(f"flex2flex:{ssh_user}@{process_ip}")
+            if not stage_lock.acquire(blocking=False):
+                yield "data: [R3-F2F] Waiting for another selected Flex2Flex job to finish jumphost staging.\n\n"
+                stage_lock.acquire()
+            stage_lock_acquired = True
+
+            with open(local_script, "rb") as fh:
+                local_md5 = _hashlib.md5(fh.read()).hexdigest()
+            yield "data: [R3-F2F] Checking flex2flex script on jumphost.\n\n"
+            chk = subprocess.run(
+                ssh_base + [f"test -f {_sx.quote(remote_script)} && md5sum {_sx.quote(remote_script)} | awk '{{print $1}}' || true"],
+                check=False, timeout=30, capture_output=True, text=True,
+            )
+            remote_md5 = (chk.stdout or "").strip().splitlines()[-1] if (chk.stdout or "").strip() else ""
+            if remote_md5 == local_md5:
+                yield "data: [R3-F2F] Script already current on jumphost; skipped upload.\n\n"
+            else:
+                yield "data: [R3-F2F] Uploading flex2flex_region_migrate.sh to jumphost.\n\n"
+                yield from _run_retry("R3 FLEX2FLEX script upload", scp_base + [local_script, f"{ssh_user}@{process_ip}:{remote_script}"], timeout=300, attempts=4, wait=10)
+
+            yield "data: [R3-F2F] Uploading source Flex OpenRC to jumphost.\n\n"
+            yield from _run_retry("R3 FLEX2FLEX source OpenRC upload", scp_base + [source_rc, f"{ssh_user}@{process_ip}:{remote_source_rc}"], timeout=180, attempts=4, wait=10)
+            yield "data: [R3-F2F] Uploading target Flex OpenRC to jumphost.\n\n"
+            yield from _run_retry("R3 FLEX2FLEX target OpenRC upload", scp_base + [target_rc, f"{ssh_user}@{process_ip}:{remote_target_rc}"], timeout=180, attempts=4, wait=10)
+            yield "data: [R3-F2F] Setting remote script/OpenRC permissions.\n\n"
+            yield from _run_retry(
+                "R3 FLEX2FLEX chmod",
+                ssh_base + [f"chmod 700 {_sx.quote(remote_script)}; chmod 600 {_sx.quote(remote_source_rc)} {_sx.quote(remote_target_rc)}"],
+                timeout=120,
+                attempts=4,
+                wait=10,
+            )
+            yield "data: [R3-F2F] Source/target Flex credentials staged on jumphost.\n\n"
+            if stage_lock_acquired and stage_lock is not None:
+                stage_lock.release()
+                stage_lock_acquired = False
+            if start_fresh_kill and not dry_run_requested:
+                label_pattern_q = _sx.quote(f"--label {label_safe}")
+                kill_cmd = (
+                    "pids=$(pgrep -af 'flex2flex_region_migrate.sh|FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex' | "
+                    f"grep -v 'pgrep -af' | grep -F -- {label_pattern_q} | "
+                    "awk '{print $1}' | sort -u || true); "
+                    "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                    "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                )
+                killed = subprocess.run(
+                    ssh_base + [kill_cmd],
+                    check=False, timeout=45, capture_output=True, text=True,
+                )
+                killed_pids = " ".join((killed.stdout or "").split())
+                yield f"data: [R3-F2F] START FRESH: killed existing same-label Flex2Flex job pid(s): {killed_pids or 'none'}\n\n"
+
+            if not dry_run_requested:
+                cleanup_parts = [
+                    "set +e",
+                    "root=/mnt/migration/flex2flex",
+                    "label=" + _sx.quote(label_safe),
+                    "mkdir -p \"$root\" 2>/dev/null || true",
+                    "if [ -d \"$root\" ]; then",
+                    "  before=$(df -hP \"$root\" 2>/dev/null | awk 'NR==2{print $4 \" free / \" $2 \" total (\" $5 \" used)\"}')",
+                    "  echo \"[R3-F2F][DISK] run root before cleanup: ${before:-unknown}\"",
+                    "  if [ " + ("1" if start_fresh_kill else "0") + " -eq 1 ]; then",
+                    "    find \"$root\" -mindepth 1 -maxdepth 1 -type d -name \"*_${label}_*\" -print 2>/dev/null | while read -r d; do [ -n \"$d\" ] || continue; echo \"[R3-F2F][DISK] delete same-label old run: $d\"; rm -rf -- \"$d\"; done",
+                    "  fi",
+                    "  avail_kb=$(df -Pk \"$root\" 2>/dev/null | awk 'NR==2{print $4+0}')",
+                    "  min_kb=${FLEX2FLEX_MIN_FREE_KB:-26214400}",
+                    "  if [ \"${avail_kb:-0}\" -lt \"$min_kb\" ]; then",
+                    "    echo \"[R3-F2F][DISK] low free space (${avail_kb:-0}KB); pruning stale flex2flex runs older than 6h\"",
+                    "    find \"$root\" -mindepth 1 -maxdepth 1 -type d -mmin +360 -print 2>/dev/null | sort | while read -r d; do [ -n \"$d\" ] || continue; echo \"[R3-F2F][DISK] delete stale old run: $d\"; rm -rf -- \"$d\"; done",
+                    "  fi",
+                    "  after=$(df -hP \"$root\" 2>/dev/null | awk 'NR==2{print $4 \" free / \" $2 \" total (\" $5 \" used)\"}')",
+                    "  echo \"[R3-F2F][DISK] run root after cleanup: ${after:-unknown}\"",
+                    "fi",
+                ]
+                disk_cleanup = subprocess.run(
+                    ssh_base + ["\n".join(cleanup_parts)],
+                    check=False, timeout=180, capture_output=True, text=True,
+                )
+                cleanup_output = ((disk_cleanup.stdout or "") + (disk_cleanup.stderr or "")).strip()
+                if cleanup_output:
+                    for cleanup_line in cleanup_output.splitlines():
+                        yield f"data: {cleanup_line.rstrip()}\n\n"
+
+            f2f_cmd = [
+                remote_script,
+                "--label", label_safe,
+                "--run-id", r3_run_id,
+                "--source-openrc", remote_source_rc,
+                "--target-openrc", remote_target_rc,
+                "--source-region", source_region,
+                "--target-region", target_region,
+                "--target-image-name", str(req.get("target_image_name") or ""),
+                "--target-flavor", str(req.get("target_flavor") or req.get("flex_flavor") or ""),
+                "--target-network", str(req.get("target_network") or req.get("flex_network_id") or req.get("flex_network") or ""),
+                "--target-key-name", str(req.get("target_key_name") or req.get("flex_key_name") or ""),
+                "--dry-run", "true" if dry_run_requested else "false",
+                "--boot-target", "true" if boot_target else "false",
+            ]
+            if start_fresh_kill:
+                f2f_cmd += ["--start-fresh"]
+            if source_server_id:
+                f2f_cmd += ["--source-server-id", source_server_id]
+            if source_image_id:
+                f2f_cmd += ["--source-image-id", source_image_id]
+
+            cinder_export_env = "FLEX2FLEX_ENABLE_CINDER_IMAGE_EXPORT=1 FLEX2FLEX_WINDOWS_CINDER_MIN_GB=80 " if windows_source_hint else ""
+            image_create_timeout_env = "FLEX2FLEX_IMAGE_CREATE_TIMEOUT=21600 " if windows_source_hint else ""
+            remote_run = (
+                f"set -o pipefail; FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex "
+                f"FLEX2FLEX_FALLBACK_RUN_ROOT=/tmp/flex2flex "
+                f"{cinder_export_env}"
+                f"{image_create_timeout_env}"
+                f"{' '.join(_sx.quote(x) for x in f2f_cmd)} 2>&1 | tee {_sx.quote(remote_log)}"
+            )
+            yield "data: [R3-F2F] Launching FLEX2FLEX-Region snapshot clone on jumphost.\n\n"
+            process = subprocess.Popen(
+                ssh_base + [remote_run],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                start_new_session=True,
+            )
+            ACTIVE_MIGRATOR_PROCESSES.add(process)
+            saw_remote_success = False
+            remote_stdout = process.stdout
+            while remote_stdout is not None:
+                ready, _, _ = select.select([remote_stdout], [], [], 25)
+                if ready:
+                    line = remote_stdout.readline()
+                    if not line:
+                        if process.poll() is not None:
+                            break
+                        continue
+                    if "R3 FLEX2FLEX-Region Cloning complete" in line:
+                        saw_remote_success = True
+                    yield f"data: {line.rstrip()}\n\n"
+                    continue
+                if process.poll() is not None:
+                    for tail_line in (remote_stdout.read() or "").splitlines():
+                        if "R3 FLEX2FLEX-Region Cloning complete" in tail_line:
+                            saw_remote_success = True
+                        yield f"data: {tail_line.rstrip()}\n\n"
+                    break
+                yield "data: [R3-F2F] still running on jumphost; waiting for next stage output...\n\n"
+            process.wait()
+            ACTIVE_MIGRATOR_PROCESSES.discard(process)
+            effective_rc = 0 if saw_remote_success else process.returncode
+            yield f"data: [PROCESS EXITED WITH CODE {effective_rc}]\n\n"
+            if effective_rc == 0:
+                yield "data: [R3-F2F] FLEX2FLEX-Region snapshot clone complete.\n\n"
+            else:
+                yield "data: [R3-F2F] FAILED — check jumphost log.\n\n"
+        except GeneratorExit:
+            if process is not None and process.poll() is None:
+                proc = process
+                cleanup_deferred = True
+
+                def _drain_after_disconnect():
+                    try:
+                        if proc.stdout:
+                            for _ in proc.stdout:
+                                pass
+                        proc.wait()
+                    finally:
+                        ACTIVE_MIGRATOR_PROCESSES.discard(proc)
+                        subprocess.run(
+                            ssh_base + [f"rm -f {_sx.quote(remote_source_rc)} {_sx.quote(remote_target_rc)} 2>/dev/null || true"],
+                            timeout=30, check=False,
+                        )
+
+                threading.Thread(target=_drain_after_disconnect, name=f"r3-f2f-drain-{label_safe}", daemon=True).start()
+            raise
+        except Exception as exc:
+            yield f"data: [R3-F2F ERROR] {exc}\n\n"
+        finally:
+            if stage_lock_acquired and stage_lock is not None:
+                try:
+                    stage_lock.release()
+                except Exception:
+                    pass
+            for p in (source_rc, target_rc):
+                try:
+                    os.unlink(p)
+                except Exception:
+                    pass
+            if not cleanup_deferred:
+                try:
+                    subprocess.run(
+                        ssh_base + [f"rm -f {_sx.quote(remote_source_rc)} {_sx.quote(remote_target_rc)} 2>/dev/null || true"],
+                        timeout=30, check=False,
+                    )
+                except Exception:
+                    pass
+                yield "data: [DONE]\n\n"
+
+    return Response(stream_with_context(_generator()), mimetype="text/event-stream")
 
 
 # ── Volume-Snapshot Pairing endpoints ─────────────────────────────────────────
