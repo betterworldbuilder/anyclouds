@@ -19,10 +19,77 @@ CloudJumper is a browser-based control room for OSPC to FLEX migration. It bring
 - **Orbital Mechanics**: Topology import, design, validation, deploy, and rollback.
 - **Zero-G Image Transport**: VM image migration through a jumphost using NBD, Glance, Cloud Files, and `qemu-img`.
 - **Private Snapshot Migration**: Browser-driven Linux, Windows, and Volume snapshot migration from OSPC to FLEX — no Glance round-trip, no qcow2 conversion, streamed directly to FLEX Cinder.
+- **FLEX2FLEX Region Cloning**: FLEX region-to-region cloning for private Glance images, Linux snapshots, Windows snapshots, bootable volume snapshots, data volume snapshots, and DB volume snapshots.
+- **FLEX Anywhere Hyperscaler Bridge (WIP)**: A cloned mission-control surface for AWS, Azure, and GCP image/snapshot/volume movement to and from FLEX using the proven snapshot table, per-job terminal, and batch controls.
 - **In-Flight Pod Repair**: Linux offline repair (Ubuntu, Debian, CentOS, RHEL, Rocky, AlmaLinux) and Windows offline VirtIO repair/snapshot-based migration.
 - **Mission Telemetry**: Batch job telemetry in the MBUX/Apollo dashboard.
 - **Atmospheric Re-entry**: SSH/UAT verification, reports, and J.A.R.V.I.S. audio alerts.
 - **Tenant IaC DR Pack**: Preflight checks, target cloud credential profile, OpenRC import, restore-plan overlays, and Git/S3 backup export for cross-region or cross-cloud restore.
+
+## New: FLEX Region Cloning And FLEX Anywhere
+
+### FLEX2FLEX Region Cloning
+
+The **FLEX2FLEX Region Cloning** workflow copies FLEX resources from one FLEX region to another while preserving the source. It creates new target-region resource IDs and records the mapping in the job terminal.
+
+| Source type | Target result | Purpose |
+|---|---|---|
+| Linux image snapshot | New Linux image in target FLEX region | Rebuild Linux VM in another region |
+| Windows image snapshot | New Windows image in target FLEX region | Rebuild Windows VM, including virtio-ready images |
+| Bootable volume snapshot | New bootable volume in target region | Restore VM boot disk |
+| Data volume snapshot | New data volume in target region | Restore application data |
+| DB volume snapshot | New DB volume in target region | Restore or test database recovery |
+
+How it works:
+
+1. Select the source FLEX region and scan private source snapshots.
+2. Choose Linux Snapshots, Windows Snapshots, or Volume Snapshots rows from the same migration table pattern used by OSPC2FLEX.
+3. Pick the target FLEX region.
+4. Run the clone job. The workflow tries direct Glance-to-Glance regional copy first.
+5. If the provider blocks direct import, the workflow falls back to the proven jumphost stream method.
+6. For volume snapshots, the path reuses the OSPC2FLEX volume snapshot remount/attach process, adapted for FLEX source and FLEX target regions.
+7. Validate the result from the per-job terminal, including source snapshot ID, new target image/volume ID, target VM/server details, clone status, and attach or mount result.
+
+Operational notes:
+
+- Source FLEX resources are not deleted or changed.
+- FLEX Glance image IDs are region-scoped; the target region always receives a newly created image ID.
+- Table selections, common field inputs, and per-row choices are cached in the browser.
+- Start Fresh and Stop Batch controls are available for image, Windows, and volume batches.
+- Direct Glance import is still provider-dependent; the jumphost fallback remains the reliable path for large images or blocked web-download imports.
+
+### FLEX Anywhere Hyperscaler Bridge (WIP)
+
+The **FLEX Anywhere / HYPER FLEX** workflow is a work-in-progress bridge for moving images, snapshots, and volume artifacts between FLEX and AWS, Azure, or GCP. It intentionally reuses the FLEX2FLEX mission-control layout and the existing batch/job wiring before adding provider-specific logic.
+
+Supported directions being wired:
+
+| Direction | Source artifacts | Target artifacts |
+|---|---|---|
+| AWS to FLEX | AMI, EBS snapshot, exported disk image | FLEX image or FLEX volume |
+| Azure to FLEX | Managed disk, snapshot, VHD | FLEX image or FLEX volume |
+| GCP to FLEX | Image, persistent disk snapshot | FLEX image or FLEX volume |
+| FLEX to AWS | FLEX image or volume | AMI, EBS snapshot, or imported disk |
+| FLEX to Azure | FLEX image or volume | Managed disk, snapshot, or VHD |
+| FLEX to GCP | FLEX image or volume | GCP image or persistent disk snapshot |
+
+Hyperscaler credential/input sections planned in the UI:
+
+- Migration direction: hyperscaler to FLEX, FLEX to hyperscaler, or bidirectional planning.
+- Provider selector: AWS, Azure, or GCP.
+- FLEX credentials: existing OpenRC/Auth URL, username, password, project, domain, and region fields.
+- AWS inputs: access key, secret key, profile, role ARN, account ID, source/target region, S3 bucket, AMI ID, EBS snapshot ID, instance type, subnet/security group, and key pair.
+- Azure inputs: tenant ID, subscription ID, client ID, client secret, resource group, source/target region, storage account/container, managed disk ID, snapshot ID, VM size, VNet/subnet, and SSH key.
+- GCP inputs: project ID, service account JSON, source/target region or zone, Cloud Storage bucket, image ID, disk snapshot ID, machine type, VPC/subnet, and SSH key.
+- Artifact options: image format, OS family, boot/data/DB volume type, target name prefix, and validation mode.
+
+Rackspace hyperscaler account links for operators:
+
+- AWS accounts: <https://manage.rackspace.com/aws/accounts>
+- GCP accounts: <https://manage.rackspace.com/gcp>
+- Azure enrollment: <https://manage.rackspace.com/azure/enrollment>
+
+Status: **WIP**. The page, provider credential sections, account access links, and operator flow are being added first. Provider-specific export/import adapters should be implemented by extending the working FLEX2FLEX and OSPC2FLEX paths, not by replacing them.
 
 ## 🌌 The "Why" and "So What"
 
