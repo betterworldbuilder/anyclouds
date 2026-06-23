@@ -61,6 +61,7 @@ cred-cache.js
 
 # Runtime outputs
 .dashboard.pid
+.tmp_*.pid
 .tmp_runs/
 .tmp_dashboard_*.log
 flex_mockup_5005.log
@@ -74,6 +75,14 @@ dashboard.log
 migration_log.txt
 uploads/migration_output_bundles/
 *.log
+
+# Local migration disk artifacts
+*.img
+*.raw
+*.qcow2
+*.vhd
+*.vmdk
+flex2flex-linux-win-vol-allok.*/
 
 # Backup files
 *.bak

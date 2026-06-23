@@ -13,13 +13,13 @@
 
   <main class="app">
     <header class="hero">
-      <p class="eyebrow">Rackspace Footprint Viewer</p>
-      <h1>CSV Dashboard</h1>
-      <p class="sub">Top section is for <code>account_overview.py</code>. Bottom section is optional for <code>flavor_mapper.py</code>.</p>
+      <p class="eyebrow" id="pageEyebrow">Rackspace Footprint Viewer</p>
+      <h1 id="pageTitle">CSV Dashboard</h1>
+      <p class="sub" id="pageSubtitle">Top section is for <code>account_overview.py</code>. Bottom section is optional for <code>flavor_mapper.py</code>.</p>
     </header>
 
     <section class="panel upload-panel">
-      <label for="csvFile" class="upload-label">Account Overview CSV</label>
+      <label for="csvFile" class="upload-label" id="overviewUploadLabel">Account Overview CSV</label>
       <input id="csvFile" type="file" accept=".csv,text/csv" />
       <p id="fileMeta" class="meta">No file loaded</p>
     </section>
@@ -93,7 +93,7 @@
     </section>
 
     <section class="panel upload-panel mapper-upload">
-      <label for="mapperFile" class="upload-label">Optional Flavor Mapper CSV</label>
+      <label for="mapperFile" class="upload-label" id="mapperUploadLabel">Optional Flavor Mapper CSV</label>
       <input id="mapperFile" type="file" accept=".csv,text/csv" />
       <p id="mapperMeta" class="meta">No flavor mapper file loaded</p>
     </section>
@@ -225,11 +225,26 @@
 
   <script src="./app.js"></script>
   <script>
+    (function customizeProviderView() {
+      const source = (new URLSearchParams(window.location.search).get('source') || 'ospc').toLowerCase();
+      const labels = { ospc: 'OSPC', flex2flex: 'FLEX2FLEX', aws: 'AWS', gcp: 'GCP', azure: 'Azure' };
+      const label = labels[source] || 'OSPC';
+      if (!['aws', 'gcp', 'azure', 'flex2flex'].includes(source)) return;
+      document.title = `${label} Inventory and FLEX Mapper`;
+      const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+      set('pageEyebrow', `${label} Source Footprint Viewer`);
+      set('pageTitle', `${label} Inventory and FLEX Mapper`);
+      set('pageSubtitle', `Load ${label} overview exports, review discovered resources, and pair them with FLEX flavor, block, and LB mapper files.`);
+      set('overviewUploadLabel', `${label} Overview CSV`);
+      set('mapperUploadLabel', `Optional ${label} to FLEX Flavor Mapper CSV`);
+    })();
+
     // ── Auto-load CSVs from server on page start ──────────────────────────────
     (async function autoloadCSVs() {
       const banner  = document.getElementById('autoloadBanner');
       const status  = document.getElementById('autoloadStatus');
       const BASE    = window.location.origin;   // http://127.0.0.1:5001
+      const source  = (new URLSearchParams(window.location.search).get('source') || 'ospc').toLowerCase();
 
       function log(msg) {
         if (status) status.innerHTML += msg + '<br>';
@@ -265,10 +280,17 @@
         banner.style.display = 'block';
         log('Scanning server CSVs…');
 
-        await pickAndLoad(files, f => /_overview\.csv$/i.test(f),  'csvFile',    false);
-        await pickAndLoad(files, f => /_flavormap\.csv$/i.test(f), 'mapperFile', true);
-        await pickAndLoad(files, f => /_blockmap\.csv$/i.test(f),  'blockFile',  'block');
-        await pickAndLoad(files, f => /_lbmap\.csv$/i.test(f),     'lbFile',     'lb');
+        const lower = f => String(f || '').toLowerCase();
+        const sourceMatch = f => {
+          const n = lower(f);
+          if (source === 'flex2flex') return n.includes('flex2flex_') || n.includes('_flex2flex_');
+          if (['aws', 'gcp', 'azure'].includes(source)) return n.includes(`_${source}_hyperflex_`);
+          return !n.includes('flex2flex') && !n.includes('_hyperflex_');
+        };
+        await pickAndLoad(files, f => sourceMatch(f) && /_overview\.csv$/i.test(f),  'csvFile',    false);
+        await pickAndLoad(files, f => sourceMatch(f) && /_flavormap\.csv$/i.test(f), 'mapperFile', true);
+        await pickAndLoad(files, f => sourceMatch(f) && /_blockmap\.csv$/i.test(f),  'blockFile',  'block');
+        await pickAndLoad(files, f => sourceMatch(f) && /_lbmap\.csv$/i.test(f),     'lbFile',     'lb');
 
         log('<span style="color:#86efac">Done.</span>');
         setTimeout(() => { banner.style.display = 'none'; }, 4000);

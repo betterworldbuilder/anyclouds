@@ -12,6 +12,7 @@ TARGET_IMAGE_NAME=""
 TARGET_FLAVOR=""
 TARGET_NETWORK=""
 TARGET_KEY_NAME=""
+FLOATING_IP=""
 DRY_RUN=1
 BOOT_TARGET=0
 
@@ -28,6 +29,7 @@ while [[ $# -gt 0 ]]; do
     --target-flavor) TARGET_FLAVOR="${2:-}"; shift 2 ;;
     --target-network) TARGET_NETWORK="${2:-}"; shift 2 ;;
     --target-key-name) TARGET_KEY_NAME="${2:-}"; shift 2 ;;
+    --floating-ip) FLOATING_IP="${2:-}"; shift 2 ;;
     --dry-run) case "${2:-true}" in false|0|no|off) DRY_RUN=0 ;; *) DRY_RUN=1 ;; esac; shift 2 ;;
     --boot-target) case "${2:-false}" in true|1|yes|on) BOOT_TARGET=1 ;; *) BOOT_TARGET=0 ;; esac; shift 2 ;;
     *) echo "[FLEX-GLANCE-DIRECT][ERROR] Unknown argument: $1" >&2; exit 2 ;;
@@ -49,6 +51,53 @@ REPORT_MD="$RUN_DIR/flex_glance_direct_report.md"
 log() { printf '[%s][%s][FLEX-DIRECT] %s\n' "$(date -u +%H:%M:%S)" "$safe_label" "$*"; }
 stage() { log "══════════════════════════════════════════════════════"; log "$1"; log "══════════════════════════════════════════════════════"; }
 json_escape() { python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])'; }
+
+cleanup_stale_direct_artifacts() {
+  [[ "${FLEX_DIRECT_CLEAN_STALE_IMAGES:-1}" == "1" ]] || {
+    log "[DG0] stale direct artifact cleanup disabled"
+    return 0
+  }
+  local min_age_minutes="${FLEX_DIRECT_CLEAN_MIN_AGE_MIN:-60}"
+  [[ "$min_age_minutes" =~ ^[0-9]+$ ]] || min_age_minutes=60
+  local before after delete_list
+  before="$(df -hP "$RUN_ROOT" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+  log "[DG0] run root disk before cleanup: ${before:-unknown}"
+  delete_list="$RUN_DIR/stale_direct_images.tsv"
+  : >"$delete_list"
+  find "$RUN_ROOT" -xdev -type f -mmin +"$min_age_minutes" \( \
+      -iname "*.img" -o -iname "*.raw" -o -iname "*.vhd" -o -iname "*.vhdx" -o -iname "*.vmdk" -o -iname "*.partial*" \
+    \) -printf '%s\t%p\n' 2>/dev/null | sort -nr -u >"$delete_list" || true
+  local count bytes deleted=0 freed=0 sz path run_root
+  count="$(wc -l <"$delete_list" | tr -d '[:space:]')"
+  bytes="$(awk -F '\t' '{s+=$1} END{printf "%.0f", s+0}' "$delete_list")"
+  if [[ "${count:-0}" -gt 0 ]]; then
+    log "[DG0] stale direct artifact cleanup candidates older than ${min_age_minutes}m: count=$count bytes=$bytes"
+    while IFS=$'\t' read -r sz path; do
+      [[ -n "$path" ]] || continue
+      case "$path" in "$RUN_DIR"/*) log "[DG0] keep current direct artifact: $path"; continue ;; esac
+      run_root="$(printf '%s\n' "$path" | sed -E "s#^(${RUN_ROOT}/[^/]+).*#\\1#")"
+      if [[ -n "$run_root" ]] && ps -eo args= 2>/dev/null | grep -F -- "$run_root" | grep -vq grep; then
+        log "[DG0] keep active direct artifact: $path"
+        continue
+      fi
+      case "$path" in
+        "$RUN_ROOT"/*)
+          log "[DG0] delete stale direct artifact: ${sz}B $path"
+          rm -f -- "$path" 2>/dev/null || true
+          deleted=$((deleted + 1))
+          freed=$((freed + ${sz:-0}))
+          ;;
+        *) log "[DG0] skip unsafe direct artifact path: $path" ;;
+      esac
+    done <"$delete_list"
+  else
+    log "[DG0] no stale direct image artifacts found"
+  fi
+  rm -f -- "$delete_list" 2>/dev/null || true
+  after="$(df -hP "$RUN_ROOT" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+  log "[DG0] stale direct artifact cleanup complete; deleted=$deleted freed_bytes=$freed"
+  log "[DG0] run root disk after cleanup: ${after:-unknown}"
+}
 
 require_file() {
   [[ -f "$1" ]] && return 0
@@ -139,6 +188,7 @@ JSON
 }
 
 stage "DG0_PREFLIGHT"
+cleanup_stale_direct_artifacts
 require_file "$SOURCE_OPENRC" "source Flex OpenRC"
 require_file "$TARGET_OPENRC" "target Flex OpenRC"
 [[ -n "$SOURCE_REGION" && -n "$TARGET_REGION" && -n "$SOURCE_IMAGE_ID" ]] || { log "[ERROR] source-region, target-region, source-image-id required"; exit 1; }
@@ -355,7 +405,7 @@ PY
       SOURCE_SWIFT_OBJECT_URL_FOR_LOCAL="$source_swift_object_url"
       SOURCE_SWIFT_OBJECT_SIZE_FOR_LOCAL="$source_swift_size"
 	      stream_byte_limit="${FLEX_GLANCE_DIRECT_STREAM_MAX_BYTES:-134217728}"
-	      [[ "$stream_byte_limit" =~ ^[0-9]+$ && "$stream_byte_limit" -ge 0 ]] || stream_byte_limit=134217728
+	      [[ "$stream_byte_limit" =~ ^[0-9]+$ && "$stream_byte_limit" -ge 0 ]] || stream_byte_limit=8589934592
 		      skip_web_download=0
 		      if [[ "$source_swift_size" =~ ^[0-9]+$ && "$source_swift_size" -gt "$stream_byte_limit" ]]; then
 			        log "[WARN] Source object is $source_swift_size bytes; skipping pipe stream above ${stream_byte_limit}B and trying target Glance web-download import."
@@ -391,23 +441,41 @@ PY
 	            if [[ "$source_swift_size" =~ ^[0-9]+$ && "$source_swift_size" -gt 0 ]]; then
 	              upload_headers+=(-H "Content-Length: $source_swift_size")
 	            fi
+	            stream_rc_file="$RUN_DIR/swift-stream-upload.rc"
+	            rm -f "$stream_rc_file"
 	            set +e
 	            (
-	              set -o pipefail
-	              curl --http1.1 -fSsL \
-	                --connect-timeout 30 \
-	                --speed-time 300 \
-	                --speed-limit 1024 \
-	                -H "X-Auth-Token: $SOURCE_TOKEN" \
-	                -H "Accept: application/octet-stream" \
-	                "$source_swift_object_url" | \
-	              curl --http1.1 -fSs -X PUT "$UPLOAD_URL" \
-	                "${upload_headers[@]}" \
-	                --data-binary @- \
-	                --write-out "%{http_code}" \
-	                -o "$upload_body"
-	            ) >"$http_status_file" 2>"$stream_log"
-	            swift_stream_rc=$?
+	              set +e
+	              (
+	                set -o pipefail
+	                curl --http1.1 -fSsL \
+	                  --connect-timeout 30 \
+	                  --speed-time 300 \
+	                  --speed-limit 1024 \
+	                  -H "X-Auth-Token: $SOURCE_TOKEN" \
+	                  -H "Accept: application/octet-stream" \
+	                  "$source_swift_object_url" | \
+	                curl --http1.1 -fSs -X PUT "$UPLOAD_URL" \
+	                  "${upload_headers[@]}" \
+	                  --data-binary @- \
+	                  --write-out "%{http_code}" \
+	                  -o "$upload_body"
+	              ) >"$http_status_file" 2>"$stream_log"
+	              printf '%s\n' "$?" >"$stream_rc_file"
+	            ) &
+	            stream_pid=$!
+	            stream_started="$(date +%s)"
+	            stream_interval="${FLEX_GLANCE_DIRECT_PROGRESS_INTERVAL:-20}"
+	            [[ "$stream_interval" =~ ^[0-9]+$ && "$stream_interval" -ge 5 ]] || stream_interval=20
+	            while kill -0 "$stream_pid" >/dev/null 2>&1; do
+	              sleep "$stream_interval"
+	              if kill -0 "$stream_pid" >/dev/null 2>&1; then
+	                stream_elapsed=$(( $(date +%s) - stream_started ))
+	                log "[STREAM] source Swift object upload still running elapsed=${stream_elapsed}s target_image=$TARGET_IMAGE_ID"
+	              fi
+	            done
+	            wait "$stream_pid" >/dev/null 2>&1 || true
+	            swift_stream_rc="$(cat "$stream_rc_file" 2>/dev/null || echo 1)"
 	            set -e
 	            http_status="$(cat "$http_status_file" 2>/dev/null || true)"
 	            if [[ "$swift_stream_rc" -eq 0 && "$http_status" =~ ^(200|201|204)$ ]]; then
@@ -802,9 +870,29 @@ if [[ "$BOOT_TARGET" -eq 1 ]]; then
 	      [[ -n "$TARGET_KEY_NAME" ]] && boot_args+=(--key-name "$TARGET_KEY_NAME")
 	      [[ -n "$boot_from_volume_size" ]] && boot_args+=(--boot-from-volume "$boot_from_volume_size")
 	      boot_args+=(--wait -f value -c id)
-	      TARGET_SERVER_ID="$(source_os "$TARGET_OPENRC" "$TARGET_REGION"; openstack "${boot_args[@]}")"
-	      TARGET_SERVER_ID="$(printf '%s' "$TARGET_SERVER_ID" | tail -1 | tr -d '[:space:]')"
-	      log "Target server ID: $TARGET_SERVER_ID"
+      TARGET_SERVER_ID="$(source_os "$TARGET_OPENRC" "$TARGET_REGION"; openstack "${boot_args[@]}")"
+      TARGET_SERVER_ID="$(printf '%s' "$TARGET_SERVER_ID" | tail -1 | tr -d '[:space:]')"
+      log "Target server ID: $TARGET_SERVER_ID"
+	      if [[ -n "$TARGET_SERVER_ID" && -n "$FLOATING_IP" ]]; then
+	        log "[FIP] replacement IP requested: $FLOATING_IP"
+	        (
+	          source_os "$TARGET_OPENRC" "$TARGET_REGION"
+	          port_id="$(openstack port list --server "$TARGET_SERVER_ID" -f value -c ID 2>/dev/null | head -1 | tr -d '\r' || true)"
+	          fip_id="$(openstack floating ip list -f value -c ID -c 'Floating IP Address' 2>/dev/null | awk -v ip="$FLOATING_IP" '$2==ip{print $1; exit}' || true)"
+	          if [[ -n "$port_id" && -n "$fip_id" ]]; then
+	            fixed="$(openstack floating ip show "$fip_id" -f value -c fixed_ip_address 2>/dev/null || true)"
+	            if [[ -n "$fixed" && "$fixed" != "None" ]]; then
+	              log "[FIP] detaching replacement IP $FLOATING_IP from existing fixed IP $fixed"
+	              openstack floating ip unset --port "$fip_id" >/dev/null 2>&1 || true
+	              sleep 3
+	            fi
+	            openstack floating ip set --port "$port_id" "$fip_id" >/dev/null 2>&1 || true
+	            log "[FIP] replacement IP attached: $FLOATING_IP"
+	          else
+	            log "[FIP][WARN] replacement IP or target port not found; ip=$FLOATING_IP port=${port_id:-missing}"
+	          fi
+	        )
+	      fi
 	    fi
   fi
 else

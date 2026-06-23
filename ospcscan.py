@@ -92,9 +92,13 @@ try:
             "tenantId": TENANT_ID
         }
     })
+    if "access" not in auth:
+        fault = auth.get("unauthorized") or auth.get("forbidden") or auth.get("badRequest") or auth.get("itemNotFound") or auth
+        print(json.dumps({"error": f"Auth failed for tenant {TENANT_ID}: {fault}"}))
+        sys.exit(1)
     token = auth["access"]["token"]["id"]
 except Exception as e:
-    print(json.dumps({"error": f"Auth failed: {e}"}))
+    print(json.dumps({"error": f"Auth failed for tenant {TENANT_ID}: {e}"}))
     sys.exit(1)
 
 # ── Step 2: Resolve endpoints ─────────────────────────────────────────────────

@@ -906,19 +906,12 @@ REPAIR_OS_TYPE={shell_quote(repair_os_type or "")}
 OFFLINE_REPAIR_METHOD={shell_quote(offline_repair_method or "custom_os")}
 log "[INFO] Repair profile: REPAIR_OS_TYPE=${{REPAIR_OS_TYPE:-<auto>}} method=$OFFLINE_REPAIR_METHOD"
 
-# ── Check: resume from repaired image if already done (skip stages 4.5/4.6/4.7) ──
-repair_done=0
+# ── Resume rule: only unrepaired qcow2 may resume. Repaired images are stale outputs. ──
 if [ -f "$repaired_path" ]; then
   _rz=$(stat -c%s "$repaired_path" 2>/dev/null || echo 0)
-  if [ "$_rz" -ge "$MIN_SIZE_BYTES" ]; then
-    log "  [INFO] Repaired image exists: $repaired_path ($_rz bytes) — resuming from repaired image (skipping repair stages)"
-    repair_done=1
-  else
-    log "  [WARN] Repaired image too small ($_rz bytes) — discarding and re-repairing"
-    rm -f "$repaired_path"
-  fi
+  log "  [INFO] Removing repaired qcow2 output before repair-always resume: $repaired_path ($_rz bytes)"
+  rm -f "$repaired_path"
 fi
-if [ $repair_done -eq 0 ]; then
 
 # ── STAGE 4.5: Offline Guest Repair ──────────────────────────────────────────
 # Linux quick path (fstab + netplan). Windows skips — Stage 4.6 runs VirtIO script.
@@ -1541,8 +1534,6 @@ if [ $_verify_passed -eq 0 ] && [ $_repair_attempt -ge $_max_repair_attempts ]; 
 fi
 fi  # end Windows/Linux verify branch
 stage_done '4.7'
-
-fi  # end repair_done check (stages 4.5/4.6/4.7)
 
 # ── STAGE 5: Upload to FLEX Glance ───────────────────────────────────────────
 stage_start 5 'Upload to FLEX Glance' 'Prefer FLEX Cloud Files staging → Glance import; fallback to direct Glance upload'

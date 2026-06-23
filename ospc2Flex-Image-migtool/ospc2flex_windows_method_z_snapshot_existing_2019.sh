@@ -53,6 +53,8 @@ HEALTHCHECK_WAIT="${OSPC2FLEX_HEALTHCHECK_WAIT:-1200}"
 EXPORT_RETRIES="${OSPC2FLEX_IMAGE_EXPORT_RETRIES:-4}"
 EXPORT_RETRY_WAIT="${OSPC2FLEX_IMAGE_EXPORT_RETRY_WAIT:-15}"
 CLOUD_FILES_EXPORT_TIMEOUT="${OSPC2FLEX_CF_EXPORT_TIMEOUT:-7200}"
+USE_CLOUD_FILES_EXPORT="${OSPC2FLEX_USE_CLOUD_FILES_EXPORT:-0}"
+PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-1}"
 OSPC_HELPER_SERVER_ID="${OSPC_HELPER_SERVER_ID:-}"
 CINDER_VOLUME_EXPORT_ON_LICENSED="${OSPC2FLEX_CINDER_VOLUME_EXPORT_ON_LICENSED:-1}"
 KEEP_CINDER_EXPORT_VOLUME="${OSPC2FLEX_KEEP_CINDER_EXPORT_VOLUME:-0}"
@@ -1171,7 +1173,7 @@ print(gb)
 PY
 }
 
-image_is_licensed_cinder_only() {
+image_is_cinder_preferred_snapshot() {
   local image_id="$1" meta_json="$JOB_TMP/image_meta_for_export.json"
   openstack image show "$image_id" -f json >"$meta_json" 2>/dev/null || return 1
   python3 - "$meta_json" <<'PY'
@@ -1182,12 +1184,16 @@ except Exception:
     print("0")
     raise SystemExit
 props = d.get("properties") or {}
-flag = ""
-if isinstance(props, dict):
-    flag = str(props.get("com.rackspace__1__options", "")).strip()
-if not flag:
-    flag = str(d.get("com.rackspace__1__options", "")).strip()
-print("1" if flag == "4" else "0")
+if not isinstance(props, dict):
+    props = {}
+flag = str(props.get("com.rackspace__1__options", d.get("com.rackspace__1__options", ""))).strip()
+image_type = str(props.get("image_type", d.get("image_type", ""))).strip().lower()
+rackspace_managed = any(str(props.get(k, "")).strip() for k in (
+    "com.rackspace__1__build_managed",
+    "com.rackspace__1__visible_managed",
+    "com.rackspace__1__build_config_options",
+))
+print("1" if flag == "4" or (image_type == "snapshot" and rackspace_managed) else "0")
 PY
 }
 
@@ -1334,15 +1340,17 @@ download_curl_glance() {
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3_DOWNLOAD_SNAPSHOT] Download waterfall for existing image=$image_id"
-  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$(image_is_licensed_cinder_only "$image_id" || echo 0)" = "1" ]; then
-    log "[ZS3_DOWNLOAD_SNAPSHOT] HIT image metadata indicates licensed/cinder-only (com.rackspace__1__options=4)"
-    log "[ZS3_DOWNLOAD_SNAPSHOT] Prioritizing Cinder volume attach/raw-copy fallback before Glance export attempts"
+  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT" = "1" ] && [ "$(image_is_cinder_preferred_snapshot "$image_id" || echo 0)" = "1" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Rackspace-managed/licensed snapshot — using Cinder fallback first; set OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 to try Cloud Files first"
     if cinder_volume_raw_export "$image_id" "$dest"; then
       return 0
     fi
     DOWNLOAD_FAILURE_REASON="OSPC_CINDER_VOLUME_EXPORT_FAILED"
     DOWNLOAD_NEXT_ACTION="Cinder fallback could not create/attach/read the image volume from this jumphost. Inspect $JOB_LOG/cinder_volume_export.log and detach/delete any temporary volume named ${LABEL_SAFE}-snapwin-cinder-export-${RUN_ID} if needed."
-    return 1
+    if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
+      return 1
+    fi
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Cinder-first export failed — Cloud Files export is explicitly enabled, trying Cloud Files path"
   fi
   log "[ZS3_DOWNLOAD_SNAPSHOT] Glance endpoint candidates:"
   image_bases | sed 's/^/[ZS3_DOWNLOAD_SNAPSHOT]   - /' | while IFS= read -r line; do log "$line"; done
@@ -1425,6 +1433,10 @@ download_existing_ospc_snapshot() {
     fi
   fi
 
+  if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Skipping Cloud Files export task; Cinder/direct paths preferred. Set OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 to enable Cloud Files."
+    return 1
+  fi
   local cf_rc
   set +e
   download_cloud_files_export_task "$image_id" "$dest" "${CLOUD_FILES_CONTAINER:-ospc2flex-export}" "$min_bytes"
@@ -1466,9 +1478,25 @@ z_wait_for_server_status() {
 }
 
 z_attach_floating_ip() {
-  local server_id="$1" port_id fip_json fip_id fip
+  local server_id="$1" replacement_ip="${2:-}" port_id fip_json fip_id fip fixed
   port_id="$(openstack port list --server "$server_id" -f value -c ID 2>/dev/null | head -1 | tr -d '\r' || true)"
   [ -n "$port_id" ] || return 1
+  if [ -n "$replacement_ip" ]; then
+    log "[FIP] replacement IP requested: $replacement_ip"
+    fip_id="$(openstack floating ip list -f value -c ID -c 'Floating IP Address' 2>/dev/null | awk -v ip="$replacement_ip" '$2==ip{print $1; exit}' || true)"
+    if [ -n "$fip_id" ]; then
+      fixed="$(openstack floating ip show "$fip_id" -f value -c fixed_ip_address 2>/dev/null || true)"
+      if [ -n "$fixed" ] && [ "$fixed" != "None" ]; then
+        log "[FIP] detaching replacement IP $replacement_ip from existing fixed IP $fixed"
+        openstack floating ip unset --port "$fip_id" >/dev/null 2>&1 || true
+        sleep 3
+      fi
+      openstack floating ip set --port "$port_id" "$fip_id" >/dev/null 2>&1 || return 1
+      printf '%s\n' "$replacement_ip"
+      return 0
+    fi
+    log "[FIP][WARN] replacement IP $replacement_ip not found; allocating new FIP"
+  fi
   fip_json="$(openstack floating ip create "$FLEX_EXT_NET" -f json 2>/dev/null || true)"
   fip_id="$(printf '%s' "$fip_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("id",""))' 2>/dev/null || true)"
   fip="$(printf '%s' "$fip_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("floating_ip_address",""))' 2>/dev/null || true)"
@@ -1565,10 +1593,16 @@ run_driver_binding() {
 }
 
 upload_flex_rescue_image_method_ab() {
-  local upload_try out_file err_file rc image_id status_line err_msg
+  local upload_try out_file err_file rc image_id status_line err_msg upload_pid upload_start upload_elapsed upload_timeout upload_heartbeat
+  local image_name_show image_vis_show image_stat_show
   local qcow_bytes qcow_mib
   qcow_bytes=$(stat -c%s "$QCOW2" 2>/dev/null || echo 0)
   qcow_mib=$((qcow_bytes / 1024 / 1024))
+  upload_timeout="${OSPC2FLEX_IMAGE_UPLOAD_TIMEOUT:-${FLEX2FLEX_IMAGE_CREATE_TIMEOUT:-21600}}"
+  upload_heartbeat="${OSPC2FLEX_IMAGE_UPLOAD_HEARTBEAT_SECONDS:-25}"
+  [[ "$upload_timeout" =~ ^[0-9]+$ ]] || upload_timeout=21600
+  [[ "$upload_heartbeat" =~ ^[0-9]+$ ]] || upload_heartbeat=25
+  [ "$upload_heartbeat" -lt 5 ] && upload_heartbeat=5
 
   log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Method A/B Glance upload path"
   log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Uploading: ${qcow_bytes} bytes (${qcow_mib} MiB) to FLEX Glance"
@@ -1599,24 +1633,48 @@ upload_flex_rescue_image_method_ab() {
     echo "[$(date '+%F %T')] openstack image create name=$RESCUE_IMAGE_NAME file=$QCOW2 bytes=$qcow_bytes try=$upload_try" >>"$BACKGROUND_LOG"
     out_file="$(mktemp)"
     err_file="$(mktemp)"
-    if openstack "${image_create_args[@]}" >"$out_file" 2>"$err_file"; then
+    openstack "${image_create_args[@]}" >"$out_file" 2>"$err_file" &
+    upload_pid=$!
+    upload_start="$(date +%s)"
+    while kill -0 "$upload_pid" 2>/dev/null; do
+      sleep "$upload_heartbeat"
+      kill -0 "$upload_pid" 2>/dev/null || break
+      upload_elapsed=$(( $(date +%s) - upload_start ))
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] heartbeat elapsed=${upload_elapsed}s/${upload_timeout}s upload still running (${qcow_mib} MiB)"
+      echo "[$(date '+%F %T')] upload heartbeat try=$upload_try elapsed=${upload_elapsed}s bytes=$qcow_bytes" >>"$BACKGROUND_LOG"
+      if [ "$upload_timeout" -gt 0 ] && [ "$upload_elapsed" -gt "$upload_timeout" ]; then
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try exceeded ${upload_timeout}s; terminating openstack image create"
+        kill -TERM "$upload_pid" 2>/dev/null || true
+        sleep 5
+        kill -KILL "$upload_pid" 2>/dev/null || true
+        break
+      fi
+    done
+    set +e
+    wait "$upload_pid"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
       cat "$err_file" >>"$BACKGROUND_LOG"
       image_id="$(grep -Eo '[0-9a-fA-F-]{36}' "$out_file" | tail -n 1 || true)"
       rm -f "$out_file" "$err_file" 2>/dev/null || true
       if [ -n "$image_id" ]; then
+        upload_elapsed=$(( $(date +%s) - upload_start ))
         status_line="$(openstack image show "$image_id" -f value -c status 2>/dev/null || echo "unknown")"
         log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] returned image id: $image_id"
         log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] initial image status: ${status_line:-unknown}"
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] openstack image create finished in ${upload_elapsed}s"
+        echo "$image_id" > "${QCOW2}.image_id" 2>/dev/null || true
         RESCUE_IMAGE_ID="$image_id"
         return 0
       fi
       log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload returned no image id"
     else
-      rc=$?
       cat "$err_file" >>"$BACKGROUND_LOG"
       err_msg="$(tail -n 8 "$err_file" 2>/dev/null | tr '\n' ' ' | cut -c 1-320 || echo "Unknown error")"
       rm -f "$out_file" "$err_file" 2>/dev/null || true
       log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try failed rc=$rc: $err_msg"
+      tail -n 40 "$BACKGROUND_LOG" 2>/dev/null | sed 's/^/[ZS6_UPLOAD_FLEX_RESCUE_IMAGE][debug-tail] /' || true
     fi
 
     if [ "$upload_try" -lt 3 ]; then
@@ -2440,6 +2498,10 @@ else
 fi
 [ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path returned no image id; inspect $BACKGROUND_LOG."
 z_wait_for_image_active "$RESCUE_IMAGE_ID" 1800 || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_not_active" "Inspect Flex Glance image status."
+image_name_show="$(openstack image show "$RESCUE_IMAGE_ID" -f value -c name 2>/dev/null || echo "$RESCUE_IMAGE_NAME")"
+image_vis_show="$(openstack image show "$RESCUE_IMAGE_ID" -f value -c visibility 2>/dev/null || echo "unknown")"
+image_stat_show="$(openstack image show "$RESCUE_IMAGE_ID" -f value -c status 2>/dev/null || echo "unknown")"
+log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$RESCUE_IMAGE_ID name=${image_name_show:-unknown} status=${image_stat_show:-unknown} visibility=${image_vis_show:-unknown}"
 openstack image set "$RESCUE_IMAGE_ID" \
   --property architecture=x86_64 \
   --property hw_disk_bus=ide \
@@ -2513,14 +2575,8 @@ if [ "$MANUAL_DRIVER_BIND" = 1 ]; then
 fi
 
 SNAPWIN_ONLINE_BIND=0
-if [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
-  run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
-  SNAPWIN_ONLINE_BIND=1
-  log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind completed over $ACCESS_METHOD on $ACCESS_IP:$ACCESS_PORT"
-else
-  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; using offline-staged VirtIO drivers and registry/CDDB boot binding."
-  log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted (no rescue reboot — matching win2016 working method)"
-fi
+log "[ZS9_DRIVER_BIND] WinRM/Windows access skipped; using offline-staged VirtIO drivers and registry/CDDB boot binding."
+log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted (no rescue reboot — matching win2016 working method)"
 checkpoint_hit "driver_bind"
 log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind confirmed"
 
@@ -2567,7 +2623,7 @@ EFFECTIVE_KEYPAIR="$(effective_keypair)"
 FINAL_SERVER_ID="$(openstack "${final_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$FINAL_SERVER_ID" ] || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_create_failed" "Inspect final image metadata and Nova request."
 z_wait_for_server_status "$FINAL_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_not_active" "Inspect final VM console."
-FINAL_FLOATING_IP="$(z_attach_floating_ip "$FINAL_SERVER_ID" || true)"
+FINAL_FLOATING_IP="$(z_attach_floating_ip "$FINAL_SERVER_ID" "${OSPC2FLEX_REPLACEMENT_FLOATING_IP:-}" || true)"
 sleep "${OSPC2FLEX_SNAPWIN_FINAL_BOOT_SETTLE_SECONDS:-180}"
 if console_has_fatal_boot_error "$FINAL_SERVER_ID"; then console_rc=0; else console_rc=$?; fi
 if [ "$console_rc" -eq 2 ]; then fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "WINDOWS_SYSTEM_HIVE_OR_REGISTRY_STOP" "Inspect final VM console and restore SYSTEM hive backup."; fi

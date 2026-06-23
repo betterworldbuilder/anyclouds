@@ -60,7 +60,8 @@ POST_ATTACH_ALLOW_LVM_ACTIVATE="true"
 POST_ATTACH_UPDATE_POSTGRESQL_CONF="true"
 POST_ATTACH_START_POSTGRESQL="true"
 POST_ATTACH_SCRIPT_PATH="/tmp/osflex_post_attach_pg_mount_validate.sh"
-BASE_DIR="${OSPC2FLEX_LINUX_SNAP_BASE_DIR:-/mnt/migration/ospc2flex_linux_snap}"
+BASE_DIR="${VOLSNAP_RUN_ROOT:-${OSPC2FLEX_VOLSNAP_BASE_DIR:-${OSPC2FLEX_LINUX_SNAP_BASE_DIR:-/mnt/migration/ospc2flex_linux_snap}}}"
+START_FRESH="${VOLSNAP_START_FRESH:-0}"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -99,6 +100,7 @@ while [[ $# -gt 0 ]]; do
     --post-attach-start-postgresql) POST_ATTACH_START_POSTGRESQL="$2"; shift 2 ;;
     --post-attach-script-path) POST_ATTACH_SCRIPT_PATH="$2"; shift 2 ;;
     --base-dir)            BASE_DIR="$2";                shift 2 ;;
+    --start-fresh)         START_FRESH=1;                shift ;;
     --dry-run)             DRY_RUN=1;                    shift ;;
     # legacy compat — ignored
     --nbd-dev)             shift 2 ;;
@@ -144,6 +146,103 @@ log()      { printf '[%s][%s][VOLSNAP] %s\n' "$(date -u +%H:%M:%S)" "$LABEL_SAFE
 stage()    { log "══════════════════════════════════════════════════════"; log "  $1"; log "══════════════════════════════════════════════════════"; }
 fail_exit(){ log "FAILED: $*"; exit 1; }
 kv()       { log "  $(printf '%-24s' "$1"): $2"; }
+
+prep_disk_and_stale_image_cleanup() {
+  [ "${VOLSNAP_CLEAN_STALE_IMAGES:-1}" = "1" ] || {
+    log "[VS0A] stale image cleanup disabled"
+    return 0
+  }
+
+  local before after min_age_minutes
+  before="$(df -hP "$BASE_DIR" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+  log "[VS0A] run root disk before cleanup: ${before:-unknown}"
+
+  min_age_minutes="${VOLSNAP_CLEAN_MIN_AGE_MIN:-60}"
+  case "$min_age_minutes" in ''|*[!0-9]*) min_age_minutes=60 ;; esac
+
+  local roots=()
+  [ -d /mnt/migration/flex2flex ] && roots+=("/mnt/migration/flex2flex")
+  [ -d /mnt/migration/ospc2flex_method_z ] && roots+=("/mnt/migration/ospc2flex_method_z")
+  [ -d /mnt/migration/ospc2flex_image ] && roots+=("/mnt/migration/ospc2flex_image")
+
+  local delete_list="$JOB_TMP/stale_image_delete.tsv"
+  : >"$delete_list"
+
+  local root root_real
+  for root in "${roots[@]}"; do
+    [ -d "$root" ] || continue
+    root_real="$(readlink -f "$root" 2>/dev/null || true)"
+    case "$root_real" in
+      /mnt/migration|/mnt/migration/*) ;;
+      *) log "[VS0A] refusing stale image cleanup outside /mnt/migration: $root"; continue ;;
+    esac
+    find "$root" -xdev -type f -mmin +"$min_age_minutes" \( \
+        -iname "*.img" -o -iname "*.raw" -o -iname "*.vhd" -o -iname "*.vhdx" -o -iname "*.vmdk" -o -iname "*.vpc" \
+        -o -iname "*repaired*.qcow2" -o -iname "*repair*.qcow2" \
+        -o -iname "*flex-rescue*.qcow2" -o -iname "*safe-ide*.qcow2" -o -iname "*final*.qcow2" -o -iname "*rescue*.qcow2" \
+        -o -iname "*.invalid*" -o -iname "*.partial*" \
+      \) -printf '%s\t%p\n' 2>/dev/null >>"$delete_list" || true
+  done
+
+  sort -nr -u -o "$delete_list" "$delete_list" 2>/dev/null || true
+  local count bytes
+  count="$(wc -l <"$delete_list" | tr -d '[:space:]')"
+  bytes="$(awk -F '\t' '{s+=$1} END{printf "%.0f", s+0}' "$delete_list")"
+  if [ "${count:-0}" -eq 0 ]; then
+    log "[VS0A] no stale image files found; keeping unrepaired qcow2 files"
+    after="$(df -hP "$BASE_DIR" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+    log "[VS0A] run root disk after cleanup: ${after:-unknown}"
+    return 0
+  fi
+
+  log "[VS0A] stale image cleanup candidates older than ${min_age_minutes}m: count=$count bytes=$bytes"
+  local deleted=0 freed=0 sz path run_root
+  while IFS=$'\t' read -r sz path; do
+    [ -n "$path" ] || continue
+    case "$(basename "$path")" in
+      source_snapshot.qcow2|source_snapshot-*.qcow2)
+        log "[VS0A] keep unrepaired source qcow2: $path"
+        continue
+        ;;
+    esac
+    run_root="$(printf '%s\n' "$path" | sed -E 's#^(/mnt/migration/flex2flex/[^/]+).*#\1#; s#^(/mnt/migration/ospc2flex_method_z/runs/[^/]+/[^/]+).*#\1#; s#^(/mnt/migration/ospc2flex_image/[^/]+).*#\1#')"
+    if [ -n "$run_root" ] && ps -eo args= 2>/dev/null | grep -F -- "$run_root" | grep -vq grep; then
+      log "[VS0A] keep active run artifact: $path"
+      continue
+    fi
+    case "$path" in
+      /mnt/migration/*)
+        log "[VS0A] delete stale image: ${sz}B $path"
+        rm -f -- "$path" 2>/dev/null || sudo rm -f -- "$path" 2>/dev/null || true
+        deleted=$((deleted + 1))
+        freed=$((freed + ${sz:-0}))
+        ;;
+      *) log "[VS0A] skip unsafe stale image path: $path" ;;
+    esac
+  done <"$delete_list"
+  log "[VS0A] stale image cleanup complete; deleted=$deleted freed_bytes=$freed"
+  after="$(df -hP "$BASE_DIR" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+  log "[VS0A] run root disk after cleanup: ${after:-unknown}"
+}
+
+start_fresh_clear_label_resume() {
+  [ "$START_FRESH" = "1" ] || return 0
+  local label_root="$BASE_DIR/runs/$LABEL_SAFE"
+  [ -d "$label_root" ] || return 0
+  log "[VS0B] START FRESH: deleting previous VOLSNAP resume artifacts for $LABEL_SAFE"
+  find "$label_root" -mindepth 1 -maxdepth 1 -type d ! -name "$RUN_ID" -print 2>/dev/null | while read -r old_run; do
+    [ -n "$old_run" ] || continue
+    case "$old_run" in
+      "$label_root"/*)
+        log "[VS0B] delete old run: $old_run"
+        rm -rf -- "$old_run"
+        ;;
+      *)
+        log "[VS0B] skip outside label root: $old_run"
+        ;;
+    esac
+  done
+}
 
 if [ "$DRY_RUN" = 1 ]; then
   source_label="OSPC"
@@ -200,6 +299,8 @@ cleanup_on_exit() {
   return "$rc"
 }
 trap cleanup_on_exit EXIT
+prep_disk_and_stale_image_cleanup
+start_fresh_clear_label_resume
 
 # ── SSH helper to FLEX helper VM ──────────────────────────────────────────────
 SSH_FLEX_BASE=()
@@ -219,16 +320,16 @@ set_ssh_flex_base
 ssh_flex() { "${SSH_FLEX_BASE[@]}" "$@"; }
 
 # ── OSPC Cinder/Compute REST helpers (use saved OSPC_TOKEN, never overwritten) ─
-_cinder_get()    { curl -sS -H "X-Auth-Token: $OSPC_TOKEN" "$OSPC_BS_BASE/$1" 2>>"$JOB_LOG/cinder.log"; }
-_cinder_post()   { curl -sS -w '\nHTTP_CODE=%{http_code}\n' -X POST \
+_cinder_get()    { curl -sS --connect-timeout 15 --max-time 45 -H "X-Auth-Token: $OSPC_TOKEN" "$OSPC_BS_BASE/$1" 2>>"$JOB_LOG/cinder.log"; }
+_cinder_post()   { curl -sS --connect-timeout 15 --max-time 60 -w '\nHTTP_CODE=%{http_code}\n' -X POST \
                      -H "X-Auth-Token: $OSPC_TOKEN" -H "Content-Type: application/json" \
                      -d "$2" "$OSPC_BS_BASE/$1" 2>>"$JOB_LOG/cinder.log"; }
-_cinder_delete() { curl -sS -o /dev/null -X DELETE -H "X-Auth-Token: $OSPC_TOKEN" \
+_cinder_delete() { curl -sS --connect-timeout 15 --max-time 45 -o /dev/null -X DELETE -H "X-Auth-Token: $OSPC_TOKEN" \
                      "$OSPC_BS_BASE/$1" 2>>"$JOB_LOG/cinder.log" || true; }
-_compute_post()  { curl -sS -w '\nHTTP_CODE=%{http_code}\n' -X POST \
+_compute_post()  { curl -sS --connect-timeout 15 --max-time 60 -w '\nHTTP_CODE=%{http_code}\n' -X POST \
                      -H "X-Auth-Token: $OSPC_TOKEN" -H "Content-Type: application/json" \
                      -d "$2" "$OSPC_COMPUTE_BASE/$1" 2>>"$JOB_LOG/cinder.log"; }
-_compute_delete(){ curl -sS -o /dev/null -X DELETE -H "X-Auth-Token: $OSPC_TOKEN" \
+_compute_delete(){ curl -sS --connect-timeout 15 --max-time 45 -o /dev/null -X DELETE -H "X-Auth-Token: $OSPC_TOKEN" \
                      "$OSPC_COMPUTE_BASE/$1" 2>>"$JOB_LOG/cinder.log" || true; }
 
 ospc_volume_status() {
@@ -241,7 +342,7 @@ ospc_wait_volume() {
     status="$(ospc_volume_status "$vid")"
     [ "$status" = "$want" ] && return 0
     [ "$status" = "error" ] && { log "[OSPC] vol=$vid error state"; return 1; }
-    [ $((waited % 60)) -eq 0 ] && log "[OSPC] vol=$vid status=$status → $want (${waited}s)"
+    log "[OSPC] vol=$vid status=$status → $want (${waited}s)"
     sleep 10; waited=$((waited + 10))
   done
   log "[OSPC] TIMEOUT vol=$vid target=$want after ${timeout}s"; return 1
@@ -272,7 +373,7 @@ source_wait_volume() {
     status="$(source_volume_status "$vid")"
     [ "$status" = "$want" ] && return 0
     [ "$status" = "error" ] && { log "[$label] vol=$vid error state"; return 1; }
-    [ $((waited % 60)) -eq 0 ] && log "[$label] vol=$vid status=$status → $want (${waited}s)"
+    log "[$label] vol=$vid status=$status → $want (${waited}s)"
     sleep 10; waited=$((waited + 10))
   done
   log "[$label] TIMEOUT vol=$vid target=$want after ${timeout}s"; return 1
@@ -319,7 +420,7 @@ flex_wait_volume() {
     status="$(flex_volume_status "$vid")"
     [ "$status" = "$want" ] && return 0
     [ "$status" = "error" ] && { log "[FLEX] vol=$vid error state"; return 1; }
-    [ $((waited % 60)) -eq 0 ] && log "[FLEX] vol=$vid status=$status → $want (${waited}s)"
+    log "[FLEX] vol=$vid status=$status → $want (${waited}s)"
     sleep 10; waited=$((waited + 10))
   done
   log "[FLEX] TIMEOUT vol=$vid target=$want after ${timeout}s"; return 1
@@ -460,6 +561,7 @@ flex_final_attach_volume_to_server_verified() {
 flex_find_resume_volume() {
   local name="$1" stream_bytes="$2" base="$BASE_DIR/runs/$LABEL_SAFE"
   local run log src vid bytes tmp vol_name status servers device
+  [ "$START_FRESH" = "1" ] && return 1
   [ -d "$base" ] || return 1
   while IFS= read -r run; do
     [ -n "$run" ] || continue
@@ -1001,8 +1103,9 @@ kv "Source device" "$SOURCE_DEV"
 stage "VS3_GET_SOURCE_SIZE"
 SOURCE_BYTES="$(sudo blockdev --getsize64 "$SOURCE_DEV" 2>/dev/null || echo 0)"
 [ "$SOURCE_BYTES" -gt 1073741824 ] || fail_exit "Source device $SOURCE_DEV too small: ${SOURCE_BYTES}B"
+SOURCE_GB_CEIL=$(( (SOURCE_BYTES + 1073741823) / 1073741824 ))
 kv "Source bytes" "$SOURCE_BYTES"
-kv "Source GB"    "$(( SOURCE_BYTES / 1073741824 ))"
+kv "Source GB"    "$SOURCE_GB_CEIL"
 
 # ── VS4: Create blank FLEX Cinder volume ──────────────────────────────────────
 stage "VS4_CREATE_FLEX_CINDER_VOLUME"
@@ -1017,12 +1120,18 @@ openstack token issue >/dev/null 2>&1 || fail_exit "FLEX authentication failed �
 
 # FLEX encrypted Cinder can expose a guest block device slightly smaller than
 # the requested size because of provider-side encryption/header reservation.
-# Use +1GiB headroom so a full original-size block stream does not hit EOD.
+# Use +1GiB headroom, but never request a target smaller than the attached
+# source device. OSPC snapshots below the source cloud minimum can materialize
+# as an 80GiB temp volume even when the snapshot metadata says 75GiB.
 FLEX_VOL_SIZE_GB=$(( SNAP_SIZE_ORIG_GB + 1 ))
+if [ "$FLEX_VOL_SIZE_GB" -lt "$SOURCE_GB_CEIL" ] 2>/dev/null; then
+  log "[VS4] FLEX requested size ${FLEX_VOL_SIZE_GB}GB is below measured source device ${SOURCE_GB_CEIL}GB; using ${SOURCE_GB_CEIL}GB"
+  FLEX_VOL_SIZE_GB="$SOURCE_GB_CEIL"
+fi
 FLEX_VOL_NAME="${FLEX_VOLUME_NAME_OVERRIDE:-mig-${LABEL_SAFE}-flex}"
 kv "FLEX volume name" "$FLEX_VOL_NAME"
 kv "FLEX volume size" "${FLEX_VOL_SIZE_GB}GB"
-log "[VS4] FLEX volume includes +1GB safety headroom for encrypted Cinder presented-size differences"
+log "[VS4] FLEX volume is sized with headroom and measured source-device floor"
 RESUME_INFO="$(flex_find_resume_volume "$FLEX_VOL_NAME" "$STREAM_BYTES" || true)"
 if [ -n "$RESUME_INFO" ]; then
   IFS=$'\t' read -r FLEX_VOL_ID RESUME_SOURCE_STATUS RESUME_SERVERS RESUME_DEVICE RESUME_SOURCE_RUN <<<"$RESUME_INFO"
@@ -1044,7 +1153,14 @@ else
     --size "$FLEX_VOL_SIZE_GB" \
     --format value -c id \
     "$FLEX_VOL_NAME" 2>>"$JOB_LOG/flex_cinder.log" || true)"
-  [ -n "$FLEX_VOL_ID" ] || fail_exit "openstack volume create failed — check $JOB_LOG/flex_cinder.log"
+  if [ -z "$FLEX_VOL_ID" ]; then
+    flex_create_tail="$(tail -c 1200 "$JOB_LOG/flex_cinder.log" 2>/dev/null | tr '\n' ' ' || true)"
+    log "ICF Issue=FLEX Cinder target volume create failed"
+    log "ICF Cause=openstack volume create returned no target volume id for ${FLEX_VOL_SIZE_GB}GB in the target FLEX region"
+    log "ICF Fix=verify target FLEX Cinder quota/volume type/minimum size in the selected region, then retry START FRESH"
+    [ -n "$flex_create_tail" ] && log "[VS4] flex_cinder.log tail: $flex_create_tail"
+    fail_exit "openstack volume create failed — check $JOB_LOG/flex_cinder.log"
+  fi
   kv "FLEX volume ID" "$FLEX_VOL_ID"
   log "[VS4] Waiting for FLEX volume to become available…"
   flex_wait_volume "$FLEX_VOL_ID" "available" 3600 || fail_exit "FLEX volume $FLEX_VOL_ID never became available"

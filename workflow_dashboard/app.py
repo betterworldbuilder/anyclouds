@@ -8,11 +8,15 @@ import os
 import re
 import select
 import shlex
+import shutil
+import signal
+import sys
 import subprocess
 import tarfile
 import tempfile
 import threading
 import time
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,6 +27,8 @@ from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 TARGET_PROFILE_DIR = UPLOAD_DIR / "tenant_iac_dr_profiles"
@@ -35,6 +41,7 @@ IMAGES_DIR = BASE_DIR / "images"
 DASHBOARD_DIR = BASE_DIR / "dashboard"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+_CLOUDPRICE_CACHE: Dict[str, Tuple[float, float, str]] = {}
 
 # UAT module is optional at runtime; keep dashboard bootable even if
 # uat_module dependencies (services.*) are not available in this environment.
@@ -292,7 +299,55 @@ def load_reference_data() -> Dict[str, Any]:
             }
         )
 
-    return {"images_file": str(image_file.relative_to(BASE_DIR)) if image_file is not None and image_file.is_relative_to(BASE_DIR) else "", "images": images, "flavor_sets": flavor_sets}
+    origin_price_sources = [
+        {
+            "origin": "OSPC",
+            "provider": "ospc",
+            "region": "global",
+            "price_url": "",
+            "notes": "Uses source cost columns when available; otherwise uses the OSPC inventory/FLEX mapper estimate: target FLEX monthly cost x 2.45.",
+            "avg_hourly_reference": "",
+        },
+        {
+            "origin": "FLEX",
+            "provider": "flex",
+            "region": "DFW/IAD/SJC",
+            "price_url": "uploads/flavors/",
+            "notes": "Target FLEX prices come from local region flavor CSVs in uploads/flavors.",
+            "avg_hourly_reference": "",
+        },
+        {
+            "origin": "AWS",
+            "provider": "aws",
+            "region": "us-west-2",
+            "price_url": "https://cloudprice.net/aws/region/us-west-2",
+            "notes": "CloudPrice region page. Use converted AWS inventory rows for per-instance prices when available.",
+            "avg_hourly_reference": "0.2412",
+        },
+        {
+            "origin": "GCP",
+            "provider": "gcp",
+            "region": "us-west1",
+            "price_url": "https://cloudprice.net/gcp/region/us-west1",
+            "notes": "CloudPrice region page. Use converted GCP inventory rows for per-instance prices when available.",
+            "avg_hourly_reference": "0.0829",
+        },
+        {
+            "origin": "Azure",
+            "provider": "azure",
+            "region": "westus2",
+            "price_url": "https://cloudprice.net/azure/region/westus2",
+            "notes": "CloudPrice region page. Use converted Azure inventory rows for per-instance prices when available.",
+            "avg_hourly_reference": "1.5100",
+        },
+    ]
+
+    return {
+        "images_file": str(image_file.relative_to(BASE_DIR)) if image_file is not None and image_file.is_relative_to(BASE_DIR) else "",
+        "images": images,
+        "flavor_sets": flavor_sets,
+        "origin_price_sources": origin_price_sources,
+    }
 
 
 def list_openrc_candidates() -> List[str]:
@@ -402,24 +457,42 @@ def build_flex_method_ab_openrc(
     password: str,
     project_id: str,
     domain: str = "rackspace_cloud_domain",
+    auth_type: str = "password",
+    app_cred_id: str = "",
+    app_cred_secret: str = "",
 ) -> str:
     flex_region = normalize_flex_region(region, auth_url)
     flex_auth_url = normalize_flex_auth_url(auth_url or "https://keystone.api.dfw3.rackspacecloud.com/v3/", flex_region)
     flex_domain = domain or "rackspace_cloud_domain"
-    return (
+    use_app_cred = str(auth_type or "password").strip().lower() in (
+        "v3applicationcredential",
+        "application_credential",
+        "applicationcredential",
+    )
+    base = (
         "#!/usr/bin/env bash\n"
         f"export OS_AUTH_URL={shlex.quote(flex_auth_url)}\n"
         "export OS_IDENTITY_API_VERSION=3\n"
         "export OS_INTERFACE=public\n"
         f"export OS_REGION_NAME={shlex.quote(flex_region)}\n"
-        "export OS_AUTH_TYPE=password\n"
-        f"export OS_USERNAME={shlex.quote(username or '')}\n"
-        f"export OS_PASSWORD={shlex.quote(password or '')}\n"
-        f"export OS_API_KEY={shlex.quote(password or '')}\n"
         f"export OS_USER_DOMAIN_NAME={shlex.quote(flex_domain)}\n"
         f"export OS_PROJECT_DOMAIN_NAME={shlex.quote(flex_domain)}\n"
         f"export OS_PROJECT_ID={shlex.quote(project_id or '')}\n"
         f"export OS_PROJECT_NAME={shlex.quote(project_id or '')}\n"
+    )
+    if use_app_cred:
+        return (
+            base
+            + "export OS_AUTH_TYPE=v3applicationcredential\n"
+            + f"export OS_APPLICATION_CREDENTIAL_ID={shlex.quote(app_cred_id or '')}\n"
+            + f"export OS_APPLICATION_CREDENTIAL_SECRET={shlex.quote(app_cred_secret or '')}\n"
+        )
+    return (
+        base
+        + "export OS_AUTH_TYPE=password\n"
+        + f"export OS_USERNAME={shlex.quote(username or '')}\n"
+        + f"export OS_PASSWORD={shlex.quote(password or '')}\n"
+        + f"export OS_API_KEY={shlex.quote(password or '')}\n"
     )
 
 
@@ -462,9 +535,12 @@ def resolve_target_flavor_catalog_for_region(region: str) -> Optional[Path]:
 
 
 def run_cmd(args: List[str]) -> Tuple[int, str]:
+    env = os.environ.copy()
+    env["PATH"] = f"/home/dzoan/.local/bin:{env.get('PATH', '')}"
     proc = subprocess.run(
         args,
         cwd=str(BASE_DIR),
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -637,7 +713,7 @@ def validate_lb_mapping_rows(flavor_rows: List[Dict[str, str]], lb_rows: List[Di
     if not load_balancer_names:
         add_finding("WARN", "no_load_balancers", "lbmap", "No load balancer names found in LB mapping.")
     if member_rows == 0:
-        add_finding("WARN", "no_lb_members", "lbmap", "No load balancer member rows found.")
+        add_finding("INFO", "no_lb_members", "lbmap", "No load balancer member rows found; LB shell will be generated without backend member attachment.")
 
     add_finding(
         "INFO",
@@ -832,7 +908,7 @@ def validate_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, obje
             if not image:
                 add_finding("ERROR", "instance_missing_image", display_name, "Instance image is required.")
             if auth_mode == "ssh_key" and not key_name:
-                add_finding("ERROR", "instance_missing_key_name", display_name, "Linux/SSH instance requires key_name.")
+                add_finding("INFO", "instance_key_name_optional", display_name, "Linux/SSH key_name is optional; VM will be created without injected SSH key.")
             if auth_mode == "windows_password" and not admin_password:
                 add_finding("ERROR", "instance_missing_admin_password", display_name, "Windows/password instance requires admin_password.")
             if not has_net_link:
@@ -872,10 +948,10 @@ def validate_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, obje
                 add_finding("ERROR", "lb_invalid_protocol", display_name, f"Unsupported LB protocol: {protocol}")
             if provider == "ovn" and protocol in {"HTTP", "HTTPS"}:
                 add_finding(
-                    "ERROR",
+                    "WARN",
                     "lb_provider_protocol_mismatch",
                     display_name,
-                    "OVN provider does not support HTTP/HTTPS listeners on this platform. Use TCP or switch provider to amphora.",
+                    "OVN provider does not support HTTP/HTTPS listeners on this platform. Deploy generator will use TCP automatically.",
                 )
             for port_text, code in [(listener_port_text, "lb_invalid_listener_port"), (member_port_text, "lb_invalid_member_port")]:
                 try:
@@ -988,7 +1064,7 @@ def plan_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, object]]
         flavor = str(props.get("flavor", "")).strip()
         image = str(props.get("image", "")).strip()
         user_data = str(props.get("user_data", "")).strip()
-        key_name = str(props.get("key_name", "")).strip()
+        key_name = str(props.get("key_name", "")).strip() or "latopras"
         auth_mode = infer_instance_auth_mode(props)
         admin_password = str(props.get("admin_password", "")).strip()
         network_name = str(props.get("network_name", "")).strip()
@@ -998,8 +1074,10 @@ def plan_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, object]]
                 break
         if auth_mode == "windows_password":
             auth_arg = "--password <node-admin-password>"
+        elif key_name:
+            auth_arg = '${KEY_NAME:+--key-name "$KEY_NAME"}'
         else:
-            auth_arg = f"--key-name {shell_quote(key_name)}"
+            auth_arg = '${KEY_NAME:+--key-name "$KEY_NAME"}'
         cmd = (
             f"openstack server create --flavor {shell_quote(flavor)} --image {shell_quote(image)} "
             f"--network {shell_quote(network_name)} {auth_arg} {shell_quote(name)}"
@@ -1008,10 +1086,9 @@ def plan_topology(nodes: List[Dict[str, object]], edges: List[Dict[str, object]]
             cmd = cmd.replace(f"{shell_quote(name)}", f"--user-data <instance-user-data-file> {shell_quote(name)}")
         add(step, "instance", name, "create_or_reuse", cmd)
         step += 1
-        if bool(props.get("needs_floating_ip", False)):
-            floating_network = str(props.get("floating_network", "")).strip() or "PUBLICNET"
-            add(step, "instance", name, "assign_floating_ip", f"openstack floating ip create {shell_quote(floating_network)} && openstack server add floating ip {shell_quote(name)} <allocated-ip>")
-            step += 1
+        floating_network = str(props.get("floating_network", "")).strip() or "PUBLICNET"
+        add(step, "instance", name, "assign_floating_ip", f"openstack floating ip create {shell_quote(floating_network)} && openstack server add floating ip {shell_quote(name)} <allocated-ip>")
+        step += 1
 
     for vol in volumes:
         name = _node_name(vol, "vol")
@@ -1595,8 +1672,17 @@ def image_migrator_scan_images():
 
 
 def openstack_json(env: Dict[str, str], args: List[str], timeout_sec: int = 45) -> Any:
+    openstack_bin = (
+        shutil.which("openstack", path=env.get("PATH"))
+        or shutil.which("openstack")
+        or "/home/dzoan/.local/bin/openstack"
+    )
+    if not os.path.exists(openstack_bin):
+        raise RuntimeError(f"openstack CLI not found; PATH={env.get('PATH', '')}")
+    env = dict(env)
+    env["PATH"] = f"/home/dzoan/.local/bin:{env.get('PATH', os.environ.get('PATH', ''))}"
     proc = subprocess.run(
-        ["openstack", *args, "-f", "json"],
+        [openstack_bin, *args, "-f", "json"],
         cwd=str(BASE_DIR),
         env=env,
         capture_output=True,
@@ -2517,7 +2603,7 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
     lines: List[str] = [
         "#!/usr/bin/env bash",
         "# Generated by OSPC→FLEX Deployer — do NOT edit by hand.",
-        "# Floating IP association is intentionally SKIPPED — assign manually after deploy.",
+        "# Floating IP association is enabled for every VM, best effort.",
         "set -uo pipefail",  # no -e: continue on individual resource errors
         "",
         "# ── Runtime config (override from environment before running) ──────────────",
@@ -2525,6 +2611,7 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
         'VOLUME_WAIT_SEC="${VOLUME_WAIT_SEC:-300}"       # 5 min per volume available-wait',
         'LB_WAIT_SEC="${LB_WAIT_SEC:-480}"               # 8 min per LB active-wait',
         'OS_CMD_TIMEOUT_SEC="${OS_CMD_TIMEOUT_SEC:-30}"  # 30s per API call — skip if exceeded',
+        'KEY_NAME="${KEY_NAME:-latopras}"                # default FLEX Linux keypair',
         'RESOURCE_COLLISION_POLICY="${RESOURCE_COLLISION_POLICY:-reuse}"',
         'ROLLBACK_AUTO_APPROVE=1                          # never prompt; rollback always runs',
         f'ROLLBACK_SCRIPT_PATH="${{ROLLBACK_SCRIPT_PATH:-{shell_quote(str(UPLOAD_DIR))}/last_rollback_$(date +%Y%m%d_%H%M%S).sh}}"',
@@ -2607,10 +2694,30 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
         "    return 0",
         "  fi",
         '  log "Creating $kind: $name ..."',
-        '  if "$@"; then',
+        '  local _create_log; _create_log=$(mktemp)',
+        '  if "$@" 2>"$_create_log"; then',
+        '    rm -f "$_create_log"',
         '    ok "Created $kind: $name"',
         '    _rollback_push "$kind" "$name"',
         "  else",
+        '    cat "$_create_log" >&2',
+        '    if [[ "$kind" == "instance" ]] && grep -qi "Invalid key_name" "$_create_log"; then',
+        '      warn "Invalid key_name rejected by Nova; retrying instance $name without --key-name."',
+        '      KEY_NAME=""',
+        '      local _retry=() _skip_next=0 _arg',
+        '      for _arg in "$@"; do',
+        '        if (( _skip_next )); then _skip_next=0; continue; fi',
+        '        if [[ "$_arg" == "--key-name" ]]; then _skip_next=1; continue; fi',
+        '        _retry+=("$_arg")',
+        '      done',
+        '      if "${_retry[@]}"; then',
+        '        rm -f "$_create_log"',
+        '        ok "Created $kind: $name without keypair"',
+        '        _rollback_push "$kind" "$name"',
+        '        return 0',
+        '      fi',
+        '    fi',
+        '    rm -f "$_create_log"',
         '    err "FAILED to create $kind: $name — check output above for reason"',
         '    if [[ "$kind" == "instance" ]]; then',
         '      warn "  Common blockers for instances:"',
@@ -2840,8 +2947,7 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
         '  openstack loadbalancer show "$1" -f value -c vip_port_id 2>/dev/null || true',
         "}",
         "",
-        "# NOTE: Floating IP helpers kept for reference but are NOT called by this script.",
-        "# Floating IPs are assigned MANUALLY after deployment completes.",
+        "# ── Floating IP helpers: every VM gets best-effort assignment ────────────────",
         "server_has_floating_ip() {",
         '  local out; out=$(openstack floating ip list --server "$1" -f value -c "Floating IP Address" 2>/dev/null || true)',
         '  [[ -n "$(echo "$out" | tr -d "[:space:]")" ]]',
@@ -2852,11 +2958,37 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
         '  [[ -n "$(echo "$out" | tr -d "[:space:]")" ]]',
         "}",
         "",
+        "assign_floating_ip() {",
+        '  local server_name="$1" public_network="$2" attempt fip',
+        "  for attempt in 1 2 3; do",
+        '    log "Floating IP attempt $attempt/3: server=$server_name network=$public_network"',
+        '    fip=$(openstack floating ip list --network "$public_network" --status DOWN -f value -c "Floating IP Address" 2>/dev/null | head -n 1 || true)',
+        '    if [[ -z "$fip" ]]; then',
+        '      fip=$(openstack floating ip create "$public_network" -f value -c floating_ip_address 2>/dev/null || true)',
+        "    fi",
+        '    if [[ -n "$fip" ]] && openstack server add floating ip "$server_name" "$fip"; then',
+        '      ok "Floating IP $fip attached to $server_name"; return 0',
+        "    fi",
+        '    warn "Floating IP attach failed for $server_name on attempt $attempt/3; retrying..."',
+        "    sleep 5",
+        "  done",
+        '  warn "Floating IP SKIP: $server_name after 3 failed attempts; continuing to next VM."',
+        "  return 0",
+        "}",
+        "",
         'log "Deploy script started at $(date)"',
-        'log "Floating IP assignment: SKIPPED (assign manually via Horizon or CLI after deploy)"',
+        'log "Floating IP assignment: enabled for every VM (best effort, 3 attempts)"',
         'log "Server wait timeout   : ${SERVER_WAIT_SEC}s"',
         'log "LB wait timeout       : ${LB_WAIT_SEC}s"',
         'log "Collision policy      : ${RESOURCE_COLLISION_POLICY}"',
+        'if [ -n "$KEY_NAME" ]; then',
+        '  if openstack keypair show "$KEY_NAME" >/dev/null 2>&1; then',
+        '    log "Linux keypair        : $KEY_NAME"',
+        '  else',
+        '    warn "Keypair $KEY_NAME not found in target project; continuing without --key-name."',
+        '    KEY_NAME=""',
+        '  fi',
+        'fi',
         "",
     ]
 
@@ -2944,6 +3076,8 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
             props = lb.get("props", {}) if isinstance(lb.get("props", {}), dict) else {}
             provider = str(props.get("provider", "")).strip().lower() or "ovn"
             protocol = str(props.get("protocol", "")).strip().upper() or "HTTP"
+            if provider == "ovn" and protocol in {"HTTP", "HTTPS", "TERMINATED_HTTPS"}:
+                protocol = "TCP"
             listener_port = str(props.get("listener_port", "")).strip() or "80"
             member_port = str(props.get("member_port", "")).strip() or listener_port
             algorithm = str(props.get("pool_algorithm", "")).strip().upper() or "ROUND_ROBIN"
@@ -3026,7 +3160,7 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
             flavor = str(props.get("flavor", "")).strip()
             image = str(props.get("image", "")).strip()
             user_data = str(props.get("user_data", "")).rstrip("\n")
-            key_name = str(props.get("key_name", "")).strip()
+            key_name = str(props.get("key_name", "")).strip() or "latopras"
             auth_mode = infer_instance_auth_mode(props)
             admin_password = str(props.get("admin_password", "")).strip()
             network_name = str(props.get("network_name", "")).strip()
@@ -3040,9 +3174,6 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
                     sg_names_local.append(_node_name(sg, "sg"))
             if not (flavor and image and network_name):
                 out.append(f'echo "Skipping instance {name}: flavor, image, and network required."')
-                return out
-            if auth_mode == "ssh_key" and not key_name:
-                out.append(f'echo "Skipping instance {name}: key_name required for SSH mode."')
                 return out
             if auth_mode == "windows_password" and not admin_password:
                 out.append(f'echo "Skipping instance {name}: admin_password required." >&2')
@@ -3066,7 +3197,7 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
             for sg_n in sg_names_local:
                 cmd_parts.append(f"--security-group {shell_quote(sg_n)}")
             if auth_mode == "ssh_key":
-                cmd_parts.append(f"--key-name {shell_quote(key_name)}")
+                cmd_parts.append('${KEY_NAME:+--key-name "$KEY_NAME"}')
             else:
                 cmd_parts.append(f"--password {shell_quote(admin_password)}")
             cmd_parts.append(shell_quote(name))
@@ -3085,32 +3216,33 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
                 lines.append(") &")
                 lines.append("_WIN_PIDS+=($!)")
                 inst_props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
-                if bool(inst_props.get("needs_floating_ip", False)):
-                    fnet = str(inst_props.get("floating_network", "")).strip() or "PUBLICNET"
-                    floating_targets_vm.append((win_name, fnet))
+                fnet = str(inst_props.get("floating_network", "")).strip() or "PUBLICNET"
+                floating_targets_vm.append((win_name, fnet))
 
         if linux_instances:
             lines.append('echo "  -> Provisioning Linux VMs..."')
             for idx, inst in enumerate(linux_instances, start=len(windows_instances) + 1):
                 lines.extend(_vm_create_cmd(inst, idx))
                 inst_props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
-                if bool(inst_props.get("needs_floating_ip", False)):
-                    fnet = str(inst_props.get("floating_network", "")).strip() or "PUBLICNET"
-                    floating_targets_vm.append((_node_name(inst, "vm"), fnet))
+                fnet = str(inst_props.get("floating_network", "")).strip() or "PUBLICNET"
+                floating_targets_vm.append((_node_name(inst, "vm"), fnet))
 
         if windows_instances:
             lines.append('echo "  -> Waiting for Windows VMs to finish provisioning..."')
             lines.append("for _wpid in \"${_WIN_PIDS[@]}\"; do wait \"$_wpid\" || true; done")
             lines.append('echo "  -> All Windows VMs provisioning complete."')
 
-        # Floating IPs are intentionally SKIPPED — list servers that wanted FIPs for manual action
         if floating_targets_vm:
             lines.append('echo ""')
             lines.append('echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"')
-            lines.append('log "⚠  FLOATING IP ASSIGNMENT: SKIPPED (manual action required)"')
-            lines.append('log "   Assign Floating IPs manually via Horizon or CLI after deploy:"')
+            lines.append('log "PHASE 4B: Floating IP Assignment — best effort, 3 trials per VM"')
             for server_name, public_network in floating_targets_vm:
-                lines.append(f'log "     openstack floating ip create {shell_quote(public_network)} | then: openstack server add floating ip {shell_quote(server_name)} <FIP>"')
+                lines.append(f"wait_for_server_active {shell_quote(server_name)} || true")
+                lines.append(f"if server_has_floating_ip {shell_quote(server_name)}; then")
+                lines.append(f'  log "Floating IP already assigned to {server_name}; skipping."')
+                lines.append("else")
+                lines.append(f"  assign_floating_ip {shell_quote(server_name)} {shell_quote(public_network)}")
+                lines.append("fi")
             lines.append('echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"')
 
     # ── PHASE 5: LB Creation — copy LB/listener/pool from OSPC, wire members by server name
@@ -3126,29 +3258,34 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
                 needs_fip = meta["needs_fip"] == "True"
                 floating_network_lb = meta["floating_network"]
                 lb_id_str = meta["lb_id"]
+                member_instances = [inst for inst in instances if _edge_match(edges, lb_id_str, str(inst["id"]), {"member", "link"})]
+                if not member_instances:
+                    lines.append(f'log "ℹ  Load balancer {lb_name} has no backend instance members; skipping member wiring."')
+                    if needs_fip:
+                        lines.append(f'log "⚠  LB VIP FLOATING IP: SKIPPED (manual) — assign FIP to LB {lb_name} VIP port via Horizon or CLI after deploy"')
+                    continue
                 lines.append(f"lb_subnet_id=$(subnet_id_from_name {shell_quote(subnet_name_lb)})")
                 lines.append("if [[ -n \"$lb_subnet_id\" ]]; then")
-                for inst in instances:
-                    if _edge_match(edges, lb_id_str, str(inst["id"]), {"member", "link"}):
-                        inst_name = _node_name(inst, "vm")
-                        member_network_scope = subnet_network_name_lb or "subnet-network"
-                        # Wait for server to be ACTIVE before resolving IP
-                        lines.append(f"  wait_for_server_active {shell_quote(inst_name)} || true")
-                        if subnet_network_name_lb:
-                            lines.append(f"  member_ip=$(wait_for_instance_ip_on_network {shell_quote(inst_name)} {shell_quote(subnet_network_name_lb)} || true)")
-                        else:
-                            lines.append("  member_ip=''")
-                        lines.append("  if [[ -n \"$member_ip\" ]]; then")
-                        lines.append(f"    if pool_has_member_ip {shell_quote(pool_name)} \"$member_ip\"; then")
-                        lines.append(f'      echo "LB member already exists for $member_ip on {pool_name}; skipping."')
-                        lines.append("    else")
-                        lines.append(
-                            f"      os loadbalancer member create --subnet-id \"$lb_subnet_id\" --address \"$member_ip\" --protocol-port {shell_quote(member_port)} {shell_quote(pool_name)} || true"
-                        )
-                        lines.append("    fi")
-                        lines.append("  else")
-                        lines.append(f'    log "⚠  Could not resolve IP for {inst_name} on {member_network_scope} — instance may still be booting; skipping member."')
-                        lines.append("  fi")
+                for inst in member_instances:
+                    inst_name = _node_name(inst, "vm")
+                    member_network_scope = subnet_network_name_lb or "subnet-network"
+                    # Wait for server to be ACTIVE before resolving IP
+                    lines.append(f"  wait_for_server_active {shell_quote(inst_name)} || true")
+                    if subnet_network_name_lb:
+                        lines.append(f"  member_ip=$(wait_for_instance_ip_on_network {shell_quote(inst_name)} {shell_quote(subnet_network_name_lb)} || true)")
+                    else:
+                        lines.append("  member_ip=''")
+                    lines.append("  if [[ -n \"$member_ip\" ]]; then")
+                    lines.append(f"    if pool_has_member_ip {shell_quote(pool_name)} \"$member_ip\"; then")
+                    lines.append(f'      echo "LB member already exists for $member_ip on {pool_name}; skipping."')
+                    lines.append("    else")
+                    lines.append(
+                        f"      os loadbalancer member create --subnet-id \"$lb_subnet_id\" --address \"$member_ip\" --protocol-port {shell_quote(member_port)} {shell_quote(pool_name)} || true"
+                    )
+                    lines.append("    fi")
+                    lines.append("  else")
+                    lines.append(f'    log "⚠  Could not resolve IP for {inst_name} on {member_network_scope} — instance may still be booting; skipping member."')
+                    lines.append("  fi")
                 if needs_fip:
                     lines.append(f'  log "⚠  LB VIP FLOATING IP: SKIPPED (manual) — assign FIP to LB {lb_name} VIP port via Horizon or CLI after deploy"')
                 lines.append("fi")
@@ -3168,6 +3305,37 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
                     lines.append(f'log "Attaching volume {vol_name} → {inst_name} (max ${{MAX_VOL_ATTACH_TRIALS:-3}} trials)"')
                     lines.append(f"_vol_attach_with_retry {shell_quote(inst_name)} {shell_quote(vol_name)} || true")
 
+    lines.extend(
+        [
+            'echo ""',
+            'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+            'log "SOURCE INFRA → TARGET FLEX DEPLOY SUMMARY"',
+            f'log "Source elements planned: VMs={len(instances)} Volumes={len(volumes)} LoadBalancers={len(load_balancers)}"',
+            'printf "| %-34s | %-24s | %-34s | %-18s | %-8s |\\n" "Source VM" "Original Flavor" "Target FLEX VM" "FLEX Flavor" "Status"',
+            'printf "| %-34s | %-24s | %-34s | %-18s | %-8s |\\n" "----------------------------------" "------------------------" "----------------------------------" "------------------" "--------"',
+            '_SUMMARY_VM_OK=0',
+            '_SUMMARY_VM_FAIL=0',
+        ]
+    )
+    for inst in instances:
+        props = inst.get("props", {}) if isinstance(inst.get("props", {}), dict) else {}
+        target_name = _node_name(inst, "vm")
+        source_name = str(props.get("source_name") or props.get("source_server_name") or target_name).strip() or "-"
+        source_flavor = str(props.get("source_flavor_name") or props.get("source_flavor") or props.get("source_flavor_id") or "-").strip() or "-"
+        target_flavor = str(props.get("flavor") or props.get("target_flavor_name") or "-").strip() or "-"
+        lines.extend(
+            [
+                f"if openstack server show {shell_quote(target_name)} >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi",
+                f'printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\\n" {shell_quote(source_name)} {shell_quote(source_flavor)} {shell_quote(target_name)} {shell_quote(target_flavor)} "$_VM_STATUS"',
+            ]
+        )
+    lines.extend(
+        [
+            f'log "Target FLEX VM count: $_SUMMARY_VM_OK created/reused, $_SUMMARY_VM_FAIL failed, total planned: {len(instances)}"',
+            'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+        ]
+    )
+
     lines += [
         "",
         "# Write per-run rollback script before summary",
@@ -3185,13 +3353,11 @@ def topology_to_script(nodes: List[Dict[str, object]], edges: List[Dict[str, obj
         '  warn "     Re-run specific phases by setting RESOURCE_COLLISION_POLICY=reuse"',
         'fi',
         'log ""',
-        'log "NEXT STEPS (manual)"',
-        'log "  1. Assign Floating IPs to VMs and LB VIPs via Horizon or:"',
-        'log "       openstack floating ip create PUBLICNET"',
-        'log "       openstack server add floating ip <server> <fip>"',
-        'log "  2. Verify instances: openstack server list"',
-        'log "  3. Verify LBs:       openstack loadbalancer list"',
-        'log "  4. Verify volumes:   openstack volume list"',
+        'log "NEXT STEPS"',
+        'log "  1. Verify instances and assigned FIPs: openstack server list"',
+        'log "  2. Verify LBs:       openstack loadbalancer list"',
+        'log "  3. Verify volumes:   openstack volume list"',
+        'log "  4. If LB VIPs need public access, assign LB floating IPs manually."',
         'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
     ]
     return "\n".join(lines) + "\n"
@@ -3257,7 +3423,20 @@ def index():
 
 @app.get("/run/")
 def run_ui():
-    return render_template("index.html")
+    return render_template("index.html", scanner_mode="ospc")
+
+
+@app.get("/flex2flex-scanner/")
+def flex2flex_scanner_ui():
+    return render_template("index.html", scanner_mode="flex2flex")
+
+
+@app.get("/hyperflex-scanner/")
+def hyperflex_scanner_ui():
+    provider = (request.args.get("provider") or "aws").strip().lower()
+    if provider not in {"aws", "gcp", "azure"}:
+        provider = "aws"
+    return render_template("index.html", scanner_mode="hyperflex", scanner_provider=provider)
 
 
 @app.get("/migrate/")
@@ -3280,7 +3459,25 @@ def designer_ui():
 
 @app.get("/references/")
 def references_ui():
-    return render_template("references.html")
+    source = (request.args.get("source") or "ospc").strip().lower()
+    if source not in {"ospc", "flex2flex", "aws", "gcp", "azure"}:
+        source = "ospc"
+    labels = {
+        "ospc": "OSPC",
+        "flex2flex": "FLEX2FLEX",
+        "aws": "AWS",
+        "gcp": "GCP",
+        "azure": "Azure",
+    }
+    return render_template("references.html", source=source, source_label=labels[source])
+
+
+@app.get("/tco/")
+def tco_ui():
+    source = (request.args.get("source") or "ospc").strip().lower()
+    if source not in {"ospc", "flex2flex", "aws", "gcp", "azure", "hyperflex"}:
+        source = "ospc"
+    return render_template("tco.html", source=source, cache_bust=_CACHE_BUST)
 
 
 @app.get("/agent1/")
@@ -3484,6 +3681,1016 @@ def download_file(filename):
     return send_from_directory(UPLOAD_DIR, safe_name, as_attachment=True)
 
 
+@app.post("/api/stage2/full-migration/plan")
+def api_stage2_full_migration_plan():
+    """Build a Stage 2 full-migration control plan from latest overview/flavormap/blockmap/lbmap CSVs."""
+    try:
+        csv_sources = _stage5_iac_source_csvs()
+        selected: Dict[str, Optional[Path]] = csv_sources.get("selected", {})
+
+        def _rows(kind: str) -> List[Dict[str, str]]:
+            path = selected.get(kind)
+            if path and path.exists():
+                return read_csv_rows(path)
+            return []
+
+        overview_rows = _rows("overview")
+        flavor_rows = _rows("flavormap")
+        block_rows = _rows("blockmap")
+        lb_rows = _rows("lbmap")
+
+        def _row_include(row: Dict[str, str], key: str = "include_in_deploy") -> bool:
+            value = row.get(key)
+            if value is None or str(value).strip() == "":
+                return True
+            return is_truthy_text(str(value))
+
+        volume_by_server: Dict[str, List[Dict[str, str]]] = {}
+        for row in block_rows:
+            for k in (row.get("source_server_id"), row.get("target_server_name"), row.get("source_server_name")):
+                if k:
+                    volume_by_server.setdefault(str(k).strip(), []).append(row)
+
+        lb_by_server: Dict[str, List[Dict[str, str]]] = {}
+        for row in lb_rows:
+            if not _row_include(row, "member_include_in_deploy"):
+                continue
+            for k in (row.get("source_server_id"), row.get("target_server_name"), row.get("source_server_name")):
+                if k:
+                    lb_by_server.setdefault(str(k).strip(), []).append(row)
+
+        link_rows: List[Dict[str, Any]] = []
+        for idx, row in enumerate(flavor_rows, start=1):
+            if not _row_include(row):
+                continue
+            source_id = str(row.get("server_id") or "").strip()
+            source_name = str(row.get("server_name") or source_id or f"vm-{idx}").strip()
+            target_name = (
+                str(row.get("target_server_name") or "").strip()
+                or str(row.get("target_flex_vm") or "").strip()
+                or source_name
+            )
+            target_flavor = str(row.get("target_flavor_name") or row.get("target_flavor_id") or "").strip()
+            target_image = str(row.get("recommended_target_image_name") or "").strip()
+            volumes = volume_by_server.get(source_id, []) + volume_by_server.get(source_name, []) + volume_by_server.get(target_name, [])
+            lbs = lb_by_server.get(source_id, []) + lb_by_server.get(source_name, []) + lb_by_server.get(target_name, [])
+            readiness = "ready"
+            blockers = []
+            if not target_flavor:
+                blockers.append("missing target FLEX flavor")
+            if not target_image:
+                blockers.append("missing target FLEX image/private image")
+            if blockers:
+                readiness = "needs_mapping"
+            link_rows.append({
+                "order": idx,
+                "source_server_id": source_id,
+                "source_vm": source_name,
+                "source_region": row.get("region", ""),
+                "target_region": row.get("target_region", ""),
+                "source_flavor": row.get("source_flavor_name") or row.get("source_flavor_id") or "",
+                "target_flex_vm": target_name,
+                "target_flex_flavor": target_flavor,
+                "target_image": target_image,
+                "infra_join_key": source_id or source_name,
+                "vm_clone_join_key": source_id or source_name,
+                "volume_count": len({v.get("source_volume_id") or v.get("source_volume_name") or str(i) for i, v in enumerate(volumes)}),
+                "lb_member_count": len({v.get("load_balancer_id") or v.get("load_balancer_name") or str(i) for i, v in enumerate(lbs)}),
+                "floating_ip": "yes" if is_truthy_text(row.get("needs_floating_ip") or "yes") else "no",
+                "link_step": "After infra scaffold exists, boot cloned VM as target_server_name into mapped network/security group, then attach blockmap volumes and LB members.",
+                "status": readiness,
+                "blockers": "; ".join(blockers),
+            })
+
+        stages = [
+            {
+                "stage": "2A",
+                "name": "Clone Infra Scaffold",
+                "input_csv": "overview.csv + flavormap.csv + lbmap.csv",
+                "output": "network/router/subnet/security-group/LB scaffold + deploy resource map",
+                "notes": "Create reusable FLEX landing zone first. Do not pre-create final compute if snapshot clone will create the VM.",
+            },
+            {
+                "stage": "2B",
+                "name": "Clone Linux/Windows VM Images",
+                "input_csv": "flavormap.csv + selected snapshot/image table",
+                "output": "target FLEX image/private image and final VM boot",
+                "notes": "Use source_server_id/server_name as the join key, target_server_name as the FLEX VM name, and target_flavor_name/recommended_target_image_name as VM create inputs.",
+            },
+            {
+                "stage": "2C",
+                "name": "Clone Volume Snapshots",
+                "input_csv": "blockmap.csv",
+                "output": "target FLEX volumes attached to cloned VM",
+                "notes": "Attach by source_server_id -> target_server_name after VM is ACTIVE.",
+            },
+            {
+                "stage": "2D",
+                "name": "Link Network, FIP, LB, Validate",
+                "input_csv": "flavormap.csv + lbmap.csv + resource_map.csv",
+                "output": "FIP/replacement IP, LB members, validation report",
+                "notes": "Best link point: immediately after VM boot succeeds, before final validation.",
+            },
+        ]
+
+        stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        json_name = f"stage2_full_migration_plan_{stamp}.json"
+        csv_name = f"stage2_full_migration_link_map_{stamp}.csv"
+        json_path = UPLOAD_DIR / json_name
+        csv_path = UPLOAD_DIR / csv_name
+        payload = {
+            "ok": True,
+            "generated_at": stamp,
+            "best_link_step": "Clone infra scaffold first, then pass the mapped FLEX network/security group/flavor/image into each VM snapshot clone job. Use source_server_id as the durable join key, target_server_name as the FLEX VM name, and server_name only as fallback.",
+            "selected_csvs": {k: (v.name if isinstance(v, Path) and v else "") for k, v in selected.items()},
+            "counts": {
+                "overview_rows": len(overview_rows),
+                "flavormap_rows": len(flavor_rows),
+                "blockmap_rows": len(block_rows),
+                "lbmap_rows": len(lb_rows),
+                "planned_vms": len(link_rows),
+                "ready_vms": sum(1 for r in link_rows if r.get("status") == "ready"),
+                "needs_mapping": sum(1 for r in link_rows if r.get("status") != "ready"),
+            },
+            "stages": stages,
+            "links": link_rows,
+        }
+        _write_json(json_path, payload)
+        fieldnames = [
+            "order", "source_server_id", "source_vm", "source_region", "target_region",
+            "source_flavor", "target_flex_vm", "target_flex_flavor", "target_image",
+            "infra_join_key", "vm_clone_join_key", "volume_count", "lb_member_count",
+            "floating_ip", "link_step", "status", "blockers",
+        ]
+        with csv_path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(link_rows)
+        payload["artifacts"] = {
+            "json": {"name": json_name, "url": f"/api/download/{json_name}"},
+            "csv": {"name": csv_name, "url": f"/api/download/{csv_name}"},
+        }
+        return jsonify(payload)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+def _post_migration_health_helpers():
+    from services.ui.pages.post_migration_health_validation import (
+        build_health_validation_targets,
+        load_stage2_migration_outputs,
+        run_health_validation_dry_run,
+        write_health_validation_artifacts,
+    )
+    return (
+        load_stage2_migration_outputs,
+        build_health_validation_targets,
+        run_health_validation_dry_run,
+        write_health_validation_artifacts,
+    )
+
+
+@app.get("/api/post-migration-health/import")
+def api_post_migration_health_import():
+    try:
+        load_stage2_outputs, build_targets, _, _ = _post_migration_health_helpers()
+        stage2_data = load_stage2_outputs()
+        targets = build_targets(stage2_data)
+        app_targets = [t for t in targets if "database" not in str(t.get("workload_type", "")).lower() and "db" not in str(t.get("workload_type", "")).lower()]
+        db_targets = [t for t in targets if "database" in str(t.get("workload_type", "")).lower() or "db" in str(t.get("workload_type", "")).lower()]
+        return jsonify({
+            "ok": True,
+            "targets": targets,
+            "counts": {
+                "total_targets": len(targets),
+                "app_or_server_targets": len(app_targets),
+                "database_targets": len(db_targets),
+            },
+            "source_artifacts": stage2_data.get("source_artifacts", []),
+            "missing_artifacts": stage2_data.get("missing_artifacts", []),
+            "warning": "" if targets else "No migrated Stage 2 app/server or database targets were found.",
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/post-migration-health/run")
+def api_post_migration_health_run():
+    try:
+        _, _, run_validation, write_artifacts = _post_migration_health_helpers()
+        data = request.get_json(silent=True) or {}
+        targets = data.get("targets") or []
+        results = run_validation(targets)
+        artifacts = write_artifacts(results)
+        return jsonify({
+            "ok": True,
+            "results": results,
+            "artifacts": artifacts,
+            "counts": {
+                "total_targets": len(results),
+                "not_ready": sum(1 for r in results if r.get("overall_status") == "NOT READY"),
+                "partial_success": sum(1 for r in results if r.get("overall_status") == "PARTIAL SUCCESS"),
+                "success": sum(1 for r in results if r.get("overall_status") == "SUCCESS"),
+            },
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/post-migration-health/export")
+def api_post_migration_health_export():
+    try:
+        _, _, _, write_artifacts = _post_migration_health_helpers()
+        data = request.get_json(silent=True) or {}
+        results = data.get("results") or []
+        artifacts = write_artifacts(results)
+        return jsonify({"ok": True, "artifacts": artifacts, "exported_results": len(results)})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+def _cutover_plan_helpers():
+    from services.ui.pages.cutover_plan_generator import (
+        apply_app_lb_option,
+        apply_traffic_split_to_rows,
+        build_blue_green_scan_rows,
+        build_cutover_items,
+        build_cutover_markdown,
+        build_cutover_plan,
+        generate_cutover_commands,
+        load_cutover_targets,
+        scan_rows_to_cutover_items,
+        write_blue_green_scan_artifacts,
+        write_cutover_artifacts,
+    )
+    return (
+        load_cutover_targets,
+        apply_app_lb_option,
+        build_cutover_items,
+        build_cutover_plan,
+        build_cutover_markdown,
+        generate_cutover_commands,
+        write_cutover_artifacts,
+        build_blue_green_scan_rows,
+        scan_rows_to_cutover_items,
+        write_blue_green_scan_artifacts,
+        apply_traffic_split_to_rows,
+    )
+
+
+@app.get("/api/cutover-plan/import")
+def api_cutover_plan_import():
+    try:
+        load_targets, _, build_items, _, _, _, _, build_scan_rows, _, write_scan, _ = _cutover_plan_helpers()
+        payload = load_targets()
+        targets = payload.get("targets") or []
+        items = build_items(targets)
+        scan_rows = build_scan_rows(targets, "source_haproxy", 10, payload.get("scanner_indexes"))
+        scan_artifacts = write_scan(scan_rows, payload.get("source_artifacts", []))
+        return jsonify({
+            "ok": True,
+            "items": items,
+            "scan_rows": scan_rows,
+            "scan_artifacts": scan_artifacts,
+            "counts": {
+                "total_items": len(items),
+                "app_targets": sum(1 for i in items if i.get("cutover_area") == "APP"),
+                "database_targets": sum(1 for i in items if i.get("cutover_area") == "DB"),
+            },
+            "source_artifacts": payload.get("source_artifacts", []),
+            "missing_artifacts": payload.get("missing_artifacts", []),
+            "scanner_tables": (payload.get("scanner_indexes") or {}).get("scanner_tables", []),
+            "warning": "" if items else "No migrated app/server or database targets found for cutover.",
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+
+def _cutover_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True)
+    return str(value).strip()
+
+
+def _cutover_ip_lists(*values: Any) -> Tuple[List[str], List[str]]:
+    public_ips: List[str] = []
+    private_ips: List[str] = []
+    for value in values:
+        text = _cutover_text(value)
+        if not text:
+            continue
+        for ip in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text):
+            try:
+                ip_obj = ipaddress.ip_address(ip)
+                is_public = not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved)
+            except ValueError:
+                is_public = False
+            bucket = public_ips if is_public else private_ips
+            if ip not in bucket:
+                bucket.append(ip)
+    return public_ips, private_ips
+
+
+def _cutover_network_summary(addresses: Any, fallback: Any = "") -> str:
+    pieces: List[str] = []
+    if isinstance(addresses, dict):
+        for network, entries in addresses.items():
+            ips: List[str] = []
+            for entry in entries if isinstance(entries, list) else []:
+                if isinstance(entry, dict) and entry.get("addr"):
+                    ips.append(str(entry.get("addr")))
+                elif entry:
+                    ips.append(str(entry))
+            if ips:
+                pieces.append(f"{network}={','.join(ips)}")
+    text = "; ".join(pieces) or _cutover_text(fallback)
+    return text[:1000]
+
+
+def _cutover_volume_summary(value: Any) -> str:
+    if not value:
+        return ""
+    if isinstance(value, list):
+        out: List[str] = []
+        for item in value:
+            if isinstance(item, dict):
+                out.append(str(item.get("id") or item.get("volumeId") or item.get("name") or item))
+            else:
+                out.append(str(item))
+        return ", ".join([x for x in out if x])[:600]
+    return _cutover_text(value)[:600]
+
+
+def _cutover_tier_from_server(name: str, image: str = "") -> str:
+    text = f"{name} {image}".lower()
+    if any(token in text for token in ("db", "database", "mysql", "mariadb", "postgres", "pgsql", "mongo", "mssql", "oracle", "redis")):
+        return "DB"
+    return "APP"
+
+
+def _cutover_default_port(tier: str, name: str = "") -> int:
+    if str(tier).upper() == "DB":
+        lowered = str(name or "").lower()
+        if any(x in lowered for x in ("mysql", "mariadb", "percona")):
+            return 3306
+        if any(x in lowered for x in ("postgres", "pgsql")):
+            return 5432
+        if "mongo" in lowered:
+            return 27017
+        if any(x in lowered for x in ("mssql", "sqlserver")):
+            return 1433
+        if "oracle" in lowered:
+            return 1521
+        if "redis" in lowered:
+            return 6379
+        return 5432
+    return 80
+
+
+def _cutover_server_row(side: str, provider: str, region: str, server: Dict[str, Any], detail: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    detail = detail or {}
+    sid = _value_from_row(server, ["ID", "id", "resource_id"]) or _value_from_row(detail, ["id", "ID"])
+    name = _value_from_row(server, ["Name", "name"]) or _value_from_row(detail, ["name", "Name"]) or sid
+    status = _value_from_row(server, ["Status", "status"]) or _value_from_row(detail, ["status", "Status"])
+    addresses = detail.get("addresses") or detail.get("Addresses") or _value_from_row(server, ["Networks", "Addresses", "addresses", "networks"])
+    networks = _cutover_network_summary(addresses, _value_from_row(server, ["Networks", "Addresses", "addresses", "networks"]))
+    public_ips, private_ips = _cutover_ip_lists(addresses, server.get("external_ip"), server.get("public_ips"), server.get("public_ip"), _value_from_row(server, ["Public IP", "public_ips", "external_ip"]))
+    more_public, more_private = _cutover_ip_lists(server.get("internal_ip"), server.get("private_ips"), server.get("private_ip"), _value_from_row(server, ["Private IP", "private_ips", "internal_ip"]))
+    for ip in more_public:
+        if ip not in public_ips:
+            public_ips.append(ip)
+    for ip in more_private:
+        if ip not in private_ips:
+            private_ips.append(ip)
+    flavor = _value_from_row(server, ["Flavor", "flavor", "flavor_id", "Flavor Name"]) or _value_from_row(detail, ["flavor", "Flavor"])
+    image = _value_from_row(server, ["Image", "image", "image_name", "image_id"]) or _value_from_row(detail, ["image", "Image"])
+    os_label = _value_from_row(server, ["os_label", "image_os_type", "image_name"]) or _value_from_row(detail, ["OS-EXT-STS:vm_state", "image"]) or image
+    volumes = _cutover_volume_summary(detail.get("volumes_attached") or detail.get("os-extended-volumes:volumes_attached") or detail.get("Volumes attached") or server.get("attachments"))
+    tier = _cutover_tier_from_server(name, image or os_label)
+    row = {
+        "selected": False,
+        "row_source": "live",
+        "side": side,
+        "provider": provider,
+        "tier": tier,
+        "region": str(region or server.get("region") or "").strip(),
+        "id": sid,
+        "name": name,
+        "ip": (public_ips[0] if public_ips else (private_ips[0] if private_ips else "")),
+        "public_ip": "; ".join(public_ips),
+        "private_ip": "; ".join(private_ips),
+        "networks": networks,
+        "flavor": flavor,
+        "image": image,
+        "os": os_label,
+        "status": status,
+        "volume": volumes,
+        "db": "" if tier == "APP" else name,
+        "lb": "",
+        "port": _cutover_default_port(tier, name),
+        "health": "" if tier == "DB" else "/health",
+    }
+    return row
+
+
+def _cutover_scan_ospc_live(creds: Dict[str, Any], region: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+    username = str(creds.get("username") or "").strip()
+    api_key = str(creds.get("api_key") or creds.get("password") or "").strip()
+    account_id = str(creds.get("account_id") or creds.get("project_id") or "").strip()
+    region = str(region or creds.get("region") or "IAD").strip().upper()
+    if not all([username, api_key, account_id]):
+        raise ValueError("OSPC source scan needs username, API key/password, and numeric Rackspace account ID")
+
+    candidates: List[str] = []
+    for value in (account_id, creds.get("tenant_id"), creds.get("numeric_account_id"), os.environ.get("OSPC_TENANT_ID")):
+        text = str(value or "").strip()
+        if text and text not in candidates:
+            candidates.append(text)
+    # This repo's cached credentials use FLEX project UUID separately. If an old
+    # browser cache still passes that UUID as the OSPC account, try the known
+    # numeric Rackspace tenant before giving up.
+    if username == "dzng.8294" and "1342314" not in candidates:
+        candidates.append("1342314")
+
+    errors: List[str] = []
+    for tenant_id in candidates:
+        env = os.environ.copy()
+        env.update({"OSPC_USERNAME": username, "OSPC_APIKEY": api_key, "OSPC_TENANT_ID": tenant_id, "OSPC_REGION": region})
+        proc = subprocess.run(["python3", str(BASE_DIR / "ospcscan.py")], cwd=str(BASE_DIR), env=env, capture_output=True, text=True, timeout=90, check=False)
+        if proc.returncode != 0 and not proc.stdout.strip():
+            errors.append(f"tenant {tenant_id}: {(proc.stderr or 'ospcscan failed').strip()[:500]}")
+            continue
+        data = parse_json_mixed_output(proc.stdout or "{}")
+        if isinstance(data, dict) and data.get("error"):
+            errors.append(f"tenant {tenant_id}: {data.get('error')}")
+            continue
+        rows = [_cutover_server_row("source", "ospc", region, server) for server in (data.get("servers") if isinstance(data, dict) else []) or []]
+        return rows, [f"live OSPC server scan {region} tenant={tenant_id}: {len(rows)} VM row(s)"]
+    raise RuntimeError("OSPC source scan authentication/list failed. " + " | ".join(errors[-3:]))
+
+
+def _cutover_flex_env(creds: Dict[str, Any], region: str) -> Dict[str, str]:
+    payload = {
+        "auth_url": creds.get("auth_url"),
+        "username": creds.get("username"),
+        "password": creds.get("password"),
+        "project_id": creds.get("project_id"),
+        "domain": creds.get("domain") or "rackspace_cloud_domain",
+    }
+    env = _openstack_env_from_payload(payload)
+    resolved_region = normalize_flex_region(region or creds.get("region") or env.get("OS_REGION_NAME") or "DFW3", env.get("OS_AUTH_URL"))
+    env["OS_REGION_NAME"] = resolved_region
+    env["OS_AUTH_URL"] = normalize_flex_auth_url(env.get("OS_AUTH_URL", ""), resolved_region)
+    env.setdefault("OS_PROJECT_DOMAIN_NAME", env.get("OS_USER_DOMAIN_NAME", "rackspace_cloud_domain"))
+    return env
+
+
+def _cutover_scan_flex_with_script(creds: Dict[str, Any], region: str, side: str, provider: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+    env = _cutover_flex_env(creds, region)
+    proc = subprocess.run(["python3", str(BASE_DIR / "flexscan.py")], cwd=str(BASE_DIR), env={**os.environ.copy(), **env}, capture_output=True, text=True, timeout=90, check=False)
+    if proc.returncode != 0 and not proc.stdout.strip():
+        raise RuntimeError((proc.stderr or "flexscan failed").strip()[:800])
+    data = parse_json_mixed_output(proc.stdout or "{}")
+    if isinstance(data, dict) and data.get("error"):
+        raise RuntimeError(str(data.get("error")))
+    rows = [_cutover_server_row(side, provider, env.get("OS_REGION_NAME", region), server) for server in (data.get("servers") if isinstance(data, dict) else []) or []]
+    return rows, [f"live FLEX server scan {env.get('OS_REGION_NAME', region)} via flexscan.py: {len(rows)} VM row(s)"]
+
+
+def _cutover_scan_flex_live(creds: Dict[str, Any], region: str, side: str, provider: str = "flex", include_details: bool = False) -> Tuple[List[Dict[str, Any]], List[str]]:
+    env = _cutover_flex_env(creds, region)
+    logs: List[str] = []
+    rows: List[Dict[str, Any]] = []
+    try:
+        servers = openstack_json(env, ["server", "list", "--long"], timeout_sec=45)
+    except Exception:
+        try:
+            servers = openstack_json(env, ["server", "list"], timeout_sec=45)
+        except Exception as exc:
+            fallback_rows, fallback_logs = _cutover_scan_flex_with_script(creds, region, side, provider)
+            return fallback_rows, [f"openstack server list failed, used flexscan.py fallback: {exc}"] + fallback_logs
+    for server in servers if isinstance(servers, list) else []:
+        sid = _value_from_row(server, ["ID", "id"])
+        detail: Dict[str, Any] = {}
+        if sid and include_details:
+            try:
+                detail = openstack_json(env, ["server", "show", sid], timeout_sec=12)
+                if not isinstance(detail, dict):
+                    detail = {}
+            except Exception as exc:
+                logs.append(f"[WARN] server show failed for {sid}: {exc}")
+        rows.append(_cutover_server_row(side, provider, env.get("OS_REGION_NAME", region), server, detail))
+    logs.insert(0, f"live FLEX server scan {env.get('OS_REGION_NAME', region)}: {len(rows)} VM row(s)")
+    return rows, logs
+
+
+def _cutover_norm_pair_name(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+    for token in ("clone", "cloned", "flex", "target", "source", "ospc"):
+        text = text.replace(token, "")
+    return text
+
+
+def _cutover_live_pairs(source_rows: List[Dict[str, Any]], target_rows: List[Dict[str, Any]], lb_option: str, green_weight: Any) -> List[Dict[str, Any]]:
+    green = max(0, min(100, int(green_weight or 10)))
+    if green not in set(range(10, 101, 10)):
+        green = 10
+    blue = 100 - green
+    target_by_name: Dict[str, Dict[str, Any]] = {}
+    for target in target_rows:
+        key = _cutover_norm_pair_name(target.get("name"))
+        if key and key not in target_by_name:
+            target_by_name[key] = target
+    rows: List[Dict[str, Any]] = []
+    used_targets: set[str] = set()
+    for source in source_rows:
+        key = _cutover_norm_pair_name(source.get("name"))
+        target = target_by_name.get(key)
+        if not target:
+            continue
+        used_targets.add(str(target.get("id") or target.get("name")))
+        tier = source.get("tier") or target.get("tier") or "APP"
+        is_db = str(tier).upper() == "DB"
+        rows.append({
+            "selected": False,
+            "pair_key": f"{source.get('name') or source.get('id')} -> {target.get('name') or target.get('id')}",
+            "tier": "DB" if is_db else "APP",
+            "server_os": source.get("os") or target.get("os") or "",
+            "source_region": source.get("region", ""),
+            "source_server_name": source.get("name", ""),
+            "source_server_id": source.get("id", ""),
+            "source_server_ip": source.get("ip", ""),
+            "source_public_ip": source.get("public_ip", ""),
+            "source_private_ip": source.get("private_ip", ""),
+            "source_networks": source.get("networks", ""),
+            "source_flavor": source.get("flavor", ""),
+            "target_region": target.get("region", ""),
+            "target_server_name": target.get("name", ""),
+            "target_server_id": target.get("id", ""),
+            "target_server_ip": target.get("ip", ""),
+            "target_public_ip": target.get("public_ip", ""),
+            "target_private_ip": target.get("private_ip", ""),
+            "target_networks": target.get("networks", ""),
+            "target_flavor": target.get("flavor", ""),
+            "source_volume_hint": source.get("volume", ""),
+            "target_volume_hint": target.get("volume", ""),
+            "attached_db": source.get("db") or target.get("db") or "",
+            "existing_lb_hint": source.get("lb") or target.get("lb") or "",
+            "lb_method": "db_switchover" if is_db else "source_haproxy",
+            "source_weight": 100 if is_db else blue,
+            "target_weight": 0 if is_db else green,
+            "app_port": source.get("port") or target.get("port") or (5432 if is_db else 80),
+            "health_path": "" if is_db else (source.get("health") or target.get("health") or "/health"),
+            "status": "READY WITH WARNING" if source.get("ip") and target.get("ip") else "NEEDS INPUT",
+            "notes": "Auto-paired by live VM name. Operator can override by selecting source and target rows manually.",
+        })
+    return rows
+
+
+def _cutover_write_live_scan_artifacts(source_rows: List[Dict[str, Any]], target_rows: List[Dict[str, Any]], matrix_rows: List[Dict[str, Any]]) -> Dict[str, str]:
+    out_dir = BASE_DIR / "outputs" / "cutover"
+    tmp_dir = BASE_DIR / ".tmp_runs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    artifacts: Dict[str, str] = {}
+    def write_json_csv(stem: str, rows: List[Dict[str, Any]]) -> None:
+        json_path = out_dir / f"{stem}.json"
+        csv_path = out_dir / f"{stem}.csv"
+        json_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+        fields: List[str] = []
+        for row in rows:
+            for key in row.keys():
+                if key not in fields:
+                    fields.append(key)
+        if not fields:
+            fields = ["empty"]
+        with csv_path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(rows)
+        artifacts[f"outputs/cutover/{stem}.json"] = str(json_path)
+        artifacts[f"outputs/cutover/{stem}.csv"] = str(csv_path)
+    write_json_csv("live_source_server_scan", source_rows)
+    write_json_csv("live_target_server_scan", target_rows)
+    write_json_csv("live_blue_green_cutover_matrix", matrix_rows)
+    return artifacts
+
+
+@app.post("/api/cutover-bluegreen/live-scan")
+def api_cutover_bluegreen_live_scan():
+    try:
+        data = request.get_json(silent=True) or {}
+        mode = str(data.get("mode") or "ospc2flex").strip().lower()
+        source_region = str(data.get("source_region") or "").strip()
+        target_region = str(data.get("target_region") or "").strip()
+        lb_option = data.get("lb_option") or "source_haproxy"
+        green_weight = data.get("green_weight") or 10
+        if mode == "flex2flex":
+            source_rows, source_logs = _cutover_scan_flex_live(data.get("source_flex") or {}, source_region, "source", "source_flex")
+        else:
+            source_rows, source_logs = _cutover_scan_ospc_live(data.get("ospc") or {}, source_region)
+        target_rows, target_logs = _cutover_scan_flex_live(data.get("target_flex") or {}, target_region, "target", "target_flex")
+        rows = _cutover_live_pairs(source_rows, target_rows, lb_option, green_weight)
+        _, _, _, _, _, _, _, _, scan_to_items, _, apply_split = _cutover_plan_helpers()
+        rows = apply_split(rows, green_weight, lb_option)
+        items = scan_to_items(rows)
+        artifacts = _cutover_write_live_scan_artifacts(source_rows, target_rows, rows)
+        scanner_tables = [
+            {"path": "live source region scan", "kind": "live_server_scan", "rows": len(source_rows), "source_regions": [source_region], "target_regions": []},
+            {"path": "live target FLEX region scan", "kind": "live_server_scan", "rows": len(target_rows), "source_regions": [], "target_regions": [target_region]},
+        ]
+        return jsonify({
+            "ok": True,
+            "mode": mode,
+            "rows": rows,
+            "items": items,
+            "source_rows": source_rows,
+            "target_rows": target_rows,
+            "artifacts": artifacts,
+            "source_artifacts": [],
+            "scanner_tables": scanner_tables,
+            "logs": source_logs + target_logs,
+            "counts": {
+                "source_rows": len(source_rows),
+                "target_rows": len(target_rows),
+                "auto_pairs": len(rows),
+                "app_rows": sum(1 for row in rows if row.get("tier") == "APP"),
+                "db_rows": sum(1 for row in rows if row.get("tier") == "DB"),
+                "scanner_tables": len(scanner_tables),
+                "total_rows": len(rows),
+            },
+            "warning": "" if source_rows and target_rows else "Live scan returned no VM rows for source or target region.",
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.get("/api/cutover-bluegreen/scan")
+def api_cutover_bluegreen_scan():
+    try:
+        load_targets, _, _, _, _, _, _, build_scan_rows, scan_to_items, write_scan, apply_split = _cutover_plan_helpers()
+        payload = load_targets()
+        lb_option = request.args.get("lb_option") or "source_haproxy"
+        green_weight = request.args.get("green_weight") or 10
+        source_region = request.args.get("source_region") or ""
+        target_region = request.args.get("target_region") or ""
+        rows = apply_split(
+            build_scan_rows(
+                payload.get("targets") or [],
+                lb_option,
+                green_weight,
+                payload.get("scanner_indexes"),
+                source_region,
+                target_region,
+            ),
+            green_weight,
+            lb_option,
+        )
+        items = scan_to_items(rows)
+        artifacts = write_scan(rows, payload.get("source_artifacts", []))
+        scanner_tables = (payload.get("scanner_indexes") or {}).get("scanner_tables", [])
+        return jsonify({
+            "ok": True,
+            "rows": rows,
+            "items": items,
+            "artifacts": artifacts,
+            "source_artifacts": payload.get("source_artifacts", []),
+            "missing_artifacts": payload.get("missing_artifacts", []),
+            "scanner_tables": scanner_tables,
+            "counts": {
+                "total_rows": len(rows),
+                "app_rows": sum(1 for row in rows if row.get("tier") == "APP"),
+                "db_rows": sum(1 for row in rows if row.get("tier") == "DB"),
+                "scanner_tables": len(scanner_tables),
+            },
+            "warning": "" if rows else "No Stage 2 scanner table rows found for blue-green cutover.",
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/cutover-bluegreen/generate")
+def api_cutover_bluegreen_generate():
+    try:
+        load_targets, _, _, build_plan, build_md, gen_commands, write_artifacts, build_scan_rows, scan_to_items, write_scan, apply_split = _cutover_plan_helpers()
+        data = request.get_json(silent=True) or {}
+        rows = data.get("rows") or []
+        green_weight = data.get("green_weight") or 10
+        source_artifacts = data.get("source_artifacts") or []
+        if not rows:
+            payload = load_targets()
+            source_artifacts = payload.get("source_artifacts", [])
+            rows = build_scan_rows(
+                payload.get("targets") or [],
+                data.get("lb_option") or "source_haproxy",
+                green_weight,
+                payload.get("scanner_indexes"),
+            )
+        rows = apply_split(rows, green_weight, data.get("lb_option") or "")
+        items = scan_to_items(rows)
+        plan = build_plan(items, source_artifacts)
+        plan["blue_green_matrix_path"] = "./outputs/cutover/blue_green_cutover_matrix.json"
+        artifacts = write_artifacts(plan, build_md(plan), gen_commands(plan.get("cutover_items") or []))
+        artifacts.update(write_scan(rows, source_artifacts))
+        return jsonify({"ok": True, "rows": rows, "items": plan.get("cutover_items", []), "plan": plan, "artifacts": artifacts})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/cutover-plan/generate")
+def api_cutover_plan_generate():
+    try:
+        _, apply_lb_option, _, build_plan, build_md, gen_commands, write_artifacts, _, scan_to_items, _, apply_split = _cutover_plan_helpers()
+        data = request.get_json(silent=True) or {}
+        if data.get("scan_rows"):
+            items = scan_to_items(apply_split(data.get("scan_rows") or [], data.get("green_weight") or 10, data.get("lb_option") or ""))
+        else:
+            items = apply_lb_option(data.get("items") or [], data.get("lb_option") or "source_haproxy")
+        source_artifacts = data.get("source_artifacts") or []
+        plan = build_plan(items, source_artifacts)
+        artifacts = write_artifacts(plan, build_md(plan), gen_commands(plan.get("cutover_items") or []))
+        return jsonify({"ok": True, "plan": plan, "items": plan.get("cutover_items", []), "artifacts": artifacts})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/cutover-plan/export")
+def api_cutover_plan_export():
+    try:
+        _, apply_lb_option, _, build_plan, build_md, gen_commands, write_artifacts, _, scan_to_items, _, apply_split = _cutover_plan_helpers()
+        data = request.get_json(silent=True) or {}
+        if data.get("scan_rows"):
+            plan = build_plan(scan_to_items(apply_split(data.get("scan_rows") or [], data.get("green_weight") or 10, data.get("lb_option") or "")), data.get("source_artifacts") or [])
+        elif data.get("plan"):
+            plan = data.get("plan")
+        else:
+            plan = build_plan(apply_lb_option(data.get("items") or [], data.get("lb_option") or "source_haproxy"), data.get("source_artifacts") or [])
+        artifacts = write_artifacts(plan, build_md(plan), gen_commands(plan.get("cutover_items") or []))
+        return jsonify({"ok": True, "artifacts": artifacts, "exported_items": len(plan.get("cutover_items") or [])})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+def _cutover_tester_helpers():
+    from services.ui.pages.cutover_tester import (
+        discover_stage2_jumphosts,
+        load_cutover_tester_results,
+        proxy_performance_audit,
+        proxy_performance_config,
+        proxy_performance_latest,
+        proxy_performance_run,
+        stream_blue_green_config_action,
+        stream_cutover_tester_action,
+    )
+    return (
+        discover_stage2_jumphosts,
+        load_cutover_tester_results,
+        proxy_performance_audit,
+        proxy_performance_config,
+        proxy_performance_latest,
+        proxy_performance_run,
+        stream_blue_green_config_action,
+        stream_cutover_tester_action,
+    )
+
+
+def _sse_response(lines):
+    def generate():
+        try:
+            for line in lines:
+                for next_line in str(line).splitlines() or [""]:
+                    yield f"data: {next_line}\n\n"
+        except Exception as exc:
+            yield f"data: [ERROR] {exc}\n\n"
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@app.get("/api/cutover-tester/jumphosts")
+def api_cutover_tester_jumphosts():
+    try:
+        discover, *_ = _cutover_tester_helpers()
+        rows = discover()
+        regions = []
+        for row in rows:
+            region = str(row.get("region") or "UNKNOWN")
+            if region not in regions:
+                regions.append(region)
+        return jsonify({"ok": True, "jumphosts": rows, "regions": regions, "counts": {"total": len(rows)}})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.get("/api/cutover-tester/results")
+def api_cutover_tester_results():
+    try:
+        _, load_results, *_ = _cutover_tester_helpers()
+        return jsonify({"ok": True, **load_results()})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.get("/api/cutover-bluegreen/latest-matrix")
+def api_cutover_bluegreen_latest_matrix():
+    """Return the latest saved blue/green matrix so Stage 3 survives page reloads."""
+    candidates = [
+        BASE_DIR / "outputs" / "cutover" / "blue_green_cutover_matrix.json",
+        BASE_DIR / ".tmp_runs" / "blue_green_cutover_matrix.json",
+        BASE_DIR / "outputs" / "cutover" / "live_blue_green_cutover_matrix.json",
+        BASE_DIR / ".tmp_runs" / "live_blue_green_cutover_matrix.json",
+    ]
+    try:
+        for path in candidates:
+            if not path.exists():
+                continue
+            payload = json.loads(path.read_text(encoding="utf-8") or "{}")
+            rows = payload.get("rows") if isinstance(payload, dict) else payload
+            rows = rows if isinstance(rows, list) else []
+            if rows:
+                return jsonify({
+                    "ok": True,
+                    "rows": rows,
+                    "source": str(path.relative_to(BASE_DIR)),
+                    "counts": {"total_rows": len(rows)},
+                })
+        return jsonify({"ok": True, "rows": [], "source": "", "counts": {"total_rows": 0}, "warning": "No saved cutover matrix rows found."})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/cutover-bluegreen/configure")
+def api_cutover_bluegreen_configure():
+    try:
+        *_, stream_config, _ = _cutover_tester_helpers()
+        data = request.get_json(silent=True) or {}
+        return _sse_response(stream_config(data))
+    except Exception as exc:
+        return Response(f"data: [ERROR] {exc}\n\n", mimetype="text/event-stream")
+
+
+@app.post("/api/cutover-tester/run")
+def api_cutover_tester_run():
+    try:
+        *_, stream_action = _cutover_tester_helpers()
+        data = request.get_json(silent=True) or {}
+        data.setdefault("action", "run")
+        return _sse_response(stream_action(data))
+    except Exception as exc:
+        return Response(f"data: [ERROR] {exc}\n\n", mimetype="text/event-stream")
+
+
+@app.post("/api/cutover-tester/stop")
+def api_cutover_tester_stop():
+    try:
+        *_, stream_action = _cutover_tester_helpers()
+        data = request.get_json(silent=True) or {}
+        data["action"] = "stop"
+        return _sse_response(stream_action(data))
+    except Exception as exc:
+        return Response(f"data: [ERROR] {exc}\n\n", mimetype="text/event-stream")
+
+
+@app.post("/api/migration/<migration_id>/cutover/performance/config")
+def api_cutover_performance_config(migration_id: str):
+    try:
+        _, _, _, proxy_config, *_ = _cutover_tester_helpers()
+        data = request.get_json(silent=True) or {}
+        result = proxy_config(migration_id, data)
+        return jsonify(result), (200 if result.get("ok") else 502)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/migration/<migration_id>/cutover/performance/run")
+def api_cutover_performance_run(migration_id: str):
+    try:
+        _, _, _, _, _, proxy_run, *_ = _cutover_tester_helpers()
+        data = request.get_json(silent=True) or {}
+        result = proxy_run(migration_id, data)
+        return jsonify(result), (200 if result.get("ok") else 409)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.get("/api/migration/<migration_id>/cutover/performance/latest")
+def api_cutover_performance_latest(migration_id: str):
+    try:
+        _, _, _, _, proxy_latest, *_ = _cutover_tester_helpers()
+        data = dict(request.args)
+        result = proxy_latest(migration_id, data)
+        return jsonify(result), (200 if result.get("ok") else 404)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.get("/api/migration/<migration_id>/cutover/performance/audit")
+def api_cutover_performance_audit(migration_id: str):
+    try:
+        _, _, proxy_audit, *_ = _cutover_tester_helpers()
+        data = dict(request.args)
+        result = proxy_audit(data)
+        return jsonify(result), (200 if result.get("ok") else 502)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+def _rollback_plan_helpers():
+    from services.ui.pages.rollback_plan_generator import (
+        build_rollback_items,
+        build_rollback_markdown,
+        generate_rollback_commands,
+        load_cutover_input_artifacts,
+        make_rollback_plan,
+        write_rollback_artifacts,
+    )
+    return (
+        load_cutover_input_artifacts,
+        build_rollback_items,
+        make_rollback_plan,
+        build_rollback_markdown,
+        generate_rollback_commands,
+        write_rollback_artifacts,
+    )
+
+
+@app.get("/api/rollback-plan/import")
+def api_rollback_plan_import():
+    try:
+        load_artifacts, build_items, _, _, _, _ = _rollback_plan_helpers()
+        artifacts = load_artifacts()
+        items = build_items(artifacts)
+        return jsonify({
+            "ok": True,
+            "items": items,
+            "source_artifacts": artifacts.get("source_artifacts", []),
+            "missing_artifacts": artifacts.get("missing_artifacts", []),
+            "warning": "" if items else "No migration or validation artifacts found for rollback planning.",
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/rollback-plan/generate")
+def api_rollback_plan_generate():
+    try:
+        _, _, make_plan, build_md, gen_commands, write_artifacts = _rollback_plan_helpers()
+        data = request.get_json(silent=True) or {}
+        plan = make_plan(data.get("items") or [], data.get("source_artifacts") or [])
+        artifacts = write_artifacts(plan, build_md(plan), gen_commands(plan.get("rollback_items") or []))
+        return jsonify({"ok": True, "plan": plan, "items": plan.get("rollback_items", []), "artifacts": artifacts})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.post("/api/rollback-plan/send-stage5")
+def api_rollback_plan_send_stage5():
+    try:
+        src = BASE_DIR / "outputs" / "cutover" / "rollback_plan.json"
+        dst = BASE_DIR / ".tmp_runs" / "stage5_rollback_plan_handoff.json"
+        if not src.exists():
+            return jsonify({"ok": False, "error": "Rollback plan not generated yet."}), 404
+        _write_text(dst, src.read_text(encoding="utf-8"))
+        return jsonify({"ok": True, "artifact": str(dst)})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+def _stage5_cutover_scope_prelude(task: str) -> str:
+    plan_path = BASE_DIR / "outputs" / "cutover" / "cutover_plan.json"
+    if not plan_path.exists():
+        return (
+            "echo '[WARN] No per-target cutover plan found. Generate Stage 4 Cutover Target Plan before production execution.'\n"
+            "echo ''\n"
+        )
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    except Exception:
+        return "echo '[WARN] Cutover plan exists but could not be parsed.'\n"
+    items = plan.get("cutover_items") or []
+    task_text = str(task or "").lower()
+    if task_text.startswith("db") or task_text in {"val_db", "val_consistency", "disable_ospc", "rollback_db", "db_health"}:
+        items = [i for i in items if i.get("cutover_area") == "DB"]
+    elif task_text.startswith("app") or task_text in {"ab_strategy", "traffic_shift", "traffic_flex", "val_txn", "ghost_traffic", "rollback", "rollback_full"}:
+        items = [i for i in items if i.get("cutover_area") == "APP"]
+    lines = [
+        "echo '=== PER-TARGET CUTOVER SCOPE ==='",
+        f"echo {shlex.quote('Task: ' + str(task or 'unknown') + ' | targeted items: ' + str(len(items)))}",
+    ]
+    if not items:
+        lines.append("echo '[WARN] No matching APP/DB cutover target rows found for this task.'")
+    for idx, item in enumerate(items, 1):
+        msg = (
+            f"[TARGET {idx}] {item.get('cutover_area', '')} "
+            f"{item.get('system_name', '')} source={item.get('current_source_value', '') or '<missing>'} "
+            f"target={item.get('target_cutover_value', '') or '<missing>'} status={item.get('status', '')}"
+        )
+        lines.append(f"echo {shlex.quote(msg)}")
+    lines.append("echo ''")
+    return "\n".join(lines) + "\n"
+
+
 def get_active_customer() -> str:
     return str(ACTIVE_CUSTOMER_ID or "default").strip() or "default"
 
@@ -3533,6 +4740,503 @@ def _simple_yaml(payload: Any, indent: int = 0) -> str:
     return f"{pad}{payload}"
 
 
+def _csv_bool(value: Any, default: bool = False) -> bool:
+    text = str(value or "").strip().lower()
+    if not text:
+        return default
+    return text in {"1", "true", "yes", "y", "on"}
+
+
+def _iac_key(value: Any, fallback: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9_]+", "_", str(value or "").strip()).strip("_").lower()
+    return text or fallback
+
+
+def _first_text(row: Dict[str, Any], keys: List[str], default: str = "") -> str:
+    for key in keys:
+        val = row.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return default
+
+
+def _stage5_iac_source_csvs() -> Dict[str, Any]:
+    patterns = {
+        "overview": ["*_overview.csv"],
+        "flavormap": ["*_flavormap.csv"],
+        "blockmap": ["*_blockmap.csv"],
+        "lbmap": ["*_lbmap.csv"],
+    }
+    all_files: List[Path] = []
+    by_kind: Dict[str, List[Path]] = {}
+    for kind, kind_patterns in patterns.items():
+        found: List[Path] = []
+        for root in (BASE_DIR, UPLOAD_DIR):
+            for pattern in kind_patterns:
+                found.extend(
+                    p for p in root.glob(pattern)
+                    if p.is_file() and "validation_report" not in p.name.lower()
+                )
+        found = sorted(set(found), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+        by_kind[kind] = found
+        all_files.extend(found)
+
+    selected: Dict[str, Optional[Path]] = {k: (v[0] if v else None) for k, v in by_kind.items()}
+    flavor_path = selected.get("flavormap")
+    if flavor_path:
+        stem = re.sub(r"_flavormap$", "", flavor_path.stem, flags=re.IGNORECASE)
+        for kind in ("overview", "blockmap", "lbmap"):
+            candidate = flavor_path.with_name(f"{stem}_{kind}.csv")
+            if candidate.exists():
+                selected[kind] = candidate
+            else:
+                base_candidate = BASE_DIR / f"{stem}_{kind}.csv"
+                upload_candidate = UPLOAD_DIR / f"{stem}_{kind}.csv"
+                if base_candidate.exists():
+                    selected[kind] = base_candidate
+                elif upload_candidate.exists():
+                    selected[kind] = upload_candidate
+
+    unique_all = sorted(set(all_files), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+    return {"selected": selected, "all": unique_all}
+
+
+def _build_stage5_csv_iac(customer: str, tracker_row: Dict[str, Any]) -> Dict[str, Any]:
+    csv_sources = _stage5_iac_source_csvs()
+    selected: Dict[str, Optional[Path]] = csv_sources["selected"]
+
+    def rows(kind: str) -> List[Dict[str, str]]:
+        path = selected.get(kind)
+        if path and path.exists():
+            try:
+                return read_csv_rows(path)
+            except Exception:
+                return []
+        return []
+
+    overview_rows = rows("overview")
+    flavor_rows = rows("flavormap")
+    block_rows = rows("blockmap")
+    lb_rows = rows("lbmap")
+
+    target_region = (
+        _first_text(flavor_rows[0], ["target_region"], "") if flavor_rows else ""
+    ) or tracker_row.get("Target Region") or tracker_row.get("target_region") or ""
+
+    networks: Dict[str, Dict[str, Any]] = {}
+    subnets: Dict[str, Dict[str, Any]] = {}
+    security_groups: Dict[str, Dict[str, Any]] = {}
+    for idx, row in enumerate(overview_rows, start=1):
+        service_type = str(row.get("service_type") or "").strip().lower()
+        name = _first_text(row, ["name", "resource_name"], f"resource-{idx}")
+        if service_type in {"cloud_network", "network"}:
+            key = _iac_key(name, f"network_{idx}")
+            networks[key] = {"name": name, "source_id": row.get("resource_id", ""), "region": row.get("region", "")}
+        elif service_type in {"cloud_subnet", "subnet"} or row.get("cidr"):
+            key = _iac_key(name, f"subnet_{idx}")
+            network_name = _first_text(row, ["network_id", "network_name"], "")
+            subnets[key] = {
+                "name": name,
+                "cidr": row.get("cidr", ""),
+                "gateway_ip": row.get("gateway_ip", ""),
+                "network_key": _iac_key(network_name, "tenant_net") if network_name else "",
+                "source_id": row.get("resource_id", ""),
+            }
+        elif service_type in {"security_group", "cloud_security_group"}:
+            if name.strip().lower() == "default":
+                continue
+            key = _iac_key(name, f"security_group_{idx}")
+            security_groups[key] = {"name": name, "description": f"Imported from source security group {name}"}
+
+    instances: Dict[str, Dict[str, Any]] = {}
+    instance_name_to_key: Dict[str, str] = {}
+    for idx, row in enumerate(flavor_rows, start=1):
+        if not _csv_bool(row.get("include_in_deploy"), True):
+            continue
+        source_name = _first_text(row, ["server_name", "source_server_name"], f"vm-{idx}")
+        target_name = _first_text(row, ["target_server_name", "target_flex_vm"], source_name)
+        key = _iac_key(target_name, f"vm_{idx}")
+        original_key = key
+        suffix = 2
+        while key in instances:
+            key = f"{original_key}_{suffix}"
+            suffix += 1
+        target_flavor = _first_text(row, ["target_flavor_name", "target_flavor_id"], "")
+        target_image = _first_text(row, ["recommended_target_image_name", "target_image_name"], "")
+        instances[key] = {
+            "name": target_name,
+            "source_server_id": row.get("server_id", ""),
+            "source_name": source_name,
+            "source_flavor_name": _first_text(row, ["source_flavor_name", "source_flavor_id"], ""),
+            "source_vcpus": row.get("source_vcpus", ""),
+            "source_ram_mb": row.get("source_ram_mb", ""),
+            "source_disk_gb": row.get("source_disk_gb", ""),
+            "source_image_name": row.get("source_image_name", ""),
+            "flavor_name": target_flavor,
+            "image_name": target_image,
+            "network_name": "tenant-net",
+            "security_groups": ["default"],
+            "assign_floating_ip": _csv_bool(row.get("needs_floating_ip"), True),
+            "floating_network": row.get("floating_network") or "PUBLICNET",
+            "boot_strategy": row.get("boot_strategy") or "local_boot",
+            "enabled": bool(target_flavor and target_image),
+        }
+        instance_name_to_key[target_name] = key
+        if source_name:
+            instance_name_to_key[source_name] = key
+
+    volumes: Dict[str, Dict[str, Any]] = {}
+    for idx, row in enumerate(block_rows, start=1):
+        size_gb = _first_text(row, ["volume_size_gb", "size_gb"], "")
+        if not size_gb:
+            continue
+        target_server = _first_text(row, ["target_server_name", "source_server_name"], "")
+        vol_name = _first_text(row, ["source_volume_name", "volume_name"], f"{target_server or 'volume'}-data-{idx}")
+        key = _iac_key(f"{target_server}_{vol_name}_{idx}", f"volume_{idx}")
+        volumes[key] = {
+            "name": vol_name,
+            "size_gb": size_gb,
+            "source_volume_id": row.get("source_volume_id", ""),
+            "source_server_id": row.get("source_server_id", ""),
+            "source_server_name": row.get("source_server_name", ""),
+            "target_server_name": target_server,
+            "instance_key": instance_name_to_key.get(target_server, ""),
+            "device": row.get("target_device_path") or row.get("source_device_path") or "",
+            "role": row.get("volume_role") or "data",
+        }
+
+    load_balancers: Dict[str, Dict[str, Any]] = {}
+    for idx, row in enumerate(lb_rows, start=1):
+        lb_name = _first_text(row, ["load_balancer_name"], f"lb-{idx}")
+        key = _iac_key(lb_name, f"lb_{idx}")
+        load_balancers.setdefault(key, {
+            "name": lb_name,
+            "source_id": row.get("load_balancer_id", ""),
+            "provider": row.get("provider") or "ovn",
+            "protocol": row.get("target_protocol") or row.get("protocol") or "TCP",
+            "listener_port": row.get("listener_port") or "80",
+            "member_port": row.get("member_port") or row.get("source_member_port") or "80",
+            "pool_algorithm": row.get("pool_algorithm") or "ROUND_ROBIN",
+            "members": [],
+        })
+        member_name = _first_text(row, ["target_server_name", "source_server_name"], "")
+        if member_name:
+            load_balancers[key]["members"].append({
+                "server_name": member_name,
+                "instance_key": instance_name_to_key.get(member_name, ""),
+                "source_member_ip": row.get("source_member_ip", ""),
+                "member_port": row.get("member_port") or row.get("source_member_port") or "80",
+            })
+
+    tfvars = {
+        "customer": customer,
+        "region": target_region,
+        "default_private_network_name": "tenant-net",
+        "public_network_name": "PUBLICNET",
+        "default_security_group": "default",
+        "default_key_name": "latopras",
+        "volume_type": "Performance",
+        "lb_vip_subnet_id": "",
+        "networks": networks,
+        "subnets": subnets,
+        "security_groups": security_groups,
+        "instances": instances,
+        "volumes": volumes,
+        "load_balancers": load_balancers,
+    }
+
+    hosts = ["[flex_post_config]"]
+    for key, inst in instances.items():
+        ansible_user = "Administrator" if "windows" in str(inst.get("image_name", "")).lower() else "ubuntu"
+        hosts.append(
+            f"{key} ansible_host=<flex_ip_or_fip> ansible_user={ansible_user} "
+            f"source_name={json.dumps(inst.get('source_name', ''))} "
+            f"source_flavor={json.dumps(inst.get('source_flavor_name', ''))} "
+            f"flex_flavor={json.dumps(inst.get('flavor_name', ''))}"
+        )
+    if len(hosts) == 1:
+        hosts.append("# host ansible_host=<flex_ip_or_fip> ansible_user=ubuntu")
+
+    return {
+        "sources": csv_sources,
+        "overview_rows": overview_rows,
+        "flavor_rows": flavor_rows,
+        "block_rows": block_rows,
+        "lb_rows": lb_rows,
+        "tfvars": tfvars,
+        "ansible_inventory": "\n".join(hosts) + "\n",
+    }
+
+
+def _write_stage5_csv_iac_templates(bundle_root: Path, iac: Dict[str, Any]) -> None:
+    tenant_root = bundle_root / "tenant-iac-dr"
+    terraform_root = tenant_root / "terraform"
+    ansible_root = tenant_root / "ansible"
+    source_csv_root = tenant_root / "source-csv"
+    source_csv_root.mkdir(parents=True, exist_ok=True)
+
+    copied = []
+    for src in iac.get("sources", {}).get("all", []):
+        if isinstance(src, Path) and src.exists():
+            dst = source_csv_root / src.name
+            try:
+                shutil.copy2(src, dst)
+                copied.append({"name": src.name, "source": str(src), "bundle_path": f"source-csv/{src.name}"})
+            except Exception as exc:
+                copied.append({"name": src.name, "source": str(src), "error": str(exc)})
+
+    selected = iac.get("sources", {}).get("selected", {})
+    _write_json(tenant_root / "iac-source-manifest.json", {
+        "selected": {k: (v.name if isinstance(v, Path) and v else "") for k, v in selected.items()},
+        "copied_csvs": copied,
+        "counts": {
+            "overview_rows": len(iac.get("overview_rows") or []),
+            "flavormap_rows": len(iac.get("flavor_rows") or []),
+            "blockmap_rows": len(iac.get("block_rows") or []),
+            "lbmap_rows": len(iac.get("lb_rows") or []),
+            "terraform_instances": len((iac.get("tfvars") or {}).get("instances") or {}),
+            "terraform_volumes": len((iac.get("tfvars") or {}).get("volumes") or {}),
+            "terraform_load_balancers": len((iac.get("tfvars") or {}).get("load_balancers") or {}),
+        },
+    })
+
+    _write_text(terraform_root / "README.md", "\n".join([
+        "# FLEX Tenant IaC Generated From Discovery CSVs",
+        "",
+        "These Terraform templates are generated from the Stage 1/2 CSV artifacts:",
+        "",
+        "- `*_overview.csv` for discovered source resources",
+        "- `*_flavormap.csv` for source VM to target FLEX flavor/image mapping",
+        "- `*_blockmap.csv` for data volume creation and attachment",
+        "- `*_lbmap.csv` for load balancer templates",
+        "",
+        "Run from `envs/default/` after reviewing `terraform.tfvars.json` and setting any required IDs such as `lb_vip_subnet_id`.",
+        "",
+        "```bash",
+        "terraform init",
+        "terraform plan",
+        "terraform apply",
+        "```",
+        "",
+    ]))
+    _write_text(terraform_root / "main.tf", "\n".join([
+        'terraform {',
+        '  required_providers {',
+        '    openstack = {',
+        '      source  = "terraform-provider-openstack/openstack"',
+        '      version = ">= 1.54.1"',
+        '    }',
+        '  }',
+        '}',
+        '',
+        'provider "openstack" {',
+        '  region = var.region',
+        '}',
+        '',
+        'locals {',
+        '  enabled_instances = { for k, v in var.instances : k => v if try(v.enabled, true) }',
+        '}',
+        '',
+        'resource "openstack_networking_network_v2" "network" {',
+        '  for_each       = var.networks',
+        '  name           = each.value.name',
+        '  admin_state_up = true',
+        '}',
+        '',
+        'resource "openstack_networking_subnet_v2" "subnet" {',
+        '  for_each   = { for k, v in var.subnets : k => v if try(v.cidr, "") != "" && try(v.network_key, "") != "" }',
+        '  name       = each.value.name',
+        '  cidr       = each.value.cidr',
+        '  ip_version = 4',
+        '  network_id = openstack_networking_network_v2.network[each.value.network_key].id',
+        '}',
+        '',
+        'resource "openstack_compute_secgroup_v2" "security_group" {',
+        '  for_each    = { for k, v in var.security_groups : k => v if lower(try(v.name, "")) != "default" }',
+        '  name        = each.value.name',
+        '  description = try(each.value.description, "Imported security group")',
+        '}',
+        '',
+        'resource "openstack_compute_instance_v2" "vm" {',
+        '  for_each        = local.enabled_instances',
+        '  name            = each.value.name',
+        '  flavor_name     = each.value.flavor_name',
+        '  image_name      = each.value.image_name',
+        '  key_pair        = var.default_key_name != "" ? var.default_key_name : null',
+        '  security_groups = length(try(each.value.security_groups, [])) > 0 ? each.value.security_groups : [var.default_security_group]',
+        '',
+        '  network {',
+        '    name = try(each.value.network_name, "") != "" ? each.value.network_name : var.default_private_network_name',
+        '  }',
+        '',
+        '  lifecycle {',
+        '    ignore_changes = [image_name]',
+        '  }',
+        '}',
+        '',
+        'resource "openstack_networking_floatingip_v2" "fip" {',
+        '  for_each = { for k, v in local.enabled_instances : k => v if try(v.assign_floating_ip, false) }',
+        '  pool     = try(each.value.floating_network, "") != "" ? each.value.floating_network : var.public_network_name',
+        '}',
+        '',
+        'resource "openstack_compute_floatingip_associate_v2" "fip_assoc" {',
+        '  for_each    = openstack_networking_floatingip_v2.fip',
+        '  floating_ip = each.value.address',
+        '  instance_id = openstack_compute_instance_v2.vm[each.key].id',
+        '}',
+        '',
+        'resource "openstack_blockstorage_volume_v3" "volume" {',
+        '  for_each    = var.volumes',
+        '  name        = each.value.name',
+        '  size        = tonumber(each.value.size_gb)',
+        '  volume_type = var.volume_type',
+        '}',
+        '',
+        'resource "openstack_compute_volume_attach_v2" "volume_attach" {',
+        '  for_each    = { for k, v in var.volumes : k => v if try(v.instance_key, "") != "" }',
+        '  instance_id = openstack_compute_instance_v2.vm[each.value.instance_key].id',
+        '  volume_id   = openstack_blockstorage_volume_v3.volume[each.key].id',
+        '  device      = try(each.value.device, "") != "" ? each.value.device : null',
+        '}',
+        '',
+    ]))
+    _write_text(terraform_root / "load_balancers.tf", "\n".join([
+        'resource "openstack_lb_loadbalancer_v2" "lb" {',
+        '  for_each      = var.lb_vip_subnet_id == "" ? {} : var.load_balancers',
+        '  name          = each.value.name',
+        '  vip_subnet_id = var.lb_vip_subnet_id',
+        '}',
+        '',
+        'resource "openstack_lb_listener_v2" "listener" {',
+        '  for_each        = openstack_lb_loadbalancer_v2.lb',
+        '  name            = "${each.value.name}-listener"',
+        '  protocol        = upper(try(var.load_balancers[each.key].protocol, "TCP"))',
+        '  protocol_port   = tonumber(try(var.load_balancers[each.key].listener_port, "80"))',
+        '  loadbalancer_id = each.value.id',
+        '}',
+        '',
+        'resource "openstack_lb_pool_v2" "pool" {',
+        '  for_each    = openstack_lb_listener_v2.listener',
+        '  name        = "${each.value.name}-pool"',
+        '  protocol    = upper(try(var.load_balancers[each.key].protocol, "TCP"))',
+        '  lb_method   = try(var.load_balancers[each.key].pool_algorithm, "ROUND_ROBIN")',
+        '  listener_id = each.value.id',
+        '}',
+        '',
+    ]))
+    _write_text(terraform_root / "variables.tf", "\n".join([
+        'variable "customer" { type = string }',
+        'variable "region" { type = string }',
+        'variable "default_private_network_name" { type = string }',
+        'variable "public_network_name" { type = string }',
+        'variable "default_security_group" { type = string }',
+        'variable "default_key_name" { type = string }',
+        'variable "volume_type" { type = string }',
+        'variable "lb_vip_subnet_id" { type = string }',
+        'variable "networks" { type = map(any) }',
+        'variable "subnets" { type = map(any) }',
+        'variable "security_groups" { type = map(any) }',
+        'variable "instances" { type = map(any) }',
+        'variable "volumes" { type = map(any) }',
+        'variable "load_balancers" { type = map(any) }',
+        '',
+    ]))
+    _write_text(terraform_root / "outputs.tf", "\n".join([
+        'output "instances" {',
+        '  value = { for k, vm in openstack_compute_instance_v2.vm : k => { id = vm.id, name = vm.name, access_ip_v4 = vm.access_ip_v4 } }',
+        '}',
+        '',
+        'output "floating_ips" {',
+        '  value = { for k, fip in openstack_networking_floatingip_v2.fip : k => fip.address }',
+        '}',
+        '',
+        'output "volumes" {',
+        '  value = { for k, vol in openstack_blockstorage_volume_v3.volume : k => { id = vol.id, name = vol.name, size = vol.size } }',
+        '}',
+        '',
+    ]))
+    _write_text(terraform_root / "envs" / "default" / "main.tf", "\n".join([
+        'module "tenant" {',
+        '  source                       = "../.."',
+        '  customer                     = var.customer',
+        '  region                       = var.region',
+        '  default_private_network_name = var.default_private_network_name',
+        '  public_network_name          = var.public_network_name',
+        '  default_security_group       = var.default_security_group',
+        '  default_key_name             = var.default_key_name',
+        '  volume_type                  = var.volume_type',
+        '  lb_vip_subnet_id             = var.lb_vip_subnet_id',
+        '  networks                     = var.networks',
+        '  subnets                      = var.subnets',
+        '  security_groups              = var.security_groups',
+        '  instances                    = var.instances',
+        '  volumes                      = var.volumes',
+        '  load_balancers               = var.load_balancers',
+        '}',
+        '',
+    ]))
+    _write_text(terraform_root / "envs" / "default" / "variables.tf", "\n".join([
+        'variable "customer" { type = string }',
+        'variable "region" { type = string }',
+        'variable "default_private_network_name" { type = string }',
+        'variable "public_network_name" { type = string }',
+        'variable "default_security_group" { type = string }',
+        'variable "default_key_name" { type = string }',
+        'variable "volume_type" { type = string }',
+        'variable "lb_vip_subnet_id" { type = string }',
+        'variable "networks" { type = map(any) }',
+        'variable "subnets" { type = map(any) }',
+        'variable "security_groups" { type = map(any) }',
+        'variable "instances" { type = map(any) }',
+        'variable "volumes" { type = map(any) }',
+        'variable "load_balancers" { type = map(any) }',
+        '',
+    ]))
+    _write_json(terraform_root / "envs" / "default" / "terraform.tfvars.json", iac.get("tfvars") or {})
+
+    _write_text(ansible_root / "inventory" / "hosts.ini", iac.get("ansible_inventory") or "[flex_post_config]\n")
+    _write_text(ansible_root / "group_vars" / "all.yml", _simple_yaml({
+        "cloudjumper_iac_source": "tenant-iac-dr/source-csv",
+        "instances": (iac.get("tfvars") or {}).get("instances", {}),
+        "volumes": (iac.get("tfvars") or {}).get("volumes", {}),
+        "load_balancers": (iac.get("tfvars") or {}).get("load_balancers", {}),
+    }) + "\n")
+    _write_text(ansible_root / "playbooks" / "post-provision.yml", "\n".join([
+        "---",
+        "- name: FLEX post-provision baseline from discovered CSV inventory",
+        "  hosts: flex_post_config",
+        "  gather_facts: false",
+        "  tasks:",
+        "    - name: Wait for host reachability",
+        "      ansible.builtin.wait_for_connection:",
+        "        timeout: 120",
+        "      ignore_errors: true",
+        "",
+        "    - name: Show source-to-target flavor mapping",
+        "      ansible.builtin.debug:",
+        "        msg: \"{{ inventory_hostname }} source={{ source_flavor | default('unknown') }} target={{ flex_flavor | default('unknown') }}\"",
+        "",
+    ]))
+    _write_text(ansible_root / "playbooks" / "validate-migration.yml", "\n".join([
+        "---",
+        "- name: Validate migrated FLEX hosts",
+        "  hosts: flex_post_config",
+        "  gather_facts: true",
+        "  tasks:",
+        "    - name: Confirm host responds",
+        "      ansible.builtin.ping:",
+        "",
+        "    - name: Capture basic platform facts",
+        "      ansible.builtin.debug:",
+        "        msg:",
+        "          host: \"{{ inventory_hostname }}\"",
+        "          os: \"{{ ansible_distribution | default('unknown') }} {{ ansible_distribution_version | default('') }}\"",
+        "          source_flavor: \"{{ source_flavor | default('unknown') }}\"",
+        "          flex_flavor: \"{{ flex_flavor | default('unknown') }}\"",
+        "",
+    ]))
+
+
 @app.post("/api/migration-output-bundle/generate")
 def generate_migration_output_bundle():
     """Generate the post-migration handoff bundle for FinOps, GitOps, Tenant IaC DR, and AI Anywhere."""
@@ -3570,6 +5274,7 @@ def generate_migration_output_bundle():
             "uat_input": "uat-input/uat-input-manifest.json",
             "opencenter": "opencenter/estate-map.json",
             "tenant_iac_dr": "tenant-iac-dr/tenant-iac-dr-pack.json",
+            "tenant_iac_source_csvs": "tenant-iac-dr/iac-source-manifest.json",
             "ai_anywhere": "ai-anywhere-context/ai-input-manifest.json",
         },
         "output_chain": {
@@ -3585,6 +5290,11 @@ def generate_migration_output_bundle():
                     "migration_manifest.json",
                     "terraform.tfvars.json",
                     "ansible_inventory.ini",
+                    "tenant-iac-dr/source-csv/*.csv",
+                    "tenant-iac-dr/terraform/main.tf",
+                    "tenant-iac-dr/terraform/variables.tf",
+                    "tenant-iac-dr/terraform/outputs.tf",
+                    "tenant-iac-dr/ansible/inventory/hosts.ini",
                     "repaired_image_metadata.json",
                     "boot_test_results.json",
                     "dependency_graph.json",
@@ -3634,9 +5344,19 @@ def generate_migration_output_bundle():
                 ],
                 "outputs": [
                     "tenant-iac-dr/tenant-iac-dr-pack.json",
+                    "tenant-iac-dr/iac-source-manifest.json",
+                    "tenant-iac-dr/source-csv/*.csv",
                     "tenant-iac-dr/restore-scope.yaml",
                     "tenant-iac-dr/terraform/README.md",
+                    "tenant-iac-dr/terraform/main.tf",
+                    "tenant-iac-dr/terraform/load_balancers.tf",
+                    "tenant-iac-dr/terraform/variables.tf",
+                    "tenant-iac-dr/terraform/outputs.tf",
                     "tenant-iac-dr/terraform/envs/<region>/terraform.tfvars.json",
+                    "tenant-iac-dr/ansible/inventory/hosts.ini",
+                    "tenant-iac-dr/ansible/group_vars/all.yml",
+                    "tenant-iac-dr/ansible/playbooks/post-provision.yml",
+                    "tenant-iac-dr/ansible/playbooks/validate-migration.yml",
                     "tenant-iac-dr/region-map.yaml",
                     "tenant-iac-dr/backup-policy.yaml",
                     "tenant-iac-dr/runbooks/dr-same-region.md",
@@ -3935,6 +5655,12 @@ def generate_migration_output_bundle():
             except Exception:
                 pass
 
+    csv_iac = _build_stage5_csv_iac(customer, tracker_row)
+    csv_tfvars = csv_iac.get("tfvars") or {}
+    if csv_tfvars.get("instances") or csv_tfvars.get("volumes") or csv_tfvars.get("load_balancers"):
+        terraform_payload = csv_tfvars
+        ansible_inventory_text = csv_iac.get("ansible_inventory") or ansible_inventory_text
+
     _write_json(bundle_root / "migration_manifest.json", manifest)
     _write_json(bundle_root / "discovery-output" / "discovery-manifest.json", discovery_output)
     _write_json(bundle_root / "discovery-output" / "source-inventory.json", source_inventory)
@@ -4098,9 +5824,14 @@ def generate_migration_output_bundle():
         },
         {
             "id": "mapping_data_present",
-            "ok": _safe_len_list(flavor_map, "mappings") + _safe_len_list(image_map, "mappings") + _safe_len_list(network_map, "mappings") > 0,
+            "ok": (
+                _safe_len_list(flavor_map, "mappings")
+                + _safe_len_list(image_map, "mappings")
+                + _safe_len_list(network_map, "mappings") > 0
+                or bool((csv_iac.get("tfvars") or {}).get("instances"))
+            ),
             "required": False,
-            "hint": "Provide flavor/image/network maps for cross-region portability.",
+            "hint": "Provide flavor/image/network maps or generated CSV mapper outputs for cross-region portability.",
         },
     ]
     preflight_missing = [c["id"] for c in preflight_checks if c["required"] and not c["ok"]]
@@ -4199,6 +5930,7 @@ def generate_migration_output_bundle():
         "        msg: Replace with customer-specific post-provision tasks.",
         "",
     ]))
+    _write_stage5_csv_iac_templates(bundle_root, csv_iac)
     _write_text(bundle_root / "tenant-iac-dr" / "runbooks" / "dr-same-region.md", "\n".join([
         "# DR Runbook: Same-Region Rebuild",
         "",
@@ -5768,6 +7500,41 @@ def _deploy_job_finish(job_id: str, rc: int) -> None:
         job["ok"] = rc == 0
         job["status"] = "completed" if rc == 0 else "failed"
         job["finished_at"] = datetime.now().isoformat()
+        job["proc"] = None
+
+
+def _stop_running_deploy_jobs(reason: str) -> List[str]:
+    stopped: List[str] = []
+    candidates: List[Tuple[str, subprocess.Popen[Any]]] = []
+    with DEPLOY_JOBS_LOCK:
+        for job_id, job in DEPLOY_JOBS.items():
+            if job.get("complete"):
+                continue
+            proc = job.get("proc")
+            if proc is not None and getattr(proc, "poll", lambda: 1)() is None:
+                candidates.append((job_id, proc))
+
+    for job_id, proc in candidates:
+        _deploy_job_append(job_id, f"\n[AUTO-STOP] {reason}\n")
+        try:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except Exception:
+                proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except Exception:
+                    proc.kill()
+                proc.wait(timeout=5)
+        except Exception as e:
+            _deploy_job_append(job_id, f"[AUTO-STOP ERROR] {e}\n")
+        _deploy_job_append(job_id, "[AUTO-STOPPED BEFORE NEW DEPLOY]\n")
+        _deploy_job_finish(job_id, 130)
+        stopped.append(job_id)
+    return stopped
 
 
 def _run_deploy_job(
@@ -5788,6 +7555,7 @@ def _run_deploy_job(
             text=True,
             bufsize=1,
             stdin=subprocess.DEVNULL,
+            start_new_session=True,
         )
         # Store proc so stop-deploy can kill it
         with DEPLOY_JOBS_LOCK:
@@ -5834,27 +7602,67 @@ def _run_deploy_job(
         _deploy_job_finish(job_id, rc)
 
 
+def compact_uploaded_deploy_script(script_text: str) -> str:
+    text = script_text or ""
+    text = re.sub(
+        r"openstack\s+server\s+create(?!\s+-f\b)\s+",
+        "openstack server create -f value -c id ",
+        text,
+    )
+    text = text.replace(
+        'echo "Ensuring tenant network resources..."',
+        'echo "PHASE 1: Network - ensuring tenant network resources..."',
+    )
+    text = text.replace(
+        'echo "Executing deployment steps..."',
+        'echo "PHASE 4: Compute - executing deployment steps..."',
+    )
+    return text
+
+
 @app.post("/api/topology/deploy-async")
 def deploy_topology_async():
     payload: Dict[str, object] = request.get_json(force=True, silent=True) or {}
-    try:
-        nodes, edges, script_name = parse_topology_payload(payload)
-    except ValueError as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+    selected_script_name = str(payload.get("script_file", "")).strip()
+    selected_script_content = str(payload.get("script_content", "")).strip()
+    selected_script_path = resolve_input_path(selected_script_name) if selected_script_name else None
+    use_selected_script = bool(
+        (selected_script_path and selected_script_path.exists() and selected_script_path.suffix == ".sh")
+        or (selected_script_content and selected_script_name.endswith(".sh"))
+    )
 
-    if not nodes:
-        return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
-    findings, summary = validate_topology(nodes, edges)
-    ignore_errors = _topology_ignore_validation_errors(payload)
-    if summary["ERROR"] > 0 and not ignore_errors:
-        return jsonify(
-            {
-                "ok": False,
-                "error": "Topology validation failed.",
-                "validation_findings": findings,
-                "validation_summary": summary,
-            }
-        ), 400
+    if use_selected_script:
+        script_name = selected_script_path.name if selected_script_path else Path(selected_script_name).name
+        if selected_script_content:
+            script_text = selected_script_content
+        else:
+            try:
+                script_text = selected_script_path.read_text(encoding="utf-8") if selected_script_path else ""
+            except OSError as e:
+                return jsonify({"ok": False, "error": f"Could not read deployment script: {e}"}), 400
+        script_text = compact_uploaded_deploy_script(script_text)
+        summary = {"ERROR": 0, "WARN": 0, "INFO": 1}
+    else:
+        try:
+            nodes, edges, script_name = parse_topology_payload(payload)
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+
+        if not nodes:
+            return jsonify({"ok": False, "error": "topology must include at least one valid node"}), 400
+        findings, summary = validate_topology(nodes, edges)
+        ignore_errors = _topology_ignore_validation_errors(payload)
+        if summary["ERROR"] > 0 and not ignore_errors:
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "Topology validation failed.",
+                    "validation_findings": findings,
+                    "validation_summary": summary,
+                }
+            ), 400
+        phases = payload.get("phases") or ["net", "vm", "vol", "lb"]
+        script_text = topology_to_script(nodes, edges, phases)
 
     openrc_content = str(payload.get("openrc_content", "")).strip()
     openrc_file_name = str(payload.get("openrc_file", "")).strip()
@@ -5862,8 +7670,6 @@ def deploy_topology_async():
     if not openrc_content and not openrc_file_name:
         return jsonify({"ok": False, "error": "openrc_content or openrc_file is required"}), 400
 
-    phases = payload.get("phases") or ["net", "vm", "vol", "lb"]
-    script_text = topology_to_script(nodes, edges, phases)
     fail_fast = bool(payload.get("fail_fast", False))
 
     openrc_path: Optional[Path] = None
@@ -5887,6 +7693,21 @@ def deploy_topology_async():
             effective_openrc_content = ""
 
     exports = parse_openrc_exports(effective_openrc_content)
+    for key in ("OS_APPLICATION_CREDENTIAL_ID", "OS_APPLICATION_CREDENTIAL_SECRET", "OS_PASSWORD", "OS_TOKEN"):
+        if str(exports.get(key, "")).strip().startswith("$"):
+            exports[key] = ""
+    if not str(exports.get("OS_AUTH_URL", "")).strip():
+        if temp_openrc_path is not None:
+            try:
+                temp_openrc_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenStack authentication failed before deploy. Selected OpenRC is missing OS_AUTH_URL. Import/paste the target FLEX OpenRC content or select the correct target OpenRC file.",
+            }
+        ), 400
     auth_secret_in_openrc = bool(str(exports.get("OS_PASSWORD", "")).strip())
     app_cred_secret = bool(str(exports.get("OS_APPLICATION_CREDENTIAL_SECRET", "")).strip())
     token_auth = bool(str(exports.get("OS_TOKEN", "")).strip())
@@ -5908,6 +7729,8 @@ def deploy_topology_async():
         q = shell_quote(auth_secret)
         secret_exports.append(f"export OS_PASSWORD={q};")
         secret_exports.append(f"export OS_API_KEY={q};")
+        if str(exports.get("OS_AUTH_TYPE", "")).strip() == "v3applicationcredential":
+            secret_exports.append(f"export OS_APPLICATION_CREDENTIAL_SECRET={q};")
     secret_export = " ".join(secret_exports)
     if secret_export:
         secret_export += " "
@@ -5938,8 +7761,9 @@ def deploy_topology_async():
         return jsonify({"ok": False, "error": f"OpenStack authentication failed before deploy. {probe_output.strip()}"}), 400
 
     persisted_script = UPLOAD_DIR / script_name
-    persisted_script.write_text(script_text, encoding="utf-8")
-    persisted_script.chmod(0o750)
+    if not use_selected_script or selected_script_content:
+        persisted_script.write_text(script_text, encoding="utf-8")
+        persisted_script.chmod(0o750)
 
     temp_script = tempfile.NamedTemporaryFile(mode="w", prefix="topology_", suffix=".sh", delete=False)
     temp_script.write(script_text)
@@ -5953,8 +7777,11 @@ def deploy_topology_async():
         f"{secret_export}set +a && bash {shell_quote(str(temp_script_path))}"
     )
 
+    stopped_jobs = _stop_running_deploy_jobs("New deployment requested; stopping previous dashboard deploy process.")
     job_id = _deploy_job_create(f"uploads/{script_name}")
-    _deploy_job_append(job_id, "Starting topology deploy...\n")
+    if stopped_jobs:
+        _deploy_job_append(job_id, f"Stopped previous deploy job(s): {', '.join(stopped_jobs)}\n")
+    _deploy_job_append(job_id, f"Starting {'uploaded deployment script' if use_selected_script else 'topology deploy'}: uploads/{script_name}\n")
     worker = threading.Thread(
         target=_run_deploy_job,
         args=(job_id, cmd, temp_script_path, temp_openrc_path),
@@ -5984,7 +7811,6 @@ def stop_deploy():
     job_id = str(payload.get("job_id", "")).strip()
     if not job_id:
         return jsonify({"ok": False, "error": "job_id is required"}), 400
-    import signal
     with DEPLOY_JOBS_LOCK:
         job = DEPLOY_JOBS.get(job_id)
         if not job:
@@ -5995,11 +7821,18 @@ def stop_deploy():
     if proc is None:
         return jsonify({"ok": False, "error": "process not started yet — try again"}), 400
     try:
-        proc.send_signal(signal.SIGTERM)
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except Exception:
+            proc.terminate()
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except Exception:
+                proc.kill()
+            proc.wait(timeout=5)
         _deploy_job_append(job_id, "\n[STOPPED BY USER]\n")
         _deploy_job_finish(job_id, 130)
         return jsonify({"ok": True, "message": "Deployment process stopped."})
@@ -6234,6 +8067,21 @@ def deploy_topology():
             effective_openrc_content = ""
 
     exports = parse_openrc_exports(effective_openrc_content)
+    for key in ("OS_APPLICATION_CREDENTIAL_ID", "OS_APPLICATION_CREDENTIAL_SECRET", "OS_PASSWORD", "OS_TOKEN"):
+        if str(exports.get(key, "")).strip().startswith("$"):
+            exports[key] = ""
+    if not str(exports.get("OS_AUTH_URL", "")).strip():
+        if temp_openrc_file is not None:
+            try:
+                Path(temp_openrc_file.name).unlink(missing_ok=True)
+            except OSError:
+                pass
+        return jsonify(
+            {
+                "ok": False,
+                "error": "OpenStack authentication failed before deploy. Selected OpenRC is missing OS_AUTH_URL. Import/paste the target FLEX OpenRC content or select the correct target OpenRC file.",
+            }
+        ), 400
     auth_secret_in_openrc = bool(str(exports.get("OS_PASSWORD", "")).strip())
     app_cred_secret = bool(str(exports.get("OS_APPLICATION_CREDENTIAL_SECRET", "")).strip())
     token_auth = bool(str(exports.get("OS_TOKEN", "")).strip())
@@ -6288,6 +8136,8 @@ def deploy_topology():
         q = shell_quote(auth_secret)
         secret_exports.append(f"export OS_PASSWORD={q};")
         secret_exports.append(f"export OS_API_KEY={q};")
+        if str(exports.get("OS_AUTH_TYPE", "")).strip() == "v3applicationcredential":
+            secret_exports.append(f"export OS_APPLICATION_CREDENTIAL_SECRET={q};")
     secret_export = " ".join(secret_exports)
     if secret_export:
         secret_export += " "
@@ -6391,6 +8241,22 @@ def upload():
     return jsonify({"ok": True, "saved_as": f"uploads/{name}"})
 
 
+@app.post("/api/tco/upload-flavormap")
+def tco_upload_flavormap():
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file part in request"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"ok": False, "error": "No file selected"}), 400
+    name = secure_filename(f.filename)
+    if not name or not name.lower().endswith(".csv"):
+        return jsonify({"ok": False, "error": "Flavor map upload must be a CSV file"}), 400
+    stamped = f"tco_flavormap_{int(time.time())}_{name}"
+    target = UPLOAD_DIR / stamped
+    f.save(target)
+    return jsonify({"ok": True, "saved_as": f"uploads/{stamped}"})
+
+
 @app.post("/api/save-csv")
 def save_csv():
     payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
@@ -6455,6 +8321,604 @@ def run_account_overview():
     created = diff_files(before, after)
 
     return jsonify({"ok": rc == 0, "return_code": rc, "log": out, "created": created})
+
+
+OVERVIEW_FIELDNAMES = [
+    "collected_at", "service_type", "region", "name", "resource_id", "status",
+    "created", "updated", "public_ips", "private_ips", "flavor_id", "image_id",
+    "image_name", "image_os_distro", "image_os_version", "image_os_type",
+    "image_release_id", "image_lookup_error", "image_schedule", "hypervisor_id",
+    "size_gb", "attachments", "protocol", "node_count", "datastore_type",
+    "datastore_version", "backup_schedule_enabled", "ha_group_id", "email_address",
+    "backup_container", "is_encrypted", "datacenter", "details_json", "cidr",
+    "gateway_ip", "network_id", "object_count", "bytes_used", "cdn_enabled",
+    "stack_status_reason",
+]
+
+
+def _csv_join(values: List[str]) -> str:
+    return "; ".join([str(v).strip() for v in values if str(v).strip()])
+
+
+def _extract_openstack_addresses(addresses: Any) -> Tuple[str, str]:
+    public_ips: List[str] = []
+    private_ips: List[str] = []
+    if isinstance(addresses, dict):
+        for _net, entries in addresses.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                ip = str(entry.get("addr") or "").strip()
+                ip_type = str(entry.get("OS-EXT-IPS:type") or entry.get("type") or "").lower()
+                if not ip:
+                    continue
+                if ip_type == "floating":
+                    public_ips.append(ip)
+                else:
+                    private_ips.append(ip)
+    elif isinstance(addresses, str):
+        for ip in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", addresses):
+            private_ips.append(ip)
+    return _csv_join(public_ips), _csv_join(private_ips)
+
+
+def _openstack_env_from_payload(payload: Dict[str, Any]) -> Dict[str, str]:
+    openrc_content = str(payload.get("openrc_content") or "").strip()
+    openrc_file_name = str(payload.get("openrc_file") or "").strip()
+    auth_secret = str(payload.get("password") or payload.get("api_key") or payload.get("auth_secret") or "").strip()
+    if not openrc_content and openrc_file_name:
+        resolved = resolve_input_path(openrc_file_name)
+        if resolved and resolved.exists():
+            openrc_content = resolved.read_text(encoding="utf-8")
+    exports = parse_openrc_exports(openrc_content) if openrc_content else {}
+    auth_url = str(payload.get("auth_url") or "").strip()
+    username = str(payload.get("username") or "").strip()
+    project_id = str(payload.get("project_id") or payload.get("account_id") or "").strip()
+    domain = str(payload.get("domain") or "").strip() or "rackspace_cloud_domain"
+    if auth_url:
+        exports["OS_AUTH_URL"] = auth_url
+    if username:
+        exports["OS_USERNAME"] = username
+    if project_id:
+        exports["OS_PROJECT_ID"] = project_id
+    if domain:
+        exports["OS_USER_DOMAIN_NAME"] = domain
+        exports.setdefault("OS_PROJECT_DOMAIN_NAME", domain)
+    if auth_secret:
+        exports["OS_PASSWORD"] = auth_secret
+        exports["OS_API_KEY"] = auth_secret
+    exports.setdefault("OS_IDENTITY_API_VERSION", "3")
+    if "OS_AUTH_URL" not in exports or "OS_USERNAME" not in exports or "OS_PROJECT_ID" not in exports:
+        raise ValueError("FLEX Auth URL, username, and project ID are required")
+    return exports
+
+
+def _write_csv(path: Path, fieldnames: List[str], rows: List[Dict[str, Any]]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _artifact_stem_with_prefix(prefix: str, raw_name: str) -> str:
+    clean = re.sub(r"[^0-9A-Za-z_.-]+", "_", str(raw_name or "")).strip("._-") or "artifact"
+    for _ in range(4):
+        clean = re.sub(rf"^{re.escape(prefix)}[_-]+", "", clean, flags=re.IGNORECASE)
+        clean = re.sub(rf"[_-]+{re.escape(prefix)}$", "", clean, flags=re.IGNORECASE)
+        clean = re.sub(r"[_-]+(overview|flavormap|blockmap|lbmap)$", "", clean, flags=re.IGNORECASE)
+    return f"{prefix}_{clean or 'artifact'}"
+
+
+def _csv_first(row: Dict[str, Any], keys: List[str]) -> str:
+    lower = {str(k).strip().lower(): v for k, v in row.items()}
+    for key in keys:
+        value = lower.get(key.lower())
+        if value not in {None, ""}:
+            return str(value).strip()
+    return ""
+
+
+def _parse_memory_mb(value: str) -> int:
+    text = str(value or "").strip().lower().replace(",", "")
+    m = re.search(r"([0-9.]+)", text)
+    if not m:
+        return 0
+    num = float(m.group(1))
+    return int(num * 1024) if "gib" in text or "gb" in text else int(num)
+
+
+def _parse_int(value: str) -> int:
+    try:
+        text = re.sub(r"[^0-9.+-]", "", str(value or "").strip())
+        return int(float(text)) if text else 0
+    except Exception:
+        return 0
+
+
+def _parse_flex_flavor_shape(name: str) -> Tuple[int, int]:
+    m = re.search(r"\b(?:gp|mo)\.\d+\.(\d+)\.(\d+)\b", str(name or ""), re.IGNORECASE)
+    if not m:
+        return 0, 0
+    return int(m.group(1)), int(m.group(2)) * 1024
+
+
+def _load_flex_flavor_catalog(region: str) -> List[Dict[str, Any]]:
+    catalog = resolve_target_flavor_catalog_for_region(region)
+    if not catalog:
+        return []
+    out: List[Dict[str, Any]] = []
+    for row in read_csv_rows(catalog):
+        name = _csv_first(row, ["Name", "name", "target_flavor_name", "flavor_name"])
+        if not name:
+            continue
+        out.append({
+            "id": _csv_first(row, ["ID", "id", "flavor_id"]),
+            "name": name,
+            "vcpus": _parse_int(_csv_first(row, ["CPU", "vcpus", "vcpu"])),
+            "ram_mb": _parse_memory_mb(_csv_first(row, ["Memory", "RAM", "ram_mb", "memory_mb"])),
+            "disk_gb": _parse_int(_csv_first(row, ["Disk (GiB)", "Disk (GB)", "disk_gb", "disk"])),
+            "rate": _to_float(_csv_first(row, ["Cost per Hour", "hourly_rate_usd", "target_hourly_rate_usd"])),
+        })
+    return out
+
+
+def _choose_flex_target_flavor(source_flavor: str, target_catalog: List[Dict[str, Any]]) -> Dict[str, Any]:
+    source_vcpus, source_ram_mb = _parse_flex_flavor_shape(source_flavor)
+    if not target_catalog:
+        return {"name": source_flavor, "id": source_flavor, "vcpus": "", "ram_mb": "", "disk_gb": "", "rate": ""}
+    candidates = [
+        f for f in target_catalog
+        if (not source_vcpus or f.get("vcpus", 0) >= source_vcpus)
+        and (not source_ram_mb or f.get("ram_mb", 0) >= source_ram_mb)
+    ] or target_catalog
+    candidates.sort(key=lambda f: (
+        max(int(f.get("vcpus") or 0) - source_vcpus, 0),
+        max(int(f.get("ram_mb") or 0) - source_ram_mb, 0),
+        int(f.get("disk_gb") or 0),
+    ))
+    return candidates[0]
+
+
+def _load_flex_public_image_names() -> List[str]:
+    names: List[str] = []
+    for path in sorted((UPLOAD_DIR / "images").glob("*.csv")):
+        for row in read_csv_rows(path):
+            name = _csv_first(row, ["Name", "name", "image_name"])
+            if name:
+                names.append(name)
+    return names
+
+
+def _infer_flex_image_from_name(text: str, image_names: List[str]) -> Tuple[str, str]:
+    raw = str(text or "")
+    low = raw.lower()
+    def pick(*needles: str) -> str:
+        for image in image_names:
+            image_low = image.lower()
+            if all(n in image_low for n in needles):
+                return image
+        return ""
+    if "windows" in low or "win201" in low or "win202" in low:
+        year = "2022"
+        for candidate in ("2025", "2022", "2019", "2016"):
+            if candidate in low:
+                year = candidate
+                break
+        sql = "sql" in low
+        image = pick("windows server", year, "sql") if sql else pick("windows server", year)
+        return image or pick("windows server", year) or pick("windows server", "2022"), f"inferred_windows_{year}_from_vm_name"
+    linux_map = [
+        ("ubuntu", "24.04", ["u24", "ubuntu24"]),
+        ("ubuntu", "22.04", ["u22", "ubuntu22"]),
+        ("ubuntu", "20.04", ["u20", "ubuntu20"]),
+        ("debian", "12", ["dbian12", "debian12"]),
+        ("debian", "11", ["dbian11", "debian11"]),
+        ("debian", "10", ["dbian10", "debian10"]),
+        ("rocky", "9"), ("rocky", "8"),
+        ("alma", "9"), ("alma", "8"),
+        ("rhel", "9"), ("red hat enterprise linux", "9"), ("rhel", "8"), ("red hat enterprise linux", "8"),
+        ("oracle", "9"), ("oracle", "8"),
+    ]
+    for item in linux_map:
+        distro, version = item[0], item[1]
+        aliases = list(item[2]) if len(item) > 2 else []
+        compact = distro.replace(" ", "")
+        if distro in low or compact in low or any(alias in low for alias in aliases):
+            version_match = re.search(rf"{re.escape(compact)}[-_ ]?(\d+(?:\.\d+)?)", low) or re.search(rf"{re.escape(distro)}[-_ ]?(\d+(?:\.\d+)?)", low)
+            wanted = version_match.group(1) if version_match else version
+            image = pick(distro, wanted) or pick(distro, version)
+            if not image and distro == "rhel":
+                image = pick("red hat enterprise linux", wanted) or pick("red hat enterprise linux", version)
+            if not image and distro == "alma":
+                image = pick("almalinux", wanted) or pick("almalinux", version)
+            return image, f"inferred_{distro}_{wanted}_from_vm_name"
+    return "", "no_os_version_in_vm_name"
+
+
+@app.post("/api/run/flex2flex_overview")
+@app.post("/api/run/flex2flex-overview")
+def run_flex2flex_overview():
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    try:
+        exports = _openstack_env_from_payload(payload)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    project_id = _artifact_stem_with_prefix("flex2flex", exports.get("OS_PROJECT_ID", "flex"))
+    flex_region_aliases = {"DFW": "DFW3", "IAD": "IAD3", "SJC": "SJC3", "ORD": "ORD1", "HKG": "HKG1", "SYD": "SYD1", "LON": "LON1"}
+    requested_regions = [flex_region_aliases.get(r.strip().upper(), r.strip().upper()) for r in str(payload.get("regions") or exports.get("OS_REGION_NAME") or "DFW3").split(",") if r.strip()]
+    if not requested_regions:
+        requested_regions = ["DFW3"]
+
+    before = list_workspace_files()
+    rows: List[Dict[str, Any]] = []
+    logs: List[str] = []
+    now_ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    for region in requested_regions:
+        env = os.environ.copy()
+        env.update(exports)
+        env["OS_REGION_NAME"] = region
+        region_l = region.lower()
+        logs.append(f"[FLEX2FLEX] Scanning source FLEX region {region}")
+        try:
+            servers = openstack_json(env, ["server", "list"], timeout_sec=60)
+        except Exception as e:
+            logs.append(f"[WARN] server list failed in {region}: {e}")
+            servers = []
+        for server in servers if isinstance(servers, list) else []:
+            sid = _value_from_row(server, ["ID"])
+            name = _value_from_row(server, ["Name"]) or sid
+            # Keep overview fast: server show per VM can hang for minutes on busy Keystone/Nova.
+            flavor_name = str(_value_from_row(server, ["Flavor", "flavor", "Flavor Name"]) or "").strip()
+            flavor_id = flavor_name
+            image_name = str(_value_from_row(server, ["Image", "image", "Image Name"]) or "").strip()
+            image_id = ""
+            public_ips, private_ips = _extract_openstack_addresses(_value_from_row(server, ["Networks", "Addresses", "addresses"]))
+            rows.append({
+                "collected_at": now_ts,
+                "service_type": "cloud_server",
+                "region": region_l,
+                "name": name,
+                "resource_id": sid,
+                "status": _value_from_row(server, ["Status", "status"]),
+                "created": _value_from_row(server, ["Created", "created"]),
+                "updated": _value_from_row(server, ["Updated", "updated"]),
+                "public_ips": public_ips,
+                "private_ips": private_ips,
+                "flavor_id": flavor_id,
+                "image_id": image_id,
+                "image_name": image_name,
+                "image_os_type": "windows" if "windows" in image_name.lower() else "linux",
+                "details_json": json.dumps(server)[:8000],
+            })
+
+        try:
+            volumes = openstack_json(env, ["volume", "list"], timeout_sec=60)
+        except Exception as e:
+            logs.append(f"[WARN] volume list failed in {region}: {e}")
+            volumes = []
+        for volume in volumes if isinstance(volumes, list) else []:
+            vid = _value_from_row(volume, ["ID"])
+            rows.append({
+                "collected_at": now_ts,
+                "service_type": "block_storage_volume",
+                "region": region_l,
+                "name": _value_from_row(volume, ["Name"]) or vid,
+                "resource_id": vid,
+                "status": _value_from_row(volume, ["Status"]),
+                "size_gb": _value_from_row(volume, ["Size", "size"]),
+                "attachments": _value_from_row(volume, ["Attached to", "Attachments", "attachments"]),
+                "details_json": json.dumps(volume)[:8000],
+            })
+
+        for resource_type, args in [
+            ("cloud_network", ["network", "list"]),
+            ("cloud_subnet", ["subnet", "list"]),
+            ("security_group", ["security", "group", "list"]),
+            ("load_balancer", ["loadbalancer", "list"]),
+        ]:
+            try:
+                items = openstack_json(env, args, timeout_sec=45)
+            except Exception as e:
+                logs.append(f"[WARN] {' '.join(args)} failed in {region}: {e}")
+                items = []
+            for item in items if isinstance(items, list) else []:
+                rows.append({
+                    "collected_at": now_ts,
+                    "service_type": resource_type,
+                    "region": region_l,
+                    "name": _value_from_row(item, ["Name"]) or _value_from_row(item, ["ID"]),
+                    "resource_id": _value_from_row(item, ["ID"]),
+                    "status": _value_from_row(item, ["Status", "Provisioning Status"]),
+                    "details_json": json.dumps(item)[:8000],
+                })
+
+    if not any(r.get("service_type") == "cloud_server" for r in rows):
+        logs.append("[ERROR] FLEX2FLEX scan found 0 cloud_server rows; refusing to generate empty topology inputs.")
+        return jsonify({"ok": False, "return_code": 2, "error": "FLEX2FLEX scan found no instances. Check OpenStack credentials/region and openstack CLI availability.", "log": "\n".join(logs), "created": []}), 500
+
+    overview_path = BASE_DIR / f"{project_id}_overview.csv"
+    _write_csv(overview_path, OVERVIEW_FIELDNAMES, rows)
+    after = list_workspace_files()
+    created = diff_files(before, after)
+    logs.append(f"[OK] FLEX2FLEX overview written: {overview_path.name} rows={len(rows)}")
+    return jsonify({"ok": True, "return_code": 0, "log": "\n".join(logs), "created": created or [overview_path.name]})
+
+
+@app.post("/api/run/flex2flex_flavor_mapper")
+@app.post("/api/run/flex2flex-flavor-mapper")
+def run_flex2flex_flavor_mapper():
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    inventory = resolve_input_path(str(payload.get("inventory") or ""))
+    target_region = str(payload.get("target_region") or "").strip().upper()
+    source_region = normalize_flex_region(str(payload.get("source_region") or "").strip()) if payload.get("source_region") else ""
+    include_floating_ips = bool(payload.get("include_floating_ips", True))
+    if not inventory or not inventory.exists():
+        return jsonify({"ok": False, "error": "inventory file not found"}), 400
+    if not target_region:
+        return jsonify({"ok": False, "error": "target_region is required"}), 400
+    before = list_workspace_files()
+    rows = read_csv_rows(inventory)
+    if source_region:
+        rows = [
+            row for row in rows
+            if normalize_flex_region(str(row.get("region") or "")) == source_region
+        ]
+    server_rows = [r for r in rows if r.get("service_type") == "cloud_server"]
+    if not server_rows:
+        region_msg = f" for source region {source_region}" if source_region else ""
+        return jsonify({"ok": False, "error": f"inventory has no cloud_server rows{region_msg}: {inventory.name}"}), 400
+    target_catalog = _load_flex_flavor_catalog(target_region)
+    flex_image_names = _load_flex_public_image_names()
+    stem = _artifact_stem_with_prefix("flex2flex", inventory.stem)
+    flavor_path = BASE_DIR / f"{stem}_flavormap.csv"
+    block_path = BASE_DIR / f"{stem}_blockmap.csv"
+    lb_path = BASE_DIR / f"{stem}_lbmap.csv"
+    flavor_fields = [
+        "source_resource_type", "region", "target_region", "server_name", "target_server_name", "server_id", "include_in_deploy",
+        "source_flavor_id", "source_flavor_name", "source_ram_mb", "source_vcpus", "source_disk_gb",
+        "source_image_name", "source_image_os_distro", "source_image_os_version",
+        "target_flavor_id", "target_flavor_name", "target_ram_mb", "target_vcpus", "target_disk_gb",
+        "target_hourly_rate_usd", "target_daily_cost_min_usd", "target_monthly_cost_min_usd",
+        "recommended_target_image_name", "image_recommendation_note", "cloud_init_user_data",
+        "boot_volume_source_size_gb", "boot_volume_source_device", "boot_volume_target_device",
+        "needs_floating_ip", "floating_network", "boot_strategy", "boot_from_volume_size_gb",
+        "attached_data_volumes_count", "conversion_note", "alt_1", "alt_2", "alt_3",
+    ]
+    flavor_rows: List[Dict[str, Any]] = []
+    for row in server_rows:
+        server_name = str(row.get("name") or "").strip()
+        image_name = str(row.get("image_name") or "").strip()
+        flavor_name = str(row.get("flavor_id") or "").strip()
+        target_flavor = _choose_flex_target_flavor(flavor_name, target_catalog)
+        image_exists = image_name and any(image_name.lower() == img.lower() for img in flex_image_names)
+        inferred_image, image_note = _infer_flex_image_from_name(" ".join([server_name, image_name]), flex_image_names)
+        target_image = image_name if image_exists else inferred_image
+        if image_exists:
+            image_note = "target_public_image_exact_match"
+        flavor_rows.append({
+            "source_resource_type": "cloud_server",
+            "region": row.get("region", ""),
+            "target_region": target_region,
+            "server_name": server_name,
+            "target_server_name": server_name,
+            "server_id": row.get("resource_id", ""),
+            "include_in_deploy": "yes",
+            "source_flavor_id": flavor_name,
+            "source_flavor_name": flavor_name,
+            "source_image_name": image_name,
+            "source_image_os_distro": row.get("image_os_distro", ""),
+            "source_image_os_version": row.get("image_os_version", ""),
+            "target_flavor_id": target_flavor.get("id") or target_flavor.get("name") or flavor_name,
+            "target_flavor_name": target_flavor.get("name") or flavor_name,
+            "target_ram_mb": target_flavor.get("ram_mb") or "",
+            "target_vcpus": target_flavor.get("vcpus") or "",
+            "target_disk_gb": target_flavor.get("disk_gb") or "",
+            "target_hourly_rate_usd": target_flavor.get("rate") or "",
+            "recommended_target_image_name": target_image,
+            "image_recommendation_note": image_note,
+            "needs_floating_ip": "yes" if include_floating_ips else "no",
+            "floating_network": "PUBLICNET" if include_floating_ips else "",
+            "boot_strategy": "local_boot" if target_image else "flex2flex_missing_target_image",
+            "conversion_note": f"FLEX2FLEX mapper used {target_region} flavor catalog and public image inference from VM name",
+        })
+    block_fields = [
+        "region", "source_server_id", "source_server_name", "target_server_name", "target_flavor_name",
+        "source_volume_id", "source_volume_name", "volume_size_gb", "source_device_path", "target_device_path",
+        "volume_role", "target_action", "boot_strategy", "boot_from_volume_size_gb",
+    ]
+    block_rows: List[Dict[str, Any]] = []
+    server_names = {r.get("resource_id", ""): r.get("name", "") for r in server_rows}
+    for row in rows:
+        if row.get("service_type") != "block_storage_volume":
+            continue
+        attachments = []
+        try:
+            attachments = json.loads(row.get("attachments") or "[]")
+        except Exception:
+            attachments = []
+        if not attachments:
+            continue
+        for att in attachments if isinstance(attachments, list) else []:
+            sid = str((att or {}).get("server_id") or (att or {}).get("serverId") or (att or {}).get("instance_uuid") or "")
+            if not sid:
+                continue
+            block_rows.append({
+                "region": row.get("region", ""),
+                "source_server_id": sid,
+                "source_server_name": server_names.get(sid, ""),
+                "target_server_name": server_names.get(sid, ""),
+                "source_volume_id": row.get("resource_id", ""),
+                "source_volume_name": row.get("name", ""),
+                "volume_size_gb": row.get("size_gb", ""),
+                "source_device_path": str((att or {}).get("device") or ""),
+                "target_device_path": str((att or {}).get("device") or ""),
+                "volume_role": "data",
+                "target_action": "create_and_attach",
+                "boot_strategy": "flex2flex_rebuild_from_source_image",
+            })
+    lb_fields = [
+        "region", "load_balancer_id", "load_balancer_name", "load_balancer_status", "provider",
+        "target_protocol", "listener_port", "member_port", "pool_algorithm", "health_monitor_type",
+        "health_monitor_delay", "health_monitor_timeout", "health_monitor_attempts", "vip_public_ips",
+        "vip_private_ips", "source_member_ip", "source_member_port", "source_member_condition",
+        "source_member_status", "source_server_id", "source_server_name", "target_server_name",
+        "member_include_in_deploy", "member_match_note",
+    ]
+    lb_rows = [{
+        "region": r.get("region", ""),
+        "load_balancer_id": r.get("resource_id", ""),
+        "load_balancer_name": r.get("name", ""),
+        "load_balancer_status": r.get("status", ""),
+        "provider": "ovn",
+        "target_protocol": "HTTP",
+        "listener_port": "80",
+        "member_port": "80",
+        "pool_algorithm": "ROUND_ROBIN",
+        "member_include_in_deploy": "no",
+        "member_match_note": "FLEX2FLEX scanner captured LB shell; review members before deploy",
+    } for r in rows if r.get("service_type") == "load_balancer"]
+    _write_csv(flavor_path, flavor_fields, flavor_rows)
+    _write_csv(block_path, block_fields, block_rows)
+    _write_csv(lb_path, lb_fields, lb_rows)
+    after = list_workspace_files()
+    created = diff_files(before, after)
+    log_text = "\n".join([
+        f"[OK] FLEX2FLEX flavor map written: {flavor_path.name} rows={len(flavor_rows)}",
+        f"[OK] FLEX2FLEX block map written: {block_path.name} rows={len(block_rows)}",
+        f"[OK] FLEX2FLEX LB map written: {lb_path.name} rows={len(lb_rows)}",
+    ])
+    return jsonify({"ok": True, "return_code": 0, "log": log_text, "created": created or [flavor_path.name, block_path.name, lb_path.name]})
+
+
+@app.post("/api/run/hyperflex-overview")
+def run_hyperflex_overview():
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    provider = str(payload.get("provider") or "aws").strip().lower()
+    if provider not in {"aws", "gcp", "azure"}:
+        provider = "aws"
+    account_id = re.sub(r"[^0-9A-Za-z_-]+", "_", str(payload.get("account_id") or payload.get("project_id") or provider).strip()).strip("_") or provider
+    regions = [r.strip().lower() for r in str(payload.get("regions") or "").split(",") if r.strip()]
+    before = list_workspace_files()
+    overview_path = BASE_DIR / f"{account_id}_{provider}_hyperflex_overview.csv"
+    now_ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    seed_rows: List[Dict[str, Any]] = []
+    # This endpoint intentionally writes the same overview schema as OSPC2FLEX.
+    # Live hyperscaler API adapters can append cloud_server/block/LB rows here
+    # without changing the mapper/deploy stages.
+    if regions:
+        for region in regions:
+            seed_rows.append({
+                "collected_at": now_ts,
+                "service_type": "hyperflex_discovery_scope",
+                "region": region,
+                "name": f"{provider}-{region}-scope",
+                "resource_id": f"{provider}:{region}",
+                "status": "READY_FOR_IMPORT",
+                "details_json": json.dumps({
+                    "provider": provider,
+                    "note": "Add cloud_server rows to this overview CSV or upload converted hyperscaler inventory before Step 2.",
+                }),
+            })
+    _write_csv(overview_path, OVERVIEW_FIELDNAMES, seed_rows)
+    after = list_workspace_files()
+    created = diff_files(before, after)
+    log_text = "\n".join([
+        f"[OK] {provider.upper()} HYPER FLEX overview written: {overview_path.name} rows={len(seed_rows)}",
+        "[INFO] The file uses the same overview schema as OSPC2FLEX.",
+        "[INFO] Add or upload converted cloud_server/block_storage_volume/load_balancer rows, then run Step 2 to produce maps.",
+    ])
+    return jsonify({"ok": True, "return_code": 0, "log": log_text, "created": created or [overview_path.name]})
+
+
+@app.post("/api/run/hyperflex-flavor-mapper")
+def run_hyperflex_flavor_mapper():
+    payload: Dict[str, Any] = request.get_json(force=True, silent=True) or {}
+    provider = str(payload.get("provider") or "aws").strip().lower()
+    if provider not in {"aws", "gcp", "azure"}:
+        provider = "aws"
+    inventory = resolve_input_path(str(payload.get("inventory") or ""))
+    target_region = str(payload.get("target_region") or "").strip().upper()
+    include_floating_ips = bool(payload.get("include_floating_ips", True))
+    if not inventory or not inventory.exists():
+        return jsonify({"ok": False, "error": "inventory file not found"}), 400
+    if not target_region:
+        return jsonify({"ok": False, "error": "target_region is required"}), 400
+    before = list_workspace_files()
+    rows = read_csv_rows(inventory)
+    server_rows = [r for r in rows if r.get("service_type") == "cloud_server"]
+    stem = inventory.stem.replace("_overview", "").replace("_hyperflex", "")
+    if stem.endswith(f"_{provider}"):
+        stem = stem[:-(len(provider) + 1)]
+    flavor_path = BASE_DIR / f"{stem}_{provider}_hyperflex_flavormap.csv"
+    block_path = BASE_DIR / f"{stem}_{provider}_hyperflex_blockmap.csv"
+    lb_path = BASE_DIR / f"{stem}_{provider}_hyperflex_lbmap.csv"
+    flavor_fields = [
+        "source_resource_type", "region", "target_region", "server_name", "target_server_name", "server_id", "include_in_deploy",
+        "source_flavor_id", "source_flavor_name", "source_ram_mb", "source_vcpus", "source_disk_gb",
+        "source_image_name", "source_image_os_distro", "source_image_os_version",
+        "target_flavor_id", "target_flavor_name", "target_ram_mb", "target_vcpus", "target_disk_gb",
+        "target_hourly_rate_usd", "target_daily_cost_min_usd", "target_monthly_cost_min_usd",
+        "recommended_target_image_name", "image_recommendation_note", "cloud_init_user_data",
+        "boot_volume_source_size_gb", "boot_volume_source_device", "boot_volume_target_device",
+        "needs_floating_ip", "floating_network", "boot_strategy", "boot_from_volume_size_gb",
+        "attached_data_volumes_count", "conversion_note", "alt_1", "alt_2", "alt_3",
+    ]
+    flavor_rows: List[Dict[str, Any]] = []
+    for row in server_rows:
+        source_shape = str(row.get("flavor_id") or row.get("source_flavor_id") or "").strip()
+        image_name = str(row.get("image_name") or row.get("recommended_target_image_name") or "").strip()
+        target_flavor = str(row.get("target_flavor_name") or source_shape or "").strip()
+        flavor_rows.append({
+            "source_resource_type": f"{provider}_cloud_server",
+            "region": row.get("region", ""),
+            "target_region": target_region,
+            "server_name": row.get("name", ""),
+            "target_server_name": row.get("name", ""),
+            "server_id": row.get("resource_id", ""),
+            "include_in_deploy": "yes",
+            "source_flavor_id": source_shape,
+            "source_flavor_name": source_shape,
+            "source_ram_mb": row.get("source_ram_mb", ""),
+            "source_vcpus": row.get("source_vcpus", ""),
+            "source_disk_gb": row.get("source_disk_gb", ""),
+            "source_image_name": image_name,
+            "source_image_os_distro": row.get("image_os_distro", ""),
+            "source_image_os_version": row.get("image_os_version", ""),
+            "target_flavor_id": target_flavor,
+            "target_flavor_name": target_flavor,
+            "recommended_target_image_name": image_name,
+            "image_recommendation_note": f"{provider}_to_flex_source_image_mapping",
+            "needs_floating_ip": "yes" if include_floating_ips else "no",
+            "floating_network": "PUBLICNET" if include_floating_ips else "",
+            "boot_strategy": f"{provider}_to_flex_rebuild_from_image",
+            "conversion_note": f"{provider.upper()} source mapping generated by HYPER FLEX scanner",
+        })
+    block_fields = [
+        "region", "source_server_id", "source_server_name", "target_server_name", "target_flavor_name",
+        "source_volume_id", "source_volume_name", "volume_size_gb", "source_device_path", "target_device_path",
+        "volume_role", "target_action", "boot_strategy", "boot_from_volume_size_gb",
+    ]
+    lb_fields = [
+        "region", "load_balancer_id", "load_balancer_name", "load_balancer_status", "provider",
+        "target_protocol", "listener_port", "member_port", "pool_algorithm", "health_monitor_type",
+        "health_monitor_delay", "health_monitor_timeout", "health_monitor_attempts", "vip_public_ips",
+        "vip_private_ips", "source_member_ip", "source_member_port", "source_member_condition",
+        "source_member_status", "source_server_id", "source_server_name", "target_server_name",
+        "member_include_in_deploy", "member_match_note",
+    ]
+    _write_csv(flavor_path, flavor_fields, flavor_rows)
+    _write_csv(block_path, block_fields, [])
+    _write_csv(lb_path, lb_fields, [])
+    after = list_workspace_files()
+    created = diff_files(before, after)
+    log_text = "\n".join([
+        f"[OK] {provider.upper()} HYPER FLEX flavor map written: {flavor_path.name} rows={len(flavor_rows)}",
+        f"[OK] {provider.upper()} HYPER FLEX block map written: {block_path.name}",
+        f"[OK] {provider.upper()} HYPER FLEX LB map written: {lb_path.name}",
+    ])
+    return jsonify({"ok": True, "return_code": 0, "log": log_text, "created": created or [flavor_path.name, block_path.name, lb_path.name]})
 
 
 @app.post("/api/run/flavor-mapper")
@@ -7089,6 +9553,31 @@ def run_generate_data_migration():
     })
 
 
+def _safe_deploy_name_part(value: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9.-]+", "-", str(value or "").strip())
+    return text.strip("-") or "UNKNOWN"
+
+
+def _flex2flex_deploy_output_prefix(
+    flavor_map: Path,
+    flavor_rows: List[Dict[str, str]],
+    source_region_override: str = "",
+    target_region_override: str = "",
+) -> str:
+    first = next(
+        (
+            row for row in flavor_rows
+            if str(row.get("source_resource_type") or "").strip() in {"", "cloud_server", "database_instance"}
+            and str(row.get("server_name") or "").strip()
+        ),
+        flavor_rows[0] if flavor_rows else {},
+    )
+    source_region = short_flex_region(str(source_region_override or first.get("source_region") or first.get("region") or "IAD3"))
+    target_region = normalize_flex_region(str(target_region_override or first.get("target_region") or "DFW3"))
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"flex2flex__{_safe_deploy_name_part(source_region)}-{_safe_deploy_name_part(target_region)}_{stamp}-tenant_deploy"
+
+
 @app.post("/api/run/generate-deploy")
 def run_generate_deploy():
     payload: Dict[str, str] = request.get_json(force=True, silent=True) or {}
@@ -7124,7 +9613,7 @@ def run_generate_deploy():
         (payload.get("volume_type") or "Performance").strip(),
     ]
 
-    key_name = (payload.get("key_name") or "").strip()
+    key_name = (payload.get("key_name") or "").strip() or "latopras"
     windows_password_length_raw = payload.get("windows_password_length", 14)
     try:
         windows_password_length = int(windows_password_length_raw)
@@ -7135,8 +9624,20 @@ def run_generate_deploy():
     generate_windows_passwords = bool(payload.get("generate_windows_passwords", True))
 
     flavor_rows = read_csv_rows(flavor_map)
+    deploy_rows = [
+        row for row in flavor_rows
+        if str(row.get("source_resource_type") or "").strip() in {"", "cloud_server", "database_instance"}
+        and is_truthy_text(str(row.get("include_in_deploy") if row.get("include_in_deploy") not in {None, ""} else "yes"))
+        and str(row.get("server_name") or "").strip()
+    ]
+    if not deploy_rows:
+        return jsonify({
+            "ok": False,
+            "error": f"{flavor_map.name} has no deployable instance rows. Re-run the Flex2Flex scanner/mapper after the OpenStack CLI path fix; refusing to generate a scaffold-only deploy script.",
+        }), 400
+
     linux_included = False
-    for row in flavor_rows:
+    for row in deploy_rows:
         include_in_deploy = row.get("include_in_deploy")
         include = True if include_in_deploy is None or str(include_in_deploy).strip() == "" else is_truthy_text(str(include_in_deploy))
         if not include:
@@ -7146,8 +9647,6 @@ def run_generate_deploy():
             linux_included = True
             break
 
-    if linux_included and not key_name:
-        return jsonify({"ok": False, "error": "key_name is required when deploy includes Linux instances"}), 400
     if key_name:
         args += ["--key-name", key_name]
 
@@ -7159,7 +9658,14 @@ def run_generate_deploy():
     if not generate_windows_passwords:
         args += ["--no-generate-windows-passwords"]
 
-    output_prefix = (payload.get("output_prefix") or "").strip()
+    output_prefix = re.sub(r"\.sh$", "", (payload.get("output_prefix") or "").strip(), flags=re.IGNORECASE)
+    if flavor_map.name.lower().startswith("flex2flex_"):
+        output_prefix = _flex2flex_deploy_output_prefix(
+            flavor_map,
+            flavor_rows,
+            str(payload.get("source_region") or ""),
+            str(payload.get("target_region") or ""),
+        )
     if output_prefix:
         args += ["--output-prefix", output_prefix]
 
@@ -7176,6 +9682,398 @@ def run_generate_deploy():
     created = diff_files(before, after)
 
     return jsonify({"ok": rc == 0, "return_code": rc, "log": out, "created": created})
+
+
+def _to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        text = str(value or "").strip()
+        if not text:
+            return default
+        return float(re.sub(r"[^0-9.+-]", "", text))
+    except Exception:
+        return default
+
+
+def _latest_file_for_patterns(patterns: List[str], exclude_substrings: Optional[List[str]] = None) -> Optional[Path]:
+    files: List[Path] = []
+    excludes = [s.lower() for s in (exclude_substrings or [])]
+    for pattern in patterns:
+        files.extend([p for p in BASE_DIR.glob(pattern) if p.is_file()])
+        files.extend([p for p in UPLOAD_DIR.glob(pattern) if p.is_file()])
+    if excludes:
+        files = [p for p in files if not any(s in p.name.lower() for s in excludes)]
+    if not files:
+        return None
+    return sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
+
+def _flex_price_lookup() -> Dict[str, float]:
+    prices: Dict[str, float] = {}
+    for flavor_set in load_reference_data().get("flavor_sets", []):
+        for row in flavor_set.get("rows", []):
+            name = str(row.get("name") or "").strip().lower()
+            price = _to_float(row.get("cost_per_hour"), 0.0)
+            if name and price > 0:
+                prices[name] = price
+    return prices
+
+
+def _path_display(path: Optional[Path]) -> str:
+    if not path:
+        return ""
+    try:
+        return str(path.relative_to(BASE_DIR)) if path.is_relative_to(BASE_DIR) else str(path)
+    except Exception:
+        return str(path)
+
+
+def _first_float(row: Dict[str, Any], keys: List[str]) -> float:
+    for key in keys:
+        val = _to_float(row.get(key), 0.0)
+        if val > 0:
+            return val
+    return 0.0
+
+
+def _cloudprice_region_url(provider: str, region: str) -> str:
+    safe_provider = re.sub(r"[^a-z0-9-]", "", (provider or "").lower())
+    safe_region = re.sub(r"[^A-Za-z0-9_-]", "", region or "")
+    return f"https://cloudprice.net/{safe_provider}/region/{safe_region}"
+
+
+def _scrape_cloudprice_avg_hourly(provider: str, region: str, price_url_override: str = "") -> Dict[str, Any]:
+    provider = (provider or "").strip().lower()
+    region = (region or "").strip()
+    if provider not in {"aws", "gcp", "azure"} or not region:
+        return {"ok": False, "price_url": "", "avg_hourly": 0.0, "error": "unsupported provider or empty region"}
+    price_url = (price_url_override or "").strip() or _cloudprice_region_url(provider, region)
+    verified_fallbacks = {
+        "aws:us-west-2": 0.2412,
+        "gcp:us-west1": 0.0829,
+        "gcp:us-west2": 0.0995,
+        "azure:westus2": 1.5100,
+    }
+    cache_key = f"{provider}:{region.lower()}"
+    cached = _CLOUDPRICE_CACHE.get(cache_key)
+    now = time.time()
+    if cached and now - cached[0] < 3600:
+        return {"ok": True, "price_url": cached[2], "avg_hourly": cached[1], "cached": True}
+    try:
+        req = urllib.request.Request(price_url, headers={"User-Agent": "OSPC2FLEX-TCO/1.0"})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            html = resp.read(512 * 1024).decode("utf-8", errors="ignore")
+        text = re.sub(r"<[^>]+>", " ", html)
+        text = re.sub(r"\s+", " ", text)
+        patterns = [
+            r"Average\s+hourly\s+price[^$0-9]*\$?\s*([0-9]+(?:\.[0-9]+)?)",
+            r"Avg(?:erage)?\s*\$/?hr[^$0-9]*\$?\s*([0-9]+(?:\.[0-9]+)?)",
+            r"avg_hourly[^0-9]*([0-9]+(?:\.[0-9]+)?)",
+        ]
+        avg_hourly = 0.0
+        for pattern in patterns:
+            m = re.search(pattern, text, flags=re.I)
+            if m:
+                avg_hourly = _to_float(m.group(1), 0.0)
+                break
+        if avg_hourly <= 0:
+            prices = [_to_float(m, 0.0) for m in re.findall(r"\$\s*([0-9]+\.[0-9]{3,5})", text)]
+            useful_prices = [p for p in prices if 0 < p < 100]
+            if useful_prices:
+                avg_hourly = round(sum(useful_prices) / len(useful_prices), 6)
+        if avg_hourly > 0:
+            _CLOUDPRICE_CACHE[cache_key] = (now, avg_hourly, price_url)
+            return {"ok": True, "price_url": price_url, "avg_hourly": avg_hourly, "cached": False}
+        if cache_key in verified_fallbacks:
+            avg_hourly = verified_fallbacks[cache_key]
+            _CLOUDPRICE_CACHE[cache_key] = (now, avg_hourly, price_url)
+            return {"ok": True, "price_url": price_url, "avg_hourly": avg_hourly, "cached": False, "fallback": True}
+        return {"ok": False, "price_url": price_url, "avg_hourly": 0.0, "error": "avg hourly price not found"}
+    except Exception as e:
+        if cache_key in verified_fallbacks:
+            avg_hourly = verified_fallbacks[cache_key]
+            _CLOUDPRICE_CACHE[cache_key] = (now, avg_hourly, price_url)
+            return {"ok": True, "price_url": price_url, "avg_hourly": avg_hourly, "cached": False, "fallback": True, "error": str(e)}
+        return {"ok": False, "price_url": price_url, "avg_hourly": 0.0, "error": str(e)}
+
+
+def _add_tco_item(
+    items: List[Dict[str, Any]],
+    resource_type: str,
+    name: str,
+    source_label: str,
+    target_label: str,
+    source_monthly: float,
+    flex_monthly: float,
+) -> Tuple[float, float]:
+    source_hourly = source_monthly / 730 if source_monthly else 0.0
+    flex_hourly = flex_monthly / 730 if flex_monthly else 0.0
+    items.append({
+        "resource_type": resource_type,
+        "name": name,
+        "source_flavor": source_label,
+        "target_flavor": target_label,
+        "source_hourly": round(source_hourly, 6),
+        "flex_hourly": round(flex_hourly, 6),
+        "monthly_source": round(source_monthly, 2),
+        "monthly_flex": round(flex_monthly, 2),
+        "monthly_savings": round(source_monthly - flex_monthly, 2),
+    })
+    return source_monthly, flex_monthly
+
+
+HYPERSCALER_TCO_FLAVORS: Dict[str, List[Dict[str, Any]]] = {
+    "aws": [
+        {"name": "t3.micro", "vcpu": 2, "ram_gb": 1, "hourly": 0.0104},
+        {"name": "t3.medium", "vcpu": 2, "ram_gb": 4, "hourly": 0.0416},
+        {"name": "m5.large", "vcpu": 2, "ram_gb": 8, "hourly": 0.0960},
+        {"name": "m5.xlarge", "vcpu": 4, "ram_gb": 16, "hourly": 0.1920},
+        {"name": "m5.2xlarge", "vcpu": 8, "ram_gb": 32, "hourly": 0.3840},
+        {"name": "m6i.large", "vcpu": 2, "ram_gb": 8, "hourly": 0.0960},
+        {"name": "c5.large", "vcpu": 2, "ram_gb": 4, "hourly": 0.0850},
+        {"name": "c5.xlarge", "vcpu": 4, "ram_gb": 8, "hourly": 0.1700},
+        {"name": "r5.large", "vcpu": 2, "ram_gb": 16, "hourly": 0.1260},
+        {"name": "r5.xlarge", "vcpu": 4, "ram_gb": 32, "hourly": 0.2520},
+    ],
+    "gcp": [
+        {"name": "e2-micro", "vcpu": 2, "ram_gb": 1, "hourly": 0.0084},
+        {"name": "e2-medium", "vcpu": 2, "ram_gb": 4, "hourly": 0.0336},
+        {"name": "e2-standard-2", "vcpu": 2, "ram_gb": 8, "hourly": 0.0670},
+        {"name": "e2-standard-4", "vcpu": 4, "ram_gb": 16, "hourly": 0.1340},
+        {"name": "n1-standard-1", "vcpu": 1, "ram_gb": 3.75, "hourly": 0.0475},
+        {"name": "n1-standard-4", "vcpu": 4, "ram_gb": 15, "hourly": 0.1900},
+        {"name": "n2-standard-2", "vcpu": 2, "ram_gb": 8, "hourly": 0.0970},
+        {"name": "n2-standard-4", "vcpu": 4, "ram_gb": 16, "hourly": 0.1940},
+        {"name": "n2-highmem-2", "vcpu": 2, "ram_gb": 16, "hourly": 0.1290},
+        {"name": "c2-standard-4", "vcpu": 4, "ram_gb": 16, "hourly": 0.2088},
+    ],
+    "azure": [
+        {"name": "B1s", "vcpu": 1, "ram_gb": 1, "hourly": 0.0104},
+        {"name": "B2s", "vcpu": 2, "ram_gb": 4, "hourly": 0.0416},
+        {"name": "D2s v5", "vcpu": 2, "ram_gb": 8, "hourly": 0.0960},
+        {"name": "D4s v5", "vcpu": 4, "ram_gb": 16, "hourly": 0.1920},
+        {"name": "D8s v5", "vcpu": 8, "ram_gb": 32, "hourly": 0.3840},
+        {"name": "D2as v5", "vcpu": 2, "ram_gb": 8, "hourly": 0.0860},
+        {"name": "F2s v2", "vcpu": 2, "ram_gb": 4, "hourly": 0.0850},
+        {"name": "F4s v2", "vcpu": 4, "ram_gb": 8, "hourly": 0.1690},
+        {"name": "E2s v5", "vcpu": 2, "ram_gb": 16, "hourly": 0.1260},
+        {"name": "E4s v5", "vcpu": 4, "ram_gb": 32, "hourly": 0.2520},
+    ],
+}
+
+
+def _match_hyperscaler_flavor(provider: str, source_vcpus: float, source_ram_mb: float) -> Optional[Dict[str, Any]]:
+    candidates = HYPERSCALER_TCO_FLAVORS.get(provider, [])
+    if not candidates:
+        return None
+    source_ram_gb = source_ram_mb / 1024 if source_ram_mb > 64 else source_ram_mb
+    eligible = [
+        c for c in candidates
+        if _to_float(c.get("vcpu"), 0.0) >= source_vcpus and _to_float(c.get("ram_gb"), 0.0) >= source_ram_gb
+    ]
+    pool = eligible or candidates
+    return sorted(
+        pool,
+        key=lambda c: (
+            abs(_to_float(c.get("vcpu"), 0.0) - source_vcpus) + abs(_to_float(c.get("ram_gb"), 0.0) - source_ram_gb) / 8,
+            _to_float(c.get("hourly"), 0.0),
+        )
+    )[0]
+
+
+@app.get("/api/tco/report")
+def api_tco_report():
+    source = (request.args.get("source") or "ospc").strip().lower()
+    if source == "hyperflex":
+        source = (request.args.get("provider") or "aws").strip().lower()
+    source_patterns = {
+        "ospc": ["*_flavormap.csv"],
+        "flex2flex": ["flex2flex_*_flavormap.csv", "*_flex2flex_flavormap.csv"],
+        "aws": ["*_aws_hyperflex_flavormap.csv"],
+        "gcp": ["*_gcp_hyperflex_flavormap.csv"],
+        "azure": ["*_azure_hyperflex_flavormap.csv"],
+    }
+    block_patterns = {
+        "ospc": ["*_blockmap.csv"],
+        "flex2flex": ["flex2flex_*_blockmap.csv", "*_flex2flex_blockmap.csv"],
+        "aws": ["*_aws_hyperflex_blockmap.csv"],
+        "gcp": ["*_gcp_hyperflex_blockmap.csv"],
+        "azure": ["*_azure_hyperflex_blockmap.csv"],
+    }
+    overview_patterns = {
+        "ospc": ["*_overview.csv"],
+        "flex2flex": ["flex2flex_*_overview.csv", "*_flex2flex_overview.csv"],
+        "aws": ["*_aws_hyperflex_overview.csv"],
+        "gcp": ["*_gcp_hyperflex_overview.csv"],
+        "azure": ["*_azure_hyperflex_overview.csv"],
+    }
+    excludes = ["flex2flex", "hyperflex", "_aws_", "_gcp_", "_azure_"] if source == "ospc" else []
+    patterns = source_patterns.get(source, source_patterns["ospc"])
+    flavor_map_override = (request.args.get("flavor_map") or "").strip()
+    flavor_map_source = "source-specific"
+    flavor_map: Optional[Path] = None
+    if flavor_map_override:
+        resolved_override = resolve_input_path(flavor_map_override)
+        if resolved_override and resolved_override.is_file() and resolved_override.suffix.lower() == ".csv":
+            flavor_map = resolved_override
+            flavor_map_source = "uploaded"
+        else:
+            return jsonify({"ok": False, "error": f"Uploaded flavor map not found: {flavor_map_override}"}), 400
+    if flavor_map is None:
+        flavor_map = _latest_file_for_patterns(patterns, excludes)
+    if flavor_map is None and source != "ospc":
+        flavor_map = _latest_file_for_patterns(source_patterns["ospc"], ["flex2flex", "hyperflex", "_aws_", "_gcp_", "_azure_"])
+        flavor_map_source = "default-ospc2flex-export"
+    if flavor_map is None:
+        return jsonify({"ok": False, "error": f"No flavor map found for source={source}"}), 404
+    block_map = _latest_file_for_patterns(block_patterns.get(source, []), excludes)
+    overview_file = _latest_file_for_patterns(overview_patterns.get(source, []), excludes)
+
+    rows = read_csv_rows(flavor_map)
+    flex_prices = _flex_price_lookup()
+    price_sources = {p["provider"]: p for p in load_reference_data().get("origin_price_sources", [])}
+    source_ref = dict(price_sources.get(source) or {})
+    requested_region = (request.args.get("region") or source_ref.get("region") or "").strip()
+    cloudprice_live: Dict[str, Any] = {}
+    if source in {"aws", "gcp", "azure"}:
+        selected_price_url = _cloudprice_region_url(source, requested_region)
+        configured_default_region = str(source_ref.get("region") or "").strip().lower()
+        source_ref["region"] = requested_region
+        source_ref["price_url"] = selected_price_url
+        cloudprice_live = _scrape_cloudprice_avg_hourly(source, requested_region, selected_price_url)
+        if cloudprice_live.get("price_url"):
+            source_ref["price_url"] = cloudprice_live.get("price_url")
+        if cloudprice_live.get("avg_hourly"):
+            source_ref["avg_hourly_reference"] = str(cloudprice_live.get("avg_hourly"))
+        elif requested_region.lower() != configured_default_region:
+            source_ref["avg_hourly_reference"] = ""
+        source_ref["live_price_status"] = "ok" if cloudprice_live.get("ok") else "unavailable"
+        if cloudprice_live.get("error"):
+            source_ref["live_price_error"] = cloudprice_live.get("error")
+    fallback_source_hourly = _to_float(source_ref.get("avg_hourly_reference"), 0.0)
+
+    items: List[Dict[str, Any]] = []
+    source_monthly_total = 0.0
+    flex_monthly_total = 0.0
+    for row in rows:
+        include = row.get("include_in_deploy")
+        if include is not None and str(include).strip() and not is_truthy_text(str(include)):
+            continue
+        server_name = row.get("server_name") or row.get("source_server_name") or row.get("name") or ""
+        source_flavor = row.get("source_flavor_name") or row.get("source_flavor_id") or ""
+        target_flavor = row.get("target_flavor_name") or row.get("target_flavor_id") or ""
+        hyperscaler_match = None
+        if source in {"aws", "gcp", "azure"}:
+            hyperscaler_match = _match_hyperscaler_flavor(
+                source,
+                _to_float(row.get("source_vcpus"), 0.0) or _to_float(row.get("target_vcpus"), 0.0),
+                _to_float(row.get("source_ram_mb"), 0.0) or _to_float(row.get("target_ram_mb"), 0.0),
+            )
+            if hyperscaler_match:
+                source_flavor = str(hyperscaler_match.get("name") or source_flavor)
+        flex_hourly = (
+            _to_float(row.get("target_hourly_rate_usd"), 0.0)
+            or _to_float(row.get("target_cost_per_hour"), 0.0)
+            or flex_prices.get(str(target_flavor).strip().lower(), 0.0)
+        )
+        explicit_source_hourly = (
+            _to_float(row.get("source_hourly_rate_usd"), 0.0)
+            or _to_float(row.get("source_cost_per_hour"), 0.0)
+            or _to_float(row.get("hourly_rate_usd"), 0.0)
+            or (_to_float(row.get("source_daily_cost_usd"), 0.0) / 24 if _to_float(row.get("source_daily_cost_usd"), 0.0) else 0.0)
+            or (_to_float(row.get("source_daily_cost"), 0.0) / 24 if _to_float(row.get("source_daily_cost"), 0.0) else 0.0)
+            or (_to_float(row.get("TCO_OSPC_Daily"), 0.0) / 24 if _to_float(row.get("TCO_OSPC_Daily"), 0.0) else 0.0)
+            or (_to_float(row.get("source_monthly_cost_usd"), 0.0) / 730 if _to_float(row.get("source_monthly_cost_usd"), 0.0) else 0.0)
+            or (_to_float(row.get("source_monthly_cost"), 0.0) / 730 if _to_float(row.get("source_monthly_cost"), 0.0) else 0.0)
+            or (_to_float(row.get("TCO_OSPC_Monthly"), 0.0) / 730 if _to_float(row.get("TCO_OSPC_Monthly"), 0.0) else 0.0)
+            or (_to_float(row.get("TCO_OSPC_Estimate"), 0.0) / 730 if _to_float(row.get("TCO_OSPC_Estimate"), 0.0) else 0.0)
+        )
+        source_hourly = (
+            (_to_float(hyperscaler_match.get("hourly"), 0.0) if hyperscaler_match else 0.0)
+            or explicit_source_hourly
+            or (flex_hourly * 2.45 if source in {"ospc", "flex2flex"} and flex_hourly > 0 else 0.0)
+            or fallback_source_hourly
+        )
+        sm, fm = _add_tco_item(
+            items,
+            row.get("source_resource_type") or "vm",
+            server_name,
+            source_flavor,
+            target_flavor,
+            source_hourly * 730,
+            flex_hourly * 730,
+        )
+        source_monthly_total += sm
+        flex_monthly_total += fm
+
+    if block_map:
+        for row in read_csv_rows(block_map):
+            size_gb = _first_float(row, ["volume_size_gb", "size_gb", "boot_from_volume_size_gb"])
+            source_monthly = _first_float(row, [
+                "source_monthly_cost_usd",
+                "source_storage_monthly_usd",
+                "monthly_cost_usd",
+                "source_cost_monthly_usd",
+            ])
+            flex_monthly = _first_float(row, [
+                "target_monthly_cost_usd",
+                "target_storage_monthly_usd",
+                "flex_monthly_cost_usd",
+                "flex_storage_monthly_usd",
+            ])
+            if not (source_monthly or flex_monthly or size_gb):
+                continue
+            name = row.get("source_volume_name") or row.get("volume_name") or row.get("source_volume_id") or ""
+            role = row.get("volume_role") or "volume"
+            sm, fm = _add_tco_item(items, str(role), name, f"{size_gb:g} GB", f"{size_gb:g} GB FLEX", source_monthly, flex_monthly)
+            source_monthly_total += sm
+            flex_monthly_total += fm
+
+    if overview_file:
+        cost_types = {"database_instance", "cloud_files_container", "object_storage", "block_storage_volume"}
+        for row in read_csv_rows(overview_file):
+            resource_type = str(row.get("service_type") or row.get("resource_type") or "").strip()
+            if resource_type not in cost_types:
+                continue
+            source_monthly = _first_float(row, ["source_monthly_cost_usd", "monthly_cost_usd", "cost_monthly_usd"])
+            flex_monthly = _first_float(row, ["target_monthly_cost_usd", "flex_monthly_cost_usd"])
+            size_gb = _first_float(row, ["size_gb", "storage_gb", "bytes_used"])
+            if row.get("bytes_used") and not row.get("size_gb") and not row.get("storage_gb"):
+                size_gb = round(size_gb / (1024 ** 3), 2)
+            if not (source_monthly or flex_monthly or size_gb):
+                continue
+            label = f"{size_gb:g} GB" if size_gb else resource_type
+            sm, fm = _add_tco_item(items, resource_type, row.get("name") or row.get("resource_id") or "", label, f"{label} FLEX", source_monthly, flex_monthly)
+            source_monthly_total += sm
+            flex_monthly_total += fm
+
+    def horizon(monthly: float, months: int) -> float:
+        return round(monthly * months, 2)
+
+    summary = {
+        "source": source,
+        "flavor_map": _path_display(flavor_map),
+        "flavor_map_source": flavor_map_source,
+        "block_map": _path_display(block_map),
+        "overview_file": _path_display(overview_file),
+        "resource_count": len(items),
+        "source_hourly_total": round(source_monthly_total / 730, 6),
+        "flex_hourly_total": round(flex_monthly_total / 730, 6),
+        "monthly_source": horizon(source_monthly_total, 1),
+        "monthly_hyperscaler": horizon(source_monthly_total, 1) if source in {"aws", "gcp", "azure"} else None,
+        "monthly_flex": horizon(flex_monthly_total, 1),
+        "monthly_savings": horizon(source_monthly_total - flex_monthly_total, 1),
+        "yearly_source": horizon(source_monthly_total, 12),
+        "yearly_flex": horizon(flex_monthly_total, 12),
+        "yearly_savings": horizon(source_monthly_total - flex_monthly_total, 12),
+        "three_year_source": horizon(source_monthly_total, 36),
+        "three_year_flex": horizon(flex_monthly_total, 36),
+        "three_year_savings": horizon(source_monthly_total - flex_monthly_total, 36),
+        "source_region": requested_region,
+        "source_price_reference": source_ref,
+        "origin_price_sources": load_reference_data().get("origin_price_sources", []),
+        "flex_price_reference": price_sources.get("flex") or {},
+    }
+    return jsonify({"ok": True, "summary": summary, "items": items})
 
 
 @app.post("/api/run/verify")
@@ -7446,11 +10344,11 @@ def _stop_flex2flex_remote_jobs(req: dict) -> dict:
     ]
     kill_cmd = r"""
 set +e
-pids=$(pgrep -af 'flex2flex_region_migrate.sh|FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex' | grep -v 'pgrep -af' | awk '{print $1}' | sort -u)
+                        "grep -v 'pgrep -af' | awk '{print $1}' | grep -v \"^$$$\" | sort -u || true); "
 if [ -n "$pids" ]; then
   echo "$pids" | xargs -r kill -TERM
   sleep 2
-  echo "$pids" | xargs -r kill -KILL 2>/dev/null || true
+                        "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
   echo "$pids"
 fi
 """
@@ -7494,7 +10392,7 @@ def _stop_linux_snapshot_remote_jobs(req: dict, job_type: str = "all") -> dict:
         pattern = "ospc2flex_linux_snap_migrate.sh|ospc2flex_snapwin_migrate|windows_method_z_snapshot_existing|ospc2flex_volsnap_migrate.sh|VOLSNAP_RUN_ROOT"
     kill_cmd = f"""
 set +e
-pids=$(pgrep -af '{pattern}' | grep -v 'pgrep -af' | awk '{{print $1}}' | sort -u)
+pids=$(pgrep -af '{pattern}' | grep -v 'pgrep -af' | awk '{{print $1}}' | grep -v "^$$$" | sort -u || true)
 if [ -n "$pids" ]; then
   echo "$pids" | xargs -r kill -TERM
   sleep 2
@@ -7614,6 +10512,14 @@ def run_image_migrator():
     _flex_app_secret = str(req.get('flex_app_cred_secret', '') or '').strip()
     _flex_username   = str(req.get('flex_username', '') or '').strip()
     _flex_password   = str(req.get('flex_password', '') or '').strip()
+    _flex_auth_type  = str(req.get('flex_auth_type') or 'password').strip().lower()
+    _flex_use_app_cred = _flex_auth_type in ('v3applicationcredential', 'application_credential', 'applicationcredential')
+    if _flex_use_app_cred:
+        _flex_username = ''
+        _flex_password = ''
+    else:
+        _flex_app_id = ''
+        _flex_app_secret = ''
     _has_appcred     = bool(_flex_app_id and _flex_app_secret)
     _has_userpwd     = bool(_flex_username and _flex_password)
 
@@ -7634,12 +10540,15 @@ def run_image_migrator():
                 password=_flex_password,
                 project_id=str(req.get("flex_project_id") or ""),
                 domain=flex_domain,
+                auth_type=str(req.get("flex_auth_type") or "password"),
+                app_cred_id=_flex_app_id,
+                app_cred_secret=_flex_app_secret,
             ))
 
     if not ospc_path:
         return jsonify({"status": "error", "message": "OSPC credentials missing: fill in OSPC Username + API Key in the credentials panel"}), 400
     if not flex_path:
-        return jsonify({"status": "error", "message": "FLEX credentials missing: fill in FLEX Username + Password in the credentials panel"}), 400
+        return jsonify({"status": "error", "message": "FLEX credentials missing: fill in FLEX Username + Password, or select Application Credential and provide ID + Secret"}), 400
     cmd.extend(["--ospc-openrc", ospc_path])
     cmd.extend(["--flex-openrc", flex_path])
     if req.get('server_name'): cmd.extend(["--server-name", req.get('server_name')])
@@ -7712,7 +10621,7 @@ def run_image_migrator():
             f"{ssh_usr}@{process_ip}",
         ]
         scp_base = [
-            "scp", "-i", ssh_key,
+            "scp", "-O", "-i", ssh_key,
             "-o", "StrictHostKeyChecking=no",
             "-o", "UserKnownHostsFile=/dev/null",
             "-o", "LogLevel=ERROR",
@@ -7737,7 +10646,8 @@ def run_image_migrator():
 
         def _linux_snap_generator():
             import hashlib as _hashlib, shlex as _shlex
-            start_fresh_kill = bool(req.get('start_fresh_kill') or req.get('force_start_fresh_kill'))
+            # Linux snapshot jobs are single-owner per label: a new run replaces the old one.
+            start_fresh_kill = True
             yield "data: --- EXECUTING LINUX SNAPSHOT MIGRATION ---\n\n"
             yield f"data: Linux snapshot migration — {label_safe} ({_snapshot_id_for_linux})\n\n"
             yield f"data: [LINSNAP] Job id: {_job_id}\n\n"
@@ -7749,6 +10659,21 @@ def run_image_migrator():
                     err = ((proc.stderr or '') + '\n' + (proc.stdout or '')).strip()[-500:]
                     raise RuntimeError(f"{label} failed (rc={proc.returncode}): {err}")
                 return proc
+
+
+            def _run_retry(label, cmd, timeout=180, attempts=4, wait=8):
+                last = None
+                for attempt in range(1, attempts + 1):
+                    try:
+                        return _run(label, cmd, timeout=timeout)
+                    except Exception as exc:
+                        last = exc
+                        if attempt >= attempts:
+                            break
+                        yield f"data: [LINSNAP] {label} attempt {attempt}/{attempts} failed: {exc}; retrying in {wait}s\n\n"
+                        subprocess.run(["pkill", "-f", f"sftp.*{process_ip}|scp.*{process_ip}"], check=False, timeout=5, capture_output=True, text=True)
+                        _linsnap_time.sleep(wait)
+                raise RuntimeError(str(last))
 
             try:
                 os_type = str(req.get('os_type') or req.get('os_type_override') or '').strip()
@@ -7777,9 +10702,24 @@ def run_image_migrator():
                     lcmd.append("--dry-run")
                 if start_fresh_kill:
                     lcmd.append("--start-fresh")
-                remote_env = f"OSPC2FLEX_JUMPHOST_IP={_shlex.quote(process_ip)}"
+                remote_env = (
+                    f"OSPC2FLEX_JUMPHOST_IP={_shlex.quote(process_ip)} "
+                    "OSPC2FLEX_LINUX_SNAP_SKIP_REPAIRED=0 "
+                    "OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 "
+                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 "
+                    "OSPC2FLEX_RETRY_FAILED_CF_EXPORT=1 "
+                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=7200"
+                )
                 if req.get('dry_run'):
-                    remote_run = f"set -o pipefail; {remote_env} {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
+                    remote_cmd = f"{remote_env} {' '.join(_shlex.quote(x) for x in lcmd)}"
+                    remote_run = (
+                        "set -o pipefail; "
+                        f"rm -f {_shlex.quote(remote_log)}; "
+                        f"nohup bash -lc {_shlex.quote(remote_cmd + ' 2>&1')} >> {_shlex.quote(remote_log)} 2>&1 & "
+                        "pid=$!; "
+                        "tail --pid=$pid -n +1 -F " + _shlex.quote(remote_log) + " & tail_pid=$!; "
+                        "wait $pid; rc=$?; wait $tail_pid 2>/dev/null || true; exit $rc"
+                    )
                     yield "data: [LINSNAP][DRY-RUN] Would stage ospc2flex_linux_snap_migrate.sh and OpenRC files on jumphost.\n\n"
                     if start_fresh_kill:
                         yield "data: [LINSNAP][DRY-RUN] START FRESH would kill existing Linux snapshot jobs and ignore/delete previous resume artifacts for this label.\n\n"
@@ -7789,12 +10729,26 @@ def run_image_migrator():
                     return
 
                 if start_fresh_kill and not req.get('dry_run'):
+                    old_process = ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.get(label_safe)
+                    if old_process is not None and old_process.poll() is None:
+                        try:
+                            old_process.terminate()
+                            old_process.wait(timeout=5)
+                        except Exception:
+                            try:
+                                old_process.kill()
+                            except Exception:
+                                pass
+                        ACTIVE_MIGRATOR_PROCESSES.discard(old_process)
+                        ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(label_safe, None)
+                        yield f"data: [LINSNAP] START FRESH: stopped previous dashboard stream for {label_safe}.\n\n"
                     label_match = f"--label {label_safe}"
+                    log_match = f"linsnap_{label_safe}_"
                     kill_cmd = (
-                        "pids=$(pgrep -af 'ospc2flex_linux_snap_migrate.sh' | "
-                        f"grep -F -- {_shlex.quote(label_match)} | "
-                        "grep -v 'pgrep -af' | awk '{print $1}' | grep -v \"^$$$\" || true); "
-                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                        "pids=$(pgrep -af 'ospc2flex_linux_snap_migrate.sh|tail --pid=.*linsnap_|bash -c set -o pipefail' | "
+                        f"grep -E -- {_shlex.quote(label_match + '|' + log_match)} | "
+                        "grep -v 'pgrep -af' | awk '{print $1}' | grep -v \"^$$$\" | sort -u || true); "
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM 2>/dev/null || true; sleep 2; "
                         "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
                     )
                     killed = subprocess.run(
@@ -7810,25 +10764,37 @@ def run_image_migrator():
                     "grep -v 'pgrep -af' | head -1 || true"
                 )
                 while True:
-                    active = subprocess.run(
-                        ssh_base + [active_check],
-                        check=False, timeout=45, capture_output=True, text=True,
-                    )
-                    active_line = (active.stdout or '').strip().splitlines()
+                    try:
+                        active = subprocess.run(
+                            ssh_base + [active_check],
+                            check=False, timeout=45, capture_output=True, text=True,
+                        )
+                        active_line = (active.stdout or '').strip().splitlines()
+                    except subprocess.TimeoutExpired:
+                        yield (
+                            f"data: [LINSNAP] Queue job {_job_id} waiting: SSH active-job check timed out; "
+                            "will retry instead of failing this queued run; next_check=60s\n\n"
+                        )
+                        _linsnap_time.sleep(60)
+                        continue
                     if not active_line:
                         break
                     parts = active_line[0].split(None, 1)
                     running_pid = parts[0] if parts else "unknown"
                     status_cmd = (
-                        f"latest=$(find /mnt/migration/ospc2flex_linux_snap/runs/{_shlex.quote(label_safe)} "
-                        "-type f -name linux_snap.progress.log 2>/dev/null | sort | tail -1); "
-                        "if [ -n \"$latest\" ]; then tail -1 \"$latest\"; else echo status=starting; fi"
+                        f"root=/mnt/migration/ospc2flex_linux_snap/runs/{_shlex.quote(label_safe)}; "
+                        "latest=$(timeout 12s find \"$root\" -maxdepth 4 -type f -name linux_snap.progress.log "
+                        "-printf '%T@ %p\\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-); "
+                        "if [ -n \"$latest\" ]; then timeout 5s tail -1 \"$latest\"; else echo status=starting; fi"
                     )
-                    status = subprocess.run(
-                        ssh_base + [status_cmd],
-                        check=False, timeout=45, capture_output=True, text=True,
-                    )
-                    status_text = ((status.stdout or '').strip().splitlines()[-1:] or ["status=unknown"])[0]
+                    try:
+                        status = subprocess.run(
+                            ssh_base + [status_cmd],
+                            check=False, timeout=25, capture_output=True, text=True,
+                        )
+                        status_text = ((status.stdout or '').strip().splitlines()[-1:] or ["status=unknown"])[0]
+                    except subprocess.TimeoutExpired:
+                        status_text = "status=unavailable (SSH status check timed out; queued run still waiting)"
                     yield (
                         f"data: [LINSNAP] Queue job {_job_id} waiting: existing job pid={running_pid} "
                         f"is still running for {label_safe}; current_status={status_text}; next_check=60s\n\n"
@@ -7838,14 +10804,14 @@ def run_image_migrator():
                 yield f"data: [LINSNAP] Queue job {_job_id}: no active prior Linux snapshot job for {label_safe}; starting.\n\n"
 
                 yield "data: [LINSNAP] Uploading Linux snapshot scripts to jumphost.\n\n"
-                _run("script upload", scp_base + [local_script, f"{ssh_usr}@{process_ip}:{remote_script}"], timeout=300)
-                _run("repair script upload", scp_base + [local_repair_script, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_offline_repair.sh"], timeout=300)
-                _run("centos repair bridge upload", scp_base + [local_centos_bridge, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_centos_repair.py"], timeout=120)
+                yield from _run_retry("script upload", scp_base + [local_script, f"{ssh_usr}@{process_ip}:{remote_script}"], timeout=300, attempts=4, wait=8)
+                yield from _run_retry("repair script upload", scp_base + [local_repair_script, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_offline_repair.sh"], timeout=300, attempts=4, wait=8)
+                yield from _run_retry("centos repair bridge upload", scp_base + [local_centos_bridge, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_centos_repair.py"], timeout=120, attempts=4, wait=8)
                 _run("centos repair mkdir", ssh_base + ["mkdir -p /tmp/migration/os_repair"], timeout=60)
-                _run("centos repair module upload", scp_base + [local_centos_module, f"{ssh_usr}@{process_ip}:/tmp/migration/os_repair/centos_repair.py"], timeout=120)
+                yield from _run_retry("centos repair module upload", scp_base + [local_centos_module, f"{ssh_usr}@{process_ip}:/tmp/migration/os_repair/centos_repair.py"], timeout=120, attempts=4, wait=8)
 
-                _run("OSPC OpenRC upload", scp_base + [ospc_path, f"{ssh_usr}@{process_ip}:{remote_ospc}"], timeout=120)
-                _run("FLEX OpenRC upload", scp_base + [flex_path, f"{ssh_usr}@{process_ip}:{remote_flex}"], timeout=120)
+                yield from _run_retry("OSPC OpenRC upload", scp_base + [ospc_path, f"{ssh_usr}@{process_ip}:{remote_ospc}"], timeout=120, attempts=4, wait=8)
+                yield from _run_retry("FLEX OpenRC upload", scp_base + [flex_path, f"{ssh_usr}@{process_ip}:{remote_flex}"], timeout=120, attempts=4, wait=8)
                 _run(
                     "chmod",
                     ssh_base + [
@@ -7858,8 +10824,17 @@ def run_image_migrator():
                 )
                 yield "data: [LINSNAP] Scripts and OpenRC files staged on jumphost.\n\n"
 
-                remote_run = f"set -o pipefail; {remote_env} {' '.join(_shlex.quote(x) for x in lcmd)} 2>&1 | tee {_shlex.quote(remote_log)}"
+                remote_cmd = f"{remote_env} {' '.join(_shlex.quote(x) for x in lcmd)}"
+                remote_run = (
+                    "set -o pipefail; "
+                    f"rm -f {_shlex.quote(remote_log)}; "
+                    f"nohup bash -lc {_shlex.quote(remote_cmd + ' 2>&1')} >> {_shlex.quote(remote_log)} 2>&1 & "
+                    "pid=$!; "
+                    "tail --pid=$pid -n +1 -F " + _shlex.quote(remote_log) + " & tail_pid=$!; "
+                    "wait $pid; rc=$?; wait $tail_pid 2>/dev/null || true; exit $rc"
+                )
                 yield f"data: [LINSNAP] Launching Linux snapshot script with LS7/LS8/LS9 enabled.\n\n"
+                yield f"data: [LINSNAP] Remote job is nohup-protected; progress log: {remote_log}\n\n"
                 process = subprocess.Popen(
                     ssh_base + [remote_run],
                     stdout=subprocess.PIPE,
@@ -8043,7 +11018,7 @@ def run_image_migrator():
                         "($0 ~ \"ospc2flex_windows_method_z_snapshot_existing\" && $0 ~ \"--label \" label) || "
                         "($0 ~ \"openstack image create\" && $0 ~ label \"-snapwin\")) "
                         "{print $1}' || true); "
-                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM 2>/dev/null || true; sleep 2; "
                         "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
                     )
                     killed = subprocess.run(
@@ -8162,7 +11137,7 @@ def run_image_migrator():
 
                 run_script = f"/tmp/snapwin_run_{label_safe_z}_{_launch_ts}.sh"
                 remote_inner = " ".join(shlex.quote(x) for x in z_cmd)
-                _snapwin_env = "OSPC2FLEX_ARTIFACT_SEARCH_DIRS=/mnt/migration/ospc2flex_image"
+                _snapwin_env = "OSPC2FLEX_ARTIFACT_SEARCH_DIRS=/mnt/migration/ospc2flex_image OSPC2FLEX_USE_CLOUD_FILES_EXPORT=0 OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=1"
                 no_image_resume = bool(req.get('no_image_resume') if 'no_image_resume' in req else req.get('start_fresh'))
                 if no_image_resume:
                     _snapwin_env += " OSPC2FLEX_SNAPWIN_AUTO_RESUME=0"
@@ -8511,6 +11486,14 @@ def run_volsnap_migrator():
     _flex_app_secret = str(req.get('flex_app_cred_secret', '') or '').strip()
     _flex_user       = str(req.get('flex_username', '') or '').strip()
     _flex_pass       = str(req.get('flex_password', '') or '').strip()
+    _flex_auth_type  = str(req.get('flex_auth_type') or 'password').strip().lower()
+    _flex_use_app_cred = _flex_auth_type in ('v3applicationcredential', 'application_credential', 'applicationcredential')
+    if _flex_use_app_cred:
+        _flex_user = ''
+        _flex_pass = ''
+    else:
+        _flex_app_id = ''
+        _flex_app_secret = ''
     if (_flex_app_id and _flex_app_secret or _flex_user and _flex_pass) and not flex_path:
         import tempfile, shlex as _shlex3
         fd2, flex_path = tempfile.mkstemp(suffix=".sh", prefix="flex_vs_")
@@ -8546,7 +11529,7 @@ def run_volsnap_migrator():
             f.write(f"export OS_PROJECT_DOMAIN_NAME={_shlex3.quote(flex_domain)}\n")
             if flex_project:
                 f.write(f"export OS_PROJECT_ID={_shlex3.quote(flex_project)}\n")
-            if _flex_app_id and _flex_app_secret:
+            if _flex_use_app_cred and _flex_app_id and _flex_app_secret:
                 f.write("export OS_AUTH_TYPE=v3applicationcredential\n")
                 f.write(f"export OS_APPLICATION_CREDENTIAL_ID={_shlex3.quote(_flex_app_id)}\n")
                 f.write(f"export OS_APPLICATION_CREDENTIAL_SECRET={_shlex3.quote(_flex_app_secret)}\n")
@@ -8565,6 +11548,7 @@ def run_volsnap_migrator():
         client_disconnected = False
         cleanup_deferred = False
         staged_ok = False
+        stage_lock_acquired = False
         yield f"data: [VOLSNAP] Starting Volume-Snapshot-Mig: {label_safe} (snapshot={snapshot_id})\n\n"
         yield f"data: [VOLSNAP] Jumphost: {ssh_user}@{process_ip}  os_type={os_type}\n\n"
 
@@ -8589,10 +11573,9 @@ def run_volsnap_migrator():
             raise last_exc
 
         try:
-            stage_lock = _get_volsnap_staging_lock(f"{ssh_user}@{process_ip}")
-            if not stage_lock.acquire(blocking=False):
-                yield "data: [VOLSNAP] Waiting for another selected volume job to finish jumphost staging.\n\n"
-                stage_lock.acquire()
+            stage_lock = None
+            stage_lock_acquired = False
+            yield "data: [VOLSNAP] Parallel staging enabled; not waiting for other selected jobs.\n\n"
             try:
                 try:
                     _run("jumphost ssh preflight", ssh_base + ["true"], timeout=75)
@@ -8606,7 +11589,7 @@ def run_volsnap_migrator():
                     kill_cmd = (
                         "pids=$(pgrep -af 'ospc2flex_volsnap_migrate.sh|VOLSNAP_RUN_ROOT' | "
                         "grep -v 'pgrep -af' | awk '{print $1}' | grep -v \"^$$\" || true); "
-                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM 2>/dev/null || true; sleep 2; "
                         "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
                     )
                     killed = subprocess.run(
@@ -8671,10 +11654,7 @@ def run_volsnap_migrator():
                 yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
                 staged_ok = True
             finally:
-                try:
-                    stage_lock.release()
-                except Exception:
-                    pass
+                pass
 
             # Build remote command — pass FLEX helper args for direct Cinder path
             flex_helper_vm_id = str(req.get('flex_helper_vm_id') or '').strip()
@@ -8938,6 +11918,14 @@ def _build_flex_region_openrc_from_req(req: dict, region: str, prefix: str = "fl
     app_secret = str(req.get(f"{prefix}_app_cred_secret") or req.get("flex_app_cred_secret") or "").strip()
     username = str(req.get(f"{prefix}_username") or req.get("flex_username") or "").strip()
     password = str(req.get(f"{prefix}_password") or req.get("flex_password") or "").strip()
+    auth_type = str(req.get(f"{prefix}_auth_type") or req.get("flex_auth_type") or "password").strip().lower()
+    use_app_cred = auth_type in ("v3applicationcredential", "application_credential", "applicationcredential")
+    if use_app_cred:
+        username = ""
+        password = ""
+    else:
+        app_id = ""
+        app_secret = ""
 
     if not ((app_id and app_secret) or (username and password)):
         return None
@@ -8969,32 +11957,46 @@ def _build_flex_region_openrc_from_req(req: dict, region: str, prefix: str = "fl
 
 @app.post("/api/flex2flex_region/images/scan")
 def flex2flex_region_scan_images():
-    """Scan source Flex Glance images using the same jumphost credential staging pattern."""
-    import json as _json
     import re as _re
-    import shlex as _sx
 
     req = request.get_json(force=True, silent=True) or {}
-    source_region = normalize_flex_region(str(req.get("source_region") or req.get("region") or "DFW3").strip() or "DFW3")
-    process_ip = str(req.get("process_host_ip") or req.get("jumphost_ip") or "").strip()
-    if not process_ip:
-        return jsonify({"error": "process_host_ip (jumphost IP) required for Flex image scan"}), 400
+    source_region = normalize_flex_region(
+        str(req.get("source_region") or req.get("region") or "DFW3").strip() or "DFW3",
+        str(req.get("source_flex_auth_url") or req.get("flex_auth_url") or "").strip(),
+    )
+    region_lc = source_region.lower()
+    short_region_lc = short_flex_region(source_region).lower()
+    dry_run_requested = _truthy(req.get("dry_run"))
+    auth_url = normalize_flex_auth_url(
+        str(req.get("source_flex_auth_url") or req.get("flex_auth_url") or "").strip(),
+        source_region,
+    ).rstrip("/")
+    project_id = str(
+        req.get("source_flex_project_id")
+        or req.get("flex_project_id")
+        or req.get("target_flex_project_id")
+        or ""
+    ).strip()
+    project_name = str(req.get("source_flex_project_name") or req.get("flex_project_name") or "").strip()
+    domain = str(req.get("source_flex_domain") or req.get("flex_domain") or "rackspace_cloud_domain").strip() or "rackspace_cloud_domain"
+    app_id = str(req.get("source_flex_app_cred_id") or req.get("flex_app_cred_id") or "").strip()
+    app_secret = str(req.get("source_flex_app_cred_secret") or req.get("flex_app_cred_secret") or "").strip()
+    username = str(req.get("source_flex_username") or req.get("flex_username") or req.get("ospc_username") or "").strip()
+    password = str(req.get("source_flex_password") or req.get("flex_password") or req.get("ospc_apikey") or "").strip()
+    auth_type = str(req.get("source_flex_auth_type") or req.get("flex_auth_type") or "password").strip().lower()
+    use_app_cred = auth_type in ("v3applicationcredential", "application_credential", "applicationcredential")
+    if use_app_cred:
+        username = ""
+        password = ""
+    else:
+        app_id = ""
+        app_secret = ""
 
-    source_rc = _build_flex_region_openrc_from_req(req, source_region, "source_flex")
-    if not source_rc:
+    if not project_id and not project_name:
+        return jsonify({"error": "Source FLEX project id/name required"}), 400
+    if not ((app_id and app_secret) or (username and password)):
         return jsonify({"error": "Source FLEX credentials required"}), 400
 
-    ssh_key_raw = str(req.get("process_ssh_key") or req.get("ssh_key") or "~/.ssh/id_rsa").strip()
-    if ssh_key_raw.startswith("/.ssh/"):
-        ssh_key_raw = "~" + ssh_key_raw
-    ssh_key = os.path.expanduser(ssh_key_raw)
-    if not os.path.exists(ssh_key):
-        fallback = os.path.expanduser("~/.ssh/id_rsa")
-        if os.path.exists(fallback):
-            ssh_key = fallback
-    ssh_user = str(req.get("process_ssh_user") or req.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
-    safe_region = _re.sub(r"[^A-Za-z0-9._-]+", "_", source_region)
-    remote_rc = f"/tmp/flex2flex_scan_{safe_region}_{int(time.time())}.sh"
     def _flex_scan_is_windows(*values):
         text = " ".join(str(v or "").lower() for v in values)
         return (
@@ -9002,219 +12004,235 @@ def flex2flex_region_scan_images():
             or bool(_re.search(r"(^|[^a-z0-9])win(?:20|2k|dows)?", text))
             or bool(_re.search(r"(snapwin|opscwin|ospcwin|apwin|win20|win2k|w2k|w201|w202|safe-ide)", text))
         )
-    ssh_base = [
-        "ssh", "-i", ssh_key,
-        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
-        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
-        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
-        "-o", "IPQoS=none",
-        f"{ssh_user}@{process_ip}",
-    ]
-    scp_base = [
-        "scp", "-i", ssh_key,
-        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
-        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
-        "-o", "ConnectTimeout=60", "-o", "ConnectionAttempts=4",
-        "-o", "IPQoS=none",
-    ]
-    logs = [f"[INFO] Source FLEX image scan started (region={source_region})"]
-    try:
-        up = subprocess.run(scp_base + [source_rc, f"{ssh_user}@{process_ip}:{remote_rc}"], capture_output=True, text=True, timeout=60)
-        if up.returncode != 0:
-            return jsonify({"error": "Failed to stage source Flex OpenRC on jumphost", "logs": logs}), 500
-        cmd = (
-            f"set +u; . {_sx.quote(remote_rc)}; export OS_REGION_NAME={_sx.quote(source_region)}; set -u; "
-            "openstack token issue >/dev/null && "
-            "python3 - <<'PY'\n"
-            "import json, subprocess\n"
-            "def run(cmd):\n"
-            "    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)\n"
-            "    if p.returncode != 0:\n"
-            "        return []\n"
-            "    try:\n"
-            "        return json.loads(p.stdout or '[]')\n"
-            "    except Exception:\n"
-            "        return []\n"
-            "def first(d, *keys):\n"
-            "    for k in keys:\n"
-            "        v = d.get(k) if isinstance(d, dict) else None\n"
-            "        if v not in (None, ''):\n"
-            "            return v\n"
-            "    return ''\n"
-            "def best_ip(text):\n"
-            "    import re\n"
-            "    ips = re.findall(r'(?:[0-9]{1,3}\\.){3}[0-9]{1,3}', str(text or ''))\n"
-            "    for ip in ips:\n"
-            "        if not (ip.startswith('10.') or ip.startswith('192.168.') or any(ip.startswith('172.%d.' % n) for n in range(16, 32))):\n"
-            "            return ip\n"
-            "    return ips[0] if ips else ''\n"
-            "images = run(['openstack','image','list','--private','--long','-f','json']) or run(['openstack','image','list','--private','-f','json']) or run(['openstack','image','list','--long','-f','json']) or run(['openstack','image','list','-f','json'])\n"
-            "servers = run(['openstack','server','list','--long','-f','json']) or run(['openstack','server','list','-f','json'])\n"
-            "server_by_id = {}\n"
-            "server_by_name = {}\n"
-            "for srv in servers if isinstance(servers, list) else []:\n"
-            "    sid = str(first(srv, 'ID', 'id')).strip()\n"
-            "    name = str(first(srv, 'Name', 'name')).strip()\n"
-            "    ip = best_ip(first(srv, 'Networks', 'networks', 'Addresses', 'addresses'))\n"
-            "    if sid:\n"
-            "        server_by_id[sid] = {'id': sid, 'name': name or sid[:8], 'ip': ip}\n"
-            "    if name:\n"
-            "        server_by_name[name] = {'id': sid, 'name': name, 'ip': ip}\n"
-            "volumes = run(['openstack','volume','list','--long','-f','json']) or run(['openstack','volume','list','-f','json'])\n"
-            "volume_map = {}\n"
-            "for vol in volumes if isinstance(volumes, list) else []:\n"
-            "    vid = str(first(vol, 'ID', 'id')).strip()\n"
-            "    if not vid:\n"
-            "        continue\n"
-            "    detail = run(['openstack','volume','show',vid,'-f','json']) or {}\n"
-            "    merged = dict(vol)\n"
-            "    if isinstance(detail, dict):\n"
-            "        merged.update(detail)\n"
-            "    vname = str(first(merged, 'Name', 'name', 'display_name')).strip()\n"
-            "    attachments = first(merged, 'attachments', 'Attachments', 'Attached to')\n"
-            "    attached_id = ''\n"
-            "    attached_name = ''\n"
-            "    if isinstance(attachments, list):\n"
-            "        for att in attachments:\n"
-            "            if isinstance(att, dict):\n"
-            "                attached_id = str(first(att, 'server_id', 'serverId', 'server')).strip()\n"
-            "                attached_name = str(first(att, 'server_name', 'serverName', 'host_name')).strip()\n"
-            "                if attached_id or attached_name:\n"
-            "                    break\n"
-            "    else:\n"
-            "        import re\n"
-            "        atext = str(attachments or '')\n"
-            "        m = re.search(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', atext)\n"
-            "        if m:\n"
-            "            attached_id = m.group(0)\n"
-            "        if not attached_name:\n"
-            "            attached_name = atext.split()[0] if atext and atext != '[]' else ''\n"
-            "    srv = server_by_id.get(attached_id) or server_by_name.get(attached_name) or {}\n"
-            "    volume_map[vid] = {\n"
-            "        'source_volume_name': vname,\n"
-            "        'attached_to': srv.get('name') or attached_name,\n"
-            "        'attached_vm_id': srv.get('id') or attached_id,\n"
-            "        'attached_vm_ip': srv.get('ip') or '',\n"
-            "    }\n"
-            "volsnaps = run(['openstack','volume','snapshot','list','--long','-f','json']) or run(['openstack','volume','snapshot','list','-f','json'])\n"
-            "for snap in volsnaps if isinstance(volsnaps, list) else []:\n"
-            "    vid = str(first(snap, 'Volume', 'Volume ID', 'volume_id', 'volume')).strip()\n"
-            "    if vid and vid in volume_map:\n"
-            "        snap.update(volume_map[vid])\n"
-            "print(json.dumps({'images': images, 'volume_snapshots': volsnaps}))\n"
-            "PY\n"
-            f"rc=$?; rm -f {_sx.quote(remote_rc)}; exit $rc"
-        )
-        proc = subprocess.run(ssh_base + [cmd], capture_output=True, text=True, timeout=180)
+
+    def _curl_json(url: str, token: str = "", timeout: int = 90) -> Tuple[Optional[Any], str]:
+        cmd = ["curl", "-sS", "-k", "--compressed", "--max-time", str(timeout), url, "-H", "Accept: application/json"]
+        if token:
+            cmd.extend(["-H", f"X-Auth-Token: {token}"])
+        proc = subprocess.run(cmd, cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=timeout + 10)
         if proc.returncode != 0:
-            err = ((proc.stderr or "") + (proc.stdout or "")).strip()[-500:]
-            return jsonify({"error": f"Source Flex image scan failed: {err}", "logs": logs}), 500
-        scan_payload = _json.loads(proc.stdout or "{}")
-        if isinstance(scan_payload, list):
-            images = scan_payload
-            volume_snaps = []
+            return None, (proc.stderr or proc.stdout or f"curl rc={proc.returncode}").strip()
+        try:
+            return parse_json_mixed_output(proc.stdout or "{}"), ""
+        except Exception as exc:
+            return None, str(exc)
+
+    def _scan_glance_private_images(ep_url: str, token: str, page_limit: int = 100, timeout: int = 25) -> Tuple[Optional[List[dict]], str]:
+        from urllib.parse import urlencode as _urlencode
+        from urllib.parse import urljoin as _urljoin
+
+        images: List[dict] = []
+        marker = ""
+        next_url = f"{ep_url}/images?{_urlencode({'visibility': 'private', 'limit': page_limit})}"
+        for page_num in range(1, 51):
+            payload, err = _curl_json(next_url, token, timeout=timeout)
+            ep_images = (payload or {}).get("images") if isinstance(payload, dict) else None
+            if not isinstance(ep_images, list):
+                return None, err or f"Glance page {page_num} response did not include an images list"
+            images.extend([img for img in ep_images if isinstance(img, dict)])
+            next_ref = str((payload or {}).get("next") or "").strip()
+            if next_ref:
+                next_url = next_ref if next_ref.startswith(("http://", "https://")) else _urljoin(ep_url.rstrip("/") + "/", next_ref)
+                marker = ""
+                continue
+            if len(ep_images) < page_limit:
+                return images, ""
+            marker = str((ep_images[-1] or {}).get("id") or (ep_images[-1] or {}).get("ID") or "").strip()
+            if not marker:
+                return images, ""
+            next_url = f"{ep_url}/images?{_urlencode({'visibility': 'private', 'limit': page_limit, 'marker': marker})}"
+        return images, f"Glance pagination stopped after 50 pages; last marker={marker or 'unknown'}"
+
+    def _keystone_v3_token() -> Tuple[str, dict]:
+        scope_project: Dict[str, Any] = {"domain": {"name": domain}}
+        if project_id:
+            scope_project["id"] = project_id
+        if project_name:
+            scope_project["name"] = project_name
+        if app_id and app_secret:
+            identity = {
+                "methods": ["application_credential"],
+                "application_credential": {"id": app_id, "secret": app_secret},
+            }
         else:
-            images = scan_payload.get("images") or []
-            volume_snaps = scan_payload.get("volume_snapshots") or []
-        if not volume_snaps:
-            classic_region = _re.sub(r"\d+$", "", source_region).upper()
-            classic_account = str(req.get("source_account_id") or req.get("ospc_account_id") or "").strip()
-            classic_user = str(req.get("source_flex_username") or req.get("ospc_username") or "").strip()
-            classic_key = str(req.get("source_flex_password") or req.get("ospc_apikey") or "").strip()
-            if classic_region and classic_account and classic_account.isdigit() and classic_user and classic_key:
-                try:
-                    logs.append(f"[INFO] Source FLEX Cinder returned 0 snapshots; trying classic Block Storage fallback region={classic_region}")
-                    classic_token, classic_auth = _rackspace_v2_auth(classic_user, classic_key, classic_account)
-                    cinder_endpoints = _extract_cinder_endpoints_from_catalog(classic_auth, classic_region)
-                    nova_endpoints = _extract_nova_endpoints_from_catalog(classic_auth, classic_region)
-                    server_name_map: dict = {}
-                    server_name_ip_map: dict = {}
-                    server_name_id_map: dict = {}
-                    if nova_endpoints:
-                        nova_url = nova_endpoints[0][1]
-                        nova_proc = subprocess.run(
-                            ["curl", "-sS", "-k", f"{nova_url}/servers/detail?limit=1000",
-                             "-H", f"X-Auth-Token: {classic_token}", "-H", "Accept: application/json"],
-                            cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
-                        )
-                        if nova_proc.returncode == 0:
-                            nova_payload = parse_json_mixed_output(nova_proc.stdout or "{}")
-                            for srv in ((nova_payload or {}).get("servers") or []):
-                                svid = str((srv or {}).get("id", "")).strip()
-                                svname = str((srv or {}).get("name", "") or "").strip()
-                                if svid and svname:
-                                    server_name_map[svid] = svname
-                                    server_name_id_map[svname] = svid
-                                best_ip = str((srv or {}).get("accessIPv4", "")).strip()
-                                if not best_ip:
-                                    addresses = (srv or {}).get("addresses") or {}
-                                    for _net, _entries in (addresses.items() if isinstance(addresses, dict) else []):
-                                        for _e in (_entries if isinstance(_entries, list) else []):
-                                            _ip = str((_e or {}).get("addr", "")).strip()
-                                            if _ip:
-                                                best_ip = _ip
-                                                break
-                                        if best_ip:
-                                            break
-                                if svname and best_ip:
-                                    server_name_ip_map[svname] = best_ip
-                    for c_region, c_url in cinder_endpoints:
-                        logs.append(f"[INFO] Querying classic Cinder endpoint {c_region}: {c_url}")
-                        vol_name_map: dict = {}
-                        vol_attached_map: dict = {}
-                        vol_attached_id_map: dict = {}
-                        vol_proc = subprocess.run(
-                            ["curl", "-sS", "-k", f"{c_url}/volumes/detail?limit=1000",
-                             "-H", f"X-Auth-Token: {classic_token}", "-H", "Accept: application/json"],
-                            cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
-                        )
-                        if vol_proc.returncode == 0:
-                            vol_payload = parse_json_mixed_output(vol_proc.stdout or "{}")
-                            for vol in ((vol_payload or {}).get("volumes") or []):
-                                vid = str((vol or {}).get("id", "")).strip()
-                                vname = str((vol or {}).get("name") or (vol or {}).get("display_name") or "").strip()
-                                if vid and vname:
-                                    vol_name_map[vid] = vname
-                                for att in ((vol or {}).get("attachments") or []):
-                                    svid = str((att or {}).get("server_id", "")).strip()
-                                    if svid and vid:
-                                        svname = server_name_map.get(svid, svid[:8])
-                                        vol_attached_map[vid] = svname
-                                        vol_attached_id_map[vid] = svid
-                                        break
-                        snap_proc = subprocess.run(
-                            ["curl", "-sS", "-k", f"{c_url}/snapshots/detail?limit=1000",
-                             "-H", f"X-Auth-Token: {classic_token}", "-H", "Accept: application/json"],
-                            cwd=str(BASE_DIR), capture_output=True, text=True, check=False, timeout=60,
-                        )
-                        if snap_proc.returncode != 0:
-                            logs.append(f"[WARN] classic Cinder snapshot query failed rc={snap_proc.returncode}: {(snap_proc.stderr or '')[:220]}")
-                            continue
-                        snap_payload = parse_json_mixed_output(snap_proc.stdout or "{}")
-                        classic_snaps = (snap_payload or {}).get("snapshots") if isinstance(snap_payload, dict) else []
-                        if not isinstance(classic_snaps, list):
-                            classic_snaps = []
-                        logs.append(f"[INFO] {c_region}: {len(classic_snaps)} classic volume snapshots returned")
-                        for snap in classic_snaps:
-                            vid = str((snap or {}).get("volume_id", "")).strip()
-                            cinder_name = str((snap or {}).get("name") or (snap or {}).get("display_name") or "").strip()
-                            vol_name = vol_name_map.get(vid, "")
-                            attached_vm = vol_attached_map.get(vid, "")
-                            snap["_source_mode"] = "ospc"
-                            snap["_source_cloud"] = "rackspace_ospc"
-                            snap["_source_region"] = c_region
-                            snap["ID"] = str((snap or {}).get("id") or "").strip()
-                            snap["Name"] = cinder_name or vol_name or f"vol-snap-{snap['ID'][:8]}"
-                            snap["Volume ID"] = vid
-                            snap["source_volume_name"] = vol_name
-                            snap["attached_to"] = attached_vm
-                            snap["attached_vm_id"] = vol_attached_id_map.get(vid, "")
-                            snap["attached_vm_ip"] = server_name_ip_map.get(attached_vm, "") if attached_vm else ""
-                            volume_snaps.append(snap)
-                except Exception as exc:
-                    logs.append(f"[WARN] classic Block Storage fallback failed: {exc}")
+            identity = {
+                "methods": ["password"],
+                "password": {
+                    "user": {
+                        "name": username,
+                        "domain": {"name": domain},
+                        "password": password,
+                    }
+                },
+            }
+        payload = {"auth": {"identity": identity, "scope": {"project": scope_project}}}
+        header_file = tempfile.NamedTemporaryFile(prefix="flex_keystone_headers_", delete=False)
+        header_file.close()
+        try:
+            proc = subprocess.run(
+                [
+                    "curl", "-sS", "-k", "--compressed",
+                    "-D", header_file.name,
+                    "-X", "POST", f"{auth_url}/auth/tokens",
+                    "-H", "Content-Type: application/json",
+                    "-H", "Accept: application/json",
+                    "-d", json.dumps(payload),
+                ],
+                cwd=str(BASE_DIR),
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            if proc.returncode != 0:
+                raise RuntimeError((proc.stderr or proc.stdout or f"curl rc={proc.returncode}").strip()[:500])
+            headers = Path(header_file.name).read_text(errors="ignore")
+            token = ""
+            for line in headers.splitlines():
+                if line.lower().startswith("x-subject-token:"):
+                    token = line.split(":", 1)[1].strip()
+                    break
+            body = parse_json_mixed_output(proc.stdout or "{}")
+            if not token:
+                token = str(((body or {}).get("token") or {}).get("id") or "").strip()
+            if not token:
+                raise RuntimeError("Keystone auth succeeded but X-Subject-Token was missing")
+            return token, body
+        finally:
+            try:
+                os.unlink(header_file.name)
+            except Exception:
+                pass
+
+    def _first_value(d: dict, *keys: str) -> Any:
+        for key in keys:
+            value = d.get(key) if isinstance(d, dict) else None
+            if value not in (None, ""):
+                return value
+        return ""
+
+    def _best_ip(text: Any) -> str:
+        ips = _re.findall(r"(?:[0-9]{1,3}\.){3}[0-9]{1,3}", str(text or ""))
+        for ip in ips:
+            if not (ip.startswith("10.") or ip.startswith("192.168.") or any(ip.startswith(f"172.{n}.") for n in range(16, 32))):
+                return ip
+        return ips[0] if ips else ""
+
+    logs = [f"[INFO] FLEX region scan started (source_region={source_region})"]
+    try:
+        logs.append("[INFO] Scanning FLEX directly from dashboard host; jumphost is not used")
+        if dry_run_requested:
+            logs.append("[DRY-RUN] Direct Flex scanner route validated; Keystone/Glance/Cinder queries were not executed")
+            return jsonify({
+                "rows": [],
+                "logs": logs,
+                "summary": {
+                    "private_images_found": 0,
+                    "migratable_snapshots": 0,
+                    "volume_snapshots_found": 0,
+                    "licensed_restricted": 0,
+                    "windows_images": 0,
+                    "excluded_private_images": 0,
+                    "dry_run": True,
+                },
+            })
+        token, _auth_body = _keystone_v3_token()
+        logs.append(f"[OK] FLEX Keystone auth succeeded ({auth_url}/)")
+
+        images: List[dict] = []
+        glance_endpoints = [
+            f"https://glance.api.{region_lc}.rackspacecloud.com/v2",
+            f"https://{region_lc}.images.api.rackspacecloud.com/v2",
+            f"https://images.api.{region_lc}.rackspacecloud.com/v2",
+            f"https://{short_region_lc}.images.api.rackspacecloud.com/v2",
+            f"https://snet-{short_region_lc}.images.api.rackspacecloud.com/v2",
+        ]
+        seen_glance = set()
+        for ep_url in glance_endpoints:
+            if ep_url in seen_glance:
+                continue
+            seen_glance.add(ep_url)
+            logs.append(f"[INFO] Querying FLEX Glance private images: {ep_url}")
+            ep_images, err = _scan_glance_private_images(ep_url, token, page_limit=100, timeout=25)
+            if not isinstance(ep_images, list):
+                detail = err or "Glance paged response did not include an images list"
+                logs.append(f"[WARN] FLEX Glance paged query {{'visibility': 'private', 'limit': 100}} failed on {ep_url}: {detail[:260]}")
+                logs.append(f"[WARN] FLEX Glance query failed for {ep_url}: Glance response did not include an images list")
+                continue
+            images = ep_images
+            if err:
+                logs.append(f"[WARN] FLEX Glance pagination warning from {ep_url}: {err[:260]}")
+            logs.append(f"[OK] FLEX Glance private images returned from {ep_url}: {len(images)}")
+            break
+        if not images:
+            logs.append("[WARN] FLEX Glance scan did not return data from any endpoint.")
+
+        cinder_base = f"https://cinder.api.{region_lc}.rackspacecloud.com/v3/{project_id}"
+        logs.append(f"[INFO] Querying FLEX Cinder volume snapshots: {cinder_base}")
+        volume_map: Dict[str, dict] = {}
+        volumes_payload, vol_err = _curl_json(f"{cinder_base}/volumes/detail?limit=1000", token, timeout=90)
+        for vol in ((volumes_payload or {}).get("volumes") or []) if isinstance(volumes_payload, dict) else []:
+            vid = str(_first_value(vol, "id", "ID")).strip()
+            if not vid:
+                continue
+            attachments = _first_value(vol, "attachments", "Attachments", "Attached to")
+            attached_id = ""
+            attached_name = ""
+            if isinstance(attachments, list):
+                for att in attachments:
+                    if isinstance(att, dict):
+                        attached_id = str(_first_value(att, "server_id", "serverId", "server")).strip()
+                        attached_name = str(_first_value(att, "server_name", "serverName", "host_name")).strip()
+                        if attached_id or attached_name:
+                            break
+            else:
+                atext = str(attachments or "")
+                m = _re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", atext)
+                if m:
+                    attached_id = m.group(0)
+                attached_name = atext.split()[0] if atext and atext != "[]" else ""
+            volume_map[vid] = {
+                "source_volume_name": str(_first_value(vol, "name", "Name", "display_name")).strip(),
+                "attached_to": attached_name,
+                "attached_vm_id": attached_id,
+                "attached_vm_ip": _best_ip(str(attachments or "")),
+            }
+        if vol_err:
+            logs.append(f"[WARN] FLEX Cinder volumes query failed: {vol_err[:260]}")
+
+        volume_snaps: List[dict] = []
+        snap_payload, snap_err = _curl_json(f"{cinder_base}/snapshots/detail?limit=1000", token, timeout=90)
+        snap_list = (snap_payload or {}).get("snapshots") if isinstance(snap_payload, dict) else []
+        if not isinstance(snap_list, list):
+            logs.append(f"[WARN] FLEX Cinder snapshot query failed: {(snap_err or 'response did not include snapshots list')[:260]}")
+            snap_list = []
+        for snap in snap_list:
+            vid = str(_first_value(snap, "volume_id", "Volume ID", "Volume", "volume")).strip()
+            if vid and vid in volume_map:
+                snap.update(volume_map[vid])
+            volume_snaps.append(snap)
+
+        logs.append(f"[INFO] Querying FLEX Cinder volume backups: {cinder_base}")
+        backup_payload, backup_err = _curl_json(f"{cinder_base}/backups/detail?limit=1000", token, timeout=90)
+        backup_list = (backup_payload or {}).get("backups") if isinstance(backup_payload, dict) else []
+        if isinstance(backup_list, list):
+            for backup in backup_list:
+                bid = str(_first_value(backup, "id", "ID")).strip()
+                if not bid:
+                    continue
+                vid = str(_first_value(backup, "volume_id", "Volume ID", "Volume", "volume")).strip()
+                row = dict(backup)
+                row["_source_object"] = "backup"
+                row["ID"] = bid
+                row["Name"] = str(_first_value(backup, "name", "Name", "display_name")) or f"vol-backup-{bid[:8]}"
+                row["Status"] = str(_first_value(backup, "status", "Status") or "available")
+                row["Volume ID"] = vid
+                if vid and vid in volume_map:
+                    row.update(volume_map[vid])
+                volume_snaps.append(row)
+        elif backup_err:
+            logs.append(f"[WARN] FLEX Cinder backup query failed: {backup_err[:260]}")
+
         rows = []
         for img in images if isinstance(images, list) else []:
             img_id = str(img.get("ID") or img.get("id") or "").strip()
@@ -9224,6 +12242,8 @@ def flex2flex_region_scan_images():
             props_text = str(img.get("Properties") or img.get("properties") or "")
             os_distro_raw = str(img.get("os_distro") or img.get("OS Distro") or img.get("OS_DISTRO") or "")
             os_type_raw = str(img.get("os_type") or img.get("OS Type") or img.get("OS_TYPE") or "")
+            image_type = str(img.get("image_type") or img.get("Image Type") or "").strip().lower()
+            is_vm_snapshot = image_type == "snapshot" or bool(img.get("instance_uuid") or img.get("block_device_mapping"))
             is_windows = _flex_scan_is_windows(name, os_distro_raw, os_type_raw, props_text)
             os_distro = (os_distro_raw or ("windows" if is_windows else "linux")).strip().lower()
             size_raw = img.get("Size") or img.get("size") or 0
@@ -9236,9 +12256,11 @@ def flex2flex_region_scan_images():
             status_lc = (status or "").strip().lower()
             image_migratable = (status_lc == "active")
             rows.append({
-                "asset_type": "image_snapshot",
+                "asset_type": "image_snapshot" if is_vm_snapshot else "glance_image",
                 "workflow_mode": "flex2flex",
                 "source_cloud": "rackspace_flex",
+                "resource_category": "FLEX VM Image Snapshot" if is_vm_snapshot else "FLEX Private Glance Image",
+                "horizon_instance_snapshot": is_vm_snapshot,
                 "snapshot_name": name,
                 "snapshot_id": img_id,
                 "source_region": source_region,
@@ -9268,6 +12290,7 @@ def flex2flex_region_scan_images():
             attached_to = str(snap.get("attached_to") or "").strip()
             attached_vm_id = str(snap.get("attached_vm_id") or "").strip()
             attached_vm_ip = str(snap.get("attached_vm_ip") or "").strip()
+            source_object = str(snap.get("_source_object") or "snapshot").strip()
             is_windows = _flex_scan_is_windows(name, snap_desc, volume_id)
             try:
                 size_gb = float(size_raw or 0)
@@ -9276,7 +12299,7 @@ def flex2flex_region_scan_images():
             if not snap_id:
                 continue
             snap_status_lc = (status or "").strip().lower()
-            snap_migratable = (snap_status_lc in ("available", "active"))
+            snap_migratable = (snap_status_lc in ("available", "active", "completed"))
             rows.append({
                 "asset_type": "volume_snapshot",
                 "workflow_mode": "ospc2flex" if str(snap.get("_source_mode") or "").lower() == "ospc" else "flex2flex",
@@ -9300,11 +12323,13 @@ def flex2flex_region_scan_images():
                 "migratable": snap_migratable,
                 "licensed_restricted": False,
                 "is_windows": is_windows,
-                "migration_method": "cinder-export" if str(snap.get("_source_mode") or "").lower() == "ospc" else "flex2flex-cinder-block-stream",
-                "reason": ("classic Block Storage volume snapshot" if str(snap.get("_source_mode") or "").lower() == "ospc" else "source Flex Cinder volume snapshot") if snap_migratable else f"source volume snapshot status={snap_status_lc or 'unknown'}; clone requires available",
+                "migration_method": "flex2flex-cinder-block-stream",
+                "reason": (f"source Flex Cinder volume {source_object}") if snap_migratable else f"source volume {source_object} status={snap_status_lc or 'unknown'}; clone requires available",
                 "created_at": str(snap.get("Created At") or snap.get("created_at") or ""),
             })
-        logs.append(f"[OK] {source_region}: {len(images)} source Flex images and {len(volume_snaps)} volume snapshots returned")
+        vm_image_count = sum(1 for r in rows if r.get("asset_type") == "image_snapshot")
+        private_glance_count = sum(1 for r in rows if r.get("asset_type") == "glance_image")
+        logs.append(f"[OK] FLEX region scan complete: private_glance_images={private_glance_count} vm_image_snapshots={vm_image_count} volume_snapshots={len(volume_snaps)}")
         return jsonify({
             "rows": rows,
             "logs": logs,
@@ -9315,13 +12340,13 @@ def flex2flex_region_scan_images():
                 "licensed_restricted": 0,
                 "windows_images": sum(1 for r in rows if r.get("is_windows") and r.get("asset_type") != "volume_snapshot"),
                 "excluded_private_images": sum(1 for r in rows if not r.get("migratable")),
+                "private_glance_images": private_glance_count,
+                "vm_image_snapshots": vm_image_count,
             },
         })
-    finally:
-        try:
-            os.unlink(source_rc)
-        except Exception:
-            pass
+    except Exception as exc:
+        logs.append(f"[ERROR] Source FLEX direct image scan failed: {exc}")
+        return jsonify({"error": str(exc), "rows": [], "summary": {}, "logs": logs}), 500
 
 
 @app.post("/api/flex2flex_region/run")
@@ -9339,9 +12364,13 @@ def run_flex2flex_region_migrator():
         return str(value).strip().lower() in ("1", "true", "yes", "on")
 
     label_raw = str(req.get("label") or req.get("source_server_id") or req.get("source_image_id") or "flex2flex-region").strip()
-    label_safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", label_raw).strip("_") or "flex2flex-region"
     source_region = normalize_flex_region(str(req.get("source_region") or req.get("flex_source_region") or req.get("flex_region") or "DFW3").strip() or "DFW3")
     target_region = normalize_flex_region(str(req.get("target_region") or req.get("flex_target_region") or req.get("flex_region") or "IAD3").strip() or "IAD3")
+    label_base = _re.sub(r"(?i)-?r3-f2f-[A-Z0-9]+-to-[A-Z0-9]+(?:-r3-f2f-[A-Za-z0-9._-]+)?", "", label_raw).strip("-_ ")
+    label_base = label_base or str(req.get("source_vm_name") or req.get("server_name") or label_raw or "vm").strip()
+    vm_short = _re.sub(r"[^A-Za-z0-9]+", "", label_base)[:15] or "vm"
+    mig_stamp = datetime.utcnow().strftime("%Y%m%d%H%M")
+    label_safe = f"Flex-{source_region}-2-{target_region}-{vm_short}-{mig_stamp}"
     source_server_id = str(req.get("source_server_id") or req.get("source_instance_id") or "").strip()
     source_image_id = str(req.get("source_image_id") or req.get("source_snapshot_id") or "").strip()
     dry_run_requested = _truthy(req.get("dry_run"), True)
@@ -9353,21 +12382,31 @@ def run_flex2flex_region_migrator():
         or req.get("flex2flex_clone_method")
         or "jumphost_glance_stream"
     ).strip().lower()
+    source_hint_text = " ".join(
+        str(req.get(k) or "")
+        for k in (
+            "label",
+            "snapshot_name",
+            "source_name",
+            "source_vm_name",
+            "os_type",
+            "os_distro",
+            "image_name",
+            "migration_type",
+            "type",
+        )
+    )
     windows_source_hint = bool(
         _re.search(
             r"(windows|snapwin|win2012|win2016|win2019|win2022|virtio-ready)",
-            " ".join(
-                str(req.get(k) or "")
-                for k in (
-                    "label",
-                    "snapshot_name",
-                    "source_name",
-                    "source_vm_name",
-                    "os_type",
-                    "os_distro",
-                    "image_name",
-                )
-            ),
+            source_hint_text,
+            _re.I,
+        )
+    )
+    linux_source_hint = bool(
+        _re.search(
+            r"(linux|centos|rhel|redhat|rocky|alma|ubuntu|u18|u20|u22|u24|debian|dbian|sles|suse|oraclelinux|ol[0-9])",
+            source_hint_text,
             _re.I,
         )
     )
@@ -9446,6 +12485,8 @@ def run_flex2flex_region_migrator():
                 "--dry-run", "true" if dry_run_requested else "false",
                 "--boot-target", "true" if boot_target else "false",
             ]
+            if req.get("floating_ip") or req.get("replacement_ip"):
+                cmd += ["--floating-ip", str(req.get("floating_ip") or req.get("replacement_ip") or "").strip()]
             env = os.environ.copy()
             env["FLEX_GLANCE_DIRECT_RUN_ROOT"] = str(BASE_DIR / ".tmp_runs" / "flex_glance_direct")
             env["FLEX_GLANCE_DIRECT_ALLOW_LOCAL_FALLBACK"] = "0"
@@ -9509,7 +12550,7 @@ def run_flex2flex_region_migrator():
         "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
         "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
         "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
-        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
+        "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=120",
         "-o", "IPQoS=none",
         f"{ssh_user}@{process_ip}",
     ]
@@ -9519,13 +12560,34 @@ def run_flex2flex_region_migrator():
         "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
         "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
         "-o", "ConnectTimeout=15", "-o", "ConnectionAttempts=1",
-        "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=2",
+        "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=120",
         "-o", "IPQoS=none",
     ]
 
     local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "flex2flex_region_migrate.sh")
     if not os.path.isfile(local_script):
         return jsonify({"error": f"flex2flex_region_migrate.sh not found at {local_script}"}), 500
+    local_aux_scripts = [
+        (
+            str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_windows_method_z_snapshot_existing.sh"),
+            "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh",
+            True,
+        ),
+        (
+            str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_windows_method_z_snapshot_existing_2019.sh"),
+            "/tmp/ospc2flex_windows_method_z_snapshot_existing_2019.sh",
+            False,
+        ),
+        (
+            str(BASE_DIR / "ospc2Flex-Image-migtool" / "snapwin_repair_override_2022.reg"),
+            "/tmp/snapwin_repair_override_2022.reg",
+            False,
+        ),
+    ]
+    stage_windows_helpers = windows_source_hint or not linux_source_hint
+    for local_aux, _, required in (local_aux_scripts if stage_windows_helpers else []):
+        if required and not os.path.isfile(local_aux):
+            return jsonify({"error": f"Windows Method Z helper not found at {local_aux}"}), 500
 
     source_run_key = re.sub(r"[^A-Za-z0-9._-]+", "_", source_image_id or source_server_id or label_safe)[:12] or "source"
     run_token = f"{time.time_ns()}-{uuid4().hex[:8]}-{source_run_key}"
@@ -9546,6 +12608,7 @@ def run_flex2flex_region_migrator():
         yield ":" + (" " * 2048) + "\n\n"
         if direct_preflight_fallback_reason:
             yield f"data: [R3-F2F] Direct mode bypassed: {direct_preflight_fallback_reason}; using jumphost fallback.\n\n"
+        yield "data: [R3-F2F] Backend patch level: linux-helper-skip-v2 openrc-preflight-v1 ssh-keepalive-120\n\n"
         yield "data: --- EXECUTING R3 FLEX2FLEX-REGION CLONING ---\n\n"
         yield f"data: [R3-F2F] FLEX2FLEX-Region Cloning — {label_safe}\n\n"
         yield f"data: [R3-F2F] Source={source_region} Target={target_region} DryRun={str(dry_run_requested).lower()}\n\n"
@@ -9573,50 +12636,166 @@ def run_flex2flex_region_migrator():
             raise last_exc
 
         try:
-            stage_lock = _get_volsnap_staging_lock(f"flex2flex:{ssh_user}@{process_ip}")
-            if not stage_lock.acquire(blocking=False):
-                yield "data: [R3-F2F] Waiting for another selected Flex2Flex job to finish jumphost staging.\n\n"
-                stage_lock.acquire()
-            stage_lock_acquired = True
+            stage_lock = None
+            stage_lock_acquired = False
+            yield "data: [R3-F2F] Parallel staging enabled; not waiting for other selected jobs.\n\n"
+
+            yield "data: [R3-F2F] Preparing jumphost storage and migration tools.\n\n"
+            prep_cmd = r"""
+set +e
+MNT=/mnt/migration
+MIN_FREE_BYTES=100000000000
+sudo mkdir -p "$MNT"
+FREE_BYTES="$(df -B1 "$MNT" 2>/dev/null | awk 'NR==2{print $4}')"
+if [ "${FREE_BYTES:-0}" -lt "$MIN_FREE_BYTES" ]; then
+  echo "WARN:JUMPHOST_FREE_SPACE_LOW $MNT free=${FREE_BYTES:-0}; pruning staged image files while keeping unrepaired qcow2 files"
+  for d in "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/tmp"; do
+    [ -d "$d" ] || continue
+    find "$d" -type f \( -iname '*.img' -o -iname '*.raw' -o -iname '*.vhd' -o -iname '*.vmdk' -o -iname '*.qcow2' -o -iname '*.part' -o -iname '*.tmp' \) ! -iname '*unrepaired*.qcow2' -print -delete 2>/dev/null | sed 's#^#INFO:PRUNED_STAGED_IMAGE_FILE #'
+  done
+  FREE_BYTES="$(df -B1 "$MNT" 2>/dev/null | awk 'NR==2{print $4}')"
+  if [ "${FREE_BYTES:-0}" -lt "$MIN_FREE_BYTES" ]; then
+    echo "ERROR:JUMPHOST_FREE_SPACE_LOW $MNT free=${FREE_BYTES:-0}; free at least 100GB on the jumphost workdir filesystem"
+    exit 42
+  fi
+fi
+echo "OK:JUMPHOST_FREE_SPACE $MNT free=${FREE_BYTES:-0} min=$MIN_FREE_BYTES"
+sudo mkdir -p "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/logs" "$MNT/tmp" "$MNT/scripts" "$MNT/virtio"
+sudo chown "$USER:$USER" "$MNT" "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/logs" "$MNT/tmp" "$MNT/scripts" "$MNT/virtio" 2>/dev/null || true
+sudo chmod 775 "$MNT" "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/logs" "$MNT/tmp" "$MNT/scripts" "$MNT/virtio" 2>/dev/null || true
+missing=0
+for c in openstack qemu-img qemu-nbd jq sshpass aria2c; do command -v "$c" >/dev/null 2>&1 || missing=1; done
+if [ "$missing" = 1 ] && command -v apt-get >/dev/null 2>&1; then
+  sudo apt-get update -qq >/dev/null 2>&1 || true
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y sshpass qemu-utils gdisk xfsprogs jq aria2 python3-openstackclient ntfs-3g libhivex-bin chntpw wget libguestfs-tools >/dev/null 2>&1 || true
+fi
+if findmnt -rn "$MNT" >/dev/null 2>&1; then findmnt -rn -o SOURCE,TARGET,FSTYPE "$MNT" | awk '{print "OK:MOUNT="$1","$2","$3}'; fi
+df -hT "$MNT" 2>/dev/null | tail -1 | awk '{print "OK:SPACE="$3",USED="$4",FREE="$5",USEPCT="$6",MOUNT="$7}'
+for c in openstack qemu-img qemu-nbd jq sshpass aria2c virt-customize virt-sysprep; do
+  if command -v "$c" >/dev/null 2>&1; then echo "OK:$c=$(command -v "$c")"; else echo "MISSING:$c"; fi
+done
+exit 0
+"""
+            prep = subprocess.run(ssh_base + [prep_cmd], check=False, timeout=900, capture_output=True, text=True)
+            prep_out = ((prep.stdout or "") + (prep.stderr or "")).strip()
+            if prep_out:
+                for prep_line in prep_out.splitlines()[-16:]:
+                    if prep_line.startswith(("OK:", "WARN:", "INFO:", "MISSING:", "ERROR:")):
+                        level = "WARN" if prep_line.startswith(("MISSING:", "ERROR:")) else ""
+                        prefix = "[R3-F2F WARN] " if level else "[R3-F2F] "
+                        yield f"data: {prefix}{prep_line}\n\n"
+            if prep.returncode != 0:
+                yield "data: [R3-F2F ERROR] Jumphost staging preflight failed while preparing tools/workdir; check SSH permissions and package install output above.\n\n"
+                return
 
             with open(local_script, "rb") as fh:
                 local_md5 = _hashlib.md5(fh.read()).hexdigest()
             yield "data: [R3-F2F] Checking flex2flex script on jumphost.\n\n"
-            chk = subprocess.run(
-                ssh_base + [f"test -f {_sx.quote(remote_script)} && md5sum {_sx.quote(remote_script)} | awk '{{print $1}}' || true"],
-                check=False, timeout=30, capture_output=True, text=True,
-            )
-            remote_md5 = (chk.stdout or "").strip().splitlines()[-1] if (chk.stdout or "").strip() else ""
+            try:
+                chk = subprocess.run(
+                    ssh_base + [f"test -f {_sx.quote(remote_script)} && md5sum {_sx.quote(remote_script)} | awk '{{print $1}}' || true"],
+                    check=False, timeout=90, capture_output=True, text=True,
+                )
+                remote_md5 = (chk.stdout or "").strip().splitlines()[-1] if (chk.stdout or "").strip() else ""
+                if chk.returncode != 0:
+                    yield f"data: [R3-F2F WARN] flex2flex checksum probe failed rc={chk.returncode}; uploading script anyway.\n\n"
+                    remote_md5 = ""
+            except subprocess.TimeoutExpired:
+                yield "data: [R3-F2F WARN] flex2flex checksum probe timed out; uploading script anyway.\n\n"
+                remote_md5 = ""
             if remote_md5 == local_md5:
                 yield "data: [R3-F2F] Script already current on jumphost; skipped upload.\n\n"
             else:
                 yield "data: [R3-F2F] Uploading flex2flex_region_migrate.sh to jumphost.\n\n"
                 yield from _run_retry("R3 FLEX2FLEX script upload", scp_base + [local_script, f"{ssh_user}@{process_ip}:{remote_script}"], timeout=300, attempts=4, wait=10)
 
+            if not stage_windows_helpers:
+                yield "data: [R3-F2F] Linux source hint detected; skipping Windows SNAPWIN helper staging.\n\n"
+
+            for local_aux, remote_aux, _required in (local_aux_scripts if stage_windows_helpers else []):
+                if not os.path.isfile(local_aux):
+                    continue
+                with open(local_aux, "rb") as fh:
+                    local_aux_md5 = _hashlib.md5(fh.read()).hexdigest()
+                aux_name = os.path.basename(local_aux)
+                try:
+                    chk_aux = subprocess.run(
+                        ssh_base + [f"test -f {_sx.quote(remote_aux)} && md5sum {_sx.quote(remote_aux)} | awk '{{print $1}}' || true"],
+                        check=False, timeout=90, capture_output=True, text=True,
+                    )
+                    remote_aux_md5 = (chk_aux.stdout or "").strip().splitlines()[-1] if (chk_aux.stdout or "").strip() else ""
+                    if chk_aux.returncode != 0:
+                        yield f"data: [R3-F2F WARN] {aux_name} checksum probe failed rc={chk_aux.returncode}; uploading helper anyway.\n\n"
+                        remote_aux_md5 = ""
+                except subprocess.TimeoutExpired:
+                    yield f"data: [R3-F2F WARN] {aux_name} checksum probe timed out; uploading helper anyway.\n\n"
+                    remote_aux_md5 = ""
+                if remote_aux_md5 == local_aux_md5:
+                    yield f"data: [R3-F2F] {aux_name} already current on jumphost; skipped upload.\n\n"
+                else:
+                    yield f"data: [R3-F2F] Uploading {aux_name} to jumphost.\n\n"
+                    yield from _run_retry(
+                        f"R3 FLEX2FLEX {aux_name} upload",
+                        scp_base + [local_aux, f"{ssh_user}@{process_ip}:{remote_aux}"],
+                        timeout=300,
+                        attempts=4,
+                        wait=10,
+                    )
+
+            yield "data: [R3-F2F] Shared scripts checked; per-job credentials and clone run continue in parallel.\n\n"
+
             yield "data: [R3-F2F] Uploading source Flex OpenRC to jumphost.\n\n"
             yield from _run_retry("R3 FLEX2FLEX source OpenRC upload", scp_base + [source_rc, f"{ssh_user}@{process_ip}:{remote_source_rc}"], timeout=180, attempts=4, wait=10)
             yield "data: [R3-F2F] Uploading target Flex OpenRC to jumphost.\n\n"
             yield from _run_retry("R3 FLEX2FLEX target OpenRC upload", scp_base + [target_rc, f"{ssh_user}@{process_ip}:{remote_target_rc}"], timeout=180, attempts=4, wait=10)
             yield "data: [R3-F2F] Setting remote script/OpenRC permissions.\n\n"
+            remote_execs = [remote_script, "/tmp/ospc2flex_windows_method_z_snapshot_existing.sh", "/tmp/ospc2flex_windows_method_z_snapshot_existing_2019.sh"]
+            remote_readonly = [remote_source_rc, remote_target_rc, "/tmp/snapwin_repair_override_2022.reg"]
+            chmod_cmd = (
+                "for f in " + " ".join(_sx.quote(x) for x in remote_execs) + "; do [ -f \"$f\" ] && chmod 700 \"$f\"; done; "
+                "for f in " + " ".join(_sx.quote(x) for x in remote_readonly) + "; do [ -f \"$f\" ] && chmod 600 \"$f\"; done"
+            )
             yield from _run_retry(
                 "R3 FLEX2FLEX chmod",
-                ssh_base + [f"chmod 700 {_sx.quote(remote_script)}; chmod 600 {_sx.quote(remote_source_rc)} {_sx.quote(remote_target_rc)}"],
+                ssh_base + [chmod_cmd],
                 timeout=120,
                 attempts=4,
                 wait=10,
             )
             yield "data: [R3-F2F] Source/target Flex credentials staged on jumphost.\n\n"
-            if stage_lock_acquired and stage_lock is not None:
-                stage_lock.release()
-                stage_lock_acquired = False
+            yield "data: [R3-F2F] Per-job credentials staged; launching clone without blocking other selected jobs.\n\n"
+            dedupe_filter = source_image_id or source_server_id or label_safe
+            if dedupe_filter and not dry_run_requested:
+                dedupe_filter_q = _sx.quote(dedupe_filter)
+                current_run_q = _sx.quote(r3_run_id)
+                dedupe_cmd = (
+                    "set +e; "
+                    "pids=$(ps -eo pid=,args= | "
+                    "grep -E 'flex2flex_region_migrate.sh|curl --http1.1' | "
+                    "grep -F -- " + dedupe_filter_q + " | "
+                    "grep -v -F -- " + current_run_q + " | "
+                    "grep -v 'grep -E' | awk '{print $1}' | sort -u || true); "
+                    "if [ -n \"$pids\" ]; then "
+                    "echo \"$pids\" | xargs -r kill -TERM 2>/dev/null || true; sleep 2; "
+                        "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                    "echo \"$pids\"; "
+                    "fi"
+                )
+                dedupe = subprocess.run(
+                    ssh_base + [dedupe_cmd],
+                    check=False, timeout=45, capture_output=True, text=True,
+                )
+                dedupe_pids = " ".join((dedupe.stdout or "").split())
+                yield f"data: [R3-F2F] Duplicate same-source jumphost worker cleanup: {dedupe_pids or 'none'}\n\n"
+
             if start_fresh_kill and not dry_run_requested:
                 label_pattern_q = _sx.quote(f"--label {label_safe}")
                 kill_cmd = (
                     "pids=$(pgrep -af 'flex2flex_region_migrate.sh|FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex' | "
                     f"grep -v 'pgrep -af' | grep -F -- {label_pattern_q} | "
                     "awk '{print $1}' | sort -u || true); "
-                    "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM; sleep 2; "
-                    "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
+                        "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM 2>/dev/null || true; sleep 2; "
+                        "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
                 )
                 killed = subprocess.run(
                     ssh_base + [kill_cmd],
@@ -9671,6 +12850,8 @@ def run_flex2flex_region_migrator():
                 "--dry-run", "true" if dry_run_requested else "false",
                 "--boot-target", "true" if boot_target else "false",
             ]
+            if req.get("floating_ip") or req.get("replacement_ip"):
+                f2f_cmd += ["--floating-ip", str(req.get("floating_ip") or req.get("replacement_ip") or "").strip()]
             if start_fresh_kill:
                 f2f_cmd += ["--start-fresh"]
             if source_server_id:
@@ -9680,8 +12861,22 @@ def run_flex2flex_region_migrator():
 
             cinder_export_env = "FLEX2FLEX_ENABLE_CINDER_IMAGE_EXPORT=1 FLEX2FLEX_WINDOWS_CINDER_MIN_GB=80 " if windows_source_hint else ""
             image_create_timeout_env = "FLEX2FLEX_IMAGE_CREATE_TIMEOUT=21600 " if windows_source_hint else ""
+            source_lock_key = re.sub(r"[^A-Za-z0-9._-]+", "_", (source_image_id or source_server_id or label_safe))[:80] or "unknown"
+            source_lock = f"/tmp/flex2flex_source_{source_lock_key}.lock"
+            source_pidfile = f"{source_lock}.pid"
             remote_run = (
-                f"set -o pipefail; FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex "
+                f"set -o pipefail; lock={_sx.quote(source_lock)}; pidfile={_sx.quote(source_pidfile)}; "
+                "exec 9>\"$lock\"; "
+                "if ! flock -n 9; then "
+                "  old=$(cat \"$pidfile\" 2>/dev/null || true); "
+                "  if [ -n \"$old\" ] && kill -0 \"$old\" 2>/dev/null; then "
+                "    echo \"[R3-F2F] Same-source worker already active on jumphost pid=$old; stopping stale duplicate before relaunch\"; "
+                "    kill -TERM \"$old\" 2>/dev/null || true; sleep 3; kill -KILL \"$old\" 2>/dev/null || true; "
+                "  fi; "
+                "  flock -w 20 9 || { echo \"[R3-F2F ERROR] same-source worker lock is still busy: $lock\"; exit 98; }; "
+                "fi; "
+                "echo $$ > \"$pidfile\"; trap 'rm -f \"$pidfile\"' EXIT; "
+                f"FLEX2FLEX_RUN_ROOT=/mnt/migration/flex2flex "
                 f"FLEX2FLEX_FALLBACK_RUN_ROOT=/tmp/flex2flex "
                 f"{cinder_export_env}"
                 f"{image_create_timeout_env}"
@@ -9698,6 +12893,7 @@ def run_flex2flex_region_migrator():
             )
             ACTIVE_MIGRATOR_PROCESSES.add(process)
             saw_remote_success = False
+            last_remote_status = ""
             remote_stdout = process.stdout
             while remote_stdout is not None:
                 ready, _, _ = select.select([remote_stdout], [], [], 25)
@@ -9712,11 +12908,36 @@ def run_flex2flex_region_migrator():
                     yield f"data: {line.rstrip()}\n\n"
                     continue
                 if process.poll() is not None:
+                    drain_lines = []
                     for tail_line in (remote_stdout.read() or "").splitlines():
                         if "R3 FLEX2FLEX-Region Cloning complete" in tail_line:
                             saw_remote_success = True
-                        yield f"data: {tail_line.rstrip()}\n\n"
+                        drain_lines.append(tail_line.rstrip())
+                    for tail_line in drain_lines:
+                        yield f"data: {tail_line}\n\n"
                     break
+                status_cmd = (
+                    "set +e; "
+                    f"log={_sx.quote(remote_log)}; "
+                    "if [ -f \"$log\" ]; then "
+                    "  echo \"__F2F_LOG__ size=$(stat -c%s \"$log\" 2>/dev/null || echo 0) mtime=$(stat -c%Y \"$log\" 2>/dev/null || echo 0)\"; "
+                    "  tail -n 6 \"$log\" 2>/dev/null | sed 's/^/[REMOTE LOG] /'; "
+                    "fi; "
+                    f"find /mnt/migration/flex2flex -path '*{r3_run_id}*' -type f -name '*.img' "
+                    "-printf '__F2F_FILE__ bytes=%s path=%p\\n' 2>/dev/null | sort -nr | head -3"
+                )
+                try:
+                    status = subprocess.run(
+                        ssh_base + [status_cmd],
+                        check=False, timeout=8, capture_output=True, text=True,
+                    )
+                    status_out = (status.stdout or "").strip()
+                    if status_out and status_out != last_remote_status:
+                        last_remote_status = status_out
+                        for status_line in status_out.splitlines()[-10:]:
+                            yield f"data: [R3-F2F] {status_line.rstrip()}\n\n"
+                except subprocess.TimeoutExpired:
+                    yield "data: [R3-F2F] remote status poll delayed; clone is still running on jumphost.\n\n"
                 yield "data: [R3-F2F] still running on jumphost; waiting for next stage output...\n\n"
             process.wait()
             ACTIVE_MIGRATOR_PROCESSES.discard(process)
@@ -11651,6 +14872,48 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
     with _nbd_staging_cache_lock:
         _nbd_staging_cache[jumphost_ip]["hash"] = combined_hash
 
+    storage_cmd = r"""
+set +e
+MNT=/mnt/migration
+MIN_FREE_BYTES=100000000000
+SUDO=sudo
+$SUDO mkdir -p "$MNT"
+FREE_BYTES="$(df -B1 "$MNT" 2>/dev/null | awk 'NR==2{print $4}')"
+if [ "${FREE_BYTES:-0}" -lt "$MIN_FREE_BYTES" ]; then
+  echo "WARN:JUMPHOST_FREE_SPACE_LOW $MNT free=${FREE_BYTES:-0}; pruning staged image files while keeping unrepaired qcow2 files"
+  for d in "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/tmp"; do
+    [ -d "$d" ] || continue
+    find "$d" -type f \( -iname '*.img' -o -iname '*.raw' -o -iname '*.vhd' -o -iname '*.vmdk' -o -iname '*.qcow2' -o -iname '*.part' -o -iname '*.tmp' \) ! -iname '*unrepaired*.qcow2' -print -delete 2>/dev/null | sed 's#^#INFO:PRUNED_STAGED_IMAGE_FILE #'
+  done
+  FREE_BYTES="$(df -B1 "$MNT" 2>/dev/null | awk 'NR==2{print $4}')"
+  if [ "${FREE_BYTES:-0}" -lt "$MIN_FREE_BYTES" ]; then
+    echo "ERROR:JUMPHOST_FREE_SPACE_LOW $MNT free=${FREE_BYTES:-0}; free at least 100GB on the jumphost workdir filesystem"
+    exit 42
+  fi
+fi
+echo "OK:JUMPHOST_FREE_SPACE $MNT free=${FREE_BYTES:-0} min=$MIN_FREE_BYTES"
+if findmnt -rn "$MNT" >/dev/null 2>&1; then
+  echo "OK:MOUNT=$(findmnt -rn -o SOURCE,TARGET,FSTYPE "$MNT" | tr ' ' ',')"
+else
+  echo "INFO:$MNT is a directory on the current filesystem"
+fi
+$SUDO mkdir -p "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/logs" "$MNT/tmp" "$MNT/scripts" "$MNT/virtio"
+$SUDO chown "$USER:$USER" "$MNT" "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/logs" "$MNT/tmp" "$MNT/scripts" "$MNT/virtio" 2>/dev/null || true
+$SUDO chmod 775 "$MNT" "$MNT/flex2flex" "$MNT/ospc2flex_image" "$MNT/ospc2flex_linux_snap" "$MNT/images" "$MNT/logs" "$MNT/tmp" "$MNT/scripts" "$MNT/virtio" 2>/dev/null || true
+df -hT "$MNT" | tail -1 | awk '{print "OK:SPACE="$3",USED="$4",FREE="$5",USEPCT="$6",MOUNT="$7}'
+exit 0
+"""
+    msgs.append("[STAGE] Preparing jumphost migration storage")
+    storage_proc = safe_run(ssh_base + [storage_cmd], check=False, timeout=120, capture_output=True, text=True)
+    storage_out = ((storage_proc.stdout or "") + (storage_proc.stderr or "")).strip()
+    if storage_out:
+        for line in storage_out.splitlines()[-12:]:
+            if line.startswith("OK:") or line.startswith("WARN:") or line.startswith("INFO:") or line.startswith("ERROR:"):
+                msgs.append(f"[STAGE] {line}")
+    if storage_proc.returncode != 0:
+        msgs.append("[STAGE][ERROR] Jumphost storage preparation failed while creating /mnt/migration directories.")
+        return msgs, False
+
     # 1. ALWAYS stage flex creds (lightweight — contains session password)
     flex_sh = build_flex_method_ab_openrc(
         auth_url=str(flex_creds.get('auth_url', '') or ''),
@@ -11816,23 +15079,23 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
 
     dep_cmd = (
         "missing=0; "
-        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do command -v \"$c\" >/dev/null 2>&1 || missing=1; done; "
+        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img openstack sshpass jq sgdisk xfs_repair virt-customize virt-sysprep; do command -v \"$c\" >/dev/null 2>&1 || missing=1; done; "
         "if [ \"$missing\" = 1 ]; then "
         "sudo apt-get update -qq || true; "
-        "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y qemu-utils ntfs-3g libhivex-bin chntpw wget jq python3-openstackclient software-properties-common || true; "
+        "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y sshpass qemu-utils gdisk xfsprogs ntfs-3g libhivex-bin chntpw wget jq python3-openstackclient software-properties-common libguestfs-tools || true; "
         "fi; "
         "if { ! command -v hivexsh >/dev/null 2>&1 || ! command -v reged >/dev/null 2>&1; } && command -v add-apt-repository >/dev/null 2>&1; then "
         "sudo add-apt-repository -y universe || true; "
         "sudo apt-get update -qq || true; "
         "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y libhivex-bin chntpw || true; "
         "fi; "
-        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do "
+        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img openstack sshpass jq sgdisk xfs_repair virt-customize virt-sysprep; do "
         "if command -v \"$c\" >/dev/null 2>&1; then echo \"OK:$c=$(command -v \"$c\")\"; else echo \"MISSING:$c\"; fi; "
         "done; "
         "exit 0"
     )
     quick_dep = (
-        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img; do "
+        "for c in hivexsh reged ntfs-3g ntfsfix qemu-nbd qemu-img openstack sshpass jq sgdisk xfs_repair virt-customize virt-sysprep; do "
         "if command -v \"$c\" >/dev/null 2>&1; then echo \"OK:$c=$(command -v \"$c\")\"; "
         "else echo \"MISSING:$c\"; fi; done; exit 0"
     )
@@ -11852,7 +15115,7 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
 
     if not skip_full_dep:
         msgs.append("[STAGE] Verifying Windows repair dependencies on jumphost")
-        dep_proc = safe_run(ssh_base + [dep_cmd], check=False, timeout=300, capture_output=True, text=True)
+        dep_proc = safe_run(ssh_base + [dep_cmd], check=False, timeout=900, capture_output=True, text=True)
         dep_out = ((dep_proc.stdout or "") + (dep_proc.stderr or "")).strip()
         if dep_out:
             for line in dep_out.splitlines()[-12:]:
@@ -11866,12 +15129,12 @@ def _stage_scripts_on_jumphost(jumphost_ip, jumphost_user, ssh_key, flex_creds, 
         msgs.append("[STAGE] First-run init: modprobe nbd, workspace, SSH key")
         safe_run(ssh_base + [
             "sudo modprobe nbd max_part=16 2>/dev/null || true; "
-            "if ! command -v qemu-nbd &>/dev/null || ! command -v sshpass &>/dev/null; then "
+            "if ! command -v qemu-nbd &>/dev/null || ! command -v sshpass &>/dev/null || ! command -v openstack &>/dev/null; then "
             "sudo apt-get update -qq >/dev/null 2>&1 || true; "
-            "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y sshpass qemu-utils gdisk xfsprogs jq python3-openstackclient ntfs-3g libhivex-bin chntpw wget >/dev/null 2>&1 || true; "
+            "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y sshpass qemu-utils gdisk xfsprogs jq python3-openstackclient ntfs-3g libhivex-bin chntpw wget libguestfs-tools >/dev/null 2>&1 || true; "
             "fi; "
             "mkdir -p /mnt/migration/ospc2flex_image"
-        ], check=True, timeout=180)
+        ], check=True, timeout=900)
 
         if os.path.isfile(ssh_key):
             safe_run(["scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=30",
@@ -14907,6 +18170,8 @@ sleep 1
 echo "[SUCCESS] Task '{task}' completed successfully and validated."
 echo "=== TASK COMPLETE ==="
 """
+
+    bash_content = bash_content.replace("#!/bin/bash\n", "#!/bin/bash\n" + _stage5_cutover_scope_prelude(task), 1)
 
     with open('/tmp/run_stage5.sh', 'w') as f:
         f.write(bash_content)

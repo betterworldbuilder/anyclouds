@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blue/Green Cutover Tester</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #07111f; color: #e5f2ff; }
+    main { max-width: 980px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    section { border: 1px solid #24415f; border-radius: 8px; padding: 16px; margin-top: 16px; background: #0d1a2b; }
+    label { display: block; color: #9fb4c8; font-weight: 700; margin: 10px 0 4px; font-size: 12px; }
+    input, select { width: 100%; box-sizing: border-box; background: #07111f; color: #e5f2ff; border: 1px solid #3a668f; border-radius: 6px; padding: 9px; }
+    button { margin: 10px 8px 0 0; border: 1px solid #3a668f; background: #10233a; color: #e5f2ff; border-radius: 6px; padding: 9px 12px; cursor: pointer; }
+    button.primary { border-color: #2ecc71; color: #bbf7d0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+    .metric { border: 1px solid #24415f; border-radius: 7px; padding: 10px; background: #101b30; color: #9fb4c8; }
+    .metric strong { display: block; color: #e5f2ff; font-size: 20px; margin-top: 8px; }
+    pre { white-space: pre-wrap; background: #020817; border: 1px solid #24415f; border-radius: 6px; padding: 12px; min-height: 120px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Blue/Green Cutover Tester</h1>
+  <p>Simulation mode. Use from the source jumphost to validate source and target app endpoints before production traffic moves.</p>
+  <section>
+    <label>Source app URL</label>
+    <input id="source" placeholder="http://SOURCE_SERVER_IP:APP_PORT">
+    <label>Target app URL</label>
+    <input id="target" placeholder="http://TARGET_SERVER_IP:APP_PORT">
+    <label>Health path</label>
+    <input id="health" value="/health">
+    <label>Smoke path</label>
+    <input id="smoke" value="/">
+    <button class="primary" onclick="configure()">Save Config</button>
+    <button onclick="callApi('GET','/health-check')">Health Check</button>
+    <button onclick="callApi('GET','/smoke-test')">Smoke Test</button>
+    <button onclick="callApi('POST','/pre-cutover-check')">Pre-Cutover Gate</button>
+    <button onclick="switchTarget()">Switch to Target</button>
+    <button onclick="rollback()">Rollback</button>
+    <button onclick="callApi('GET','/audit')">Audit</button>
+  </section>
+  <section>
+    <h2>5. Performance Validation</h2>
+    <div class="grid">
+      <label>OSPC AVG RESPONSE MS<input id="ospcAvgResponseMs" type="number" step="0.01" oninput="calculatePerformanceStatus()"></label>
+      <label>FLEX AVG RESPONSE MS<input id="flexAvgResponseMs" type="number" step="0.01" oninput="calculatePerformanceStatus()"></label>
+      <label>OSPC P95 MS<input id="ospcP95Ms" type="number" step="0.01" oninput="calculatePerformanceStatus()"></label>
+      <label>FLEX P95 MS<input id="flexP95Ms" type="number" step="0.01" oninput="calculatePerformanceStatus()"></label>
+      <label>TARGET CONCURRENT USERS<input id="targetConcurrentUsers" type="number" min="1" max="100" value="10"></label>
+      <label>PEAK CONCURRENT USERS TESTED<input id="peakConcurrentUsersTested" type="number" min="1" max="100" value="25"></label>
+      <label>ACTIVE SESSIONS TESTED<input id="activeSessionsTested" type="number" min="1" max="100" value="10"></label>
+      <label>API ERROR RATE PERCENT<input id="apiErrorRatePercent" type="number" step="0.01" value="0" oninput="calculatePerformanceStatus()"></label>
+      <label>DB AVG QUERY MS<input id="dbAvgQueryMs" type="number" step="0.01"></label>
+      <label>REPORT GENERATION SECONDS<input id="reportGenerationSeconds" type="number" step="0.01"></label>
+      <label>MOBILE APP LOAD SECONDS<input id="mobileAppLoadSeconds" type="number" step="0.01"></label>
+      <label>MOBILE TAP RESPONSE MS<input id="mobileTapResponseMs" type="number" step="0.01"></label>
+      <label>NETWORK LATENCY MS<input id="networkLatencyMs" type="number" step="0.01"></label>
+      <label>UPLOAD MBPS<input id="uploadMbps" type="number" step="0.01"></label>
+      <label>DOWNLOAD MBPS<input id="downloadMbps" type="number" step="0.01"></label>
+      <label>MOBILE LAG STATUS<select id="mobileLagStatus" onchange="calculatePerformanceStatus()"><option>Pass</option><option>Review</option><option>Fail</option></select></label>
+    </div>
+    <div class="grid" style="margin-top:12px;">
+      <div class="metric">AVG RESPONSE DELTA<strong id="avgResponseDelta">-</strong></div>
+      <div class="metric">P95 DELTA<strong id="p95Delta">-</strong></div>
+      <div class="metric">PERFORMANCE STATUS<strong id="performanceStatus">REVIEW</strong></div>
+    </div>
+    <button class="primary" onclick="savePerformanceConfigAndRun()">Run Performance Test</button>
+    <button onclick="calculatePerformanceStatus()">Calculate &amp; Save</button>
+    <button onclick="loadLatestPerformance()">Load Latest Performance</button>
+  </section>
+  <section>
+    <pre id="out">Ready.</pre>
+  </section>
+</main>
+<script>
+const out = document.getElementById('out');
+function show(data) { out.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2); }
+async function callApi(method, path, body) {
+  const res = await fetch(path, {method, headers: {'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  const data = await res.json();
+  show(data);
+  if (!res.ok) throw new Error(data.detail || data.error || ('HTTP ' + res.status));
+  return data;
+}
+function numberValue(id) {
+  const value = document.getElementById(id).value;
+  if (value === '' || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function calculatePerformanceStatus() {
+  const ospcAvg = numberValue('ospcAvgResponseMs');
+  const flexAvg = numberValue('flexAvgResponseMs');
+  const ospcP95 = numberValue('ospcP95Ms');
+  const flexP95 = numberValue('flexP95Ms');
+  const errorRate = numberValue('apiErrorRatePercent') || 0;
+  if (ospcAvg === null || flexAvg === null || ospcP95 === null || flexP95 === null) {
+    document.getElementById('avgResponseDelta').textContent = '-';
+    document.getElementById('p95Delta').textContent = '-';
+    document.getElementById('performanceStatus').textContent = 'REVIEW';
+    return 'REVIEW';
+  }
+  const avgDelta = flexAvg - ospcAvg;
+  const p95Delta = flexP95 - ospcP95;
+  document.getElementById('avgResponseDelta').textContent = avgDelta.toFixed(2);
+  document.getElementById('p95Delta').textContent = p95Delta.toFixed(2);
+  let status = 'PASS';
+  if (flexP95 > 2000 || errorRate > 2 || avgDelta > 750 || p95Delta > 1500 || document.getElementById('mobileLagStatus').value === 'Fail') {
+    status = 'FAIL';
+  } else if (avgDelta > 250 || p95Delta > 500 || errorRate > 1 || document.getElementById('mobileLagStatus').value === 'Review') {
+    status = 'REVIEW';
+  }
+  document.getElementById('performanceStatus').textContent = status;
+  return status;
+}
+async function configure() {
+  await callApi('POST', '/config', {
+    active_environment: 'source',
+    traffic_mode: 'simulation',
+    source: {name:'source-blue', base_url: document.getElementById('source').value, health_path: document.getElementById('health').value || '/health', smoke_path: document.getElementById('smoke').value || '/', expected_status: 200, timeout_seconds: 5},
+    target: {name:'target-green', base_url: document.getElementById('target').value, health_path: document.getElementById('health').value || '/health', smoke_path: document.getElementById('smoke').value || '/', expected_status: 200, timeout_seconds: 5}
+  });
+}
+function fillPerformanceFields(result) {
+  document.getElementById('ospcAvgResponseMs').value = result.ospc_avg_response_ms ?? '';
+  document.getElementById('flexAvgResponseMs').value = result.flex_avg_response_ms ?? '';
+  document.getElementById('ospcP95Ms').value = result.ospc_p95_ms ?? '';
+  document.getElementById('flexP95Ms').value = result.flex_p95_ms ?? '';
+  document.getElementById('targetConcurrentUsers').value = result.target_concurrent_users ?? '';
+  document.getElementById('peakConcurrentUsersTested').value = result.peak_concurrent_users_tested ?? '';
+  document.getElementById('activeSessionsTested').value = result.active_sessions_tested ?? '';
+  document.getElementById('apiErrorRatePercent').value = result.api_error_rate_percent ?? '';
+  document.getElementById('dbAvgQueryMs').value = result.db_avg_query_ms ?? '';
+  document.getElementById('reportGenerationSeconds').value = result.report_generation_seconds ?? '';
+  document.getElementById('mobileAppLoadSeconds').value = result.mobile_app_load_seconds ?? '';
+  document.getElementById('mobileTapResponseMs').value = result.mobile_tap_response_ms ?? '';
+  document.getElementById('networkLatencyMs').value = result.network_latency_ms ?? '';
+  document.getElementById('uploadMbps').value = result.upload_mbps ?? '';
+  document.getElementById('downloadMbps').value = result.download_mbps ?? '';
+  document.getElementById('mobileLagStatus').value = result.mobile_lag_status ?? 'Review';
+  document.getElementById('avgResponseDelta').textContent = result.avg_response_delta ?? '-';
+  document.getElementById('p95Delta').textContent = result.p95_delta ?? '-';
+  document.getElementById('performanceStatus').textContent = result.performance_status ?? 'REVIEW';
+}
+async function savePerformanceConfigAndRun() {
+  const concurrent = numberValue('targetConcurrentUsers') || 10;
+  if (concurrent > 100 && !confirm('High-load performance tests require confirmation. Continue?')) return;
+  const payload = {
+    source_base_url: document.getElementById('source').value,
+    target_base_url: document.getElementById('target').value,
+    test_path: document.getElementById('smoke').value || '/',
+    health_path: document.getElementById('health').value || '/health',
+    concurrent_users: concurrent,
+    peak_concurrent_users: numberValue('peakConcurrentUsersTested') || 25,
+    requests_per_user: 5,
+    timeout_seconds: 5,
+    max_avg_response_ms: 1000,
+    max_p95_ms: 2000,
+    max_error_rate_percent: 2
+  };
+  await callApi('POST', '/performance/config', payload);
+  const result = await callApi('POST', '/performance/run');
+  fillPerformanceFields(result);
+  show(result);
+}
+async function loadLatestPerformance() {
+  const result = await callApi('GET', '/performance/latest');
+  fillPerformanceFields(result);
+  show(result);
+}
+async function switchTarget() {
+  await callApi('POST', '/switch', {target_environment:'target', require_target_healthy:true});
+}
+async function rollback() {
+  await callApi('POST', '/rollback', {reason:'Manual rollback from tester UI'});
+}
+</script>
+</body>
+</html>

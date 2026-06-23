@@ -495,6 +495,43 @@
       height: 100%;
     }
 
+    .pane-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pane-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pane-actions button {
+      padding: 4px 9px;
+      font-size: 10px;
+      min-height: 24px;
+    }
+
+    .phase-active {
+      border-radius: 6px;
+      padding: 3px 6px;
+      background: rgba(14, 165, 233, 0.22);
+      box-shadow: 0 0 0 1px rgba(103, 232, 249, 0.65), 0 0 14px rgba(34, 211, 238, 0.5);
+      animation: phaseBlink 0.9s ease-in-out infinite alternate;
+    }
+
+    .phase-active span {
+      background: #0891b2 !important;
+      color: #ecfeff !important;
+    }
+
+    @keyframes phaseBlink {
+      from { filter: brightness(1); }
+      to { filter: brightness(1.55); }
+    }
+
     .preview-dual {
       display: grid;
       grid-template-rows: auto 1fr auto 1fr;
@@ -523,17 +560,17 @@
 </head>
 <body>
   <header>
-    <h1>Visual OpenStack FLEX Topology Builder and Deployer</h1>
-    <p>Clone from OSPC topology on FLEX, link resources, and either generate a shell script or deploy directly with OpenRC credentials.</p>
+    <h1 id="designerTitle">Visual OpenStack FLEX Topology Builder and Deployer</h1>
+    <p id="designerSubtitle">Clone discovered source topology onto FLEX, link resources, and either generate a shell script or deploy directly with OpenRC credentials.</p>
     <div style="max-width:960px;margin:10px auto;background:rgba(0,0,0,.22);color:#e8eeff;padding:14px 24px;border-radius:8px;font-size:13px;line-height:1.75;">
-      <strong style="color:#7ecfff;">Prerequisites &amp; Workflow:</strong>
-      <ol style="margin:8px 0 0 18px;padding:0;">
+      <strong style="color:#7ecfff;" id="designerWorkflowTitle">Prerequisites &amp; Workflow:</strong>
+      <ol id="designerWorkflowList" style="margin:8px 0 0 18px;padding:0;">
         <li><strong>OpenStack CLI &amp; Octavia CLI</strong> must be installed in the operator environment.</li>
         <li><strong>FLEX OpenRC file</strong> (password version) downloaded &mdash; update it with your FLEX API password and place it in the <code>ospcflex/</code> folder.</li>
-        <li><strong>Paste the deployment script</strong> <code>XXXX_tenant_deploy.sh</code> generated in Stage 1 into the <em>Paste deployment script</em> box.</li>
-        <li>Click <strong>Import from Script</strong> &mdash; the topology will be extracted from the OSPC cloud definition.</li>
+        <li><strong>Paste the deployment script</strong> generated in Stage 1 into the <em>Paste deployment script</em> box, or use live import when the source is an OpenStack/FLEX project.</li>
+        <li>Click <strong>Import from Script</strong> or <strong>Import From Project</strong> &mdash; the topology will be extracted from the selected source cloud definition.</li>
         <li>Then click: <strong>Validate Topology</strong> &rarr; <strong>Preview Plan</strong> &rarr; <strong>Generate Shell Script</strong> or <strong>Deploy Now</strong>.<br/>
-            The script deploys the extracted OSPC topology on FLEX, automatically mapping to equivalent or superior FLEX flavors.</li>
+            The script deploys the extracted source topology on FLEX, automatically mapping to equivalent or superior FLEX flavors.</li>
         <li>Monitor progress in the <strong>Activity Log</strong> window in real time.</li>
       </ol>
     </div>
@@ -622,11 +659,22 @@
     <div class="bottom-grid">
       <section id="deployAuthCard" class="card stack">
       <h2>Deploy Auth</h2>
+      <label>Infrastructure Clone Source
+        <select id="infraSourceMode">
+          <option value="ospc">OSPC to FLEX</option>
+          <option value="flex2flex">FLEX to FLEX</option>
+          <option value="hyperflex">AWS / Azure / GCP to FLEX</option>
+        </select>
+      </label>
+      <p class="hint" id="infraSourceHint">Use the Stage 1 OSPC infra discovery deployment script, or import a live OpenStack project when credentials are available.</p>
       <label>Account ID (for script filename)
         <input id="scriptAccountId" type="text" placeholder="123456" value="1342314" />
       </label>
       <label>OpenRC File (workspace path)
         <input id="openrcFile" type="text" placeholder="uploads/my-openrc.sh" value="openrcpassnew.sh" />
+      </label>
+      <label>OpenRC Content (auto-filled from Stage 1 FLEX credentials)
+        <textarea id="openrcContent" rows="5" placeholder="export OS_AUTH_URL=...&#10;export OS_USERNAME=...&#10;export OS_PASSWORD=...&#10;export OS_PROJECT_ID=..." style="font-family:monospace;"></textarea>
       </label>
       <label>Detected OpenRC Files
         <select id="openrcSelect">
@@ -635,7 +683,7 @@
       </label>
       <button id="refreshOpenrcBtn">Refresh OpenRC List</button>
       <label>API Key / Password (optional override)
-        <input id="authSecret" type="password" placeholder="Used as OS_PASSWORD when required by auth" />
+        <input id="authSecret" type="text" placeholder="Used as OS_PASSWORD when required by auth" />
       </label>
       <label>Deployment Phases (Batch Deployment)
         <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
@@ -683,15 +731,22 @@
       <label><input id="failFast" type="checkbox" /> Fail fast</label>
 
       <button id="importLiveBtn">Import From Project</button>
-      <p class="hint">Import uses the same OpenRC credentials and discovers resources currently in your project.</p>
+      <p class="hint" id="importLiveHint">Import uses the same OpenRC credentials and discovers resources currently in your project.</p>
       <label>Deployment Script File (workspace path)
         <input id="scriptFile" type="text" placeholder="uploads/project_123_deploy.sh" value="1342314_tenant_deploy.sh" />
+      </label>
+      <label>Upload Deployment Script
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="scriptUploadFile" type="file" accept=".sh,.bash,.txt" />
+          <button id="uploadScriptBtn" type="button">Upload Script</button>
+        </div>
+        <span class="hint">Selecting a file uploads it automatically; the button can be used to retry/manual upload.</span>
       </label>
       <label>Or Paste Deployment Script
         <textarea id="scriptContent" placeholder="#!/usr/bin/env bash\nopenstack network create tenant-net\n..."></textarea>
       </label>
       <button id="importScriptBtn">Import From Script</button>
-      <p class="hint">Script import performs a best-effort parse of OpenStack CLI commands and builds visual nodes/links.</p>
+      <p class="hint" id="importScriptHint">Script import performs a best-effort parse of OpenStack CLI commands and builds visual nodes/links.</p>
       </section>
 
       <section class="card stack preview-dual">
@@ -703,12 +758,26 @@
       </section>
 
       <section class="card stack preview-single">
-      <h2>Generated Script</h2>
+      <div class="pane-titlebar">
+        <h2>Generated Script</h2>
+        <div class="pane-actions">
+          <button id="copyScriptPreviewBtn" type="button">Copy</button>
+          <button id="saveScriptPreviewBtn" type="button">Save</button>
+          <button id="clearScriptPreviewBtn" type="button">Clear</button>
+        </div>
+      </div>
       <pre id="scriptPreview">No script generated yet.</pre>
       </section>
 
       <section class="card stack preview-single">
-      <h2>Activity Log</h2>
+      <div class="pane-titlebar">
+        <h2>Activity Log</h2>
+        <div class="pane-actions">
+          <button id="copyActivityLogBtn" type="button">Copy</button>
+          <button id="saveActivityLogBtn" type="button">Save</button>
+          <button id="clearActivityLogBtn" type="button">Clear</button>
+        </div>
+      </div>
       <pre id="logBox">Ready.</pre>
       </section>
     </div>
@@ -736,7 +805,7 @@
     </div>
   </div>
 
-  <script src="/static/designer.js"></script>
+  <script src="/static/designer.js?v={{ cache_bust|default(0) }}"></script>
   <script>
   // ── Auto-fill Deploy Auth from Cloud Credentials (localStorage) ───────────
   // These keys are written by the Cloud Credentials panel in the Scanner page.
@@ -755,6 +824,12 @@
     }
 
     // Build an OpenRC content string from FLEX credentials
+    function regionFromAuthUrl(url) {
+      const text = String(url || '').toLowerCase();
+      const match = text.match(/keystone\.api\.([a-z0-9-]+)\.rackspacecloud\.com/);
+      return match ? match[1].toUpperCase() : 'RegionOne';
+    }
+
     function buildOpenrc() {
       const url    = ls.getItem('cred_flex_auth_url')   || '';
       const user   = ls.getItem('cred_flex_username')   || '';
@@ -770,7 +845,7 @@
         `export OS_PROJECT_ID="${projId}"`,
         `export OS_USER_DOMAIN_NAME="${domain}"`,
         'export OS_IDENTITY_API_VERSION=3',
-        'export OS_REGION_NAME="RegionOne"',
+        `export OS_REGION_NAME="${regionFromAuthUrl(url)}"`,
       ].join('\n');
     }
 

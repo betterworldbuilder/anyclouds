@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>References</title>
+  <title>{{ source_label|default('OSPC') }} Flavors & Images</title>
   <style>
     :root {
       --bg: #233a6b;
@@ -116,12 +116,12 @@
 <body>
   <main class="wrap">
     <section class="card">
-      <h1>References</h1>
-      <p class="meta">Shows available public images and available flavors from your CSV reference folders.</p>
+      <h1>{{ source_label|default('OSPC') }} Flavors &amp; Images</h1>
+      <p class="meta">Shows {{ source_label|default('OSPC') }} source image intent, target FLEX images, and FLEX flavor references used by the mapper and deployment generator.</p>
     </section>
 
     <section class="card">
-      <h2>Public Images <span id="imagesCount" class="pill">0</span></h2>
+      <h2>{{ source_label|default('OSPC') }} Image References <span id="imagesCount" class="pill">0</span></h2>
       <p id="imagesSource" class="meta">Source: not found</p>
       <button class="btn-export" id="exportImagesBtn">⬇️ Export Images CSV</button>
       <ul id="imagesList" class="images"></ul>
@@ -131,6 +131,8 @@
   </main>
 
   <script>
+    const sourceLabel = "{{ source_label|default('OSPC') }}";
+    const sourceKey = "{{ source|default('ospc') }}";
     const flavorColumns = [
       { key: "name", label: "Name", numeric: false },
       { key: "category", label: "Category", numeric: false },
@@ -310,7 +312,7 @@
     document.getElementById('exportImagesBtn').addEventListener('click', () => {
       const imgs = referenceData.images;
       if (!imgs || !imgs.length) { alert('No images loaded yet.'); return; }
-      downloadCSV('ospc_images.csv', imgs.map(name => ({ image_name: name })), ['image_name']);
+      downloadCSV(`${sourceKey}_images.csv`, imgs.map(name => ({ image_name: name })), ['image_name']);
     });
   </script>
 </body>

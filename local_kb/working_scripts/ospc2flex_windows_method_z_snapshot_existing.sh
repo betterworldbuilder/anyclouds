@@ -36,6 +36,7 @@ VIRTIO_ISO_URL="${OSPC2FLEX_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt
 LEGACY_VIRTIO_ISO_URL="${OSPC2FLEX_LEGACY_VIRTIO_ISO_URL:-https://fedorapeople.org/groups/virt/virtio-win/deprecated-isos/archives/virtio-win-0.1.108/virtio-win-0.1.108.iso}"
 WINDOWS_VERSION="auto"
 WINDOWS_VERSION_REQUESTED="${WINDOWS_VERSION}"
+WINDOWS_VERSION_EXPECTED_SOURCE="arg"
 SNAPWIN_REPAIR_VERSION="${OSPC2FLEX_SNAPWIN_REPAIR_VERSION:-20260515-unified-v7}"
 SKIP_RESCUE_BOOT=0
 MANUAL_DRIVER_BIND=0
@@ -53,6 +54,8 @@ HEALTHCHECK_WAIT="${OSPC2FLEX_HEALTHCHECK_WAIT:-1200}"
 EXPORT_RETRIES="${OSPC2FLEX_IMAGE_EXPORT_RETRIES:-4}"
 EXPORT_RETRY_WAIT="${OSPC2FLEX_IMAGE_EXPORT_RETRY_WAIT:-15}"
 CLOUD_FILES_EXPORT_TIMEOUT="${OSPC2FLEX_CF_EXPORT_TIMEOUT:-7200}"
+USE_CLOUD_FILES_EXPORT="${OSPC2FLEX_USE_CLOUD_FILES_EXPORT:-0}"
+PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-1}"
 OSPC_HELPER_SERVER_ID="${OSPC_HELPER_SERVER_ID:-}"
 CINDER_VOLUME_EXPORT_ON_LICENSED="${OSPC2FLEX_CINDER_VOLUME_EXPORT_ON_LICENSED:-1}"
 KEEP_CINDER_EXPORT_VOLUME="${OSPC2FLEX_KEEP_CINDER_EXPORT_VOLUME:-0}"
@@ -151,13 +154,14 @@ fi
 
 WINDOWS_VERSION_REQUESTED="$WINDOWS_VERSION"
 if [ "${WINDOWS_VERSION,,}" = "auto" ] || [ -z "$WINDOWS_VERSION" ]; then
+  WINDOWS_VERSION_EXPECTED_SOURCE="default"
   case "${LABEL_SAFE,,}" in
-    *2008*r2*|*2k8r2*) WINDOWS_VERSION="2008r2" ;;
-    *2012*r2*|*2k12r2*) WINDOWS_VERSION="2012r2" ;;
-    *2012*|*2k12*) WINDOWS_VERSION="2012" ;;
-    *2016*|*2k16*) WINDOWS_VERSION="2016" ;;
-    *2019*|*2k19*) WINDOWS_VERSION="2019" ;;
-    *2022*|*2k22*) WINDOWS_VERSION="2022" ;;
+    *2008*r2*|*2k8r2*) WINDOWS_VERSION="2008r2"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2012*r2*|*2k12r2*) WINDOWS_VERSION="2012r2"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2012*|*2k12*) WINDOWS_VERSION="2012"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2016*|*2k16*) WINDOWS_VERSION="2016"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2019*|*2k19*) WINDOWS_VERSION="2019"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
+    *2022*|*2k22*) WINDOWS_VERSION="2022"; WINDOWS_VERSION_EXPECTED_SOURCE="label" ;;
     *) WINDOWS_VERSION="${OSPC2FLEX_SNAPWIN_DEFAULT_WINDOWS_VERSION:-2016}" ;;
   esac
 fi
@@ -540,18 +544,31 @@ write_repair_marker() {
 }
 
 find_resume_artifact() {
-  local label_runs="$BASE_DIR/runs/$LABEL_SAFE"
   [ "${OSPC2FLEX_SNAPWIN_AUTO_RESUME:-1}" = "1" ] || return 1
-  [ -d "$label_runs" ] || return 1
-  find "$label_runs" -type f \( \
-      -name "source_snapshot.qcow2" -o \
-      -name "source_snapshot.raw" -o \
-      -name "source_snapshot.img" -o \
-      -name "source_snapshot.vhd" -o \
-      -name "source_snapshot.vhdx" \
-    \) -size +1G -printf '%T@ %p\n' 2>/dev/null \
-    | sort -nr \
-    | awk '{ $1=""; sub(/^ /, ""); print; exit }'
+  local f dir label_dir dirs=()
+  [ -d "$BASE_DIR/runs/$LABEL_SAFE" ] && dirs+=("$BASE_DIR/runs/$LABEL_SAFE")
+  IFS=: read -ra _extra <<< "${OSPC2FLEX_ARTIFACT_SEARCH_DIRS:-}"
+  dirs+=("${_extra[@]}")
+  for dir in "${dirs[@]}"; do
+    [ -d "$dir" ] || continue
+    label_dir=0
+    case "$dir" in
+      "$BASE_DIR/runs/$LABEL_SAFE"|"$BASE_DIR/runs/$LABEL_SAFE"/*) label_dir=1 ;;
+    esac
+    while IFS= read -r f; do
+      if [ "$label_dir" != "1" ] && [[ "${f,,}" != *"${LABEL_SAFE,,}"* ]]; then
+        printf '%s\n' "[ZS3_DOWNLOAD_SNAPSHOT] foreign qcow2 skipped: $f" >>"$BACKGROUND_LOG"
+        continue
+      fi
+      if ! qemu-img check -q "$f" >>"$BACKGROUND_LOG" 2>&1; then
+        printf '%s\n' "[ZS3_DOWNLOAD_SNAPSHOT] corrupt qcow2 skipped: $f" >>"$BACKGROUND_LOG"
+        continue
+      fi
+      echo "$f"; return 0
+    done < <(find "$dir" -maxdepth 3 -type f -name "*.qcow2" \
+        -size +1G -printf '%s %p\n' 2>/dev/null | sort -nr | awk '{ $1=""; sub(/^ /, ""); print }')
+  done
+  return 1
 }
 
 ensure_libguestfs_kernel_readable() {
@@ -934,7 +951,7 @@ PY
       failure|error)
         task_msg="$(printf '%s' "$task_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("result") or "")' 2>/dev/null || true)"
         log "[ZS3_DOWNLOAD_SNAPSHOT] WARN Cloud Files export task failed: ${task_msg:-<no message>}"
-        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|com\.rackspace__1__options'; then
+        if printf '%s' "$task_msg $task_json" | grep -qiE 'licensing|billing restrictions|cannot be exported|exported by the image owner|only be exported by the image owner|com\.rackspace__1__options'; then
           DOWNLOAD_FAILURE_REASON="OSPC_SNAPSHOT_EXPORT_BLOCKED_LICENSED_CINDER_ONLY"
           DOWNLOAD_NEXT_ACTION="This OSPC image is licensed/cinder-only (com.rackspace__1__options=4). Use the Cinder volume migration path or provide an operator-exported local artifact; Glance/Cloud Files export is blocked by Rackspace policy."
           if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ]; then
@@ -1166,7 +1183,7 @@ print(gb)
 PY
 }
 
-image_is_licensed_cinder_only() {
+image_is_cinder_preferred_snapshot() {
   local image_id="$1" meta_json="$JOB_TMP/image_meta_for_export.json"
   openstack image show "$image_id" -f json >"$meta_json" 2>/dev/null || return 1
   python3 - "$meta_json" <<'PY'
@@ -1177,12 +1194,16 @@ except Exception:
     print("0")
     raise SystemExit
 props = d.get("properties") or {}
-flag = ""
-if isinstance(props, dict):
-    flag = str(props.get("com.rackspace__1__options", "")).strip()
-if not flag:
-    flag = str(d.get("com.rackspace__1__options", "")).strip()
-print("1" if flag == "4" else "0")
+if not isinstance(props, dict):
+    props = {}
+flag = str(props.get("com.rackspace__1__options", d.get("com.rackspace__1__options", ""))).strip()
+image_type = str(props.get("image_type", d.get("image_type", ""))).strip().lower()
+rackspace_managed = any(str(props.get(k, "")).strip() for k in (
+    "com.rackspace__1__build_managed",
+    "com.rackspace__1__visible_managed",
+    "com.rackspace__1__build_config_options",
+))
+print("1" if flag == "4" or (image_type == "snapshot" and rackspace_managed) else "0")
 PY
 }
 
@@ -1329,15 +1350,17 @@ download_curl_glance() {
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3_DOWNLOAD_SNAPSHOT] Download waterfall for existing image=$image_id"
-  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$(image_is_licensed_cinder_only "$image_id" || echo 0)" = "1" ]; then
-    log "[ZS3_DOWNLOAD_SNAPSHOT] HIT image metadata indicates licensed/cinder-only (com.rackspace__1__options=4)"
-    log "[ZS3_DOWNLOAD_SNAPSHOT] Prioritizing Cinder volume attach/raw-copy fallback before Glance export attempts"
+  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT" = "1" ] && [ "$(image_is_cinder_preferred_snapshot "$image_id" || echo 0)" = "1" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Rackspace-managed/licensed snapshot — using Cinder fallback first; set OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 to try Cloud Files first"
     if cinder_volume_raw_export "$image_id" "$dest"; then
       return 0
     fi
     DOWNLOAD_FAILURE_REASON="OSPC_CINDER_VOLUME_EXPORT_FAILED"
     DOWNLOAD_NEXT_ACTION="Cinder fallback could not create/attach/read the image volume from this jumphost. Inspect $JOB_LOG/cinder_volume_export.log and detach/delete any temporary volume named ${LABEL_SAFE}-snapwin-cinder-export-${RUN_ID} if needed."
-    return 1
+    if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
+      return 1
+    fi
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Cinder-first export failed — Cloud Files export is explicitly enabled, trying Cloud Files path"
   fi
   log "[ZS3_DOWNLOAD_SNAPSHOT] Glance endpoint candidates:"
   image_bases | sed 's/^/[ZS3_DOWNLOAD_SNAPSHOT]   - /' | while IFS= read -r line; do log "$line"; done
@@ -1420,6 +1443,10 @@ download_existing_ospc_snapshot() {
     fi
   fi
 
+  if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
+    log "[ZS3_DOWNLOAD_SNAPSHOT] Skipping Cloud Files export task; Cinder/direct paths preferred. Set OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 to enable Cloud Files."
+    return 1
+  fi
   local cf_rc
   set +e
   download_cloud_files_export_task "$image_id" "$dest" "${CLOUD_FILES_CONTAINER:-ospc2flex-export}" "$min_bytes"
@@ -1461,9 +1488,25 @@ z_wait_for_server_status() {
 }
 
 z_attach_floating_ip() {
-  local server_id="$1" port_id fip_json fip_id fip
+  local server_id="$1" replacement_ip="${2:-}" port_id fip_json fip_id fip fixed
   port_id="$(openstack port list --server "$server_id" -f value -c ID 2>/dev/null | head -1 | tr -d '\r' || true)"
   [ -n "$port_id" ] || return 1
+  if [ -n "$replacement_ip" ]; then
+    log "[FIP] replacement IP requested: $replacement_ip"
+    fip_id="$(openstack floating ip list -f value -c ID -c 'Floating IP Address' 2>/dev/null | awk -v ip="$replacement_ip" '$2==ip{print $1; exit}' || true)"
+    if [ -n "$fip_id" ]; then
+      fixed="$(openstack floating ip show "$fip_id" -f value -c fixed_ip_address 2>/dev/null || true)"
+      if [ -n "$fixed" ] && [ "$fixed" != "None" ]; then
+        log "[FIP] detaching replacement IP $replacement_ip from existing fixed IP $fixed"
+        openstack floating ip unset --port "$fip_id" >/dev/null 2>&1 || true
+        sleep 3
+      fi
+      openstack floating ip set --port "$port_id" "$fip_id" >/dev/null 2>&1 || return 1
+      printf '%s\n' "$replacement_ip"
+      return 0
+    fi
+    log "[FIP][WARN] replacement IP $replacement_ip not found; allocating new FIP"
+  fi
   fip_json="$(openstack floating ip create "$FLEX_EXT_NET" -f json 2>/dev/null || true)"
   fip_id="$(printf '%s' "$fip_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("id",""))' 2>/dev/null || true)"
   fip="$(printf '%s' "$fip_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("floating_ip_address",""))' 2>/dev/null || true)"
@@ -1560,10 +1603,16 @@ run_driver_binding() {
 }
 
 upload_flex_rescue_image_method_ab() {
-  local upload_try out_file err_file rc image_id status_line err_msg
+  local upload_try out_file err_file rc image_id status_line err_msg upload_pid upload_start upload_elapsed upload_timeout upload_heartbeat
+  local image_name_show image_vis_show image_stat_show
   local qcow_bytes qcow_mib
   qcow_bytes=$(stat -c%s "$QCOW2" 2>/dev/null || echo 0)
   qcow_mib=$((qcow_bytes / 1024 / 1024))
+  upload_timeout="${OSPC2FLEX_IMAGE_UPLOAD_TIMEOUT:-${FLEX2FLEX_IMAGE_CREATE_TIMEOUT:-21600}}"
+  upload_heartbeat="${OSPC2FLEX_IMAGE_UPLOAD_HEARTBEAT_SECONDS:-25}"
+  [[ "$upload_timeout" =~ ^[0-9]+$ ]] || upload_timeout=21600
+  [[ "$upload_heartbeat" =~ ^[0-9]+$ ]] || upload_heartbeat=25
+  [ "$upload_heartbeat" -lt 5 ] && upload_heartbeat=5
 
   log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Method A/B Glance upload path"
   log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] Uploading: ${qcow_bytes} bytes (${qcow_mib} MiB) to FLEX Glance"
@@ -1594,24 +1643,48 @@ upload_flex_rescue_image_method_ab() {
     echo "[$(date '+%F %T')] openstack image create name=$RESCUE_IMAGE_NAME file=$QCOW2 bytes=$qcow_bytes try=$upload_try" >>"$BACKGROUND_LOG"
     out_file="$(mktemp)"
     err_file="$(mktemp)"
-    if openstack "${image_create_args[@]}" >"$out_file" 2>"$err_file"; then
+    openstack "${image_create_args[@]}" >"$out_file" 2>"$err_file" &
+    upload_pid=$!
+    upload_start="$(date +%s)"
+    while kill -0 "$upload_pid" 2>/dev/null; do
+      sleep "$upload_heartbeat"
+      kill -0 "$upload_pid" 2>/dev/null || break
+      upload_elapsed=$(( $(date +%s) - upload_start ))
+      log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] heartbeat elapsed=${upload_elapsed}s/${upload_timeout}s upload still running (${qcow_mib} MiB)"
+      echo "[$(date '+%F %T')] upload heartbeat try=$upload_try elapsed=${upload_elapsed}s bytes=$qcow_bytes" >>"$BACKGROUND_LOG"
+      if [ "$upload_timeout" -gt 0 ] && [ "$upload_elapsed" -gt "$upload_timeout" ]; then
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try exceeded ${upload_timeout}s; terminating openstack image create"
+        kill -TERM "$upload_pid" 2>/dev/null || true
+        sleep 5
+        kill -KILL "$upload_pid" 2>/dev/null || true
+        break
+      fi
+    done
+    set +e
+    wait "$upload_pid"
+    rc=$?
+    set -e
+    if [ "$rc" -eq 0 ]; then
       cat "$err_file" >>"$BACKGROUND_LOG"
       image_id="$(grep -Eo '[0-9a-fA-F-]{36}' "$out_file" | tail -n 1 || true)"
       rm -f "$out_file" "$err_file" 2>/dev/null || true
       if [ -n "$image_id" ]; then
+        upload_elapsed=$(( $(date +%s) - upload_start ))
         status_line="$(openstack image show "$image_id" -f value -c status 2>/dev/null || echo "unknown")"
         log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] returned image id: $image_id"
         log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] initial image status: ${status_line:-unknown}"
+        log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD $upload_try/3] openstack image create finished in ${upload_elapsed}s"
+        echo "$image_id" > "${QCOW2}.image_id" 2>/dev/null || true
         RESCUE_IMAGE_ID="$image_id"
         return 0
       fi
       log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload returned no image id"
     else
-      rc=$?
       cat "$err_file" >>"$BACKGROUND_LOG"
       err_msg="$(tail -n 8 "$err_file" 2>/dev/null | tr '\n' ' ' | cut -c 1-320 || echo "Unknown error")"
       rm -f "$out_file" "$err_file" 2>/dev/null || true
       log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] WARN upload attempt $upload_try failed rc=$rc: $err_msg"
+      tail -n 40 "$BACKGROUND_LOG" 2>/dev/null | sed 's/^/[ZS6_UPLOAD_FLEX_RESCUE_IMAGE][debug-tail] /' || true
     fi
 
     if [ "$upload_try" -lt 3 ]; then
@@ -1867,6 +1940,65 @@ driver_token_candidates() {
   esac
 }
 
+windows_version_from_registry() {
+  local cfg="$1" software="$cfg/SOFTWARE" product build actual=""
+  [ -f "$software" ] || return 1
+  command -v hivexget >/dev/null 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "hivexget_missing" "Install hivex on the jumphost."
+
+  product="$(sudo hivexget "$software" 'Microsoft\Windows NT\CurrentVersion' ProductName 2>/dev/null || true)"
+  build="$(sudo hivexget "$software" 'Microsoft\Windows NT\CurrentVersion' CurrentBuildNumber 2>/dev/null || true)"
+  [ -n "$build" ] || build="$(sudo hivexget "$software" 'Microsoft\Windows NT\CurrentVersion' CurrentBuild 2>/dev/null || true)"
+
+  case "${product,,}" in
+    *2022*) actual="2022" ;;
+    *2019*) actual="2019" ;;
+    *2016*) actual="2016" ;;
+    *2012*r2*) actual="2012r2" ;;
+    *2012*) actual="2012" ;;
+    *2008*r2*) actual="2008r2" ;;
+  esac
+  if [ -z "$actual" ]; then
+    case "$build" in
+      20348*) actual="2022" ;;
+      17763*) actual="2019" ;;
+      14393*) actual="2016" ;;
+      9600*) actual="2012r2" ;;
+      9200*) actual="2012" ;;
+    esac
+  fi
+
+  WINDOWS_PRODUCT_DETECTED="${product:-unknown}"
+  WINDOWS_BUILD_DETECTED="${build:-unknown}"
+  [ -n "$actual" ] || return 1
+  printf '%s\n' "$actual"
+}
+
+assert_windows_version_matches_artifact() {
+  local cfg="$1" actual expected="$WINDOWS_VERSION"
+  WINDOWS_PRODUCT_DETECTED=""
+  WINDOWS_BUILD_DETECTED=""
+  actual="$(windows_version_from_registry "$cfg" || true)"
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] Detected Windows product: ${WINDOWS_PRODUCT_DETECTED:-unknown} build=${WINDOWS_BUILD_DETECTED:-unknown}"
+
+  if [ -z "$actual" ]; then
+    cleanup_windows_mount
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_version_unknown" "Cannot read Windows version from the mounted qcow2 registry; inspect $REPAIR_LOG."
+  fi
+
+  if [ "$WINDOWS_VERSION_EXPECTED_SOURCE" = "default" ]; then
+    WINDOWS_VERSION="$actual"
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] Auto-detected Windows version from qcow2: $WINDOWS_VERSION"
+    return 0
+  fi
+
+  if [ "$actual" != "$expected" ]; then
+    cleanup_windows_mount
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_version_mismatch" "Selected snapshot expects Windows $expected but cached/source qcow2 is Windows $actual. Disable image resume or select the correct artifact."
+  fi
+
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT Windows version guard: expected=$expected actual=$actual"
+}
+
 mount_virtio_iso() {
   local iso="$1"
   [ -f "$iso" ] || return 1
@@ -2016,6 +2148,30 @@ PY
   done
 }
 
+clear_windows_password_offline() {
+  local cfg="$1" user="${WIN_USER:-Administrator}" clear_out verify_out
+  [ -f "$cfg/SAM" ] || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "sam_hive_missing" "Windows SAM hive was not found for offline password clear."
+  command -v chntpw >/dev/null 2>&1 || fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "chntpw_missing" "Install chntpw on the jumphost."
+  log "[ZS5_OFFLINE_WINDOWS_REPAIR] clearing Windows password for ${user} via offline SAM"
+
+  clear_out="$(mktemp)"
+  verify_out="$(mktemp)"
+  printf '1\nq\ny\n' | sudo chntpw -u "$user" "$cfg/SAM" >"$clear_out" 2>&1 || true
+  cat "$clear_out" >>"$REPAIR_LOG"
+
+  printf 'q\n' | sudo chntpw -u "$user" "$cfg/SAM" >"$verify_out" 2>&1 || true
+  cat "$verify_out" >>"$REPAIR_LOG"
+
+  if grep -Eiq 'No NT MD4 hash found|BLANK password' "$verify_out"; then
+    log "[ZS5_OFFLINE_WINDOWS_REPAIR] HIT Windows password cleared for ${user}"
+  else
+    rm -f "$clear_out" "$verify_out"
+    fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_password_clear_failed" "Inspect $REPAIR_LOG for chntpw output."
+  fi
+
+  rm -f "$clear_out" "$verify_out"
+}
+
 standalone_offline_windows_repair() {
   local ts winroot cfg hives backup_dir reg_file sw_reg
   ts="$(date -u +%Y%m%d-%H%M%S)"
@@ -2024,6 +2180,7 @@ standalone_offline_windows_repair() {
   winroot="$(find_windows_root)" || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "non_windows_image" "Windows/System32/config/SYSTEM was not found in the mounted image."; }
   [ -f "$winroot/System32/ntoskrnl.exe" ] || [ -f "$winroot/system32/ntoskrnl.exe" ] || { cleanup_windows_mount; fail_exit "ZS5_OFFLINE_WINDOWS_REPAIR" "windows_kernel_missing" "Windows ntoskrnl.exe was not found."; }
   cfg="$winroot/System32/config"
+  assert_windows_version_matches_artifact "$cfg"
   backup_dir="$winroot/ospc2flex/registry-backups/$ts"
   sudo mkdir -p "$backup_dir"
   for hive in SYSTEM SOFTWARE SAM SECURITY DEFAULT; do
@@ -2032,6 +2189,7 @@ standalone_offline_windows_repair() {
     sudo cp -a "$cfg/$hive" "$backup_dir/$hive"
   done
   log "[ZS5_OFFLINE_WINDOWS_REPAIR] registry hives backed up to C:\\ospc2flex\\registry-backups\\$ts"
+  clear_windows_password_offline "$cfg"
   stage_virtio_drivers "$winroot"
   write_firstboot_network_reset "$winroot"
   apply_windows_bcd_boot_policy "$winroot"
@@ -2354,13 +2512,18 @@ if [ "$DRY_RUN" = 1 ]; then
 fi
 
 stage_start "ZS1_LOAD_CREDENTIALS"
-source_openrc_if_present "$OSPC_OPENRC"
-OSPC_TOKEN="$(rackspace_identity_v2_auth || true)"
-[ -n "$OSPC_TOKEN" ] || fail_exit "ZS1_LOAD_CREDENTIALS" "ospc_v2_token_issue_failed" "Use the same OSPC username/API key/account ID as the private snapshot scanner."
-log "[ZS1_LOAD_CREDENTIALS] Rackspace Identity v2 auth succeeded"
-redacted_env_snapshot "$JOB_STATE/ospc_env_redacted.txt"
+if [ -n "$LOCAL_ARTIFACT" ]; then
+  log "[ZS1_LOAD_CREDENTIALS] Local artifact mode: skipping OSPC Identity v2 auth; source export is already on the jumphost."
+  redacted_env_snapshot "$JOB_STATE/ospc_env_redacted.txt"
+else
+  source_openrc_if_present "$OSPC_OPENRC"
+  OSPC_TOKEN="$(rackspace_identity_v2_auth || true)"
+  [ -n "$OSPC_TOKEN" ] || fail_exit "ZS1_LOAD_CREDENTIALS" "ospc_v2_token_issue_failed" "Use the same OSPC username/API key/account ID as the private snapshot scanner."
+  log "[ZS1_LOAD_CREDENTIALS] Rackspace Identity v2 auth succeeded"
+  redacted_env_snapshot "$JOB_STATE/ospc_env_redacted.txt"
+fi
 checkpoint_hit "preflight"
-log "[ZS1_LOAD_CREDENTIALS] HIT OSPC credentials validated"
+log "[ZS1_LOAD_CREDENTIALS] HIT source credentials/artifact validation complete"
 
 stage_start "ZS2_SELECT_SNAPSHOT"
 if [ -z "$OSPC_IMAGE_ID" ] && [ -n "$OSPC_SNAPSHOT_ID" ]; then
@@ -2409,6 +2572,7 @@ else
     log "[ZS3_DOWNLOAD_SNAPSHOT] HIT auto-resume artifact found on jumphost: $RESUME_ARTIFACT"
     SOURCE_ARTIFACT="$RESUME_ARTIFACT"
   else
+    log "[ZS3_DOWNLOAD_SNAPSHOT] No matching auto-resume qcow2 found; exporting selected snapshot/image."
     SOURCE_ARTIFACT="$JOB_ART/source_snapshot.img"
     set +e
     download_existing_ospc_snapshot "$OSPC_IMAGE_ID" "$SOURCE_ARTIFACT"
@@ -2486,6 +2650,10 @@ else
 fi
 [ -n "$RESCUE_IMAGE_ID" ] || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_upload_failed" "Method A/B Glance upload path returned no image id; inspect $BACKGROUND_LOG."
 z_wait_for_image_active "$RESCUE_IMAGE_ID" 1800 || fail_exit "ZS6_UPLOAD_FLEX_RESCUE_IMAGE" "rescue_image_not_active" "Inspect Flex Glance image status."
+image_name_show="$(openstack image show "$RESCUE_IMAGE_ID" -f value -c name 2>/dev/null || echo "$RESCUE_IMAGE_NAME")"
+image_vis_show="$(openstack image show "$RESCUE_IMAGE_ID" -f value -c visibility 2>/dev/null || echo "unknown")"
+image_stat_show="$(openstack image show "$RESCUE_IMAGE_ID" -f value -c status 2>/dev/null || echo "unknown")"
+log "[ZS6_UPLOAD_FLEX_RESCUE_IMAGE] [UPLOAD-CONFIRMED] region=${OS_REGION_NAME:-unknown} id=$RESCUE_IMAGE_ID name=${image_name_show:-unknown} status=${image_stat_show:-unknown} visibility=${image_vis_show:-unknown}"
 openstack image set "$RESCUE_IMAGE_ID" \
   --property architecture=x86_64 \
   --property hw_disk_bus=ide \
@@ -2559,14 +2727,8 @@ if [ "$MANUAL_DRIVER_BIND" = 1 ]; then
 fi
 
 SNAPWIN_ONLINE_BIND=0
-if [ -n "$WIN_PASSWORD" ] && z_wait_for_windows_access "$RESCUE_SERVER_ID" "$HEALTHCHECK_WAIT"; then
-  run_driver_binding || fail_exit "ZS9_DRIVER_BIND" "virtio_driver_binding_failed" "Use console/RDP and manual pnputil bind."
-  SNAPWIN_ONLINE_BIND=1
-  log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind completed over $ACCESS_METHOD on $ACCESS_IP:$ACCESS_PORT"
-else
-  log "[ZS9_DRIVER_BIND] WinRM not available or no Windows password supplied; using offline-staged VirtIO drivers and registry/CDDB boot binding."
-  log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted (no rescue reboot — matching win2016 working method)"
-fi
+log "[ZS9_DRIVER_BIND] WinRM/Windows access skipped; using offline-staged VirtIO drivers and registry/CDDB boot binding."
+log "[ZS9_DRIVER_BIND] HIT offline VirtIO bind path accepted (no rescue reboot — matching win2016 working method)"
 checkpoint_hit "driver_bind"
 log "[ZS9_DRIVER_BIND] HIT VirtIO driver bind confirmed"
 
@@ -2613,7 +2775,7 @@ EFFECTIVE_KEYPAIR="$(effective_keypair)"
 FINAL_SERVER_ID="$(openstack "${final_args[@]}" 2>>"$BACKGROUND_LOG" | tr -d '\r\n' || true)"
 [ -n "$FINAL_SERVER_ID" ] || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_create_failed" "Inspect final image metadata and Nova request."
 z_wait_for_server_status "$FINAL_SERVER_ID" "ACTIVE" 900 || fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "final_server_not_active" "Inspect final VM console."
-FINAL_FLOATING_IP="$(z_attach_floating_ip "$FINAL_SERVER_ID" || true)"
+FINAL_FLOATING_IP="$(z_attach_floating_ip "$FINAL_SERVER_ID" "${OSPC2FLEX_REPLACEMENT_FLOATING_IP:-}" || true)"
 sleep "${OSPC2FLEX_SNAPWIN_FINAL_BOOT_SETTLE_SECONDS:-180}"
 if console_has_fatal_boot_error "$FINAL_SERVER_ID"; then console_rc=0; else console_rc=$?; fi
 if [ "$console_rc" -eq 2 ]; then fail_exit "ZS11_BOOT_FINAL_FLEX_VM" "WINDOWS_SYSTEM_HIVE_OR_REGISTRY_STOP" "Inspect final VM console and restore SYSTEM hive backup."; fi

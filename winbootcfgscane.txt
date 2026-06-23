@@ -1,4 +1,0 @@
-$bcd=bcdedit /enum all; $sys=Get-ComputerInfo; $drv=Get-WmiObject Win32_SystemDriver | Where-Object {$_.State -eq "Running"}; $disk=Get-Disk; $net=Get-NetAdapter; $svc=Get-Service; Write-Output "$bcd`n==== SYSTEM INFO ====`n$($sys | Out-String)`n==== RUNNING DRIVERS ====`n$($drv | Out-String)`n==== DISKS ====`n$($disk | Out-String)`n==== NETWORK ====`n$($net | Out-String)`n==== SERVICES ====`n$($svc | Out-String)"
-
-
-$bcd=bcdedit /enum all; $sys=Get-ComputerInfo; $drv=Get-WmiObject Win32_SystemDriver | Where-Object {$_.State -eq "Running"}; $disk=Get-Disk; $net=Get-NetAdapter; $svc=Get-Service; "$bcd`n==== SYSTEM INFO ====`n$($sys | Out-String)`n==== RUNNING DRIVERS ====`n$($drv | Out-String)`n==== DISKS ====`n$($disk | Out-String)`n==== NETWORK ====`n$($net | Out-String)`n==== SERVICES ====`n$($svc | Out-String)" | Out-File C:\flex_win2016_bootcfg.txt

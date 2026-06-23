@@ -104,11 +104,16 @@ def build_server_actions(
     for row in flavor_rows:
         server_id = (row.get("server_id") or "").strip()
         server_name = (row.get("server_name") or server_id or "unnamed-server").strip()
+        target_server_name = (
+            (row.get("target_server_name") or "").strip()
+            or (row.get("target_flex_vm") or "").strip()
+            or server_name
+        )
         flavor = (row.get("target_flavor_name") or "").strip()
         image = (row.get("recommended_target_image_name") or "").strip()
         cloud_init_user_data = decode_cloud_init_user_data((row.get("cloud_init_user_data") or ""))
         boot_strategy = (row.get("boot_strategy") or "").strip()
-        needs_floating_ip = is_truthy(row.get("needs_floating_ip") or "")
+        needs_floating_ip = True  # Assign a public floating IP to every deployed VM, best effort.
         floating_network = (row.get("floating_network") or "").strip() or "PUBLICNET"
         is_windows = is_windows_image(image)
         auth_mode = "windows_password" if is_windows else "ssh_key"
@@ -172,8 +177,6 @@ def build_server_actions(
                 continue
             windows_password = generate_windows_password(windows_password_length)
 
-        base_name = server_name
-        target_server_name = base_name  # Preserving exact OSPC instance name without auto-increment suffixes
         server_seq += 1
         source_server_to_target_name[server_id] = target_server_name
         included_source_server_ids.add(server_id)
@@ -241,7 +244,7 @@ def build_server_actions(
                     f'wait_for_volume_available {shell_quote(boot_vol_name)}',
                     f'BOOT_VOL_ID=$(openstack volume show -f value -c id {shell_quote(boot_vol_name)})',
                     (
-                        "openstack server create "
+                        "openstack server create -f value -c id "
                         f"--flavor {shell_quote(flavor)} "
                         "--volume \"$BOOT_VOL_ID\" "
                         "--network \"$PRIVATE_NETWORK\" "
@@ -259,6 +262,8 @@ def build_server_actions(
                     "phase": "compute",
                     "resource_type": "server",
                     "source_server_id": server_id,
+                    "source_name": server_name,
+                    "source_flavor_name": (row.get("source_flavor_name") or row.get("source_flavor_id") or "").strip(),
                     "resource_name": target_server_name,
                     "target_flavor_name": flavor,
                     "action": "create_server_boot_from_volume",
@@ -294,7 +299,7 @@ def build_server_actions(
                     *k8s_msg,
                     f'echo "Creating server {target_server_name}"',
                     (
-                        "openstack server create "
+                        "openstack server create -f value -c id "
                         f"--flavor {shell_quote(flavor)} "
                         f"--image {shell_quote(image)} "
                         "--network \"$PRIVATE_NETWORK\" "
@@ -312,6 +317,8 @@ def build_server_actions(
                     "phase": "compute",
                     "resource_type": "server",
                     "source_server_id": server_id,
+                    "source_name": server_name,
+                    "source_flavor_name": (row.get("source_flavor_name") or row.get("source_flavor_id") or "").strip(),
                     "resource_name": target_server_name,
                     "target_flavor_name": flavor,
                     "action": "create_server_local_boot",
@@ -678,7 +685,7 @@ def build_script(
         f'ROUTER_NAME={shell_quote(args.router_name)}',
         f'SECURITY_GROUP={shell_quote(args.security_group)}',
         f'VOLUME_TYPE={shell_quote(args.volume_type)}',
-        f'KEY_NAME={shell_quote(args.key_name or "")}',
+        f'KEY_NAME={shell_quote(args.key_name or "latopras")}',
         f'SSH_PUB_KEY={shell_quote(args.ssh_pub_key or "")}',
         f'FAIL_FAST={"1" if args.fail_fast else "0"}',
         f'RESULTS_CSV={shell_quote(str(results_path))}',
@@ -894,16 +901,22 @@ def build_script(
         "assign_floating_ip() {",
         "  local server_name=\"$1\"",
         "  local public_network=\"$2\"",
-        "  local fip",
-        "  fip=$(openstack floating ip list --network \"$public_network\" --status DOWN -f value -c \"Floating IP Address\" 2>/dev/null | head -n 1 || true)",
-        "  if [ -z \"$fip\" ]; then",
-        "    fip=$(openstack floating ip create \"$public_network\" -f value -c floating_ip_address 2>/dev/null || true)",
-        "  fi",
-        "  if [ -z \"$fip\" ]; then",
-        "    echo \"Failed to allocate floating IP on network $public_network for $server_name\" >&2",
-        "    return 1",
-        "  fi",
-        "  openstack server add floating ip \"$server_name\" \"$fip\"",
+        "  local attempt fip",
+        "  for attempt in 1 2 3; do",
+        "    echo \"Floating IP attempt $attempt/3: server=$server_name network=$public_network\"",
+        "    fip=$(openstack floating ip list --network \"$public_network\" --status DOWN -f value -c \"Floating IP Address\" 2>/dev/null | head -n 1 || true)",
+        "    if [ -z \"$fip\" ]; then",
+        "      fip=$(openstack floating ip create \"$public_network\" -f value -c floating_ip_address 2>/dev/null || true)",
+        "    fi",
+        "    if [ -n \"$fip\" ] && openstack server add floating ip \"$server_name\" \"$fip\"; then",
+        "      echo \"Floating IP $fip attached to $server_name\"",
+        "      return 0",
+        "    fi",
+        "    echo \"Floating IP attach failed for $server_name on attempt $attempt/3; retrying...\" >&2",
+        "    sleep 5",
+        "  done",
+        "  echo \"WARN: Failed to attach floating IP to $server_name after 3 attempts; continuing.\" >&2",
+        "  return 0",
         "}",
         "",
         "attach_volume_with_retry() {",
@@ -944,20 +957,20 @@ def build_script(
         '    }',
         '  else',
         '    openstack keypair show "$KEY_NAME" >/dev/null 2>&1 || {',
-        '      echo "Keypair $KEY_NAME was not found in target project. Create it first or provide the SSH Public Key." >&2',
-        '      exit 1',
+        '      echo "Keypair $KEY_NAME was not found in target project; continuing without --key-name." >&2',
+        '      KEY_NAME=""',
         '    }',
         '  fi',
         'fi',
         "",
-        'echo "Ensuring tenant network resources..."',
+        'echo "PHASE 1: Network - ensuring tenant network resources..."',
         'openstack network show "$PRIVATE_NETWORK" >/dev/null 2>&1 || openstack network create "$PRIVATE_NETWORK"',
         'openstack subnet show "$SUBNET_NAME" >/dev/null 2>&1 || openstack subnet create --network "$PRIVATE_NETWORK" --subnet-range "$SUBNET_CIDR" "$SUBNET_NAME"',
         'openstack router show "$ROUTER_NAME" >/dev/null 2>&1 || openstack router create "$ROUTER_NAME"',
         'openstack router set --external-gateway "$PUBLIC_NETWORK" "$ROUTER_NAME"',
         'openstack router add subnet "$ROUTER_NAME" "$SUBNET_NAME" >/dev/null 2>&1 || true',
         "",
-        'echo "Executing deployment steps..."',
+        'echo "PHASE 4: Compute - executing deployment steps..."',
         "",
     ]
 
@@ -1036,6 +1049,44 @@ def build_script(
                 f"'created'"
             )
             lines.append("")
+
+    server_summary_rows = [
+        row for row, _block in planned_steps
+        if row.get("resource_type") == "server" and str(row.get("action") or "").startswith("create_server")
+    ]
+    volume_summary_count = sum(1 for row, _block in planned_steps if row.get("resource_type") == "volume")
+    lb_summary_count = sum(1 for row, _block in planned_steps if row.get("resource_type") == "load_balancer")
+    lines.extend(
+        [
+            'echo ""',
+            'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+            'echo "SOURCE INFRA → TARGET FLEX DEPLOY SUMMARY"',
+            f'echo "Source elements planned: VMs={len(server_summary_rows)} Volumes={volume_summary_count} LoadBalancers={lb_summary_count}"',
+            'printf "| %-34s | %-24s | %-34s | %-18s | %-8s |\\n" "Source VM" "Original Flavor" "Target FLEX VM" "FLEX Flavor" "Status"',
+            'printf "| %-34s | %-24s | %-34s | %-18s | %-8s |\\n" "----------------------------------" "------------------------" "----------------------------------" "------------------" "--------"',
+            '_SUMMARY_VM_OK=0',
+            '_SUMMARY_VM_FAIL=0',
+        ]
+    )
+    for row in server_summary_rows:
+        source_name = (row.get("source_name") or row.get("source_server_id") or "-").strip()
+        source_flavor = (row.get("source_flavor_name") or "-").strip()
+        target_name = (row.get("resource_name") or "-").strip()
+        target_flavor = (row.get("target_flavor_name") or "-").strip()
+        lines.extend(
+            [
+                f"if openstack server show {shell_quote(target_name)} >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi",
+                f'printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\\n" {shell_quote(source_name)} {shell_quote(source_flavor)} {shell_quote(target_name)} {shell_quote(target_flavor)} "$_VM_STATUS"',
+            ]
+        )
+    lines.extend(
+        [
+            'echo "Target FLEX VM count: $_SUMMARY_VM_OK created/reused, $_SUMMARY_VM_FAIL failed, total planned: '
+            + str(len(server_summary_rows))
+            + '"',
+            'echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"',
+        ]
+    )
 
     lines += [
         'echo "Deployment script finished."',
@@ -1285,7 +1336,7 @@ def main() -> None:
 
     compute_commands, compute_plan, compute_unresolved, source_map, included_server_ids, windows_credentials = build_server_actions(
         flavor_rows,
-        (args.key_name or "").strip(),
+        (args.key_name or "latopras").strip(),
         (args.private_network or "").strip(),
         (args.ssh_pub_key or "").strip(),
         not args.no_generate_windows_passwords,

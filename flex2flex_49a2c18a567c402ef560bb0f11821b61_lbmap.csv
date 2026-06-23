@@ -1,0 +1,8 @@
+region,load_balancer_id,load_balancer_name,load_balancer_status,provider,target_protocol,listener_port,member_port,pool_algorithm,health_monitor_type,health_monitor_delay,health_monitor_timeout,health_monitor_attempts,vip_public_ips,vip_private_ips,source_member_ip,source_member_port,source_member_condition,source_member_status,source_server_id,source_server_name,target_server_name,member_include_in_deploy,member_match_note
+iad3,fa939cbd-60f6-41e9-99ac-03aeb9e5bdda,frontend- Load-Balancer-01,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy
+iad3,31cbab96-bd3c-4206-8e02-fa3ea96b75c2,u24backend,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy
+iad3,e9b5f794-effc-489d-9ec8-a7cbbc928543,DB_loadbalancer MYSQL,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy
+iad3,fbac045d-d1ab-4a9c-a1c3-91465f30d12d,LBmariaDB,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy
+iad3,59429d95-3fac-47e1-9ecd-c9a86d1f69c5,perconaLB,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy
+iad3,bd6a124d-93db-4d14-b9d8-95d5daefb7ab,dblb,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy
+iad3,f01798f2-4076-4f81-bb34-0b000220265a,backend,,ovn,HTTP,80,80,ROUND_ROBIN,,,,,,,,,,,,,,no,FLEX2FLEX scanner captured LB shell; review members before deploy

@@ -1,0 +1,6 @@
+resource_type,source_server_id,source_name,reason
+server,8a517aeb-1a09-49b6-98cb-aa98776c1e5f,ospc2flex-dbian10new-20260427-1831-r3-f2f-DFW3-r3-f2f-1779927071772478003-c1f86974-fc51632e-2a5,missing_recommended_target_image_name
+server,f26fd003-e391-4181-bc49-7d2d1563bfaf,SSHED-ospc2flex-rh6-GL-20260425-1356,missing_recommended_target_image_name
+load_balancer_member,,,FLEX2FLEX scanner captured LB shell; review members before deploy
+load_balancer_member,,,FLEX2FLEX scanner captured LB shell; review members before deploy
+load_balancer_member,,,FLEX2FLEX scanner captured LB shell; review members before deploy

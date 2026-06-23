@@ -1,4 +1,6 @@
 const logBox = document.getElementById('logBox');
+const SCANNER_MODE = (window.OSFLEX_SCANNER_MODE || 'ospc').toLowerCase();
+const SCANNER_PROVIDER = (window.OSFLEX_SCANNER_PROVIDER || 'aws').toLowerCase();
 const validationFindingsCard = document.getElementById('validationFindingsCard');
 const validationFindingsSummary = document.getElementById('validationFindingsSummary');
 const validationFindingsSource = document.getElementById('validationFindingsSource');
@@ -17,6 +19,29 @@ const summaryEls = {
 
 const logEntries = [];
 let logFilter = 'all';
+
+function shortFlexRegionValue(value) {
+  const text = String(value || '').trim().toUpperCase();
+  const match = text.match(/^([A-Z]{3})\d*$/);
+  return match ? match[1] : text;
+}
+
+function currentFlex2FlexSourceRegion() {
+  return document.getElementById('credSourceFlexRegion')?.value || localStorage.getItem('cred_source_flex_region') || 'DFW3';
+}
+
+function currentFlex2FlexTargetRegion() {
+  return document.getElementById('credFlexRegion')?.value || localStorage.getItem('cred_flex_region') || 'IAD3';
+}
+
+function syncFlex2FlexTargetRegionControls() {
+  if (SCANNER_MODE !== 'flex2flex') return;
+  const mapTarget = document.getElementById('mapTargetRegion');
+  if (mapTarget) {
+    mapTarget.value = shortFlexRegionValue(currentFlex2FlexTargetRegion());
+    mapTarget.dispatchEvent(new Event('input'));
+  }
+}
 
 function log(msg) {
   const ts = new Date().toLocaleTimeString();
@@ -47,7 +72,13 @@ function setStepStatus(chipId, state, label) {
 
 async function apiGet(url) {
   const res = await fetch(url);
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    throw new Error(`GET ${url} returned ${res.status} ${res.headers.get('content-type') || ''}: ${text.slice(0, 120)}`);
+  }
   if (!res.ok) throw new Error(data.error || `GET ${url} failed`);
   return data;
 }
@@ -58,7 +89,13 @@ async function apiPost(url, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload || {}),
   });
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (e) {
+    throw new Error(`POST ${url} returned ${res.status} ${res.headers.get('content-type') || ''}: ${text.slice(0, 120)}`);
+  }
   if (!res.ok) throw new Error(data.error || `POST ${url} failed`);
   return data;
 }
@@ -90,6 +127,10 @@ function updateRunSummary() {
   summaryEls.router.textContent = document.getElementById('depRouterName').value || '-';
   summaryEls.key.textContent = document.getElementById('depKeyName').value || '-';
 }
+
+document.getElementById('credFlexRegion')?.addEventListener('change', syncFlex2FlexTargetRegionControls);
+document.getElementById('credFlexRegion')?.addEventListener('input', syncFlex2FlexTargetRegionControls);
+syncFlex2FlexTargetRegionControls();
 
 function markInvalid(id, isInvalid) {
   const el = document.getElementById(id);
@@ -157,17 +198,28 @@ async function refreshFiles() {
   // Auto-select prefix from OSPC Account ID field
   const acctEl = document.getElementById('ovAccountId');
   const ap = acctEl && acctEl.value.trim() ? acctEl.value.trim() + '_' : '';
+  const sourceFileMatch = (f) => {
+    const n = String(f || '').toLowerCase();
+    if (SCANNER_MODE === 'flex2flex') return n.startsWith('flex2flex_') || n.includes('_flex2flex_');
+    if (SCANNER_MODE === 'hyperflex') return n.includes(`_${SCANNER_PROVIDER}_hyperflex_`);
+    return !n.includes('flex2flex') && !n.includes('_hyperflex_');
+  };
+  const overviewMatch = f => sourceFileMatch(f) && f.endsWith('_overview.csv');
+  const flavorMatch = f => sourceFileMatch(f) && (f.endsWith('_flavormap.csv') || f.includes('flavormap'));
+  const blockMatch = f => sourceFileMatch(f) && (f.endsWith('_blockmap.csv') || f.includes('blockmap'));
+  const lbMatch = f => sourceFileMatch(f) && (f.endsWith('_lbmap.csv') || f.includes('lbmap') || f.includes('lb_mapping'));
+  const sourcePrefix = SCANNER_MODE === 'flex2flex' ? `flex2flex_${ap}` : (SCANNER_MODE === 'hyperflex' ? `${ap}${SCANNER_PROVIDER}_hyperflex_` : ap);
 
-  fillSelect('admInventory', files, f => f.endsWith('_overview.csv') || f.endsWith('.csv'), ap + 'overview.csv');
-  fillSelect('mapInventory', files, f => f.endsWith('_overview.csv') || f.endsWith('.csv'), ap + 'overview.csv');
-  fillSelect('valFlavorMap', files, f => f.endsWith('_flavormap.csv') || f.includes('flavormap'), ap + 'flavormap.csv');
-  fillSelect('valBlockMap', files, f => f.endsWith('_blockmap.csv') || f.includes('blockmap'), ap + 'blockmap.csv');
-  fillSelect('valLbMap', files, f => f.endsWith('_lbmap.csv') || f.includes('lbmap') || f.includes('lb_mapping'), ap + 'lbmap.csv');
-  fillSelect('depFlavorMap', files, f => f.endsWith('_flavormap.csv') || f.includes('flavormap'), ap + 'flavormap.csv');
-  fillSelect('depBlockMap', files, f => f.endsWith('_blockmap.csv') || f.includes('blockmap'), ap + 'blockmap.csv');
-  fillSelect('depLbMap', files, f => f.endsWith('_lbmap.csv') || f.includes('lbmap') || f.includes('lb_mapping'), ap + 'lbmap.csv');
-  fillSelect('migInventory', files, f => f.endsWith('_overview.csv') || f.endsWith('.csv'), ap + 'overview.csv');
-  fillSelect('migFlavorMap', files, f => f.endsWith('_flavormap.csv') || f.includes('flavormap'), ap + 'flavormap.csv');
+  fillSelect('admInventory', files, overviewMatch, sourcePrefix + 'overview.csv');
+  fillSelect('mapInventory', files, overviewMatch, sourcePrefix + 'overview.csv');
+  fillSelect('valFlavorMap', files, flavorMatch, sourcePrefix + 'flavormap.csv');
+  fillSelect('valBlockMap', files, blockMatch, sourcePrefix + 'blockmap.csv');
+  fillSelect('valLbMap', files, lbMatch, sourcePrefix + 'lbmap.csv');
+  fillSelect('depFlavorMap', files, flavorMatch, sourcePrefix + 'flavormap.csv');
+  fillSelect('depBlockMap', files, blockMatch, sourcePrefix + 'blockmap.csv');
+  fillSelect('depLbMap', files, lbMatch, sourcePrefix + 'lbmap.csv');
+  fillSelect('migInventory', files, overviewMatch, sourcePrefix + 'overview.csv');
+  fillSelect('migFlavorMap', files, flavorMatch, sourcePrefix + 'flavormap.csv');
   fillSelect('migCustomList', files, f => f.endsWith('.csv'), '');
   
   const migStrategyEl = document.getElementById('migStrategy');
@@ -482,24 +534,48 @@ if (runOverviewBtn) runOverviewBtn.addEventListener('click', async () => {
   const username = document.getElementById('ovUsername').value.trim();
   const apiKey = document.getElementById('ovApiKey').value.trim();
   const accountId = document.getElementById('ovAccountId').value.trim();
-  if (!username || !apiKey || !accountId) {
+  const flexAuthUrl = SCANNER_MODE === 'flex2flex'
+    ? (document.getElementById('credSourceFlexAuthUrl')?.value || localStorage.getItem('cred_source_flex_auth_url') || '')
+    : (localStorage.getItem('cred_flex_auth_url') || document.getElementById('credFlexAuthUrl')?.value || '');
+  const flexDomain = SCANNER_MODE === 'flex2flex'
+    ? (document.getElementById('credSourceFlexDomain')?.value || localStorage.getItem('cred_source_flex_domain') || 'rackspace_cloud_domain')
+    : (localStorage.getItem('cred_flex_domain') || document.getElementById('credFlexDomain')?.value || 'rackspace_cloud_domain');
+  if (!username || !apiKey || !accountId || (SCANNER_MODE === 'flex2flex' && !flexAuthUrl.trim())) {
     markInvalid('ovUsername', !username);
     markInvalid('ovApiKey', !apiKey);
     markInvalid('ovAccountId', !accountId);
-    log('Username, API Key, and Account ID are required.');
+    log(SCANNER_MODE === 'flex2flex'
+      ? 'FLEX Auth URL, username, password, and project ID are required.'
+      : (SCANNER_MODE === 'hyperflex' ? 'Hyperscaler account/access ID, secret/key, and account/project ID are required.' : 'Username, API Key, and Account ID are required.'));
     setStepStatus('statusOverview', 'failed', 'Failed');
     return;
   }
   setStepStatus('statusOverview', 'running', 'Running');
-  await withButtonBusy('runOverviewBtn', 'account_overview.py', async () => {
+  const overviewAction = SCANNER_MODE === 'flex2flex' ? 'flex2flex_overview' : (SCANNER_MODE === 'hyperflex' ? `${SCANNER_PROVIDER}_hyperflex_overview` : 'account_overview.py');
+  await withButtonBusy('runOverviewBtn', overviewAction, async () => {
     try {
-      const data = await apiPost('/api/run/account-overview', {
+      const regionSelect = document.getElementById('ovRegionSelect');
+      const selectedRegions = SCANNER_MODE === 'flex2flex'
+        ? [currentFlex2FlexSourceRegion()]
+        : (regionSelect
+        ? Array.from(regionSelect.selectedOptions).map(opt => opt.value).filter(Boolean)
+        : Array.from(document.querySelectorAll('input[name="ovRegions"]:checked')).map(cb => cb.value));
+      const payload = {
         username,
         api_key: apiKey,
+        password: apiKey,
         account_id: accountId,
-        regions: Array.from(document.querySelectorAll('input[name="ovRegions"]:checked')).map(cb => cb.value).join(','),
-      });
-      showResult('account_overview.py', data);
+        project_id: accountId,
+        auth_url: flexAuthUrl,
+        domain: flexDomain,
+        regions: selectedRegions.join(','),
+      };
+      payload.provider = SCANNER_PROVIDER;
+      const overviewEndpoint = SCANNER_MODE === 'flex2flex'
+        ? '/api/run/flex2flex-overview'
+        : (SCANNER_MODE === 'hyperflex' ? '/api/run/hyperflex-overview' : '/api/run/account-overview');
+      const data = await apiPost(overviewEndpoint, payload);
+      showResult(overviewAction, data);
       setStepStatus('statusOverview', data.ok ? 'success' : 'failed', data.ok ? 'Success' : 'Failed');
       
       if (data.ok) {
@@ -578,7 +654,10 @@ if (runAdmOptABtn) runAdmOptABtn.addEventListener('click', async () => {
 const runMapperBtn = document.getElementById('runMapperBtn');
 if (runMapperBtn) runMapperBtn.addEventListener('click', async () => {
   clearValidationMarks(['mapTargetRegion', 'mapInventory']);
-  const targetRegion = document.getElementById('mapTargetRegion').value.trim();
+  syncFlex2FlexTargetRegionControls();
+  const targetRegion = (SCANNER_MODE === 'flex2flex'
+    ? shortFlexRegionValue(currentFlex2FlexTargetRegion())
+    : document.getElementById('mapTargetRegion').value).trim();
   const overviewCsv = document.getElementById('mapInventory').value.trim();
   if (!targetRegion) {
     markInvalid('mapTargetRegion', true);
@@ -593,15 +672,21 @@ if (runMapperBtn) runMapperBtn.addEventListener('click', async () => {
     return;
   }
   setStepStatus('statusMapper', 'running', 'Running');
-  await withButtonBusy('runMapperBtn', 'flavor_mapper.py', async () => {
+  const mapperAction = SCANNER_MODE === 'flex2flex' ? 'flex2flex_flavor_mapper' : (SCANNER_MODE === 'hyperflex' ? `${SCANNER_PROVIDER}_hyperflex_mapper` : 'flavor_mapper.py');
+  await withButtonBusy('runMapperBtn', mapperAction, async () => {
     try {
-      const data = await apiPost('/api/run/flavor-mapper', {
+      const mapperEndpoint = SCANNER_MODE === 'flex2flex'
+        ? '/api/run/flex2flex-flavor-mapper'
+        : (SCANNER_MODE === 'hyperflex' ? '/api/run/hyperflex-flavor-mapper' : '/api/run/flavor-mapper');
+      const data = await apiPost(mapperEndpoint, {
         inventory: overviewCsv,
         include_database_instances_as_servers: document.getElementById('mapIncludeDbAsServers').checked,
         include_floating_ips: document.getElementById('mapIncludeFloatingIps').checked,
         target_region: targetRegion,
+        source_region: SCANNER_MODE === 'flex2flex' ? currentFlex2FlexSourceRegion() : '',
+        provider: SCANNER_PROVIDER,
       });
-      showResult('flavor_mapper.py', data);
+      showResult(mapperAction, data);
       setStepStatus('statusMapper', data.ok ? 'success' : 'failed', data.ok ? 'Success' : 'Failed');
       await refreshFiles();
     } catch (e) {
@@ -689,6 +774,8 @@ if (runDeployGenBtn) runDeployGenBtn.addEventListener('click', async () => {
         generate_windows_passwords: generateWindowsPasswords,
         windows_password_length: windowsPasswordLength,
         windows_admin_user: windowsAdminUser,
+        source_region: '',
+        target_region: '',
         output_prefix: document.getElementById('depOutputPrefix').value,
         fail_fast: document.getElementById('depFailFast').checked,
       });

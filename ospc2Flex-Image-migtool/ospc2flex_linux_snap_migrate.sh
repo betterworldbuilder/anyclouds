@@ -37,10 +37,12 @@ SSH_WAIT="${OSPC2FLEX_LINUX_SNAP_SSH_WAIT:-20}"
 EXPORT_RETRIES="${OSPC2FLEX_IMAGE_EXPORT_RETRIES:-4}"
 EXPORT_RETRY_WAIT="${OSPC2FLEX_IMAGE_EXPORT_RETRY_WAIT:-15}"
 CLOUD_FILES_EXPORT_TIMEOUT="${OSPC2FLEX_CF_EXPORT_TIMEOUT:-7200}"
+CF_FAILURE_CACHE_TTL="${OSPC2FLEX_CF_FAILURE_CACHE_TTL:-21600}"
 USE_CLOUD_FILES_EXPORT="${OSPC2FLEX_USE_CLOUD_FILES_EXPORT:-1}"
 CINDER_VOLUME_EXPORT_ON_LICENSED="${OSPC2FLEX_CINDER_VOLUME_EXPORT_ON_LICENSED:-1}"
-CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-0}"
-CINDER_CREATE_TIMEOUT="${OSPC2FLEX_CINDER_CREATE_TIMEOUT:-1800}"
+CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-75}"
+CINDER_CREATE_TIMEOUT="${OSPC2FLEX_CINDER_CREATE_TIMEOUT:-7200}"
+PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-0}"
 DOWNLOAD_ONLY=0
 DRY_RUN=0
 START_FRESH=0
@@ -134,6 +136,10 @@ fmt_bytes() {
   else
     printf '%sB\n' "$n"
   fi
+}
+mb_from_bytes() {
+  local n="${1:-0}"
+  awk -v n="$n" 'BEGIN{if(n>0) printf "%.0f", n/1048576; else printf "0"}'
 }
 kv() { log "  $(printf '%-18s' "$1") : ${*:2}"; }
 stage() {
@@ -229,7 +235,7 @@ cleanup_stale_jumphost_images() {
 
   sudo find "$cleanup_root" -xdev -type f -mmin +"$min_age_minutes" \( \
       -iname "*.img" -o -iname "*.raw" -o -iname "*.vhd" -o -iname "*.vhdx" -o -iname "*.vpc" \
-      -o -iname "*repaired*.qcow2" -o -iname "*repair*.qcow2" \
+      -o -iname "*.qcow2" -o -iname "*repaired*.qcow2" -o -iname "*repair*.qcow2" \
       -o -iname "*flex-rescue*.qcow2" -o -iname "*final*.qcow2" -o -iname "*rescue*.qcow2" \
       -o -iname "*.invalid*" -o -iname "*.partial*" \
     \) -printf '%s\t%p\n' 2>/dev/null | sort -nr >"$delete_list" || true
@@ -238,7 +244,7 @@ cleanup_stale_jumphost_images() {
   count="$(wc -l <"$delete_list" | tr -d '[:space:]')"
   bytes="$(awk -F '\t' '{s+=$1} END{printf "%.0f", s+0}' "$delete_list")"
   if [ "${count:-0}" -eq 0 ]; then
-    log "[LS0A] no stale image files found; keeping unrepaired qcow2 files for resume"
+    log "[LS0A] no stale image files found"
     return 0
   fi
 
@@ -249,6 +255,11 @@ cleanup_stale_jumphost_images() {
 
   while IFS=$'\t' read -r _sz path; do
     [ -n "$path" ] || continue
+    active_root="$(printf '%s\n' "$path" | sed -E 's#^(/mnt/migration/[^/]+/runs/[^/]+/[^/]+).*#\1#; s#^(/mnt/migration/flex2flex/[^/]+).*#\1#')"
+    if [ -n "$active_root" ] && ps -eo args= 2>/dev/null | grep -F -- "$active_root" | grep -vq grep; then
+      log "[LS0A] keep active run artifact: $path"
+      continue
+    fi
     case "$path" in
       "$QCOW"|"${SOURCE_RAW:-__none__}") log "[LS0A] keep current run artifact: $path" ;;
       /mnt/migration/*) sudo rm -f -- "$path" ;;
@@ -256,7 +267,7 @@ cleanup_stale_jumphost_images() {
     esac
   done <"$delete_list"
 
-  log "[LS0A] stale image cleanup complete; active files younger than ${min_age_minutes}m and unrepaired qcow2 files are kept"
+  log "[LS0A] stale image cleanup complete; only active/current-run files and files younger than ${min_age_minutes}m are kept"
 }
 
 start_fresh_clear_label_resume() {
@@ -514,10 +525,18 @@ download_cloud_files_export_task() {
     log "[ZS3] Checking UUID-based CF object: $container/$_uuid_vhd"
     download_cloud_files_object "$container" "$_uuid_vhd" "$dest" "$min_bytes" "$tmp_log" && return 0
   fi
-  if [ -s "$cf_fail_marker" ] && [ "${OSPC2FLEX_RETRY_FAILED_CF_EXPORT:-0}" != "1" ]; then
-    log "[ZS3] Skipping Cloud Files export for $image_id — previous Rackspace export failed ($(head -1 "$cf_fail_marker" 2>/dev/null || echo cached failure))"
-    log "[ZS3] Set OSPC2FLEX_RETRY_FAILED_CF_EXPORT=1 to force a new CF export attempt"
-    return 1
+  if [ -s "$cf_fail_marker" ]; then
+    if [ "${OSPC2FLEX_RETRY_FAILED_CF_EXPORT:-0}" = "1" ] || [ "${START_FRESH:-0}" = "1" ]; then
+      log "[ZS3] Ignoring cached Cloud Files export failure for START FRESH/retry: $(head -1 "$cf_fail_marker" 2>/dev/null || echo cached failure)"
+      rm -f "$cf_fail_marker" 2>/dev/null || true
+    elif [ "${CF_FAILURE_CACHE_TTL:-0}" -gt 0 ] 2>/dev/null && [ "$(find "$cf_fail_marker" -mmin +"$((CF_FAILURE_CACHE_TTL / 60))" -print -quit 2>/dev/null)" = "$cf_fail_marker" ]; then
+      log "[ZS3] Expiring stale Cloud Files export failure cache: $(head -1 "$cf_fail_marker" 2>/dev/null || echo cached failure)"
+      rm -f "$cf_fail_marker" 2>/dev/null || true
+    else
+      log "[ZS3] Skipping Cloud Files export for $image_id — recent Rackspace export failed ($(head -1 "$cf_fail_marker" 2>/dev/null || echo cached failure))"
+      log "[ZS3] Falling through to Cinder fallback. Set OSPC2FLEX_RETRY_FAILED_CF_EXPORT=1 to force a new CF export attempt"
+      return 1
+    fi
   fi
   glance_base="$(first_resolvable_image_base || true)"
   [ -n "$glance_base" ] || return 1
@@ -550,7 +569,8 @@ PY
     }
     token="$(refresh_ospc_token || printf '%s' "$token")"
     task_json="$(curl -sS "$tasks_url/$task_id" -H "X-Auth-Token: $token" "${project_header[@]}" 2>/dev/null || true)"
-    status="$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null || echo unknown)"
+    status="$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null | tr -d '\r\n[:space:]' || echo unknown)"
+    [ -n "$status" ] || status="unknown"
     log "[ZS3] CF task status=$status elapsed=${elapsed}s"
     case "$status" in
       success) break ;;
@@ -622,14 +642,29 @@ rackspace_volume_status() {
   printf '%s' "$resp" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("status","unknown"))' 2>/dev/null || echo unknown
 }
 cinder_wait_volume_status() {
-  local vol_id="$1" want="$2" timeout="${3:-1800}" waited=0 status
+  local vol_id="$1" want="$2" timeout="${3:-1800}" phase="${4:-cinder_wait}" total_mb="${5:-0}" downloaded_mb="${6:-0}" waited=0 status poll_rc
   while [ "$waited" -lt "$timeout" ]; do
-    status="$(rackspace_volume_status "$vol_id" 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -d '\r' || echo unknown)"
-    [ "$status" = "$want" ] && return 0
-    [ "$status" = "error" ] && return 1
-    [ $((waited % 60)) -eq 0 ] && log "[CINDER] vol=$vol_id status=$status target=$want waited=${waited}s"
+    set +e
+    status="$(rackspace_volume_status "$vol_id" 2>>"$JOB_LOG/cinder.log" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+    poll_rc=$?
+    set -e
+    [ -n "$status" ] || status="unknown"
+    if [ "$status" = "$want" ]; then
+      log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=$status waited=${waited}s"
+      return 0
+    fi
+    if [ "$status" = "error" ]; then
+      log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=error waited=${waited}s"
+      log "[CINDER] vol=$vol_id status=error target=$want waited=${waited}s poll_rc=$poll_rc"
+      return 1
+    fi
+    if [ $((waited % 60)) -eq 0 ]; then
+      log "[CINDER] vol=$vol_id status=$status target=$want waited=${waited}s poll_rc=$poll_rc"
+      log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=$status waited=${waited}s"
+    fi
     sleep 10; waited=$((waited + 10))
   done
+  log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=timeout waited=${timeout}s"
   return 1
 }
 local_block_disks() {
@@ -799,8 +834,8 @@ remote_ospc_helper_volume_export() {
     log "[CINDER] ICF Issue=Cinder fallback needs an OSPC helper VM Cause=jumpshost is not an OSPC server Fix=create/reuse codex-linsnap-helper or set OSPC2FLEX_REMOTE_OSPC_HELPER_SERVER_ID and OSPC2FLEX_REMOTE_OSPC_HELPER_IP"
     return 1
   }
-  size_gb="$(image_cinder_size_gb "$image_id")"
-  [ "$size_gb" -lt 75 ] 2>/dev/null && size_gb=75
+  size_gb="$(apply_cinder_min_volume_size "$(image_cinder_size_gb "$image_id")")"
+  source_mb=0
   volume_name="${LABEL_SAFE}-linsnap-remote-cinder-${RUN_ID}"
   helper_tmp="/tmp/ospc2flex_${LABEL_SAFE}_${RUN_ID}.qcow2"
   ssh_key_file="${SSH_KEY_PATH/#\~/$HOME}"
@@ -810,14 +845,14 @@ remote_ospc_helper_volume_export() {
   volume_id="$(printf '%s' "$volume_id" | tr -d '\r' | tail -1)"
   [ -n "$volume_id" ] || return 1
   log "[CINDER] volume=$volume_id — waiting available"
-  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" || {
+  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "cinder_volume_create" "$source_mb" "0" || {
     log "[CINDER] FAILED remote helper volume create timeout"
     rackspace_delete_volume "$volume_id" || true
     return 1
   }
 
   rackspace_attach_volume "$helper_id" "$volume_id" || { rackspace_delete_volume "$volume_id" || true; return 1; }
-  cinder_wait_volume_status "$volume_id" "in-use" 900 || {
+  cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || {
     rackspace_detach_volume "$helper_id" "$volume_id" || true
     rackspace_delete_volume "$volume_id" || true
     return 1
@@ -878,22 +913,42 @@ gb = max(1, min_disk, math.ceil(size/(1024**3)), math.ceil(virtual/(1024**3)) if
 print(gb)
 PY
 }
-image_is_licensed_cinder_only() {
+image_is_cinder_preferred_snapshot() {
   local image_id="$1" meta="$JOB_TMP/img_meta_export.json"
   openstack image show "$image_id" -f json >"$meta" 2>/dev/null || return 1
   python3 - "$meta" <<'PY'
 import json, sys
-try: d = json.load(open(sys.argv[1], encoding="utf-8"))
-except Exception: print("0"); raise SystemExit
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("0")
+    raise SystemExit
 props = d.get("properties") or {}
-flag = str(props.get("com.rackspace__1__options","")).strip() if isinstance(props,dict) else ""
-if not flag: flag = str(d.get("com.rackspace__1__options","")).strip()
-print("1" if flag == "4" else "0")
+if not isinstance(props, dict):
+    props = {}
+flag = str(props.get("com.rackspace__1__options", d.get("com.rackspace__1__options", ""))).strip()
+image_type = str(props.get("image_type", d.get("image_type", ""))).strip().lower()
+rackspace_managed = any(str(props.get(k, "")).strip() for k in (
+    "com.rackspace__1__build_managed",
+    "com.rackspace__1__visible_managed",
+    "com.rackspace__1__build_config_options",
+))
+# flag=4 is the classic licensed/export-blocked case.  Rackspace-managed snapshots
+# can also fail Cloud Files export with a generic error; prefer Cinder for those.
+print("1" if flag == "4" or (image_type == "snapshot" and rackspace_managed) else "0")
 PY
+}
+apply_cinder_min_volume_size() {
+  local size_gb="${1:-0}" min_size="${CINDER_MIN_VOLUME_SIZE_GB:-75}"
+  if [ "$min_size" -gt 0 ] 2>/dev/null && [ "$size_gb" -lt "$min_size" ] 2>/dev/null; then
+    printf '%s\n' "$min_size"
+    return 0
+  fi
+  printf '%s\n' "$size_gb"
 }
 cinder_volume_raw_export() {
   local image_id="$1" dest="$2"
-  local helper_id volume_name volume_id before_file after_file dev dev_size dd_rc
+  local helper_id volume_name volume_id before_file after_file dev dev_size dd_rc source_bytes source_mb volume_mb dev_mb copied copied_mb pct final_bytes final_mb copy_start_ts elapsed_s eta_min
   helper_id="$(discover_ospc_helper_server_id | head -1 | tr -d '[:space:]')"
   [ -n "$helper_id" ] || {
     log "[CINDER] FAILED helper server discovery"
@@ -902,13 +957,22 @@ cinder_volume_raw_export() {
     log "[CINDER] ICF Issue=Cinder fallback could not identify/use an OSPC helper Cause=metadata/openstack server list did not expose local helper and remote helper failed Fix=reuse codex-linsnap-helper or set OSPC2FLEX_REMOTE_OSPC_HELPER_SERVER_ID/IP"
     return 1
   }
-  local size_gb; size_gb="$(image_cinder_size_gb "$image_id")"
-  if [ "${CINDER_MIN_VOLUME_SIZE_GB:-0}" -gt 0 ] && [ "$size_gb" -lt "$CINDER_MIN_VOLUME_SIZE_GB" ]; then
-    size_gb="$CINDER_MIN_VOLUME_SIZE_GB"
-  fi
+  local size_gb; size_gb="$(apply_cinder_min_volume_size "$(image_cinder_size_gb "$image_id")")"
+  source_bytes="$(python3 - "$JOB_TMP/cinder_img_meta.json" <<'PYSIZE'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+except Exception:
+    data = {}
+print(data.get("size") or data.get("Size") or 0)
+PYSIZE
+)"
+  source_mb="$(mb_from_bytes "$source_bytes")"
+  volume_mb=$((size_gb * 1024))
   volume_name="${LABEL_SAFE}-linsnap-cinder-${RUN_ID}"
   before_file="$JOB_TMP/cinder_before.txt"; after_file="$JOB_TMP/cinder_after.txt"
   log "[CINDER] Licensed image — Cinder attach fallback: helper=$helper_id size=${size_gb}GB"
+  log "[DOWNLOAD_STATUS] phase=cinder_volume_create downloaded_mb=0 total_mb=$source_mb volume_mb=$volume_mb status=starting"
   local_block_disks >"$before_file"
   volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || {
     log "[CINDER] FAILED volume create request; cannot use Cinder fallback"
@@ -920,15 +984,16 @@ cinder_volume_raw_export() {
     return 1
   }
   log "[CINDER] volume=$volume_id — waiting available"
-  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" || {
+  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "cinder_volume_create" "$source_mb" "0" || {
     log "[CINDER] FAILED volume create timeout: volume=$volume_id waited=${CINDER_CREATE_TIMEOUT}s status=$(rackspace_volume_status "$volume_id" 2>/dev/null || echo unknown)"
     log "[CINDER] ICF Issue=volume stuck creating Cause=Rackspace Cinder backend did not finish image-to-volume create Fix=retry later or use START FRESH after volume leaves creating/error"
     log "[CINDER] cleanup: requesting delete for failed temp volume=$volume_id"
     rackspace_delete_volume "$volume_id" || true
     return 1
   }
+  log "[DOWNLOAD_STATUS] phase=cinder_attach downloaded_mb=0 total_mb=$source_mb status=starting"
   rackspace_attach_volume "$helper_id" "$volume_id" || return 1
-  cinder_wait_volume_status "$volume_id" "in-use" 900 || return 1
+  cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || return 1
   dev=""
   for _i in $(seq 1 60); do
     sleep 3
@@ -947,24 +1012,34 @@ cinder_volume_raw_export() {
   fi
   [ -n "$dev" ] || return 1
   dev_size="$(sudo blockdev --getsize64 "$dev" 2>/dev/null || echo 0)"
+  dev_mb="$(mb_from_bytes "$dev_size")"
   log "[CINDER] attached block device for volume=$volume_id: $dev bytes=$dev_size"
   [ "$dev_size" -gt 1073741824 ] || return 1
   rm -f "$dest"
   log "[CINDER] raw-copying $dev → $dest"
+  copy_start_ts="$(date +%s)"
+  log "[DOWNLOAD_STATUS] phase=raw_copy downloaded_mb=0 total_mb=$dev_mb pct=0.0 eta_min=unknown status=starting"
   set +e
   sudo dd if="$dev" of="$dest" bs=64M status=progress conv=noerror,sync >>"$JOB_LOG/cinder.log" 2>&1 &
   dd_pid=$!
   while kill -0 "$dd_pid" 2>/dev/null; do
     sleep 60
     copied="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+    copied_mb="$(mb_from_bytes "$copied")"
     pct="$(awk -v c="$copied" -v t="$dev_size" 'BEGIN{if(t>0)printf "%.1f", (c/t)*100; else printf "0.0"}')"
-    log "[CINDER] copy progress: $(fmt_bytes "$copied") / $(fmt_bytes "$dev_size") (${pct}%)"
+    elapsed_s=$(( $(date +%s) - copy_start_ts ))
+    eta_min="$(awk -v c="$copied" -v t="$dev_size" -v e="$elapsed_s" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
+    log "[CINDER] copy progress: ${copied_mb}MB / ${dev_mb}MB (${pct}%), eta=${eta_min}min"
+    log "[DOWNLOAD_STATUS] phase=raw_copy downloaded_mb=$copied_mb total_mb=$dev_mb pct=$pct eta_min=$eta_min status=copying"
   done
   wait "$dd_pid"; dd_rc=$?
   set -e
   [ "$dd_rc" -eq 0 ] || return 1
   sudo chown "$(id -u):$(id -g)" "$dest" 2>/dev/null || true
-  log "[CINDER] HIT raw artifact: $dest ($(stat -c%s "$dest" 2>/dev/null || echo 0) bytes)"
+  final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+  final_mb="$(mb_from_bytes "$final_bytes")"
+  log "[DOWNLOAD_STATUS] phase=raw_copy downloaded_mb=$final_mb total_mb=$dev_mb pct=100.0 eta_min=0 status=complete"
+  log "[CINDER] HIT raw artifact: $dest (${final_bytes} bytes)"
   rackspace_detach_volume "$helper_id" "$volume_id"
   cinder_wait_volume_status "$volume_id" "available" 900 || true
   rackspace_delete_volume "$volume_id"
@@ -974,8 +1049,16 @@ cinder_volume_raw_export() {
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3] Download waterfall for image=$image_id"
-  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$(image_is_licensed_cinder_only "$image_id" || echo 0)" = "1" ]; then
-    log "[ZS3] Licensed image — Cloud Files first, Cinder fallback if CF fails"
+  if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT" = "1" ] && [ "$(image_is_cinder_preferred_snapshot "$image_id" || echo 0)" = "1" ]; then
+    log "[ZS3] Rackspace-managed snapshot — using Cinder fallback first; set OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 to try Cloud Files first"
+    OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1
+    cinder_volume_raw_export "$image_id" "$dest" && return 0
+    log "[ZS3] Cinder-first export failed. Not retrying the same Cinder path in this run."
+    if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
+      log "[ZS3] Enabling Cloud Files export automatically because Cinder image-to-volume did not become available"
+      USE_CLOUD_FILES_EXPORT=1
+    fi
+    log "[ZS3] Trying Cloud Files export next"
   fi
   if [ "${OSPC2FLEX_ALLOW_LEGACY_GLANCE_DOWNLOAD:-0}" = "1" ]; then
     log "[ZS3] Legacy direct Glance retry enabled by OSPC2FLEX_ALLOW_LEGACY_GLANCE_DOWNLOAD=1"
@@ -1010,36 +1093,40 @@ download_existing_ospc_snapshot() {
   else
     log "[ZS3] Skipping legacy direct Glance retry; using Cloud Files then Cinder fallback"
   fi
-  if [ "$USE_CLOUD_FILES_EXPORT" = "1" ]; then
-    if [ -n "$CLOUD_FILES_CONTAINER" ] && [ -n "$CLOUD_FILES_OBJECT" ]; then
-      log "[ZS3] Download strategy 2: existing Cloud Files object $CLOUD_FILES_CONTAINER/$CLOUD_FILES_OBJECT"
-      if command -v openstack >/dev/null 2>&1; then
-        tmp_log="$JOB_LOG/cloud_files_object_save.log"
-        rm -f "$dest"
-        if openstack object save "$CLOUD_FILES_CONTAINER" "$CLOUD_FILES_OBJECT" --file "$dest" >"$tmp_log" 2>&1 && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
-          log "[ZS3] HIT Cloud Files object downloaded"
-          return 0
-        fi
-        log "[ZS3] WARN Cloud Files object download failed log=$tmp_log"
-        log_file_excerpt "[ZS3] cloud-files-error:" "$tmp_log"
-      elif command -v swift >/dev/null 2>&1; then
-        tmp_log="$JOB_LOG/swift_download.log"
-        rm -f "$dest"
-        if swift download "$CLOUD_FILES_CONTAINER" "$CLOUD_FILES_OBJECT" --output "$dest" >"$tmp_log" 2>&1 && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
-          log "[ZS3] HIT Cloud Files object downloaded via swift"
-          return 0
-        fi
-        log_file_excerpt "[ZS3] swift-error:" "$tmp_log"
+  if [ -n "$CLOUD_FILES_CONTAINER" ] && [ -n "$CLOUD_FILES_OBJECT" ]; then
+    log "[ZS3] Explicit Cloud Files object provided: $CLOUD_FILES_CONTAINER/$CLOUD_FILES_OBJECT"
+    if command -v openstack >/dev/null 2>&1; then
+      tmp_log="$JOB_LOG/cloud_files_object_save.log"
+      rm -f "$dest"
+      if openstack object save "$CLOUD_FILES_CONTAINER" "$CLOUD_FILES_OBJECT" --file "$dest" >"$tmp_log" 2>&1 && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
+        log "[ZS3] HIT Cloud Files object downloaded"
+        return 0
       fi
+      log "[ZS3] WARN Cloud Files object download failed log=$tmp_log"
+      log_file_excerpt "[ZS3] cloud-files-error:" "$tmp_log"
+    elif command -v swift >/dev/null 2>&1; then
+      tmp_log="$JOB_LOG/swift_download.log"
+      rm -f "$dest"
+      if swift download "$CLOUD_FILES_CONTAINER" "$CLOUD_FILES_OBJECT" --output "$dest" >"$tmp_log" 2>&1 && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min_bytes" ]; then
+        log "[ZS3] HIT Cloud Files object downloaded via swift"
+        return 0
+      fi
+      log_file_excerpt "[ZS3] swift-error:" "$tmp_log"
     fi
+  fi
 
+  if [ "$USE_CLOUD_FILES_EXPORT" = "1" ]; then
     set +e; download_cloud_files_export_task "$image_id" "$dest" "${CLOUD_FILES_CONTAINER:-ospc2flex-export}" "$min_bytes"; local cf_rc=$?; set -e
     [ "$cf_rc" -eq 0 ] && return 0
     log "[ZS3] CF export failed — trying Cinder volume fallback"
   else
-    log "[ZS3] Cloud Files export disabled — using Cinder volume fallback"
+    log "[ZS3] Skipping Cloud Files export task. Set OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 to enable Cloud Files."
   fi
-  cinder_volume_raw_export "$image_id" "$dest" && return 0
+  if [ "${OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED:-0}" = "1" ]; then
+    log "[ZS3] Cinder fallback already failed once in this run; stopping to avoid duplicate stuck temp volumes."
+    return 1
+  fi
+  OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1 cinder_volume_raw_export "$image_id" "$dest" && return 0
   return 1
 }
 

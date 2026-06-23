@@ -1,21 +1,26 @@
+{% set scanner_mode = scanner_mode|default('ospc') %}
+{% set scanner_provider = scanner_provider|default('aws') %}
+{% set provider_label = scanner_provider|upper if scanner_provider != 'azure' else 'Azure' %}
+{% set is_flex2flex = scanner_mode == 'flex2flex' %}
+{% set is_hyperflex = scanner_mode == 'hyperflex' %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OSPC Scanner and Deployment Script Generator</title>
+  <title>{% if is_flex2flex %}FLEX2FLEX Scanner and Deployment Script Generator{% elif is_hyperflex %}{{ provider_label }} Scanner and FLEX Deployment Script Generator{% else %}OSPC Scanner and Deployment Script Generator{% endif %}</title>
   <link rel="stylesheet" href="/static/style.css" />
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
 </head>
 <body>
   <header>
-    <h1>OSPC Scanner and Deployment Script Generator</h1>
-    <p>Connects to your OSPC Rackspace account, scans your existing server inventory, maps legacy OSPC flavors to equivalent FLEX flavors, validates your target environment, then auto-generates ready-to-run deployment shell scripts to clone your entire OSPC infrastructure into the Flex OpenStack cloud.</p>
+    <h1>{% if is_flex2flex %}FLEX2FLEX Scanner and Deployment Script Generator{% elif is_hyperflex %}{{ provider_label }} Scanner and FLEX Deployment Script Generator{% else %}OSPC Scanner and Deployment Script Generator{% endif %}</h1>
+    <p>{% if is_flex2flex %}Connects to your source FLEX project, scans existing OpenStack inventory, carries FLEX flavor and image selections into target FLEX mappings, validates the target environment, then auto-generates ready-to-run deployment shell scripts to clone FLEX infrastructure into another FLEX region or project.{% elif is_hyperflex %}Builds {{ provider_label }} to FLEX infrastructure discovery artifacts, maps source compute shape and image intent to FLEX deployment inputs, validates the target environment, then auto-generates ready-to-run deployment shell scripts using the same OSPC2FLEX generator workflow.{% else %}Connects to your OSPC Rackspace account, scans your existing server inventory, maps legacy OSPC flavors to equivalent FLEX flavors, validates your target environment, then auto-generates ready-to-run deployment shell scripts to clone your entire OSPC infrastructure into the Flex OpenStack cloud.{% endif %}</p>
     <ul style="max-width: 900px; margin: 10px auto; text-align: left; background: rgba(0, 0, 0, 0.2); color: #fff; padding: 15px 35px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); line-height: 1.6;">
       <li><strong>File Manager (Upload/View)</strong>: Visually tracks all generated shell scripts and allows you to manually inject external CSV lists (if bypassing Step 1).</li>
-      <li><strong>Step 1 (Overview)</strong>: Securely connects to Rackspace APIs to discover and download your legacy OSPC server inventory.</li>
+      <li><strong>Step 1 (Overview)</strong>: {% if is_flex2flex %}Securely connects to FLEX/OpenStack APIs to discover source project servers, volumes, networks, security groups, and load balancers.{% elif is_hyperflex %}Creates the {{ provider_label }} source overview CSV using the same inventory schema consumed by the OSPC mapper and deployment generator.{% else %}Securely connects to Rackspace APIs to discover and download your legacy OSPC server inventory.{% endif %}</li>
       <li><strong>Step 1.5 (App Mapping)</strong>: Actively scans instances to map live application and database dependencies via SSH.</li>
-      <li><strong>Step 2 (Flavor Mapping)</strong>: Computes your legacy OSPC server sizes into modern OpenStack FLEX flavor equivalents.</li>
+      <li><strong>Step 2 (Flavor Mapping)</strong>: {% if is_flex2flex %}Creates FLEX-to-FLEX target mappings using the discovered source flavor and image names, producing the same flavor/block/LB map files as OSPC2FLEX.{% elif is_hyperflex %}Creates {{ provider_label }} to FLEX target mappings and emits the same flavor/block/LB map files as OSPC2FLEX.{% else %}Computes your legacy OSPC server sizes into modern OpenStack FLEX flavor equivalents.{% endif %}</li>
       <li><strong>Step 3 (Validation)</strong>: Pre-flights your mappings against the live FLEX environment to ensure quotas and networks are valid before deploying.</li>
       <li><strong>Step 4 (Deploy Generation)</strong>: Builds the infrastructure-as-code scripts (Networks, Keypairs, LBs, VMs) to spawn your FLEX clones.</li>
       <li><strong>Next Step</strong>: Paste the generated deploy script into the FLEX Deployment Dashboard (Stage 2).</li>
@@ -58,29 +63,142 @@
       </h2>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
 
-        <!-- OSPC -->
+        <!-- Source cloud -->
         <div>
-          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">{% if is_flex2flex %}FLEX Source Credentials{% elif scanner_provider == 'aws' and is_hyperflex %}AWS Source Credentials{% elif scanner_provider == 'gcp' and is_hyperflex %}GCP Source Credentials{% elif scanner_provider == 'azure' and is_hyperflex %}Azure Source Credentials{% else %}OSPC Cloud Credentials{% endif %}</h3>
+          {% if is_flex2flex %}
           <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Origin Region
+              <select id="credSourceFlexRegion" class="flex-region-select" data-auth-target="credSourceFlexAuthUrl" style="background:rgba(15,30,62,0.9);border:1px solid rgba(165,180,252,.4);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="DFW3">DFW3</option><option value="IAD3">IAD3</option><option value="DFW">DFW</option><option value="IAD">IAD</option><option value="ORD">ORD</option><option value="SJC3">SJC3</option><option value="LON">LON</option><option value="SYD">SYD</option><option value="HKG">HKG</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Auth URL
+              <input id="credSourceFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
-              <input id="credOspcUsername" type="text" placeholder="e.g. dzng.8294" value="dzng.8294"
+              <input id="credSourceFlexUsername" type="text" placeholder="e.g. dzng.8294" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
+              <input id="credSourceFlexPassword" type="text" placeholder="FLEX source password" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
+              <input id="credSourceFlexProjectId" type="text" placeholder="source project UUID" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain
+              <input id="credSourceFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Import Origin OpenRC File
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="credSourceOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;font-size:.8rem;color:#94a3b8;" />
+                <button id="credSourceOpenrcImportBtn" type="button"
+                  style="padding:6px 14px;background:linear-gradient(135deg,#2563eb,#06b6d4);border:none;border-radius:6px;color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
+                  📂 Import Origin OpenRC
+                </button>
+              </div>
+            </label>
+          </div>
+          {% elif scanner_provider == 'aws' and is_hyperflex %}
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Access Key ID
+              <input id="credAwsAccessKeyId" type="text" autocomplete="off" placeholder="AKIA... or ASIA..."
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">API Key / Password
-              <input id="credOspcApiKey" type="password" placeholder="Rackspace API key"
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Secret Access Key
+              <input id="credAwsSecretAccessKey" type="text" autocomplete="off" placeholder="AWS secret access key"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Account / Project ID
-              <input id="credOspcAccountId" type="text" placeholder="e.g. 1342314"
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Session Token
+              <input id="credAwsSessionToken" type="text" autocomplete="off" placeholder="Optional STS session token"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Account ID
+                <input id="credAwsAccountId" type="text" placeholder="123456789012"
+                  style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+              </label>
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Default Region
+                <input id="credAwsRegion" type="text" placeholder="us-west-2"
+                  style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+              </label>
+            </div>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Assume Role ARN
+              <input id="credAwsRoleArn" type="text" placeholder="arn:aws:iam::123456789012:role/MigrationReadOnly"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Profile
+              <input id="credAwsProfile" type="text" placeholder="default or migration-profile"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
           </div>
+          {% elif scanner_provider == 'gcp' and is_hyperflex %}
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">GCP Project ID
+              <input id="credGcpProjectId" type="text" placeholder="my-gcp-project"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Service Account JSON Path
+              <input id="credGcpCredentialsFile" type="text" placeholder="/path/to/service-account.json"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">GCP Region / Zone
+              <input id="credGcpRegion" type="text" placeholder="us-central1 / us-central1-a"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Service Account JSON Inline
+              <textarea id="credGcpServiceAccountJson" rows="4" placeholder='{"type":"service_account", ...}' style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.85rem;font-family:monospace;"></textarea>
+            </label>
+          </div>
+          {% elif scanner_provider == 'azure' and is_hyperflex %}
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Tenant ID
+              <input id="credAzureTenantId" type="text" placeholder="Azure tenant UUID"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Subscription ID
+              <input id="credAzureSubscriptionId" type="text" placeholder="Azure subscription UUID"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Client ID
+              <input id="credAzureClientId" type="text" placeholder="Service principal client ID"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Client Secret
+              <input id="credAzureClientSecret" type="text" autocomplete="off" placeholder="Service principal secret"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Azure Region
+              <input id="credAzureRegion" type="text" placeholder="westus2"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+          </div>
+          {% else %}
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_hyperflex %}{{ provider_label }} Access ID / User{% else %}Username{% endif %}
+              <input id="credOspcUsername" type="text" placeholder="{% if is_hyperflex %}{{ provider_label }} access key, service account, or operator user{% else %}e.g. dzng.8294{% endif %}" value="{% if is_hyperflex %}{% else %}dzng.8294{% endif %}"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_hyperflex %}{{ provider_label }} Secret / Key{% else %}API Key / Password{% endif %}
+              <input id="credOspcApiKey" type="text" placeholder="{% if is_hyperflex %}{{ provider_label }} secret, token, or JSON key reference{% else %}Rackspace API key{% endif %}"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_hyperflex %}{{ provider_label }} Account / Project / Subscription{% else %}Account / Project ID{% endif %}
+              <input id="credOspcAccountId" type="text" placeholder="{% if scanner_provider == 'azure' %}subscription id{% elif scanner_provider == 'gcp' %}project id{% elif is_hyperflex %}account id{% else %}e.g. 1342314{% endif %}"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+            </label>
+          </div>
+          {% endif %}
         </div>
 
         <!-- FLEX -->
         <div>
-          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
+          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">{% if is_flex2flex %}Target FLEX Credentials{% elif is_hyperflex %}{{ provider_label }} - FLEX Credentials{% else %}FLEX Cloud Credentials{% endif %} <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
           <div style="display:flex;flex-direction:column;gap:10px;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_flex2flex %}Target Region{% else %}FLEX Region{% endif %}
+              <select id="credFlexRegion" class="flex-region-select" data-auth-target="credFlexAuthUrl" style="background:rgba(15,30,62,0.9);border:1px solid rgba(165,180,252,.4);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+                <option value="IAD3">IAD3</option><option value="DFW3">DFW3</option><option value="DFW">DFW</option><option value="IAD">IAD</option><option value="ORD">ORD</option><option value="SJC3">SJC3</option><option value="LON">LON</option><option value="SYD">SYD</option><option value="HKG">HKG</option>
+              </select>
+            </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Auth URL
               <input id="credFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
@@ -90,7 +208,7 @@
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
-              <input id="credFlexPassword" type="password" placeholder="FLEX password"
+              <input id="credFlexPassword" type="text" placeholder="FLEX password"
                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
             </label>
             <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
@@ -117,7 +235,7 @@
 
       <!-- Auto-propagate hint -->
       <p style="margin:14px 0 0;font-size:.75rem;color:#64748b;font-style:italic;">
-        ✦ OSPC credentials auto-fill the scanner fields below. FLEX credentials are available to Validation (Step 3) and Deploy Generation (Step 4).
+        {% if is_flex2flex %}✦ Origin FLEX credentials scan the source project. Target FLEX credentials validate and generate deployment output.{% elif is_hyperflex %}✦ {{ provider_label }} source fields auto-fill the scanner below where available. FLEX credentials remain available for validation and final deployment.{% else %}✦ OSPC credentials auto-fill the scanner fields below. FLEX credentials are available to Validation (Step 3) and Deploy Generation (Step 4).{% endif %}
       </p>
     </section>
 
@@ -127,12 +245,83 @@
       credOspcUsername:  'cred_ospc_username',
       credOspcApiKey:    'cred_ospc_apikey',
       credOspcAccountId: 'cred_ospc_accountid',
+      credSourceFlexRegion: 'cred_source_flex_region',
+      credSourceFlexAuthUrl: 'cred_source_flex_auth_url',
+      credSourceFlexUsername: 'cred_source_flex_username',
+      credSourceFlexPassword: 'cred_source_flex_password',
+      credSourceFlexProjectId: 'cred_source_flex_project_id',
+      credSourceFlexDomain: 'cred_source_flex_domain',
+      credFlexRegion:    'cred_flex_region',
       credFlexAuthUrl:   'cred_flex_auth_url',
       credFlexUsername:  'cred_flex_username',
       credFlexPassword:  'cred_flex_password',
       credFlexProjectId: 'cred_flex_project_id',
       credFlexDomain:    'cred_flex_domain',
+      credAwsAccessKeyId: 'cred_aws_access_key_id',
+      credAwsSecretAccessKey: 'cred_aws_secret_access_key',
+      credAwsSessionToken: 'cred_aws_session_token',
+      credAwsAccountId: 'cred_aws_account_id',
+      credAwsRegion: 'cred_aws_region',
+      credAwsRoleArn: 'cred_aws_role_arn',
+      credAwsProfile: 'cred_aws_profile',
+      credGcpProjectId: 'cred_gcp_project_id',
+      credGcpCredentialsFile: 'cred_gcp_credentials_file',
+      credGcpRegion: 'cred_gcp_region',
+      credGcpServiceAccountJson: 'cred_gcp_service_account_json',
+      credAzureTenantId: 'cred_azure_tenant_id',
+      credAzureSubscriptionId: 'cred_azure_subscription_id',
+      credAzureClientId: 'cred_azure_client_id',
+      credAzureClientSecret: 'cred_azure_client_secret',
+      credAzureRegion: 'cred_azure_region',
     };
+
+    const CLOUD_CREDENTIAL_DEFAULTS = {
+      cred_ospc_username: 'dzng.8294',
+      cred_ospc_apikey: '0b6f44aad11f4c6fbaeaa159151dd316',
+      cred_ospc_accountid: '1342314',
+      cred_ospc_region: 'IAD',
+      cred_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
+      cred_flex_auth_type: 'password',
+      cred_flex_username: 'dzng.8294',
+      cred_flex_password: '0b6f44aad11f4c6fbaeaa159151dd316',
+      cred_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+      cred_flex_domain: 'rackspace_cloud_domain',
+      cred_flex_region: 'DFW3',
+      cred_flex_app_cred_id: '3e27a1c80075436a9f79573fb878e984',
+      cred_flex_app_cred_secret: 'iANdfZV-vYAR4uVlvYrqU82XFEmmLwxJL8mIkyWr5qyoBKqRMzSagmE4OZPBgHcb4cIUHkmzuatGlV99S3J4HA',
+      cred_source_flex_auth_url: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
+      cred_source_flex_username: 'dzng.8294',
+      cred_source_flex_password: '0b6f44aad11f4c6fbaeaa159151dd316',
+      cred_source_flex_project_id: '49a2c18a567c402ef560bb0f11821b61',
+      cred_source_flex_domain: 'rackspace_cloud_domain',
+      cred_source_flex_region: 'DFW3',
+      mig_ospc_cloud_user: 'dzng.8294',
+      mig_ospc_cloud_key: '0b6f44aad11f4c6fbaeaa159151dd316',
+      mig_ospc_cloud_account: '1342314',
+      mig_credFlexAuthUrl: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
+      mig_credFlexAuthType: 'password',
+      mig_credFlexUsername: 'dzng.8294',
+      mig_credFlexPassword: '0b6f44aad11f4c6fbaeaa159151dd316',
+      mig_credFlexProjectId: '49a2c18a567c402ef560bb0f11821b61',
+      mig_credFlexDomain: 'rackspace_cloud_domain',
+      mig_credFlexRegion: 'DFW3',
+    };
+    
+    function seedCloudCredentialDefaults() {
+      Object.entries(CLOUD_CREDENTIAL_DEFAULTS).forEach(function(entry) {
+        const key = entry[0];
+        const value = entry[1];
+        try { if (value !== undefined && value !== null && value !== '') localStorage.setItem(key, value); } catch (_) {}
+      });
+    }
+
+    // ── OpenRC import state tracking ──────────────────────────────────────────
+    const OPENRC_IMPORT_KEYS = {
+      credOpenrcFile: 'openrc_flex_imported_timestamp',
+      credSourceOpenrcFile: 'openrc_source_flex_imported_timestamp',
+    };
+
+    seedCloudCredentialDefaults();
 
     // Load saved values on page init
     Object.entries(CRED_KEYS).forEach(([elId, lsKey]) => {
@@ -148,106 +337,200 @@
       });
     });
 
-    // ── Auto-propagate OSPC credentials → scanner Step 1 fields ──────────────
+    // Restore OpenRC import status on page load
+    function restoreOpenrcImportStatus() {
+      ['credOpenrcImportBtn', 'credSourceOpenrcImportBtn'].forEach(btnId => {
+        const timestamp = localStorage.getItem(btnId === 'credOpenrcImportBtn' ? 'openrc_flex_imported_timestamp' : 'openrc_source_flex_imported_timestamp');
+        if (timestamp) {
+          const btn = document.getElementById(btnId);
+          if (btn) {
+            btn.textContent = '✅ OpenRC imported (' + new Date(parseInt(timestamp)).toLocaleString() + ')';
+            btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+          }
+        }
+      });
+    }
+    // Call on page load
+    document.addEventListener('DOMContentLoaded', restoreOpenrcImportStatus);
+    restoreOpenrcImportStatus(); // Call immediately in case DOM is already loaded
+
+    const FLEX_AUTH_URLS = {
+      DFW3: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
+      IAD3: 'https://keystone.api.iad3.rackspacecloud.com/v3/',
+      DFW: 'https://keystone.api.dfw.rackspacecloud.com/v3/',
+      IAD: 'https://keystone.api.iad.rackspacecloud.com/v3/',
+      ORD: 'https://keystone.api.ord.rackspacecloud.com/v3/',
+      SJC3: 'https://keystone.api.sjc3.rackspacecloud.com/v3/',
+      LON: 'https://keystone.api.lon.rackspacecloud.com/v3/',
+      SYD: 'https://keystone.api.syd.rackspacecloud.com/v3/',
+      HKG: 'https://keystone.api.hkg.rackspacecloud.com/v3/',
+    };
+    function syncFlexAuthUrlFromRegion(sel) {
+      const target = document.getElementById(sel?.dataset?.authTarget || '');
+      const url = FLEX_AUTH_URLS[sel?.value || ''];
+      if (target && url) {
+        target.value = url;
+        target.dispatchEvent(new Event('input'));
+      }
+    }
+    document.querySelectorAll('.flex-region-select').forEach(sel => {
+      if (!document.getElementById(sel.dataset.authTarget || '')?.value) syncFlexAuthUrlFromRegion(sel);
+      sel.addEventListener('change', () => syncFlexAuthUrlFromRegion(sel));
+    });
+
+    // ── Auto-propagate source credentials → scanner Step 1 fields ────────────
     (function () {
-      function syncOspc() {
-        const u = document.getElementById('credOspcUsername')?.value || '';
-        const k = document.getElementById('credOspcApiKey')?.value || '';
-        const a = document.getElementById('credOspcAccountId')?.value || '';
+      const scannerMode = "{{ scanner_mode }}";
+      const scannerProvider = "{{ scanner_provider }}";
+      function val(id) { return document.getElementById(id)?.value || ''; }
+      function sourceFieldIds() {
+        if (scannerMode === 'flex2flex') return ['credSourceFlexUsername','credSourceFlexPassword','credSourceFlexProjectId'];
+        if (scannerMode === 'hyperflex' && scannerProvider === 'aws') return ['credAwsAccessKeyId','credAwsSecretAccessKey','credAwsAccountId','credAwsRegion','credAwsRoleArn','credAwsProfile','credAwsSessionToken'];
+        if (scannerMode === 'hyperflex' && scannerProvider === 'gcp') return ['credGcpProjectId','credGcpCredentialsFile','credGcpRegion','credGcpServiceAccountJson'];
+        if (scannerMode === 'hyperflex' && scannerProvider === 'azure') return ['credAzureClientId','credAzureClientSecret','credAzureSubscriptionId','credAzureTenantId','credAzureRegion'];
+        return ['credOspcUsername','credOspcApiKey','credOspcAccountId'];
+      }
+      function sourceValues() {
+        if (scannerMode === 'flex2flex') return [val('credSourceFlexUsername'), val('credSourceFlexPassword'), val('credSourceFlexProjectId')];
+        if (scannerMode === 'hyperflex' && scannerProvider === 'aws') return [val('credAwsAccessKeyId') || val('credAwsProfile'), val('credAwsSecretAccessKey') || val('credAwsRoleArn'), val('credAwsAccountId')];
+        if (scannerMode === 'hyperflex' && scannerProvider === 'gcp') return [val('credGcpProjectId'), val('credGcpCredentialsFile') || val('credGcpServiceAccountJson'), val('credGcpProjectId')];
+        if (scannerMode === 'hyperflex' && scannerProvider === 'azure') return [val('credAzureClientId'), val('credAzureClientSecret'), val('credAzureSubscriptionId')];
+        return [val('credOspcUsername'), val('credOspcApiKey'), val('credOspcAccountId')];
+      }
+      function syncSourceCredentials() {
+        const [u, k, a] = sourceValues();
         const fu = document.getElementById('ovUsername');  if (fu && !fu._manuallyEdited) fu.value = u;
         const fk = document.getElementById('ovApiKey');    if (fk && !fk._manuallyEdited) fk.value = k;
         const fa = document.getElementById('ovAccountId'); if (fa && !fa._manuallyEdited) fa.value = a;
       }
-      ['credOspcUsername','credOspcApiKey','credOspcAccountId'].forEach(id => {
-        document.getElementById(id)?.addEventListener('input', syncOspc);
+      sourceFieldIds().forEach(id => {
+        document.getElementById(id)?.addEventListener('input', syncSourceCredentials);
       });
-      // Mark a field as manually edited so we stop overwriting it
+      // Mark a field as manually edited so we stop overwriting it ONLY if it has actual changes
       ['ovUsername','ovApiKey','ovAccountId'].forEach(id => {
-        document.getElementById(id)?.addEventListener('input', function(){ this._manuallyEdited = true; });
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('change', function(){ this._manuallyEdited = true; });
+        }
       });
-      syncOspc(); // run once on load with restored values
+      // Sync immediately on page load with restored values from localStorage
+      setTimeout(() => syncSourceCredentials(), 100); 
     })();
 
     // ── OpenRC file parser → FLEX fields + localStorage ───────────────────────
-    document.getElementById('credOpenrcImportBtn')?.addEventListener('click', function() {
-      const file = document.getElementById('credOpenrcFile')?.files?.[0];
+    function parseOpenrc(src) {
+      const map = {};
+      src.replace(/\r\n/g, '\n').split('\n').forEach(line => {
+        const l = line.trim();
+        if (!l || l.startsWith('#')) return;
+        const m = l.match(/^(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)(?:\s+#.*)?$/);
+        if (!m) return;
+        let val = m[2].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
+        if (val.startsWith('$(')) return;
+        if (val) map[m[1]] = val;
+      });
+      return map;
+    }
+    function importOpenrcToFields(fileInputId, buttonId, ids) {
+      const file = document.getElementById(fileInputId)?.files?.[0];
       if (!file) { alert('Please select an OpenRC file first.'); return; }
       const reader = new FileReader();
       reader.onload = function(e) {
-        const text = e.target.result.replace(/\r\n/g, '\n');  // normalise CRLF
-
-        // Robust line-by-line parser — handles quoted/unquoted, with or without 'export'
-        function parseOpenrc(src) {
-          const map = {};
-          src.split('\n').forEach(line => {
-            // Strip leading whitespace and ignore comments
-            const l = line.trim();
-            if (!l || l.startsWith('#')) return;
-            // Match:  [export] KEY=VALUE  (value may be quoted or bare, may have trailing comment)
-            const m = l.match(/^(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)(?:\s+#.*)?$/);
-            if (!m) return;
-            let val = m[2].trim();
-            // Strip wrapping single or double quotes
-            if ((val.startsWith('"') && val.endsWith('"')) ||
-                (val.startsWith("'") && val.endsWith("'"))) {
-              val = val.slice(1, -1);
-            }
-            // Skip shell subshell values like $(...)
-            if (val.startsWith('$(')) return;
-            if (val) map[m[1]] = val;
-          });
-          return map;
-        }
-
-        const env = parseOpenrc(text);
-
+        const env = parseOpenrc(e.target.result || '');
         const vals = {
-          credFlexAuthUrl:   env['OS_AUTH_URL']          || '',
-          credFlexUsername:  env['OS_USERNAME']           || '',
-          credFlexPassword:  env['OS_PASSWORD']           || '',
-          credFlexProjectId: env['OS_PROJECT_ID']         || env['OS_TENANT_ID'] || '',
-          credFlexDomain:    env['OS_USER_DOMAIN_NAME']   || env['OS_DOMAIN_NAME'] || env['OS_PROJECT_DOMAIN_NAME'] || 'rackspace_cloud_domain',
+          [ids.authUrl]:   env['OS_AUTH_URL'] || '',
+          [ids.username]:  env['OS_USERNAME'] || '',
+          [ids.password]:  env['OS_PASSWORD'] || '',
+          [ids.projectId]: env['OS_PROJECT_ID'] || env['OS_TENANT_ID'] || '',
+          [ids.domain]:    env['OS_USER_DOMAIN_NAME'] || env['OS_DOMAIN_NAME'] || env['OS_PROJECT_DOMAIN_NAME'] || 'rackspace_cloud_domain',
         };
-
         let filled = 0;
         Object.entries(vals).forEach(([id, val]) => {
-          if (!val) return;
+          if (!id || !val) return;
           const el = document.getElementById(id);
           if (el) { el.value = val; el.dispatchEvent(new Event('input')); filled++; }
           if (CRED_KEYS[id]) localStorage.setItem(CRED_KEYS[id], val);
         });
-
-        // Show a quick toast
-        const btn = document.getElementById('credOpenrcImportBtn');
-        const orig = btn.textContent;
-        btn.textContent = filled > 0 ? `✅ Filled ${filled} fields` : '⚠️ No values found';
-        btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#b45309,#f59e0b)';
-        setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 3000);
+        
+        // Save OpenRC import timestamp for restoration on page reload
+        const timestamp = Date.now().toString();
+        if (buttonId === 'credOpenrcImportBtn') {
+          localStorage.setItem('openrc_flex_imported_timestamp', timestamp);
+        } else if (buttonId === 'credSourceOpenrcImportBtn') {
+          localStorage.setItem('openrc_source_flex_imported_timestamp', timestamp);
+        }
+        
+        const btn = document.getElementById(buttonId);
+        if (btn) {
+          const orig = btn.textContent;
+          btn.textContent = filled > 0 ? `✅ Filled ${filled} fields` : '⚠️ No values found';
+          btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#b45309,#f59e0b)';
+          setTimeout(() => { 
+            btn.textContent = filled > 0 ? '✅ OpenRC imported' : orig;
+            btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : '';
+          }, 3000);
+        }
       };
       reader.readAsText(file);
+    }
+    document.getElementById('credOpenrcImportBtn')?.addEventListener('click', function() {
+      importOpenrcToFields('credOpenrcFile', 'credOpenrcImportBtn', {
+        authUrl: 'credFlexAuthUrl', username: 'credFlexUsername', password: 'credFlexPassword',
+        projectId: 'credFlexProjectId', domain: 'credFlexDomain'
+      });
+    });
+    document.getElementById('credSourceOpenrcImportBtn')?.addEventListener('click', function() {
+      importOpenrcToFields('credSourceOpenrcFile', 'credSourceOpenrcImportBtn', {
+        authUrl: 'credSourceFlexAuthUrl', username: 'credSourceFlexUsername', password: 'credSourceFlexPassword',
+        projectId: 'credSourceFlexProjectId', domain: 'credSourceFlexDomain'
+      });
     });
     </script>
 
     <section class="card">
-      <h2>1) OSPC Account Inventory <span id="statusOverview" class="status-chip idle">Idle</span></h2>
-      <p class="hint">Authenticate with your Rackspace OSPC Credentials and click the Run Account Scanning button below.</p>
+      <h2>1) {% if is_flex2flex %}FLEX Source Project Inventory{% elif is_hyperflex %}{{ provider_label }} Source Inventory{% else %}OSPC Account Inventory{% endif %} <span id="statusOverview" class="status-chip idle">Idle</span></h2>
+      <p class="hint">{% if is_flex2flex %}Authenticate with source FLEX Keystone credentials or import an OpenRC file, then scan the source project inventory.{% elif is_hyperflex %}Create or load {{ provider_label }} source inventory artifacts, then generate FLEX-ready overview and mapping files.{% else %}Authenticate with your Rackspace OSPC Credentials and click the Run Account Scanning button below.{% endif %}</p>
       <div class="grid">
-        <label>OSPC Username <input id="ovUsername" type="text" value="dzng.8294" /></label>
-        <label>OSPC API Key <input id="ovApiKey" type="password" /></label>
-        <label>OSPC Account ID <input id="ovAccountId" type="text" /></label>
+        <label>{% if is_flex2flex %}FLEX Username{% elif is_hyperflex %}{{ provider_label }} Account / Access ID{% else %}OSPC Username{% endif %} <input id="ovUsername" type="text" value="{% if is_flex2flex or is_hyperflex %}{% else %}dzng.8294{% endif %}" /></label>
+        <label>{% if is_flex2flex %}FLEX Password{% elif is_hyperflex %}{{ provider_label }} Secret / Key{% else %}OSPC API Key{% endif %} <input id="ovApiKey" type="text" /></label>
+        <label>{% if is_flex2flex %}FLEX Project ID{% elif is_hyperflex %}{{ provider_label }} Account / Project ID{% else %}OSPC Account ID{% endif %} <input id="ovAccountId" type="text" /></label>
         <div style="grid-column: span 2;">
-          <label style="margin-bottom: 5px;">OSPC Regions to Scan</label>
+          <label style="margin-bottom: 5px;">{% if is_flex2flex %}FLEX Regions to Scan{% elif is_hyperflex %}{{ provider_label }} Regions to Prepare{% else %}OSPC Regions to Scan{% endif %}</label>
+          {% if is_hyperflex %}
+          <select id="ovRegionSelect" multiple size="7" style="width:100%;max-width:560px;background:#0f172a;border:1px solid #38bdf8;color:#e2e8f0;border-radius:7px;padding:8px 10px;margin-bottom:15px;">
+            {% if scanner_provider == 'aws' %}
+            <option value="us-east-1">us-east-1</option><option value="us-east-2">us-east-2</option><option value="us-west-1">us-west-1</option><option value="us-west-2" selected>us-west-2</option>
+            <option value="ca-central-1">ca-central-1</option><option value="ca-west-1">ca-west-1</option><option value="eu-west-1">eu-west-1</option><option value="eu-west-2">eu-west-2</option><option value="eu-central-1">eu-central-1</option>
+            <option value="ap-southeast-1">ap-southeast-1</option><option value="ap-southeast-2">ap-southeast-2</option><option value="ap-northeast-1">ap-northeast-1</option><option value="sa-east-1">sa-east-1</option>
+            {% elif scanner_provider == 'gcp' %}
+            <option value="us-central1">us-central1</option><option value="us-east1">us-east1</option><option value="us-east4">us-east4</option><option value="us-west1" selected>us-west1</option><option value="us-west2">us-west2</option><option value="us-west3">us-west3</option><option value="us-west4">us-west4</option>
+            <option value="europe-west1">europe-west1</option><option value="europe-west2">europe-west2</option><option value="europe-west3">europe-west3</option><option value="asia-east1">asia-east1</option><option value="asia-southeast1">asia-southeast1</option>
+            {% elif scanner_provider == 'azure' %}
+            <option value="eastus">eastus</option><option value="eastus2">eastus2</option><option value="centralus">centralus</option><option value="westus">westus</option><option value="westus2" selected>westus2</option><option value="westus3">westus3</option>
+            <option value="westeurope">westeurope</option><option value="northeurope">northeurope</option><option value="uksouth">uksouth</option><option value="southeastasia">southeastasia</option><option value="australiaeast">australiaeast</option>
+            {% endif %}
+          </select>
+          <p class="hint" style="margin-top:-8px;">Select one or more {{ provider_label }} regions. Use Ctrl/Command-click for multiple regions.</p>
+          {% else %}
           <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+            {% if is_flex2flex %}
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
+            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="sjc" checked> sjc</label>
+            {% else %}
             <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
             <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
             <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="ord" checked> ord</label>
             <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="hkg" checked> hkg</label>
             <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="syd" checked> syd</label>
             <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="lon"> lon</label>
+            {% endif %}
           </div>
+          {% endif %}
         </div>
       </div>
-      <button id="runOverviewBtn">Run Account Scanning</button>
+      <button id="runOverviewBtn">{% if is_flex2flex %}Run FLEX Source Scanning{% elif is_hyperflex %}Generate {{ provider_label }} Source Overview{% else %}Run Account Scanning{% endif %}</button>
     </section>
 
     <!-- SG Rule Detail Cards (populated after Step 1 or CSV upload) -->
@@ -303,10 +586,10 @@
 
     <section class="card">
       <h2>2) Flavor + Block + LB Mapping <span id="statusMapper" class="status-chip idle">Idle</span></h2>
-      <p class="hint">Select your deployment region, then select your Account Overview file, choose any optional DB/Floating IP behaviors, and press <code>Run Flavor Mapper</code>.</p>
+      <p class="hint">{% if is_flex2flex %}Target region mirrors the Target FLEX Credentials selector above. Select your source overview, choose optional DB/Floating IP behaviors, and press <code>Run Flavor Mapper</code>.{% else %}Select your deployment region, then select your Account Overview file, choose any optional DB/Floating IP behaviors, and press <code>Run Flavor Mapper</code>.{% endif %}</p>
       <p class="hint">Regional target flavor catalogs are loaded from <code>uploads/flavors/</code>.</p>
       <div class="grid">
-        <label>Deployment Region
+        <label {% if is_flex2flex %}style="display:none;"{% endif %}>{% if is_flex2flex %}Target FLEX Region{% else %}Deployment Region{% endif %}
           <select id="mapTargetRegion">
             <option value="">-- select region --</option>
             <option value="DFW">DFW</option>
@@ -381,7 +664,7 @@
             <option value="HA-Standard">HA-Standard</option>
           </select>
         </label>
-        <label>Key Name (must already exist or be provided below for Linux VMs) <input id="depKeyName" type="text" /></label>
+        <label>Key Name (optional SSH access for Linux VMs) <input id="depKeyName" type="text" /></label>
         <label>SSH Public Key (Optional: Auto-import if Key Name is missing) <textarea id="depSshPubKey" rows="2" placeholder="ssh-rsa AAAAB3N..."></textarea></label>
         <label>Windows Admin User <input id="depWindowsAdminUser" type="text" value="Administrator" /></label>
         <label>Windows Password Length
@@ -425,6 +708,7 @@
     </section>
   </main>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
+  <script>window.OSFLEX_SCANNER_MODE = "{{ scanner_mode }}"; window.OSFLEX_SCANNER_PROVIDER = "{{ scanner_provider }}";</script>
+  <script src="{{ url_for('static', filename='app.js') }}?v={{ cache_bust|default(6) }}"></script>
 </body>
 </html>

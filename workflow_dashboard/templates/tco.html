@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TCO Savings</title>
+  <style>
+    body { margin:0; font-family:"Segoe UI",Tahoma,sans-serif; color:#e2e8f0; background:linear-gradient(120deg,#13244d,#253b78 55%,#3c315f); font-size:13px; }
+    .wrap { padding:14px; display:grid; gap:12px; }
+    .card { background:rgba(15,23,42,.78); border:1px solid rgba(125,211,252,.28); border-radius:10px; padding:14px; }
+    h1,h2 { margin:0 0 8px; }
+    h1 { font-size:20px; color:#fef3c7; }
+    h2 { font-size:15px; color:#bae6fd; }
+    .meta { color:#94a3b8; margin:0; }
+    .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    label { display:flex; flex-direction:column; gap:5px; color:#cbd5e1; font-size:12px; }
+    select,input,button { background:#0f172a; border:1px solid #38bdf8; color:#e2e8f0; border-radius:7px; padding:8px 10px; }
+    button { cursor:pointer; font-weight:800; background:linear-gradient(135deg,#0891b2,#0e7490); }
+    .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+    .metric { background:rgba(0,0,0,.28); border:1px solid rgba(148,163,184,.25); border-radius:8px; padding:12px; }
+    .metric div:first-child { color:#94a3b8; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .metric div:last-child { color:#f8fafc; font-size:20px; font-weight:900; margin-top:4px; }
+    .positive { color:#86efac !important; }
+    .negative { color:#fca5a5 !important; }
+    table { width:100%; border-collapse:collapse; min-width:880px; }
+    th,td { padding:7px 8px; border-bottom:1px solid rgba(148,163,184,.22); white-space:nowrap; text-align:left; }
+    th { position:sticky; top:0; background:#172554; color:#7dd3fc; }
+    .table-wrap { overflow:auto; max-height:58vh; border:1px solid rgba(148,163,184,.25); border-radius:8px; background:rgba(0,0,0,.2); }
+    .browser-panel { border:1px solid rgba(125,211,252,.28); border-radius:8px; background:rgba(2,6,23,.55); padding:14px; display:grid; gap:10px; }
+    .hidden { display:none; }
+    a { color:#7dd3fc; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>TCO Savings</h1>
+      <p class="meta">Monthly, yearly, and 3-year source infrastructure cost versus projected target FLEX cost for VMs, volumes, database, and storage rows found in scanner outputs.</p>
+    </section>
+    <section class="card">
+      <h2>Origin Infrastructure Price Sources</h2>
+      <p class="meta">Live hyperscaler region pricing is fetched from CloudPrice when AWS, GCP, or Azure is selected. FLEX prices come from local uploaded flavor CSVs.</p>
+      <div class="table-wrap" style="max-height:220px;">
+        <table>
+          <thead><tr><th>Origin</th><th>Region</th><th>Avg $/hr Ref</th><th>Price Source</th><th>Notes</th></tr></thead>
+          <tbody id="priceSourceRows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card controls">
+      <label>Migration Source
+        <select id="source">
+          <option value="ospc">OSPC to FLEX</option>
+          <option value="flex2flex">FLEX to FLEX</option>
+          <option value="aws">AWS to FLEX</option>
+          <option value="gcp">GCP to FLEX</option>
+          <option value="azure">Azure to FLEX</option>
+        </select>
+      </label>
+      <label>Source Region
+        <select id="region"></select>
+      </label>
+      <label>Flavor Map CSV
+        <input id="flavorMapFile" type="file" accept=".csv" />
+      </label>
+      <button id="uploadFlavorMap" type="button">Upload Flavor Map</button>
+      <button id="refresh">Refresh TCO</button>
+      <button id="exportTcoCsv" type="button">Export CSV</button>
+      <a id="currentPriceUrl" href="#" target="_blank" rel="noopener" class="hidden">Open CloudPrice region page</a>
+      <span id="status" class="meta">Ready.</span>
+    </section>
+    <section id="cloudPriceBrowserCard" class="card hidden">
+      <h2>CloudPrice Region Browser</h2>
+      <p class="meta">CloudPrice blocks iframe embedding, so use the controls below to open the selected region page in a browser tab.</p>
+      <div class="browser-panel">
+        <div><strong>Selected region URL:</strong> <a id="cloudPricePanelLink" href="#" target="_blank" rel="noopener"></a></div>
+        <div id="cloudPricePanelStatus" class="meta">Refresh TCO to load pricing status.</div>
+        <div><button id="openCloudPriceBtn" type="button">Open Region Price Page</button></div>
+      </div>
+    </section>
+    <section id="sampleTcoCard" class="card hidden">
+      <h2>Example Hyperscaler TCO Samples</h2>
+      <p class="meta">Ten sample instance types for the selected hyperscaler. These are illustrative examples until an uploaded flavor map or scanner export supplies exact per-instance prices.</p>
+      <div class="table-wrap" style="max-height:360px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Provider</th><th>Type</th><th>Instance Type</th><th>vCPU</th><th>RAM GB</th><th>Sample Source $/hr</th><th>Sample FLEX $/hr</th><th>Source / mo</th><th>FLEX / mo</th><th>Savings / mo</th>
+            </tr>
+          </thead>
+          <tbody id="sampleRows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Summary</h2>
+      <div id="summary" class="summary"></div>
+      <p id="sourceRef" class="meta" style="margin-top:10px;"></p>
+    </section>
+    <section class="card">
+      <h2>Resource Cost Lines</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th><th>Name</th><th>Source Flavor</th><th>Current Cost</th><th>Target FLEX Flavor</th>
+              <th>FLEX $/hr</th><th>Source / mo</th><th>FLEX / mo</th><th>Savings / mo</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script>
+    const initialSource = "{{ source }}";
+    const defaultRegions = { ospc: 'global', flex2flex: 'DFW/IAD/SJC', aws: 'us-west-2', gcp: 'us-west1', azure: 'westus2' };
+    const regionOptions = {
+      ospc: ['global'],
+      flex2flex: ['DFW/IAD/SJC', 'DFW3', 'IAD3', 'SJC3', 'ORD1', 'HKG1', 'SYD1', 'LON1'],
+      aws: [
+        'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+        'ca-central-1', 'ca-west-1',
+        'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1', 'eu-central-2', 'eu-north-1', 'eu-south-1', 'eu-south-2',
+        'ap-east-1', 'ap-south-1', 'ap-south-2', 'ap-southeast-1', 'ap-southeast-2', 'ap-southeast-3', 'ap-southeast-4',
+        'ap-northeast-1', 'ap-northeast-2', 'ap-northeast-3',
+        'sa-east-1', 'me-south-1', 'me-central-1', 'af-south-1', 'il-central-1'
+      ],
+      gcp: [
+        'us-central1', 'us-east1', 'us-east4', 'us-east5', 'us-south1', 'us-west1', 'us-west2', 'us-west3', 'us-west4',
+        'northamerica-northeast1', 'northamerica-northeast2',
+        'southamerica-east1', 'southamerica-west1',
+        'europe-west1', 'europe-west2', 'europe-west3', 'europe-west4', 'europe-west6', 'europe-west8', 'europe-west9', 'europe-west10', 'europe-west12',
+        'europe-central2', 'europe-north1', 'europe-southwest1',
+        'asia-east1', 'asia-east2', 'asia-northeast1', 'asia-northeast2', 'asia-northeast3',
+        'asia-south1', 'asia-south2', 'asia-southeast1', 'asia-southeast2',
+        'australia-southeast1', 'australia-southeast2', 'me-central1', 'me-central2', 'me-west1'
+      ],
+      azure: [
+        'eastus', 'eastus2', 'centralus', 'northcentralus', 'southcentralus', 'westcentralus', 'westus', 'westus2', 'westus3',
+        'canadacentral', 'canadaeast',
+        'brazilsouth', 'brazilsoutheast',
+        'northeurope', 'westeurope', 'uksouth', 'ukwest', 'francecentral', 'francesouth', 'germanywestcentral',
+        'swedencentral', 'switzerlandnorth', 'switzerlandwest', 'norwayeast', 'norwaywest', 'polandcentral', 'italynorth', 'spaincentral',
+        'eastasia', 'southeastasia', 'japaneast', 'japanwest', 'koreacentral', 'koreasouth',
+        'australiaeast', 'australiasoutheast', 'centralindia', 'southindia', 'westindia',
+        'uaenorth', 'qatarcentral', 'israelcentral', 'southafricanorth'
+      ],
+    };
+    const sampleInstances = {
+      aws: [
+        ['VM', 't3.micro', 2, 1, 0.0104, 0.0250], ['VM', 't3.medium', 2, 4, 0.0416, 0.0430],
+        ['VM', 'm5.large', 2, 8, 0.0960, 0.0860], ['VM', 'm5.xlarge', 4, 16, 0.1920, 0.1720],
+        ['VM', 'm5.2xlarge', 8, 32, 0.3840, 0.3440], ['VM', 'm6i.large', 2, 8, 0.0960, 0.0860],
+        ['VM', 'c5.large', 2, 4, 0.0850, 0.0860], ['VM', 'c5.xlarge', 4, 8, 0.1700, 0.1720],
+        ['VM', 'r5.large', 2, 16, 0.1260, 0.1290], ['VM', 'r5.xlarge', 4, 32, 0.2520, 0.2580],
+        ['DB', 'db.t3.micro', 2, 1, 0.0170, 0.0250], ['DB', 'db.t3.medium', 2, 4, 0.0680, 0.0430],
+        ['DB', 'db.m5.large', 2, 8, 0.1710, 0.0860], ['DB', 'db.m5.xlarge', 4, 16, 0.3420, 0.1720],
+        ['DB', 'db.r5.large', 2, 16, 0.2400, 0.1290],
+      ],
+      gcp: [
+        ['VM', 'e2-micro', 2, 1, 0.0084, 0.0250], ['VM', 'e2-medium', 2, 4, 0.0336, 0.0430],
+        ['VM', 'e2-standard-2', 2, 8, 0.0670, 0.0860], ['VM', 'e2-standard-4', 4, 16, 0.1340, 0.1720],
+        ['VM', 'n1-standard-1', 1, 3.75, 0.0475, 0.0430], ['VM', 'n1-standard-4', 4, 15, 0.1900, 0.1720],
+        ['VM', 'n2-standard-2', 2, 8, 0.0970, 0.0860], ['VM', 'n2-standard-4', 4, 16, 0.1940, 0.1720],
+        ['VM', 'n2-highmem-2', 2, 16, 0.1290, 0.1290], ['VM', 'c2-standard-4', 4, 16, 0.2088, 0.1720],
+        ['DB', 'db-f1-micro', 1, 0.6, 0.0150, 0.0250], ['DB', 'db-g1-small', 1, 1.7, 0.0500, 0.0430],
+        ['DB', 'db-custom-2-7680', 2, 7.5, 0.1210, 0.0860], ['DB', 'db-custom-4-15360', 4, 15, 0.2420, 0.1720],
+        ['DB', 'db-custom-8-30720', 8, 30, 0.4840, 0.3440],
+      ],
+      azure: [
+        ['VM', 'B1s', 1, 1, 0.0104, 0.0250], ['VM', 'B2s', 2, 4, 0.0416, 0.0430],
+        ['VM', 'D2s v5', 2, 8, 0.0960, 0.0860], ['VM', 'D4s v5', 4, 16, 0.1920, 0.1720],
+        ['VM', 'D8s v5', 8, 32, 0.3840, 0.3440], ['VM', 'D2as v5', 2, 8, 0.0860, 0.0860],
+        ['VM', 'F2s v2', 2, 4, 0.0850, 0.0860], ['VM', 'F4s v2', 4, 8, 0.1690, 0.1720],
+        ['VM', 'E2s v5', 2, 16, 0.1260, 0.1290], ['VM', 'E4s v5', 4, 32, 0.2520, 0.2580],
+        ['DB', 'Basic B1ms', 1, 2, 0.0260, 0.0250], ['DB', 'GP Gen5 2 vCore', 2, 10, 0.1250, 0.0860],
+        ['DB', 'GP Gen5 4 vCore', 4, 20, 0.2500, 0.1720], ['DB', 'MO Gen5 2 vCore', 2, 20, 0.1800, 0.1290],
+        ['DB', 'BC Gen5 4 vCore', 4, 20, 0.5040, 0.1720],
+      ],
+    };
+    let uploadedFlavorMap = '';
+    let latestTcoData = null;
+    const money = n => '$' + Number(n || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    const esc = s => String(s || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    function metric(label, value, cls='') {
+      return `<div class="metric"><div>${esc(label)}</div><div class="${cls}">${money(value)}</div></div>`;
+    }
+    function csvEscape(value) {
+      return '"' + String(value ?? '').replace(/"/g, '""') + '"';
+    }
+    function downloadCsv(filename, rows, headers) {
+      const lines = [headers.map(csvEscape).join(',')];
+      rows.forEach(row => lines.push(headers.map(h => csvEscape(row[h])).join(',')));
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    function cloudPriceUrl(source, region) {
+      return ['aws', 'gcp', 'azure'].includes(source) ? `https://cloudprice.net/${source}/region/${region}` : '';
+    }
+    function updateCloudPriceBrowser(source, region) {
+      const url = cloudPriceUrl(source, region);
+      const link = document.getElementById('currentPriceUrl');
+      const card = document.getElementById('cloudPriceBrowserCard');
+      const panelLink = document.getElementById('cloudPricePanelLink');
+      if (!url) {
+        link.classList.add('hidden');
+        card.classList.add('hidden');
+        panelLink.removeAttribute('href');
+        panelLink.textContent = '';
+        return;
+      }
+      link.href = url;
+      link.textContent = url;
+      link.classList.remove('hidden');
+      card.classList.remove('hidden');
+      panelLink.href = url;
+      panelLink.textContent = url;
+    }
+    function renderSampleTco(source) {
+      const card = document.getElementById('sampleTcoCard');
+      const rows = sampleInstances[source] || [];
+      if (!rows.length) {
+        card.classList.add('hidden');
+        document.getElementById('sampleRows').innerHTML = '';
+        return;
+      }
+      card.classList.remove('hidden');
+      document.getElementById('sampleRows').innerHTML = rows.map(([kind, name, cpu, ram, sourceHourly, flexHourly]) => {
+        const sourceMonthly = sourceHourly * 730;
+        const flexMonthly = flexHourly * 730;
+        const savings = sourceMonthly - flexMonthly;
+        return `<tr>
+          <td>${esc(source.toUpperCase())}</td><td>${esc(kind)}</td><td>${esc(name)}</td><td>${esc(cpu)}</td><td>${esc(ram)}</td>
+          <td>${money(sourceHourly)}</td><td>${money(flexHourly)}</td><td>${money(sourceMonthly)}</td><td>${money(flexMonthly)}</td>
+          <td class="${savings >= 0 ? 'positive' : 'negative'}">${money(savings)}</td>
+        </tr>`;
+      }).join('');
+    }
+    async function load() {
+      const source = document.getElementById('source').value;
+      const region = document.getElementById('region').value || defaultRegions[source] || '';
+      const status = document.getElementById('status');
+      updateCloudPriceBrowser(source, region);
+      renderSampleTco(source);
+      status.textContent = 'Loading...';
+      let url = '/api/tco/report?source=' + encodeURIComponent(source) + '&region=' + encodeURIComponent(region);
+      if (uploadedFlavorMap) url += '&flavor_map=' + encodeURIComponent(uploadedFlavorMap);
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        status.textContent = data.error || 'TCO report failed';
+        document.getElementById('summary').innerHTML = '';
+        document.getElementById('rows').innerHTML = '';
+        return;
+      }
+      const s = data.summary || {};
+      latestTcoData = data;
+      renderPriceSources(s);
+      const savingsCls = Number(s.monthly_savings || 0) >= 0 ? 'positive' : 'negative';
+      const summaryMetrics = [
+        metric('Current Infra Monthly Cost', s.monthly_source),
+        ['aws', 'gcp', 'azure'].includes(s.source) ? metric(`${String(s.source || '').toUpperCase()} Monthly`, s.monthly_hyperscaler) : '',
+        metric('Target FLEX Monthly', s.monthly_flex),
+        metric('Monthly Savings', s.monthly_savings, savingsCls),
+        metric('Yearly Savings', s.yearly_savings, Number(s.yearly_savings || 0) >= 0 ? 'positive' : 'negative'),
+        metric('3-Year Source', s.three_year_source),
+        metric('3-Year FLEX', s.three_year_flex),
+        metric('3-Year Savings', s.three_year_savings, Number(s.three_year_savings || 0) >= 0 ? 'positive' : 'negative'),
+      ].filter(Boolean);
+      document.getElementById('summary').innerHTML = summaryMetrics.join('');
+      const ref = s.source_price_reference || {};
+      const fileBits = [
+        s.flavor_map ? `Flavor map: ${esc(s.flavor_map)}` : '',
+        s.block_map ? `Block map: ${esc(s.block_map)}` : '',
+        s.overview_file ? `Overview: ${esc(s.overview_file)}` : '',
+      ].filter(Boolean).join(' · ');
+      const pricing = ref.price_url ? `<a href="${esc(ref.price_url)}" target="_blank" rel="noopener">${esc(ref.price_url)}</a>` : esc(ref.notes || 'local/customer supplied');
+      const liveNote = ref.live_price_status ? ` · Live price: ${esc(ref.live_price_status)}${ref.live_price_error ? ` (${esc(ref.live_price_error)})` : ''}` : '';
+      document.getElementById('cloudPricePanelStatus').textContent = ref.live_price_status
+        ? `Pricing status: ${ref.live_price_status}${ref.avg_hourly_reference ? ` · Avg $/hr: ${ref.avg_hourly_reference}` : ''}${ref.live_price_error ? ` · ${ref.live_price_error}` : ''}`
+        : 'Pricing status: not applicable for this source.';
+      document.getElementById('sourceRef').innerHTML = `${fileBits}<br>Flavor map source: ${esc(s.flavor_map_source || 'source-specific')}<br>Source pricing: ${pricing}${liveNote}<br>Rows use exported price columns when present; missing source prices use the selected region average only for hyperscaler sources.`;
+      document.getElementById('rows').innerHTML = (data.items || []).map(r => `
+        <tr>
+          <td>${esc(r.resource_type)}</td><td>${esc(r.name)}</td><td>${esc(r.source_flavor)}</td><td>${money(r.source_hourly)}</td><td>${esc(r.target_flavor)}</td>
+          <td>${money(r.flex_hourly)}</td><td>${money(r.monthly_source)}</td><td>${money(r.monthly_flex)}</td>
+          <td class="${Number(r.monthly_savings || 0) >= 0 ? 'positive' : 'negative'}">${money(r.monthly_savings)}</td>
+        </tr>`).join('') || '<tr><td colspan="9">No included resources found.</td></tr>';
+      status.textContent = `Loaded ${s.resource_count || 0} resource(s).`;
+    }
+    function renderPriceSources(summary) {
+      const currentSource = summary.source || document.getElementById('source').value;
+      const currentRef = summary.source_price_reference || {};
+      const rows = (summary.origin_price_sources || []).map((r) => {
+        const isCurrent = r.provider === currentSource;
+        const merged = isCurrent ? {...r, ...currentRef, region: summary.source_region || currentRef.region || r.region} : r;
+        return `<tr>
+          <td>${esc(merged.origin)}</td>
+          <td>${esc(merged.region)}</td>
+          <td>${esc(merged.avg_hourly_reference)}</td>
+          <td>${merged.price_url ? `<a href="${esc(merged.price_url)}" target="_blank" rel="noopener">${esc(merged.price_url)}</a>` : 'local / customer supplied'}</td>
+          <td>${esc(merged.notes || '')}${merged.live_price_status ? ` · live=${esc(merged.live_price_status)}` : ''}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('priceSourceRows').innerHTML = rows || '<tr><td colspan="5">No price sources loaded.</td></tr>';
+    }
+    function populateRegionDropdown(source, preferred='') {
+      const regionSelect = document.getElementById('region');
+      const regions = regionOptions[source] || [defaultRegions[source] || 'global'];
+      const selected = preferred || defaultRegions[source] || regions[0];
+      regionSelect.innerHTML = regions.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
+      if (!regions.includes(selected)) {
+        regionSelect.insertAdjacentHTML('afterbegin', `<option value="${esc(selected)}">${esc(selected)}</option>`);
+      }
+      regionSelect.value = selected;
+      updateCloudPriceBrowser(source, regionSelect.value);
+      renderSampleTco(source);
+    }
+    document.getElementById('source').value = initialSource;
+    populateRegionDropdown(initialSource);
+    document.getElementById('source').addEventListener('change', () => {
+      const source = document.getElementById('source').value;
+      populateRegionDropdown(source);
+    });
+    document.getElementById('region').addEventListener('change', () => {
+      const source = document.getElementById('source').value;
+      const region = document.getElementById('region').value || defaultRegions[source] || '';
+      updateCloudPriceBrowser(source, region);
+    });
+    document.getElementById('openCloudPriceBtn').addEventListener('click', () => {
+      const source = document.getElementById('source').value;
+      const region = document.getElementById('region').value || defaultRegions[source] || '';
+      const url = cloudPriceUrl(source, region);
+      if (url) window.open(url, '_blank', 'noopener');
+    });
+    document.getElementById('uploadFlavorMap').addEventListener('click', async () => {
+      const input = document.getElementById('flavorMapFile');
+      const status = document.getElementById('status');
+      if (!input.files || !input.files[0]) {
+        status.textContent = 'Choose a flavor map CSV first.';
+        return;
+      }
+      const form = new FormData();
+      form.append('file', input.files[0]);
+      status.textContent = 'Uploading flavor map...';
+      const res = await fetch('/api/tco/upload-flavormap', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        status.textContent = data.error || 'Flavor map upload failed.';
+        return;
+      }
+      uploadedFlavorMap = data.saved_as || '';
+      status.textContent = `Flavor map uploaded: ${uploadedFlavorMap}`;
+      load();
+    });
+    document.getElementById('refresh').addEventListener('click', load);
+    document.getElementById('exportTcoCsv').addEventListener('click', () => {
+      if (!latestTcoData || !latestTcoData.ok) {
+        document.getElementById('status').textContent = 'Refresh TCO before exporting.';
+        return;
+      }
+      const s = latestTcoData.summary || {};
+      const rows = (latestTcoData.items || []).map(r => ({
+        source: s.source || '',
+        source_region: s.source_region || '',
+        resource_type: r.resource_type || '',
+        name: r.name || '',
+        source_flavor: r.source_flavor || '',
+        current_cost_per_hour: r.source_hourly || 0,
+        target_flex_flavor: r.target_flavor || '',
+        flex_cost_per_hour: r.flex_hourly || 0,
+        source_monthly_cost: r.monthly_source || 0,
+        flex_monthly_cost: r.monthly_flex || 0,
+        monthly_savings: r.monthly_savings || 0,
+      }));
+      rows.unshift({
+        source: s.source || '',
+        source_region: s.source_region || '',
+        resource_type: 'SUMMARY',
+        name: 'TCO totals',
+        source_flavor: '',
+        current_cost_per_hour: s.source_hourly_total || 0,
+        target_flex_flavor: '',
+        flex_cost_per_hour: s.flex_hourly_total || 0,
+        source_monthly_cost: s.monthly_source || 0,
+        flex_monthly_cost: s.monthly_flex || 0,
+        monthly_savings: s.monthly_savings || 0,
+      });
+      const headers = ['source','source_region','resource_type','name','source_flavor','current_cost_per_hour','target_flex_flavor','flex_cost_per_hour','source_monthly_cost','flex_monthly_cost','monthly_savings'];
+      const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+      downloadCsv(`tco_${s.source || 'source'}_${s.source_region || 'global'}_${stamp}.csv`, rows, headers);
+    });
+    load();
+  </script>
+</body>
+</html>

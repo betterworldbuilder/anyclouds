@@ -31,6 +31,62 @@ const scriptFileInput = document.getElementById('scriptFile');
 
 const DEFAULT_OPENRC_FILE = 'openrcpassnew.sh';
 const DEFAULT_DEPLOY_SCRIPT_FILE = '1342314_tenant_deploy.sh';
+const INFRA_SOURCE_MODES = {
+  ospc: {
+    title: 'Anycloud to FLEX Infrastructure Topology Builder and Deployer',
+    subtitle: 'Clone discovered source topology onto FLEX, link resources, then generate or run the deployment script.',
+    hint: 'Use the Stage 1 OSPC infra discovery deployment script, or import a live OpenStack project when credentials are available.',
+    liveHint: 'Import uses FLEX/OpenStack OpenRC credentials and discovers resources currently in that project.',
+    scriptHint: 'Paste the OSPC Stage 1 tenant deploy script to reconstruct networks, routers, security groups, load balancers, volumes, and VMs.',
+    fileDefault: DEFAULT_DEPLOY_SCRIPT_FILE,
+    filenameTag: 'ospc2flex',
+  },
+  flex2flex: {
+    title: 'FLEX2FLEX Infrastructure Topology Builder and Deployer',
+    subtitle: 'Discover an existing FLEX project or import its generated script, then clone the same infrastructure shape into the target FLEX region.',
+    hint: 'Use FLEX source OpenRC for live discovery, then deploy with target FLEX OpenRC. Script import accepts the same OpenStack commands as OSPC2FLEX.',
+    liveHint: 'Import From Project discovers the source FLEX project with OpenStack CLI, matching the OSPC infra discovery shape.',
+    scriptHint: 'Paste a FLEX source topology/deploy script or generated OpenStack CLI script to build the same visual topology module.',
+    fileDefault: 'flex2flex_topology_deploy.sh',
+    filenameTag: 'flex2flex',
+  },
+  hyperflex: {
+    title: 'HYPER FLEX Infrastructure Topology Builder and Deployer',
+    subtitle: 'Adapt AWS, Azure, or GCP discovered infrastructure into FLEX topology, then generate or run the FLEX deployment script.',
+    hint: 'Use hyperscaler discovery output from Stage 1, converted OpenStack-style script, or manually place nodes before FLEX deploy.',
+    liveHint: 'Live OpenStack import is for FLEX/OpenStack sources. For AWS, Azure, or GCP, paste the converted discovery/deploy script or use manual topology nodes.',
+    scriptHint: 'Paste hyperscaler-to-FLEX converted topology commands. The builder reuses the same OSPC2FLEX visual parser and deployment stages.',
+    fileDefault: 'hyperflex_topology_deploy.sh',
+    filenameTag: 'hyperflex',
+  },
+};
+
+function currentInfraSourceMode() {
+  const selectValue = document.getElementById('infraSourceMode')?.value || '';
+  const queryValue = new URLSearchParams(window.location.search).get('source') || '';
+  const mode = (selectValue || queryValue || 'ospc').toLowerCase();
+  return INFRA_SOURCE_MODES[mode] ? mode : 'ospc';
+}
+
+function applyInfraSourceMode(modeArg) {
+  const mode = INFRA_SOURCE_MODES[modeArg] ? modeArg : currentInfraSourceMode();
+  const cfg = INFRA_SOURCE_MODES[mode];
+  const select = document.getElementById('infraSourceMode');
+  if (select) select.value = mode;
+  const title = document.getElementById('designerTitle');
+  const subtitle = document.getElementById('designerSubtitle');
+  const sourceHint = document.getElementById('infraSourceHint');
+  const liveHint = document.getElementById('importLiveHint');
+  const scriptHint = document.getElementById('importScriptHint');
+  if (title) title.textContent = cfg.title;
+  if (subtitle) subtitle.textContent = cfg.subtitle;
+  if (sourceHint) sourceHint.textContent = cfg.hint;
+  if (liveHint) liveHint.textContent = cfg.liveHint;
+  if (scriptHint) scriptHint.textContent = cfg.scriptHint;
+  if (scriptFileInput && (!scriptFileInput.value.trim() || Object.values(INFRA_SOURCE_MODES).some((m) => scriptFileInput.value === m.fileDefault))) {
+    scriptFileInput.value = cfg.fileDefault;
+  }
+}
 
 function getOpenrcContentValue() {
   return openrcContentInput ? openrcContentInput.value : '';
@@ -48,7 +104,40 @@ function appendRawLog(text) {
   if (!logBox.textContent.endsWith('\n')) logBox.textContent += '\n';
   logBox.textContent += chunk;
   logBox.scrollTop = logBox.scrollHeight;
+  updateActiveDeployPhaseFromText(chunk);
 }
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([String(text || '')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function wireTextPaneActions(copyId, saveId, clearId, pane, defaultText, filename) {
+  document.getElementById(copyId)?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(pane?.textContent || '');
+      log(`Copied ${filename}`);
+    } catch (e) {
+      log(`Copy failed: ${e.message}`);
+    }
+  });
+  document.getElementById(saveId)?.addEventListener('click', () => {
+    downloadTextFile(filename, pane?.textContent || '');
+  });
+  document.getElementById(clearId)?.addEventListener('click', () => {
+    if (pane) pane.textContent = defaultText;
+  });
+}
+
+wireTextPaneActions('copyScriptPreviewBtn', 'saveScriptPreviewBtn', 'clearScriptPreviewBtn', scriptPreview, 'No script generated yet.', 'generated-script.sh');
+wireTextPaneActions('copyActivityLogBtn', 'saveActivityLogBtn', 'clearActivityLogBtn', logBox, 'Ready.', 'activity-log.txt');
 
 async function withButtonBusy(buttonId, actionName, fn) {
   const btn = document.getElementById(buttonId);
@@ -70,6 +159,11 @@ async function withButtonBusy(buttonId, actionName, fn) {
 
 function nodeDisplayName(node) {
   return (node.props?.name || node.label || node.id || '').trim() || node.type;
+}
+
+function topologyLabel(node) {
+  const text = nodeDisplayName(node);
+  return text.length > 10 ? text.slice(0, 10) : text;
 }
 
 function isNodeMultiSelected(nodeId) {
@@ -98,17 +192,13 @@ function nodeMetaBadges(node) {
 function instanceMetaHtml(node) {
   const props = node?.props || {};
   const flavor = String(props.flavor || '').trim();
-  const image = String(props.image || '').trim();
   const authMode = String(props.auth_mode || '').trim().toLowerCase();
   const keyName = String(props.key_name || '').trim();
   const showKey = authMode !== 'windows_password' && keyName;
   const keyHtml = showKey
     ? `<div class="instance-key-chip">Key: ${escapeHtml(keyName)}</div>`
     : '';
-  const imageHtml = image
-    ? `<div class="instance-os-chip">OS: ${escapeHtml(image)}</div>`
-    : '';
-  return { flavor, keyHtml, imageHtml };
+  return { flavor, keyHtml, imageHtml: '' };
 }
 
 function defaultProps(type) {
@@ -186,13 +276,15 @@ function render() {
       ? '<span class="node-badge">FIP</span>'
       : '';
     let metaHtml = '';
-    let nameHtml = `<div class="name">${escapeHtml(nodeDisplayName(node))}</div>`;
+    const fullName = nodeDisplayName(node);
+    const shortName = topologyLabel(node);
+    let nameHtml = `<div class="name" title="${escapeHtml(fullName)}">${escapeHtml(shortName)}</div>`;
     if (node.type === 'instance') {
       const instanceMeta = instanceMetaHtml(node);
       const flavorHtml = instanceMeta.flavor
         ? `<span class="instance-flavor-chip">Flavor: ${escapeHtml(instanceMeta.flavor)}</span>`
         : '';
-      nameHtml = `<div class="instance-name-row"><div class="name">${escapeHtml(nodeDisplayName(node))}</div>${flavorHtml}</div>`;
+      nameHtml = `<div class="instance-name-row"><div class="name" title="${escapeHtml(fullName)}">${escapeHtml(shortName)}</div>${flavorHtml}</div>`;
       metaHtml = `${instanceMeta.keyHtml || ''}${instanceMeta.imageHtml || ''}`;
     } else {
       const metaBadges = nodeMetaBadges(node);
@@ -835,6 +927,25 @@ async function apiPost(url, payload) {
   return data;
 }
 
+async function uploadDeploymentScriptFile() {
+  const input = document.getElementById('scriptUploadFile');
+  const file = input?.files?.[0];
+  if (!file) {
+    log('Choose a deployment script file first.');
+    return;
+  }
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/upload', { method: 'POST', body: form });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Upload failed');
+  const scriptFile = document.getElementById('scriptFile');
+  const savedAs = data.saved_as || file.name;
+  if (scriptFile) scriptFile.value = savedAs;
+  localStorage.setItem('designer_last_deploy_script', savedAs);
+  log(`Uploaded deployment script: ${savedAs}`);
+}
+
 async function refreshTopologies() {
   const data = await apiGet('/api/topology/list');
   const prev = topologySelect.value;
@@ -852,6 +963,7 @@ async function refreshOpenrcFiles() {
   if (!openrcSelect) return;
   const data = await apiGet('/api/topology/openrc-files');
   const previous = openrcSelect.value;
+  const cached = localStorage.getItem('designer_last_good_openrc') || '';
   openrcSelect.innerHTML = '<option value="">-- select detected OpenRC --</option>';
   for (const file of data.files || []) {
     const opt = document.createElement('option');
@@ -859,7 +971,10 @@ async function refreshOpenrcFiles() {
     opt.textContent = file;
     openrcSelect.appendChild(opt);
   }
-  if ([...openrcSelect.options].some((o) => o.value === previous)) {
+  if (cached && [...openrcSelect.options].some((o) => o.value === cached)) {
+    openrcSelect.value = cached;
+    if (openrcFileInput) openrcFileInput.value = cached;
+  } else if ([...openrcSelect.options].some((o) => o.value === previous)) {
     openrcSelect.value = previous;
     if (openrcFileInput && previous) openrcFileInput.value = previous;
   } else if ([...openrcSelect.options].some((o) => o.value === DEFAULT_OPENRC_FILE)) {
@@ -879,7 +994,9 @@ function timestampForScriptName() {
 function buildTopologyScriptName() {
   const rawAccountId = (document.getElementById('scriptAccountId')?.value || '').trim();
   const accountId = rawAccountId.replace(/[^0-9a-zA-Z_-]/g, '') || 'account';
-  return `${accountId}_topology_deploy_${timestampForScriptName()}.sh`;
+  const mode = currentInfraSourceMode();
+  const tag = INFRA_SOURCE_MODES[mode]?.filenameTag || 'topology';
+  return `${accountId}_${tag}_topology_deploy_${timestampForScriptName()}.sh`;
 }
 
 function renderValidation(data) {
@@ -1136,6 +1253,8 @@ document.getElementById('importScriptBtn').addEventListener('click', async () =>
         script_file: document.getElementById('scriptFile').value,
         script_content: document.getElementById('scriptContent').value,
       });
+      const usedScript = (document.getElementById('scriptFile')?.value || '').trim();
+      if (usedScript) localStorage.setItem('designer_last_deploy_script', usedScript);
       state.nodes = Array.isArray(data.topology?.nodes) ? data.topology.nodes : [];
       state.edges = Array.isArray(data.topology?.edges) ? data.topology.edges : [];
       state.selectedNodeId = null;
@@ -1147,6 +1266,22 @@ document.getElementById('importScriptBtn').addEventListener('click', async () =>
       log(`Script import failed: ${e.message}`);
     }
   });
+});
+
+document.getElementById('scriptUploadFile')?.addEventListener('change', async () => {
+  try {
+    await uploadDeploymentScriptFile();
+  } catch (e) {
+    log(`Script upload failed: ${e.message}`);
+  }
+});
+
+document.getElementById('uploadScriptBtn')?.addEventListener('click', async () => {
+  try {
+    await uploadDeploymentScriptFile();
+  } catch (e) {
+    log(`Script upload failed: ${e.message}`);
+  }
 });
 
 // ── Track current deploy job so Stop can kill it ─────────────────────────────
@@ -1183,6 +1318,8 @@ document.getElementById('deployBtn').addEventListener('click', async () => {
       const data = await apiPost('/api/topology/deploy-async', {
         topology: currentTopology(),
         script_name: buildTopologyScriptName(),
+        script_file: document.getElementById('scriptFile')?.value || '',
+        script_content: document.getElementById('scriptContent')?.value || '',
         openrc_file: document.getElementById('openrcFile').value,
         openrc_content: getOpenrcContentValue(),
         auth_secret: document.getElementById('authSecret').value,
@@ -1211,6 +1348,10 @@ document.getElementById('deployBtn').addEventListener('click', async () => {
         }
         if (status.complete) {
           finished = true;
+          if (status.ok) {
+            const usedOpenrc = (document.getElementById('openrcFile')?.value || '').trim();
+            if (usedOpenrc) localStorage.setItem('designer_last_good_openrc', usedOpenrc);
+          }
           log(`Deploy complete: ok=${status.ok} rc=${status.return_code} script=${status.script_path || data.script_path}`);
           break;
         }
@@ -1222,6 +1363,7 @@ document.getElementById('deployBtn').addEventListener('click', async () => {
       log(`Deploy failed: ${e.message}`);
     } finally {
       setDeployRunning(false);
+      setActiveDeployPhase('');
       currentDeployJobId = null;
     }
   });
@@ -1332,6 +1474,38 @@ if (rollbackBtn) {
 
 // ── Phase Select All / None ───────────────────────────────────────────────────
 const PHASE_IDS = ['phaseNet','phaseLbScaffold','phaseVolCreate','phaseVm','phaseVolAttach','phaseLbMembers'];
+const DEPLOY_PHASE_BY_NUMBER = {
+  1: 'phaseNet',
+  2: 'phaseLbScaffold',
+  3: 'phaseVolCreate',
+  4: 'phaseVm',
+  5: 'phaseVolAttach',
+  6: 'phaseLbMembers',
+};
+
+function setActiveDeployPhase(phaseId) {
+  PHASE_IDS.forEach((id) => {
+    const input = document.getElementById(id);
+    input?.closest('label')?.classList.toggle('phase-active', id === phaseId);
+  });
+}
+
+function updateActiveDeployPhaseFromText(text) {
+  const chunk = String(text || '');
+  const matches = [...chunk.matchAll(/PHASE\s+([1-6])\b/gi)];
+  if (matches.length) {
+    const phaseNumber = Number(matches[matches.length - 1][1]);
+    setActiveDeployPhase(DEPLOY_PHASE_BY_NUMBER[phaseNumber] || '');
+    return;
+  }
+  if (/Ensuring tenant network resources|network create|subnet create|router create/i.test(chunk)) setActiveDeployPhase('phaseNet');
+  else if (/loadbalancer create|listener create|pool create/i.test(chunk)) setActiveDeployPhase('phaseLbScaffold');
+  else if (/volume create/i.test(chunk)) setActiveDeployPhase('phaseVolCreate');
+  else if (/Executing deployment steps|Creating server|server create/i.test(chunk)) setActiveDeployPhase('phaseVm');
+  else if (/volume attach|Attaching volume/i.test(chunk)) setActiveDeployPhase('phaseVolAttach');
+  else if (/member create|LB member|pool member/i.test(chunk)) setActiveDeployPhase('phaseLbMembers');
+}
+
 document.getElementById('phaseSelectAll')?.addEventListener('click', () => {
   PHASE_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.checked = true; });
 });
@@ -1344,9 +1518,17 @@ refreshOpenrcFiles().catch((e) => log(`OpenRC list load failed: ${e.message}`));
 if (openrcFileInput && !openrcFileInput.value.trim()) {
   openrcFileInput.value = DEFAULT_OPENRC_FILE;
 }
-if (scriptFileInput && !scriptFileInput.value.trim()) {
-  scriptFileInput.value = DEFAULT_DEPLOY_SCRIPT_FILE;
+if (scriptFileInput) {
+  const cachedScript = localStorage.getItem('designer_last_deploy_script') || '';
+  if (cachedScript || !scriptFileInput.value.trim() || scriptFileInput.value === DEFAULT_DEPLOY_SCRIPT_FILE) {
+    scriptFileInput.value = cachedScript || DEFAULT_DEPLOY_SCRIPT_FILE;
+  }
 }
+const infraSourceModeSelect = document.getElementById('infraSourceMode');
+if (infraSourceModeSelect) {
+  infraSourceModeSelect.addEventListener('change', () => applyInfraSourceMode(infraSourceModeSelect.value));
+}
+applyInfraSourceMode(currentInfraSourceMode());
 const canvasResizeObserver = new ResizeObserver(() => renderEdges());
 canvasResizeObserver.observe(canvas);
 window.addEventListener('resize', () => renderEdges());

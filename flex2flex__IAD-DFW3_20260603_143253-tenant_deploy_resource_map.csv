@@ -1,0 +1,2 @@
+source_server_id,source_name,resource_type,flex_name,flex_id,flex_private_ip,flex_floating_ip,status
+"632e1a39-10fd-45c3-b995-b22aed273108","FlexDFWjumphost","server","FlexDFWjumphost","","","","failed"

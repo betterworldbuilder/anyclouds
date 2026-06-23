@@ -85,11 +85,12 @@ def validate(flavor_rows: List[Dict[str, str]], block_rows: List[Dict[str, str]]
         error_count += 1
 
     included_ids = set()
-    included_names = {}
+    included_target_names = {}
 
     for idx, row in enumerate(flavor_rows, start=2):
         server_id = (row.get("server_id") or "").strip()
         server_name = (row.get("server_name") or "").strip()
+        target_server_name = (row.get("target_server_name") or "").strip() or server_name
         include_raw = row.get("include_in_deploy")
 
         if include_raw is None or include_raw.strip() == "":
@@ -102,8 +103,8 @@ def validate(flavor_rows: List[Dict[str, str]], block_rows: List[Dict[str, str]]
             continue
 
         included_ids.add(server_id)
-        if server_name:
-            included_names.setdefault(server_name, []).append(idx)
+        if target_server_name:
+            included_target_names.setdefault(target_server_name, []).append(idx)
 
         target_flavor = (row.get("target_flavor_name") or "").strip()
         image = (row.get("recommended_target_image_name") or "").strip()
@@ -114,7 +115,11 @@ def validate(flavor_rows: List[Dict[str, str]], block_rows: List[Dict[str, str]]
             add_finding(findings, "ERROR", "missing_target_flavor", f"flavormap:row:{idx}", f"server_id={server_id} missing target_flavor_name")
             error_count += 1
 
-        if not image:
+        is_flex2flex_reuse = (
+            boot_strategy == "flex2flex_rebuild_from_source_image"
+            or "flex2flex_source_image_reuse" in (row.get("image_recommendation_note") or "").lower()
+        )
+        if not image and not is_flex2flex_reuse:
             add_finding(findings, "ERROR", "missing_target_image", f"flavormap:row:{idx}", f"server_id={server_id} missing recommended_target_image_name")
             error_count += 1
 
@@ -142,14 +147,14 @@ def validate(flavor_rows: List[Dict[str, str]], block_rows: List[Dict[str, str]]
             )
             error_count += 1
 
-    for name, rows in included_names.items():
+    for name, rows in included_target_names.items():
         if len(rows) > 1:
             add_finding(
                 findings,
                 "WARN",
-                "duplicate_server_name",
+                "duplicate_target_server_name",
                 "flavormap",
-                f"Included server_name '{name}' appears multiple times at rows {rows}; name collisions can break deployment",
+                f"Included target_server_name '{name}' appears multiple times at rows {rows}; target name collisions can break deployment",
             )
 
     for idx, row in enumerate(block_rows, start=2):

@@ -1,0 +1,4 @@
+step_id,phase,resource_type,resource_name,action,status,exit_code,error
+"step-0001","compute","server","FlexDFWjumphost","create_server_local_boot","PASS","0",""
+"step-0002","compute","floating_ip","FlexDFWjumphost","assign_floating_ip","FAIL","1","More than one Server exists with the name 'FlexDFWjumphost'. "
+"step-0003","compute","server","FlexDFWjumphost","create_server_local_boot","PASS","0",""
