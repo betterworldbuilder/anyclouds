@@ -141,6 +141,25 @@ mb_from_bytes() {
   local n="${1:-0}"
   awk -v n="$n" 'BEGIN{if(n>0) printf "%.0f", n/1048576; else printf "0"}'
 }
+download_progress_bar() {
+  local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" eta_min="${5:-}" pct="${6:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$downloaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  local filled empty bar
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% ${downloaded_mb}/${total_mb}MB status=${status}${eta_min:+ eta_min=$eta_min}"
+}
+log_download_status() {
+  local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" pct="${5:-}" eta_min="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$downloaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb pct=$pct${eta_min:+ eta_min=$eta_min} status=$status${extra:+ $extra}"
+  download_progress_bar "$phase" "$downloaded_mb" "$total_mb" "$status" "$eta_min" "$pct"
+}
 kv() { log "  $(printf '%-18s' "$1") : ${*:2}"; }
 stage() {
   CURRENT_STAGE="$1"
@@ -650,21 +669,21 @@ cinder_wait_volume_status() {
     set -e
     [ -n "$status" ] || status="unknown"
     if [ "$status" = "$want" ]; then
-      log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=$status waited=${waited}s"
+      log_download_status "$phase" "$downloaded_mb" "$total_mb" "$status" "" "" "waited=${waited}s"
       return 0
     fi
     if [ "$status" = "error" ]; then
-      log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=error waited=${waited}s"
+      log_download_status "$phase" "$downloaded_mb" "$total_mb" "error" "" "" "waited=${waited}s"
       log "[CINDER] vol=$vol_id status=error target=$want waited=${waited}s poll_rc=$poll_rc"
       return 1
     fi
     if [ $((waited % 60)) -eq 0 ]; then
       log "[CINDER] vol=$vol_id status=$status target=$want waited=${waited}s poll_rc=$poll_rc"
-      log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=$status waited=${waited}s"
+      log_download_status "$phase" "$downloaded_mb" "$total_mb" "$status" "" "" "waited=${waited}s"
     fi
     sleep 10; waited=$((waited + 10))
   done
-  log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb status=timeout waited=${timeout}s"
+  log_download_status "$phase" "$downloaded_mb" "$total_mb" "timeout" "" "" "waited=${timeout}s"
   return 1
 }
 local_block_disks() {
@@ -972,7 +991,7 @@ PYSIZE
   volume_name="${LABEL_SAFE}-linsnap-cinder-${RUN_ID}"
   before_file="$JOB_TMP/cinder_before.txt"; after_file="$JOB_TMP/cinder_after.txt"
   log "[CINDER] Licensed image — Cinder attach fallback: helper=$helper_id size=${size_gb}GB"
-  log "[DOWNLOAD_STATUS] phase=cinder_volume_create downloaded_mb=0 total_mb=$source_mb volume_mb=$volume_mb status=starting"
+  log_download_status "cinder_volume_create" "0" "$source_mb" "starting" "" "" "volume_mb=$volume_mb"
   local_block_disks >"$before_file"
   volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || {
     log "[CINDER] FAILED volume create request; cannot use Cinder fallback"
@@ -991,7 +1010,7 @@ PYSIZE
     rackspace_delete_volume "$volume_id" || true
     return 1
   }
-  log "[DOWNLOAD_STATUS] phase=cinder_attach downloaded_mb=0 total_mb=$source_mb status=starting"
+  log_download_status "cinder_attach" "0" "$source_mb" "starting"
   rackspace_attach_volume "$helper_id" "$volume_id" || return 1
   cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || return 1
   dev=""
@@ -1018,7 +1037,7 @@ PYSIZE
   rm -f "$dest"
   log "[CINDER] raw-copying $dev → $dest"
   copy_start_ts="$(date +%s)"
-  log "[DOWNLOAD_STATUS] phase=raw_copy downloaded_mb=0 total_mb=$dev_mb pct=0.0 eta_min=unknown status=starting"
+  log_download_status "raw_copy" "0" "$dev_mb" "starting" "0.0" "unknown"
   set +e
   sudo dd if="$dev" of="$dest" bs=64M status=progress conv=noerror,sync >>"$JOB_LOG/cinder.log" 2>&1 &
   dd_pid=$!
@@ -1030,7 +1049,7 @@ PYSIZE
     elapsed_s=$(( $(date +%s) - copy_start_ts ))
     eta_min="$(awk -v c="$copied" -v t="$dev_size" -v e="$elapsed_s" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
     log "[CINDER] copy progress: ${copied_mb}MB / ${dev_mb}MB (${pct}%), eta=${eta_min}min"
-    log "[DOWNLOAD_STATUS] phase=raw_copy downloaded_mb=$copied_mb total_mb=$dev_mb pct=$pct eta_min=$eta_min status=copying"
+    log_download_status "raw_copy" "$copied_mb" "$dev_mb" "copying" "$pct" "$eta_min"
   done
   wait "$dd_pid"; dd_rc=$?
   set -e
@@ -1038,7 +1057,7 @@ PYSIZE
   sudo chown "$(id -u):$(id -g)" "$dest" 2>/dev/null || true
   final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
   final_mb="$(mb_from_bytes "$final_bytes")"
-  log "[DOWNLOAD_STATUS] phase=raw_copy downloaded_mb=$final_mb total_mb=$dev_mb pct=100.0 eta_min=0 status=complete"
+  log_download_status "raw_copy" "$final_mb" "$dev_mb" "complete" "100.0" "0"
   log "[CINDER] HIT raw artifact: $dest (${final_bytes} bytes)"
   rackspace_detach_volume "$helper_id" "$volume_id"
   cinder_wait_volume_status "$volume_id" "available" 900 || true

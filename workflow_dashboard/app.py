@@ -39,9 +39,53 @@ TOPOLOGY_UPLOAD_DIR = UPLOAD_DIR / "topologies"
 TOPOLOGY_UPLOAD_DIR.mkdir(exist_ok=True)
 IMAGES_DIR = BASE_DIR / "images"
 DASHBOARD_DIR = BASE_DIR / "dashboard"
+SNAPSHOT_SCAN_CACHE_DIR = Path(__file__).resolve().parent / "cache"
+SNAPSHOT_SCAN_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+SNAPSHOT_SCAN_CACHE_FILES = {
+    "ospc": SNAPSHOT_SCAN_CACHE_DIR / "ospc_private_snapshot_last.json",
+    "flex2flex": SNAPSHOT_SCAN_CACHE_DIR / "flex2flex_source_snapshot_last.json",
+}
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 _CLOUDPRICE_CACHE: Dict[str, Tuple[float, float, str]] = {}
+
+
+def _snapshot_scan_cache_path(source: str) -> Path:
+    key = str(source or "ospc").strip().lower()
+    return SNAPSHOT_SCAN_CACHE_FILES.get(key, SNAPSHOT_SCAN_CACHE_FILES["ospc"])
+
+
+def _save_snapshot_scan_cache(source: str, payload: Dict[str, Any]) -> None:
+    """Persist the last scanner table payload without credentials."""
+    path = _snapshot_scan_cache_path(source)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    clean = {
+        "source": str(source or "ospc").strip().lower(),
+        "rows": payload.get("rows") if isinstance(payload.get("rows"), list) else [],
+        "summary": payload.get("summary") if isinstance(payload.get("summary"), dict) else {},
+        "logs": (payload.get("logs") if isinstance(payload.get("logs"), list) else [])[-80:],
+        "region": str(payload.get("region") or "").strip(),
+        "sourceRegion": str(payload.get("sourceRegion") or payload.get("region") or "").strip(),
+        "accountId": str(payload.get("accountId") or "").strip(),
+        "activeTab": str(payload.get("activeTab") or "private_linux").strip() or "private_linux",
+        "ts": int(time.time() * 1000),
+    }
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(clean, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _load_snapshot_scan_cache(source: str) -> Optional[Dict[str, Any]]:
+    path = _snapshot_scan_cache_path(source)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("rows"), list) or not data.get("rows"):
+        return None
+    return data
 
 # UAT module is optional at runtime; keep dashboard bootable even if
 # uat_module dependencies (services.*) are not available in this environment.
@@ -1356,6 +1400,15 @@ def _extract_cinder_endpoints_from_catalog(auth_body: dict, wanted_region: str) 
     return uniq
 
 
+@app.get("/api/image_migrator/images/cache")
+def image_migrator_images_cache():
+    source = str(request.args.get("source") or "ospc").strip().lower()
+    cache = _load_snapshot_scan_cache(source)
+    if not cache:
+        return jsonify({"cached": False, "rows": [], "summary": {}, "logs": []}), 404
+    return jsonify({"cached": True, **cache})
+
+
 @app.post("/api/image_migrator/images/scan")
 def image_migrator_scan_images():
     req = request.get_json(silent=True) or {}
@@ -1665,6 +1718,13 @@ def image_migrator_scan_images():
             f"volume_snapshots={volume_snapshots_found} "
             f"licensed_restricted={licensed_count} windows={windows_count}"
         )
+        _save_snapshot_scan_cache("ospc", {
+            "rows": rows,
+            "summary": summary,
+            "logs": logs,
+            "region": region,
+            "accountId": ospc_tenant,
+        })
         return jsonify({"rows": rows, "summary": summary, "logs": logs})
     except Exception as exc:
         logs.append(f"[ERROR] Scan failed: {exc}")
@@ -12330,19 +12390,28 @@ def flex2flex_region_scan_images():
         vm_image_count = sum(1 for r in rows if r.get("asset_type") == "image_snapshot")
         private_glance_count = sum(1 for r in rows if r.get("asset_type") == "glance_image")
         logs.append(f"[OK] FLEX region scan complete: private_glance_images={private_glance_count} vm_image_snapshots={vm_image_count} volume_snapshots={len(volume_snaps)}")
+        summary = {
+            "private_images_found": len(rows),
+            "migratable_snapshots": sum(1 for r in rows if r.get("migratable")),
+            "volume_snapshots_found": len(volume_snaps),
+            "licensed_restricted": 0,
+            "windows_images": sum(1 for r in rows if r.get("is_windows") and r.get("asset_type") != "volume_snapshot"),
+            "excluded_private_images": sum(1 for r in rows if not r.get("migratable")),
+            "private_glance_images": private_glance_count,
+            "vm_image_snapshots": vm_image_count,
+        }
+        _save_snapshot_scan_cache("flex2flex", {
+            "rows": rows,
+            "logs": logs,
+            "summary": summary,
+            "sourceRegion": source_region,
+            "region": source_region,
+            "accountId": project_id or project_name,
+        })
         return jsonify({
             "rows": rows,
             "logs": logs,
-            "summary": {
-                "private_images_found": len(rows),
-                "migratable_snapshots": sum(1 for r in rows if r.get("migratable")),
-                "volume_snapshots_found": len(volume_snaps),
-                "licensed_restricted": 0,
-                "windows_images": sum(1 for r in rows if r.get("is_windows") and r.get("asset_type") != "volume_snapshot"),
-                "excluded_private_images": sum(1 for r in rows if not r.get("migratable")),
-                "private_glance_images": private_glance_count,
-                "vm_image_snapshots": vm_image_count,
-            },
+            "summary": summary,
         })
     except Exception as exc:
         logs.append(f"[ERROR] Source FLEX direct image scan failed: {exc}")

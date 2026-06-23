@@ -109,16 +109,65 @@
           min-width: 0;
       }
       #top-theme-dropdown {
-          width: 100%;
+          position: fixed;
+          top: 12px;
+          left: 12px;
+          width: auto;
           display: flex;
-          justify-content: center;
-          margin: 26px 0 14px;
+          justify-content: flex-start;
+          margin: 0;
+          z-index: 12000;
+      }
+      #top-theme-trigger {
+          background: linear-gradient(135deg, #1e3a8a, #312e81);
+          border: 1px solid #3b82f6;
+          color: #fff;
+          padding: 7px 12px;
+          border-radius: 6px;
+          font-family: 'Orbitron', sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 0 14px rgba(59,130,246,0.45);
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          letter-spacing: 0;
+      }
+      #top-theme-trigger svg {
+          width: 15px;
+          height: 15px;
       }
       #top-theme-menu {
-          left: 50% !important;
-          right: auto !important;
-          transform: translateX(-50%);
+          display: none;
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          right: auto;
+          margin-top: 0;
+          background: #0f172a;
+          border: 1px solid #3b82f6;
+          border-radius: 6px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.75);
+          min-width: 190px;
+          overflow: hidden;
       }
+      .global-theme-option {
+          display: block;
+          width: 100%;
+          background: none;
+          border: none;
+          border-bottom: 1px solid #1e293b;
+          color: #e5e7eb;
+          padding: 10px 14px;
+          font-family: 'Orbitron', sans-serif;
+          font-size: 10px;
+          font-weight: 700;
+          cursor: pointer;
+          text-align: left;
+          letter-spacing: 0;
+      }
+      .global-theme-option:last-child { border-bottom: none; }
       .section-title::before {
           content: ''; display: block; width: 8px; height: 24px;
           background: linear-gradient(to bottom, #10b981, #059669); border-radius: 4px;
@@ -188,27 +237,58 @@
       }
 
       body.flex-light-mode {
-        background: #f3f5f8 !important;
-        color: #111827 !important;
+        background: #eef1f5 !important;
+        color: #151922 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      }
+      body.flex-light-mode::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 52px;
+        background: #1e232b;
+        box-shadow: 0 1px 0 rgba(0,0,0,.45), 0 6px 22px rgba(15,23,42,.12);
+        z-index: 11950;
+        pointer-events: none;
       }
       body.flex-light-mode .background-orbs { display: none !important; }
       body.flex-light-mode #top-theme-dropdown { display: flex !important; }
+      body.flex-light-mode #top-theme-trigger {
+        background: #a33e3e !important;
+        border-color: #a33e3e !important;
+        color: #fff !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        min-height: 40px;
+      }
+      body.flex-light-mode #top-theme-menu {
+        background: #fff !important;
+        border-color: #d7dbe2 !important;
+        box-shadow: 0 12px 30px rgba(15,23,42,.18) !important;
+      }
+      body.flex-light-mode .global-theme-option {
+        color: #1f2937 !important;
+        border-color: #edf0f4 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      }
+      body.flex-light-mode .global-theme-option:hover { background: #f4f6fa !important; }
       body.flex-light-mode .app-container {
         max-width: none !important;
         margin: 0 !important;
-        padding: 16px !important;
-        background: #f3f5f8 !important;
+        padding: 68px 16px 16px !important;
+        background: #eef1f5 !important;
       }
       body.flex-light-mode .panel,
       body.flex-light-mode .adv-panel,
       body.flex-light-mode #mig-progress-panel,
       body.flex-light-mode details {
         background: #fff !important;
-        border: 1px solid #e6e9ee !important;
-        border-radius: 4px !important;
-        box-shadow: none !important;
-        color: #111827 !important;
+        border: 1px solid #e2e6ec !important;
+        border-radius: 3px !important;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04) !important;
+        color: #151922 !important;
         backdrop-filter: none !important;
       }
       body.flex-light-mode .section-title,
@@ -218,7 +298,7 @@
       body.flex-light-mode h3,
       body.flex-light-mode h4,
       body.flex-light-mode h5 {
-        color: #111827 !important;
+        color: #151922 !important;
         text-shadow: none !important;
         letter-spacing: 0 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
@@ -231,51 +311,56 @@
       }
       body.flex-light-mode .section-title::before {
         background: #a33e3e !important;
-        border-radius: 2px !important;
+        border-radius: 1px !important;
       }
       body.flex-light-mode p,
       body.flex-light-mode li,
       body.flex-light-mode label,
       body.flex-light-mode summary,
       body.flex-light-mode .form-group label {
-        color: #344054 !important;
+        color: #293241 !important;
         text-shadow: none !important;
       }
       body.flex-light-mode input,
       body.flex-light-mode select,
       body.flex-light-mode textarea {
         background: #fff !important;
-        color: #111827 !important;
-        border: 1px solid #d6dbe3 !important;
-        border-radius: 4px !important;
+        color: #151922 !important;
+        border: 1px solid #d7dbe2 !important;
+        border-radius: 2px !important;
         box-shadow: none !important;
       }
       body.flex-light-mode input[type="file"] { color: #344054 !important; }
       body.flex-light-mode button {
-        border-radius: 4px !important;
+        border-radius: 2px !important;
         box-shadow: none !important;
         text-shadow: none !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      }
+      body.flex-light-mode button:not(#top-theme-trigger):not(.global-theme-option) {
+        background: #a33e3e !important;
+        border-color: #a33e3e !important;
+        color: #fff !important;
       }
       body.flex-light-mode table,
       body.flex-light-mode .batch-table,
       body.flex-light-mode .adv-table {
         background: #fff !important;
-        color: #111827 !important;
+        color: #151922 !important;
         border-color: #e6e9ee !important;
       }
       body.flex-light-mode th,
       body.flex-light-mode .batch-table th,
       body.flex-light-mode .adv-table th {
         background: #fafbfc !important;
-        color: #111827 !important;
+        color: #151922 !important;
         border-color: #e6e9ee !important;
       }
       body.flex-light-mode td,
       body.flex-light-mode .batch-table td,
       body.flex-light-mode .adv-table td {
         background: #fff !important;
-        color: #111827 !important;
+        color: #151922 !important;
         border-color: #e6e9ee !important;
       }
       body.flex-light-mode tr:hover td { background: #f7f9fc !important; color: #111827 !important; }
@@ -310,9 +395,34 @@
 </head>
 <body class="{% if flex_light_mode %}flex-light-mode{% endif %}">
     <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('osflex_global_theme_v1') || 'flex-skyline';
+          if (theme === 'apollo') document.body.classList.add('theme-apollo');
+          else if (theme === 'flex-skyline' || theme === 'flex-light' || theme === 'light') document.body.classList.add('flex-light-mode');
+        } catch (_) {
+          document.body.classList.add('flex-light-mode');
+        }
+      })();
+    </script>
+    <script>
       window.FLEXANYWHERE_UI = {{ 'true' if flexanywhere_mode else 'false' }};
       window.FLEX2FLEX_UI = {{ 'true' if flex2flex_mode or flexanywhere_mode else 'false' }};
     </script>
+    <div id="top-theme-dropdown" aria-label="Global theme selector">
+        <button id="top-theme-trigger" type="button" onclick="toggleGlobalThemeMenu()" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 2v3"></path><path d="M12 19v3"></path><path d="m4.93 4.93 2.12 2.12"></path><path d="m16.95 16.95 2.12 2.12"></path><path d="M2 12h3"></path><path d="M19 12h3"></path><path d="m4.93 19.07 2.12-2.12"></path><path d="m16.95 7.05 2.12-2.12"></path>
+            </svg>
+            <span id="top-theme-label">Theme</span>
+        </button>
+        <div id="top-theme-menu">
+            <button id="theme-dark-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('dark', true); closeGlobalThemeMenu();">Dark Theme</button>
+            <button id="theme-skyline-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('flex-skyline', true); closeGlobalThemeMenu();">Flex Skyline</button>
+            <button id="theme-apollo-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('apollo', true); closeGlobalThemeMenu();">Apollo Theme</button>
+        </div>
+    </div>
     <div class="background-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 
     <div class="app-container" style="max-width: 1560px; margin: 0 auto; padding: 28px 16px 40px;">
@@ -363,15 +473,6 @@
                             </div>
                         </div>
                     </div>
-                    <div style="position:relative; width:100%; display:flex; justify-content:center; margin:26px 0 14px;" id="top-theme-dropdown">
-                        <button onclick="document.getElementById('top-theme-menu').style.display = document.getElementById('top-theme-menu').style.display === 'block' ? 'none' : 'block';" style="background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#fff; padding:6px 12px; border-radius:6px; font-family:'Orbitron'; font-size:12px; cursor:pointer; box-shadow:0 0 10px rgba(59,130,246,0.5); display:flex; align-items:center; gap:5px;">🎨 Theme ▾</button>
-                        <div id="top-theme-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; background:#0f172a; border:1px solid #3b82f6; border-radius:6px; box-shadow:0 4px 20px rgba(0,0,0,0.8); z-index:999; min-width:180px; overflow:hidden;">
-                            <button class="theme-btn" onclick="setApolloTheme(); document.getElementById('top-theme-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; border-bottom:1px solid #1e293b; color:#60a5fa; padding:10px 14px; font-family:'Orbitron'; font-size:11px; cursor:pointer; text-align:left;" id="top-apollo-btn">🚀 Apollo Theme</button>
-                            <button onclick="setSweet70Theme(); document.getElementById('top-theme-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; border-bottom:1px solid #1e293b; color:#fbbf24; padding:10px 14px; font-family:'Orbitron'; font-size:11px; cursor:pointer; text-align:left;" id="top-sweet70-btn">🎵 Sweet 70s ✓</button>
-                            <button onclick="toggleFlexLightTheme(); document.getElementById('top-theme-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; color:#10b981; padding:10px 14px; font-family:'Orbitron'; font-size:11px; cursor:pointer; text-align:left;">🌗 Dark / Light Mode</button>
-                        </div>
-                    </div>
-                    <script>document.addEventListener('click', function(e) { var dd = document.getElementById('top-theme-dropdown'); var m = document.getElementById('top-theme-menu'); if (dd && m && !dd.contains(e.target)) m.style.display = 'none'; });</script>
                 </h2>
                 <p style="color: #94a3b8; margin-bottom: 15px; margin-top: 18px;">Load your target maps to automatically inject infrastructure specifications and trigger fleet migrations.</p>
 
@@ -2517,6 +2618,7 @@
                     function applyImageScanCache(cache, options) {
                         options = options || {};
                         if (!cache || !Array.isArray(cache.rows) || !cache.rows.length) return false;
+                        const sourceLabel = options.sourceLabel || 'cached';
                         const rows = options.flexMode
                             ? cache.rows.map(r => Object.assign({workflow_mode: 'flex2flex', source_cloud: 'rackspace_flex'}, r || {}))
                             : cache.rows;
@@ -2542,7 +2644,7 @@
                         const ageEl = document.getElementById('image-scan-cache-age');
                         if (ageEl) {
                             const age = imageScanCacheAgeLabel(cache.ts);
-                            ageEl.textContent = age ? `cached · ${age}` : 'cached';
+                            ageEl.textContent = age ? `${sourceLabel} · ${age}` : sourceLabel;
                             ageEl.style.display = 'inline';
                         }
                         if (options.showConsole) {
@@ -2550,7 +2652,7 @@
                             const logWrap = document.getElementById('image-scan-console-wrap');
                             const savedAt = cache.ts ? new Date(cache.ts).toLocaleString() : '';
                             if (logEl) {
-                                logEl.textContent = `Restored ${rows.length} scanner row(s) from browser cache · region ${cachedRegion || '?'}`
+                                logEl.textContent = `Restored ${rows.length} scanner row(s) from ${sourceLabel} · region ${cachedRegion || '?'}`
                                     + (savedAt ? ` · saved ${savedAt}` : '')
                                     + '\nRun Start Private Snapshot Scan to refresh from Glance.';
                             }
@@ -3195,19 +3297,34 @@
                             });
                         }
 
-                        // Restore snapshot table from localStorage cache on page load
-                        (function _restoreImageScanCache() {
+                        // Restore snapshot table from the last server scan, then localStorage fallback.
+                        (async function _restoreImageScanCache() {
                             try {
                                 const flexMode = !!window.FLEX2FLEX_UI;
                                 if (flexMode) {
                                     localStorage.removeItem(LS_OSPC_IMAGE_SCAN);
                                     localStorage.removeItem(LS_OSPC_IMAGE_SEARCH);
                                 }
+                                const source = flexMode ? 'flex2flex' : 'ospc';
+                                try {
+                                    const serverResp = await fetch(`/api/image_migrator/images/cache?source=${encodeURIComponent(source)}`, { cache: 'no-store' });
+                                    if (serverResp.ok) {
+                                        const serverCache = await serverResp.json();
+                                        if (serverCache && Array.isArray(serverCache.rows) && serverCache.rows.length) {
+                                            if (applyImageScanCache(serverCache, { flexMode, showConsole: false, sourceLabel: 'last scan' })) {
+                                                try {
+                                                    localStorage.setItem(flexMode ? LS_FLEX2FLEX_IMAGE_SCAN : LS_OSPC_IMAGE_SCAN, JSON.stringify(serverCache));
+                                                } catch (e) { /* ignore quota/private mode */ }
+                                                return;
+                                            }
+                                        }
+                                    }
+                                } catch (e) { /* offline/server cache unavailable; use browser cache */ }
                                 const raw = localStorage.getItem(flexMode ? LS_FLEX2FLEX_IMAGE_SCAN : LS_OSPC_IMAGE_SCAN);
                                 if (!raw) return;
                                 const c = JSON.parse(raw);
                                 if (!c || !Array.isArray(c.rows) || !c.rows.length) return;
-                                applyImageScanCache(c, { flexMode, showConsole: false });
+                                applyImageScanCache(c, { flexMode, showConsole: false, sourceLabel: 'browser cache' });
                             } catch (e) { /* ignore corrupt cache */ }
                         })();
                     });
@@ -3990,16 +4107,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                     <div>
                         <div style="display:flex; align-items:center; gap:12px;">
                             <span style="color:#00ff41; font-size:15px; font-weight:bold; letter-spacing:1px; text-transform:uppercase; text-shadow:0 0 8px rgba(0,255,65,0.6);">📊 Live Migration Progress</span>
-                            <div style="position:relative; display:inline-block;" id="mig-settings-dropdown">
-                                <button onclick="document.getElementById('mig-settings-menu').style.display = document.getElementById('mig-settings-menu').style.display === 'block' ? 'none' : 'block';" style="background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#fff; padding:5px 10px; border-radius:5px; font-family:'Orbitron'; font-size:10px; cursor:pointer; box-shadow:0 0 8px rgba(59,130,246,0.4); display:flex; align-items:center; gap:5px;">🎨 Theme ▾</button>
-                                <div id="mig-settings-menu" style="display:none; position:absolute; top:100%; left:0; margin-top:4px; background:#0f172a; border:1px solid #3b82f6; border-radius:6px; box-shadow:0 4px 20px rgba(0,0,0,0.8); z-index:999; min-width:180px; overflow:hidden;">
-                                    <button class="theme-btn" onclick="setApolloTheme(); document.getElementById('mig-settings-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; border-bottom:1px solid #1e293b; color:#60a5fa; padding:10px 14px; font-family:'Orbitron'; font-size:10px; cursor:pointer; text-align:left;">🚀 Apollo Theme</button>
-                                    <button onclick="setSweet70Theme(); document.getElementById('mig-settings-menu').style.display='none';" style="display:block; width:100%; background:none; border:none; border-bottom:1px solid #1e293b; color:#fbbf24; padding:10px 14px; font-family:'Orbitron'; font-size:10px; cursor:pointer; text-align:left;" id="dropdown-sweet70">🎵 Sweet 70s ✓</button>
-                                </div>
-                            </div>
                             <button id="soundToggleBtn" onclick="toggleSpaceBeep()" style="background:linear-gradient(135deg, #1e3a8a, #312e81); border:1px solid #3b82f6; color:#60a5fa; padding:5px 10px; border-radius:5px; font-family:'Orbitron'; font-size:10px; cursor:pointer; box-shadow:0 0 5px rgba(59,130,246,0.3);">🔊 Sound On</button>
                         </div>
-                        <script>document.addEventListener('click', function(e) { var dd = document.getElementById('mig-settings-dropdown'); var m = document.getElementById('mig-settings-menu'); if (dd && m && !dd.contains(e.target)) m.style.display = 'none'; });</script>
                         <div id="mig-progress-subtitle" style="color:#005500; font-size:13px; margin-top:3px;">Waiting for batch to start…</div>
                     </div>
                     <div style="display:flex; gap:10px; align-items:center;">
@@ -5558,7 +5667,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
         _isLinuxSnapMonitorOnlyLine(text) {
             const t = String(text || '');
-            return /\[LINSNAP ERROR\]|\[LINSNAP WARN\]|SSH poll failed|remote job.*still.*running|Remote job is nohup-protected|Queue job .*waiting|existing job pid=.*still running|DOWNLOAD_STATUS|status=creating\s+target=available|scp: Connection closed|Connection timed out|timed out after/i.test(t);
+            return /\[LINSNAP ERROR\]|\[LINSNAP WARN\]|SSH poll failed|remote job.*still.*running|Remote job is nohup-protected|Queue job .*waiting|existing job pid=.*still running|DOWNLOAD_STATUS|DOWNLOAD_BAR|status=creating\s+target=available|scp: Connection closed|Connection timed out|timed out after/i.test(t);
         },
 
         _isLinuxSnapTerminalFailureLine(text) {
@@ -6712,6 +6821,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
     /** Restore last OSPC Image List from localStorage (same tenant as creds). */
     function restoreOspcImageScanCacheIfAny() {
+        if (window.FLEX2FLEX_UI || window.FLEXANYWHERE_UI) return;
+        if (typeof imageScanState !== 'undefined' && Array.isArray(imageScanState.rows) && imageScanState.rows.length) return;
         const LS = 'mig_ospc_image_scan_cache_v1';
         let parsed = null;
         try {
@@ -6725,6 +6836,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         if (parsed.accountId && curAcct && parsed.accountId !== curAcct) return;
 
         if (typeof imageScanState === 'undefined') return;
+        if (Array.isArray(imageScanState.rows) && imageScanState.rows.length) return;
 
         const imageTableSearchEl = document.getElementById('imageTableSearch');
         if (imageTableSearchEl) {
@@ -6734,7 +6846,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             } catch (e) { /* ignore */ }
         }
         if (typeof applyImageScanCache === 'function') {
-            applyImageScanCache(parsed, { showConsole: true });
+            applyImageScanCache(parsed, { showConsole: true, sourceLabel: 'browser cache' });
         } else if (typeof renderImageTable === 'function') {
             imageScanState.rows = parsed.rows;
             imageScanState.summary = parsed.summary || {};
@@ -11987,40 +12099,79 @@ function toggleSpaceBeep() {
     }
 }
 
-function toggleTheme() {
-    const isApollo = document.body.classList.toggle('theme-apollo');
-    // Update all Apollo buttons
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.innerHTML = isApollo ? '🚀 Apollo Theme ✓' : '🚀 Apollo Theme';
-    });
-    // Update all Sweet 70s buttons
-    ['dropdown-sweet70', 'top-sweet70-btn'].forEach(id => {
+const GLOBAL_THEME_KEY = 'osflex_global_theme_v1';
+
+function closeGlobalThemeMenu() {
+    const menu = document.getElementById('top-theme-menu');
+    const trigger = document.getElementById('top-theme-trigger');
+    if (menu) menu.style.display = 'none';
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+
+function toggleGlobalThemeMenu() {
+    const menu = document.getElementById('top-theme-menu');
+    const trigger = document.getElementById('top-theme-trigger');
+    if (!menu) return;
+    const isOpen = menu.style.display === 'block';
+    menu.style.display = isOpen ? 'none' : 'block';
+    if (trigger) trigger.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+}
+
+function applyGlobalTheme(theme, persist) {
+    const normalized = theme === 'apollo' ? 'apollo' : (theme === 'flex-skyline' || theme === 'flex-light' || theme === 'light') ? 'flex-skyline' : 'dark';
+    document.body.classList.toggle('theme-apollo', normalized === 'apollo');
+    document.body.classList.toggle('flex-light-mode', normalized === 'flex-skyline');
+    if (persist) {
+        try { localStorage.setItem(GLOBAL_THEME_KEY, normalized); } catch (_) {}
+    }
+
+    const labels = {
+        dark: 'Dark Theme',
+        'flex-skyline': 'Flex Skyline',
+        apollo: 'Apollo Theme'
+    };
+    const triggerLabel = document.getElementById('top-theme-label');
+    if (triggerLabel) triggerLabel.textContent = labels[normalized] || 'Theme';
+
+    const mark = function(id, label, active) {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = isApollo ? '🎵 Sweet 70s' : '🎵 Sweet 70s ✓';
-    });
+        if (el) el.textContent = label + (active ? ' ✓' : '');
+    };
+    mark('theme-dark-btn', 'Dark Theme', normalized === 'dark');
+    mark('theme-skyline-btn', 'Flex Skyline', normalized === 'flex-skyline');
+    mark('theme-apollo-btn', 'Apollo Theme', normalized === 'apollo');
+
     if (typeof migTracker !== 'undefined' && migTracker.render) migTracker.render();
+}
+
+function restoreGlobalTheme() {
+    let saved = '';
+    try { saved = localStorage.getItem(GLOBAL_THEME_KEY) || ''; } catch (_) {}
+    if (!saved && document.body.classList.contains('flex-light-mode')) saved = 'flex-skyline';
+    applyGlobalTheme(saved || 'flex-skyline', false);
+}
+
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('top-theme-dropdown');
+    if (dd && !dd.contains(e.target)) closeGlobalThemeMenu();
+});
+document.addEventListener('DOMContentLoaded', restoreGlobalTheme);
+if (document.readyState !== 'loading') restoreGlobalTheme();
+
+function toggleTheme() {
+    applyGlobalTheme(document.body.classList.contains('theme-apollo') ? 'dark' : 'apollo', true);
 }
 
 function setApolloTheme() {
-    document.body.classList.remove('flex-light-mode');
-    if (!document.body.classList.contains('theme-apollo')) toggleTheme();
-    if (typeof migTracker !== 'undefined' && migTracker.render) migTracker.render();
+    applyGlobalTheme('apollo', true);
 }
 
 function setSweet70Theme() {
-    document.body.classList.remove('flex-light-mode');
-    if (document.body.classList.contains('theme-apollo')) toggleTheme();
-    if (typeof migTracker !== 'undefined' && migTracker.render) migTracker.render();
+    applyGlobalTheme('dark', true);
 }
 
 function toggleFlexLightTheme() {
-    if (!document.body.classList.contains('flex-light-mode')) {
-        if (document.body.classList.contains('theme-apollo')) toggleTheme();
-        document.body.classList.add('flex-light-mode');
-    } else {
-        document.body.classList.remove('flex-light-mode');
-    }
-    if (typeof migTracker !== 'undefined' && migTracker.render) migTracker.render();
+    applyGlobalTheme(document.body.classList.contains('flex-light-mode') ? 'dark' : 'flex-skyline', true);
 }
 
 function playApolloPulse() {
@@ -12084,7 +12235,7 @@ function toggleLunarGame() {
         window.removeEventListener('scroll', _positionLunarOverlay);
     } else {
         // Ensure Apollo theme active
-        if (!document.body.classList.contains('theme-apollo')) toggleTheme();
+        if (!document.body.classList.contains('theme-apollo')) applyGlobalTheme('apollo', true);
         // Make sure the progress panel is visible first
         const panel = document.getElementById('mig-progress-panel');
         if (panel) panel.style.display = 'block';

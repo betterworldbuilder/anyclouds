@@ -146,6 +146,29 @@ log()      { printf '[%s][%s][VOLSNAP] %s\n' "$(date -u +%H:%M:%S)" "$LABEL_SAFE
 stage()    { log "══════════════════════════════════════════════════════"; log "  $1"; log "══════════════════════════════════════════════════════"; }
 fail_exit(){ log "FAILED: $*"; exit 1; }
 kv()       { log "  $(printf '%-24s' "$1"): $2"; }
+mb_from_bytes() {
+  local n="${1:-0}"
+  awk -v n="$n" 'BEGIN{if(n>0) printf "%.0f", n/1048576; else printf "0"}'
+}
+download_progress_bar() {
+  local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" eta_min="${5:-}" pct="${6:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$downloaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  local filled empty bar
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% ${downloaded_mb}/${total_mb}MB status=${status}${eta_min:+ eta_min=$eta_min}"
+}
+log_download_status() {
+  local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" pct="${5:-}" eta_min="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$downloaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb pct=$pct${eta_min:+ eta_min=$eta_min} status=$status${extra:+ $extra}"
+  download_progress_bar "$phase" "$downloaded_mb" "$total_mb" "$status" "$eta_min" "$pct"
+}
 
 prep_disk_and_stale_image_cleanup() {
   [ "${VOLSNAP_CLEAN_STALE_IMAGES:-1}" = "1" ] || {
@@ -1273,6 +1296,9 @@ else
 
   _DD_COUNT=$(( SNAP_SIZE_ORIG_GB * 16 ))  # 64M * 16 = 1 GiB → count = orig GB * 16
   log "[VS8] Streaming ${SNAP_SIZE_ORIG_GB}GB (${_DD_COUNT} blocks of 64M)"
+  STREAM_TOTAL_MB="$(mb_from_bytes "$STREAM_BYTES")"
+  STREAM_START_TS="$(date +%s)"
+  log_download_status "volsnap_stream" "0" "$STREAM_TOTAL_MB" "starting" "0.0" "unknown"
   set +e
   (
     set -o pipefail
@@ -1297,9 +1323,15 @@ print(matches[-1] if matches else "")
 PY
 )"
       if [ -n "$STREAM_DONE_BYTES" ]; then
+        STREAM_DONE_MB="$(mb_from_bytes "$STREAM_DONE_BYTES")"
+        STREAM_PCT="$(awk -v c="$STREAM_DONE_BYTES" -v t="$STREAM_BYTES" 'BEGIN{if(t>0) printf "%.1f", (c/t)*100; else printf "0.0"}')"
+        STREAM_ELAPSED_S=$(( $(date +%s) - STREAM_START_TS ))
+        STREAM_ETA_MIN="$(awk -v c="$STREAM_DONE_BYTES" -v t="$STREAM_BYTES" -v e="$STREAM_ELAPSED_S" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
         log "[VS8] Streaming progress: ${STREAM_DONE_BYTES}/${STREAM_BYTES} bytes"
+        log_download_status "volsnap_stream" "$STREAM_DONE_MB" "$STREAM_TOTAL_MB" "streaming" "$STREAM_PCT" "$STREAM_ETA_MIN"
       else
         log "[VS8] Streaming progress: active"
+        log_download_status "volsnap_stream" "0" "$STREAM_TOTAL_MB" "active" "0.0" "unknown"
       fi
     fi
   done
@@ -1307,6 +1339,7 @@ PY
   STREAM_RC=$?
   set -e
   [ "$STREAM_RC" -eq 0 ] || fail_exit "Block stream failed rc=$STREAM_RC — check $JOB_LOG/stream.log"
+  log_download_status "volsnap_stream" "$STREAM_TOTAL_MB" "$STREAM_TOTAL_MB" "complete" "100.0" "0"
   log "[VS8] HIT block stream complete"
 fi
 

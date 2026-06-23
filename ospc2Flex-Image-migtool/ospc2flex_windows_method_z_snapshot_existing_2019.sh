@@ -202,6 +202,32 @@ log() {
   echo "$raw_line" >>"$BACKGROUND_LOG"
 }
 
+mb_from_bytes() {
+  local n="${1:-0}"
+  awk -v n="$n" 'BEGIN{if(n>0) printf "%.0f", n/1048576; else printf "0"}'
+}
+
+download_progress_bar() {
+  local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" eta_min="${5:-}" pct="${6:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$downloaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  local filled empty bar
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% ${downloaded_mb}/${total_mb}MB status=${status}${eta_min:+ eta_min=$eta_min}"
+}
+
+log_download_status() {
+  local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" pct="${5:-}" eta_min="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$downloaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb pct=$pct${eta_min:+ eta_min=$eta_min} status=$status${extra:+ $extra}"
+  download_progress_bar "$phase" "$downloaded_mb" "$total_mb" "$status" "$eta_min" "$pct"
+}
+
 banner() {
   local stage="$1" title w=75
   title="$(step_title "$stage")"
@@ -1215,7 +1241,7 @@ apply_cinder_min_volume_size() {
 
 cinder_volume_raw_export() {
   local image_id="$1" dest="$2"
-  local helper_id volume_name volume_size volume_id before_file after_file dev dev_size tmp_log dd_rc
+  local helper_id volume_name volume_size volume_id before_file after_file dev dev_size dev_mb tmp_log dd_rc dd_pid copy_start_ts copied copied_mb pct elapsed_s eta_min final_bytes final_mb
   helper_id="$(discover_ospc_helper_server_id | head -1 | tr -d '[:space:]')"
   [ -n "$helper_id" ] || return 1
   volume_size="$(apply_cinder_min_volume_size "$(image_cinder_size_gb "$image_id")")"
@@ -1227,17 +1253,22 @@ cinder_volume_raw_export() {
 
   log "[ZS3B_CINDER_VOLUME_EXPORT] START licensed/cinder-only workaround"
   log "[ZS3B_CINDER_VOLUME_EXPORT] helper_server_id=$helper_id volume_size=${volume_size}GB image=$image_id"
+  log_download_status "snapwin2019_cinder_volume_create" "0" "$((volume_size * 1024))" "starting"
   local_block_disks >"$before_file"
 
   volume_id="$(rackspace_create_volume_from_image "$image_id" "$volume_size" "$volume_name" | tr -d '\r' | tail -1)"
   [ -n "$volume_id" ] || return 1
   log "[ZS3B_CINDER_VOLUME_EXPORT] created volume=$volume_id name=$volume_name"
   json_merge "{\"checkpoints\":{\"cinder_volume_export\":\"RUNNING\"},\"cinder_export_volume_id\":\"$volume_id\"}"
+  log_download_status "snapwin2019_cinder_volume_create" "0" "$((volume_size * 1024))" "creating" "" "" "volume=$volume_id"
   cinder_wait_volume_status "$volume_id" "available" 3600 || return 1
+  log_download_status "snapwin2019_cinder_volume_create" "$((volume_size * 1024))" "$((volume_size * 1024))" "available" "100.0" "0" "volume=$volume_id"
 
   log "[ZS3B_CINDER_VOLUME_EXPORT] attaching volume to helper/jumphost"
+  log_download_status "snapwin2019_cinder_attach" "0" "$((volume_size * 1024))" "starting" "" "" "volume=$volume_id"
   rackspace_attach_volume "$helper_id" "$volume_id" || return 1
   cinder_wait_volume_status "$volume_id" "in-use" 900 || return 1
+  log_download_status "snapwin2019_cinder_attach" "0" "$((volume_size * 1024))" "in-use" "" "" "volume=$volume_id"
 
   dev=""
   for _i in $(seq 1 60); do
@@ -1248,18 +1279,37 @@ cinder_volume_raw_export() {
   done
   [ -n "$dev" ] || return 1
   dev_size="$(sudo blockdev --getsize64 "$dev" 2>/dev/null || echo 0)"
+  dev_mb="$(mb_from_bytes "$dev_size")"
   log "[ZS3B_CINDER_VOLUME_EXPORT] detected attached block device: $dev bytes=$dev_size"
   [ "$dev_size" -gt 1073741824 ] || return 1
 
   rm -f "$dest"
   log "[ZS3B_CINDER_VOLUME_EXPORT] raw-copying $dev -> $dest"
+  copy_start_ts="$(date +%s)"
+  log_download_status "snapwin2019_raw_copy" "0" "$dev_mb" "starting" "0.0" "unknown"
   set +e
-  sudo dd if="$dev" of="$dest" bs=64M status=progress conv=noerror,sync >>"$tmp_log" 2>&1
-  dd_rc=$?
+  sudo dd if="$dev" of="$dest" bs=64M status=progress conv=noerror,sync >>"$tmp_log" 2>&1 &
+  dd_pid=$!
+  while kill -0 "$dd_pid" 2>/dev/null; do
+    sleep 60
+    if kill -0 "$dd_pid" 2>/dev/null; then
+      copied="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+      copied_mb="$(mb_from_bytes "$copied")"
+      pct="$(awk -v c="$copied" -v t="$dev_size" 'BEGIN{if(t>0)printf "%.1f", (c/t)*100; else printf "0.0"}')"
+      elapsed_s=$(( $(date +%s) - copy_start_ts ))
+      eta_min="$(awk -v c="$copied" -v t="$dev_size" -v e="$elapsed_s" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
+      log "[ZS3B_CINDER_VOLUME_EXPORT] copy progress: ${copied_mb}MB / ${dev_mb}MB (${pct}%), eta=${eta_min}min"
+      log_download_status "snapwin2019_raw_copy" "$copied_mb" "$dev_mb" "copying" "$pct" "$eta_min"
+    fi
+  done
+  wait "$dd_pid"; dd_rc=$?
   set -e
   [ "$dd_rc" -eq 0 ] || return 1
   sudo chown "$(id -u):$(id -g)" "$dest" 2>/dev/null || true
   [ -s "$dest" ] || return 1
+  final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+  final_mb="$(mb_from_bytes "$final_bytes")"
+  log_download_status "snapwin2019_raw_copy" "$final_mb" "$dev_mb" "complete" "100.0" "0"
   log "[ZS3B_CINDER_VOLUME_EXPORT] HIT raw artifact copied: $dest ($(stat -c%s "$dest" 2>/dev/null || echo 0) bytes)"
 
   log "[ZS3B_CINDER_VOLUME_EXPORT] detaching temporary volume"

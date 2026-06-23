@@ -74,6 +74,7 @@ newimagemig-cloudfiles-regionjumphost.*/
 dashboard.log
 migration_log.txt
 uploads/migration_output_bundles/
+workflow_dashboard/cache/
 *.log
 
 # Local migration disk artifacts
