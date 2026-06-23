@@ -19,6 +19,104 @@ body {
   min-height: 100vh;
 }
 
+/* Flex Skyline default surface for scanner/generator pages */
+:root {
+  --bg: #eef1f5;
+  --card: #fff;
+  --text: #151922;
+  --muted: #596273;
+  --border: #e2e6ec;
+  --primary: #a33e3e;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #eef1f5;
+  color: #151922;
+}
+
+header {
+  background: #1e232b;
+  color: #fff;
+  border-bottom: 1px solid rgba(0,0,0,.45);
+  box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 6px 22px rgba(15,23,42,.12);
+}
+
+header h1,
+header p {
+  color: #fff;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+main {
+  max-width: none;
+  padding: 14px 16px 28px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e6ec;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(15,23,42,.04);
+  backdrop-filter: none;
+  color: #151922;
+}
+
+.card h2,
+.card h3,
+label,
+p,
+li {
+  color: #151922;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+input,
+select,
+textarea {
+  background: #fff;
+  color: #151922;
+  border: 1px solid #d7dbe2;
+  border-radius: 2px;
+  box-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+button,
+.btn,
+input[type="button"],
+input[type="submit"] {
+  background: #a33e3e;
+  border: 1px solid #a33e3e;
+  color: #fff;
+  border-radius: 2px;
+  box-shadow: none;
+  text-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+table {
+  background: #fff;
+  color: #151922;
+  border-color: #e6e9ee;
+}
+
+th {
+  background: #fafbfc;
+  color: #151922;
+  border-color: #e6e9ee;
+  text-shadow: none;
+}
+
+td {
+  background: #fff;
+  color: #151922;
+  border-color: #e6e9ee;
+}
+
 header {
   background: #080e1c;
   color: #e2e8f0;
@@ -143,4 +241,117 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 12px;
   overflow: auto;
   white-space: pre-wrap;
+}
+
+/* Final Flex Skyline override layer */
+:root {
+  --bg: #eef1f5;
+  --card: #fff;
+  --text: #151922;
+  --muted: #596273;
+  --border: #e2e6ec;
+  --primary: #a33e3e;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #eef1f5;
+  color: #151922;
+}
+
+header {
+  background: #1e232b;
+  color: #fff;
+  border-bottom: 1px solid rgba(0,0,0,.45);
+  box-shadow: 0 1px 0 rgba(0,0,0,.25), 0 6px 22px rgba(15,23,42,.12);
+}
+
+header h1,
+header p {
+  color: #fff;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+main {
+  max-width: none;
+  padding: 14px 16px 28px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e6ec;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(15,23,42,.04);
+  backdrop-filter: none;
+  color: #151922;
+}
+
+.card h2,
+.card h3,
+label,
+p,
+li {
+  color: #151922;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+input:not([type="checkbox"]),
+select,
+textarea {
+  background: #fff;
+  color: #151922;
+  border: 1px solid #d7dbe2;
+  border-radius: 2px;
+  box-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+button,
+.btn,
+input[type="button"],
+input[type="submit"] {
+  background: #a33e3e;
+  border: 1px solid #a33e3e;
+  color: #fff;
+  border-radius: 2px;
+  box-shadow: none;
+  text-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+button:hover {
+  background: #8f3535;
+  border-color: #8f3535;
+}
+
+table,
+.findings-table {
+  background: #fff;
+  color: #151922;
+  border-color: #e6e9ee;
+}
+
+th,
+.findings-table th {
+  background: #fafbfc;
+  color: #151922;
+  border-color: #e6e9ee;
+  text-shadow: none;
+}
+
+td,
+.findings-table td {
+  background: #fff;
+  color: #151922;
+  border-color: #e6e9ee;
+}
+
+#logBox {
+  border-color: #d7dbe2;
+  background: #fff;
+  color: #151922;
+  border-radius: 3px;
 }

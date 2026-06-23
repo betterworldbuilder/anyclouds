@@ -494,10 +494,275 @@
     .artifact-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .artifact-link { font-size: 11px; padding: 4px 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(148,163,184,0.3); border-radius: 4px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 4px; }
     .artifact-link:hover { border-color: #7ecfff; color: #fff; }
+
+    /* Flex Skyline global console skin */
+    #top-theme-dropdown {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: auto;
+      display: flex;
+      justify-content: flex-start;
+      margin: 0;
+      z-index: 12000;
+    }
+    #top-theme-trigger {
+      background: #a33e3e;
+      border: 0;
+      border-right: 1px solid rgba(255,255,255,.08);
+      color: #fff;
+      min-height: 52px;
+      padding: 0 14px;
+      border-radius: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: none;
+    }
+    #top-theme-trigger svg { width: 16px; height: 16px; }
+    #top-theme-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 190px;
+      background: #fff;
+      border: 1px solid #d7dbe2;
+      border-radius: 3px;
+      box-shadow: 0 12px 30px rgba(15,23,42,.18);
+      overflow: hidden;
+      z-index: 12001;
+    }
+    .global-theme-option {
+      display: block;
+      width: 100%;
+      background: #fff;
+      border: 0;
+      border-bottom: 1px solid #edf0f4;
+      color: #1f2937;
+      padding: 10px 14px;
+      text-align: left;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .global-theme-option:last-child { border-bottom: 0; }
+    .global-theme-option:hover { background: #f4f6fa; }
+
+    body.flex-skyline-mode {
+      --bg: #eef1f5;
+      --card: #fff;
+      --text: #151922;
+      --muted: #596273;
+      --border: #e2e6ec;
+      --primary: #a33e3e;
+      background: #eef1f5 !important;
+      color: #151922 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+    }
+    body.flex-skyline-mode header {
+      background: #1e232b !important;
+      padding: 14px 30px 14px 64px !important;
+      border-bottom: 1px solid rgba(0,0,0,.45) !important;
+    }
+    body.flex-skyline-mode .neon-sign-outer,
+    body.flex-skyline-mode .neon-sign {
+      border-radius: 3px !important;
+    }
+    body.flex-skyline-mode .mission-control {
+      animation: none !important;
+      color: #d0d4dc !important;
+      text-shadow: none !important;
+    }
+    body.flex-skyline-mode .stage-bar,
+    body.flex-skyline-mode .sub-bar {
+      background: #1e232b !important;
+      border-bottom: 1px solid #151922 !important;
+      padding-left: 16px !important;
+      gap: 6px !important;
+    }
+    body.flex-skyline-mode .stage-btn,
+    body.flex-skyline-mode .stage-tracker-btn,
+    body.flex-skyline-mode .sub-btn,
+    body.flex-skyline-mode .sub-btn-dropdown {
+      background: #2b3039 !important;
+      border: 1px solid #3b424e !important;
+      color: #eef1f5 !important;
+      border-radius: 3px !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      font-size: 13px !important;
+      letter-spacing: 0 !important;
+    }
+    body.flex-skyline-mode .stage-btn {
+      padding: 10px 8px !important;
+    }
+    body.flex-skyline-mode .stage-btn small {
+      color: #c6ccd6 !important;
+      opacity: 1 !important;
+      font-size: 11px !important;
+    }
+    body.flex-skyline-mode .stage-btn.active,
+    body.flex-skyline-mode .stage-tracker-btn.active,
+    body.flex-skyline-mode .sub-btn.active {
+      background: #a33e3e !important;
+      border-color: #a33e3e !important;
+      color: #fff !important;
+      transform: none !important;
+    }
+    body.flex-skyline-mode main,
+    body.flex-skyline-mode .gov-page,
+    body.flex-skyline-mode .gov-section,
+    body.flex-skyline-mode .card,
+    body.flex-skyline-mode .notice,
+    body.flex-skyline-mode .uat-card {
+      background: #fff !important;
+      color: #151922 !important;
+      border-color: #e2e6ec !important;
+      border-radius: 3px !important;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04) !important;
+      text-shadow: none !important;
+    }
+    body.flex-skyline-mode h1,
+    body.flex-skyline-mode h2,
+    body.flex-skyline-mode h3,
+    body.flex-skyline-mode h4,
+    body.flex-skyline-mode p,
+    body.flex-skyline-mode label,
+    body.flex-skyline-mode summary,
+    body.flex-skyline-mode li {
+      color: #151922 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+      text-shadow: none !important;
+      letter-spacing: 0 !important;
+    }
+    body.flex-skyline-mode .gov-table,
+    body.flex-skyline-mode .matrix-table,
+    body.flex-skyline-mode table {
+      background: #fff !important;
+      color: #151922 !important;
+      border-color: #e6e9ee !important;
+    }
+    body.flex-skyline-mode th {
+      background: #fafbfc !important;
+      color: #151922 !important;
+      border-color: #e6e9ee !important;
+      text-shadow: none !important;
+    }
+    body.flex-skyline-mode td {
+      background: #fff !important;
+      color: #151922 !important;
+      border-color: #e6e9ee !important;
+    }
+    body.flex-skyline-mode input,
+    body.flex-skyline-mode select,
+    body.flex-skyline-mode textarea {
+      background: #fff !important;
+      color: #151922 !important;
+      border: 1px solid #d7dbe2 !important;
+      border-radius: 2px !important;
+      box-shadow: none !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+    }
+    body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option),
+    body.flex-skyline-mode .gov-btn,
+    body.flex-skyline-mode .uat-btn {
+      background: #a33e3e !important;
+      border-color: #a33e3e !important;
+      color: #fff !important;
+      border-radius: 2px !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+    }
+    body.flex-skyline-mode .artifact-link,
+    body.flex-skyline-mode .gov-status-badge,
+    body.flex-skyline-mode .uat-note {
+      background: #f4f6fa !important;
+      border-color: #d7dbe2 !important;
+      color: #293241 !important;
+      text-shadow: none !important;
+    }
   </style>
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
 </head>
-<body>
+<body class="flex-skyline-mode">
+<script>
+  (function() {
+    try {
+      var theme = localStorage.getItem('osflex_global_theme_v1') || 'flex-skyline';
+      if (theme !== 'dark' && theme !== 'apollo') document.body.classList.add('flex-skyline-mode');
+      if (theme === 'dark' || theme === 'apollo') document.body.classList.remove('flex-skyline-mode');
+    } catch (_) {
+      document.body.classList.add('flex-skyline-mode');
+    }
+  })();
+</script>
+
+<div id="top-theme-dropdown" aria-label="Global theme selector">
+  <button id="top-theme-trigger" type="button" onclick="toggleGlobalThemeMenu()" aria-haspopup="true" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path>
+    </svg>
+    <span id="top-theme-label">Flex Skyline</span>
+  </button>
+  <div id="top-theme-menu">
+    <button id="theme-dark-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('dark', true); closeGlobalThemeMenu();">Dark Theme</button>
+    <button id="theme-skyline-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('flex-skyline', true); closeGlobalThemeMenu();">Flex Skyline</button>
+    <button id="theme-apollo-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('apollo', true); closeGlobalThemeMenu();">Apollo Theme</button>
+  </div>
+</div>
+<script>
+  const GLOBAL_THEME_KEY = 'osflex_global_theme_v1';
+  function closeGlobalThemeMenu() {
+    const menu = document.getElementById('top-theme-menu');
+    const trigger = document.getElementById('top-theme-trigger');
+    if (menu) menu.style.display = 'none';
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+  function toggleGlobalThemeMenu() {
+    const menu = document.getElementById('top-theme-menu');
+    const trigger = document.getElementById('top-theme-trigger');
+    if (!menu) return;
+    const isOpen = menu.style.display === 'block';
+    menu.style.display = isOpen ? 'none' : 'block';
+    if (trigger) trigger.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+  }
+  function applyGlobalTheme(theme, persist) {
+    const normalized = theme === 'dark' ? 'dark' : theme === 'apollo' ? 'apollo' : 'flex-skyline';
+    document.body.classList.toggle('flex-skyline-mode', normalized === 'flex-skyline');
+    if (persist) {
+      try { localStorage.setItem(GLOBAL_THEME_KEY, normalized); } catch (_) {}
+    }
+    const labels = { dark: 'Dark Theme', 'flex-skyline': 'Flex Skyline', apollo: 'Apollo Theme' };
+    const triggerLabel = document.getElementById('top-theme-label');
+    if (triggerLabel) triggerLabel.textContent = labels[normalized] || 'Flex Skyline';
+    const mark = function(id, label, active) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = label + (active ? ' ✓' : '');
+    };
+    mark('theme-dark-btn', 'Dark Theme', normalized === 'dark');
+    mark('theme-skyline-btn', 'Flex Skyline', normalized === 'flex-skyline');
+    mark('theme-apollo-btn', 'Apollo Theme', normalized === 'apollo');
+  }
+  function restoreGlobalTheme() {
+    let saved = '';
+    try { saved = localStorage.getItem(GLOBAL_THEME_KEY) || ''; } catch (_) {}
+    applyGlobalTheme(saved || 'flex-skyline', false);
+  }
+  document.addEventListener('click', function(e) {
+    const dd = document.getElementById('top-theme-dropdown');
+    if (dd && !dd.contains(e.target)) closeGlobalThemeMenu();
+  });
+  document.addEventListener('DOMContentLoaded', restoreGlobalTheme);
+  if (document.readyState !== 'loading') restoreGlobalTheme();
+</script>
 
 <header>
   <div class="header-inner">
