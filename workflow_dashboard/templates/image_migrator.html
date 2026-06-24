@@ -111,10 +111,10 @@
       #top-theme-dropdown {
           position: fixed;
           top: 0;
-          right: 0;
+          left: 0;
           width: auto;
           display: flex;
-          justify-content: flex-end;
+          justify-content: flex-start;
           margin: 0;
           z-index: 12000;
       }
@@ -123,7 +123,7 @@
           border: 1px solid #3b82f6;
           color: #fff;
           padding: 7px 12px;
-          border-radius: 0 0 0 4px;
+          border-radius: 0 0 4px 0;
           font-family: 'Orbitron', sans-serif;
           font-size: 11px;
           font-weight: 700;
@@ -142,8 +142,8 @@
           display: none;
           position: absolute;
           top: calc(100% + 6px);
-          right: 0;
-          left: auto;
+          left: 0;
+          right: auto;
           margin-top: 0;
           background: #0f172a;
           border: 1px solid #3b82f6;
@@ -168,6 +168,7 @@
           letter-spacing: 0;
       }
       .global-theme-option:last-child { border-bottom: none; }
+      html.embedded-frame #top-theme-dropdown { display: none !important; }
       .section-title::before {
           content: ''; display: block; width: 8px; height: 24px;
           background: linear-gradient(to bottom, #10b981, #059669); border-radius: 4px;
@@ -275,21 +276,21 @@
       }
       body.flex-light-mode .global-theme-option:hover { background: #f4f6fa !important; }
       body.flex-light-mode .app-container {
-        max-width: none !important;
-        margin: 0 !important;
-        padding: 68px 16px 16px !important;
+        max-width: 1280px !important;
+        margin: 0 auto !important;
+        padding: 68px 16px 40px !important;
         background: #eef1f5 !important;
       }
       body.flex-light-mode .panel,
       body.flex-light-mode .adv-panel,
       body.flex-light-mode #mig-progress-panel,
       body.flex-light-mode details {
-        background: #fff !important;
+        background: rgba(8, 12, 24, 0.88) !important;
         border: 1px solid #e2e6ec !important;
-        border-radius: 3px !important;
-        box-shadow: 0 1px 2px rgba(15,23,42,.04) !important;
-        color: #151922 !important;
-        backdrop-filter: none !important;
+        border-radius: 6px !important;
+        box-shadow: 0 18px 42px rgba(15,23,42,.22) !important;
+        color: #e2e8f0 !important;
+        backdrop-filter: blur(20px) !important;
       }
       body.flex-light-mode .section-title,
       body.flex-light-mode .section-title-wrapper,
@@ -298,16 +299,13 @@
       body.flex-light-mode h3,
       body.flex-light-mode h4,
       body.flex-light-mode h5 {
-        color: #151922 !important;
-        text-shadow: none !important;
-        letter-spacing: 0 !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+        color: #e2e8f0 !important;
       }
       body.flex-light-mode .mission-control {
-        animation: none !important;
-        color: #111827 !important;
-        text-shadow: none !important;
-        letter-spacing: 0 !important;
+        animation: neonPulse 4s infinite linear !important;
+        color: inherit !important;
+        text-shadow: inherit !important;
+        letter-spacing: 2px !important;
       }
       body.flex-light-mode .section-title::before {
         background: #a33e3e !important;
@@ -396,6 +394,11 @@
 <body class="{% if flex_light_mode %}flex-light-mode{% endif %}">
     <script>
       (function() {
+        try {
+          if (window.top !== window.self) document.documentElement.classList.add('embedded-frame');
+        } catch (_) {
+          document.documentElement.classList.add('embedded-frame');
+        }
         try {
           var theme = localStorage.getItem('osflex_global_theme_v1') || 'flex-skyline';
           if (theme === 'apollo') document.body.classList.add('theme-apollo');

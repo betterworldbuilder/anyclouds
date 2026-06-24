@@ -499,17 +499,17 @@
     #top-theme-dropdown {
       position: fixed;
       top: 0;
-      right: 0;
+      left: 0;
       width: auto;
       display: flex;
-      justify-content: flex-end;
+      justify-content: flex-start;
       margin: 0;
       z-index: 12000;
     }
     #top-theme-trigger {
       background: #a33e3e;
       border: 0;
-      border-left: 1px solid rgba(255,255,255,.08);
+      border-right: 1px solid rgba(255,255,255,.08);
       color: #fff;
       min-height: 52px;
       padding: 0 14px;
@@ -528,7 +528,7 @@
       display: none;
       position: absolute;
       top: calc(100% + 6px);
-      right: 0;
+      left: 0;
       min-width: 190px;
       background: #fff;
       border: 1px solid #d7dbe2;
@@ -574,10 +574,18 @@
     body.flex-skyline-mode .neon-sign {
       border-radius: 3px !important;
     }
-    body.flex-skyline-mode .mission-control {
-      animation: none !important;
-      color: #d0d4dc !important;
-      text-shadow: none !important;
+    body.flex-skyline-mode header .neon-sign h1 {
+      color: #fff !important;
+      font-family: 'Orbitron', sans-serif !important;
+      letter-spacing: .24em !important;
+      text-shadow: 0 0 7px #fff, 0 0 10px #fff, 0 0 21px #fff, 0 0 42px #0ff !important;
+    }
+    body.flex-skyline-mode header .mission-control {
+      animation: neonPulse 4s infinite linear !important;
+      color: inherit !important;
+      text-shadow: inherit !important;
+      letter-spacing: 2px !important;
+      font-family: inherit !important;
     }
     body.flex-skyline-mode .stage-bar,
     body.flex-skyline-mode .sub-bar {
