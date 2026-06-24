@@ -388,6 +388,79 @@
       body.flex-light-mode [style*="color: #e2e8f0"] {
         color: #344054 !important;
       }
+      body.flex-light-mode .terminal-shell-panel,
+      body.flex-light-mode .terminal-shell-panel .crt-terminal,
+      body.flex-light-mode .terminal-shell-panel .console-section {
+        background: #000a00 !important;
+        border-color: #00ff41 !important;
+        color: #00ff41 !important;
+        box-shadow: 0 0 30px rgba(0,255,65,0.18) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel {
+        border-radius: 10px !important;
+        overflow: hidden !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .console-header {
+        background: #001a00 !important;
+        border-bottom: 2px solid #003300 !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #vm-panels-container,
+      body.flex-light-mode .terminal-shell-panel #console-output {
+        background: #000a00 !important;
+        color: #00ff41 !important;
+        text-shadow: 0 0 5px rgba(0,255,65,0.7) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #image-panels-outer,
+      body.flex-light-mode .terminal-shell-panel #image-panels-container {
+        background: #06030f !important;
+        border-color: rgba(167,139,250,0.28) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #operator-terminal-panel {
+        background: #020802 !important;
+        border-color: rgba(0,255,65,.28) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #operator-terminal-output,
+      body.flex-light-mode .terminal-shell-panel #operator-terminal-input {
+        background: #000 !important;
+        color: #d1fae5 !important;
+        border-color: rgba(34,211,238,.35) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #operator-terminal-shell {
+        background: #06111f !important;
+        color: #e0f2fe !important;
+        border-color: #22d3ee !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .console-title {
+        color: #00ff41 !important;
+        text-shadow: 0 0 10px rgba(0,255,65,0.8), 0 0 20px rgba(0,255,65,0.4) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel [style*="color:#94a3b8"],
+      body.flex-light-mode .terminal-shell-panel [style*="color: #94a3b8"] {
+        color: #94a3b8 !important;
+      }
+      body.flex-light-mode .terminal-shell-panel [style*="color:#cbd5e1"],
+      body.flex-light-mode .terminal-shell-panel [style*="color: #cbd5e1"],
+      body.flex-light-mode .terminal-shell-panel [style*="color:#e2e8f0"],
+      body.flex-light-mode .terminal-shell-panel [style*="color: #e2e8f0"] {
+        color: #e2e8f0 !important;
+      }
+      body.flex-light-mode .terminal-shell-panel button:not(#operator-terminal-run) {
+        background: #0f172a !important;
+        border: 1px solid #334155 !important;
+        color: #d1fae5 !important;
+        border-radius: 4px !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #copy-log-btn,
+      body.flex-light-mode .terminal-shell-panel #save-log-btn,
+      body.flex-light-mode .terminal-shell-panel #clear-log-btn {
+        background: transparent !important;
+        border: none !important;
+      }
+      body.flex-light-mode .terminal-shell-panel #operator-terminal-run {
+        background: linear-gradient(135deg,#0891b2,#0e7490) !important;
+        border-color: #22d3ee !important;
+        color: #fff !important;
+      }
     </style>
     <script>
         window.LUNAR_SVG = `<img src="/static/lunar_module_sprite.png" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 0 6px rgba(56,189,248,0.8)) brightness(1.1);" />`;
@@ -3956,7 +4029,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 }
                 @keyframes crt-flicker { 0%{opacity:0.97} 5%{opacity:1} 10%{opacity:0.98} 50%{opacity:1} 100%{opacity:0.97} }
             </style>
-            <div class="panel" style="border-color: #00ff41; padding: 0; overflow: hidden; box-shadow: 0 0 30px rgba(0,255,65,0.15);">
+            <div class="panel terminal-shell-panel" style="border-color: #00ff41; padding: 0; overflow: hidden; box-shadow: 0 0 30px rgba(0,255,65,0.15);">
                 <section class="console-section crt-terminal" style="background-color: #000a00; border-radius: 20px; max-width: 100%; overflow: hidden; width: 100%; display: flex; flex-direction: column; min-width: 0; animation: crt-flicker 4s infinite;">
                     <div class="console-header" style="background-color: #001a00; border-bottom: 2px solid #003300; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
                         <div class="window-controls" style="display:flex; gap:8px;">
