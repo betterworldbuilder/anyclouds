@@ -5746,7 +5746,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
         _isLinuxSnapMonitorOnlyLine(text) {
             const t = String(text || '');
-            return /\[LINSNAP ERROR\]|\[LINSNAP WARN\]|SSH poll failed|remote job.*still.*running|Remote job is nohup-protected|Queue job .*waiting|existing job pid=.*still running|DOWNLOAD_STATUS|DOWNLOAD_BAR|status=creating\s+target=available|scp: Connection closed|Connection timed out|timed out after/i.test(t);
+            return /\[LINSNAP ERROR\]|\[LINSNAP WARN\]|SSH poll failed|remote job.*still.*running|Remote job is nohup-protected|Queue job .*waiting|existing job pid=.*still running|DOWNLOAD_STATUS|DOWNLOAD_BAR|UPLOAD_STATUS|UPLOAD_BAR|status=creating\s+target=available|scp: Connection closed|Connection timed out|timed out after/i.test(t);
         },
 
         _isLinuxSnapTerminalFailureLine(text) {
@@ -8132,14 +8132,23 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
         function parseDownloadProgressLine(text) {
             const clean = cleanMigrationLogLine(text);
-            if (!/\[DOWNLOAD_(?:BAR|STATUS)\]/i.test(clean)) return null;
+            const marker = (clean.match(/\[(DOWNLOAD|UPLOAD)_(?:BAR|STATUS)\]/i) || [])[1] || '';
+            if (!marker) return null;
             const phase = (clean.match(/\bphase=([^\s]+)/i) || [])[1] || 'snapshot_download';
             const pct = (clean.match(/\]\s*([0-9]+(?:\.[0-9]+)?)%/) || clean.match(/\bpct=([0-9]+(?:\.[0-9]+)?)%?/i) || [])[1] || '';
             const bar = (clean.match(/(\[[#=\- .]{8,}\])/) || [])[1] || '';
             const status = (clean.match(/\bstatus=([^\s]+)/i) || [])[1] || '';
-            const elapsed = (clean.match(/\belapsed=([^\s]+)/i) || [])[1] || '';
+            const elapsed = (clean.match(/\belapsed=([^\s]+)/i) || clean.match(/\belapsed_s=([^\s]+)/i) || [])[1] || '';
+            const timeout = (clean.match(/\btimeout_s=([^\s]+)/i) || [])[1] || '';
             const bytes = (clean.match(/\bbytes=([^\s]+)/i) || [])[1] || '';
             const total = (clean.match(/\btotal=([^\s]+)/i) || [])[1] || '';
+            const downloadedMb = (clean.match(/\bdownloaded_mb=([^\s]+)/i) || [])[1] || '';
+            const uploadedMb = (clean.match(/\buploaded_mb=([^\s]+)/i) || [])[1] || '';
+            const totalMb = (clean.match(/\btotal_mb=([^\s]+)/i) || [])[1] || '';
+            const etaMin = (clean.match(/\beta_min=([^\s]+)/i) || [])[1] || '';
+            const attempt = (clean.match(/\battempt=([^\s]+)/i) || [])[1] || '';
+            const poll = (clean.match(/\bpoll=([^\s]+)/i) || [])[1] || '';
+            const imageId = (clean.match(/\bimage_id=([^\s]+)/i) || [])[1] || '';
             const target = (clean.match(/\btarget=([^\s]+)/i) || [])[1] || '';
             const labelMap = {
                 cloud_files_export: 'Cloud Files Export',
@@ -8147,10 +8156,12 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 swift_download: 'Swift Snapshot Download',
                 snapshot_download: 'Snapshot Download',
                 glance_upload: 'Target Glance Upload',
+                flex_glance_upload: 'FLEX Glance Upload',
+                flex_glance_activate: 'FLEX Image Activation',
                 volume_stream: 'Volume Snapshot Stream'
             };
             const label = labelMap[phase] || phase.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
-            return { phase, label, pct, bar, status, elapsed, bytes, total, target, raw: clean };
+            return { kind: marker.toLowerCase(), phase, label, pct, bar, status, elapsed, timeout, bytes, total, downloadedMb, uploadedMb, totalMb, etaMin, attempt, poll, imageId, target, raw: clean };
         }
 
         function renderStageSectionHtml(stage, ts) {
@@ -8166,6 +8177,14 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const details = [
                 progress.status ? `status=${progress.status}` : '',
                 progress.elapsed ? `elapsed=${progress.elapsed}` : '',
+                progress.timeout ? `timeout=${progress.timeout}s` : '',
+                progress.downloadedMb ? `downloaded=${progress.downloadedMb}MiB` : '',
+                progress.uploadedMb ? `uploaded=${progress.uploadedMb}MiB` : '',
+                progress.totalMb ? `total=${progress.totalMb}MiB` : '',
+                progress.etaMin ? `eta=${progress.etaMin}min` : '',
+                progress.attempt ? `attempt=${progress.attempt}` : '',
+                progress.poll ? `poll=${progress.poll}` : '',
+                progress.imageId ? `image=${progress.imageId}` : '',
                 progress.bytes ? `bytes=${progress.bytes}` : '',
                 progress.total ? `total=${progress.total}` : '',
                 progress.target ? `target=${progress.target}` : ''

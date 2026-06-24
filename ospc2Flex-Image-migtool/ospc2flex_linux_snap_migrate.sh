@@ -174,6 +174,46 @@ log_download_wait_status() {
   log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=0 total_mb=0 pct=$pct status=$status elapsed_s=$elapsed_s timeout_s=$total_s${extra:+ $extra}"
   log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% elapsed=${elapsed_s}/${total_s}s status=${status}${extra:+ $extra}"
 }
+upload_progress_bar() {
+  local phase="$1" uploaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" eta_min="${5:-}" pct="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$uploaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  local filled empty bar
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[UPLOAD_BAR] phase=$phase [$bar] ${pct}% ${uploaded_mb}/${total_mb}MB status=${status}${eta_min:+ eta_min=$eta_min}${extra:+ $extra}"
+}
+log_upload_status() {
+  local phase="$1" uploaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" pct="${5:-}" eta_min="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$uploaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  log "[UPLOAD_STATUS] phase=$phase uploaded_mb=$uploaded_mb total_mb=$total_mb pct=$pct${eta_min:+ eta_min=$eta_min} status=$status${extra:+ $extra}"
+  upload_progress_bar "$phase" "$uploaded_mb" "$total_mb" "$status" "$eta_min" "$pct" "$extra"
+}
+log_upload_wait_status() {
+  local phase="$1" elapsed_s="${2:-0}" total_s="${3:-0}" status="${4:-waiting}" extra="${5:-}" pct filled empty bar
+  pct="$(awk -v e="$elapsed_s" -v t="$total_s" 'BEGIN{if(t>0) printf "%.1f", (e/t)*100; else printf "0.0"}')"
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[UPLOAD_STATUS] phase=$phase uploaded_mb=0 total_mb=0 pct=$pct status=$status elapsed_s=$elapsed_s timeout_s=$total_s${extra:+ $extra}"
+  log "[UPLOAD_BAR] phase=$phase [$bar] ${pct}% elapsed=${elapsed_s}/${total_s}s status=${status}${extra:+ $extra}"
+}
+proc_io_bytes() {
+  local pid="$1"
+  awk '
+    /^read_bytes:/ { rb=$2 }
+    /^rchar:/ { rc=$2 }
+    END {
+      if (rb > 0) print rb;
+      else if (rc > 0) print rc;
+      else print 0;
+    }
+  ' "/proc/$pid/io" 2>/dev/null || printf '0\n'
+}
 run_qemu_convert_with_progress() {
   local phase="$1" src="$2" fmt="$3" out="$4" qlog="$5"
   local src_bytes src_mb out_bytes out_mb pct pid rc
@@ -1643,10 +1683,46 @@ IMAGE_CREATE_ARGS=(
 
 NEW_ID=""
 for _up_try in 1 2 3; do
+  UPLOAD_OUT="$JOB_TMP/flex_glance_upload_${_up_try}.out"
+  UPLOAD_ERR="$JOB_TMP/flex_glance_upload_${_up_try}.err"
+  : >"$UPLOAD_OUT"
+  : >"$UPLOAD_ERR"
   log "  [UPLOAD $_up_try/3] starting..."
-  NEW_ID="$(openstack image create --format value -c id "${IMAGE_CREATE_ARGS[@]}" "$IMG_NAME" 2>>"$BACKGROUND_LOG" || true)"
-  [ -n "$NEW_ID" ] && { log "  [UPLOAD $_up_try/3] image id: $NEW_ID"; break; }
-  log "  [WARN] upload attempt $_up_try failed"
+  log_upload_status "flex_glance_upload" "0" "$QCOW_MIB" "starting" "0.0" "unknown" "attempt=$_up_try image=$IMG_NAME"
+  set +e
+  openstack image create --format value -c id "${IMAGE_CREATE_ARGS[@]}" "$IMG_NAME" >"$UPLOAD_OUT" 2>"$UPLOAD_ERR" &
+  UPLOAD_PID="$!"
+  UPLOAD_START="$(date +%s)"
+  while kill -0 "$UPLOAD_PID" 2>/dev/null; do
+    sleep 15
+    kill -0 "$UPLOAD_PID" 2>/dev/null || break
+    UPLOAD_BYTES="$(proc_io_bytes "$UPLOAD_PID")"
+    [ "${UPLOAD_BYTES:-0}" -gt "$QCOW_BYTES" ] 2>/dev/null && UPLOAD_BYTES="$QCOW_BYTES"
+    UPLOAD_MB="$(mb_from_bytes "$UPLOAD_BYTES")"
+    UPLOAD_PCT="$(awk -v d="${UPLOAD_BYTES:-0}" -v t="$QCOW_BYTES" 'BEGIN{if(t>0){p=(d/t)*100; if(p>99)p=99; printf "%.1f", p}else printf "0.0"}')"
+    UPLOAD_ELAPSED="$(( $(date +%s) - UPLOAD_START ))"
+    UPLOAD_ETA="$(awk -v d="${UPLOAD_BYTES:-0}" -v t="$QCOW_BYTES" -v e="$UPLOAD_ELAPSED" 'BEGIN{if(d>0 && e>0 && t>d){eta=((t-d)/(d/e))/60; printf "%.0f", eta}else printf "unknown"}')"
+    log_upload_status "flex_glance_upload" "$UPLOAD_MB" "$QCOW_MIB" "uploading" "$UPLOAD_PCT" "$UPLOAD_ETA" "attempt=$_up_try pid=$UPLOAD_PID image=$IMG_NAME"
+  done
+  wait "$UPLOAD_PID"
+  UPLOAD_RC="$?"
+  set -e
+  [ -s "$UPLOAD_ERR" ] && cat "$UPLOAD_ERR" >>"$BACKGROUND_LOG" 2>/dev/null || true
+  NEW_ID="$(awk 'NF{print $1; exit}' "$UPLOAD_OUT" 2>/dev/null | tr -d '\r')"
+  if [ "$UPLOAD_RC" -ne 0 ]; then
+    log_upload_status "flex_glance_upload" "$(mb_from_bytes "$QCOW_BYTES")" "$QCOW_MIB" "failed" "100.0" "0" "attempt=$_up_try rc=$UPLOAD_RC image=$IMG_NAME"
+    log "  [WARN] upload attempt $_up_try failed rc=$UPLOAD_RC"
+    [ -s "$UPLOAD_ERR" ] && tail -n 12 "$UPLOAD_ERR" | while IFS= read -r _upload_err_line; do log "  [UPLOAD_ERR] $_upload_err_line"; done
+    [ "$_up_try" -lt 3 ] && sleep 20
+    continue
+  fi
+  if [ -n "$NEW_ID" ]; then
+    log_upload_status "flex_glance_upload" "$QCOW_MIB" "$QCOW_MIB" "submitted" "100.0" "0" "attempt=$_up_try image_id=$NEW_ID image=$IMG_NAME"
+    log "  [UPLOAD $_up_try/3] image id: $NEW_ID"
+    break
+  fi
+  log_upload_status "flex_glance_upload" "$(mb_from_bytes "$QCOW_BYTES")" "$QCOW_MIB" "failed" "100.0" "0" "attempt=$_up_try rc=0 reason=no_image_id image=$IMG_NAME"
+  log "  [WARN] upload attempt $_up_try failed: no image id returned"
   [ "$_up_try" -lt 3 ] && sleep 20
 done
 [ -n "$NEW_ID" ] || fail_exit "LS6_UPLOAD_FLEX" "Upload failed after 3 attempts"
@@ -1654,9 +1730,11 @@ for _poll in $(seq 1 60); do
   ST="$(openstack image show "$NEW_ID" -f value -c status 2>/dev/null || echo "")"
   [ "$ST" = "active" ] && break
   [ "$ST" = "killed" ] && fail_exit "LS6_UPLOAD_FLEX" "Image $NEW_ID killed by Glance"
+  log_upload_wait_status "flex_glance_activate" "$((_poll * 20))" "1200" "${ST:-unknown}" "poll=$_poll/60 image_id=$NEW_ID"
   log "  [UPLOAD_POLL $_poll/60] status=${ST:-unknown}"; sleep 20
 done
 [ "$ST" = "active" ] || fail_exit "LS6_UPLOAD_FLEX" "Image $NEW_ID never reached active (status=$ST)"
+log_upload_wait_status "flex_glance_activate" "1200" "1200" "active" "image_id=$NEW_ID"
 log "[LS6] HIT image active: $NEW_ID"
 
 # ── LS6A: Volume-snapshot only — fix Glance virtual_size + create FLEX Cinder volume ──
