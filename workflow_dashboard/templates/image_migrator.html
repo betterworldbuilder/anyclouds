@@ -111,10 +111,10 @@
       #top-theme-dropdown {
           position: fixed;
           top: 0;
-          left: 0;
+          right: 0;
           width: auto;
           display: flex;
-          justify-content: flex-start;
+          justify-content: flex-end;
           margin: 0;
           z-index: 12000;
       }
@@ -123,7 +123,7 @@
           border: 1px solid #3b82f6;
           color: #fff;
           padding: 7px 12px;
-          border-radius: 0 0 4px 0;
+          border-radius: 0 0 0 4px;
           font-family: 'Orbitron', sans-serif;
           font-size: 11px;
           font-weight: 700;
@@ -142,8 +142,8 @@
           display: none;
           position: absolute;
           top: calc(100% + 6px);
-          left: 0;
-          right: auto;
+          right: 0;
+          left: auto;
           margin-top: 0;
           background: #0f172a;
           border: 1px solid #3b82f6;
@@ -285,12 +285,12 @@
       body.flex-light-mode .adv-panel,
       body.flex-light-mode #mig-progress-panel,
       body.flex-light-mode details {
-        background: rgba(8, 12, 24, 0.88) !important;
+        background: #fff !important;
         border: 1px solid #e2e6ec !important;
-        border-radius: 6px !important;
-        box-shadow: 0 18px 42px rgba(15,23,42,.22) !important;
-        color: #e2e8f0 !important;
-        backdrop-filter: blur(20px) !important;
+        border-radius: 3px !important;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04) !important;
+        color: #151922 !important;
+        backdrop-filter: none !important;
       }
       body.flex-light-mode .section-title,
       body.flex-light-mode .section-title-wrapper,
@@ -299,7 +299,10 @@
       body.flex-light-mode h3,
       body.flex-light-mode h4,
       body.flex-light-mode h5 {
-        color: #e2e8f0 !important;
+        color: #151922 !important;
+        text-shadow: none !important;
+        letter-spacing: 0 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
       }
       body.flex-light-mode .mission-control {
         animation: neonPulse 4s infinite linear !important;
@@ -12157,6 +12160,11 @@ function restoreGlobalTheme() {
 document.addEventListener('click', function(e) {
     var dd = document.getElementById('top-theme-dropdown');
     if (dd && !dd.contains(e.target)) closeGlobalThemeMenu();
+});
+window.addEventListener('message', function(event) {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data || {};
+    if (data.type === 'osflex-theme') applyGlobalTheme(data.theme || 'flex-skyline', false);
 });
 document.addEventListener('DOMContentLoaded', restoreGlobalTheme);
 if (document.readyState !== 'loading') restoreGlobalTheme();

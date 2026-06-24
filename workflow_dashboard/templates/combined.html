@@ -499,17 +499,17 @@
     #top-theme-dropdown {
       position: fixed;
       top: 0;
-      left: 0;
+      right: 0;
       width: auto;
       display: flex;
-      justify-content: flex-start;
+      justify-content: flex-end;
       margin: 0;
       z-index: 12000;
     }
     #top-theme-trigger {
       background: #a33e3e;
       border: 0;
-      border-right: 1px solid rgba(255,255,255,.08);
+      border-left: 1px solid rgba(255,255,255,.08);
       color: #fff;
       min-height: 52px;
       padding: 0 14px;
@@ -528,7 +528,7 @@
       display: none;
       position: absolute;
       top: calc(100% + 6px);
-      left: 0;
+      right: 0;
       min-width: 190px;
       background: #fff;
       border: 1px solid #d7dbe2;
@@ -758,6 +758,19 @@
     mark('theme-dark-btn', 'Dark Theme', normalized === 'dark');
     mark('theme-skyline-btn', 'Flex Skyline', normalized === 'flex-skyline');
     mark('theme-apollo-btn', 'Apollo Theme', normalized === 'apollo');
+    broadcastGlobalTheme(normalized);
+  }
+  function broadcastGlobalTheme(theme) {
+    document.querySelectorAll('iframe').forEach(frame => {
+      try {
+        if (frame.contentWindow && typeof frame.contentWindow.applyGlobalTheme === 'function') {
+          frame.contentWindow.applyGlobalTheme(theme, false);
+        }
+      } catch (_) {}
+      try {
+        if (frame.contentWindow) frame.contentWindow.postMessage({type: 'osflex-theme', theme}, window.location.origin);
+      } catch (_) {}
+    });
   }
   function restoreGlobalTheme() {
     let saved = '';
@@ -8860,6 +8873,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   document.querySelectorAll('iframe').forEach(frame => {
     frame.addEventListener('load', () => {
       resizeEmbeddedIframe(frame);
+      try {
+        const theme = localStorage.getItem(GLOBAL_THEME_KEY) || 'flex-skyline';
+        if (typeof broadcastGlobalTheme === 'function') broadcastGlobalTheme(theme);
+      } catch (_) {}
       setTimeout(() => resizeEmbeddedIframe(frame), 300);
       setTimeout(() => resizeEmbeddedIframe(frame), 1200);
       if (frame.id && (frame.id.startsWith('s1') || frame.id.startsWith('s2'))) {
