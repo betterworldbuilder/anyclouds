@@ -42,6 +42,8 @@ USE_CLOUD_FILES_EXPORT="${OSPC2FLEX_USE_CLOUD_FILES_EXPORT:-1}"
 CINDER_VOLUME_EXPORT_ON_LICENSED="${OSPC2FLEX_CINDER_VOLUME_EXPORT_ON_LICENSED:-1}"
 CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-75}"
 CINDER_CREATE_TIMEOUT="${OSPC2FLEX_CINDER_CREATE_TIMEOUT:-7200}"
+CINDER_CREATE_ATTEMPTS="${OSPC2FLEX_CINDER_CREATE_ATTEMPTS:-3}"
+CINDER_CREATE_RETRY_WAIT="${OSPC2FLEX_CINDER_CREATE_RETRY_WAIT:-45}"
 PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-0}"
 DOWNLOAD_ONLY=0
 DRY_RUN=0
@@ -826,6 +828,39 @@ rackspace_delete_volume() {
   [ -n "$vol_id" ] && [ -n "$token" ] && [ -n "$base" ] || return 0
   curl -sS -X DELETE "$base/volumes/$vol_id" -H "X-Auth-Token: $token" -o /dev/null >>"$JOB_LOG/cinder.log" 2>&1 || true
 }
+cinder_create_available_volume_from_image() {
+  local image_id="$1" size_gb="$2" name_prefix="$3" source_mb="${4:-0}" phase="${5:-cinder_volume_create}"
+  local attempts wait_s attempt volume_name volume_id status
+  CINDER_AVAILABLE_VOLUME_ID=""
+  attempts="${CINDER_CREATE_ATTEMPTS:-3}"
+  wait_s="${CINDER_CREATE_RETRY_WAIT:-45}"
+  [ "$attempts" -ge 1 ] 2>/dev/null || attempts=1
+  attempt=1
+  while [ "$attempt" -le "$attempts" ]; do
+    volume_name="${name_prefix}-a${attempt}"
+    log "[CINDER] create image-volume attempt $attempt/$attempts: name=$volume_name size=${size_gb}GB"
+    volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name" | tr -d '\r' | tail -1)" || volume_id=""
+    if [ -z "$volume_id" ]; then
+      log "[CINDER] WARN image-volume create request returned no volume id on attempt $attempt/$attempts"
+    else
+      log "[CINDER] volume=$volume_id — waiting available (attempt $attempt/$attempts)"
+      if cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "$phase" "$source_mb" "0"; then
+        CINDER_AVAILABLE_VOLUME_ID="$volume_id"
+        return 0
+      fi
+      status="$(rackspace_volume_status "$volume_id" 2>/dev/null || echo unknown)"
+      log "[CINDER] WARN image-volume attempt $attempt/$attempts did not become available: volume=$volume_id status=$status"
+      log "[CINDER] cleanup: requesting delete for failed temp volume=$volume_id"
+      rackspace_delete_volume "$volume_id" || true
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      log "[CINDER] retrying image-volume create after ${wait_s}s with a fresh temp volume"
+      sleep "$wait_s"
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
 discover_ospc_helper_server_id() {
   local ips_json server_json meta_id
   if [ -n "${OSPC2FLEX_OSPC_HELPER_SERVER_ID:-${OSPC2FLEX_CINDER_HELPER_SERVER_ID:-}}" ]; then
@@ -902,15 +937,11 @@ remote_ospc_helper_volume_export() {
   ssh_key_file="${SSH_KEY_PATH/#\~/$HOME}"
   log "[CINDER] Remote OSPC helper fallback: helper=$helper_id ip=$helper_ip size=${size_gb}GB"
 
-  volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || return 1
-  volume_id="$(printf '%s' "$volume_id" | tr -d '\r' | tail -1)"
-  [ -n "$volume_id" ] || return 1
-  log "[CINDER] volume=$volume_id — waiting available"
-  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "cinder_volume_create" "$source_mb" "0" || {
-    log "[CINDER] FAILED remote helper volume create timeout"
-    rackspace_delete_volume "$volume_id" || true
+  cinder_create_available_volume_from_image "$image_id" "$size_gb" "$volume_name" "$source_mb" "cinder_volume_create" || {
+    log "[CINDER] FAILED remote helper volume create after ${CINDER_CREATE_ATTEMPTS:-3} attempt(s)"
     return 1
   }
+  volume_id="$CINDER_AVAILABLE_VOLUME_ID"
 
   rackspace_attach_volume "$helper_id" "$volume_id" || { rackspace_delete_volume "$volume_id" || true; return 1; }
   cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || {
@@ -1035,26 +1066,24 @@ PYSIZE
   log "[CINDER] Licensed image — Cinder attach fallback: helper=$helper_id size=${size_gb}GB"
   log_download_status "cinder_volume_create" "0" "$source_mb" "starting" "" "" "volume_mb=$volume_mb"
   local_block_disks >"$before_file"
-  volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || {
-    log "[CINDER] FAILED volume create request; cannot use Cinder fallback"
+  cinder_create_available_volume_from_image "$image_id" "$size_gb" "$volume_name" "$source_mb" "cinder_volume_create" || {
+    log "[CINDER] FAILED volume create after ${CINDER_CREATE_ATTEMPTS:-3} attempt(s)"
+    log "[CINDER] ICF Issue=volume stuck creating/error Cause=Rackspace Cinder backend did not finish image-to-volume create Fix=retry later or use START FRESH after failed temp volumes are deleted"
     return 1
   }
-  volume_id="$(printf '%s' "$volume_id" | tr -d '\r' | tail -1)"
-  [ -n "$volume_id" ] || {
-    log "[CINDER] FAILED volume create request returned no volume id"
-    return 1
-  }
-  log "[CINDER] volume=$volume_id — waiting available"
-  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "cinder_volume_create" "$source_mb" "0" || {
-    log "[CINDER] FAILED volume create timeout: volume=$volume_id waited=${CINDER_CREATE_TIMEOUT}s status=$(rackspace_volume_status "$volume_id" 2>/dev/null || echo unknown)"
-    log "[CINDER] ICF Issue=volume stuck creating Cause=Rackspace Cinder backend did not finish image-to-volume create Fix=retry later or use START FRESH after volume leaves creating/error"
-    log "[CINDER] cleanup: requesting delete for failed temp volume=$volume_id"
+  volume_id="$CINDER_AVAILABLE_VOLUME_ID"
+  log_download_status "cinder_attach" "0" "$source_mb" "starting"
+  rackspace_attach_volume "$helper_id" "$volume_id" || {
+    log "[CINDER] FAILED attach temp volume=$volume_id to helper=$helper_id"
     rackspace_delete_volume "$volume_id" || true
     return 1
   }
-  log_download_status "cinder_attach" "0" "$source_mb" "starting"
-  rackspace_attach_volume "$helper_id" "$volume_id" || return 1
-  cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || return 1
+  cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || {
+    log "[CINDER] FAILED temp volume attach wait: volume=$volume_id"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   dev=""
   for _i in $(seq 1 60); do
     sleep 3
@@ -1068,14 +1097,25 @@ PYSIZE
       dev="$(find_new_block_disk "$before_file" "$after_file" || true)"
     else
       log "[CINDER] ERROR could not map volume=$volume_id to an attached block device; refusing unsafe parallel disk guess"
+      rackspace_detach_volume "$helper_id" "$volume_id" || true
+      rackspace_delete_volume "$volume_id" || true
       return 1
     fi
   fi
-  [ -n "$dev" ] || return 1
+  [ -n "$dev" ] || {
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   dev_size="$(sudo blockdev --getsize64 "$dev" 2>/dev/null || echo 0)"
   dev_mb="$(mb_from_bytes "$dev_size")"
   log "[CINDER] attached block device for volume=$volume_id: $dev bytes=$dev_size"
-  [ "$dev_size" -gt 1073741824 ] || return 1
+  [ "$dev_size" -gt 1073741824 ] || {
+    log "[CINDER] FAILED attached device too small/invalid: volume=$volume_id dev=$dev bytes=$dev_size"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   rm -f "$dest"
   log "[CINDER] raw-copying $dev → $dest"
   copy_start_ts="$(date +%s)"
@@ -1095,7 +1135,12 @@ PYSIZE
   done
   wait "$dd_pid"; dd_rc=$?
   set -e
-  [ "$dd_rc" -eq 0 ] || return 1
+  [ "$dd_rc" -eq 0 ] || {
+    log "[CINDER] FAILED raw copy from temp volume=$volume_id rc=$dd_rc"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   sudo chown "$(id -u):$(id -g)" "$dest" 2>/dev/null || true
   final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
   final_mb="$(mb_from_bytes "$final_bytes")"
