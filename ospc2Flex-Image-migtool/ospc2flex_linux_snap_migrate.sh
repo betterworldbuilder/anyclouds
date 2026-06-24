@@ -44,7 +44,10 @@ CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-75}"
 CINDER_CREATE_TIMEOUT="${OSPC2FLEX_CINDER_CREATE_TIMEOUT:-7200}"
 CINDER_CREATE_ATTEMPTS="${OSPC2FLEX_CINDER_CREATE_ATTEMPTS:-3}"
 CINDER_CREATE_RETRY_WAIT="${OSPC2FLEX_CINDER_CREATE_RETRY_WAIT:-45}"
-PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-0}"
+PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-1}"
+LIVE_ORIGIN_FALLBACK="${OSPC2FLEX_LIVE_ORIGIN_FALLBACK:-1}"
+LIVE_ORIGIN_EXPORT_FIRST="${OSPC2FLEX_LIVE_ORIGIN_EXPORT_FIRST:-0}"
+ORIGIN_SSH_USER="${OSPC2FLEX_ORIGIN_SSH_USER:-ubuntu}"
 DOWNLOAD_ONLY=0
 DRY_RUN=0
 START_FRESH=0
@@ -171,6 +174,33 @@ log_download_wait_status() {
   log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=0 total_mb=0 pct=$pct status=$status elapsed_s=$elapsed_s timeout_s=$total_s${extra:+ $extra}"
   log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% elapsed=${elapsed_s}/${total_s}s status=${status}${extra:+ $extra}"
 }
+run_qemu_convert_with_progress() {
+  local phase="$1" src="$2" fmt="$3" out="$4" qlog="$5"
+  local src_bytes src_mb out_bytes out_mb pct pid rc
+  src_bytes="$(stat -c%s "$src" 2>/dev/null || echo 0)"
+  src_mb="$(mb_from_bytes "$src_bytes")"
+  : >"$qlog"
+  set +e
+  qemu-img convert -f "$fmt" -O qcow2 -c "$src" "$out" >>"$qlog" 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    out_bytes="$(stat -c%s "$out" 2>/dev/null || echo 0)"
+    out_mb="$(mb_from_bytes "$out_bytes")"
+    pct="$(awk -v d="$out_bytes" -v t="$src_bytes" 'BEGIN{if(t>0){p=(d/t)*100; if(p>99)p=99; printf "%.1f", p}else printf "0.0"}')"
+    log_download_status "$phase" "$out_mb" "$src_mb" "converting" "$pct" "" "output=$out"
+    sleep 30
+  done
+  wait "$pid"; rc=$?
+  set -e
+  out_bytes="$(stat -c%s "$out" 2>/dev/null || echo 0)"
+  out_mb="$(mb_from_bytes "$out_bytes")"
+  if [ "$rc" -eq 0 ]; then
+    log_download_status "$phase" "$out_mb" "$src_mb" "complete" "100.0" "" "output=$out"
+  else
+    log "[${phase}] qemu-img convert failed rc=$rc; detail_log=$qlog"
+  fi
+  return "$rc"
+}
 kv() { log "  $(printf '%-18s' "$1") : ${*:2}"; }
 stage() {
   CURRENT_STAGE="$1"
@@ -248,15 +278,19 @@ cleanup_stale_jumphost_images() {
     log "[LS0A] no stale image files found; label cleanup root not found: $cleanup_root"
     return 0
   }
-  case "$(readlink -f "$cleanup_root")" in
-    /mnt/migration|/mnt/migration/*) ;;
+  local resolved_cleanup_root resolved_migration_root resolved_label_root
+  resolved_cleanup_root="$(readlink -f "$cleanup_root" 2>/dev/null || true)"
+  resolved_migration_root="$(readlink -f /mnt/migration 2>/dev/null || printf '%s' /mnt/migration)"
+  resolved_label_root="$(readlink -f "$BASE_DIR/runs/$LABEL_SAFE" 2>/dev/null || true)"
+  case "$resolved_cleanup_root" in
+    "$resolved_migration_root"|"$resolved_migration_root"/*) ;;
     *)
-      log "[LS0A] refusing cleanup outside /mnt/migration: $cleanup_root"
+      log "[LS0A] refusing cleanup outside /mnt/migration: $cleanup_root resolved=$resolved_cleanup_root migration_root=$resolved_migration_root"
       return 0
       ;;
   esac
-  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-0}" != "1" ] && [ "$(readlink -f "$cleanup_root")" != "$(readlink -f "$BASE_DIR/runs/$LABEL_SAFE" 2>/dev/null || true)" ]; then
-    log "[LS0A] refusing cleanup outside current label root: $cleanup_root"
+  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-0}" != "1" ] && [ "$resolved_cleanup_root" != "$resolved_label_root" ]; then
+    log "[LS0A] refusing cleanup outside current label root: $cleanup_root resolved=$resolved_cleanup_root label_root=$resolved_label_root"
     return 0
   fi
 
@@ -1005,6 +1039,118 @@ gb = max(1, min_disk, math.ceil(size/(1024**3)), math.ceil(virtual/(1024**3)) if
 print(gb)
 PY
 }
+image_origin_instance_uuid() {
+  local image_id="$1" meta="$JOB_TMP/origin_img_meta.json"
+  openstack image show "$image_id" -f json >"$meta" 2>/dev/null || return 1
+  python3 - "$meta" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("")
+    raise SystemExit
+props = data.get("properties") or {}
+if not isinstance(props, dict):
+    props = {}
+print(props.get("instance_uuid") or data.get("instance_uuid") or "")
+PY
+}
+server_public_ipv4() {
+  local server_id="$1" meta="$JOB_TMP/origin_server_meta.json"
+  openstack server show "$server_id" -f json >"$meta" 2>/dev/null || return 1
+  python3 - "$meta" <<'PY'
+import ipaddress, json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    raise SystemExit
+def public_v4(value):
+    try:
+        ip = ipaddress.ip_address(str(value))
+    except Exception:
+        return ""
+    if ip.version == 4 and not ip.is_private:
+        return str(ip)
+    return ""
+for key in ("accessIPv4", "public_v4", "publicIPv4"):
+    out = public_v4(data.get(key))
+    if out:
+        print(out)
+        raise SystemExit
+addresses = data.get("addresses") or {}
+if isinstance(addresses, dict):
+    for rows in addresses.values():
+        if not isinstance(rows, list):
+            rows = [rows]
+        for row in rows:
+            if isinstance(row, dict):
+                candidates = [row.get("addr"), row.get("ip")]
+            else:
+                candidates = [row]
+            for item in candidates:
+                out = public_v4(item)
+                if out:
+                    print(out)
+                    raise SystemExit
+print("")
+PY
+}
+server_status_value() {
+  local server_id="$1"
+  openstack server show "$server_id" -f value -c status 2>/dev/null | tr -d '[:space:]'
+}
+origin_vm_raw_export() {
+  local image_id="$1" dest="$2" min_bytes="${3:-1073741824}"
+  local origin_id status origin_ip ssh_key_file disk dev_size dev_mb export_log export_pid start_s copied copied_mb pct elapsed_s eta_min rc final_bytes final_mb
+  [ "$LIVE_ORIGIN_FALLBACK" = "1" ] || return 1
+  origin_id="${OSPC2FLEX_ORIGIN_SERVER_ID:-$(image_origin_instance_uuid "$image_id" | tr -d '[:space:]' || true)}"
+  [ -n "$origin_id" ] || { log "[ORIGIN] No source server id found in snapshot metadata"; return 1; }
+  status="$(server_status_value "$origin_id" | tr '[:lower:]' '[:upper:]')"
+  [ "$status" = "ACTIVE" ] || { log "[ORIGIN] Source server $origin_id is not ACTIVE (status=${status:-unknown})"; return 1; }
+  origin_ip="${OSPC2FLEX_ORIGIN_SERVER_IP:-$(server_public_ipv4 "$origin_id" | head -1 | tr -d '[:space:]' || true)}"
+  [ -n "$origin_ip" ] || { log "[ORIGIN] No public IPv4 found for source server $origin_id"; return 1; }
+  ssh_key_file="${SSH_KEY_PATH/#\~/$HOME}"
+  [ -f "$ssh_key_file" ] || { log "[ORIGIN] SSH key not found: $ssh_key_file"; return 1; }
+  log "[ORIGIN] Live source VM export fallback: server=$origin_id ip=$origin_ip user=$ORIGIN_SSH_USER"
+  disk="$(ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes "$ORIGIN_SSH_USER@$origin_ip" 'for d in /dev/vda /dev/xvda /dev/sda; do [ -b "$d" ] && printf "%s\n" "$d" && exit 0; done; exit 1' 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+  [ -n "$disk" ] || { log "[ORIGIN] Could not detect root disk on source VM"; return 1; }
+  dev_size="$(ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes "$ORIGIN_SSH_USER@$origin_ip" "sudo blockdev --getsize64 '$disk'" 2>/dev/null | tr -dc '0-9' || true)"
+  [ "${dev_size:-0}" -ge "$min_bytes" ] 2>/dev/null || { log "[ORIGIN] Source disk size invalid: disk=$disk bytes=${dev_size:-0}"; return 1; }
+  dev_mb="$(mb_from_bytes "$dev_size")"
+  export_log="$JOB_LOG/origin_vm_export.log"
+  rm -f "$dest" "$export_log"
+  log "[ORIGIN] Streaming source disk $disk ($(fmt_bytes "$dev_size")) to $dest"
+  log_download_status "origin_vm_raw_export" "0" "$dev_mb" "starting" "0.0" "unknown" "server=$origin_id disk=$disk"
+  set +e
+  ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o IdentitiesOnly=yes "$ORIGIN_SSH_USER@$origin_ip" \
+    "sudo dd if='$disk' bs=16M status=none" >"$dest" 2>"$export_log" &
+  export_pid=$!
+  start_s="$(date +%s)"
+  while kill -0 "$export_pid" 2>/dev/null; do
+    sleep 30
+    if kill -0 "$export_pid" 2>/dev/null; then
+      copied="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+      copied_mb="$(mb_from_bytes "$copied")"
+      pct="$(awk -v c="$copied" -v t="$dev_size" 'BEGIN{if(t>0) printf "%.1f", (c/t)*100; else printf "0.0"}')"
+      elapsed_s=$(( $(date +%s) - start_s ))
+      eta_min="$(awk -v c="$copied" -v t="$dev_size" -v e="$elapsed_s" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
+      log_download_status "origin_vm_raw_export" "$copied_mb" "$dev_mb" "streaming" "$pct" "$eta_min" "server=$origin_id disk=$disk"
+    fi
+  done
+  wait "$export_pid"; rc=$?
+  set -e
+  final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+  if [ "$rc" -eq 0 ] && [ "$final_bytes" -ge "$min_bytes" ]; then
+    final_mb="$(mb_from_bytes "$final_bytes")"
+    log_download_status "origin_vm_raw_export" "$final_mb" "$dev_mb" "complete" "100.0" "0" "server=$origin_id disk=$disk"
+    log "[ORIGIN] HIT live source raw artifact: $dest (${final_bytes} bytes)"
+    return 0
+  fi
+  log "[ORIGIN] WARN live source export failed rc=$rc size=${final_bytes}B log=$export_log"
+  log_file_excerpt "[ORIGIN] export-error:" "$export_log"
+  rm -f "$dest"
+  return 1
+}
 image_is_cinder_preferred_snapshot() {
   local image_id="$1" meta="$JOB_TMP/img_meta_export.json"
   openstack image show "$image_id" -f json >"$meta" 2>/dev/null || return 1
@@ -1155,11 +1301,17 @@ PYSIZE
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3] Download waterfall for image=$image_id"
+  if [ "$LIVE_ORIGIN_EXPORT_FIRST" = "1" ]; then
+    log "[ZS3] Live-origin export requested first"
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
+    log "[ZS3] Live-origin export-first failed — continuing waterfall"
+  fi
   if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT" = "1" ] && [ "$(image_is_cinder_preferred_snapshot "$image_id" || echo 0)" = "1" ]; then
     log "[ZS3] Rackspace-managed snapshot — using Cinder fallback first; set OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 to try Cloud Files first"
     OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1
     cinder_volume_raw_export "$image_id" "$dest" && return 0
     log "[ZS3] Cinder-first export failed. Not retrying the same Cinder path in this run."
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
     if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
       log "[ZS3] Enabling Cloud Files export automatically because Cinder image-to-volume did not become available"
       USE_CLOUD_FILES_EXPORT=1
@@ -1230,9 +1382,11 @@ download_existing_ospc_snapshot() {
   fi
   if [ "${OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED:-0}" = "1" ]; then
     log "[ZS3] Cinder fallback already failed once in this run; stopping to avoid duplicate stuck temp volumes."
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
     return 1
   fi
   OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1 cinder_volume_raw_export "$image_id" "$dest" && return 0
+  origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
   return 1
 }
 
@@ -1366,7 +1520,8 @@ else
   FMT="$(qemu-img info --output=json "$SOURCE_RAW" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("format","raw"))' 2>/dev/null || echo raw)"
   log "[LS4] Converting $SOURCE_RAW (format=$FMT) → $QCOW"
   rm -f "$QCOW"
-  qemu-img convert -p -f "$FMT" -O qcow2 -c "$SOURCE_RAW" "$QCOW" 2>&1 | tee -a "$BACKGROUND_LOG" || fail_exit "LS4_NORMALIZE_QCOW2" "qemu-img convert failed — check disk space"
+  run_qemu_convert_with_progress "qcow2_normalize" "$SOURCE_RAW" "$FMT" "$QCOW" "$JOB_LOG/qemu_convert.log" \
+    || fail_exit "LS4_NORMALIZE_QCOW2" "qemu-img convert failed — check disk space; see $JOB_LOG/qemu_convert.log"
   sz="$(stat -c%s "$QCOW" 2>/dev/null || echo 0)"
   log "[LS4] HIT qcow2: $QCOW ($sz bytes)"
 fi

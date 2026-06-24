@@ -10768,9 +10768,13 @@ def run_image_migrator():
                     f"OSPC2FLEX_JUMPHOST_IP={_shlex.quote(process_ip)} "
                     "OSPC2FLEX_LINUX_SNAP_SKIP_REPAIRED=0 "
                     "OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 "
-                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 "
+                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=1 "
                     "OSPC2FLEX_RETRY_FAILED_CF_EXPORT=1 "
-                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=7200"
+                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=7200 "
+                    "OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB=75 "
+                    "OSPC2FLEX_CINDER_CREATE_ATTEMPTS=3 "
+                    "OSPC2FLEX_CINDER_CREATE_RETRY_WAIT=45 "
+                    "OSPC2FLEX_LIVE_ORIGIN_FALLBACK=1"
                 )
                 if req.get('dry_run'):
                     remote_cmd = f"{remote_env} {' '.join(_shlex.quote(x) for x in lcmd)}"
@@ -10910,6 +10914,33 @@ def run_image_migrator():
                 )
                 yield f"data: [LINSNAP] Launching Linux snapshot script with LS7/LS8/LS9 enabled.\n\n"
                 yield f"data: [LINSNAP] Remote job is nohup-protected; progress log: {remote_log}\n\n"
+                def _remote_linsnap_after_stream_exit():
+                    status_cmd = (
+                        f"running=$(pgrep -af -- {_shlex.quote(remote_job_script)} | grep -v 'pgrep -af' | head -1 || true); "
+                        "if [ -n \"$running\" ]; then echo '__LINSNAP_RUNNING__'; echo \"$running\"; exit 0; fi; "
+                        f"if [ -f {_shlex.quote(remote_log)} ]; then echo '__LINSNAP_LOG__'; tail -n 100 {_shlex.quote(remote_log)}; "
+                        "else echo '__LINSNAP_NOLOG__'; fi"
+                    )
+                    try:
+                        probe = subprocess.run(
+                            ssh_base + [status_cmd],
+                            check=False,
+                            timeout=45,
+                            capture_output=True,
+                            text=True,
+                        )
+                    except Exception as probe_exc:
+                        return "unknown", f"remote status probe failed: {probe_exc}"
+                    text = ((probe.stdout or "") + "\n" + (probe.stderr or "")).strip()
+                    if "__LINSNAP_RUNNING__" in text:
+                        return "running", text
+                    if "MIGRATION COMPLETE" in text or "MIGRATION_COMPLETE=true" in text or "METHOD_LINUX_SNAPSHOT_DRY_RUN_SUCCESS" in text:
+                        return "success", text
+                    if "[LS" in text and ("FAILED:" in text or "TRAP: unexpected error" in text):
+                        return "failed", text
+                    if "__LINSNAP_LOG__" in text:
+                        return "log", text
+                    return "unknown", text
                 process = subprocess.Popen(
                     ssh_base + [remote_run],
                     stdout=subprocess.PIPE,
@@ -10929,7 +10960,26 @@ def run_image_migrator():
                 process.wait()
                 ACTIVE_MIGRATOR_PROCESSES.discard(process)
                 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(label_safe, None)
-                yield f"data: [PROCESS EXITED WITH CODE {process.returncode}]\n\n"
+                effective_rc = process.returncode
+                if process.returncode != 0:
+                    remote_state, remote_text = _remote_linsnap_after_stream_exit()
+                    if remote_state == "running":
+                        yield (
+                            "data: [LINSNAP] Dashboard SSH log stream exited, but the nohup-protected "
+                            f"remote migration is still running on {ssh_usr}@{process_ip}; keeping UI status non-error. "
+                            f"Reconnect or inspect {remote_log} for live progress.\n\n"
+                        )
+                        effective_rc = 0
+                    elif remote_state == "success":
+                        yield "data: [LINSNAP] Remote log confirms migration completed successfully after stream exit.\n\n"
+                        effective_rc = 0
+                    elif remote_state == "failed":
+                        yield "data: [LINSNAP] Remote log confirms migration script failed; see latest remote log excerpt above.\n\n"
+                    else:
+                        tail_excerpt = "\n".join((remote_text or "").splitlines()[-20:])
+                        if tail_excerpt:
+                            yield f"data: [LINSNAP] Remote status after stream exit was inconclusive; latest remote text:\n{tail_excerpt}\n\n"
+                yield f"data: [PROCESS EXITED WITH CODE {effective_rc}]\n\n"
             except Exception as exc:
                 yield f"data: [LINSNAP ERROR] {exc}\n\n"
             finally:
