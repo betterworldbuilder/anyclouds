@@ -7993,6 +7993,113 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             return false;
         }
 
+        function escapeLogHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function cleanMigrationLogLine(text) {
+            return String(text || '')
+                .replace(/^\[[0-9:.]+\]\s*/, '')
+                .replace(/^\[[0-9:.]+\]\[[^\]]+\]\[R3-F2F\]\s*/, '')
+                .replace(/^\[R3-F2F\]\s*/, '')
+                .replace(/^\[REMOTE LOG\]\s*/, '')
+                .replace(/^data:\s*/i, '')
+                .trim();
+        }
+
+        function stageInfoFromCode(code, rawLine = '') {
+            const rawCode = String(code || '').toUpperCase();
+            const line = String(rawLine || '');
+            const findStage = (list, key) => {
+                const stages = (typeof migTracker !== 'undefined' && migTracker && Array.isArray(migTracker[list])) ? migTracker[list] : [];
+                return stages.find(s => s.key === key) || null;
+            };
+            let stage = null;
+            if (/^LS\d+A?$/.test(rawCode)) {
+                stage = findStage('linuxSnapStages', 'ls' + rawCode.replace(/^LS/, '').toLowerCase());
+            } else if (/^VS\d+$/.test(rawCode)) {
+                stage = findStage('volsnapStages', 'vs' + rawCode.replace(/^VS/, '').toLowerCase());
+            } else if (/^ZS\d+$/.test(rawCode)) {
+                const n = parseInt(rawCode.replace(/^ZS/, ''), 10);
+                if (n <= 3) stage = findStage('snapwinStages', 'mz3');
+                else if (n <= 5) stage = findStage('snapwinStages', 'mz5');
+                else if (n <= 10) stage = findStage('snapwinStages', 'mz6');
+                else if (n === 11) stage = findStage('snapwinStages', 'mz11');
+                else stage = findStage('snapwinStages', 'mz12');
+            } else if (/^R3\.\d+/.test(rawCode)) {
+                const rKey = 'r3' + (rawCode.match(/^R3\.(\d+)/) || [])[1];
+                stage = findStage(/WINDOWS|METHOD_Z|SNAPWIN|ZS\d+/i.test(line) ? 'windowsFlex2FlexStages' : 'linuxFlex2FlexStages', rKey);
+            }
+            const friendly = (typeof migTracker !== 'undefined' && migTracker && migTracker._simpleStageForLog) ? migTracker._simpleStageForLog(line || rawCode) : null;
+            if (stage) return { code: stage.code || rawCode, label: stage.label || friendly?.stage || rawCode, goal: stage.goal || friendly?.goal || 'Run migration stage.' };
+            if (friendly) return { code: rawCode, label: friendly.stage, goal: friendly.goal };
+            return { code: rawCode, label: rawCode.replace(/_/g, ' '), goal: 'Run migration stage.' };
+        }
+
+        function parseMigrationStageSection(text) {
+            const clean = cleanMigrationLogLine(text);
+            if (!clean) return null;
+            if (/^[═━─=-]{8,}$/.test(clean)) return { skip: true };
+            const bracketStage = clean.match(/^\[(LS\d+A?|VS\d+|ZS\d+|R3\.\d+)[^\]]*\]\s*(.*)$/i);
+            const plainStage = clean.match(/^(LS\d+A?|VS\d+|ZS\d+|R3\.\d+)(?:(?:[_\s:-]+|[A-Z])[\w /.-]*)?(?:Run migration stage\.?)?$/i);
+            const namedStage = clean.match(/\b(LS\d+A?|VS\d+|ZS\d+|R3\.\d+)_[A-Z0-9_]+\b/i);
+            const match = bracketStage || plainStage || namedStage;
+            if (!match) return null;
+            const code = String(match[1] || '').toUpperCase();
+            if (!code) return null;
+            const info = stageInfoFromCode(code, clean);
+            const key = `${code}:${info.label}`;
+            return { ...info, key };
+        }
+
+        function parseDownloadProgressLine(text) {
+            const clean = cleanMigrationLogLine(text);
+            if (!/\[DOWNLOAD_(?:BAR|STATUS)\]/i.test(clean)) return null;
+            const phase = (clean.match(/\bphase=([^\s]+)/i) || [])[1] || 'snapshot_download';
+            const pct = (clean.match(/\]\s*([0-9]+(?:\.[0-9]+)?)%/) || clean.match(/\bpct=([0-9]+(?:\.[0-9]+)?)%?/i) || [])[1] || '';
+            const bar = (clean.match(/(\[[#=\- .]{8,}\])/) || [])[1] || '';
+            const status = (clean.match(/\bstatus=([^\s]+)/i) || [])[1] || '';
+            const elapsed = (clean.match(/\belapsed=([^\s]+)/i) || [])[1] || '';
+            const bytes = (clean.match(/\bbytes=([^\s]+)/i) || [])[1] || '';
+            const total = (clean.match(/\btotal=([^\s]+)/i) || [])[1] || '';
+            const target = (clean.match(/\btarget=([^\s]+)/i) || [])[1] || '';
+            const labelMap = {
+                cloud_files_export: 'Cloud Files Export',
+                cloud_files_object_download: 'Cloud Files Download',
+                swift_download: 'Swift Snapshot Download',
+                snapshot_download: 'Snapshot Download',
+                glance_upload: 'Target Glance Upload',
+                volume_stream: 'Volume Snapshot Stream'
+            };
+            const label = labelMap[phase] || phase.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+            return { phase, label, pct, bar, status, elapsed, bytes, total, target, raw: clean };
+        }
+
+        function renderStageSectionHtml(stage, ts) {
+            const code = escapeLogHtml(stage.code || 'STAGE');
+            const label = escapeLogHtml(stage.label || 'Migration Stage');
+            const goal = escapeLogHtml(stage.goal || 'Run migration stage.');
+            return `<div style="margin:12px 0 7px;padding:10px 12px;border:1px solid rgba(34,211,238,0.44);border-left:5px solid #06b6d4;border-radius:8px;background:linear-gradient(90deg,rgba(8,47,73,0.78),rgba(15,23,42,0.78));line-height:1.35;white-space:normal;box-shadow:0 0 14px rgba(34,211,238,0.14);"><div style="display:flex;align-items:center;gap:10px;min-width:0;"><span style="color:#94a3b8;font-size:11px;">[${escapeLogHtml(ts)}]</span><span style="display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:2px 7px;border-radius:999px;background:#0f172a;border:1px solid #22d3ee;color:#67e8f9;font-size:11px;font-weight:900;letter-spacing:.05em;">${code}</span><span style="color:#e0f2fe;font-weight:900;text-transform:uppercase;letter-spacing:.04em;">${label}</span></div><div style="color:#a7f3d0;margin-top:4px;font-size:12px;">${goal}</div></div>`;
+        }
+
+        function renderDownloadProgressHtml(progress, ts) {
+            const pctNum = Number(progress.pct || 0);
+            const pct = progress.pct ? Math.max(0, Math.min(100, pctNum)).toFixed(pctNum % 1 ? 1 : 0) : '';
+            const details = [
+                progress.status ? `status=${progress.status}` : '',
+                progress.elapsed ? `elapsed=${progress.elapsed}` : '',
+                progress.bytes ? `bytes=${progress.bytes}` : '',
+                progress.total ? `total=${progress.total}` : '',
+                progress.target ? `target=${progress.target}` : ''
+            ].filter(Boolean).join('  ');
+            return `<div title="${escapeLogHtml(progress.raw)}" style="margin:5px 0;padding:8px 10px;border:1px solid rgba(56,189,248,0.32);border-left:5px solid #38bdf8;border-radius:7px;background:rgba(2,6,23,0.72);line-height:1.3;white-space:normal;"><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><span style="color:#64748b;font-size:11px;">[${escapeLogHtml(ts)}]</span><span style="color:#67e8f9;font-weight:900;text-transform:uppercase;">${escapeLogHtml(progress.label)}</span>${pct ? `<span style="color:#e0f2fe;font-weight:900;">${escapeLogHtml(pct)}%</span>` : ''}${progress.bar ? `<span style="color:#93c5fd;font-family:'Share Tech Mono','Courier New',monospace;">${escapeLogHtml(progress.bar)}</span>` : ''}</div>${pct ? `<div style="height:6px;margin-top:7px;border-radius:999px;background:rgba(15,23,42,0.95);overflow:hidden;border:1px solid rgba(148,163,184,0.18);"><div style="height:100%;width:${escapeLogHtml(pct)}%;background:linear-gradient(90deg,#06b6d4,#22c55e);box-shadow:0 0 10px rgba(34,211,238,0.45);"></div></div>` : ''}${details ? `<div style="margin-top:5px;color:#cbd5e1;font-size:12px;font-family:'Share Tech Mono','Courier New',monospace;">${escapeLogHtml(details)}</div>` : ''}</div>`;
+        }
+
         function appendLog(text, type='info') {
             if (isChunkDlProgressLine(text)) return;
 
@@ -8000,9 +8107,35 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             if (text.includes('__MANUAL_REPAIR_JSON__')) return;
             if (!consoleOut) return;
 
+            const cleanLine = cleanMigrationLogLine(text);
+            const stageSection = parseMigrationStageSection(cleanLine);
+            if (stageSection && stageSection.skip) return;
+
             const el = document.createElement('div');
             el.className = `log-line ${type}`;
             const ts = new Date().toLocaleTimeString();
+
+            const downloadProgress = parseDownloadProgressLine(cleanLine);
+            if (downloadProgress) {
+                el.innerHTML = renderDownloadProgressHtml(downloadProgress, ts);
+                consoleOut.appendChild(el);
+                trimContainerLines(consoleOut, MAIN_CONSOLE_MAX_LINES);
+                consoleOut.scrollTop = consoleOut.scrollHeight;
+                _persistLogs();
+                return;
+            }
+
+            if (stageSection) {
+                appendLog._lastStageKey = appendLog._lastStageKey || '';
+                if (appendLog._lastStageKey === stageSection.key) return;
+                appendLog._lastStageKey = stageSection.key;
+                el.innerHTML = renderStageSectionHtml(stageSection, ts);
+                consoleOut.appendChild(el);
+                trimContainerLines(consoleOut, MAIN_CONSOLE_MAX_LINES);
+                consoleOut.scrollTop = consoleOut.scrollHeight;
+                _persistLogs();
+                return;
+            }
 
             // Detect stage banner (### lines)
             if (text.startsWith('###') || text.startsWith('# ===')) {
@@ -8521,6 +8654,21 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 .replace(/^\[R3-F2F\]\s*/, '')
                 .replace(/^\[REMOTE LOG\]\s*/, '')
                 .trim();
+            const sectionStage = parseMigrationStageSection(cleanText);
+            if (sectionStage && sectionStage.skip) return null;
+            const downloadProgress = parseDownloadProgressLine(cleanText);
+            if (downloadProgress) {
+                el.innerHTML = renderDownloadProgressHtml(downloadProgress, ts);
+                return el;
+            }
+            if (sectionStage) {
+                buildJobTerminalLineElement._lastStageKey = buildJobTerminalLineElement._lastStageKey || {};
+                const dedupeKey = `${channel}:${sectionStage.key}`;
+                if (buildJobTerminalLineElement._lastStageKey[channel] === dedupeKey) return null;
+                buildJobTerminalLineElement._lastStageKey[channel] = dedupeKey;
+                el.innerHTML = renderStageSectionHtml(sectionStage, ts);
+                return el;
+            }
             if (img && /^[═━─-]{8,}$/.test(cleanText)) return null;
             const card = (title, rows, color = '#38bdf8') => {
                 const shortTitle = {
