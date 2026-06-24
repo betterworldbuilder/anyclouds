@@ -10366,6 +10366,165 @@ def stop_image_migrator_images():
         "linux_snap_remote": remote_linux,
     })
 
+
+@app.get("/api/image_migrator/linsnap/reconnect")
+def reconnect_linux_snapshot_log():
+    """SSE: reconnect an image terminal to the newest Linux snapshot log on the jumphost."""
+    import re as _re
+    import shlex as _shlex
+    import time as _time
+
+    jumphost_ip = str(request.args.get("jumphost_ip") or request.args.get("process_host_ip") or "").strip()
+    jumphost_user = str(request.args.get("jumphost_user") or request.args.get("process_ssh_user") or "ubuntu").strip() or "ubuntu"
+    ssh_key_raw = str(request.args.get("ssh_key") or request.args.get("process_ssh_key") or request.args.get("ssh_key_path") or "~/.ssh/id_rsa").strip()
+    label_raw = str(request.args.get("label") or request.args.get("snapshot_name") or request.args.get("server_name") or "").strip()
+    job_id = str(request.args.get("job_id") or "").strip()
+    follow = str(request.args.get("follow") or "1").strip().lower() not in {"0", "false", "no"}
+    try:
+        tail_lines = max(20, min(int(request.args.get("tail") or 160), 500))
+    except Exception:
+        tail_lines = 160
+
+    if not jumphost_ip or not label_raw:
+        return Response("data: [RECONNECT ERROR] jumphost_ip and label are required\n\ndata: [DONE]\n\n", mimetype="text/event-stream")
+
+    label_safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", label_raw).strip("_") or "linux-snapshot"
+    if ssh_key_raw.startswith("/.ssh/"):
+        ssh_key_raw = "~" + ssh_key_raw
+    ssh_key = os.path.expanduser(ssh_key_raw)
+    if not os.path.exists(ssh_key):
+        fallback = os.path.expanduser("~/.ssh/id_rsa")
+        if os.path.exists(fallback):
+            ssh_key = fallback
+    ssh_base = [
+        "ssh", "-i", ssh_key,
+        "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "LogLevel=ERROR", "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes", "-o", "PreferredAuthentications=publickey",
+        "-o", "ConnectTimeout=10", "-o", "ConnectionAttempts=1",
+        f"{jumphost_user}@{jumphost_ip}",
+    ]
+
+    def _run_remote(cmd: str, timeout: int = 20):
+        return subprocess.run(ssh_base + [cmd], check=False, timeout=timeout, capture_output=True, text=True, errors="replace")
+
+    def generate():
+        if job_id:
+            safe_job = _re.sub(r"[^A-Za-z0-9._-]+", "", job_id)
+            find_log = f"p=/tmp/linsnap_{label_safe}_{safe_job}.log; [ -f \"$p\" ] && printf '%s' \"$p\" || true"
+        else:
+            find_log = f"ls -t /tmp/linsnap_{label_safe}_*.log 2>/dev/null | head -1 || true"
+        discover_cmd = (
+            f"log=$({find_log}); "
+            f"active=$(pgrep -af 'ospc2flex_linux_snap_migrate.sh.*--label {label_safe}' | grep -v 'pgrep -af' | head -1 || true); "
+            "if [ -z \"$log\" ]; then echo '__NO_LOG__'; echo \"$active\"; exit 0; fi; "
+            "lines=$(wc -l < \"$log\" 2>/dev/null || echo 0); "
+            "echo \"__LOG__$log\"; echo \"__LINES__$lines\"; echo \"__ACTIVE__$active\"; "
+            f"tail -n {tail_lines} \"$log\" 2>/dev/null"
+        )
+        try:
+            proc = _run_remote(discover_cmd, timeout=25)
+        except Exception as exc:
+            yield f"data: [RECONNECT ERROR] SSH reconnect failed: {exc}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        stdout = proc.stdout or ""
+        if "__NO_LOG__" in stdout:
+            yield f"data: [RECONNECT ERROR] No /tmp/linsnap_{label_safe}_*.log found on {jumphost_user}@{jumphost_ip}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        log_path = ""
+        seen_lines = 0
+        active_line = ""
+        for raw in stdout.splitlines():
+            if raw.startswith("__LOG__"):
+                log_path = raw.replace("__LOG__", "", 1).strip()
+            elif raw.startswith("__LINES__"):
+                try:
+                    seen_lines = int(raw.replace("__LINES__", "", 1).strip() or "0")
+                except ValueError:
+                    seen_lines = 0
+            elif raw.startswith("__ACTIVE__"):
+                active_line = raw.replace("__ACTIVE__", "", 1).strip()
+
+        if not log_path:
+            yield f"data: [RECONNECT ERROR] Could not identify latest Linux snapshot log for {label_safe}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        yield f"data: [LINSNAP] Reconnected live log: {log_path}\n\n"
+        if active_line:
+            yield f"data: [LINSNAP] remote job still running; {active_line}\n\n"
+        else:
+            yield "data: [LINSNAP] remote job process not currently visible; showing retained log.\n\n"
+
+        for raw in stdout.splitlines():
+            if raw.startswith("__LOG__") or raw.startswith("__LINES__") or raw.startswith("__ACTIVE__"):
+                continue
+            line = raw.rstrip()
+            if line:
+                yield f"data: {line}\n\n"
+
+        if not follow:
+            yield "data: [DONE]\n\n"
+            return
+
+        idle_polls = 0
+        q_log = _shlex.quote(log_path)
+        while True:
+            poll_cmd = (
+                f"lines=$(wc -l < {q_log} 2>/dev/null || echo 0); "
+                f"active=$(pgrep -af 'ospc2flex_linux_snap_migrate.sh.*--label {label_safe}' | grep -v 'pgrep -af' | head -1 || true); "
+                f"echo \"__LINES__$lines\"; echo \"__ACTIVE__$active\"; "
+                f"if [ \"$lines\" -gt {seen_lines} ]; then sed -n '{seen_lines + 1},$p' {q_log} 2>/dev/null; fi"
+            )
+            try:
+                proc = _run_remote(poll_cmd, timeout=20)
+            except subprocess.TimeoutExpired:
+                idle_polls += 1
+                yield f": reconnect keepalive timeout {idle_polls}\n\n"
+                _time.sleep(2)
+                continue
+            except Exception as exc:
+                yield f"data: [RECONNECT ERROR] {exc}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+            new_seen = seen_lines
+            active_line = ""
+            emitted = 0
+            for raw in (proc.stdout or "").splitlines():
+                if raw.startswith("__LINES__"):
+                    try:
+                        new_seen = int(raw.replace("__LINES__", "", 1).strip() or str(seen_lines))
+                    except ValueError:
+                        new_seen = seen_lines
+                elif raw.startswith("__ACTIVE__"):
+                    active_line = raw.replace("__ACTIVE__", "", 1).strip()
+                else:
+                    line = raw.rstrip()
+                    if line:
+                        emitted += 1
+                        yield f"data: {line}\n\n"
+            seen_lines = max(seen_lines, new_seen)
+            if emitted:
+                idle_polls = 0
+            else:
+                idle_polls += 1
+                if idle_polls % 10 == 0:
+                    if active_line:
+                        yield f"data: [LINSNAP] remote job still running; waiting for new log output from {log_path}\n\n"
+                    else:
+                        yield "data: [LINSNAP] remote job process stopped; no new log output.\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+            _time.sleep(2)
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
 @app.post("/api/flex2flex_region/stop")
 def stop_flex2flex_region_jobs():
     req = request.get_json(force=True, silent=True) or {}

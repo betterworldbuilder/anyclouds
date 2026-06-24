@@ -8344,6 +8344,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             actions.appendChild(_imgCopyBtn);
             actions.appendChild(mkHwBtn('CLEAR', 'Clear log', () => clearImagePanelLog(id), '#1f2937', '#9ca3af', '#6b7280'));
             actions.appendChild(mkHwBtn('SAVE', 'Save log to file', () => typeof downloadImagePanelLog === 'function' ? downloadImagePanelLog(id) : console.log('SAVE not implemented'), '#172554', '#60a5fa', '#3b82f6'));
+            actions.appendChild(mkHwBtn('RECONNECT LOG', 'Reconnect this terminal to the live Linux snapshot log on the jumphost', () => typeof reconnectImagePanelLog === 'function' ? reconnectImagePanelLog(id) : null, '#082f49', '#38bdf8', '#0ea5e9'));
             actions.appendChild(mkHwBtn('STOP', 'Stop only this image migration job', () => typeof killImageJob === 'function' ? killImageJob(id) : null, '#3f0f0f', '#f87171', '#ef4444'));
             actions.appendChild(mkHwBtn('CLOSE', 'Close panel', () => closeImageTerminal && closeImageTerminal(id), '#1f2937', '#94a3b8', '#64748b'));
 
@@ -8586,7 +8587,83 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             panel.appendChild(lineEl);
             trimContainerLines(panel, IMAGE_PANEL_MAX_LINES);
             panel.scrollTop = panel.scrollHeight;
-            _persistLogs();
+	            _persistLogs();
+	        }
+
+        const imageLogReconnectControllers = {};
+        async function reconnectImagePanelLog(imageId) {
+            const id = String(imageId || '').trim();
+            if (!id) return;
+            const safeId = imagePanelSafeId(id);
+            const block = document.getElementById('img-block-' + safeId);
+            const panel = document.getElementById('img-panel-' + safeId) || getOrCreateImagePanel(id, id);
+            const label = (block && block.dataset && (block.dataset.titleLabel || block.dataset.serverName)) || id;
+            let jh = null;
+            try {
+                if (typeof nbdGetJumphostParams === 'function') jh = nbdGetJumphostParams();
+                if ((!jh || !jh.jumphost_ip) && typeof window._jhGetPayloadParams === 'function') jh = window._jhGetPayloadParams();
+            } catch (_) { jh = null; }
+            const jumphostIp = String((jh && (jh.jumphost_ip || jh.jumphost_host)) || (document.getElementById('process_host_ip') || {}).value || '').trim();
+            const jumphostUser = String((jh && (jh.jumphost_user || jh.process_ssh_user)) || (document.getElementById('process_ssh_user') || {}).value || 'ubuntu').trim() || 'ubuntu';
+            const sshKey = String((jh && (jh.ssh_key_path || jh.ssh_key || jh.process_ssh_key)) || (document.getElementById('process_ssh_key') || {}).value || '~/.ssh/id_rsa').trim() || '~/.ssh/id_rsa';
+            if (!jumphostIp) {
+                appendImageLog(id, '[RECONNECT ERROR] Jumphost IP is missing. Select the jumphost, then press RECONNECT LOG again.');
+                return;
+            }
+            if (imageLogReconnectControllers[id]) {
+                try { imageLogReconnectControllers[id].abort(); } catch (_) {}
+                delete imageLogReconnectControllers[id];
+            }
+            if (panel) panel.innerHTML = '';
+            const icon = document.getElementById('img-status-icon-' + safeId);
+            if (icon) {
+                icon.textContent = 'ACTIVE';
+                icon.style.color = '#4ade80';
+            }
+            const timer = document.getElementById('img-timer-' + safeId);
+            if (timer) delete timer.dataset.stopped;
+            const controller = new AbortController();
+            imageLogReconnectControllers[id] = controller;
+            appendImageLog(id, `[RECONNECT] Opening live Linux snapshot log for ${label} on ${jumphostUser}@${jumphostIp}`);
+            const params = new URLSearchParams({
+                jumphost_ip: jumphostIp,
+                jumphost_user: jumphostUser,
+                ssh_key: sshKey,
+                label: label,
+                tail: '180',
+                follow: '1',
+            });
+            try {
+                const resp = await fetch('/api/image_migrator/linsnap/reconnect?' + params.toString(), { signal: controller.signal });
+                if (!resp.ok || !resp.body) {
+                    appendImageLog(id, `[RECONNECT ERROR] HTTP ${resp.status} while opening live log stream.`);
+                    return;
+                }
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = '';
+                while (true) {
+                    const part = await reader.read();
+                    if (part.done) break;
+                    buf += decoder.decode(part.value, { stream: true });
+                    const chunks = buf.split('\n\n');
+                    buf = chunks.pop() || '';
+                    for (const chunk of chunks) {
+                        chunk.split(/\r?\n/).forEach(rawLine => {
+                            if (!rawLine.startsWith('data:')) return;
+                            const line = rawLine.replace(/^data:\s?/, '').trim();
+                            if (!line || line === '[DONE]') return;
+                            appendImageLog(id, line);
+                        });
+                    }
+                }
+            } catch (e) {
+                if (!(e && e.name === 'AbortError')) {
+                    appendImageLog(id, `[RECONNECT ERROR] ${e && e.message ? e.message : String(e)}`);
+                }
+            } finally {
+                if (imageLogReconnectControllers[id] === controller) delete imageLogReconnectControllers[id];
+            }
         }
 
         // Export the proven OSPC->Flex snapshot terminal helpers so copied Flex2Flex
@@ -8594,6 +8671,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         window.imagePanelSafeId = imagePanelSafeId;
         window.getOrCreateImagePanel = getOrCreateImagePanel;
         window.appendImageLog = appendImageLog;
+        window.reconnectImagePanelLog = reconnectImagePanelLog;
 
         function getOrCreateVmPanel(vmName, ipHint, flavorHint) {
             const state = getBatchJobState(vmName);
