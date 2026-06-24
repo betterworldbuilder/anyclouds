@@ -160,6 +160,15 @@ log_download_status() {
   log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=$downloaded_mb total_mb=$total_mb pct=$pct${eta_min:+ eta_min=$eta_min} status=$status${extra:+ $extra}"
   download_progress_bar "$phase" "$downloaded_mb" "$total_mb" "$status" "$eta_min" "$pct"
 }
+log_download_wait_status() {
+  local phase="$1" elapsed_s="${2:-0}" total_s="${3:-0}" status="${4:-waiting}" extra="${5:-}" pct filled empty bar
+  pct="$(awk -v e="$elapsed_s" -v t="$total_s" 'BEGIN{if(t>0) printf "%.1f", (e/t)*100; else printf "0.0"}')"
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=0 total_mb=0 pct=$pct status=$status elapsed_s=$elapsed_s timeout_s=$total_s${extra:+ $extra}"
+  log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% elapsed=${elapsed_s}/${total_s}s status=${status}${extra:+ $extra}"
+}
 kv() { log "  $(printf '%-18s' "$1") : ${*:2}"; }
 stage() {
   CURRENT_STAGE="$1"
@@ -296,6 +305,10 @@ start_fresh_clear_label_resume() {
   log "[LS0B] START FRESH: deleting previous resume artifacts for $LABEL_SAFE"
   find "$label_root" -mindepth 1 -maxdepth 1 -type d ! -name "$RUN_ID" -print 2>/dev/null | while read -r old_run; do
     [ -n "$old_run" ] || continue
+    if ps -eo args= 2>/dev/null | grep -F -- "$old_run" | grep -vq grep; then
+      log "[LS0B] keep active old run: $old_run"
+      continue
+    fi
     log "[LS0B] delete old run: $old_run"
     rm -rf -- "$old_run"
   done
@@ -493,13 +506,38 @@ download_curl_glance() {
   rm -f "$dest"; return 1
 }
 download_cloud_files_object() {
-  local container="$1" object_name="$2" dest="$3" min_bytes="$4" tmp_log="$5" size
+  local container="$1" object_name="$2" dest="$3" min_bytes="$4" tmp_log="$5" size total_bytes total_mb save_pid dl_start_s copied copied_mb pct elapsed_s eta_min rc
   CF_OBJECT_DOWNLOAD_REASON=""
   rm -f "$dest"
   log "[ZS3] Cloud Files object download: $container/$object_name"
-  if openstack object save "$container" "$object_name" --file "$dest" >"$tmp_log" 2>&1; then
+  total_bytes="$(openstack object show "$container" "$object_name" -f value -c bytes 2>/dev/null | tr -dc '0-9' || true)"
+  [ -n "$total_bytes" ] || total_bytes="$min_bytes"
+  total_mb="$(mb_from_bytes "$total_bytes")"
+  log_download_status "cloud_files_object_download" "0" "$total_mb" "starting" "0.0" "unknown" "object=$object_name"
+  set +e
+  openstack object save "$container" "$object_name" --file "$dest" >"$tmp_log" 2>&1 &
+  save_pid=$!
+  dl_start_s="$(date +%s)"
+  while kill -0 "$save_pid" 2>/dev/null; do
+    sleep 10
+    if kill -0 "$save_pid" 2>/dev/null; then
+      copied="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+      copied_mb="$(mb_from_bytes "$copied")"
+      pct="$(awk -v c="$copied" -v t="$total_bytes" 'BEGIN{if(t>0) printf "%.1f", (c/t)*100; else printf "0.0"}')"
+      elapsed_s=$(( $(date +%s) - dl_start_s ))
+      eta_min="$(awk -v c="$copied" -v t="$total_bytes" -v e="$elapsed_s" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
+      log_download_status "cloud_files_object_download" "$copied_mb" "$total_mb" "downloading" "$pct" "$eta_min" "object=$object_name"
+    fi
+  done
+  wait "$save_pid"; rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
     size="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
-    if [ "$size" -ge "$min_bytes" ]; then log "[ZS3] HIT Cloud Files downloaded $size bytes"; return 0; fi
+    if [ "$size" -ge "$min_bytes" ]; then
+      log_download_status "cloud_files_object_download" "$(mb_from_bytes "$size")" "$total_mb" "complete" "100.0" "0" "object=$object_name"
+      log "[ZS3] HIT Cloud Files downloaded $size bytes"
+      return 0
+    fi
   fi
   rm -f "$dest"
   if grep -qiE 'No space left on device|Errno 28' "$tmp_log" 2>/dev/null; then
@@ -578,6 +616,7 @@ PY
   }
   log "[ZS3] Cloud Files export task: $task_id"
   start="$(date +%s)"
+  log_download_wait_status "cloud_files_export" "0" "$CLOUD_FILES_EXPORT_TIMEOUT" "starting" "task=$task_id"
   while true; do
     elapsed=$(( $(date +%s) - start ))
     [ "$elapsed" -gt "$CLOUD_FILES_EXPORT_TIMEOUT" ] && {
@@ -591,8 +630,11 @@ PY
     status="$(printf '%s' "$task_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status","unknown"))' 2>/dev/null | tr -d '\r\n[:space:]' || echo unknown)"
     [ -n "$status" ] || status="unknown"
     log "[ZS3] CF task status=$status elapsed=${elapsed}s"
+    log_download_wait_status "cloud_files_export" "$elapsed" "$CLOUD_FILES_EXPORT_TIMEOUT" "$status" "task=$task_id"
     case "$status" in
-      success) break ;;
+      success)
+        log_download_wait_status "cloud_files_export" "$CLOUD_FILES_EXPORT_TIMEOUT" "$CLOUD_FILES_EXPORT_TIMEOUT" "complete" "task=$task_id"
+        break ;;
       failure|error)
         task_msg="$(printf '%s' "$task_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("message") or d.get("result") or "")' 2>/dev/null || true)"
         log "[ZS3] WARN CF task failed: ${task_msg:-<no message>}"

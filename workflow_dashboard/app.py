@@ -10180,6 +10180,8 @@ import subprocess
 
 ACTIVE_MIGRATOR_PROCESSES = set()
 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER = {}
+ACTIVE_MIGRATOR_LAUNCHING_LABELS = set()
+ACTIVE_MIGRATOR_LAUNCH_LOCK = threading.Lock()
 VOLSNAP_STAGING_LOCKS = {}
 VOLSNAP_STAGING_LOCKS_MU = threading.Lock()
 
@@ -10788,6 +10790,19 @@ def run_image_migrator():
                     yield "data: METHOD_LINUX_SNAPSHOT_DASHBOARD_DRY_RUN_SUCCESS\n\n"
                     return
 
+                launch_guard_acquired = False
+                while not launch_guard_acquired:
+                    with ACTIVE_MIGRATOR_LAUNCH_LOCK:
+                        if label_safe not in ACTIVE_MIGRATOR_LAUNCHING_LABELS:
+                            ACTIVE_MIGRATOR_LAUNCHING_LABELS.add(label_safe)
+                            launch_guard_acquired = True
+                            break
+                    yield (
+                        f"data: [LINSNAP] Queue job {_job_id} waiting: another Linux snapshot launch "
+                        f"is still staging for {label_safe}; next_check=10s\n\n"
+                    )
+                    _linsnap_time.sleep(10)
+
                 if start_fresh_kill and not req.get('dry_run'):
                     old_process = ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.get(label_safe)
                     if old_process is not None and old_process.poll() is None:
@@ -10905,6 +10920,8 @@ def run_image_migrator():
                 )
                 ACTIVE_MIGRATOR_PROCESSES.add(process)
                 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[label_safe] = process
+                with ACTIVE_MIGRATOR_LAUNCH_LOCK:
+                    ACTIVE_MIGRATOR_LAUNCHING_LABELS.discard(label_safe)
                 for line in iter(process.stdout.readline, ''):
                     if not line:
                         break
@@ -10916,6 +10933,11 @@ def run_image_migrator():
             except Exception as exc:
                 yield f"data: [LINSNAP ERROR] {exc}\n\n"
             finally:
+                try:
+                    with ACTIVE_MIGRATOR_LAUNCH_LOCK:
+                        ACTIVE_MIGRATOR_LAUNCHING_LABELS.discard(label_safe)
+                except Exception:
+                    pass
                 yield "data: [DONE]\n\n"
 
         return Response(stream_with_context(_linux_snap_generator()), mimetype='text/event-stream')
