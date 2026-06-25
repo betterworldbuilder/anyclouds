@@ -18,6 +18,7 @@ import tarfile
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -302,6 +303,14 @@ def _ssh_base(jumphost_ip: str, jumphost_user: str = "ubuntu", ssh_key: str = ""
         "LogLevel=ERROR",
         "-o",
         "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=15",
+        "-o",
+        "ConnectionAttempts=1",
+        "-o",
+        "ServerAliveInterval=10",
+        "-o",
+        "ServerAliveCountMax=2",
         f"{jumphost_user or 'ubuntu'}@{jumphost_ip}",
     ]
 
@@ -318,7 +327,11 @@ def _scp_base(ssh_key: str = "") -> List[str]:
         "LogLevel=ERROR",
         "-o",
         "BatchMode=yes",
-    ]
+        "-o",
+        "ConnectTimeout=15",
+        "-o",
+        "ConnectionAttempts=1",
+        ]
 
 
 def _cmd_text(argv: Iterable[str]) -> str:
@@ -454,6 +467,294 @@ def _http_json(method: str, url: str, payload: Dict[str, Any] | None = None, tim
         return False, data
     except Exception as exc:
         return False, {"error": str(exc), "_http_status": 0}
+
+
+def _split_host_port(value: str, default_port: int = 80) -> Tuple[str, int]:
+    text = _safe_str(value).strip()
+    if not text:
+        return "", default_port
+    candidate = text if "://" in text else f"http://{text}"
+    parsed = urllib.parse.urlparse(candidate)
+    return parsed.hostname or text.split("/")[0].split(":")[0], int(parsed.port or default_port)
+
+
+def _url_host(value: str) -> str:
+    host, _ = _split_host_port(value)
+    return host
+
+
+def _classify_cutover_response(result: Dict[str, Any], source_ip: str, target_ip: str) -> str:
+    public_ip = _safe_str(result.get("public_ip")).strip()
+    private_ips = result.get("private_ips") if isinstance(result.get("private_ips"), list) else []
+    ips = {public_ip, *[_safe_str(ip).strip() for ip in private_ips]}
+    ips.discard("")
+    if source_ip and source_ip in ips:
+        return "blue"
+    if target_ip and target_ip in ips:
+        return "green"
+    text = json.dumps(result, sort_keys=True)
+    if source_ip and source_ip in text:
+        return "blue"
+    if target_ip and target_ip in text:
+        return "green"
+    return "other"
+
+
+def _probe_cutover_backend(
+    lb_host: str,
+    lb_port: int,
+    cutover_hostname: str,
+    source_ip: str,
+    target_ip: str,
+    timeout: int = 8,
+) -> Dict[str, Any]:
+    url = f"http://{lb_host}:{lb_port}/api/server?cutover_probe={int(time.time() * 1000)}"
+    headers = {"Accept": "application/json", "Cache-Control": "no-cache"}
+    if cutover_hostname:
+        headers["Host"] = cutover_hostname
+    started = time.time()
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            elapsed_ms = round((time.time() - started) * 1000, 2)
+            try:
+                payload = json.loads(raw) if raw else {}
+            except Exception:
+                payload = {"raw": raw[:500]}
+            payload["_http_status"] = response.status
+            backend = _classify_cutover_response(payload, source_ip, target_ip)
+            return {"ok": 200 <= int(response.status) < 300, "backend": backend, "elapsed_ms": elapsed_ms, "payload": payload}
+    except Exception as exc:
+        return {"ok": False, "backend": "error", "elapsed_ms": round((time.time() - started) * 1000, 2), "error": str(exc)}
+
+
+def _stream_set_haproxy_weights(
+    cutover_host: str,
+    user: str,
+    ssh_key: str,
+    source_weight: int,
+    target_weight: int,
+) -> Iterator[bool]:
+    command = (
+        "printf '"
+        f"set server app_blue_green/blue_source weight {int(source_weight)}\\n"
+        f"set server app_blue_green/green_flex weight {int(target_weight)}\\n"
+        "show servers state\\n"
+        "' | sudo socat stdio /run/haproxy/admin.sock"
+    )
+    rc = yield from _run_stream(
+        [*_ssh_base(cutover_host, user or "ubuntu", ssh_key), command],
+        f"set-haproxy-weights-{source_weight}-{target_weight}",
+        timeout=120,
+    )
+    return rc == 0
+
+
+def _stream_traffic_ramp(
+    data: Dict[str, Any],
+    evidence: List[Dict[str, Any]] | None = None,
+    write_artifacts: bool = True,
+) -> Iterator[bool]:
+    config = build_cutover_tester_config(data)
+    source_url = config["source"]["base_url"]
+    target_url = config["target"]["base_url"]
+    source_ip = _url_host(source_url)
+    target_ip = _url_host(target_url)
+    lb_host, lb_port = _split_host_port(data.get("source_cutover_host") or data.get("lb_ip") or data.get("jumphost_ip"), int(data.get("test_port") or 80))
+    user = _safe_str(data.get("source_cutover_user") or data.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
+    ssh_key = _safe_str(data.get("source_cutover_key") or data.get("ssh_key") or "~/.ssh/id_rsa").strip()
+    cutover_hostname = _safe_str(data.get("cutover_hostname") or "bankvault-cutover.local").strip()
+    request_count = max(1, min(500, int(data.get("ramp_requests") or 10)))
+    stages = (
+        ("Stage 1 - OSPC 50% / FLEX 50%", 50, 50),
+        ("Stage 2 - OSPC 30% / FLEX 70%", 30, 70),
+        ("Stage 3 - OSPC 0% / FLEX 100%", 0, 100),
+    )
+    evidence = evidence if evidence is not None else []
+    yield "=== BLUE/GREEN TRAFFIC RAMP PROOF ==="
+    yield f"[INFO] HAProxy host: {user}@{lb_host}:{lb_port}"
+    yield f"[INFO] Cutover hostname: {cutover_hostname}"
+    yield f"[INFO] Source/blue: {source_ip} ({source_url})"
+    yield f"[INFO] Target/FLEX green: {target_ip} ({target_url})"
+    yield f"[INFO] Requests per stage: {request_count}"
+    if not lb_host or not source_ip or not target_ip:
+        yield "[ERROR] HAProxy host, source app URL, and target FLEX app URL are required."
+        if write_artifacts:
+            artifacts = write_cutover_tester_evidence("traffic-ramp", data, {"ok": False, "steps": evidence})
+            yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
+            yield f"[RESULT_TABLE] {json.dumps(load_cutover_tester_results(), sort_keys=True)}"
+        return False
+    all_ok = True
+    for label, source_weight, target_weight in stages:
+        yield ""
+        yield f"===== {label} ====="
+        yield f"[INFO] Setting HAProxy split: OSPC/source={source_weight}% FLEX/target={target_weight}%"
+        weight_ok = yield from _stream_set_haproxy_weights(lb_host, user, ssh_key, source_weight, target_weight)
+        if not weight_ok:
+            all_ok = False
+            step = {
+                "label": label,
+                "ok": False,
+                "result": {
+                    "source_weight": source_weight,
+                    "target_weight": target_weight,
+                    "source_count": 0,
+                    "target_count": 0,
+                    "other_count": 0,
+                    "error_count": request_count,
+                    "recommendation": "Fix HAProxy admin socket SSH access before cutover proof.",
+                },
+            }
+            evidence.append(step)
+            break
+        time.sleep(2)
+        counts = {"blue": 0, "green": 0, "other": 0, "error": 0}
+        latencies: List[float] = []
+        samples: List[Dict[str, Any]] = []
+        for idx in range(1, request_count + 1):
+            probe = _probe_cutover_backend(lb_host, lb_port, cutover_hostname, source_ip, target_ip)
+            backend = probe.get("backend") if probe.get("backend") in counts else "other"
+            if not probe.get("ok") and backend != "green" and backend != "blue":
+                backend = "error"
+            counts[backend] += 1
+            if isinstance(probe.get("elapsed_ms"), (int, float)):
+                latencies.append(float(probe["elapsed_ms"]))
+            public_ip = ""
+            payload = probe.get("payload") if isinstance(probe.get("payload"), dict) else {}
+            if isinstance(payload, dict):
+                public_ip = _safe_str(payload.get("public_ip"))
+            samples.append({
+                "request": idx,
+                "backend": backend,
+                "public_ip": public_ip,
+                "elapsed_ms": probe.get("elapsed_ms"),
+                "error": probe.get("error", ""),
+            })
+            yield f"[PROBE] {idx:03d}/{request_count} backend={backend} ip={public_ip or '-'} ms={probe.get('elapsed_ms')}"
+        avg_ms = round(sum(latencies) / len(latencies), 2) if latencies else 0
+        expected_green_min = request_count if target_weight == 100 else 1
+        expected_blue_max = 0 if source_weight == 0 else request_count
+        step_ok = counts["error"] == 0 and counts["other"] == 0 and counts["green"] >= expected_green_min and counts["blue"] <= expected_blue_max
+        if not step_ok:
+            all_ok = False
+        recommendation = (
+            "Ramp split verified."
+            if step_ok
+            else "Review HAProxy weights, backend health, or app /api/server response before cutover."
+        )
+        yield f"[SUMMARY] blue={counts['blue']} green={counts['green']} other={counts['other']} errors={counts['error']} avg_ms={avg_ms}"
+        yield (
+            f"[RAMP RESULT] {label} | OSPC hits={counts['blue']} | FLEX hits={counts['green']} | "
+            f"other={counts['other']} | errors={counts['error']} | avg_ms={avg_ms} | "
+            f"result={'PASS' if step_ok else 'REVIEW'}"
+        )
+        yield "[OK] " + recommendation if step_ok else "[ERROR] " + recommendation
+        evidence.append({
+            "label": label,
+            "ok": step_ok,
+            "result": {
+                "source_weight": source_weight,
+                "target_weight": target_weight,
+                "source_count": counts["blue"],
+                "target_count": counts["green"],
+                "other_count": counts["other"],
+                "error_count": counts["error"],
+                "request_count": request_count,
+                "avg_response_ms": avg_ms,
+                "cutover_hostname": cutover_hostname,
+                "source_ip": source_ip,
+                "target_ip": target_ip,
+                "recommendation": recommendation,
+                "samples": samples,
+            },
+        })
+    yield "[OK] Traffic ramp proof completed." if all_ok else "[ERROR] Traffic ramp proof needs review."
+    if write_artifacts:
+        artifacts = write_cutover_tester_evidence("traffic-ramp", data, {"ok": all_ok, "steps": evidence})
+        yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
+        yield f"[RESULT_TABLE] {json.dumps(load_cutover_tester_results(), sort_keys=True)}"
+    return all_ok
+
+
+def _stream_set_live_traffic_split(data: Dict[str, Any]) -> Iterator[str]:
+    try:
+        green = int(data.get("green_weight") or data.get("target_weight") or 10)
+    except Exception:
+        green = 10
+    green = max(0, min(100, green))
+    try:
+        blue = int(data.get("source_weight") if data.get("source_weight") not in (None, "") else (100 - green))
+    except Exception:
+        blue = 100 - green
+    blue = max(0, min(100, blue))
+    cutover_host = _safe_str(data.get("source_cutover_host") or data.get("lb_ip") or data.get("jumphost_ip")).strip()
+    user = _safe_str(data.get("source_cutover_user") or data.get("jumphost_user") or "ubuntu").strip() or "ubuntu"
+    ssh_key = _safe_str(data.get("source_cutover_key") or data.get("ssh_key") or "~/.ssh/id_rsa").strip()
+    yield "=== LIVE HAPROXY TRAFFIC SPLIT UPDATE ==="
+    yield f"[INFO] Requested split: OSPC/source={blue}% FLEX/target={green}%"
+    if not cutover_host:
+        yield "[ERROR] Source infra host for HAProxy is required before changing live traffic weights."
+        return
+    ok = yield from _stream_set_haproxy_weights(cutover_host, user, ssh_key, blue, green)
+    if ok:
+        yield f"[OK] Live HAProxy weights updated: blue_source={blue} green_flex={green}"
+    else:
+        yield "[ERROR] Failed to update live HAProxy weights."
+
+
+def _stream_cutover_specific_tests(
+    data: Dict[str, Any],
+    action: str,
+    jumphost_ip: str,
+    user: str,
+    ssh_key: str,
+    evidence: List[Dict[str, Any]],
+) -> Iterator[bool]:
+    ok = yield from _ensure_installed_and_started(jumphost_ip, user, ssh_key)
+    if not ok:
+        return False
+    api_url = _api_url(data, jumphost_ip)
+    yield "[INFO] Waiting for tester API to become reachable."
+    time.sleep(2)
+    config_payload = build_cutover_tester_config(data)
+    if not config_payload["source"]["base_url"] or not config_payload["target"]["base_url"]:
+        yield "[ERROR] Source URL and target URL are required before cutover tests can run."
+        return False
+    ok, _ = yield from _stream_api_call("POST", f"{api_url}/config", config_payload, "configure", evidence)
+    if not ok:
+        return False
+    for label, method, path in (
+        ("source-target-health", "GET", "/health-check"),
+        ("smoke-test", "GET", "/smoke-test"),
+        ("pre-cutover-gate", "POST", "/pre-cutover-check"),
+    ):
+        ok, _ = yield from _stream_api_call(method, f"{api_url}{path}", None, label, evidence)
+        if not ok:
+            return False
+    if data.get("include_performance", True) is not False:
+        performance_config = build_performance_config_payload(data)
+        if int(performance_config.get("concurrent_users") or 0) > 100:
+            yield "[WARN] High-load performance test requested. Safe built-in runner will cap effective concurrency on the tester side."
+        ok, _ = yield from _stream_api_call("POST", f"{api_url}/performance/config", performance_config, "performance-config", evidence)
+        if not ok:
+            return False
+        ok, perf = yield from _stream_api_call("POST", f"{api_url}/performance/run", None, "performance-validation", evidence)
+        metrics = perf.get("metrics") if isinstance(perf.get("metrics"), dict) else {}
+        if not metrics and isinstance(perf, dict):
+            metrics = perf
+        if metrics:
+            yield f"[PERF] OSPC avg={metrics.get('ospc_avg_response_ms')}ms FLEX avg={metrics.get('flex_avg_response_ms')}ms delta={metrics.get('avg_response_delta')}ms"
+            yield f"[PERF] OSPC p95={metrics.get('ospc_p95_ms')}ms FLEX p95={metrics.get('flex_p95_ms')}ms delta={metrics.get('p95_delta')}ms"
+            yield f"[PERF] API error={metrics.get('api_error_rate_percent')}% status={metrics.get('performance_status')}"
+        if not ok:
+            return False
+    if data.get("switch_after_gate") and evidence and evidence[-1].get("ok"):
+        switch_payload = {"target_environment": "target", "require_target_healthy": True}
+        ok, _ = yield from _stream_api_call("POST", f"{api_url}/switch", switch_payload, "switch-target", evidence)
+        if not ok:
+            return False
+    return all(step.get("ok") for step in evidence)
 
 
 def _join_base_url(ip: str, port: Any) -> str:
@@ -735,19 +1036,27 @@ def _rows_from_evidence_steps(request_payload: Dict[str, Any], result: Dict[str,
             }
         else:
             status = _status_from_step(step)
+            ramp_source_count = step_result.get("source_count", "")
+            ramp_target_count = step_result.get("target_count", "")
+            ramp_error_count = step_result.get("error_count", "")
+            ramp_other_count = step_result.get("other_count", "")
+            ramp_avg_ms = step_result.get("avg_response_ms", "")
             row = {
                 "migration_id": migration_id,
                 "test_name": step.get("label") or "cutover-test",
                 "result_status": status,
                 "source_app_url": source_url,
                 "target_app_url": target_url,
-                "source_ok": _probe_value(step_result, "source", "ok"),
-                "target_ok": _probe_value(step_result, "target", "ok"),
-                "source_latency_ms": _probe_value(step_result, "source", "latency_ms"),
-                "target_latency_ms": _probe_value(step_result, "target", "latency_ms"),
+                "source_ok": ramp_source_count if ramp_source_count != "" else _probe_value(step_result, "source", "ok"),
+                "target_ok": ramp_target_count if ramp_target_count != "" else _probe_value(step_result, "target", "ok"),
+                "source_latency_ms": ramp_avg_ms if ramp_avg_ms != "" else _probe_value(step_result, "source", "latency_ms"),
+                "target_latency_ms": ramp_avg_ms if ramp_avg_ms != "" else _probe_value(step_result, "target", "latency_ms"),
+                "api_error_rate_percent": ramp_error_count if ramp_error_count != "" else "",
                 "performance_status": "",
                 "cutover_gate": _cutover_gate_from_status(status),
-                "recommendation": step_result.get("recommendation") or step_result.get("note") or step_result.get("message") or "",
+                "recommendation": step_result.get("recommendation") or step_result.get("note") or step_result.get("message") or (
+                    f"other={ramp_other_count} errors={ramp_error_count}" if ramp_other_count != "" or ramp_error_count != "" else ""
+                ),
                 "created_at": step_result.get("created_at") or _now(),
                 "details": json.dumps(_sanitize(step_result), sort_keys=True),
             }
@@ -903,6 +1212,26 @@ def stream_cutover_tester_action(data: Dict[str, Any]) -> Iterator[str]:
     evidence: List[Dict[str, Any]] = []
     yield "=== BLUE/GREEN CUTOVER TESTER ==="
     yield f"[INFO] Action: {action}"
+    if action in {"set-traffic-split", "set-live-traffic-split", "apply-traffic-split"}:
+        yield from _stream_set_live_traffic_split(data)
+        return
+    if action in {"traffic-ramp", "ramp", "run-ramp", "traffic-ramp-proof"}:
+        yield from _stream_traffic_ramp(data)
+        return
+    if action in {"cutover-test", "full-cutover-test"}:
+        if not jumphost_ip:
+            yield "[ERROR] Select a Stage 2 jumphost before running the cutover test."
+            return
+        yield "=== PHASE 1: TRAFFIC RAMP PROOF ==="
+        ramp_ok = yield from _stream_traffic_ramp(data, evidence=evidence, write_artifacts=False)
+        yield "=== PHASE 2: CUTOVER SPECIFIC TESTS ==="
+        specific_ok = yield from _stream_cutover_specific_tests(data, action, jumphost_ip, user, ssh_key, evidence)
+        ok = bool(ramp_ok) and bool(specific_ok)
+        yield "[OK] Cut over TEST completed." if ok else "[ERROR] Cut over TEST completed with failed checks."
+        artifacts = write_cutover_tester_evidence(action, data, {"ok": bool(ok), "steps": evidence})
+        yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
+        yield f"[RESULT_TABLE] {json.dumps(load_cutover_tester_results(), sort_keys=True)}"
+        return
     if not api_url and action not in {"run", "stop"}:
         yield "[ERROR] Tester API URL or jumphost IP is required."
         return
@@ -915,55 +1244,7 @@ def stream_cutover_tester_action(data: Dict[str, Any]) -> Iterator[str]:
         yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
         return
     if action == "run":
-        ok = yield from _ensure_installed_and_started(jumphost_ip, user, ssh_key)
-        if not ok:
-            artifacts = write_cutover_tester_evidence(action, data, {"ok": False, "steps": evidence})
-            yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
-            return
-        api_url = _api_url(data, jumphost_ip)
-        yield "[INFO] Waiting for tester API to become reachable."
-        time.sleep(2)
-        config_payload = build_cutover_tester_config(data)
-        if not config_payload["source"]["base_url"] or not config_payload["target"]["base_url"]:
-            yield "[ERROR] Source URL and target URL are required before cutover tests can run."
-            artifacts = write_cutover_tester_evidence(action, data, {"ok": False, "steps": evidence})
-            yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
-            return
-        ok, _ = yield from _stream_api_call("POST", f"{api_url}/config", config_payload, "configure", evidence)
-        if not ok:
-            artifacts = write_cutover_tester_evidence(action, data, {"ok": False, "steps": evidence})
-            yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
-            return
-        for label, method, path in (
-            ("health-check", "GET", "/health-check"),
-            ("smoke-test", "GET", "/smoke-test"),
-            ("pre-cutover-gate", "POST", "/pre-cutover-check"),
-        ):
-            ok, _ = yield from _stream_api_call(method, f"{api_url}{path}", None, label, evidence)
-            if not ok:
-                break
-        if ok and data.get("include_performance", True) is not False:
-            performance_config = build_performance_config_payload(data)
-            if int(performance_config.get("concurrent_users") or 0) > 100:
-                yield "[WARN] High-load performance test requested. Safe built-in runner will cap effective concurrency on the tester side."
-            ok, _ = yield from _stream_api_call("POST", f"{api_url}/performance/config", performance_config, "performance-config", evidence)
-            if not ok:
-                artifacts = write_cutover_tester_evidence(action, data, {"ok": False, "steps": evidence})
-                yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
-                yield f"[RESULT_TABLE] {json.dumps(load_cutover_tester_results(), sort_keys=True)}"
-                return
-            ok, perf = yield from _stream_api_call("POST", f"{api_url}/performance/run", None, "performance-validation", evidence)
-            metrics = perf.get("metrics") if isinstance(perf.get("metrics"), dict) else {}
-            if not metrics and isinstance(perf, dict):
-                metrics = perf
-            if metrics:
-                yield f"[PERF] OSPC avg={metrics.get('ospc_avg_response_ms')}ms FLEX avg={metrics.get('flex_avg_response_ms')}ms delta={metrics.get('avg_response_delta')}ms"
-                yield f"[PERF] OSPC p95={metrics.get('ospc_p95_ms')}ms FLEX p95={metrics.get('flex_p95_ms')}ms delta={metrics.get('p95_delta')}ms"
-                yield f"[PERF] API error={metrics.get('api_error_rate_percent')}% status={metrics.get('performance_status')}"
-        if data.get("switch_after_gate") and evidence and evidence[-1].get("ok"):
-            switch_payload = {"target_environment": "target", "require_target_healthy": True}
-            yield from _stream_api_call("POST", f"{api_url}/switch", switch_payload, "switch-target", evidence)
-        all_ok = all(step.get("ok") for step in evidence)
+        all_ok = yield from _stream_cutover_specific_tests(data, action, jumphost_ip, user, ssh_key, evidence)
         yield "[OK] Cutover tester run completed." if all_ok else "[ERROR] Cutover tester run completed with failed checks."
         artifacts = write_cutover_tester_evidence(action, data, {"ok": all_ok, "steps": evidence})
         yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"

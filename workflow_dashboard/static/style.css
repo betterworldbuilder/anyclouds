@@ -50,8 +50,9 @@ header p {
 }
 
 main {
-  max-width: none;
-  padding: 14px 16px 28px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px clamp(14px, 3vw, 28px) 32px;
 }
 
 .card {
@@ -61,6 +62,29 @@ main {
   box-shadow: 0 1px 2px rgba(15,23,42,.04);
   backdrop-filter: none;
   color: #151922;
+}
+
+.scanner-workflow-steps {
+  max-width: 900px;
+  margin: 14px auto 0;
+  padding: 14px 22px 14px 38px;
+  text-align: left;
+  line-height: 1.55;
+  background: #f8fafc;
+  color: #151922;
+  border: 1px solid #d8e0ea;
+  border-left: 4px solid #a33e3e;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(15,23,42,.08);
+}
+
+.scanner-workflow-steps li {
+  color: #263243;
+  margin: 4px 0;
+}
+
+.scanner-workflow-steps strong {
+  color: #a33e3e;
 }
 
 .card h2,

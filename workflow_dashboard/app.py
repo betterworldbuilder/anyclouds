@@ -18498,6 +18498,326 @@ def download_report_file(filename):
     return jsonify({"error": "File not found"}), 404
 
 
+@app.post("/api/uat/service_compare")
+def uat_service_compare():
+    data = request.json or {}
+    source_ip  = data.get("source_ip",  "").strip()
+    target_ip  = data.get("target_ip",  "").strip()
+    ssh_user   = data.get("ssh_user",   "ubuntu").strip()
+    ssh_key    = os.path.expanduser(data.get("ssh_key", "~/.ssh/id_rsa").strip())
+    ssh_port   = str(data.get("ssh_port", 22))
+
+    if not source_ip or not target_ip:
+        return jsonify({"error": "source_ip and target_ip are required"}), 400
+
+    def get_services(ip):
+        cmd = [
+            "ssh", "-i", ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "BatchMode=yes",
+            "-o", f"ConnectTimeout=10",
+            "-p", ssh_port,
+            f"{ssh_user}@{ip}",
+            "systemctl list-units --type=service --state=running --no-legend --no-pager 2>/dev/null | awk '{print $1}' | sort"
+        ]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            svcs = [s.strip() for s in r.stdout.strip().split("\n") if s.strip()]
+            err  = r.stderr.strip() if r.returncode != 0 else None
+            return svcs, err
+        except subprocess.TimeoutExpired:
+            return [], "SSH timeout"
+        except Exception as e:
+            return [], str(e)
+
+    src_svcs, src_err = get_services(source_ip)
+    tgt_svcs, tgt_err = get_services(target_ip)
+    src_set, tgt_set  = set(src_svcs), set(tgt_svcs)
+    all_svcs = sorted(src_set | tgt_set)
+
+    comparison = []
+    for svc in all_svcs:
+        on_src = svc in src_set
+        on_tgt = svc in tgt_set
+        status = "match" if (on_src and on_tgt) else ("missing_on_target" if on_src else "extra_on_target")
+        comparison.append({"service": svc, "on_source": on_src, "on_target": on_tgt, "status": status})
+
+    return jsonify({
+        "source_ip": source_ip, "target_ip": target_ip,
+        "source_count": len(src_svcs), "target_count": len(tgt_svcs),
+        "source_error": src_err, "target_error": tgt_err,
+        "comparison": comparison,
+        "summary": {
+            "match":   sum(1 for c in comparison if c["status"] == "match"),
+            "missing": sum(1 for c in comparison if c["status"] == "missing_on_target"),
+            "extra":   sum(1 for c in comparison if c["status"] == "extra_on_target"),
+        }
+    })
+
+
+@app.post("/api/uat/performance/run")
+def uat_performance_run():
+    data = request.json or {}
+    source_ip = data.get("source_ip", "").strip()
+    target_ip = data.get("target_ip", "").strip()
+    ssh_user  = data.get("ssh_user", "ubuntu").strip()
+    ssh_key   = os.path.expanduser(data.get("ssh_key", "~/.ssh/id_rsa").strip())
+    ssh_port  = str(data.get("ssh_port", 22))
+    app_port  = str(data.get("app_port", 80))
+
+    db_port  = str(data.get("db_port", "0") or "0")
+
+    if not source_ip and not target_ip:
+        return jsonify({"error": "source_ip or target_ip required"}), 400
+
+    # NOTE: awk programs are always single-quoted; bash vars passed via -v to avoid quoting bugs
+    PERF_SCRIPT = r"""#!/bin/bash
+APP_PORT=__APP_PORT__
+DB_PORT=__DB_PORT__
+
+# ── HTTP: 5 samples ────────────────────────────────────────────────────────
+tmpf=$(mktemp /tmp/uat.XXXXXX)
+ec=0
+for i in 1 2 3 4 5; do
+  resp=$(curl -s -o /dev/null -w '%{http_code}:%{time_total}' \
+         --connect-timeout 3 --max-time 6 "http://localhost:${APP_PORT}/" 2>/dev/null)
+  [ $? -ne 0 ] && resp="000:0"
+  code="${resp%%:*}"; t="${resp##*:}"
+  printf '%s\n' "$t" >> "$tmpf"
+  case "$code" in 2*|3*) true ;; *) ec=$((ec+1)) ;; esac
+done
+avg_ms=$(awk '{s+=$1;n++}END{printf "%d",(n>0)?s/n*1000:0}' "$tmpf")
+p95_ms=$(sort -n "$tmpf" | awk '{a[NR]=$1}END{p=int(NR*0.95);if(p<1)p=1;printf "%d",a[p]*1000}')
+rm -f "$tmpf"
+error_pct=$(awk -v e="$ec" 'BEGIN{printf "%.1f",e/5*100}')
+
+# ── System: /proc only, no external tools ─────────────────────────────────
+cpu_load=$(awk '{printf "%s",$1}' /proc/loadavg)
+mem_pct=$(awk '/^MemTotal/{t=$2}/^MemAvailable/{a=$2}END{printf "%.1f",(t>0)?(t-a)/t*100:0}' /proc/meminfo)
+iowait=$(awk 'NR==1{t=0;for(i=2;i<=NF;i++)t+=$i;printf "%.1f",(t>0)?$6/t*100:0}' /proc/stat)
+active_sess=$(awk 'NR>1&&$4=="01"{n++}END{print n+0}' /proc/net/tcp /proc/net/tcp6 2>/dev/null)
+
+# ── Latency: gateway ping (-W 1 = 1s timeout per packet) ─────────────────
+gw=$(ip route 2>/dev/null | awk '/^default/{print $3;exit}')
+latency_ms=0
+if [ -n "$gw" ]; then
+  lv=$(ping -c 3 -W 1 -q "$gw" 2>/dev/null | awk -F/ '/^rtt/{printf "%d",$5+0}')
+  [ -n "$lv" ] && latency_ms=$lv
+fi
+
+# ── DB TCP connect (ms) ────────────────────────────────────────────────────
+db_ms=0
+if [ -n "$DB_PORT" ] && [ "$DB_PORT" != "0" ]; then
+  t1=$(date +%s%3N 2>/dev/null)
+  nc -z -w 2 127.0.0.1 "$DB_PORT" 2>/dev/null
+  t2=$(date +%s%3N 2>/dev/null)
+  [ -n "$t1" ] && [ -n "$t2" ] && db_ms=$((t2-t1))
+fi
+
+# ── Network throughput: 2s sample from /proc/net/dev ─────────────────────
+iface=$(ip route 2>/dev/null | awk '/^default/{print $5;exit}')
+dl=0; ul=0
+if [ -n "$iface" ]; then
+  rx1=$(awk -v d="${iface}:" '$1==d{print $2+0}' /proc/net/dev); rx1=${rx1:-0}
+  tx1=$(awk -v d="${iface}:" '$1==d{print $10+0}' /proc/net/dev); tx1=${tx1:-0}
+  sleep 2
+  rx2=$(awk -v d="${iface}:" '$1==d{print $2+0}' /proc/net/dev); rx2=${rx2:-0}
+  tx2=$(awk -v d="${iface}:" '$1==d{print $10+0}' /proc/net/dev); tx2=${tx2:-0}
+  dl=$(awk -v a="$rx1" -v b="$rx2" 'BEGIN{printf "%.2f",(b-a)*8/2/1048576}')
+  ul=$(awk -v a="$tx1" -v b="$tx2" 'BEGIN{printf "%.2f",(b-a)*8/2/1048576}')
+fi
+
+printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\nactive_sess=%s\nlatency_ms=%s\ndb_ms=%s\ndownload_mbps=%s\nupload_mbps=%s\n' \
+  "${avg_ms:-0}" "${p95_ms:-0}" "${error_pct:-0.0}" \
+  "${cpu_load:-0}" "${mem_pct:-0}" "${iowait:-0}" \
+  "${active_sess:-0}" "${latency_ms:-0}" "${db_ms:-0}" \
+  "${dl:-0}" "${ul:-0}"
+""".replace("__APP_PORT__", app_port).replace("__DB_PORT__", db_port)
+
+    def ssh_run(ip):
+        script = PERF_SCRIPT
+        cmd = [
+            "ssh", "-i", ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=10",
+            "-p", ssh_port,
+            f"{ssh_user}@{ip}",
+            "bash -s"
+        ]
+        try:
+            r = subprocess.run(cmd, input=script, capture_output=True, text=True, timeout=120)
+            out = r.stdout.strip()
+            err = r.stderr.strip() or None
+            parsed = {}
+            for line in out.splitlines():
+                if "=" in line:
+                    k, _, v = line.partition("=")
+                    parsed[k.strip()] = v.strip()
+            return parsed, err, out
+        except subprocess.TimeoutExpired as e:
+            partial = (e.stdout or "").strip()
+            return {}, "SSH timeout after 120s", partial
+        except Exception as e:
+            return {}, str(e), ""
+
+    src, src_err, src_raw = ssh_run(source_ip) if source_ip else ({}, None, "")
+    tgt, tgt_err, tgt_raw = ssh_run(target_ip) if target_ip else ({}, None, "")
+
+    performance = {
+        "ospc_avg_response_ms":           src.get("avg_ms", ""),
+        "flex_avg_response_ms":           tgt.get("avg_ms", ""),
+        "ospc_p95_ms":                    src.get("p95_ms", ""),
+        "flex_p95_ms":                    tgt.get("p95_ms", ""),
+        "api_error_rate_percent":         src.get("error_pct", ""),
+        "api_error_rate_percent_target":  tgt.get("error_pct", ""),
+        "network_latency_ms":             src.get("latency_ms", ""),
+        "network_latency_ms_target":      tgt.get("latency_ms", ""),
+        "active_sessions_tested":         src.get("active_sess", ""),
+        "active_sessions_tested_target":  tgt.get("active_sess", ""),
+        "cpu_load_source":                src.get("cpu_load", ""),
+        "cpu_load_target":                tgt.get("cpu_load", ""),
+        "mem_pct_source":                 src.get("mem_pct", ""),
+        "mem_pct_target":                 tgt.get("mem_pct", ""),
+        "iowait_source":                  src.get("iowait", ""),
+        "iowait_target":                  tgt.get("iowait", ""),
+        "db_avg_query_ms":                src.get("db_ms", ""),
+        "db_avg_query_ms_target":         tgt.get("db_ms", ""),
+        "upload_mbps":                    src.get("upload_mbps", ""),
+        "upload_mbps_target":             tgt.get("upload_mbps", ""),
+        "download_mbps":                  src.get("download_mbps", ""),
+        "download_mbps_target":           tgt.get("download_mbps", ""),
+    }
+
+    return jsonify({
+        "ok": True,
+        "performance": performance,
+        "source_error": src_err,
+        "target_error": tgt_err,
+        "debug_src": src_raw,
+        "debug_tgt": tgt_raw,
+    })
+
+
+@app.post("/api/uat/performance/stream")
+def uat_performance_stream():
+    import threading, queue as _queue, json as _json
+
+    data      = request.json or {}
+    source_ip = data.get("source_ip", "").strip()
+    target_ip = data.get("target_ip", "").strip()
+    ssh_user  = data.get("ssh_user", "ubuntu").strip()
+    ssh_key   = os.path.expanduser(data.get("ssh_key", "~/.ssh/id_rsa").strip())
+    ssh_port  = str(data.get("ssh_port", 22))
+    app_port  = str(data.get("app_port", 80))
+    db_port   = str(data.get("db_port", "0") or "0")
+
+    if not source_ip and not target_ip:
+        return jsonify({"error": "source_ip or target_ip required"}), 400
+
+    PERF_SCRIPT = r"""#!/bin/bash
+APP_PORT=__APP_PORT__
+DB_PORT=__DB_PORT__
+
+tmpf=$(mktemp /tmp/uat.XXXXXX)
+ec=0
+for i in 1 2 3 4 5; do
+  resp=$(curl -s -o /dev/null -w '%{http_code}:%{time_total}' \
+         --connect-timeout 3 --max-time 6 "http://localhost:${APP_PORT}/" 2>/dev/null)
+  [ $? -ne 0 ] && resp="000:0"
+  code="${resp%%:*}"; t="${resp##*:}"
+  printf '%s\n' "$t" >> "$tmpf"
+  case "$code" in 2*|3*) true ;; *) ec=$((ec+1)) ;; esac
+done
+avg_ms=$(awk '{s+=$1;n++}END{printf "%d",(n>0)?s/n*1000:0}' "$tmpf")
+p95_ms=$(sort -n "$tmpf" | awk '{a[NR]=$1}END{p=int(NR*0.95);if(p<1)p=1;printf "%d",a[p]*1000}')
+rm -f "$tmpf"
+error_pct=$(awk -v e="$ec" 'BEGIN{printf "%.1f",e/5*100}')
+
+cpu_load=$(awk '{printf "%s",$1}' /proc/loadavg)
+mem_pct=$(awk '/^MemTotal/{t=$2}/^MemAvailable/{a=$2}END{printf "%.1f",(t>0)?(t-a)/t*100:0}' /proc/meminfo)
+iowait=$(awk 'NR==1{t=0;for(i=2;i<=NF;i++)t+=$i;printf "%.1f",(t>0)?$6/t*100:0}' /proc/stat)
+active_sess=$(awk 'NR>1&&$4=="01"{n++}END{print n+0}' /proc/net/tcp /proc/net/tcp6 2>/dev/null)
+
+gw=$(ip route 2>/dev/null | awk '/^default/{print $3;exit}')
+latency_ms=0
+if [ -n "$gw" ]; then
+  lv=$(ping -c 3 -W 1 -q "$gw" 2>/dev/null | awk -F/ '/^rtt/{printf "%d",$5+0}')
+  [ -n "$lv" ] && latency_ms=$lv
+fi
+
+db_ms=0
+if [ -n "$DB_PORT" ] && [ "$DB_PORT" != "0" ]; then
+  t1=$(date +%s%3N 2>/dev/null)
+  nc -z -w 2 127.0.0.1 "$DB_PORT" 2>/dev/null
+  t2=$(date +%s%3N 2>/dev/null)
+  [ -n "$t1" ] && [ -n "$t2" ] && db_ms=$((t2-t1))
+fi
+
+iface=$(ip route 2>/dev/null | awk '/^default/{print $5;exit}')
+dl=0; ul=0
+if [ -n "$iface" ]; then
+  rx1=$(awk -v d="${iface}:" '$1==d{print $2+0}' /proc/net/dev); rx1=${rx1:-0}
+  tx1=$(awk -v d="${iface}:" '$1==d{print $10+0}' /proc/net/dev); tx1=${tx1:-0}
+  sleep 2
+  rx2=$(awk -v d="${iface}:" '$1==d{print $2+0}' /proc/net/dev); rx2=${rx2:-0}
+  tx2=$(awk -v d="${iface}:" '$1==d{print $10+0}' /proc/net/dev); tx2=${tx2:-0}
+  dl=$(awk -v a="$rx1" -v b="$rx2" 'BEGIN{printf "%.2f",(b-a)*8/2/1048576}')
+  ul=$(awk -v a="$tx1" -v b="$tx2" 'BEGIN{printf "%.2f",(b-a)*8/2/1048576}')
+fi
+
+printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\nactive_sess=%s\nlatency_ms=%s\ndb_ms=%s\ndownload_mbps=%s\nupload_mbps=%s\n' \
+  "${avg_ms:-0}" "${p95_ms:-0}" "${error_pct:-0.0}" \
+  "${cpu_load:-0}" "${mem_pct:-0}" "${iowait:-0}" \
+  "${active_sess:-0}" "${latency_ms:-0}" "${db_ms:-0}" \
+  "${dl:-0}" "${ul:-0}"
+""".replace("__APP_PORT__", app_port).replace("__DB_PORT__", db_port)
+
+    q = _queue.Queue()
+
+    def _run_ssh(ip, label):
+        cmd = [
+            "ssh", "-i", ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=10",
+            "-p", ssh_port,
+            f"{ssh_user}@{ip}",
+            "bash -s",
+        ]
+        try:
+            r = subprocess.run(cmd, input=PERF_SCRIPT, capture_output=True, text=True, timeout=120)
+            q.put({"label": label, "out": r.stdout.strip(), "err": r.stderr.strip() or None})
+        except subprocess.TimeoutExpired as e:
+            q.put({"label": label, "out": (e.stdout or "").strip(), "err": "SSH timeout after 120s"})
+        except Exception as e:
+            q.put({"label": label, "out": "", "err": str(e)})
+
+    def generate():
+        if source_ip:
+            yield f"data: {_json.dumps({'type':'status','msg':f'Connecting to source {source_ip} and target {target_ip}...'})}\n\n"
+            threading.Thread(target=_run_ssh, args=(source_ip, "src"), daemon=True).start()
+        if target_ip:
+            threading.Thread(target=_run_ssh, args=(target_ip, "tgt"), daemon=True).start()
+
+        expected = (1 if source_ip else 0) + (1 if target_ip else 0)
+        received = 0
+        while received < expected:
+            try:
+                item = q.get(timeout=130)
+                received += 1
+                yield f"data: {_json.dumps({'type': item['label'], 'out': item['out'], 'err': item.get('err')})}\n\n"
+            except _queue.Empty:
+                break
+
+        yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+
+    resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))

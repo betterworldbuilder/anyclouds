@@ -1594,8 +1594,8 @@
                             </div>
                             <span id="db-mode-badge" style="font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);">🔍 DRY — no data moved</span>
 
-                            <button id="copy-btn-db" onclick="copyDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">📋 Copy</button>
-                            <button id="download-btn-db" onclick="downloadDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">⬇ Download</button>
+                            <button type="button" id="copy-btn-db" onclick="copyDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">📋 Copy</button>
+                            <button type="button" id="download-btn-db" onclick="downloadDbScript()" class="secondary" style="padding:6px 14px;font-size:0.82rem;">⬇ Download</button>
                             <button type="button" id="execute-btn-db" onclick="executeDbScript()" class="secondary"
                                 style="padding:6px 14px;font-size:0.82rem;border-color:#7c3aed;color:#c4b5fd;font-weight:700;"><span id="execute-btn-db-label">🚀 Execute DB Migration</span></button>
                             <button id="stop-btn-db" onclick="stopDbScript()" class="secondary"
@@ -1705,9 +1705,31 @@
                     const replUser     = fv('repl_user')  || 'replicator';
                     const replPass     = fv('repl_pass')  || '';
 
-                    // Collect ALL table rows that have a known DB type
-                    const allRows = Array.from(document.querySelectorAll('tr[data-manual-type]'));
-                    const dbRows  = allRows.filter(tr => _DB_TYPE_TO_SCENARIO[tr.getAttribute('data-manual-type')]);
+                    // Collect ALL checked rows from the pair table — works for both
+                    // auto-discovered rows (no data-manual-type) and manually-added rows
+                    const selectedScenario = (document.querySelector('input[name="db_scenario"]:checked') || {value:'dbvm'}).value || 'dbvm';
+                    const scenarioToType = { dbvm:'dbvm', single:'singledbaas', replica:'dbaas', ha:'ha' };
+
+                    const allTbodyRows = Array.from(document.querySelectorAll('#node-pair-tbody tr'));
+                    const dbRows = [];
+                    const dbRowMeta = [];
+                    allTbodyRows.forEach(tr => {
+                      const cb = tr.querySelector('input[type="checkbox"]');
+                      if (!cb || !cb.checked) return;
+                      const ospcIp = cb.getAttribute('data-ospc-ip') || '';
+                      const flexIp = cb.getAttribute('data-flex-ip') || '';
+                      if (!ospcIp || !flexIp) return;
+                      const manualType = tr.getAttribute('data-manual-type') || '';
+                      // Use the row's own DB type if it's a known DB type, otherwise use the selected tab type
+                      const type = _DB_TYPE_TO_SCENARIO[manualType] ? manualType : (scenarioToType[selectedScenario] || 'dbvm');
+                      dbRows.push(tr);
+                      dbRowMeta.push({ type, ospcIp, flexIp,
+                        name: (tr.getAttribute('data-manual-name') || cb.getAttribute('data-ospc-name') || ospcIp),
+                        repIps: (type !== 'singledbaas' && type !== 'dbvm') ? (tr.getAttribute('data-replica-ips') || '').split(' ').filter(Boolean).join(',') : '',
+                        haVip: tr.getAttribute('data-ha-vip') || '',
+                        haMethod: tr.getAttribute('data-ha-method') || '',
+                      });
+                    });
 
                     if (dbRows.length === 0) {
                       if (statusEl) statusEl.textContent = '⚠️ No entries in the table — add a server first.';
@@ -1721,20 +1743,19 @@
 
                     window._dbScripts = [];
 
-                    for (const tr of dbRows) {
-                      const type     = tr.getAttribute('data-manual-type');
+                    for (let _ri = 0; _ri < dbRows.length; _ri++) {
+                      const tr       = dbRows[_ri];
+                      const meta     = dbRowMeta[_ri];
+                      const type     = meta.type;
                       const scenario = _DB_TYPE_TO_SCENARIO[type];
                       const typeLabel= _DB_TYPE_LABEL[type] || type;
                       const cb       = tr.querySelector('input[type="checkbox"]');
 
-                      // ── IPs come ONLY from this row's data attributes ──
-                      const ospcIp   = (cb && cb.getAttribute('data-ospc-ip')) || '';
-                      const flexIp   = (cb && cb.getAttribute('data-flex-ip')) || '';
-                      const repAttr  = (type !== 'singledbaas' && type !== 'dbvm')
-                                        ? (tr.getAttribute('data-replica-ips') || '') : '';
-                      const repIps   = repAttr.split(' ').filter(Boolean).join(',');
+                      const ospcIp   = meta.ospcIp;
+                      const flexIp   = meta.flexIp;
+                      const repIps   = meta.repIps;
 
-                      const rowName  = (tr.getAttribute('data-manual-name') || ospcIp).replace(/_+/g, ' ');
+                      const rowName  = meta.name.replace(/_+/g, ' ');
                       const tabLabel = `${rowName} — ${typeLabel}`;
 
                       if (!ospcIp || !flexIp) {
@@ -1742,8 +1763,8 @@
                         continue;
                       }
 
-                      const haVip    = tr.getAttribute('data-ha-vip')    || '';
-                      const haMethod = tr.getAttribute('data-ha-method') || '';
+                      const haVip    = meta.haVip;
+                      const haMethod = meta.haMethod;
 
                       const payload = {
                         scenario:       scenario,
@@ -1831,15 +1852,15 @@
 
                 window.selectDbScriptTab = function(idx) { renderDbScriptTabs(idx); };
 
-                function copyDbScript() {
+                window.copyDbScript = function() {
                     const raw = document.getElementById('script-output-db').getAttribute('data-raw') || '';
                     navigator.clipboard.writeText(raw);
                     const btn = document.getElementById('copy-btn-db');
                     const orig = btn.textContent; btn.textContent = '✓ Copied!';
                     setTimeout(() => btn.textContent = orig, 1400);
-                }
+                };
 
-                function downloadDbScript() {
+                window.downloadDbScript = function() {
                     const codeEl  = document.getElementById('script-output-db');
                     const raw     = codeEl.getAttribute('data-raw') || '';
                     const idx     = parseInt(codeEl.getAttribute('data-tab-idx') || '0');
@@ -1849,7 +1870,7 @@
                     a.href = URL.createObjectURL(new Blob([raw], {type:'text/plain'}));
                     a.download = `${cust}_${tabName}_db_migration.sh`;
                     a.click();
-                }
+                };
 
                 window.executeDbScript = async function() {
                     // Regenerate with current DRY/LIVE toggle so stale cached scripts are never executed

@@ -101,6 +101,8 @@ SCOPE_FIELDS = [
     "ssh_host",
     "ssh_key_path",
     "ssh_port",
+    "app_port",
+    "db_port",
     "notes",
 ]
 
@@ -356,6 +358,8 @@ def normalize_scope_row(row: Dict[str, Any], idx: int) -> Dict[str, str]:
         "ssh_host": str(row.get("ssh_host") or row.get("target_ip") or ""),
         "ssh_key_path": str(row.get("ssh_key_path") or ""),
         "ssh_port": str(row.get("ssh_port") or "22"),
+        "app_port": str(row.get("app_port") or ""),
+        "db_port": str(row.get("db_port") or ""),
         "notes": str(row.get("notes") or ""),
     }
 
@@ -864,6 +868,158 @@ def create_uat_blueprint(base_dir: Path) -> Blueprint:
                 break
         write_findings_csv(paths.uat / "uat_log_findings.csv", findings)
         return jsonify({"ok": True, "findings": findings, "issues": load_issues(paths)})
+
+    @bp.post("/api/uat/compare-db")
+    def compare_db():
+        import os, subprocess, textwrap
+        payload = request.get_json(silent=True) or {}
+        source_host = (payload.get("source_host") or "").strip()
+        target_host = (payload.get("target_host") or "").strip()
+        ssh_user    = (payload.get("ssh_user") or "ubuntu").strip()
+        ssh_key     = os.path.expanduser((payload.get("ssh_key_path") or "~/.ssh/id_rsa").strip())
+        ssh_port    = int(payload.get("ssh_port") or 22)
+        db_engine   = (payload.get("db_engine") or "mysql").lower().strip()
+        db_port     = int(payload.get("db_port") or (3306 if db_engine == "mysql" else 5432))
+        db_user     = (payload.get("db_user") or ("root" if db_engine == "mysql" else "postgres")).strip()
+        db_pass     = (payload.get("db_password") or "").strip()
+
+        if not source_host or not target_host:
+            return jsonify({"ok": False, "error": "source_host and target_host are required"}), 400
+
+        # Remote inspection script — runs as `python3 -` on the target server via SSH stdin
+        remote_script = textwrap.dedent("""
+            import json, subprocess, sys
+
+            engine  = %(engine)r
+            db_user = %(db_user)r
+            db_pass = %(db_pass)r
+            db_port = %(db_port)d
+            result  = {"engine": engine, "databases": [], "error": None, "status": "ok"}
+
+            def _run(cmd):
+                try:
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+                    return r.stdout.strip(), r.stderr.strip(), r.returncode
+                except Exception as exc:
+                    return "", str(exc), -1
+
+            try:
+                if engine == "mysql":
+                    base = ["mysql", "-u", db_user, "-P", str(db_port), "-N", "--batch"]
+                    if db_pass:
+                        base += ["-p" + db_pass]
+
+                    dbs_out, dbs_err, rc = _run(base + ["-e", "SHOW DATABASES"])
+                    if rc != 0 or not dbs_out:
+                        result["error"] = dbs_err or "Cannot connect to MySQL — check credentials and port."
+                        result["status"] = "error"
+                    else:
+                        skip = {"information_schema", "performance_schema", "mysql", "sys"}
+                        dbs = [d for d in dbs_out.split("\\n") if d.strip() and d not in skip]
+                        for dbname in dbs[:5]:
+                            db_entry = {"name": dbname, "tables": [], "error": None}
+                            tbls_out, tbls_err, trc = _run(base + ["-D", dbname, "-e", "SHOW TABLES"])
+                            if trc != 0:
+                                db_entry["error"] = tbls_err
+                            else:
+                                for tbl in [t for t in tbls_out.split("\\n") if t.strip()][:10]:
+                                    rout, rerr, rrc = _run(base + ["-D", dbname, "-e",
+                                        "SELECT * FROM `" + tbl + "` LIMIT 10"])
+                                    db_entry["tables"].append({
+                                        "name": tbl,
+                                        "sample_rows": rout,
+                                        "error": rerr if rrc != 0 else None,
+                                    })
+                            result["databases"].append(db_entry)
+
+                elif engine in ("postgresql", "postgres"):
+                    def _pg(query, dbname="postgres"):
+                        for cmd in [
+                            ["sudo", "-n", "-u", "postgres", "psql",
+                             "-p", str(db_port), "-Atq", "-d", dbname, "-c", query],
+                            ["psql", "-U", db_user, "-p", str(db_port),
+                             "-Atq", "-d", dbname, "-c", query],
+                        ]:
+                            out, err, rc = _run(cmd)
+                            if rc == 0:
+                                return out, err, rc
+                        return out, err, rc
+
+                    dbs_out, dbs_err, rc = _pg(
+                        "SELECT datname FROM pg_database "
+                        "WHERE datistemplate=false "
+                        "AND datname NOT IN ('postgres','template0','template1')"
+                    )
+                    if rc != 0 or not dbs_out:
+                        result["error"] = dbs_err or "Cannot connect to PostgreSQL — check credentials and port."
+                        result["status"] = "error"
+                    else:
+                        dbs = [d for d in dbs_out.split("\\n") if d.strip()]
+                        for dbname in dbs[:5]:
+                            db_entry = {"name": dbname, "tables": [], "error": None}
+                            tbls_out, tbls_err, trc = _pg(
+                                "SELECT tablename FROM pg_tables WHERE schemaname='public'", dbname)
+                            if trc != 0:
+                                db_entry["error"] = tbls_err
+                            else:
+                                for tbl in [t for t in tbls_out.split("\\n") if t.strip()][:10]:
+                                    rout, rerr, rrc = _pg(
+                                        'SELECT * FROM "' + tbl + '" LIMIT 10', dbname)
+                                    db_entry["tables"].append({
+                                        "name": tbl,
+                                        "sample_rows": rout,
+                                        "error": rerr if rrc != 0 else None,
+                                    })
+                            result["databases"].append(db_entry)
+                else:
+                    result["error"] = "Unsupported engine: " + engine
+                    result["status"] = "error"
+
+            except Exception as exc:
+                result["error"] = str(exc)
+                result["status"] = "error"
+
+            print(json.dumps(result))
+        """) % {"engine": db_engine, "db_user": db_user, "db_pass": db_pass, "db_port": db_port}
+
+        def run_on_host(host: str) -> dict:
+            cmd = [
+                "ssh", "-T", "-i", ssh_key,
+                "-p", str(ssh_port),
+                "-o", "StrictHostKeyChecking=no",
+                "-o", "BatchMode=yes",
+                "-o", "ConnectTimeout=15",
+                f"{ssh_user}@{host}",
+                "python3 -",
+            ]
+            try:
+                proc = subprocess.run(
+                    cmd, input=remote_script,
+                    capture_output=True, text=True, timeout=120,
+                )
+                raw = proc.stdout.strip()
+                if not raw and proc.returncode != 0:
+                    return {"error": proc.stderr.strip() or f"SSH failed (exit {proc.returncode})",
+                            "databases": [], "status": "error"}
+                # Extract the last JSON object from stdout (ignore any extra output)
+                import json as _json
+                last_close = raw.rfind("}")
+                first_open = raw.rfind("{", 0, last_close + 1)
+                if first_open >= 0 and last_close > first_open:
+                    try:
+                        return _json.loads(raw[first_open: last_close + 1])
+                    except Exception:
+                        pass
+                return {"error": "Could not parse DB output", "raw": raw[:800],
+                        "databases": [], "status": "parse_error"}
+            except subprocess.TimeoutExpired:
+                return {"error": "Connection timed out (120 s)", "databases": [], "status": "timeout"}
+            except Exception as exc:
+                return {"error": str(exc), "databases": [], "status": "error"}
+
+        source_result = run_on_host(source_host)
+        target_result = run_on_host(target_host)
+        return jsonify({"ok": True, "source": source_result, "target": target_result, "engine": db_engine})
 
     @bp.get("/api/uat/artifact/<stage>/<path:filename>")
     def download_uat_artifact(stage: str, filename: str):

@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  color: #dbeafe;
+  color: #ffffff;
 }
 
 .uat-hero {
@@ -12,21 +12,21 @@
   align-items: flex-start;
   flex-wrap: wrap;
   padding: 18px 20px;
-  background: radial-gradient(circle at top left, rgba(37, 99, 235, .22), rgba(2, 6, 23, .9));
-  border: 1px solid rgba(96, 165, 250, .35);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
 }
 
 .uat-hero h2 {
   margin: 0 0 6px;
-  color: #e0f2fe;
+  color: #1e3a6e;
   font-family: "Orbitron", sans-serif;
   letter-spacing: 1px;
 }
 
 .uat-hero p {
   margin: 0;
-  color: #94a3b8;
+  color: #475569;
   font-size: 13px;
 }
 
@@ -37,8 +37,8 @@
 }
 
 .uat-panel {
-  background: rgba(6, 14, 48, .72);
-  border: 1px solid rgba(79, 126, 248, .18);
+  background: rgba(30, 64, 130, 0.55);
+  border: 1px solid rgba(147, 197, 253, 0.3);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -49,13 +49,13 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  background: rgba(0, 0, 0, .34);
-  border-bottom: 1px solid rgba(79, 126, 248, .15);
+  background: rgba(20, 50, 110, 0.6);
+  border-bottom: 1px solid rgba(147, 197, 253, 0.25);
 }
 
 .uat-panel-header h3 {
   margin: 0;
-  color: #bfdbfe;
+  color: #ffffff;
   font-size: 13px;
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -73,13 +73,13 @@
 
 .uat-stat {
   padding: 11px 12px;
-  background: rgba(15, 23, 42, .78);
-  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(20, 50, 110, 0.5);
+  border: 1px solid rgba(147, 197, 253, 0.25);
   border-radius: 7px;
 }
 
 .uat-stat-label {
-  color: #7a9acc;
+  color: #bfdbfe;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .08em;
@@ -87,7 +87,7 @@
 
 .uat-stat-value {
   margin-top: 5px;
-  color: #f8fafc;
+  color: #ffffff;
   font-size: 18px;
   font-weight: 800;
 }
@@ -107,22 +107,23 @@
 .uat-table th {
   padding: 8px 9px;
   text-align: left;
-  color: #8fb3e8;
+  color: #ffffff;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: .06em;
-  background: rgba(0, 0, 0, .32);
-  border-bottom: 1px solid rgba(96, 165, 250, .22);
+  background: rgba(20, 50, 110, 0.55);
+  border-bottom: 1px solid rgba(147, 197, 253, 0.25);
 }
 
 .uat-table td {
   padding: 8px 9px;
-  border-bottom: 1px solid rgba(96, 165, 250, .09);
+  border-bottom: 1px solid rgba(147, 197, 253, 0.12);
   vertical-align: top;
+  color: #ffffff;
 }
 
 .uat-table tr:hover td {
-  background: rgba(255, 255, 255, .025);
+  background: rgba(255, 255, 255, .06);
 }
 
 .uat-input,
@@ -227,7 +228,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  color: #7a9acc;
+  color: #bfdbfe;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .05em;
