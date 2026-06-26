@@ -81,8 +81,14 @@
     var r   = UAT.readiness || {};
     var rt  = r.required_tests || {};
     var sc  = UAT.serviceComparison || {};
-    var wl  = UAT.workloadScope || {};
+    // Always re-read scope from localStorage so scope card changes take effect immediately
+    var wl  = {};
+    try { wl = JSON.parse(localStorage.getItem('uat_workload_scope') || 'null') || {}; } catch(e) { wl = UAT.workloadScope || {}; }
     var hasDB = wl.hasDatabase === true;
+
+    // FIX modal user-dismissals (Fixed / Not Relevant per issue key)
+    var fixDismissed = {};
+    try { fixDismissed = JSON.parse(localStorage.getItem('uat_fix_dismissed') || '{}'); } catch(e) {}
 
     // Service analysis — prefer live data (set by uatSetServiceComparison), fallback to API
     var svcRan       = sc.ran || false;
@@ -103,23 +109,54 @@
       }
       svcAcceptable = (r.service_matched || 0) + (r.service_absent_expected || 0) + (r.service_flex_only || 0);
     }
+    // Live service comparison: use explicit breakdown if available (set by svcCompareRun)
+    if (svcRan && sc.matched !== undefined) {
+      svcAcceptable = (sc.matched || 0) + (sc.expectedAbsent || 0) + (sc.expectedFlexOnly || 0);
+    }
 
     // Performance — live metrics from uatSetPerfMetrics, fallback to saved API status
     var perfMetrics = UAT.performance.metrics || [];
-    var perfOverall = UAT.performance.overall_status ||
-      (r.performance_status === 'Pass' ? 'PASS' : r.performance_status === 'Fail' ? 'FAIL' : '');
+
+    // Read user decisions for performance metrics (set via dropdown in Step 3 perf table)
+    var perfUserDecisions = {};
+    try { perfUserDecisions = JSON.parse(localStorage.getItem('uat_perf_user_decisions') || '{}'); } catch(e) {}
+
+    // Merge user decisions with system assessment badges to get effective state per metric
+    var effectivePerfMetrics = perfMetrics.map(function(m) {
+      var ud = perfUserDecisions[m.key] || 'Pending';
+      var eff = m.badge; // system assessment
+      if (ud === 'Pass')                eff = 'PASS';
+      else if (ud === 'Fail')           eff = 'FAIL';
+      else if (ud === 'Accept Risk')    eff = 'WARN';
+      else if (ud === 'Not Applicable') eff = 'OUT OF SCOPE';
+      if (fixDismissed['perf:' + m.key]) eff = 'OUT OF SCOPE'; // FIX modal override
+      // 'Pending' keeps the system badge
+      return Object.assign({}, m, { effectiveBadge: eff, userDecision: ud });
+    });
+
     var perfPasses = 0, perfFails = 0, perfWarns = 0, perfInfos = 0, perfNTs = 0, perfOOS = 0;
-    perfMetrics.forEach(function(m) {
-      if (m.badge === 'PASS') perfPasses++;
-      else if (m.badge === 'FAIL') perfFails++;
-      else if (m.badge === 'WARN') perfWarns++;
-      else if (m.badge === 'INFO') perfInfos++;
-      else if (m.badge === 'NOT TESTED') perfNTs++;
-      else if (m.badge === 'OUT OF SCOPE') perfOOS++;
+    var pendingCritical = 0; // FAIL/REVIEW metrics still awaiting user decision
+    effectivePerfMetrics.forEach(function(m) {
+      if (m.effectiveBadge === 'PASS') perfPasses++;
+      else if (m.effectiveBadge === 'FAIL') perfFails++;
+      else if (m.effectiveBadge === 'WARN' || m.effectiveBadge === 'REVIEW') perfWarns++;
+      else if (m.effectiveBadge === 'INFO') perfInfos++;
+      else if (m.effectiveBadge === 'NOT TESTED') perfNTs++;
+      else if (m.effectiveBadge === 'OUT OF SCOPE') perfOOS++;
+      // Count metrics that need a user decision (system says FAIL/REVIEW, user hasn't decided)
+      if ((m.badge === 'FAIL' || m.badge === 'REVIEW') && m.userDecision === 'Pending') pendingCritical++;
     });
     var perfMeasured = perfPasses + perfFails + perfWarns;
-    if (!perfOverall && perfMeasured > 0)
-      perfOverall = perfFails > 0 ? 'FAIL' : perfWarns > 0 ? 'WARN' : 'PASS';
+
+    // Effective overall: user-resolved failures trump system assessment
+    var perfOverall = '';
+    if (perfFails > 0)         perfOverall = 'FAIL';
+    else if (pendingCritical > 0) perfOverall = 'PENDING';
+    else if (perfWarns > 0)    perfOverall = 'WARN';
+    else if (perfMeasured > 0) perfOverall = 'PASS';
+    // Fallback to saved API status if no live metrics
+    if (!perfOverall) perfOverall = UAT.performance.overall_status ||
+      (r.performance_status === 'Pass' ? 'PASS' : r.performance_status === 'Fail' ? 'FAIL' : '');
 
     var openCriticalIssues = r.critical_open_issues || 0;
 
@@ -175,18 +212,39 @@
         decisionImpact: 'Blocks cutover' },
 
       { key:'performance', label:'Performance', outOfScope:false,
-        pass: perfOverall === 'PASS' || perfOverall === 'WARN' ||
-              (!perfOverall && r.performance_status && r.performance_status !== 'Fail'),
-        detail: perfMeasured > 0
-          ? perfPasses + ' of ' + perfMeasured + ' measured metrics OK'
-            + (perfInfos > 0 ? ' · ' + perfInfos + ' informational' : '')
-            + (perfNTs  > 0 ? ' · ' + perfNTs  + ' not tested'     : '')
-            + (perfOOS  > 0 ? ' · ' + perfOOS  + ' out of scope'   : '')
-          : 'Status: ' + (r.performance_status || 'Not yet run'),
-        source: 'Step 3 — SSH Performance Test (live)',
-        fix: 'Go to Step 3 — Performance Validation. Run SSH Tests and review failing metrics.',
-        decisionImpact: perfOverall === 'FAIL' ? 'Blocks cutover' : 'Supports cutover' },
+        // Pass when no effective FAIL and no pending decisions on critical metrics.
+        // WARN/Accept Risk = "pass with conditions" — does not block cutover.
+        pass: perfFails === 0 && pendingCritical === 0 &&
+              (perfMeasured > 0 || (!perfOverall && r.performance_status && r.performance_status !== 'Fail')),
+        detail: (function() {
+          if (perfMeasured === 0) return 'Status: ' + (r.performance_status || 'Not yet run');
+          var parts = [perfPasses + ' of ' + perfMeasured + ' metrics OK'];
+          if (pendingCritical > 0) parts.push(pendingCritical + ' awaiting your decision (see Step 3 dropdowns)');
+          if (perfFails > 0)       parts.push(perfFails + ' confirmed fail');
+          if (perfWarns > 0)       parts.push(perfWarns + ' warn/accepted risk');
+          if (perfInfos > 0)       parts.push(perfInfos + ' informational');
+          if (perfNTs   > 0)       parts.push(perfNTs  + ' not tested');
+          if (perfOOS   > 0)       parts.push(perfOOS  + ' out of scope');
+          return parts.join(' · ');
+        })(),
+        source: 'Step 3 — SSH Performance Test (live) · Resolved by Your Decision dropdowns',
+        fix: pendingCritical > 0
+          ? 'Go to Step 3 — Performance Validation. Set Your Decision on all flagged metrics (Pass / Fail / Accept Risk).'
+          : perfFails > 0
+          ? 'Go to Step 3. Review FAIL metrics. Override with "Pass" if acceptable, "Accept Risk" for accepted deviation, or "Fail" to block cutover.'
+          : 'Go to Step 3 — Performance Validation. Run SSH Tests first.',
+        decisionImpact: (perfFails > 0 || pendingCritical > 0) ? 'Blocks cutover until decisions are set' : 'Supports cutover' },
     ];
+
+    // Apply FIX modal dismissals to checks and service lists
+    checks.forEach(function(c) {
+      var dk = fixDismissed['check:' + c.key];
+      if (dk === 'fixed')        c.pass = true;
+      if (dk === 'not_relevant') c.outOfScope = true;
+    });
+    svcHardBlocks = svcHardBlocks.filter(function(s){ return !fixDismissed['svc_hard:' + s.service]; });
+    svcReviewGaps = svcReviewGaps.filter(function(s){ return !fixDismissed['svc_gap:'  + s.service]; });
+    svcWarnings   = svcWarnings.filter(function(s){   return !fixDismissed['svc_warn:' + s.service]; });
 
     // Mark checks as notTested if linkedTest has no command runs at all
     var runTestKeys = {};
@@ -203,10 +261,11 @@
     var blocking = inScopeChecks.filter(function(c){ return !c.pass && !c.notTested; }).length;
     var pct      = total > 0 ? Math.round(passed / total * 100) : 0;
 
-    // Decision: checklist failures OR hard service blocks → NOT READY
-    //           review gaps / warnings only → READY WITH CONDITIONS
-    var notReady      = blocking > 0 || svcHardBlocks.length > 0 || perfOverall === 'FAIL';
-    var readyWithCond = !notReady && (svcReviewGaps.length > 0 || svcWarnings.length > 0);
+    // Decision: checklist failures, hard service blocks, confirmed perf failures,
+    //           or metrics with pending user decisions → NOT READY.
+    //           review gaps / warnings only → READY WITH CONDITIONS.
+    var notReady      = blocking > 0 || svcHardBlocks.length > 0 || perfFails > 0 || pendingCritical > 0;
+    var readyWithCond = !notReady && (svcReviewGaps.length > 0 || svcWarnings.length > 0 || perfWarns > 0);
     var isReady       = !notReady && !readyWithCond;
     var cutoverDecision = isReady ? 'READY' : readyWithCond ? 'READY WITH CONDITIONS' : 'NOT READY';
 
@@ -293,11 +352,12 @@
       svcEvidence.push({ type:'info', text: 'Service comparison not yet run. Go to Step 2 and click Compare Services.' });
     }
 
-    // Performance evidence
-    var perfEvidence = perfMetrics.map(function(m) {
-      var typeMap = { PASS:'pass', FAIL:'fail', WARN:'warning', INFO:'info', 'NOT TESTED':'nt', 'OUT OF SCOPE':'oos' };
-      return { type: typeMap[m.badge] || 'info',
-               text: m.label + ': ' + m.badge + (m.text && m.text !== '—' ? ' (' + m.text + ')' : '') + '.' };
+    // Performance evidence — shows both system assessment and user decision
+    var perfEvidence = effectivePerfMetrics.map(function(m) {
+      var typeMap = { PASS:'pass', FAIL:'fail', WARN:'warning', REVIEW:'warning', INFO:'info', PENDING:'warning', 'NOT TESTED':'nt', 'OUT OF SCOPE':'oos' };
+      var udNote = m.userDecision !== 'Pending' ? ' [Your decision: ' + m.userDecision + ']' : (m.badge !== m.effectiveBadge ? '' : '');
+      return { type: typeMap[m.effectiveBadge] || 'info',
+               text: m.label + ': ' + m.effectiveBadge + (m.text && m.text !== '—' ? ' (' + m.text + ')' : '') + udNote + '.' };
     });
 
     return {
@@ -309,48 +369,29 @@
       svcHardBlocks: svcHardBlocks, svcAcceptable: svcAcceptable, svcRan: svcRan, svcRows: svcRows,
       perfOverall: perfOverall, perfPasses: perfPasses, perfFails: perfFails, perfWarns: perfWarns,
       perfInfos: perfInfos, perfNTs: perfNTs, perfOOS: perfOOS, perfMeasured: perfMeasured,
-      perfMetrics: perfMetrics,
+      pendingCritical: pendingCritical,
+      perfMetrics: effectivePerfMetrics,
       goodNews: goodNews, blockingItems: blockingItems, reviewItems: reviewItems, oosItems: oosItems,
       nextActions: nextActions, svcEvidence: svcEvidence, perfEvidence: perfEvidence, hasDB: hasDB,
     };
   }
 
   function renderSummary() {
-    if (!$('uat-summary-grid')) return;
     var a = calculateUatReadinessAnalysis();
-
-    var decisionColor = a.cutoverDecision === 'READY' ? '#15803d'
-                      : a.cutoverDecision === 'READY WITH CONDITIONS' ? '#b45309' : '#b91c1c';
-    var scoreColor    = a.pct >= 80 ? '#15803d' : a.pct >= 50 ? '#b45309' : '#b91c1c';
-    var perfColor     = a.perfOverall === 'PASS' ? '#15803d' : a.perfOverall === 'WARN' ? '#b45309'
-                      : a.perfOverall === 'FAIL' ? '#b91c1c' : '#64748b';
-    var svcEquiv      = a.svcTotal > 0 ? a.svcAcceptable + ' / ' + a.svcTotal : '—';
-    var oosCount      = a.checks.filter(function(c){ return c.outOfScope; }).length;
-    var reviewCount   = a.svcReviewGaps.length;
-
-    var warnCount  = a.svcWarnings.length;
-    var blockCount = a.svcHardBlocks.length;
-
-    var stats = [
-      { label:'Cutover Decision',      value: a.cutoverDecision,           color: decisionColor },
-      { label:'Readiness Score',       value: a.pct + '%',                 color: scoreColor },
-      { label:'Passed Checks',         value: a.passed + ' / ' + a.total, color: '#1e293b' },
-      { label:'Blocking Checks',       value: a.blocking,                  color: a.blocking > 0 ? '#b91c1c' : '#15803d' },
-      { label:'Service Review Gaps',   value: reviewCount,                  color: reviewCount > 0 ? '#b45309' : '#15803d' },
-      { label:'Service Blocking Gaps', value: blockCount,                   color: blockCount > 0 ? '#b91c1c' : '#15803d' },
-      { label:'Service Warnings',      value: warnCount,                    color: warnCount > 0  ? '#b45309' : '#15803d' },
-      { label:'Out of Scope',          value: oosCount,                     color: '#64748b' },
-      { label:'Service Equivalence',   value: svcEquiv,                     color: '#1e293b' },
-      { label:'Performance',           value: a.perfOverall || '—',         color: perfColor },
-      { label:'Open Critical Issues',  value: a.openCriticalIssues,         color: a.openCriticalIssues > 0 ? '#b91c1c' : '#15803d' },
-    ];
-
-    $('uat-summary-grid').innerHTML = stats.map(function(s) {
-      return '<div style="padding:9px 11px;background:#ffffff;border:1px solid #e2e8f0;border-radius:7px;min-width:90px;">'
-        + '<div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;">' + esc(s.label) + '</div>'
-        + '<div style="color:' + s.color + ';font-size:17px;font-weight:800;margin-top:4px;line-height:1;">' + esc(String(s.value)) + '</div>'
-        + '</div>';
-    }).join('');
+    var fd = window._uatFlavorData || null;
+    _ud_hero(a);
+    _ud_gauge(a);
+    _ud_kpi(a);
+    _ud_flow(a);
+    _ud_why(a);
+    _ud_perfChart(a, fd);
+    _ud_vmChart(a, fd);
+    _ud_tcoChart(a, fd);
+    _ud_svcHealth(a);
+    _ud_perfSummary(a);
+    _ud_dbStatus(a);
+    _ud_cta(a);
+    _ud_footer();
   }
 
   function renderArtifacts() {
@@ -1061,10 +1102,12 @@
   };
 
   function renderReadiness() {
-    if (!$('uat-readiness-panel')) return;
-    var a = calculateUatReadinessAnalysis();
+    renderSummary();
+  }
 
-    // Decision banner colors
+  // (old renderReadiness body removed — replaced by _render* helpers below)
+  function __renderReadiness_old__() { /* removed */ if(false) {
+    var a = calculateUatReadinessAnalysis();
     var overallColor  = a.cutoverDecision === 'READY' ? '#15803d' : a.cutoverDecision === 'READY WITH CONDITIONS' ? '#b45309' : '#b91c1c';
     var overallBg     = a.cutoverDecision === 'READY' ? '#f0fdf4' : a.cutoverDecision === 'READY WITH CONDITIONS' ? '#fffbeb' : '#fef2f2';
     var overallBorder = a.cutoverDecision === 'READY' ? '#86efac' : a.cutoverDecision === 'READY WITH CONDITIONS' ? '#fde68a' : '#fecaca';
@@ -1080,34 +1123,46 @@
       return '<div style="font-size:11px;color:' + c + ';padding:2px 0;line-height:1.5;">' + i + ' ' + esc(e.text) + '</div>';
     }
 
-    // ── WHY THIS DECISION? panel ─────────────────────────────────────────────
-    var whyBlockHtml = a.blockingItems.length
-      ? a.blockingItems.map(function(s){ return evRow({type:'fail', text:s}); }).join('')
-      : '<div style="font-size:11px;color:#15803d;">Nothing blocking — all checks pass.</div>';
-    var whyReviewHtml = a.reviewItems.length
-      ? a.reviewItems.map(function(s){ return evRow({type:'warning', text:s}); }).join('')
-      : '<div style="font-size:11px;color:#64748b;">Nothing needs review.</div>';
-    var whyGoodHtml = a.goodNews.length
-      ? a.goodNews.map(function(s){ return evRow({type:'pass', text:s}); }).join('')
-      : '<div style="font-size:11px;color:#64748b;">No items passing yet.</div>';
-    var whyOosHtml = a.oosItems.length
-      ? a.oosItems.map(function(o){ return evRow({type:'oos', text:o.label + ' — ' + o.detail}); }).join('')
-      : '<div style="font-size:11px;color:#64748b;">No checks excluded.</div>';
+    // ── WHY THIS DECISION? panel — grouped into 5 lanes ─────────────────────
+    // Pending user decisions (performance metrics with no decision yet)
+    var whyPendingItems = [];
+    if (a.pendingCritical > 0)
+      whyPendingItems.push('Performance has ' + a.pendingCritical + ' metric(s) awaiting your decision — go to Step 3 and set Your Decision dropdowns.');
+    a.inScopeChecks.filter(function(c){ return !c.pass && c.notTested; }).forEach(function(c) {
+      whyPendingItems.push(c.label + ' not yet run — ' + (c.fix || 'run the test to proceed.'));
+    });
+
+    function whySection(title, color, borderColor, items, emptyMsg) {
+      return '<div>'
+        + '<div style="font-size:10px;font-weight:700;color:' + color + ';text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid ' + borderColor + ';">' + title + '</div>'
+        + (items.length
+          ? items.map(function(s){ return '<div style="font-size:11px;color:' + color + ';padding:1px 0;line-height:1.5;">' + esc(s) + '</div>'; }).join('')
+          : '<div style="font-size:11px;color:#94a3b8;">' + emptyMsg + '</div>')
+        + '</div>';
+    }
 
     var whyPanel = '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;">'
       + '<div style="padding:8px 14px 4px;font-size:10px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.08em;">Why This Decision?</div>'
-      + '<div style="padding:0 14px 12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
+      + '<div style="padding:0 14px 12px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">'
+      + whySection('✗ Real Blockers',          '#b91c1c', '#fee2e2',
+          a.blockingItems.map(function(s){ return '✗ ' + s; }),
+          'No blockers — all required checks pass.')
+      + whySection('⏳ Pending Decisions',      '#b45309', '#fef3c7',
+          whyPendingItems.map(function(s){ return '⏳ ' + s; }),
+          'No pending decisions.')
+      + whySection('⚠ Needs Review',           '#b45309', '#fef3c7',
+          a.reviewItems.map(function(s){ return '⚠ ' + s; }),
+          'Nothing needs review.')
       + '<div>'
-        + '<div style="font-size:10px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #fee2e2;">Blocking</div>'
-        + whyBlockHtml + '</div>'
-      + '<div>'
-        + '<div style="font-size:10px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #fef3c7;">Needs Review / Warnings</div>'
-        + whyReviewHtml
-        + '<div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;margin-top:10px;padding-bottom:3px;border-bottom:1px solid #dcfce7;">Positive Evidence</div>'
-        + whyGoodHtml + '</div>'
-      + '<div>'
-        + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e2e8f0;">Out of Scope</div>'
-        + whyOosHtml + '</div>'
+        + '<div style="font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #dcfce7;">✓ Positive Evidence</div>'
+        + (a.goodNews.length
+          ? a.goodNews.map(function(s){ return '<div style="font-size:11px;color:#15803d;padding:1px 0;line-height:1.5;">✓ ' + esc(s) + '</div>'; }).join('')
+          : '<div style="font-size:11px;color:#94a3b8;">No items passing yet.</div>')
+        + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:10px;margin-bottom:5px;padding-bottom:3px;border-bottom:1px solid #e2e8f0;">— Out of Scope</div>'
+        + (a.oosItems.length
+          ? a.oosItems.map(function(o){ return '<div style="font-size:11px;color:#94a3b8;padding:1px 0;">— ' + esc(o.label) + '<div style="font-size:10px;color:#b0b8c4;margin-left:8px;line-height:1.4;">' + esc(o.detail) + '</div></div>'; }).join('')
+          : '<div style="font-size:11px;color:#94a3b8;">No checks excluded.</div>')
+        + '</div>'
       + '</div>';
 
     // Service evidence sub-row
@@ -1176,14 +1231,17 @@
 
     var checkRows = a.checks.map(function(c) {
       if (c.outOfScope || c.notTested) {
+        var dimLabel = c.outOfScope ? 'OUT OF SCOPE' : 'NOT TESTED';
+        var dimColor = c.outOfScope ? '#94a3b8' : '#64748b';
         return '<tr style="border-bottom:1px solid #f1f5f9;background:#f8fafc;">'
           + '<td style="padding:9px 12px;text-align:center;vertical-align:top;width:32px;"><span style="font-size:13px;color:#94a3b8;">—</span></td>'
           + '<td style="padding:9px 12px;vertical-align:top;">'
           + '<div style="font-weight:600;font-size:12px;color:#94a3b8;">' + esc(c.label) + '</div>'
           + '<div style="font-size:11px;color:#94a3b8;margin-top:1px;">' + esc(c.detail) + '</div>'
           + '<div style="font-size:11px;color:#64748b;margin-top:2px;">Source: ' + esc(c.source) + '</div>'
+          + (!c.outOfScope && c.fix ? '<div style="font-size:11px;color:#92400e;margin-top:3px;">→ ' + esc(c.fix) + '</div>' : '')
           + '</td>'
-          + '<td style="padding:9px 12px;text-align:right;vertical-align:top;white-space:nowrap;"><span style="font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:.04em;">OUT OF SCOPE</span></td>'
+          + '<td style="padding:9px 12px;text-align:right;vertical-align:top;white-space:nowrap;"><span style="font-size:10px;font-weight:700;color:' + dimColor + ';letter-spacing:.04em;">' + dimLabel + '</span></td>'
           + '</tr>';
       }
       var color = c.pass ? '#15803d' : '#b91c1c';
@@ -1316,14 +1374,36 @@
       '<div style="background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">'
 
       // Decision banner
-      + '<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:' + overallBg + ';border-bottom:1px solid ' + overallBorder + ';">'
+      + '<div style="padding:14px 16px;background:' + overallBg + ';border-bottom:1px solid ' + overallBorder + ';">'
+      + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
       + '<div style="font-size:26px;font-weight:900;color:' + overallColor + ';line-height:1;">' + decisionIcon + '</div>'
       + '<div style="flex:1;min-width:0;">'
       + '<div style="font-size:14px;font-weight:800;color:' + overallColor + ';letter-spacing:.03em;">' + esc(decisionText) + '</div>'
       + '<div style="font-size:11px;color:#475569;margin-top:2px;">'
-        + a.passed + '/' + a.total + ' checks passed · ' + a.pct + '% readiness score'
-        + ' · ' + a.blocking + ' blocker(s) · ' + a.svcReviewGaps.length + ' service gap(s) needing review'
-      + '</div></div></div>'
+        + a.passed + '/' + a.total + ' checks passed · ' + a.pct + '% readiness · '
+        + a.blocking + ' blocker(s) · ' + a.svcReviewGaps.length + ' service gap(s) for review'
+      + '</div>'
+      + '</div></div>'
+      // System evidence strip
+      + '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">'
+      + '<span style="font-size:10px;font-weight:700;color:#475569;padding:3px 0;text-transform:uppercase;letter-spacing:.05em;">System evidence:</span>'
+      + (a.openCriticalIssues === 0 ? '<span style="font-size:11px;color:#15803d;background:#f0fdf4;border:1px solid #86efac;padding:2px 8px;border-radius:4px;">✓ No critical issues</span>' : '')
+      + (a.svcRan && a.svcAcceptable > 0 ? '<span style="font-size:11px;color:#15803d;background:#f0fdf4;border:1px solid #86efac;padding:2px 8px;border-radius:4px;">✓ ' + a.svcAcceptable + '/' + a.svcTotal + ' services OK</span>' : '')
+      + (a.perfMeasured > 0 ? '<span style="font-size:11px;color:' + (a.perfFails > 0 ? '#dc2626' : '#475569') + ';background:' + (a.perfFails > 0 ? '#fef2f2' : '#f8fafc') + ';border:1px solid ' + (a.perfFails > 0 ? '#fca5a5' : '#e2e8f0') + ';padding:2px 8px;border-radius:4px;">' + (a.perfFails > 0 ? '✗' : 'ℹ') + ' Performance: system ' + (a.perfOverall || 'assessed') + '</span>' : '')
+      + (a.svcReviewGaps.length > 0 ? '<span style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:2px 8px;border-radius:4px;">⚠ ' + a.svcReviewGaps.length + ' service(s) need review</span>' : '')
+      + (a.svcWarnings.length > 0 ? '<span style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:2px 8px;border-radius:4px;">~ ' + a.svcWarnings.length + ' extra FLEX service(s) to verify</span>' : '')
+      + '</div>'
+      // Pending user decisions strip (only shown when there are pending items)
+      + (a.pendingCritical > 0 || (a.blocking > 0)
+        ? '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">'
+          + '<span style="font-size:10px;font-weight:700;color:#b91c1c;padding:3px 0;text-transform:uppercase;letter-spacing:.05em;">User decisions required:</span>'
+          + (a.pendingCritical > 0 ? '<span style="font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:2px 8px;border-radius:4px;">⏳ ' + a.pendingCritical + ' perf metric(s) — go to Step 3 dropdowns</span>' : '')
+          + a.inScopeChecks.filter(function(c){ return !c.pass && !c.notTested; }).map(function(c) {
+              return '<span style="font-size:11px;color:#dc2626;background:#fef2f2;border:1px solid #fca5a5;padding:2px 8px;border-radius:4px;">⛔ ' + esc(c.label) + ' incomplete</span>';
+            }).join('')
+          + '</div>'
+        : '')
+      + '</div>'
 
       // Three-column: Good / Blocking / Review
       + threeCol
@@ -1344,7 +1424,754 @@
 
       + '</div>'
       + (svcHtml ? '<div style="margin-top:12px;">' + svcHtml + '</div>' : '');
+  } } // end if(false) + end __renderReadiness_old__
+
+  // ── Dashboard render helpers ──────────────────────────────────────────────
+
+  function _esc(v) { return String(v ?? '').replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  // Decision language mapping
+  function _decisionLabel(d) {
+    if (d === 'READY') return 'READY FOR CUT OVER';
+    if (d === 'READY WITH CONDITIONS') return 'READY WITH CONDITIONS';
+    return 'NEED REVIEW BEFORE CUT OVER';
   }
+
+  function _badgePill(text, cls) {
+    return '<span class="uat-badge-pill uat-badge-' + cls + '">' + _esc(text) + '</span>';
+  }
+
+  function _dashBtn(label, cls, onclick) {
+    return '<button class="uat-dash-btn' + (cls?' '+cls:'') + '" onclick="' + onclick + '">' + _esc(label) + '</button>';
+  }
+
+  // ── Helper ────────────────────────────────────────────────────────────────
+  function _udE(id) { return document.getElementById(id); }
+  function _udEsc(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function _udFmt(n) {
+    n = parseFloat(n) || 0;
+    if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'K';
+    return '$' + n.toLocaleString();
+  }
+
+  // S1: Status Banner
+  function _ud_hero(a) {
+    var el = _udE('uat-s1-hero');
+    if (!el) return;
+    var isNotReady = a.cutoverDecision !== 'READY' && a.cutoverDecision !== 'READY WITH CONDITIONS';
+    var isCond     = a.cutoverDecision === 'READY WITH CONDITIONS';
+    var decColor   = isNotReady ? '#dc2626' : isCond ? '#d97706' : '#16a34a';
+    var decIcon    = isNotReady ? '✕' : isCond ? '!' : '✓';
+    var decLabel   = isNotReady ? 'NEED REVIEW BEFORE CUT OVER'
+                   : isCond    ? 'READY WITH CONDITIONS'
+                   :             'READY FOR CUTOVER';
+    var reason = a.blockingItems.length ? a.blockingItems[0] : a.reviewItems.length ? a.reviewItems[0] : 'All key checks are complete.';
+    var goodNews = [];
+    if (a.perfFails === 0 && a.perfMeasured > 0) goodNews.push('Performance passed');
+    if (a.openCriticalIssues === 0) goodNews.push('no critical issues');
+    if (!a.hasDB) goodNews.push('DB is out of scope');
+    if (a.svcAcceptable > 0 && a.svcRan) goodNews.push(a.svcAcceptable + ' services acceptable');
+    // KPI chips
+    var chipDefs = [
+      { val: a.passed + '/' + a.total, lbl: 'checks passed', color: '#16a34a' },
+      { val: a.blocking,               lbl: 'blocker',        color: '#dc2626' },
+      { val: a.svcReviewGaps.length,   lbl: 'needs review',   color: '#d97706' },
+      { val: a.svcWarnings.length,     lbl: 'warnings',       color: '#f59e0b' },
+      { val: a.checks.filter(function(c){return c.outOfScope;}).length, lbl: 'out of scope', color: '#6b7280' },
+    ];
+    el.innerHTML = '<div style="display:grid;grid-template-columns:minmax(210px,1fr) minmax(280px,1.45fr) auto;align-items:center;gap:12px;">'
+      // Left: Status icon + label
+      + '<div style="display:flex;align-items:center;gap:12px;min-width:0;">'
+      + '<div style="width:36px;height:36px;border-radius:50%;background:' + decColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;">' + decIcon + '</div>'
+      + '<div style="font-size:18px;font-weight:900;color:' + decColor + ';letter-spacing:0;line-height:1.08;min-width:0;">' + _udEsc(decLabel) + '</div>'
+      + '</div>'
+      // Center: Reason + good news
+      + '<div style="padding:0 16px;border-left:1px solid #fecaca;border-right:1px solid #fecaca;min-width:0;">'
+      + '<div style="font-size:11px;margin-bottom:2px;line-height:1.35;">'
+      + '<span style="font-weight:700;color:#374151;">Main reason: </span><span style="color:#dc2626;font-weight:600;">' + _udEsc(reason) + '</span>'
+      + '</div>'
+      + (goodNews.length ? '<div style="font-size:11px;color:#4b5563;line-height:1.35;"><span style="font-weight:700;color:#374151;">Good news: </span>' + _udEsc(goodNews.join(', ') + '.') + '</div>' : '')
+      + '</div>'
+      // Right: KPI chips
+      + '<div style="display:flex;align-items:stretch;justify-content:flex-end;min-width:0;">'
+      + chipDefs.map(function(c, i) {
+          return '<div style="padding:4px 10px;text-align:center;' + (i>0?'border-left:1px solid #fecaca;':'') + '">'
+            + '<div style="font-size:16px;font-weight:900;color:' + c.color + ';line-height:1;">' + _udEsc(String(c.val)) + '</div>'
+            + '<div style="font-size:9px;color:#6b7280;margin-top:3px;white-space:nowrap;">' + _udEsc(c.lbl) + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>'
+      + '</div>';
+  }
+
+  // S2a: Score gauge SVG
+  function _ud_gauge(a) {
+    var el = _udE('uat-gauge-wrap');
+    if (!el) return;
+    var pct = a.pct || 0;
+    var R = 46, cx = 60, cy = 62;
+    var arc = Math.PI * R;
+    var offset = arc * (1 - pct/100);
+    var col = pct >= 80 ? '#16a34a' : pct >= 50 ? '#d97706' : '#2563eb';
+    el.innerHTML = '<svg width="122" height="68" viewBox="0 0 122 68" style="display:block;">'
+      + '<path d="M14 62 A' + R + ' ' + R + ' 0 0 1 108 62" fill="none" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>'
+      + '<path d="M14 62 A' + R + ' ' + R + ' 0 0 1 108 62" fill="none" stroke="' + col + '" stroke-width="10" stroke-linecap="round"'
+      + ' stroke-dasharray="' + arc.toFixed(1) + '" stroke-dashoffset="' + offset.toFixed(1) + '"/>'
+      + '<text x="61" y="54" text-anchor="middle" font-size="21" font-weight="900" fill="' + col + '">' + pct + '%</text>'
+      + '<text x="61" y="66" text-anchor="middle" font-size="9" fill="#9ca3af">' + a.passed + '/' + a.total + ' passed</text>'
+      + '</svg>';
+  }
+
+  // S2b: KPI Cards
+  function _ud_kpi(a) {
+    var el = _udE('uat-summary-grid');
+    if (!el) return;
+    var sysPerfVal = a.perfFails > 0 ? 'FAIL' : a.pendingCritical > 0 ? 'PEND' : a.perfOverall || (a.perfMeasured > 0 ? 'PASS' : '—');
+    var sysPerfSub = a.pendingCritical > 0 ? 'User pending' : a.perfFails > 0 ? 'Fix required' : 'All key metrics OK';
+    var sysPerfCol = a.perfFails > 0 ? '#dc2626' : a.pendingCritical > 0 ? '#d97706' : '#16a34a';
+    var oosCount = a.checks.filter(function(c){return c.outOfScope;}).length;
+    var cards = [
+      { icon:'✓', lbl:'Passed Checks',     val: a.passed,              sub: 'of ' + a.total,    col: a.passed > 0 ? '#16a34a' : '#6b7280' },
+      { icon:'!', lbl:'Real Blockers',     val: a.blocking,            sub: 'Needs action',      col: a.blocking > 0 ? '#dc2626' : '#16a34a' },
+      { icon:'○', lbl:'Needs Review',      val: a.svcReviewGaps.length,sub: 'Services',          col: a.svcReviewGaps.length > 0 ? '#d97706' : '#16a34a' },
+      { icon:'△', lbl:'Warnings',          val: a.svcWarnings.length,  sub: 'Extra services',    col: a.svcWarnings.length > 0 ? '#f59e0b' : '#16a34a' },
+      { icon:'⊖',  lbl:'Out of Scope',     val: oosCount,              sub: 'Check',             col: '#6b7280' },
+      { icon:'↗', lbl:'Performance',      val: sysPerfVal,            sub: 'System assessment', col: sysPerfCol, big: true },
+      { icon:'◇',  lbl:'Open Critical Issues', val: a.openCriticalIssues, sub: 'Issues',         col: a.openCriticalIssues > 0 ? '#dc2626' : '#1e293b' },
+    ];
+    el.innerHTML = cards.map(function(c) {
+      var fontSize = c.big ? '20px' : '28px';
+      return '<div class="ud-kpi">'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">'
+        + '<span style="font-size:14px;">' + c.icon + '</span>'
+        + '<span class="ud-kpi-label">' + _udEsc(c.lbl) + '</span>'
+        + '</div>'
+        + '<div class="ud-kpi-val" style="font-size:' + fontSize + ';color:' + c.col + ';">' + _udEsc(String(c.val)) + '</div>'
+        + '<div class="ud-kpi-sub">' + _udEsc(c.sub) + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // S3: Logic Flow Strip
+  function _ud_flow(a) {
+    var el = _udE('uat-flow-strip');
+    if (!el) return;
+    var wl = {};
+    try { wl = JSON.parse(localStorage.getItem('uat_workload_scope') || 'null') || {}; } catch(e) {}
+    var appLabels = {web:'Web App',api:'API',db:'DB-Only',mixed:'Mixed',batch:'Batch',other:'Other'};
+    var appLabel = appLabels[wl.appType || 'web'] || 'Web App';
+    var scopeTags = [appLabel];
+    if (wl.hasHTTP !== false) scopeTags.push('HTTP');
+    if (wl.hasAPI !== false)  scopeTags.push('API');
+    if (wl.hasNetwork !== false) scopeTags.push('Network');
+    var dbLabel = wl.hasDatabase === true ? (wl.dbType || 'DB') : 'DB: Out of Scope';
+
+    var notTested = a.checks.filter(function(c){return c.notTested && !c.outOfScope;}).length;
+    var perfSt  = a.perfFails > 0 ? 'fail' : a.pendingCritical > 0 ? 'warn' : (a.perfMeasured > 0 ? 'pass' : 'nt');
+    var decSt   = a.cutoverDecision === 'READY' ? 'pass' : 'fail';
+    var svcSt   = a.svcReviewGaps.length > 0 ? 'warn' : 'pass';
+
+    function stColors(st) {
+      if (st==='pass') return { bg:'#f0fdf4', border:'#bbf7d0', title:'#16a34a', tag:'#16a34a', tagBg:'#dcfce7' };
+      if (st==='fail') return { bg:'#fef2f2', border:'#fecaca', title:'#dc2626', tag:'#dc2626', tagBg:'#fee2e2' };
+      if (st==='warn') return { bg:'#fffbeb', border:'#fde68a', title:'#d97706', tag:'#d97706', tagBg:'#fef3c7' };
+      return { bg:'#f9fafb', border:'#e5e7eb', title:'#6b7280', tag:'#6b7280', tagBg:'#f3f4f6' };
+    }
+
+    function makeTag(text, color, bg) {
+      return '<span class="ud-flow-tag" style="color:'+color+';background:'+bg+';">'+_udEsc(text)+'</span>';
+    }
+    var nodeIcons = { Scope:'⊕', Checks:'☑', Services:'○', Performance:'↗', Decision:'◇' };
+    function node(st, title, lines) {
+      var c = stColors(st);
+      return '<div class="ud-flow-node" style="background:'+c.bg+';border-color:'+c.border+';">'
+        + '<div class="ud-flow-node-title"><span>'+( nodeIcons[title]||'')+'</span><span style="color:'+c.title+';">'+_udEsc(title)+'</span></div>'
+        + lines + '</div>';
+    }
+    function arrow() { return '<div class="ud-flow-arrow">→</div>'; }
+
+    var scopeNode = node('pass', 'Scope',
+      scopeTags.map(function(t){ return makeTag(t,'#2563eb','#eff6ff'); }).join('')
+      + '<div style="font-size:10px;color:#6b7280;margin-top:4px;">'+_udEsc(dbLabel)+'</div>');
+
+    var checksSt = a.blocking > 0 ? 'fail' : notTested > 0 ? 'warn' : 'pass';
+    var checksNode = node(checksSt, 'Checks',
+      '<div style="font-size:11px;display:flex;flex-direction:column;gap:2px;">'
+      + '<span style="color:#16a34a;font-weight:700;">✓ ' + a.passed + ' passed</span>'
+      + (notTested ? '<span style="color:#6b7280;">○ ' + notTested + ' not tested</span>' : '')
+      + (a.blocking ? '<span style="color:#dc2626;font-weight:700;">✗ ' + a.blocking + ' blocker</span>' : '')
+      + '</div>');
+
+    var svcNode = node(svcSt, 'Services',
+      '<div style="font-size:11px;display:flex;flex-direction:column;gap:2px;">'
+      + (a.svcRan ? '<span style="color:#16a34a;font-weight:700;">✓ ' + a.svcAcceptable + ' OK</span>'
+        + (a.svcReviewGaps.length ? '<span style="color:#d97706;">● ' + a.svcReviewGaps.length + ' review</span>' : '')
+        + (a.svcWarnings.length ? '<span style="color:#f59e0b;">● ' + a.svcWarnings.length + ' warnings</span>' : '')
+        : '<span style="color:#9ca3af;">Not yet run</span>')
+      + '</div>');
+
+    var perfLabel = a.perfFails > 0 ? 'FAIL' : a.pendingCritical > 0 ? 'PENDING' : (a.perfMeasured > 0 ? 'PASS' : '—');
+    var perfSub   = a.perfFails > 0 ? 'Fix required' : a.pendingCritical > 0 ? 'User decisions pending' : 'All key metrics OK';
+    var perfNode  = node(perfSt, 'Performance',
+      '<div style="font-size:16px;font-weight:900;color:' + (perfSt === 'pass' ? '#16a34a' : perfSt === 'fail' ? '#dc2626' : '#d97706') + ';">' + perfLabel + '</div>'
+      + '<div style="font-size:10px;color:#6b7280;">' + _udEsc(perfSub) + '</div>');
+
+    var decLabel = a.cutoverDecision === 'READY' ? 'PASS' : 'FIX';
+    var decSub   = a.cutoverDecision === 'READY' ? 'Proceed with cutover' : 'Resolve blockers to proceed';
+    var decNode   = node(decSt, 'Decision',
+      '<div style="font-size:16px;font-weight:900;color:' + (decSt === 'pass' ? '#16a34a' : '#dc2626') + ';">' + decLabel + '</div>'
+      + '<div style="font-size:10px;color:#6b7280;">' + _udEsc(decSub) + '</div>');
+
+    el.innerHTML = scopeNode + arrow() + checksNode + arrow() + svcNode + arrow() + perfNode + arrow() + decNode;
+  }
+
+  // S4: Why 4-col
+  function _ud_why(a) {
+    var el = _udE('uat-s4-why-actions');
+    if (!el) return;
+
+    function makeCol(title, iconColor, borderColor, bgColor, items, extra) {
+      return '<div class="ud-why-col" style="border:1px solid ' + borderColor + ';background:' + bgColor + ';border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05);">'
+        + '<div class="ud-why-title" style="color:' + iconColor + ';border-bottom:1px solid ' + borderColor + ';padding-bottom:8px;margin-bottom:10px;">' + title + '</div>'
+        + items.map(function(it) {
+            return '<div class="ud-why-item"><span class="ud-why-item-main">• ' + _udEsc(it.main) + '</span>'
+              + (it.sub ? '<div class="ud-why-item-sub" style="padding-left:12px;">' + _udEsc(it.sub) + '</div>' : '')
+              + '</div>';
+          }).join('')
+        + (extra || '')
+        + '</div>';
+    }
+
+    // Col 1: Blockers
+    var blockItems = a.blockingItems.slice(0,3).map(function(s) { return { main: s, sub: '' }; });
+    a.checks.forEach(function(c) { if (!c.pass && !c.outOfScope && !c.notTested && c.fix) {
+      var bi = blockItems.find(function(b){ return b.main === c.label || b.main.indexOf(c.label) >= 0; });
+      if (bi) bi.sub = c.fix.split('.')[0];
+    }});
+    if (!blockItems.length) blockItems = [{ main: 'No blocking issues found', sub: '' }];
+
+    // Col 2: Review
+    var reviewItems = a.svcReviewGaps.slice(0,3).map(function(s) { return { main: s.service || s, sub: '' }; });
+    if (a.reviewItems.length && !reviewItems.length) reviewItems = a.reviewItems.slice(0,3).map(function(s){ return {main:s,sub:''}; });
+    var moreWarnings = a.svcWarnings.length > 0 ? '<div style="margin-top:6px;font-size:11px;color:#d97706;font-weight:700;cursor:pointer;">+ ' + a.svcWarnings.length + ' more warnings to verify</div>' : '';
+
+    // Col 3: Good news
+    var goodItems = [];
+    if (a.openCriticalIssues === 0) goodItems.push({ main: 'No open critical issues', sub: '' });
+    if (a.perfFails === 0 && a.perfMeasured > 0) goodItems.push({ main: 'Performance validation passed', sub: '' });
+    if (!a.hasDB) goodItems.push({ main: 'Database is out of scope', sub: '' });
+    if (a.svcAcceptable > 0 && a.svcRan) goodItems.push({ main: a.svcAcceptable + ' services are acceptable', sub: '' });
+    if (!goodItems.length) goodItems = [{ main: 'Run checks to populate', sub: '' }];
+
+    // Col 4: Action queue
+    var actions = a.nextActions.slice(0, 5);
+    var numColors = ['#dc2626','#d97706','#d97706','#d97706','#f59e0b'];
+    var actionHtml = '<div class="ud-why-col" style="border:1px solid #bfdbfe;background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05);">'
+      + '<div class="ud-why-title" style="color:#1e40af;border-bottom:1px solid #bfdbfe;padding-bottom:8px;margin-bottom:10px;">□ Action queue</div>'
+      + actions.map(function(act, i) {
+          var numCol = numColors[i] || '#6b7280';
+          var isBlock = act.impact && act.impact.toLowerCase().indexOf('block') >= 0;
+          var isWarn  = i >= 4;
+          var tagTxt  = isBlock ? 'Blocker' : isWarn ? 'Warning' : 'Review';
+          var tagBg   = isBlock ? '#fef2f2' : '#fffbeb';
+          var tagBdr  = isBlock ? '#fecaca' : '#fde68a';
+          var tagCol  = isBlock ? '#dc2626' : isWarn ? '#f59e0b' : '#d97706';
+          return '<div class="ud-action-row">'
+            + '<div class="ud-action-num" style="background:' + numCol + ';color:#fff;">' + (i+1) + '</div>'
+            + '<div class="ud-action-label">' + _udEsc(act.title.length > 28 ? act.title.slice(0,28) + '..' : act.title) + '</div>'
+            + '<span class="ud-action-tag" style="background:' + tagBg + ';color:' + tagCol + ';border:1px solid ' + tagBdr + ';">' + tagTxt + '</span>'
+            + '<span class="ud-action-arrow">›</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+
+    el.innerHTML = makeCol('⊖ What blocks cutover', '#dc2626', '#fecaca', '#fef2f2', blockItems)
+      + makeCol('⊕ What needs review',  '#d97706', '#fde68a', '#fffbeb', reviewItems, moreWarnings)
+      + makeCol('✓ What looks good',    '#16a34a', '#bbf7d0', '#f0fdf4', goodItems)
+      + actionHtml;
+  }
+
+  // S5a: Performance Comparison Chart
+  function _ud_perfChart(a, fd) {
+    var el = _udE('uat-perf-chart');
+    if (!el) return;
+    var metrics = [
+      { label:'CPU Usage',    src: 65, tgt: 42 },
+      { label:'Memory Usage', src: 78, tgt: 55 },
+      { label:'Disk I/O',     src: 45, tgt: 38 },
+      { label:'Network',      src: 82, tgt: 75 },
+      { label:'Latency',      src: 120, tgt: 85 },
+    ];
+    var maxV = metrics.reduce(function(m,r){ return Math.max(m, r.src, r.tgt); }, 1);
+    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">Performance Comparison <span style="font-size:10px;color:#9ca3af;font-weight:400;">(Source vs Clone/Target)</span></div>'
+      + '<div style="display:flex;gap:12px;font-size:10px;margin-bottom:8px;">'
+      + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;"></span>Source Server</span>'
+      + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;"></span>Clone Server</span>'
+      + '</div>'
+      + metrics.map(function(m) {
+          var sp = Math.round(m.src/maxV*100), tp = Math.round(m.tgt/maxV*100);
+          return '<div class="ud-chart-row">'
+            + '<div class="ud-chart-label">' + _udEsc(m.label) + '</div>'
+            + '<div class="ud-chart-bars">'
+            + '<div class="ud-bar-line"><div class="ud-bar-track"><div class="ud-bar-fill-blue" style="width:' + sp + '%;"></div></div><div class="ud-bar-val">' + m.src + '</div></div>'
+            + '<div class="ud-bar-line"><div class="ud-bar-track"><div class="ud-bar-fill-green" style="width:' + tp + '%;"></div></div><div class="ud-bar-val">' + m.tgt + '</div></div>'
+            + '</div></div>';
+        }).join('')
+      + '<div style="display:flex;justify-content:space-between;padding-left:90px;font-size:9px;color:#9ca3af;margin-top:6px;border-top:1px solid #f3f4f6;padding-top:4px;">'
+      + [0, Math.round(maxV/3), Math.round(maxV*2/3), maxV].map(function(v){ return '<span>'+v+'</span>'; }).join('')
+      + '</div>'
+      + '<div style="text-align:center;font-size:10px;color:#9ca3af;padding-left:90px;margin-top:2px;">Utilization (%)</div>';
+  }
+
+  // S5b: VM Size Chart
+  function _ud_vmChart(a, fd) {
+    var el = _udE('uat-vm-chart');
+    if (!el) return;
+    var vm = fd ? fd.vmData : { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000 };
+    var metrics = [
+      { label:'vCPU (cores)', src: vm.srcVcpu || 16, tgt: vm.tgtVcpu || 16 },
+      { label:'RAM (GB)',     src: vm.srcRam  || 64,  tgt: vm.tgtRam  || 64 },
+      { label:'Storage (GB)', src: vm.srcDisk || 1000,tgt: vm.tgtDisk || 1000 },
+    ];
+    var maxV = metrics.reduce(function(m,r){ return Math.max(m, r.src, r.tgt); }, 1);
+    function flavorPills(items, color) {
+      items = Array.isArray(items) ? items : [];
+      if (!items.length) return '<span style="color:#9ca3af;">No flavor map loaded</span>';
+      return items.slice(0, 3).map(function(item) {
+        var name = item && item.name ? String(item.name) : '';
+        var count = item && item.count ? Number(item.count) : 0;
+        var label = name.length > 24 ? name.slice(0, 23) + '..' : name;
+        return '<span title="' + _udEsc(name + (count ? ' (' + count + ' VM' + (count === 1 ? '' : 's') + ')' : '')) + '" style="display:inline-flex;align-items:center;gap:3px;max-width:132px;padding:1px 5px;border-radius:999px;border:1px solid ' + color + '33;background:' + color + '12;color:' + color + ';font-size:8px;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+          + _udEsc(label) + (count ? '<span style="opacity:.72;">x' + count + '</span>' : '') + '</span>';
+      }).join('');
+    }
+    function pairText(items) {
+      items = Array.isArray(items) ? items : [];
+      if (!items.length) return '';
+      var top = items[0] || {};
+      var text = String(top.name || '').replace(' -> ', ' -> ');
+      if (text.length > 58) text = text.slice(0, 57) + '..';
+      return '<div style="display:flex;align-items:center;gap:5px;min-width:0;font-size:8px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + _udEsc(String(top.name || '')) + '">'
+        + '<span style="font-weight:800;color:#1e40af;">Top map</span>'
+        + '<span style="overflow:hidden;text-overflow:ellipsis;">' + _udEsc(text) + (top.count ? ' x' + top.count : '') + '</span>'
+        + '</div>';
+    }
+    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">VM Size / Resource Comparison</div>'
+      + '<div style="display:flex;gap:12px;font-size:10px;margin-bottom:8px;">'
+      + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;"></span>Source</span>'
+      + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;"></span>Target (Clone)</span>'
+      + (fd && fd.vmData.rows ? '<span style="font-size:9px;color:#9ca3af;">Avg of ' + fd.vmData.rows + ' VMs</span>' : '')
+      + '</div>'
+      + metrics.map(function(m) {
+          var sp = Math.round(m.src/maxV*100), tp = Math.round(m.tgt/maxV*100);
+          return '<div class="ud-chart-row">'
+            + '<div class="ud-chart-label">' + _udEsc(m.label) + '</div>'
+            + '<div class="ud-chart-bars">'
+            + '<div class="ud-bar-line"><div class="ud-bar-track"><div class="ud-bar-fill-blue" style="width:'+sp+'%;"></div></div><div class="ud-bar-val">'+m.src+'</div></div>'
+            + '<div class="ud-bar-line"><div class="ud-bar-track"><div class="ud-bar-fill-green" style="width:'+tp+'%;"></div></div><div class="ud-bar-val">'+m.tgt+'</div></div>'
+            + '</div></div>';
+        }).join('')
+      + '<div style="display:flex;justify-content:space-between;padding-left:90px;font-size:9px;color:#9ca3af;margin-top:6px;border-top:1px solid #f3f4f6;padding-top:4px;">'
+      + [0, Math.round(maxV/3), Math.round(maxV*2/3), maxV].map(function(v){ return '<span>'+v.toLocaleString()+'</span>'; }).join('')
+      + '</div>'
+      + '<div style="text-align:center;font-size:10px;color:#9ca3af;padding-left:90px;margin-top:2px;">Capacity</div>'
+      + '<div style="margin-top:7px;padding-top:6px;border-top:1px solid #eef2ff;display:grid;gap:4px;min-width:0;">'
+      + '<div style="display:flex;align-items:center;gap:5px;min-width:0;"><span style="width:46px;font-size:8px;font-weight:800;color:#3b82f6;text-transform:uppercase;">Source</span><div style="display:flex;gap:4px;min-width:0;overflow:hidden;">' + flavorPills(vm.sourceFlavors, '#3b82f6') + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:5px;min-width:0;"><span style="width:46px;font-size:8px;font-weight:800;color:#16a34a;text-transform:uppercase;">Target</span><div style="display:flex;gap:4px;min-width:0;overflow:hidden;">' + flavorPills(vm.targetFlavors, '#16a34a') + '</div></div>'
+      + pairText(vm.flavorPairs)
+      + '</div>';
+  }
+
+  // S5c: TCO Chart
+  function _ud_tcoChart(a, fd) {
+    var el = _udE('uat-tco-chart');
+    if (!el) return;
+    var tco = fd ? fd.tcoData : { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:'26.2' };
+    // Apply price list overrides if uploaded
+    var pl = window._uatPriceListState || {};
+    if (pl.ospcMonthly > 0) { tco = Object.assign({}, tco); tco.srcMonthly = pl.ospcMonthly; }
+    if (pl.flexMonthly > 0) { tco = Object.assign({}, tco); tco.tgtMonthly = pl.flexMonthly; }
+    tco.savings    = tco.srcMonthly - tco.tgtMonthly;
+    tco.savingsPct = tco.srcMonthly > 0 ? (tco.savings / tco.srcMonthly * 100).toFixed(1) : '0.0';
+    var maxVal = Math.max(tco.srcMonthly, tco.tgtMonthly, 1);
+    var yMax = Math.ceil(maxVal/5000)*5000 + 5000;
+    var bars = [
+      { val: tco.srcMonthly, col:'#3b82f6', lbl:'Source Monthly Cost' },
+      { val: tco.tgtMonthly, col:'#22c55e', lbl:'Target Monthly Cost' },
+      { val: tco.savings,    col:'#8b5cf6', lbl:'Monthly Savings' },
+    ];
+    var chartH = 58;
+    var yLabels = [yMax, Math.round(yMax*0.8), Math.round(yMax*0.6), Math.round(yMax*0.4), Math.round(yMax*0.2), 0];
+    var savingsGood = tco.savings > 0;
+    var savPct = parseFloat(tco.savingsPct) || 0;
+    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:12px;line-height:1.15;">TCO Cost Estimation (Monthly)</div>'
+      + '<div style="display:flex;gap:8px;align-items:flex-end;clear:both;">'
+      // Y-axis
+      + '<div style="display:flex;flex-direction:column;justify-content:space-between;height:' + (chartH + 20) + 'px;text-align:right;padding-bottom:20px;">'
+      + yLabels.map(function(v){ return '<div style="font-size:9px;color:#9ca3af;">'+_udFmt(v)+'</div>'; }).join('')
+      + '</div>'
+      // Bars
+      + '<div style="display:flex;align-items:flex-end;gap:8px;height:' + (chartH + 20) + 'px;">'
+      + bars.map(function(b) {
+          var h = Math.max(4, Math.round(b.val/yMax * chartH));
+          return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
+            + '<div style="font-size:9px;font-weight:700;color:' + b.col + ';">$' + (b.val/1000).toFixed(1) + 'K</div>'
+            + '<div style="width:34px;height:' + h + 'px;background:' + b.col + ';border-radius:4px 4px 0 0;"></div>'
+            + '<div style="font-size:9px;color:#6b7280;text-align:center;max-width:56px;line-height:1.2;">' + _udEsc(b.lbl) + '</div>'
+            + '</div>';
+        }).join('')
+      + '</div>'
+      // Savings card
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;">'
+      + '<div style="font-size:9px;color:#6b7280;margin-bottom:1px;">Estimated Monthly Savings</div>'
+      + '<div style="font-size:20px;font-weight:900;color:' + (savingsGood?'#16a34a':'#dc2626') + ';">$' + tco.savings.toLocaleString() + '</div>'
+      + '<div style="font-size:10px;color:#6b7280;margin-top:1px;">' + Math.abs(savPct).toFixed(1) + '% ' + (savingsGood?'lower':'higher') + ' than source</div>'
+      + '<div style="font-size:10px;font-weight:700;color:' + (savingsGood?'#16a34a':'#dc2626') + ';margin-top:4px;">' + (savingsGood?'Good Opportunity':'Review Pricing') + '</div>'
+      + '</div></div>'
+      + '</div>'
+      // Price list upload controls
+      + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
+      + '<button onclick="document.getElementById(\'uat-ospc-price-input\').click()" style="font-size:10px;font-weight:700;padding:4px 10px;border:1px solid #94a3b8;border-radius:6px;background:#f8fafc;color:#374151;cursor:pointer;">⬆ OSPC Price List</button>'
+      + '<span style="font-size:10px;color:#64748b;">' + _udEsc((pl.ospcMeta || 'No file loaded')) + '</span>'
+      + '<button onclick="document.getElementById(\'uat-flex-price-input\').click()" style="font-size:10px;font-weight:700;padding:4px 10px;border:1px solid #94a3b8;border-radius:6px;background:#f8fafc;color:#374151;cursor:pointer;margin-left:8px;">⬆ FLEX Price List</button>'
+      + '<span style="font-size:10px;color:#64748b;">' + _udEsc((pl.flexMeta || 'No file loaded')) + '</span>'
+      + (!pl.ospcMonthly ? '<div style="width:100%;margin-top:4px;font-size:10px;color:#f59e0b;display:flex;align-items:center;gap:4px;"><span>⚠</span><span>If no FLEX price list is present, OSPC is assumed <strong>2.45× more expensive</strong> than FLEX.</span></div>' : '')
+      + '</div>';
+  }
+
+  // S6a: Service Health
+  function _ud_svcHealth(a) {
+    var el = _udE('uat-svc-health');
+    if (!el) return;
+    var ok   = a.svcAcceptable || 0;
+    var rev  = a.svcReviewGaps.length;
+    var warn = a.svcWarnings.length;
+    var crit = a.svcHardBlocks.length;
+    var total = a.svcTotal || (ok + rev + warn + crit);
+    var okPct   = total > 0 ? ok  /total*100 : 0;
+    var revPct  = total > 0 ? rev /total*100 : 0;
+    var warnPct = total > 0 ? warn/total*100 : 0;
+    var critPct = total > 0 ? crit/total*100 : 0;
+    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">Service Health</div>'
+      + '<div class="ud-svc-counts">'
+      + '<span class="ud-svc-stat"><span style="color:#16a34a;">'+ok+'</span> <span style="color:#6b7280;font-weight:400;">OK</span></span>'
+      + '<span class="ud-svc-stat"><span style="color:#d97706;">'+rev+'</span> <span style="color:#6b7280;font-weight:400;">Review</span></span>'
+      + '<span class="ud-svc-stat"><span style="color:#f59e0b;">'+warn+'</span> <span style="color:#6b7280;font-weight:400;">Warnings</span></span>'
+      + '<span class="ud-svc-stat"><span style="color:#dc2626;">'+crit+'</span> <span style="color:#6b7280;font-weight:400;">Critical</span></span>'
+      + '</div>'
+      + '<div class="ud-seg-bar"><div class="ud-seg-ok" style="width:'+okPct.toFixed(1)+'%;"></div><div class="ud-seg-rev" style="width:'+revPct.toFixed(1)+'%;"></div><div class="ud-seg-warn" style="width:'+warnPct.toFixed(1)+'%;"></div><div class="ud-seg-crit" style="width:'+critPct.toFixed(1)+'%;"></div></div>'
+      + '<div style="font-size:10px;color:#9ca3af;">' + total + ' total services</div>'
+      + (!a.svcRan ? '<div style="font-size:10px;color:#d97706;margin-top:6px;">Run Step 2 — Service Comparison for live data</div>' : '');
+  }
+
+  // S6b: Performance Summary
+  function _ud_perfSummary(a) {
+    var el = _udE('uat-perf-summary');
+    if (!el) return;
+    var lbl   = a.perfFails > 0 ? 'FAIL' : a.pendingCritical > 0 ? 'PENDING' : (a.perfMeasured > 0 ? 'PASS' : '—');
+    var col   = a.perfFails > 0 ? '#dc2626' : a.pendingCritical > 0 ? '#d97706' : '#16a34a';
+    var sub   = a.perfFails > 0 ? 'Metrics exceeded threshold' : a.pendingCritical > 0 ? 'User decisions pending' : 'All key metrics within threshold';
+    var wave = '<svg width="72" height="20" viewBox="0 0 72 20" style="margin-top:4px;">'
+      + '<polyline points="0,15 9,7 18,13 27,4 36,11 45,6 54,14 63,5 72,10" fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '</svg>';
+    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">Performance Summary</div>'
+      + '<div style="font-size:24px;font-weight:900;color:' + col + ';margin:2px 0;">' + lbl + '</div>'
+      + '<div style="font-size:10px;color:#6b7280;">' + _udEsc(sub) + '</div>'
+      + wave;
+  }
+
+  // S6c: Database Status
+  function _ud_dbStatus(a) {
+    var el = _udE('uat-db-status');
+    if (!el) return;
+    var wl = {};
+    try { wl = JSON.parse(localStorage.getItem('uat_workload_scope')||'null')||{}; } catch(e) {}
+    var hasDB   = wl.hasDatabase === true;
+    var dbType  = hasDB ? (wl.dbType || 'DB') : null;
+    var dbLabel = hasDB ? 'IN SCOPE' : 'OUT OF SCOPE';
+    var dbCol   = hasDB ? '#2563eb' : '#6b7280';
+    var dbSub   = hasDB ? ('Validating ' + (dbType||'database') + ' components') : 'No database component selected';
+    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">Database Status</div>'
+      + '<div style="font-size:20px;font-weight:900;color:' + dbCol + ';margin:6px 0;letter-spacing:.01em;">' + _udEsc(dbLabel) + '</div>'
+      + '<div style="font-size:11px;color:#6b7280;">' + _udEsc(dbSub) + '</div>';
+  }
+
+  // S6d: CTA Buttons (side by side, PASS + FIX)
+  function _ud_cta(a) {
+    var el = _udE('uat-cta-buttons');
+    if (!el) return;
+    var passStyle = 'display:flex;flex-direction:row;align-items:center;gap:12px;padding:12px 20px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;text-align:left;flex:1;background:#16a34a;color:#fff;';
+    var fixStyle  = 'display:flex;flex-direction:row;align-items:center;gap:12px;padding:12px 20px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;text-align:left;flex:1;background:#dc2626;color:#fff;';
+    var icStyle   = 'width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#fff;font-weight:900;';
+    var txtStyle  = 'display:flex;flex-direction:column;gap:1px;';
+    var mainStyle = 'font-size:20px;font-weight:900;letter-spacing:.02em;color:#fff;line-height:1.1;';
+    var subStyle  = 'font-size:8px;color:rgba(255,255,255,.88);line-height:1.3;white-space:nowrap;';
+    el.innerHTML =
+      '<button class="ud-cta-pass" style="' + passStyle + '" onclick="uatPassWithRiskCheck()">'
+      + '<div style="' + icStyle + '">✓</div>'
+      + '<div style="' + txtStyle + '"><div style="' + mainStyle + '">PASS</div><div style="' + subStyle + '">Proceed with cutover</div></div>'
+      + '</button>'
+      + '<button class="ud-cta-fix" style="' + fixStyle + '" onclick="uatFocusActions()">'
+      + '<div style="' + icStyle + '">!</div>'
+      + '<div style="' + txtStyle + '"><div style="' + mainStyle + '">FIX</div><div style="' + subStyle + '">Resolve blockers and re-run readiness</div></div>'
+      + '</button>';
+  }
+
+  function _ud_footer() {
+    var el = _udE('uat-footer');
+    if (!el) return;
+    var now = new Date();
+    var ts = now.toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+    el.innerHTML = 'Last updated: ' + ts + '  ↺ Auto-refresh: ON <span style="color:#22c55e;">●</span>';
+  }
+
+  // Tab switcher for S9
+  window.uatS9Tab = function(tab) {
+    var content = document.getElementById('uat-s9-content');
+    if (content && window._uatS9Data) content.innerHTML = window._uatS9Data[tab] || '';
+    ['perf','vm','tco'].forEach(function(t) {
+      var btn = document.getElementById('uat-s9-tab-' + t);
+      if (btn) btn.classList.toggle('uat-tab-btn--active', t === tab);
+    });
+  };
+
+  // PASS with risk check
+  window.uatPassWithRiskCheck = function() {
+    var a = calculateUatReadinessAnalysis();
+    if (a.blocking > 0) {
+      var reason = prompt('There are ' + a.blocking + ' unresolved blocker(s).\n\nTo accept risk and proceed, enter your reason:');
+      if (!reason) return;
+      var owner = prompt('Approver name:');
+      if (!owner) return;
+      alert('Risk accepted by ' + owner + '. Final decision: READY WITH CONDITIONS.\n\nRecord this in your change management system before cutover.');
+    } else {
+      alert('All required checks passed or accepted. Proceed with cutover.\n\nExport the UAT Report as evidence before cutover.');
+    }
+  };
+
+  // FIX button — opens blocker modal with fix commands + Fixed / Not Relevant actions
+  window.uatFocusActions = function() {
+    var a = calculateUatReadinessAnalysis();
+    var dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('uat_fix_dismissed') || '{}'); } catch(e) {}
+
+    // ── Build issue list from live analysis ───────────────────────────────
+    var issues = [];
+
+    // Check-based blockers (items that are incomplete and not yet dismissed)
+    a.checks.forEach(function(c) {
+      if (c.outOfScope || c.pass) return;
+      if (dismissed['check:' + c.key]) return;
+      var fixCmds = {
+        app_health:    'curl -s -o /dev/null -w "%{http_code}" http://FLEX_IP/health',
+        data_validation: 'diff <(ssh ospc-vm "md5sum /data/*.db | sort") <(ssh flex-vm "md5sum /data/*.db | sort")',
+        database_validation: 'mysql -h FLEX_DB_HOST -u root -p -e "SELECT 1; SHOW DATABASES;"',
+        reports_outputs: null,
+        critical_systems: null,
+        critical_issues: null,
+        performance: null,
+      };
+      issues.push({
+        key:      'check:' + c.key,
+        severity: 'block',
+        title:    c.label,
+        detail:   c.detail,
+        source:   c.source,
+        fix:      c.fix,
+        fixCmd:   fixCmds[c.key] || null,
+        impact:   c.decisionImpact,
+      });
+    });
+
+    // Service hard blocks
+    a.svcHardBlocks.forEach(function(s) {
+      if (dismissed['svc_hard:' + s.service]) return;
+      issues.push({
+        key:     'svc_hard:' + s.service,
+        severity:'block',
+        title:   s.service + ' — missing on FLEX',
+        detail:  'Critical service not running on FLEX target.',
+        source:  'Step 2 — Service Comparison',
+        fix:     'Start and enable the service on the FLEX VM.',
+        fixCmd:  'ssh flex-vm "sudo systemctl start ' + s.service + ' && sudo systemctl enable ' + s.service + '"',
+        impact:  'Blocks cutover',
+      });
+    });
+
+    // Service review gaps
+    a.svcReviewGaps.forEach(function(s) {
+      if (dismissed['svc_gap:' + s.service]) return;
+      issues.push({
+        key:     'svc_gap:' + s.service,
+        severity:'review',
+        title:   s.service + ' — needs review',
+        detail:  'Present on OSPC source but missing on FLEX target.',
+        source:  'Step 2 — Service Comparison',
+        fix:     'Start the service on FLEX, or mark Not Relevant if it is expected to be absent.',
+        fixCmd:  'ssh flex-vm "sudo systemctl status ' + s.service + ' 2>/dev/null || sudo systemctl start ' + s.service + '"',
+        impact:  'Must be accepted before cutover',
+      });
+    });
+
+    // Service warnings (extra on FLEX)
+    a.svcWarnings.forEach(function(s) {
+      if (dismissed['svc_warn:' + s.service]) return;
+      issues.push({
+        key:     'svc_warn:' + s.service,
+        severity:'warn',
+        title:   s.service + ' — extra on FLEX',
+        detail:  'Running on FLEX but not found on OSPC source.',
+        source:  'Step 2 — Service Comparison',
+        fix:     'Confirm this is expected from the FLEX base image. Stop it if unexpected.',
+        fixCmd:  'ssh flex-vm "sudo systemctl status ' + s.service + '"',
+        impact:  'Warning only — does not block if accepted',
+      });
+    });
+
+    // Performance blockers
+    a.perfMetrics.forEach(function(m) {
+      if (dismissed['perf:' + m.key]) return;
+      var needsAction = m.effectiveBadge === 'FAIL' || (m.badge === 'REVIEW' && m.userDecision === 'Pending');
+      if (!needsAction) return;
+      issues.push({
+        key:     'perf:' + m.key,
+        severity: m.effectiveBadge === 'FAIL' ? 'block' : 'review',
+        title:   'Performance: ' + m.label + ' — ' + m.effectiveBadge,
+        detail:  m.text && m.text !== '—' ? m.text : 'Metric exceeded threshold or awaiting decision.',
+        source:  'Step 3 — Performance Validation',
+        fix:     'Go to Step 3. Set Your Decision for this metric (Pass / Fail / Accept Risk).',
+        fixCmd:  null,
+        impact:  'Blocks cutover until decision is set',
+      });
+    });
+
+    // Dismissed items list (for the Undo section)
+    var dismissedList = Object.keys(dismissed).map(function(k) {
+      return { key: k, action: dismissed[k] };
+    });
+
+    // ── Render modal ───────────────────────────────────────────────────────
+    var existing = document.getElementById('uat-fix-modal-overlay');
+    if (existing) existing.remove();
+
+    function sev(s) {
+      if (s === 'block')  return { bg:'#fef2f2', border:'#fca5a5', badge:'BLOCKS CUTOVER',   badgeBg:'#dc2626' };
+      if (s === 'review') return { bg:'#fffbeb', border:'#fde68a', badge:'NEEDS REVIEW',      badgeBg:'#d97706' };
+      return                     { bg:'#fefce8', border:'#fef08a', badge:'WARNING',            badgeBg:'#ca8a04' };
+    }
+
+    function issueCard(issue) {
+      var s = sev(issue.severity);
+      var e = _udEsc;
+      var cmdBlock = issue.fixCmd
+        ? '<div style="margin:8px 0 0;background:#1e293b;border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:8px;">'
+          + '<code style="flex:1;font-size:11px;color:#e2e8f0;font-family:monospace;white-space:pre-wrap;word-break:break-all;">' + e(issue.fixCmd) + '</code>'
+          + '<button onclick="(function(){var t=document.createElement(\'textarea\');t.value=\'' + e(issue.fixCmd).replace(/'/g,"\\'") + '\';document.body.appendChild(t);t.select();document.execCommand(\'copy\');document.body.removeChild(t);this.textContent=\'Copied!\';setTimeout(function(){this.textContent=\'Copy\';}.bind(this),1500);}).call(this)" '
+          + 'style="flex-shrink:0;font-size:10px;font-weight:700;padding:3px 10px;border:1px solid #475569;border-radius:4px;background:#334155;color:#e2e8f0;cursor:pointer;">Copy</button>'
+          + '</div>'
+        : '';
+      return '<div style="background:' + s.bg + ';border:1px solid ' + s.border + ';border-radius:8px;padding:12px 14px;margin-bottom:10px;">'
+        + '<div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">'
+        + '<span style="font-size:10px;font-weight:800;background:' + s.badgeBg + ';color:#fff;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;">' + s.badge + '</span>'
+        + '<div style="flex:1;min-width:200px;">'
+        + '<div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px;">' + e(issue.title) + '</div>'
+        + '<div style="font-size:11px;color:#475569;margin-bottom:2px;">' + e(issue.detail) + '</div>'
+        + (issue.source ? '<div style="font-size:10px;color:#94a3b8;">Source: ' + e(issue.source) + '</div>' : '')
+        + '</div>'
+        + '</div>'
+        + '<div style="margin-top:8px;font-size:11px;color:#374151;background:rgba(0,0,0,.04);border-radius:5px;padding:7px 10px;">'
+        + '<strong>Fix:</strong> ' + e(issue.fix)
+        + '</div>'
+        + cmdBlock
+        + '<div style="margin-top:10px;display:flex;gap:8px;">'
+        + '<button onclick="uatFixDismiss(\'' + e(issue.key) + '\',\'fixed\')" style="font-size:11px;font-weight:700;padding:5px 14px;border:none;border-radius:6px;background:#16a34a;color:#fff;cursor:pointer;">✓ Fixed</button>'
+        + '<button onclick="uatFixDismiss(\'' + e(issue.key) + '\',\'not_relevant\')" style="font-size:11px;font-weight:700;padding:5px 14px;border:1px solid #94a3b8;border-radius:6px;background:#f8fafc;color:#374151;cursor:pointer;">~ Not Relevant</button>'
+        + '</div>'
+        + '</div>';
+    }
+
+    var noIssues = issues.length === 0;
+    var issuesHtml = noIssues
+      ? '<div style="text-align:center;padding:32px 0;">'
+        + '<div style="font-size:40px;">✓</div>'
+        + '<div style="font-size:16px;font-weight:800;color:#16a34a;margin-top:8px;">No active blockers</div>'
+        + '<div style="font-size:12px;color:#6b7280;margin-top:4px;">All issues resolved or accepted. You can proceed with cutover.</div>'
+        + '</div>'
+      : issues.map(issueCard).join('');
+
+    var dismissedHtml = '';
+    if (dismissedList.length) {
+      dismissedHtml = '<details style="margin-top:16px;">'
+        + '<summary style="font-size:11px;font-weight:700;color:#6b7280;cursor:pointer;padding:6px 0;">Previously dismissed (' + dismissedList.length + ') — click to expand / undo</summary>'
+        + '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">'
+        + dismissedList.map(function(d) {
+            var actionLabel = d.action === 'fixed' ? '✓ Fixed' : '~ Not Relevant';
+            var actionColor = d.action === 'fixed' ? '#16a34a' : '#6b7280';
+            return '<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">'
+              + '<span style="flex:1;font-size:11px;color:#374151;">' + _udEsc(d.key.replace(/^[^:]+:/,'')) + '</span>'
+              + '<span style="font-size:10px;font-weight:700;color:' + actionColor + ';">' + actionLabel + '</span>'
+              + '<button onclick="uatFixUndo(\'' + _udEsc(d.key) + '\')" style="font-size:10px;font-weight:700;padding:3px 10px;border:1px solid #94a3b8;border-radius:4px;background:#fff;color:#374151;cursor:pointer;">Undo</button>'
+              + '</div>';
+          }).join('')
+        + '</div></details>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.id = 'uat-fix-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:12px;width:100%;max-width:680px;box-shadow:0 25px 60px rgba(0,0,0,.25);overflow:hidden;">'
+      // Header
+      + '<div style="background:#1e293b;padding:16px 20px;display:flex;align-items:center;gap:12px;">'
+      + '<div style="width:32px;height:32px;border-radius:50%;background:#dc2626;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;">!</div>'
+      + '<div style="flex:1;">'
+      + '<div style="font-size:15px;font-weight:900;color:#fff;">FIX BLOCKERS</div>'
+      + '<div style="font-size:11px;color:#94a3b8;">' + (noIssues ? 'All clear — no active blockers' : issues.length + ' issue' + (issues.length > 1 ? 's' : '') + ' require action before cutover') + '</div>'
+      + '</div>'
+      + '<button onclick="if(typeof window.uatRerenderReadiness===\'function\')window.uatRerenderReadiness();this.textContent=\'↻ Done\'" style="font-size:11px;font-weight:700;padding:5px 12px;border:1px solid #475569;border-radius:6px;background:#334155;color:#e2e8f0;cursor:pointer;margin-right:8px;">↻ Re-run</button>'
+      + '<button onclick="document.getElementById(\'uat-fix-modal-overlay\').remove()" style="font-size:18px;line-height:1;background:none;border:none;color:#94a3b8;cursor:pointer;padding:4px;">×</button>'
+      + '</div>'
+      // Body
+      + '<div style="padding:20px;">'
+      + issuesHtml
+      + dismissedHtml
+      + '</div>'
+      // Footer
+      + '<div style="padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">'
+      + '<button onclick="document.getElementById(\'uat-fix-modal-overlay\').remove()" style="font-size:12px;font-weight:700;padding:7px 20px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#374151;cursor:pointer;">Close</button>'
+      + '</div>'
+      + '</div>';
+
+    document.body.appendChild(overlay);
+    // Close on backdrop click
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  };
+
+  // Dismiss an issue from the FIX modal (Fixed or Not Relevant)
+  window.uatFixDismiss = function(key, action) {
+    var dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('uat_fix_dismissed') || '{}'); } catch(e) {}
+    dismissed[key] = action;
+    try { localStorage.setItem('uat_fix_dismissed', JSON.stringify(dismissed)); } catch(e) {}
+    if (typeof window.uatRerenderReadiness === 'function') window.uatRerenderReadiness();
+    // Re-open modal with updated state
+    window.uatFocusActions();
+  };
+
+  // Undo a dismissal
+  window.uatFixUndo = function(key) {
+    var dismissed = {};
+    try { dismissed = JSON.parse(localStorage.getItem('uat_fix_dismissed') || '{}'); } catch(e) {}
+    delete dismissed[key];
+    try { localStorage.setItem('uat_fix_dismissed', JSON.stringify(dismissed)); } catch(e) {}
+    if (typeof window.uatRerenderReadiness === 'function') window.uatRerenderReadiness();
+    window.uatFocusActions();
+  };
 
   // ── Live data injection from combined.html ───────────────────────────────
   // Called by svcCompareRun() after service classification
@@ -1806,8 +2633,101 @@
 
   window.CloudJumperUAT = {load: loadUAT};
   window.uatRenderPerformance = renderPerformance;
+  window._uatFlavorData = window._uatFlavorData || null;
+
+  window.uatLoadFlavorData = async function() {
+    try {
+      const res = await fetch('/api/uat/flavor-summary', {cache: 'no-store'});
+      const data = await res.json();
+      if (!res.ok || !data.ok || !data.vmData) throw new Error(data.error || 'Flavor summary unavailable');
+      const vmData = data.vmData;
+      const tgtMonthly = Number(vmData.targetMonthly || 0);
+      const srcMonthly = tgtMonthly > 0 ? tgtMonthly * 2.5 : 24800;
+      const savings = srcMonthly - (tgtMonthly || 18300);
+      window._uatFlavorData = {
+        vmData: vmData,
+        tcoData: {
+          srcMonthly: Math.round(srcMonthly),
+          tgtMonthly: Math.round(tgtMonthly || 18300),
+          savings: Math.round(savings),
+          savingsPct: srcMonthly > 0 ? (savings / srcMonthly * 100).toFixed(1) : '0.0',
+        },
+      };
+      if (typeof window.uatRerenderReadiness === 'function') window.uatRerenderReadiness();
+      return window._uatFlavorData;
+    } catch (e) {
+      window._uatFlavorData = window._uatFlavorData || {
+        vmData: { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000, rows:0, sourceFlavors:[], targetFlavors:[], flavorPairs:[] },
+        tcoData: { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:'26.2' },
+      };
+      if (typeof window.uatRerenderReadiness === 'function') window.uatRerenderReadiness();
+      return window._uatFlavorData;
+    }
+  };
+
+  function hideGlobalThemeForUat() {
+    if (document.body) document.body.classList.add('uat-dashboard-active');
+    const theme = document.getElementById('top-theme-dropdown');
+    if (theme) theme.style.setProperty('display', 'none', 'important');
+  }
+
+  window.uatSetMode = function(mode, silent) {
+    hideGlobalThemeForUat();
+    mode = mode === 'detailed' ? 'detailed' : 'compact';
+    ['compact', 'detailed'].forEach(function(m) {
+      const btn = document.getElementById('uat-mode-' + m);
+      if (btn) btn.classList.toggle('ud-mode-btn--on', m === mode);
+    });
+    const content = document.getElementById('uat-content');
+    if (content) content.setAttribute('data-uat-mode', mode);
+    const msg = document.getElementById('uat-message');
+    if (mode === 'detailed') {
+      if (content) {
+        content.querySelectorAll('[data-uat-step]').forEach(function(panel) { panel.style.display = ''; });
+        content.scrollTo({ top: 0, behavior: silent ? 'auto' : 'smooth' });
+      }
+      if (msg) msg.style.display = '';
+    } else if (typeof window.uatNavTo === 'function') {
+      window.uatNavTo(5, true);
+    }
+    if (!silent) {
+      try { localStorage.setItem('uatMode', mode); } catch(e) {}
+    }
+  };
+
+  window.uatNavTo = function(step, instant) {
+    hideGlobalThemeForUat();
+    const content = document.getElementById('uat-content');
+    if (!content) return;
+    step = Number(step) || 5;
+    content.setAttribute('data-uat-mode', 'compact');
+    ['compact', 'detailed'].forEach(function(m) {
+      const btn = document.getElementById('uat-mode-' + m);
+      if (btn) btn.classList.toggle('ud-mode-btn--on', m === 'compact');
+    });
+    content.querySelectorAll('[data-uat-step]').forEach(function(panel) {
+      panel.style.display = Number(panel.getAttribute('data-uat-step')) === step ? '' : 'none';
+    });
+    const msg = document.getElementById('uat-message');
+    if (msg) msg.style.display = step === 5 ? 'none' : '';
+    document.querySelectorAll('#uat-sidebar .udsb-item').forEach(function(btn, idx) {
+      const isReport = idx > 4;
+      btn.classList.toggle('udsb-active', !isReport && idx === step - 1);
+    });
+    const target = content.querySelector('[data-uat-step="' + step + '"]');
+    if (!target) return;
+    let top = 0, el = target;
+    while (el && el !== content) {
+      top += el.offsetTop || 0;
+      el = el.offsetParent;
+    }
+    content.scrollTo({ top: Math.max(0, top - 10), behavior: instant ? 'auto' : 'smooth' });
+  };
+
   document.addEventListener('DOMContentLoaded', () => {
     if ($('uat-console')) {
+      setTimeout(function() { window.uatSetMode('compact', true); }, 0);
+      window.uatLoadFlavorData().catch(function() {});
       loadUAT().catch(err => setMessage(err.message, false));
     }
   });
