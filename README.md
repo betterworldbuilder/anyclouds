@@ -26,6 +26,67 @@ CloudJumper is a browser-based control room for OSPC to FLEX migration. It bring
 - **Atmospheric Re-entry**: SSH/UAT verification, reports, and J.A.R.V.I.S. audio alerts.
 - **Tenant IaC DR Pack**: Preflight checks, target cloud credential profile, OpenRC import, restore-plan overlays, and Git/S3 backup export for cross-region or cross-cloud restore.
 
+## ✨ Latest Features
+
+### Discovery Dashboard (`/dashboard/`)
+
+The Discovery stage now includes a full TCO (Total Cost of Ownership) analysis engine:
+
+- **Auto-load Flavor Map**: The dashboard automatically loads the `flavormap.csv` generated in Stage 1 without any manual upload. Data is cached in `sessionStorage` so iframe reloads do not re-fetch.
+- **OSPC Price List Upload**: Upload a CSV with server-level monthly cost data to override the default pricing assumption with real OSPC billing data.
+- **FLEX Price List Upload**: Upload a CSV with FLEX flavor hourly rates to compute accurate target-side monthly costs.
+- **2.45× Fallback Assumption**: When no OSPC price list is present, OSPC cost is assumed to be **2.45× more expensive** than FLEX. An amber warning note is shown in the UI whenever this fallback is active.
+- **Price List Upload Panel**: Appears automatically once a flavor map is loaded. Shows file metadata and current load state for both OSPC and FLEX price lists.
+
+TCO calculation logic:
+| Source | Method |
+|---|---|
+| FLEX monthly cost | FLEX Price List CSV (hourly × 730) or flavor-match lookup |
+| OSPC monthly cost | OSPC Price List CSV (sum of `monthly_cost_usd`) or FLEX cost × 2.45 fallback |
+| Savings | OSPC monthly − FLEX monthly |
+
+### UAT Dashboard (Stage 3)
+
+The UAT cutover readiness dashboard has been significantly upgraded:
+
+#### TCO Chart — Price List Uploads
+The UAT TCO Cost Estimation chart now supports inline price list overrides directly from the dashboard:
+- **⬆ OSPC Price List** button — upload a CSV with real OSPC monthly billing data to override the 2.45× estimate
+- **⬆ FLEX Price List** button — upload a CSV with FLEX hourly rates to compute accurate FLEX monthly cost
+- Amber warning note when the 2.45× fallback is active
+- Price overrides are applied immediately and update the chart: Source Monthly Cost, Target Monthly Cost, Monthly Savings, and Savings %
+
+#### UAT DB Compare
+- Side-by-side database comparison between OSPC and FLEX target servers
+- User database enumeration (excludes system DBs)
+- Row count comparison with mismatch highlighting
+- Full table diff view per database
+
+#### Cutover Scanner — Full-Width Table
+- Cutover readiness scanner now renders as a full-width table
+- Improved layout for long server lists and multi-column scan results
+
+#### Sidebar Cleanup
+- Removed the "Environment: UAT / Admin User" footer section from the UAT sidebar for a cleaner operator view
+
+#### PASS / FIX Buttons
+- **PASS** (green): Proceeds with cutover, with risk-acceptance prompt if blockers remain
+- **FIX** (red): Active — scrolls to the blockers and next-action panel showing all unresolved items
+- Buttons are flat rectangle style matching the design template
+
+#### Cutover Readiness Engine
+The readiness analysis engine evaluates:
+- Critical systems tested
+- No open critical issues
+- Data validation checklist passed
+- App health check passed
+- Database validation (scope-aware — skipped when DB is out of scope)
+- Reports & outputs verified
+- Performance validation (with per-metric user decisions: Pass / Fail / Accept Risk / Not Applicable)
+- Service comparison gaps (hard blocks vs. review gaps vs. warnings)
+
+Status output: **READY FOR CUTOVER** / **READY WITH CONDITIONS** / **NEED REVIEW BEFORE CUT OVER**
+
 ## New: FLEX Region Cloning And FLEX Anywhere
 
 ### FLEX2FLEX Region Cloning
@@ -279,7 +340,7 @@ Jumphost credentials (IP, SSH user, SSH key) and OSPC/FLEX cloud credentials are
 | Category                        | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Current Status                                                                                       |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | **Workflow Stages**             | Stage 0: Customer Migration Tracker (Backlog management)<br>Stage 1: Discovery & Assessment (OSPC/FLEX scanning & topology import)<br>Stage 2: Migration Pipeline (Shift & Lift Images, REHOST Apps/DBs, Kubernetes)<br>Stage 3: Validation & UAT (Automated cross-cloud checks & HTTP health tests)<br>Stage 4: Cutover & Handover (Traffic split, DB promotion, final sync)<br>Stage 5: Post-Migration (Stability tracking, artifact bundle generation)<br>Stage 6: TCO / FinOps<br>Stage 7: IAC Backup & Restore (Terraform + Ansible)<br>Stage 8: GitOps / OpenCenter<br>Stage 9: AI OPS | Stage 2 VM shift and lift: ready<br>Server and DB rehost: ready<br>Windows VM migration: WIP<br>Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build |
-| **Current Features (✅ Ready)**  | Single-Tab Mission Control: No CLI required, full GUI wrapper<br>Live Execution: Real-time logs streaming to browser<br>Visual Topology Designer: Drag-and-drop infra cloning<br>Offline Guest Repair: Pre-boot image patching for networks<br>Parallel Execution: Migrate multiple DBs/Servers simultaneously<br>No Database Required: Stateless backend (CSV + local browser storage)<br>**Private Snapshot Migration Table**: 3-tab (Linux/Windows/Volume) snapshot discovery and migration cockpit with sortable columns, Export CSV, per-row SSE log stream | **READY**                                                                                            |
+| **Current Features (✅ Ready)**  | Single-Tab Mission Control: No CLI required, full GUI wrapper<br>Live Execution: Real-time logs streaming to browser<br>Visual Topology Designer: Drag-and-drop infra cloning<br>Offline Guest Repair: Pre-boot image patching for networks<br>Parallel Execution: Migrate multiple DBs/Servers simultaneously<br>No Database Required: Stateless backend (CSV + local browser storage)<br>**Private Snapshot Migration Table**: 3-tab (Linux/Windows/Volume) snapshot discovery and migration cockpit with sortable columns, Export CSV, per-row SSE log stream<br>**Discovery TCO Dashboard**: Auto-load flavor map, OSPC/FLEX price list upload, 2.45× fallback assumption, sessionStorage caching<br>**UAT TCO Chart**: Inline OSPC/FLEX price list upload buttons with real-time savings recalculation<br>**UAT DB Compare**: Side-by-side OSPC vs FLEX database comparison with row-count diff<br>**UAT Cutover Readiness**: PASS/FIX buttons, scope-aware checks, service gap analysis, per-metric performance decisions | **READY**                                                                                            |
 | **Available Migration Methods** | Direct Shift & Lift (Images): Production Mode, External Offload, Direct Export<br><br>REHOST (Apps & Servers): Infra duplication, Full Clone, Quick Install<br><br>Database Replication: Dump & Restore, DBaaS Streaming, HA Replica<br><br>Kubernetes Migration: Genestack/Kubespray, OpenCenter (GitOps), Magnum export<br><br>**Snapshot Migration**: Linux private snapshots → FLEX Glance; Windows snapshots → Method Z VirtIO repair → FLEX; Volume snapshots → direct block-device stream → FLEX Cinder (no Glance, no qcow2) | All Shift and rehost READY<br>Linux snapshot migration: READY<br>Windows snapshot migration: READY<br>Volume snapshot migration: READY<br>Stage 3 to 5: under construction<br>Stage 6 to 9: to be validated and build |
 | **Supported OS Types**          | Ubuntu (20.04, 22.04, 24.04)<br>Debian (10, 11, 12)<br>CentOS 7<br>RedHat 6, 8<br>Rocky Linux 8 / 9<br>AlmaLinux 8 / 9<br>Windows Server 2016 / 2019                                                                                                                                                                                                                                                                                                                                                                                             | Linux VM rehost set: ready<br>Linux/Windows/Volume snapshot migration: ready<br>Windows live-VM migration: under Test                                             |
 | **Future / Upcoming**           | Stage 6: TCO / FinOps (Right-sizing + cost summary)<br>Stage 7: IAC Backup & Restore (Terraform + Ansible)<br>Stage 8: GitOps / OpenCenter<br>Stage 9: AI OPS (optimization + autorepair recommendations using GitOps)                                                                                                                                                                                                                                                                                                                                                                          | under construction |
@@ -300,7 +361,11 @@ Run the dashboard from a Linux or WSL2 operator workstation. Run heavy image wor
 | Module Path | Mission Purpose |
 |---|---|
 | `workflow_dashboard/app.py` | Flask dashboard backend and API endpoints |
+| `workflow_dashboard/templates/combined.html` | UAT dashboard — cutover readiness, TCO, DB compare, PASS/FIX buttons |
+| `workflow_dashboard/static/uat/uat.js` | UAT readiness engine, TCO chart, service gap analysis |
 | `workflow_dashboard/templates/image_migrator.html` | Main VM/image migration console (snapshot tabs, modal, SSE logs) |
+| `dashboard/index.html` | Discovery dashboard — TCO pricing, flavor map autoload, price list uploads |
+| `dashboard/app.js` | Discovery dashboard logic — CSV autoload, sessionStorage cache, TCO calculation |
 | `ospc2Flex-Image-migtool/ospc2flex_image_migrator.py` | Standalone image migration pipeline |
 | `ospc2Flex-Image-migtool/ospc2flex_offline_repair.sh` | Linux offline repair engine |
 | `ospc2Flex-Image-migtool/ospc2flex_linux_snap_migrate.sh` | Linux private snapshot → FLEX migration |
