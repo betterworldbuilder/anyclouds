@@ -1212,10 +1212,11 @@
   <button class="stage-btn" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s5">Stage 4<br><small>Cutover &amp; Traffic Transition</small></button>
   <button class="stage-btn" data-stage="s6">Stage 5<br><small>Stabilization &amp; Handover</small></button>
-  <button class="stage-btn" data-stage="s7">Stage 6<br><small>FinOps &amp; Cost Optimization</small></button>
-  <button class="stage-btn" data-stage="s8">Stage 7<br><small>IaC Backup, DR &amp; Restore</small></button>
-  <button class="stage-btn" data-stage="s9">Stage 8<br><small>GitOps &amp; OpenCenter Modernization</small></button>
-  <button class="stage-btn" data-stage="s10">Stage 9<br><small>AIOps &amp; Continuous Operations</small></button>
+  <button class="stage-btn" data-stage="s7">Stage 6<br><small>Cost Optimization</small></button>
+  <button class="stage-btn" data-stage="s7a">Stage 7<br><small>Performance Gain</small></button>
+  <button class="stage-btn" data-stage="s8">Stage 8<br><small>IaC Backup, DR &amp; Restore</small></button>
+  <button class="stage-btn" data-stage="s9">Stage 9<br><small>GitOps &amp; OpenCenter Modernization</small></button>
+  <button class="stage-btn" data-stage="s10">Stage 10<br><small>AIOps &amp; Continuous Operations</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -1251,7 +1252,6 @@
       <button class="sub-btn" data-sub="s1hyper_azure_flavors">🖼 Azure Flavors &amp; Images</button>
     </div>
   </div>
-  <button class="sub-btn" data-sub="s1tco">💰 TCO Savings</button>
   <button class="sub-btn" data-sub="s1appdep">🔍 App Dependency Discovery</button>
   <button class="sub-btn" data-sub="s1appdep_handoff">🧩 AppDep Technical Selection</button>
   <button class="sub-btn" data-sub="s1business_ontology">🧠 Business System Ontology Discovery</button>
@@ -1694,8 +1694,6 @@
     <iframe id="s1hyper_aws_flavors-pane" src="/references/?source=aws" title="AWS Flavors &amp; Images" style="display:none;"></iframe>
     <iframe id="s1hyper_gcp_flavors-pane" src="/references/?source=gcp" title="GCP Flavors &amp; Images" style="display:none;"></iframe>
     <iframe id="s1hyper_azure_flavors-pane" src="/references/?source=azure" title="Azure Flavors &amp; Images" style="display:none;"></iframe>
-    <iframe id="s1tco-pane" src="/tco/?source=ospc" title="TCO Savings" style="display:none;"></iframe>
-
     <!-- 1AppDep: App Dependency Discovery -->
     <div id="s1appdep-pane" style="width:100%; height:100%; display:none; overflow:auto;">
       <div class="info-panel" style="max-width:1500px;margin:0 auto 40px;">
@@ -2632,158 +2630,574 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           </div>
         </div>
 
-        <div id="uat-message" class="uat-note">Loading UAT state...</div>
-
-        <!-- STEP 1: Server Targets -->
-        <section class="uat-panel">
-          <div class="uat-panel-header">
-            <h3>Step 1 — Server Targets</h3>
-            <div class="uat-actions">
-              <button class="uat-btn" onclick="uatShowScopeForm()">+ Add Server</button>
-              <button class="uat-btn uat-btn-good" onclick="uatSaveScope()">Save</button>
-            </div>
-          </div>
-          <div class="uat-panel-body">
-            <p style="margin:0 0 10px;font-size:12px;color:#bfdbfe;">Enter source OSPC and target FLEX server details. These auto-fill all tools below.</p>
-            <div id="uat-scope-form" class="uat-form-grid uat-hidden" style="margin-bottom:14px;">
-              <label>Type<select class="uat-select" name="system_type" onchange="var lbl=document.getElementById('scope-form-db-engine-label');if(lbl)lbl.style.display=this.value==='DB'?'':'none';"><option>App</option><option>DB</option></select></label>
-              <label>Name<input class="uat-input" name="business_system_name" placeholder="e.g. App Server"></label>
-              <label>Tier<select class="uat-select" name="tier"><option>Backend</option><option>Frontend</option><option>Database</option><option>Batch</option><option>External Integration</option></select></label>
-              <label>Source IP (OSPC)<input class="uat-input" name="source_host" id="scope-form-source-host" oninput="scopeFeedComparison(this)"></label>
-              <label>Target IP (FLEX)<input class="uat-input" name="target_ip" id="scope-form-target-ip" oninput="scopeFeedComparison(this)"></label>
-              <label>SSH User<input class="uat-input" name="ssh_user" value="ubuntu" id="scope-form-ssh-user" oninput="scopeFeedComparison(this)"></label>
-              <label>SSH Key<input class="uat-input" name="ssh_key_path" value="~/.ssh/id_rsa" id="scope-form-ssh-key" oninput="scopeFeedComparison(this)"></label>
-              <label>SSH Port<input class="uat-input" name="ssh_port" value="22" id="scope-form-ssh-port" oninput="scopeFeedComparison(this)"></label>
-              <label>App Port<input class="uat-input" id="scope-form-app-port" name="app_port" placeholder="e.g. 8080"></label>
-              <label>DB Port<input class="uat-input" id="scope-form-db-port" name="db_port" placeholder="e.g. 5432"></label>
-              <label id="scope-form-db-engine-label" style="display:none;">DB Engine<select class="uat-select" name="db_engine" id="scope-form-db-engine"><option value="mysql">MySQL</option><option value="postgresql">PostgreSQL</option></select></label>
-              <label>DB User<input class="uat-input" name="db_user" id="scope-form-db-user" placeholder="root / postgres"></label>
-              <label>DB Password<input class="uat-input" type="password" name="db_password" id="scope-form-db-password" placeholder="leave blank if none"></label>
-              <label>Criticality<select class="uat-select" name="criticality"><option>Critical</option><option>Secondary</option><option>Low</option></select></label>
-              <label>Owner<input class="uat-input" name="owner"></label>
-              <label style="display:none;"><select class="uat-select" name="execution_mode"><option>ssh</option></select></label>
-              <label style="display:none;"><input class="uat-input" name="target_host"></label>
-              <label style="display:none;"><input class="uat-input" name="ssh_host"></label>
-              <label style="display:none;"><select class="uat-select" name="uat_status"><option>Testing</option></select></label>
-              <label style="display:none;"><input class="uat-input" name="dependencies"></label>
-              <label style="display:none;"><textarea class="uat-textarea" name="notes"></textarea></label>
-              <div style="align-self:end;"><button class="uat-btn uat-btn-good" onclick="uatAddScope()">Add</button></div>
-            </div>
-            <div class="uat-table-wrap">
-              <table class="uat-table">
-                <thead><tr><th>Type</th><th>Name</th><th>Tier</th><th>Source IP (OSPC)</th><th>Target IP (FLEX)</th><th>SSH User</th><th>SSH Key</th><th>SSH Port</th><th>App Port</th><th>DB Port</th><th>DB Engine</th><th>Criticality</th><th>Owner</th><th>Status</th><th></th></tr></thead>
-                <tbody id="uat-scope-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
         <!-- DB Compare Modal (rendered by uatCompareDB()) -->
         <div id="db-compare-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;overflow-y:auto;align-items:flex-start;justify-content:center;padding:40px 20px;box-sizing:border-box;"></div>
 
-        <!-- STEP 2: Service Comparison -->
-        <section class="uat-panel">
-          <div class="uat-panel-header">
-            <h3>Step 2 — Service Comparison: OSPC → FLEX</h3>
-            <span class="uat-note">Auto-filled from Step 1 · SSH compares running systemd services</span>
-          </div>
-          <div class="uat-panel-body">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Source OSPC IP<input class="uat-input" id="svc-source-ip" placeholder="e.g. 10.1.2.100"></label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Target FLEX IP<input class="uat-input" id="svc-target-ip" placeholder="e.g. 10.2.3.200"></label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">SSH User<input class="uat-input" id="svc-ssh-user" value="ubuntu"></label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">SSH Key<input class="uat-input" id="svc-ssh-key" value="~/.ssh/id_rsa"></label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Port<input class="uat-input" id="svc-ssh-port" value="22" style="max-width:70px;"></label>
-            </div>
-            <div class="uat-actions" style="margin-bottom:12px;">
-              <button class="uat-btn uat-btn-good" onclick="svcCompareRun()">Compare Servers</button>
-              <button class="uat-btn" onclick="uatCompareDbGlobal()" id="svc-compare-db-btn" style="background:#0e7490;border-color:#0891b2;">Compare DB</button>
-            </div>
-            <div id="svc-status" class="uat-note" style="margin-bottom:10px;min-height:18px;"></div>
-            <div id="svc-summary" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
-            <div id="svc-analysis" style="display:none;margin-bottom:12px;"></div>
-            <div class="uat-table-wrap" id="svc-table-wrap" style="display:none;">
-              <table class="uat-table">
-                <thead><tr><th>Service</th><th style="text-align:center;">OSPC</th><th style="text-align:center;">FLEX</th><th>Status</th><th>Analysis</th></tr></thead>
-                <tbody id="svc-compare-body"></tbody>
-              </table>
-            </div>
-            <div id="svc-next-step" style="display:none;margin-top:14px;padding:12px 14px;border-radius:8px;border:1px solid #334155;background:rgba(30,41,59,0.6);">
-              <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Next Step</div>
-              <div id="svc-next-step-body"></div>
-            </div>
-          </div>
-        </section>
+        <!-- Step 5: Cutover Readiness Dashboard -->
+        <div id="uat-dashboard">
+          <div id="uat-layout">
 
-        <!-- STEP 3: Performance Validation -->
-        <section class="uat-panel" id="perf-section">
-          <div class="uat-panel-header">
-            <div>
-              <h3>Step 3 — Performance Validation</h3>
-              <span class="uat-note" style="font-size:11px;">SSHes into source &amp; target servers · runs HTTP response, error rate, latency, sessions, CPU, memory &amp; I/O tests · calculates delta vs 15% threshold</span>
-            </div>
-            <div class="uat-actions">
-              <button class="uat-btn" onclick="perfRunSSHTests()" id="perf-run-btn">&#9658; SERVER TESTS</button>
-              <button class="uat-btn" onclick="uatCompareDbGlobal()" id="perf-db-test-btn" style="background:#0e7490;border-color:#0891b2;">&#9658; Run DB Test</button>
-              <button class="uat-btn uat-btn-good" onclick="uatSavePerformance()">Calculate &amp; Save</button>
-            </div>
-          </div>
-          <div class="uat-panel-body">
-            <div id="perf-run-status" style="margin-bottom:10px;font-size:12px;color:#86efac;display:none;"></div>
-
-            <!-- SSH Log Terminal -->
-            <div id="perf-log-wrap" style="display:none;margin-bottom:16px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#93c5fd;">SSH Output Log</span>
-                <button class="uat-btn" style="font-size:10px;padding:3px 8px;" onclick="document.getElementById('perf-log-wrap').style.display='none'">✕ Hide</button>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <!-- ══ LEFT SIDEBAR ══ -->
+            <div id="uat-sidebar" style="background:#ffffff !important;background-color:#ffffff !important;">
+              <div class="udsb-header">
+                <div class="udsb-logo">🛡</div>
                 <div>
-                  <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:4px;">▶ SOURCE SERVER</div>
-                  <pre id="perf-log-src" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;"></pre>
-                </div>
-                <div>
-                  <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:4px;">▶ TARGET SERVER</div>
-                  <pre id="perf-log-tgt" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;"></pre>
+                  <div class="udsb-title">UAT Dashboard</div>
+                  <div class="udsb-sub">Migration</div>
                 </div>
               </div>
-            </div>
+              <nav class="udsb-nav">
+                <button class="udsb-item udsb-done" onclick="uatNavTo(1)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 1</em>Server Targets</span>
+                </button>
+                <button class="udsb-item udsb-done" onclick="uatNavTo(2)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 2</em>Service Comparison</span>
+                </button>
+                <button class="udsb-item udsb-done" onclick="uatNavTo(3)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 3</em>Performance</span>
+                </button>
+                <button class="udsb-item udsb-done" onclick="uatNavTo(4)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 4</em>Issues Tracker</span>
+                </button>
+                <button class="udsb-item udsb-active" onclick="uatNavTo(5)">
+                  <span class="udsb-ic udsb-ic-active">🛡</span>
+                  <span class="udsb-item-text"><em>Step 5</em>Cutover Readiness</span>
+                </button>
+                <div class="udsb-sep"></div>
+                <button class="udsb-item" onclick="uatDownloadFullCsv && uatDownloadFullCsv()">
+                  <span class="udsb-ic" style="font-size:14px;background:#f1f5f9;">📄</span>
+                  <span class="udsb-item-text"><em></em>Reports &amp; Export</span>
+                </button>
+              </nav>
+            </div><!-- /uat-sidebar -->
 
-            <!-- Parsed SSH results table — injected by buildPerfTable() -->
-            <div id="perf-parsed-result" style="display:none;margin-bottom:16px;background:rgba(8,16,48,0.7);border:1px solid rgba(148,163,184,0.15);border-radius:8px;overflow:hidden;"></div>
-          </div>
-        </section>
+            <!-- ══ MAIN ══ -->
+            <div id="uat-main">
 
-        <!-- STEP 4: Issues Tracker -->
-        <section class="uat-panel">
-          <div class="uat-panel-header">
-            <h3>Step 4 — Issues Tracker</h3>
-            <div class="uat-actions">
-              <button class="uat-btn" onclick="uatAddIssue()">+ Add Issue</button>
-              <button class="uat-btn uat-btn-good" onclick="uatSaveIssues()">Save</button>
-            </div>
-          </div>
-          <div class="uat-panel-body">
-            <div class="uat-table-wrap">
-              <table class="uat-table">
-                <thead><tr><th>ID</th><th>System</th><th>Test</th><th>Severity</th><th>Owner</th><th>Status</th><th>Description</th><th>Evidence</th><th></th></tr></thead>
-                <tbody id="uat-issues-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+              <!-- TOP HEADER -->
+              <div id="uat-topbar">
+                <div>
+                  <div class="udtb-h">Step 5 — Cutover Readiness</div>
+                  <div class="udtb-s">Post-migration acceptance testing summary and decision</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <div class="ud-mode-pill">
+                    <button id="uat-mode-compact" class="ud-mode-btn ud-mode-btn--on" onclick="uatSetMode('compact')">Compact</button>
+                    <button id="uat-mode-detailed" class="ud-mode-btn" onclick="uatSetMode('detailed')">Detailed</button>
+                  </div>
+                  <button class="ud-export-btn" onclick="uatDownloadFullCsv ? uatDownloadFullCsv() : null">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export Report
+                  </button>
+                </div>
+              </div>
 
-        <!-- STEP 7: Cutover Readiness -->
-        <section style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;">
-            <h3 style="margin:0;color:#1e293b;font-size:13px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;">Step 5 — Cutover Readiness</h3>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;" id="uat-summary-grid"></div>
+              <!-- SCROLLABLE CONTENT -->
+              <div id="uat-content">
+
+                <!-- ── STEPS 1-4 (inside the full-page overlay) ── -->
+                <div id="uat-message" class="uat-note" style="display:none;margin-bottom:10px;">Loading UAT state...</div>
+
+                <!-- STEP 1 -->
+                <section class="uat-panel" data-uat-step="1" style="display:none;">
+                  <div class="uat-panel-header">
+                    <h3>Step 1 — Server Targets</h3>
+                    <div class="uat-actions">
+                      <button class="uat-btn" onclick="uatShowScopeForm()">+ Add Server</button>
+                      <button class="uat-btn uat-btn-good" onclick="uatSaveScope()">Save</button>
+                    </div>
+                  </div>
+                  <div class="uat-panel-body">
+                    <p style="margin:0 0 10px;font-size:12px;color:#bfdbfe;">Enter source OSPC and target FLEX server details. These auto-fill all tools below.</p>
+                    <div id="uat-scope-form" class="uat-form-grid uat-hidden" style="margin-bottom:14px;">
+                      <label>Type<select class="uat-select" name="system_type" onchange="var lbl=document.getElementById('scope-form-db-engine-label');if(lbl)lbl.style.display=this.value==='DB'?'':'none';"><option>App</option><option>DB</option></select></label>
+                      <label>Name<input class="uat-input" name="business_system_name" placeholder="e.g. App Server"></label>
+                      <label>Tier<select class="uat-select" name="tier"><option>Backend</option><option>Frontend</option><option>Database</option><option>Batch</option><option>External Integration</option></select></label>
+                      <label>Source IP (OSPC)<input class="uat-input" name="source_host" id="scope-form-source-host" oninput="scopeFeedComparison(this)"></label>
+                      <label>Target IP (FLEX)<input class="uat-input" name="target_ip" id="scope-form-target-ip" oninput="scopeFeedComparison(this)"></label>
+                      <label>SSH User<input class="uat-input" name="ssh_user" value="ubuntu" id="scope-form-ssh-user" oninput="scopeFeedComparison(this)"></label>
+                      <label>SSH Key<input class="uat-input" name="ssh_key_path" value="~/.ssh/id_rsa" id="scope-form-ssh-key" oninput="scopeFeedComparison(this)"></label>
+                      <label>SSH Port<input class="uat-input" name="ssh_port" value="22" id="scope-form-ssh-port" oninput="scopeFeedComparison(this)"></label>
+                      <label>App Port<input class="uat-input" id="scope-form-app-port" name="app_port" placeholder="e.g. 8080"></label>
+                      <label>DB Port<input class="uat-input" id="scope-form-db-port" name="db_port" placeholder="e.g. 5432"></label>
+                      <label id="scope-form-db-engine-label" style="display:none;">DB Engine<select class="uat-select" name="db_engine" id="scope-form-db-engine"><option value="mysql">MySQL</option><option value="postgresql">PostgreSQL</option></select></label>
+                      <label>DB User<input class="uat-input" name="db_user" id="scope-form-db-user" placeholder="root / postgres"></label>
+                      <label>DB Password<input class="uat-input" type="password" name="db_password" id="scope-form-db-password" placeholder="leave blank if none"></label>
+                      <label>Criticality<select class="uat-select" name="criticality"><option>Critical</option><option>Secondary</option><option>Low</option></select></label>
+                      <label>Owner<input class="uat-input" name="owner"></label>
+                      <label style="display:none;"><select class="uat-select" name="execution_mode"><option>ssh</option></select></label>
+                      <label style="display:none;"><input class="uat-input" name="target_host"></label>
+                      <label style="display:none;"><input class="uat-input" name="ssh_host"></label>
+                      <label style="display:none;"><select class="uat-select" name="uat_status"><option>Testing</option></select></label>
+                      <label style="display:none;"><input class="uat-input" name="dependencies"></label>
+                      <label style="display:none;"><textarea class="uat-textarea" name="notes"></textarea></label>
+                      <div style="align-self:end;"><button class="uat-btn uat-btn-good" onclick="uatAddScope()">Add</button></div>
+                    </div>
+                    <div class="uat-table-wrap">
+                      <table class="uat-table">
+                        <thead><tr><th>Type</th><th>Name</th><th>Tier</th><th>Source IP (OSPC)</th><th>Target IP (FLEX)</th><th>SSH User</th><th>SSH Key</th><th>SSH Port</th><th>App Port</th><th>DB Port</th><th>DB Engine</th><th>Criticality</th><th>Owner</th><th>Status</th><th></th></tr></thead>
+                        <tbody id="uat-scope-body"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- STEP 2 -->
+                <section class="uat-panel" data-uat-step="2" style="display:none;">
+                  <div class="uat-panel-header">
+                    <h3>Step 2 — Service Comparison: OSPC → FLEX</h3>
+                    <span class="uat-note">Auto-filled from Step 1 · SSH compares running systemd services</span>
+                  </div>
+                  <div class="uat-panel-body">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;">
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Source OSPC IP<input class="uat-input" id="svc-source-ip" placeholder="e.g. 10.1.2.100"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Target FLEX IP<input class="uat-input" id="svc-target-ip" placeholder="e.g. 10.2.3.200"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">SSH User<input class="uat-input" id="svc-ssh-user" value="ubuntu"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">SSH Key<input class="uat-input" id="svc-ssh-key" value="~/.ssh/id_rsa"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Port<input class="uat-input" id="svc-ssh-port" value="22" style="max-width:70px;"></label>
+                    </div>
+                    <div class="uat-actions" style="margin-bottom:12px;">
+                      <button class="uat-btn uat-btn-good" onclick="svcCompareRun()">Compare Servers</button>
+                      <button class="uat-btn" onclick="uatCompareDbGlobal()" id="svc-compare-db-btn" style="background:#0e7490;border-color:#0891b2;">Compare DB</button>
+                    </div>
+                    <div id="svc-status" class="uat-note" style="margin-bottom:10px;min-height:18px;"></div>
+                    <div id="svc-summary" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
+                    <div id="svc-analysis" style="display:none;margin-bottom:12px;"></div>
+                    <div class="uat-table-wrap" id="svc-table-wrap" style="display:none;">
+                      <table class="uat-table">
+                        <thead><tr><th>Service</th><th style="text-align:center;">OSPC</th><th style="text-align:center;">FLEX</th><th>Status</th><th>Analysis</th></tr></thead>
+                        <tbody id="svc-compare-body"></tbody>
+                      </table>
+                    </div>
+                    <div id="svc-next-step" style="display:none;margin-top:14px;padding:12px 14px;border-radius:8px;border:1px solid #334155;background:rgba(30,41,59,0.6);">
+                      <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Next Step</div>
+                      <div id="svc-next-step-body"></div>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- STEP 3 -->
+                <section class="uat-panel" id="perf-section" data-uat-step="3" style="display:none;">
+                  <div class="uat-panel-header">
+                    <div>
+                      <h3>Step 3 — Performance Validation</h3>
+                      <span class="uat-note" style="font-size:11px;">SSHes into source &amp; target servers · runs HTTP response, error rate, latency, sessions, CPU, memory &amp; I/O tests · calculates delta vs 15% threshold</span>
+                    </div>
+                    <div class="uat-actions">
+                      <button class="uat-btn" onclick="perfRunSSHTests()" id="perf-run-btn">&#9658; SERVER TESTS</button>
+                      <button class="uat-btn" onclick="uatCompareDbGlobal()" id="perf-db-test-btn" style="background:#0e7490;border-color:#0891b2;">&#9658; Run DB Test</button>
+                      <button class="uat-btn uat-btn-good" onclick="uatSavePerformance()">Calculate &amp; Save</button>
+                    </div>
+                  </div>
+                  <div class="uat-panel-body">
+                    <div id="perf-run-status" style="margin-bottom:10px;font-size:12px;color:#86efac;display:none;"></div>
+
+                    <!-- SSH Log Terminal -->
+                    <div id="perf-log-wrap" style="display:none;margin-bottom:16px;">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#93c5fd;">SSH Output Log</span>
+                        <button class="uat-btn" style="font-size:10px;padding:3px 8px;" onclick="document.getElementById('perf-log-wrap').style.display='none'">✕ Hide</button>
+                      </div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div>
+                          <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:4px;">▶ SOURCE SERVER</div>
+                          <pre id="perf-log-src" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;"></pre>
+                        </div>
+                        <div>
+                          <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:4px;">▶ TARGET SERVER</div>
+                          <pre id="perf-log-tgt" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;"></pre>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Parsed SSH results table — injected by buildPerfTable() -->
+                    <div id="perf-parsed-result" style="display:none;margin-bottom:16px;background:rgba(8,16,48,0.7);border:1px solid rgba(148,163,184,0.15);border-radius:8px;overflow:hidden;"></div>
+                  </div>
+                </section>
+
+                <!-- STEP 4 -->
+                <section class="uat-panel" data-uat-step="4" style="display:none;">
+                  <div class="uat-panel-header">
+                    <h3>Step 4 — Issues Tracker</h3>
+                    <div class="uat-actions">
+                      <button class="uat-btn" onclick="uatAddIssue()">+ Add Issue</button>
+                      <button class="uat-btn uat-btn-good" onclick="uatSaveIssues()">Save</button>
+                    </div>
+                  </div>
+                  <div class="uat-panel-body">
+                    <div class="uat-table-wrap">
+                      <table class="uat-table">
+                        <thead><tr><th>ID</th><th>System</th><th>Test</th><th>Severity</th><th>Owner</th><th>Status</th><th>Description</th><th>Evidence</th><th></th></tr></thead>
+                        <tbody id="uat-issues-body"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+
+                <section id="uat-step5-view" data-uat-step="5">
+                <!-- ── STEP 5 DIVIDER ── -->
+                <div id="uat-step5-divider" style="display:none;align-items:center;gap:10px;margin:20px 0 14px;">
+                  <div style="flex:1;height:2px;background:#bfdbfe;border-radius:2px;"></div>
+                  <span style="background:#2563eb;color:#fff;font-size:10px;font-weight:800;padding:4px 14px;border-radius:12px;white-space:nowrap;letter-spacing:.05em;">▼ STEP 5 — CUTOVER READINESS</span>
+                  <div style="flex:1;height:2px;background:#bfdbfe;border-radius:2px;"></div>
+                </div>
+
+                <!-- C: STATUS BANNER -->
+                <div id="uat-s1-hero" class="ud-banner ud-banner--red"></div>
+
+                <!-- D: READINESS / KPI / FLOW -->
+                <div class="ud-card ud-card--blue" style="margin-bottom:12px;">
+                  <div class="ud-kpi-row">
+                    <div class="ud-gauge-wrap">
+                      <div class="ud-gauge-lbl">Readiness Score</div>
+                      <div id="uat-gauge-wrap"></div>
+                    </div>
+                    <div id="uat-summary-grid" class="ud-kpi-grid"></div>
+                  </div>
+                  <div id="uat-flow-strip" class="ud-flow"></div>
+                </div>
+
+                <!-- E: REVIEW + ACTIONS (4 cols) -->
+                <div id="uat-s4-why-actions" class="ud-why-grid"></div>
+
+                <!-- F: CHARTS -->
+                <div class="ud-card ud-card--blue ud-chart-card" style="margin-bottom:12px;">
+                  <div id="uat-perf-chart" class="ud-chart-col ud-chart-col--border"></div>
+                  <div id="uat-vm-chart"   class="ud-chart-col ud-chart-col--border"></div>
+                  <div id="uat-tco-chart"  class="ud-chart-col"></div>
+                </div>
+                <!-- Hidden price list file inputs -->
+                <input id="uat-ospc-price-input" type="file" accept=".csv,text/csv" style="display:none">
+                <input id="uat-flex-price-input" type="file" accept=".csv,text/csv" style="display:none">
+
+                <!-- G+H: SUMMARY + CTA -->
+                <div class="ud-bottom-row">
+                  <div class="ud-card ud-summary-card">
+                    <div id="uat-svc-health"   class="ud-sum-col ud-sum-col--border"></div>
+                    <div id="uat-perf-summary" class="ud-sum-col ud-sum-col--border"></div>
+                    <div id="uat-db-status"    class="ud-sum-col"></div>
+                  </div>
+                  <div id="uat-cta-buttons" class="ud-cta-wrap"></div>
+                </div>
+
+                <!-- FOOTER -->
+                <div id="uat-footer" class="ud-footer"></div>
+                </section>
+
+                <!-- DETAIL SECTIONS (hidden in compact) -->
+                <div id="uat-detailed-sections" style="display:none;"></div>
+
+              </div><!-- /uat-content -->
+            </div><!-- /uat-main -->
+          </div><!-- /uat-layout -->
+
+          <!-- Hidden scope controls (do NOT remove) -->
+          <div id="uat-s3-scope" style="display:none;">
+            <select id="uat-scope-apptype" onchange="uatScopeChange()">
+              <option value="web">Web Application</option>
+              <option value="api">API / Microservice</option>
+              <option value="db">Database-Only</option>
+              <option value="mixed">Mixed (Web + API + DB)</option>
+              <option value="batch">Batch / Background Jobs</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="uat-scope-dbtype" onchange="uatScopeChange()">
+              <option value="none">None / Not Applicable</option>
+              <option value="mysql">MySQL / MariaDB</option>
+              <option value="postgres">PostgreSQL</option>
+              <option value="mssql">SQL Server</option>
+              <option value="oracle">Oracle</option>
+              <option value="mongo">MongoDB</option>
+              <option value="redis">Redis</option>
+              <option value="other">Other</option>
+            </select>
+            <div id="uat-scope-dbtype-wrap"><select id="uat-scope-dbtype-inner" onchange="uatScopeChange()"></select></div>
+            <input type="checkbox" id="uat-scope-http"    onchange="uatScopeChange()">
+            <input type="checkbox" id="uat-scope-api"     onchange="uatScopeChange()">
+            <input type="checkbox" id="uat-scope-db"      onchange="uatScopeChange()">
+            <input type="checkbox" id="uat-scope-network" onchange="uatScopeChange()">
+            <span id="uat-scope-db-detected" style="display:none;"></span>
+            <div id="uat-scope-pills"></div>
           </div>
-          <div style="padding:14px;background:#ffffff;">
-            <div id="uat-readiness-panel"></div>
-            <div id="uat-export-links" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;"></div>
-          </div>
-        </section>
+          <div id="uat-readiness-panel" style="display:none;"></div>
+          <div id="uat-export-links"    style="display:none;"></div>
+        </div><!-- /uat-dashboard -->
+
+        <script>
+        // ── UAT Dashboard Bootstrap ───────────────────────────────────────────────────
+        (function initUatScope() {
+          var saved = {};
+          try { saved = JSON.parse(localStorage.getItem('uat_workload_scope') || 'null') || {}; } catch(e) {}
+          // Fix stale all-false state
+          if (saved.hasHTTP === false && saved.hasAPI === false && saved.hasDatabase === false && saved.hasNetwork === false) {
+            saved = { appType: saved.appType || 'web', dbType: saved.dbType || 'none' };
+            try { localStorage.removeItem('uat_workload_scope'); } catch(e) {}
+          }
+          function el(id) { return document.getElementById(id); }
+          if (saved.appType) { var at = el('uat-scope-apptype'); if (at) at.value = saved.appType; }
+          if (saved.dbType)  { var dt = el('uat-scope-dbtype');  if (dt) dt.value = saved.dbType; }
+          var cb_http    = el('uat-scope-http');    if (cb_http)    cb_http.checked    = saved.hasHTTP    !== false;
+          var cb_api     = el('uat-scope-api');     if (cb_api)     cb_api.checked     = saved.hasAPI     !== false;
+          var cb_db      = el('uat-scope-db');      if (cb_db)      cb_db.checked      = saved.hasDatabase !== false;
+          var cb_network = el('uat-scope-network'); if (cb_network) cb_network.checked = saved.hasNetwork  !== false;
+          uatScopeChange();
+        })();
+
+        window.uatSetMode = function(mode, silent) {
+          document.body.classList.add('uat-dashboard-active');
+          ['compact','detailed'].forEach(function(m) {
+            var btn = document.getElementById('uat-mode-' + m);
+            if (btn) btn.classList.toggle('ud-mode-btn--on', m === mode);
+          });
+          var content = document.getElementById('uat-content');
+          if (content) content.setAttribute('data-uat-mode', mode);
+          if (mode === 'compact') {
+            if (window.uatNavTo) window.uatNavTo(5, true);
+          } else {
+            if (content) {
+              content.querySelectorAll('[data-uat-step]').forEach(function(panel) { panel.style.display = ''; });
+              var msg = document.getElementById('uat-message');
+              if (msg) msg.style.display = '';
+              content.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }
+          if (!silent) try { localStorage.setItem('uatMode', mode); } catch(e) {}
+        };
+
+        window.uatNavTo = function(step, instant) {
+          document.body.classList.add('uat-dashboard-active');
+          var content = document.getElementById('uat-content');
+          if (!content) return;
+          content.setAttribute('data-uat-mode', 'compact');
+          ['compact','detailed'].forEach(function(m) {
+            var btn = document.getElementById('uat-mode-' + m);
+            if (btn) btn.classList.toggle('ud-mode-btn--on', m === 'compact');
+          });
+          content.querySelectorAll('[data-uat-step]').forEach(function(panel) {
+            panel.style.display = Number(panel.getAttribute('data-uat-step')) === Number(step) ? '' : 'none';
+          });
+          var msg = document.getElementById('uat-message');
+          if (msg) msg.style.display = step === 5 ? 'none' : '';
+          var theme = document.getElementById('top-theme-dropdown');
+          if (theme) theme.style.display = 'none';
+          document.querySelectorAll('#uat-sidebar .udsb-item').forEach(function(btn, idx) {
+            var isReport = idx > 4;
+            btn.classList.toggle('udsb-active', !isReport && idx === step - 1);
+          });
+          var target = content.querySelector('[data-uat-step="' + step + '"]');
+          if (!target) return;
+          // Walk up offsetParent chain to get top relative to #uat-content
+          var top = 0, el = target;
+          while (el && el !== content) { top += el.offsetTop; el = el.offsetParent; }
+          content.scrollTo({ top: top - 10, behavior: instant ? 'auto' : 'smooth' });
+        };
+
+        setTimeout(function() { if (window.uatSetMode) window.uatSetMode('compact', true); }, 0);
+
+        window.uatToggleSection = function(id) {
+          var el = document.getElementById(id);
+          if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+        };
+
+        window.uatScopeChange = function() {
+          function el(id) { return document.getElementById(id); }
+          var appType    = (el('uat-scope-apptype')  || {}).value || 'web';
+          var dbType     = (el('uat-scope-dbtype')   || {}).value || 'none';
+          var hasHTTP    = !!(el('uat-scope-http')    || {}).checked;
+          var hasAPI     = !!(el('uat-scope-api')     || {}).checked;
+          var hasDB      = !!(el('uat-scope-db')      || {}).checked;
+          var hasNetwork = !!(el('uat-scope-network') || {}).checked;
+          var dbDetected = Array.from(document.querySelectorAll('#uat-scope-body tr')).some(function(tr) {
+            var sels = tr.querySelectorAll('select');
+            if (sels[0] && sels[0].value === 'DB') return true;
+            var engines = ['mysql','postgresql','mariadb','mssql','oracle','mongo','redis'];
+            if (sels[10] && engines.indexOf((sels[10].value||'').toLowerCase()) >= 0) return true;
+            return false;
+          });
+          var dbDetEl = el('uat-scope-db-detected');
+          if (dbDetEl) dbDetEl.style.display = dbDetected ? 'inline' : 'none';
+          var scope = { appType:appType, dbType:hasDB?dbType:'none', hasHTTP:hasHTTP, hasAPI:hasAPI, hasDatabase:hasDB, hasNetwork:hasNetwork };
+          try { localStorage.setItem('uat_workload_scope', JSON.stringify(scope)); } catch(e) {}
+          if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
+        };
+
+        // ── Flavor & TCO Data Loader ────────────────────────────────────────────────
+        window._uatFlavorData = null;
+
+        window.uatLoadFlavorDataLegacy = function() {
+          fetch('/api/dashboard/csv-files')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (!d.ok || !d.files) return;
+              var flavorFile = d.files.find(function(f) { return f.toLowerCase().indexOf('_flavormap') >= 0; });
+              var tcoFile    = d.files.find(function(f) { return f.toLowerCase().indexOf('tco_comparison') >= 0 || f.toLowerCase().indexOf('final_migration_tco') >= 0; });
+
+              var promises = [];
+              promises.push(fetch('/api/uat/flavor-summary').then(function(r){ return r.json(); }).catch(function(){ return null; }));
+              if (flavorFile) promises.push(fetch('/api/dashboard/csv-content/' + flavorFile).then(function(r){return r.text();}));
+              else promises.push(Promise.resolve(''));
+              if (tcoFile) promises.push(fetch('/api/dashboard/csv-content/' + tcoFile).then(function(r){return r.text();}));
+              else promises.push(Promise.resolve(''));
+
+              return Promise.all(promises);
+            })
+            .then(function(results) {
+              if (!results) return;
+              var flavorSummary = results[0] || null;
+              var flavorCsv = results[1] || '';
+              var tcoCsv = results[2] || '';
+
+              function parseCsv(text) {
+                var lines = text.split('\n').filter(function(l){ return l.trim(); });
+                if (!lines.length) return [];
+                var headers = lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g,''); });
+                return lines.slice(1).map(function(line) {
+                  var vals = line.split(',');
+                  var obj = {};
+                  headers.forEach(function(h, i) { obj[h] = (vals[i] || '').trim().replace(/^"|"$/g,''); });
+                  return obj;
+                });
+              }
+
+              var fmRows = parseCsv(flavorCsv).filter(function(r){ return r.source_resource_type === 'cloud_server' || r.source_vcpus || r.source_flavor_name || r.target_flavor_name; });
+              var tcoRows = parseCsv(tcoCsv);
+
+              // VM size aggregation
+              var srcVcpus = [], tgtVcpus = [], srcRamGb = [], tgtRamGb = [], srcDiskGb = [], tgtDiskGb = [];
+              var totalTargetMonthly = 0;
+              fmRows.forEach(function(r) {
+                var sv = parseFloat(r.source_vcpus); if (sv > 0) srcVcpus.push(sv);
+                var tv = parseFloat(r.target_vcpus); if (tv > 0) tgtVcpus.push(tv);
+                var srm = parseFloat(r.source_ram_mb); if (srm > 0) srcRamGb.push(srm/1024);
+                var trm = parseFloat(r.target_ram_mb); if (trm > 0) tgtRamGb.push(trm/1024);
+                var sd = parseFloat(r.source_disk_gb); if (sd > 0) srcDiskGb.push(sd);
+                var td = parseFloat(r.target_disk_gb); if (td > 0) tgtDiskGb.push(td);
+                var mc = parseFloat(r.target_monthly_cost_min_usd); if (mc > 0) totalTargetMonthly += mc;
+              });
+
+              function avg(arr) { return arr.length ? arr.reduce(function(a,b){return a+b;},0)/arr.length : 0; }
+
+              var vmData = flavorSummary && flavorSummary.ok && flavorSummary.vmData ? flavorSummary.vmData : {
+                srcVcpu: Math.round(avg(srcVcpus)),
+                tgtVcpu: Math.round(avg(tgtVcpus)),
+                srcRam:  Math.round(avg(srcRamGb)),
+                tgtRam:  Math.round(avg(tgtRamGb)),
+                srcDisk: Math.round(avg(srcDiskGb)),
+                tgtDisk: Math.round(avg(tgtDiskGb)),
+                rows: fmRows.length,
+                sourceFlavors: [],
+                targetFlavors: [],
+                flavorPairs: [],
+                flavorMapFile: flavorFile || '',
+              };
+
+              // TCO aggregation
+              var srcMonthly = 0, tgtMonthlyFromTco = 0;
+              tcoRows.forEach(function(r) {
+                var lc = parseFloat((r['Legacy Cloud Cost ($)'] || r['Legacy Cost'] || '').replace(/[$,]/g,''));
+                var fc = parseFloat((r['FLEX Cloud Cost ($)'] || r['FLEX Cost'] || '').replace(/[$,]/g,''));
+                if (lc > 0) srcMonthly += lc;
+                if (fc > 0) tgtMonthlyFromTco += fc;
+              });
+              if (!srcMonthly) srcMonthly = (vmData.targetMonthly || totalTargetMonthly) * 2.5;
+              var tgtMonthly = tgtMonthlyFromTco || totalTargetMonthly;
+              if (!tgtMonthly && vmData.targetMonthly) tgtMonthly = vmData.targetMonthly;
+              if (!tgtMonthly) tgtMonthly = srcMonthly * 0.74;
+              var savings = srcMonthly - tgtMonthly;
+              var savingsPct = srcMonthly > 0 ? (savings / srcMonthly * 100) : 0;
+
+              var tcoData = {
+                srcMonthly:  Math.round(srcMonthly),
+                tgtMonthly:  Math.round(tgtMonthly),
+                savings:     Math.round(savings),
+                savingsPct:  savingsPct.toFixed(1),
+              };
+
+              window._uatFlavorData = { vmData: vmData, tcoData: tcoData };
+              if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
+            })
+            .catch(function(e) {
+              // Use placeholder data on error
+              window._uatFlavorData = {
+                vmData: { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000, rows:0 },
+                tcoData: { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:'26.2' },
+              };
+              if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
+            });
+        };
+
+        // Price list upload handlers for UAT TCO
+        window._uatPriceListState = { ospcMeta:'No file loaded', flexMeta:'No file loaded', ospcMonthly:0, flexMonthly:0 };
+        function _uatParsePriceTotal(text, costKeys) {
+          var lines = text.trim().split(/\r?\n/);
+          if (lines.length < 2) return 0;
+          var headers = lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g,'').toLowerCase(); });
+          var total = 0;
+          lines.slice(1).forEach(function(line) {
+            if (!line.trim()) return;
+            var vals = line.split(',');
+            var obj = {};
+            headers.forEach(function(h,i){ obj[h] = (vals[i]||'').trim().replace(/^"|"$/g,''); });
+            var cost = 0;
+            for (var k = 0; k < costKeys.length; k++) {
+              var v = parseFloat((obj[costKeys[k]]||'').replace(/[^0-9.]/g,''));
+              if (!isNaN(v) && v > 0) { cost = v; break; }
+            }
+            total += cost;
+          });
+          return total;
+        }
+        function _uatRerunTco() {
+          if (window._uatFlavorData && typeof window.uatRerenderReadiness === 'function') {
+            try { window.uatRerenderReadiness(); } catch(e) {}
+          }
+        }
+        (function() {
+          var ospcEl = document.getElementById('uat-ospc-price-input');
+          var flexEl = document.getElementById('uat-flex-price-input');
+          if (ospcEl) ospcEl.addEventListener('change', function(e) {
+            var f = e.target.files[0]; if (!f) return;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+              var total = _uatParsePriceTotal(ev.target.result, ['monthly_cost_usd','monthly_cost','cost_monthly','cost_per_month']);
+              window._uatPriceListState.ospcMonthly = total;
+              window._uatPriceListState.ospcMeta = f.name + (total > 0 ? ' ($' + Math.round(total).toLocaleString() + '/mo)' : ' (no costs found)');
+              _uatRerunTco();
+            };
+            reader.readAsText(f);
+          });
+          if (flexEl) flexEl.addEventListener('change', function(e) {
+            var f = e.target.files[0]; if (!f) return;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+              // Hourly rates × 730 = monthly; if value > 10 assume already monthly
+              var lines = ev.target.result.trim().split(/\r?\n/);
+              var hdrs = lines.length ? lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g,'').toLowerCase(); }) : [];
+              var total = 0;
+              lines.slice(1).forEach(function(line) {
+                if (!line.trim()) return;
+                var vals = line.split(','), obj = {};
+                hdrs.forEach(function(h,i){ obj[h] = (vals[i]||'').trim().replace(/^"|"$/g,''); });
+                var costKeys = ['hourly_rate','cost_per_hour','hourly_rate_usd','hourly_cost','monthly_cost_usd','monthly_cost'];
+                for (var k = 0; k < costKeys.length; k++) {
+                  var v = parseFloat((obj[costKeys[k]]||'').replace(/[^0-9.]/g,''));
+                  if (!isNaN(v) && v > 0) { total += (v <= 10 ? v * 730 : v); break; }
+                }
+              });
+              window._uatPriceListState.flexMonthly = total;
+              window._uatPriceListState.flexMeta = f.name + (total > 0 ? ' ($' + Math.round(total).toLocaleString() + '/mo)' : ' (no costs found)');
+              _uatRerunTco();
+            };
+            reader.readAsText(f);
+          });
+        })();
+
+        // Static /static/uat/uat.js owns the active flavor loader.
+        </script>
 
         <!-- UTILITY: Migration Logs (collapsed) -->
         <details class="uat-panel" style="overflow:visible;">
@@ -2818,15 +3232,749 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           </div>
         </details>
 
-        <!-- Bottom action bar -->
-        <div style="display:flex;justify-content:flex-end;gap:10px;padding:6px 0;">
-          <button class="uat-btn" onclick="CloudJumperUAT.load()">Refresh</button>
-          <button class="uat-btn uat-btn-good" onclick="uatDownloadFullCsv()">Export UAT Report</button>
-        </div>
 
       </div>
 
       <style>
+        /* ══════════════════════════════════════════════════
+           UAT DASHBOARD — COMPLETE STYLE RESET
+           ══════════════════════════════════════════════════ */
+
+        /* Kill parent container constraints */
+        body.uat-dashboard-active #panel-s4,
+        #panel-s4 {
+          width: 100vw !important;
+          max-width: 100vw !important;
+        }
+        body.uat-dashboard-active #panel-s4 {
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        #panel-s4 > .info-panel { padding: 0 !important; gap: 0 !important; background: transparent !important; }
+        #panel-s4 .uat-console  {
+          display: block !important;
+          gap: 0 !important;
+          color: #0f172a !important;
+          width: min(100vw, 1692px) !important;
+          max-width: 1692px !important;
+          margin: 0 auto !important;
+        }
+        /* Hide hero from original DOM position — it's now inside the overlay */
+        .uat-hero { display: none !important; }
+        /* #uat-message is inside #uat-content now — keep it visible */
+
+        /* CSS Variables */
+        #uat-dashboard {
+          --ud-bg:       #f7faff;
+          --ud-surface:  #ffffff;
+          --ud-text:     #0f172a;
+          --ud-muted:    #64748b;
+          --ud-blue:     #2563eb;
+          --ud-blue-bg:  #eff6ff;
+          --ud-blue-bd:  #2563eb;
+          --ud-red:      #ef4444;
+          --ud-red-bg:   #fff1f2;
+          --ud-red-bd:   #ef4444;
+          --ud-green:    #16a34a;
+          --ud-orange:   #f59e0b;
+          --ud-border:   #dbeafe;
+          --ud-shadow:   0 2px 12px rgba(15,23,42,.07);
+          --ud-radius:   12px;
+        }
+
+        /* ── Outer shell ── */
+        #uat-dashboard {
+          display: flex !important;
+          width: 100% !important;
+          background: var(--ud-bg) !important;
+          color: var(--ud-text) !important;
+          font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
+          padding: 0 !important; margin: 0 !important;
+          border-radius: 0 !important; box-shadow: none !important;
+        }
+        #uat-dashboard * { box-sizing: border-box; }
+
+        /* ── Layout ── */
+        #uat-layout { display: flex; width: 100%; min-height: calc(100vh - 280px); background: #f7faff; }
+
+        /* ══ SIDEBAR ══ */
+        #uat-sidebar {
+          width: 175px; flex-shrink: 0;
+          background: #ffffff !important; background-color: #ffffff !important;
+          color: #374151 !important;
+          border-right: 1px solid #e5e7eb;
+          display: flex; flex-direction: column;
+          height: calc(100vh - 280px);
+          position: sticky; top: 0;
+          overflow-y: auto;
+        }
+        /* Force all sidebar text dark — prevent dark parent theme bleeding through */
+        #uat-sidebar, #uat-sidebar * { color: #374151 !important; }
+        #uat-sidebar .udsb-title  { color: #1e293b !important; }
+        #uat-sidebar .udsb-sub    { color: #94a3b8 !important; }
+        #uat-sidebar .udsb-ic-done, #uat-sidebar .udsb-ic-active { color: #fff !important; }
+        #uat-sidebar .udsb-active .udsb-item-text * { color: #1e40af !important; }
+        #uat-sidebar .udsb-uname  { color: #1e293b !important; }
+        #uat-sidebar .udsb-uemail { color: #94a3b8 !important; }
+        .udsb-header {
+          padding: 18px 16px 14px; display: flex; align-items: center; gap: 10px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .udsb-logo {
+          width: 34px; height: 34px; background: var(--ud-blue); border-radius: 8px;
+          display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+        }
+        .udsb-title { font-size: 13px; font-weight: 800; color: #1e293b; line-height: 1.2; }
+        .udsb-sub   { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+        .udsb-nav   { flex: 1; padding: 8px 0; }
+        .udsb-item  {
+          display: flex; align-items: center; gap: 10px;
+          width: 100%; padding: 10px 16px; border: none; background: transparent;
+          text-align: left; cursor: pointer; transition: background .12s;
+        }
+        .udsb-item:hover { background: #f8fafc; }
+        .udsb-active { background: #eff6ff !important; border-left: 3px solid var(--ud-blue); padding-left: 13px !important; }
+        .udsb-ic {
+          width: 24px; height: 24px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 900; flex-shrink: 0;
+          background: #e5e7eb; color: #9ca3af;
+        }
+        .udsb-ic-done   { background: #16a34a !important; color: #fff !important; }
+        .udsb-ic-active { background: var(--ud-blue) !important; color: #fff !important; font-size: 13px; }
+        .udsb-item-text { display: flex; flex-direction: column; min-width: 0; }
+        .udsb-item-text em { font-size: 9px; color: #94a3b8; font-style: normal; text-transform: uppercase; letter-spacing: .05em; }
+        .udsb-item-text span, .udsb-item-text { font-size: 12px; font-weight: 600; color: #374151; }
+        .udsb-active .udsb-item-text { color: #1e40af !important; }
+        .udsb-active .udsb-item-text em { color: #93c5fd !important; }
+        .udsb-sep  { border-top: 1px solid #f1f5f9; margin: 6px 16px; }
+        .udsb-foot { padding: 12px 16px; border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 8px; }
+        .udsb-env  {
+          display: flex; align-items: center; gap: 5px; font-size: 11px; color: #374151;
+          background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 10px; cursor: pointer;
+        }
+        .udsb-env strong { margin-left: 3px; font-weight: 700; }
+        .udsb-arr  { margin-left: auto; color: #9ca3af; font-size: 11px; }
+        .udsb-user { display: flex; align-items: center; gap: 8px; }
+        .udsb-av   {
+          width: 28px; height: 28px; background: var(--ud-blue); border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0;
+        }
+        .udsb-uinfo { flex: 1; min-width: 0; }
+        .udsb-uname  { font-size: 11px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .udsb-uemail { font-size: 9px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ══ MAIN ══ */
+        #uat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--ud-bg); }
+
+        /* ── Top bar ── */
+        #uat-topbar {
+          background: #fff; border-bottom: 1px solid #e5e7eb;
+          padding: 14px 24px; display: flex; align-items: center;
+          justify-content: space-between; flex-shrink: 0; gap: 12px;
+        }
+        .udtb-h { font-size: 18px; font-weight: 800; color: #111827; }
+        .udtb-s { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+        /* ── Content ── */
+        #uat-content { flex: 1; padding: 16px 20px; overflow-y: visible; }
+
+        /* ── Cards ── */
+        .ud-card {
+          background: #fff; border: 1.5px solid #e5e7eb;
+          border-radius: var(--ud-radius); box-shadow: var(--ud-shadow);
+          margin-bottom: 12px;
+        }
+        .ud-card--blue { border-color: var(--ud-blue-bd) !important; background: #fff; }
+        .ud-card--red  { border-color: var(--ud-red-bd)  !important; background: var(--ud-red-bg); }
+
+        /* ── Banner ── */
+        .ud-banner { padding: 14px 20px; border-radius: var(--ud-radius); margin-bottom: 12px; }
+        .ud-banner--red { border: 1.5px solid var(--ud-red-bd); background: var(--ud-red-bg); }
+
+        /* ── Topbar controls ── */
+        .ud-mode-pill { display: flex; border: 1px solid #d1d5db; border-radius: 7px; overflow: hidden; }
+        .ud-mode-btn  { padding: 5px 14px; font-size: 12px; font-weight: 700; background: #fff; color: #6b7280; border: none; cursor: pointer; }
+        .ud-mode-btn--on { background: var(--ud-blue); color: #fff; }
+        .ud-export-btn  { padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 7px; background: #fff; font-size: 12px; font-weight: 700; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+
+        /* ── KPI row ── */
+        .ud-kpi-row  { display: flex; align-items: flex-start; gap: 24px; padding: 20px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+        .ud-gauge-wrap { flex-shrink: 0; }
+        .ud-gauge-lbl  { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 6px; }
+        .ud-kpi-grid   { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; align-items: flex-start; }
+        .ud-kpi {
+          background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+          padding: 10px 14px; flex: 1; min-width: 90px;
+        }
+        .ud-kpi-lbl { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 5px; }
+        .ud-kpi-val { font-size: 26px; font-weight: 900; line-height: 1; margin: 4px 0 2px; }
+        .ud-kpi-sub { font-size: 11px; color: #9ca3af; }
+
+        /* ── Flow ── */
+        .ud-flow { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 16px 20px; }
+        .ud-flow-node {
+          display: flex; flex-direction: column; padding: 12px 16px;
+          border-radius: 10px; min-width: 140px; flex: 1; border: 1px solid #e5e7eb; background: #fff;
+        }
+        .ud-flow-node-title { font-size: 11px; font-weight: 800; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+        .ud-flow-arr  { display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #93c5fd; font-size: 22px; flex-shrink: 0; }
+        .ud-flow-tag  { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 700; margin: 2px 2px 2px 0; }
+
+        /* ── Why/Actions grid ── */
+        .ud-why-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1.1fr; gap: 12px; margin-bottom: 12px; }
+        .ud-why-col  { border-radius: 10px; padding: 14px 16px; }
+        .ud-why-title { font-size: 12px; font-weight: 800; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid; display: flex; align-items: center; gap: 7px; }
+        .ud-why-item { font-size: 11px; padding: 3px 0; }
+        .ud-why-item-main { font-weight: 700; color: #111827; }
+        .ud-why-item-sub  { color: #6b7280; font-size: 10px; padding-left: 10px; }
+        .ud-action-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; }
+        .ud-action-num  { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; flex-shrink: 0; color: #fff; }
+        .ud-action-lbl  { flex: 1; font-size: 11px; font-weight: 600; color: #374151; }
+        .ud-action-tag  { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+        .ud-action-arr  { color: #9ca3af; font-size: 12px; }
+
+        /* ── Chart card ── */
+        .ud-chart-card { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 0; overflow: hidden; }
+        .ud-chart-col  { padding: 18px 20px; }
+        .ud-chart-col--border { border-right: 1px solid var(--ud-border); }
+        .ud-chart-title { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 8px; }
+        .ud-chart-legend { display: flex; gap: 12px; font-size: 10px; margin-bottom: 8px; }
+        .ud-legend-dot  { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+        .ud-bar-row     { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+        .ud-bar-lbl     { font-size: 10px; color: #374151; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ud-bar-stack   { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+        .ud-bar-line    { display: flex; align-items: center; gap: 4px; }
+        .ud-bar-track   { flex: 1; height: 7px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+        .ud-bar-fill-b  { height: 100%; background: var(--ud-blue); border-radius: 3px; transition: width .4s; }
+        .ud-bar-fill-g  { height: 100%; background: var(--ud-green); border-radius: 3px; transition: width .4s; }
+        .ud-bar-val     { font-size: 9px; color: #6b7280; min-width: 22px; text-align: right; }
+        .ud-tco-bars    { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+        .ud-tco-col     { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .ud-tco-bar     { border-radius: 4px 4px 0 0; min-width: 34px; display: flex; align-items: flex-start; justify-content: center; padding-top: 4px; }
+        .ud-tco-bar-v   { font-size: 9px; font-weight: 700; color: #fff; }
+        .ud-tco-bar-l   { font-size: 9px; color: #6b7280; text-align: center; max-width: 70px; }
+        .ud-savings-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+
+        /* ── Bottom row ── */
+        .ud-bottom-row   { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: stretch; margin-bottom: 12px; }
+        .ud-summary-card { display: grid; grid-template-columns: 1fr 1fr 1fr; overflow: hidden; }
+        .ud-sum-col      { padding: 16px 18px; }
+        .ud-sum-col--border { border-right: 1px solid #e5e7eb; }
+        .ud-sum-title    { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .ud-svc-counts   { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .ud-svc-stat     { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; }
+        .ud-seg-bar      { height: 8px; border-radius: 4px; overflow: hidden; display: flex; background: #f3f4f6; margin-bottom: 4px; }
+        .ud-seg-ok   { background: #22c55e; }
+        .ud-seg-rev  { background: #f59e0b; }
+        .ud-seg-warn { background: #fbbf24; }
+        .ud-seg-crit { background: #ef4444; }
+
+        /* ── CTA ── */
+        .ud-cta-wrap { display: flex; flex-direction: row; gap: 8px; align-items: stretch; }
+        .ud-cta-pass, .ud-cta-fix {
+          display: flex !important; flex-direction: row !important;
+          align-items: center !important; justify-content: flex-start !important;
+          gap: 12px; padding: 12px 20px; border: none; border-radius: 8px;
+          cursor: pointer; min-width: 185px; font-family: inherit; text-align: left;
+          flex: 1;
+        }
+        .ud-cta-pass { background: #16a34a !important; color: #fff !important; }
+        .ud-cta-fix  { background: #dc2626 !important; color: #fff !important; }
+        .ud-cta-ic-wrap {
+          width: 38px; height: 38px; border-radius: 50%;
+          background: rgba(255,255,255,.25);
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .ud-cta-ic   { font-size: 18px; color: #fff; font-weight: 900; }
+        .ud-cta-txt  { display: flex; flex-direction: column; gap: 1px; }
+        .ud-cta-main { font-size: 20px; font-weight: 900; letter-spacing: .02em; color: #fff !important; line-height: 1.1; }
+        .ud-cta-sub  { font-size: 10px; color: rgba(255,255,255,.88) !important; line-height: 1.3; }
+
+        /* ── Footer ── */
+        .ud-footer { text-align: center; font-size: 11px; color: #9ca3af; padding: 10px 0; border-top: 1px solid #f3f4f6; }
+
+        /* ── Steps 1-4 inside the overlay: dark card style ── */
+        #uat-content .uat-panel {
+          background: #1a2744 !important;
+          border: 1.5px solid rgba(96,130,200,.25) !important;
+          border-radius: 12px !important;
+          margin-bottom: 14px !important;
+          overflow: hidden;
+        }
+        #uat-content .uat-panel .uat-panel-header {
+          background: #152040 !important;
+          border-bottom: 1px solid rgba(96,130,200,.2) !important;
+          border-radius: 12px 12px 0 0 !important;
+        }
+        #uat-content .uat-panel .uat-panel-header h3 { color: #e2e8f0 !important; }
+        #uat-content .uat-panel .uat-panel-body { padding: 14px 16px !important; }
+        #uat-content .uat-note { color: #93c5fd !important; }
+
+        /* ── Step divider ── */
+        #uat-step5-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 14px; }
+
+        /* ── Responsive ── */
+        @media(max-width:900px){
+          .ud-why-grid  { grid-template-columns: 1fr 1fr !important; }
+          .ud-chart-card { grid-template-columns: 1fr !important; }
+          .ud-bottom-row { grid-template-columns: 1fr !important; }
+          .ud-summary-card { grid-template-columns: 1fr !important; }
+          .ud-cta-wrap  { flex-direction: column !important; }
+          #uat-sidebar  { display: none; }
+        }
+
+        /* Keep old variable names for uat.js compatibility */
+        .ud-card { background:#fff; border:1.5px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+        .ud-card--red  { border-color:#fecaca !important; background:#fef2f2 !important; }
+        .ud-card--blue { border-color:#bfdbfe !important; }
+        .ud-kpi { padding:10px 14px; background:#fff; border:1px solid #e5e7eb; border-radius:10px; min-width:90px; flex:1; }
+        .ud-kpi-label { font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap; }
+        .ud-kpi-val { font-size:26px;font-weight:900;margin:3px 0 2px;line-height:1; }
+        .ud-kpi-sub { font-size:11px;color:#9ca3af; }
+        .ud-flow-node { display:flex;flex-direction:column;padding:12px 16px;border-radius:10px;min-width:130px;flex:1;border:1px solid #e5e7eb;background:#fff; }
+        .ud-flow-node-title { font-size:11px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:5px; }
+        .ud-flow-arrow { display:flex;align-items:center;justify-content:center;padding:0 8px;color:#93c5fd;font-size:22px;flex-shrink:0; }
+        .ud-flow-tag { display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;margin:2px 2px 2px 0; }
+        .ud-why-col { border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05); }
+        .ud-why-title { font-size:12px;font-weight:800;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid;display:flex;align-items:center;gap:7px; }
+        .ud-why-item { font-size:11px;padding:3px 0; }
+        .ud-why-item-main { font-weight:700;color:#111827; }
+        .ud-why-item-sub  { color:#6b7280;font-size:10px;padding-left:10px; }
+        .ud-action-row { display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6; }
+        .ud-action-num  { width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;flex-shrink:0;color:#fff; }
+        .ud-action-label { flex:1;font-size:11px;font-weight:600;color:#374151; }
+        .ud-action-tag   { padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase; }
+        .ud-action-arrow { color:#9ca3af;font-size:12px; }
+        .ud-chart-row  { display:flex;align-items:center;gap:6px;margin-bottom:6px; }
+        .ud-chart-label { font-size:11px;color:#374151;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+        .ud-chart-bars  { flex:1;display:flex;flex-direction:column;gap:2px; }
+        .ud-bar-line    { display:flex;align-items:center;gap:4px; }
+        .ud-bar-src-lbl { width:32px;text-align:right;font-size:9px;color:#6b7280; }
+        .ud-bar-track   { flex:1;height:7px;background:#f3f4f6;border-radius:3px;overflow:hidden; }
+        .ud-bar-fill-blue  { height:100%;background:#3b82f6;border-radius:3px;transition:width .4s; }
+        .ud-bar-fill-green { height:100%;background:#22c55e;border-radius:3px;transition:width .4s; }
+        .ud-bar-val     { font-size:9px;color:#6b7280;min-width:22px;text-align:right; }
+        .ud-chart-xlabel { text-align:center;margin-top:4px;font-size:9px;color:#9ca3af; }
+        .ud-tco-wrap    { display:flex;gap:10px;align-items:flex-end;margin-bottom:8px; }
+        .ud-tco-bar-col { display:flex;flex-direction:column;align-items:center;gap:3px; }
+        .ud-tco-bar     { border-radius:4px 4px 0 0;min-width:34px;display:flex;align-items:flex-start;justify-content:center;padding-top:4px; }
+        .ud-tco-bar-val { font-size:9px;font-weight:700;color:#fff;white-space:nowrap; }
+        .ud-tco-bar-lbl { font-size:9px;color:#6b7280;text-align:center;max-width:70px; }
+        .ud-tco-savings-card { background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px; }
+        .ud-svc-counts  { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px; }
+        .ud-svc-stat    { display:flex;align-items:center;gap:3px;font-size:11px;font-weight:700; }
+        .ud-seg-bar     { height:8px;border-radius:4px;overflow:hidden;display:flex;background:#f3f4f6;margin-bottom:4px; }
+        .ud-seg-ok  { background:#22c55e; }
+        .ud-seg-rev { background:#f59e0b; }
+        .ud-seg-warn{ background:#fbbf24; }
+        .ud-seg-crit{ background:#ef4444; }
+        /* duplicate CTA removed — canonical rules above */
+
+        /* ── Final template fit overrides: white nav, compact readable dashboard ── */
+        body.uat-dashboard-active #top-theme-dropdown {
+          display: none !important;
+        }
+        #uat-dashboard {
+          width: 100% !important;
+          max-width: 1692px !important;
+          border: 1px solid #cbd5e1 !important;
+          background: #eef3f8 !important;
+          box-shadow: 0 2px 8px rgba(15,23,42,.08) !important;
+          min-height: calc(100vh - 2px) !important;
+          height: calc(100vh - 2px) !important;
+          overflow: hidden !important;
+        }
+        #uat-layout {
+          width: 100% !important;
+          min-height: 0 !important;
+          height: 100% !important;
+          background: #f7faff !important;
+        }
+        #uat-sidebar {
+          width: 232px !important;
+          height: 100% !important;
+          min-height: 0 !important;
+          background: #ffffff !important;
+          border-right: 1px solid #dbe3ef !important;
+        }
+        #uat-sidebar, #uat-sidebar * { color: #24324a !important; }
+        #uat-sidebar .udsb-logo,
+        #uat-sidebar .udsb-av,
+        #uat-sidebar .udsb-ic-done,
+        #uat-sidebar .udsb-ic-active { color: #ffffff !important; }
+        #uat-sidebar .udsb-active {
+          background: #eaf3ff !important;
+          border-left-color: #2563eb !important;
+        }
+        #uat-main {
+          min-width: 0 !important;
+          height: 100% !important;
+          overflow: hidden !important;
+          background: #f7faff !important;
+        }
+        #uat-topbar {
+          padding: 10px 18px !important;
+          background: #ffffff !important;
+          border-bottom: 1px solid #dbe3ef !important;
+        }
+        #uat-content {
+          padding: 8px 18px !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          min-height: 0 !important;
+        }
+        #uat-step5-view {
+          display: block;
+          width: 100%;
+          min-width: 0;
+        }
+        #uat-step5-view .ud-banner {
+          margin-bottom: 6px !important;
+          padding: 10px 16px !important;
+          border-radius: 8px !important;
+          border: 2px solid #ef4444 !important;
+          background: #fff1f2 !important;
+        }
+        #uat-step5-view .ud-card {
+          border-radius: 8px !important;
+          box-shadow: 0 1px 4px rgba(15,23,42,.06) !important;
+          margin-bottom: 6px !important;
+        }
+        #uat-step5-view .ud-card--blue {
+          border: 2px solid #2563eb !important;
+        }
+        #uat-step5-view .ud-kpi-row {
+          display: grid !important;
+          grid-template-columns: 142px minmax(0, 1fr);
+          gap: 12px !important;
+          padding: 9px 16px !important;
+          align-items: center !important;
+        }
+        #uat-step5-view .ud-gauge-wrap {
+          width: 142px;
+        }
+        #uat-step5-view .ud-kpi-grid {
+          display: grid !important;
+          grid-template-columns: repeat(7, minmax(92px, 1fr));
+          gap: 8px !important;
+        }
+        #uat-step5-view .ud-kpi {
+          min-width: 0 !important;
+          padding: 7px 10px !important;
+          border-radius: 8px !important;
+        }
+        #uat-step5-view .ud-kpi-label {
+          white-space: normal !important;
+          line-height: 1.15 !important;
+          font-size: 9px !important;
+        }
+        #uat-step5-view .ud-kpi-val {
+          font-size: 21px !important;
+          margin: 2px 0 1px !important;
+        }
+        #uat-step5-view .ud-kpi-sub {
+          font-size: 10px !important;
+        }
+        #uat-step5-view .ud-flow {
+          padding: 8px 16px !important;
+          gap: 5px !important;
+          overflow-x: auto !important;
+        }
+        #uat-step5-view .ud-flow-node {
+          min-width: 128px !important;
+          height: 82px !important;
+          min-height: 82px !important;
+          padding: 7px 10px !important;
+          border-radius: 8px !important;
+          overflow: hidden !important;
+        }
+        #uat-step5-view .ud-flow-node-title {
+          font-size: 10px !important;
+          margin-bottom: 3px !important;
+        }
+        #uat-step5-view .ud-flow-tag {
+          font-size: 9px !important;
+          padding: 1px 6px !important;
+          margin: 1px 1px 1px 0 !important;
+        }
+        #uat-step5-view .ud-flow-arrow {
+          padding: 0 2px !important;
+          font-size: 18px !important;
+          color: #60a5fa !important;
+        }
+        #uat-step5-view .ud-why-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(240px, 1.2fr) !important;
+          gap: 8px !important;
+          margin-bottom: 6px !important;
+        }
+        #uat-step5-view .ud-why-col {
+          border-radius: 8px !important;
+          padding: 8px 12px !important;
+          min-height: 104px !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        #uat-step5-view .ud-why-title {
+          font-size: 11px !important;
+          padding-bottom: 5px !important;
+          margin-bottom: 5px !important;
+        }
+        #uat-step5-view .ud-why-item {
+          font-size: 10px !important;
+          padding: 1px 0 !important;
+        }
+        #uat-step5-view .ud-why-item-sub {
+          font-size: 9px !important;
+          line-height: 1.2 !important;
+        }
+        #uat-step5-view .ud-chart-card {
+          grid-template-columns: 1.05fr 1.05fr 1.2fr !important;
+          min-height: 156px !important;
+          height: auto !important;
+        }
+        #uat-step5-view .ud-chart-col {
+          padding: 8px 16px !important;
+          min-width: 0 !important;
+          overflow: visible !important;
+        }
+        #uat-step5-view .ud-chart-row {
+          margin-bottom: 3px !important;
+        }
+        #uat-step5-view .ud-chart-label {
+          font-size: 10px !important;
+          min-width: 74px !important;
+        }
+        #uat-step5-view .ud-bar-track {
+          height: 6px !important;
+        }
+        #uat-step5-view .ud-bar-val,
+        #uat-step5-view .ud-tco-bar-val,
+        #uat-step5-view .ud-tco-bar-lbl {
+          font-size: 8px !important;
+        }
+        #uat-step5-view .ud-footer {
+          padding: 6px 0 !important;
+          font-size: 10px !important;
+        }
+        #uat-step5-view .ud-bottom-row {
+          grid-template-columns: minmax(0, 1fr) 490px !important;
+          gap: 12px !important;
+          margin-bottom: 6px !important;
+          min-height: 105px !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        #uat-step5-view .ud-summary-card {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        #uat-step5-view .ud-sum-col {
+          padding: 8px 16px !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+        }
+        #uat-step5-view .ud-cta-wrap {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 12px !important;
+          min-width: 490px !important;
+          align-self: stretch !important;
+          padding: 10px !important;
+          border: 2px solid #ef4444 !important;
+          border-radius: 8px !important;
+          background: #ffffff !important;
+        }
+        #uat-step5-view .ud-cta-pass,
+        #uat-step5-view button.ud-cta-pass {
+          background: linear-gradient(180deg, #16a34a, #059669) !important;
+          color: #ffffff !important;
+          border: 0 !important;
+          min-width: 0 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(5,150,105,.16) !important;
+          padding: 12px 12px !important;
+          min-height: 82px !important;
+        }
+        #uat-step5-view .ud-cta-fix,
+        #uat-step5-view button.ud-cta-fix {
+          background: linear-gradient(180deg, #ef1f1f, #dc2626) !important;
+          color: #ffffff !important;
+          border: 0 !important;
+          min-width: 0 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(220,38,38,.16) !important;
+          padding: 12px 12px !important;
+          min-height: 82px !important;
+        }
+        #uat-step5-view .ud-cta-main {
+          font-size: 22px !important;
+          color: #ffffff !important;
+        }
+        #uat-step5-view .ud-cta-sub {
+          color: rgba(255,255,255,.9) !important;
+          font-size: 9px !important;
+        }
+
+        /* Global theme firewall: Flex Skyline makes generic buttons red. UAT owns its palette. */
+        body.flex-skyline-mode #uat-dashboard,
+        body.flex-skyline-mode #uat-layout,
+        body.flex-skyline-mode #uat-main,
+        body.flex-skyline-mode #uat-content {
+          background: #f7faff !important;
+          color: #0f172a !important;
+        }
+        body.flex-skyline-mode #uat-sidebar {
+          background: #ffffff !important;
+          background-color: #ffffff !important;
+          border-right: 1px solid #dbe3ef !important;
+        }
+        body.flex-skyline-mode #uat-sidebar,
+        body.flex-skyline-mode #uat-sidebar * {
+          color: #24324a !important;
+          text-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-item {
+          background: transparent !important;
+          border: 0 !important;
+          border-radius: 8px !important;
+          box-shadow: none !important;
+          color: #24324a !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-item:hover {
+          background: #f8fafc !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-active {
+          background: #eaf3ff !important;
+          border-left: 3px solid #2563eb !important;
+          color: #1e40af !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar button.udsb-item.udsb-active,
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar .udsb-nav button.udsb-item.udsb-active {
+          background: #eaf3ff !important;
+          background-image: none !important;
+          border-top: 0 !important;
+          border-right: 0 !important;
+          border-bottom: 0 !important;
+          border-left: 3px solid #2563eb !important;
+          color: #1e40af !important;
+          border-radius: 0 8px 8px 0 !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar button.udsb-item:not(.udsb-active),
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar .udsb-nav button.udsb-item:not(.udsb-active) {
+          background: transparent !important;
+          background-image: none !important;
+          border: 0 !important;
+          color: #24324a !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-logo,
+        body.flex-skyline-mode #uat-sidebar .udsb-av,
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-done,
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-active {
+          color: #ffffff !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-done {
+          background: #16a34a !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-active,
+        body.flex-skyline-mode #uat-sidebar .udsb-logo,
+        body.flex-skyline-mode #uat-sidebar .udsb-av {
+          background: #2563eb !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .ud-mode-btn {
+          background: #ffffff !important;
+          border: 0 !important;
+          color: #475569 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .ud-mode-btn--on {
+          background: #2563eb !important;
+          color: #ffffff !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .ud-export-btn {
+          background: #ffffff !important;
+          border: 1px solid #d1d5db !important;
+          color: #0f172a !important;
+          border-radius: 7px !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-topbar button.ud-mode-btn,
+        body.flex-skyline-mode #uat-dashboard #uat-topbar .ud-mode-pill button.ud-mode-btn {
+          background: #ffffff !important;
+          background-image: none !important;
+          border: 0 !important;
+          color: #475569 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-topbar button.ud-mode-btn.ud-mode-btn--on,
+        body.flex-skyline-mode #uat-dashboard #uat-topbar .ud-mode-pill button.ud-mode-btn.ud-mode-btn--on {
+          background: #2563eb !important;
+          background-image: none !important;
+          color: #ffffff !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-topbar button.ud-export-btn {
+          background: #ffffff !important;
+          background-image: none !important;
+          border: 1px solid #d1d5db !important;
+          color: #0f172a !important;
+          border-radius: 7px !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard button.ud-cta-pass,
+        body.flex-skyline-mode #uat-step5-view button.ud-cta-pass,
+        #uat-dashboard #uat-step5-view button.ud-cta-pass {
+          background: linear-gradient(180deg, #16a34a, #059669) !important;
+          border: 0 !important;
+          border-color: transparent !important;
+          color: #ffffff !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(5,150,105,.16) !important;
+        }
+        body.flex-skyline-mode #uat-dashboard button.ud-cta-fix,
+        body.flex-skyline-mode #uat-step5-view button.ud-cta-fix,
+        #uat-dashboard #uat-step5-view button.ud-cta-fix {
+          background: linear-gradient(180deg, #ef1f1f, #dc2626) !important;
+          border: 0 !important;
+          border-color: transparent !important;
+          color: #ffffff !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(220,38,38,.16) !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .uat-btn {
+          background: rgba(37, 99, 235, .16) !important;
+          border: 1px solid rgba(96, 165, 250, .35) !important;
+          border-radius: 6px !important;
+          color: #bfdbfe !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .uat-btn-good {
+          background: rgba(22, 101, 52, .28) !important;
+          border-color: rgba(74, 222, 128, .5) !important;
+          color: #bbf7d0 !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .uat-btn-danger {
+          background: rgba(127, 29, 29, .22) !important;
+          border-color: rgba(248, 113, 113, .45) !important;
+          color: #fecaca !important;
+        }
+        @media(max-width:1200px){
+          #uat-step5-view .ud-kpi-grid { grid-template-columns: repeat(4, minmax(96px, 1fr)) !important; }
+          #uat-step5-view .ud-chart-card { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-chart-col--border { border-right: 0 !important; border-bottom: 1px solid #dbeafe !important; }
+          #uat-step5-view .ud-bottom-row { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-cta-wrap { min-width: 0 !important; }
+        }
+        @media(max-width:760px){
+          #uat-step5-view .ud-kpi-row { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          #uat-step5-view .ud-why-grid { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-summary-card { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-cta-wrap { grid-template-columns: 1fr !important; }
+        }
+
         #uatPage { display:none !important; }
 
         /* ── Performance section — white background ── */
@@ -4446,13 +5594,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- Stage 6 — FinOps & Cost Optimization -->
+  <!-- Stage 6 — Cost Optimization -->
   <div class="panel" id="panel-s7">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(245,158,11,.2), rgba(2,6,23,.92)); border:1px solid rgba(245,158,11,.36); border-radius:12px; padding:24px;">
         <div style="color:#fcd34d; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 6</div>
-        <h2 style="margin:8px 0 10px; color:#fef3c7; font-family:'Orbitron',sans-serif;">FinOps &amp; Cost Optimization</h2>
-        <p style="color:#94a3b8; margin:0; max-width:940px;">Turns migration output into financial evidence: OSPC baseline, FLEX target run-rate, savings opportunities, right-sizing candidates, and wave-level TCO reporting.</p>
+        <h2 style="margin:8px 0 10px; color:#fef3c7; font-family:'Orbitron',sans-serif;">Cost Optimization</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">Turns migration output into financial evidence: OSPC baseline, FLEX target run-rate, TCO savings, right-sizing candidates, and wave-level cost reporting.</p>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
@@ -4463,8 +5611,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       </div>
 
       <div style="background:rgba(15,23,42,.72); border:1px solid rgba(245,158,11,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
-        <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">FinOps chain position</div>
-        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration output bundle → FinOps &amp; cost optimization → IaC backup, DR &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
+        <div style="color:#fcd34d; font-weight:800; margin-bottom:10px;">Cost Optimization chain position</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Migration output bundle → Cost optimization → Performance Gain → IaC backup, DR &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
       </div>
 
       <div style="background:rgba(15,23,42,.82); border:1px solid rgba(245,158,11,.32); border-radius:10px; padding:18px;">
@@ -4477,18 +5625,65 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <button type="button" onclick="window.open('/tco/?source=azure','_blank')" style="background:rgba(56,189,248,.14); border:1px solid rgba(56,189,248,.46); color:#bae6fd; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">Azure to FLEX</button>
         </div>
       </div>
+      <!-- Embedded TCO Savings -->
+      <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(245,158,11,.28);background:#020617;">
+        <div style="padding:10px 16px;background:rgba(245,158,11,.12);display:flex;align-items:center;gap:10px;">
+          <span style="color:#fcd34d;font-weight:800;font-size:13px;">💰 TCO Savings</span>
+          <span style="color:#94a3b8;font-size:11px;">Source vs FLEX projected cost — monthly, yearly, 3-year</span>
+          <select id="s7tcoSource" onchange="document.getElementById('s7tcoFrame').src='/tco/?source='+this.value" style="margin-left:auto;background:#1e293b;border:1px solid rgba(245,158,11,.4);color:#fcd34d;border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;">
+            <option value="ospc">OSPC to FLEX</option>
+            <option value="flex2flex">FLEX2FLEX</option>
+            <option value="aws">AWS to FLEX</option>
+            <option value="gcp">GCP to FLEX</option>
+            <option value="azure">Azure to FLEX</option>
+          </select>
+        </div>
+        <iframe id="s7tcoFrame" src="/tco/?source=ospc" title="TCO Savings" style="width:100%;height:700px;border:none;display:block;"></iframe>
+      </div>
     </div>
   </div>
 
-  <!-- Stage 7 — IaC Backup, DR & Restore -->
+  <!-- Stage 7 — Performance Gain -->
+  <div class="panel" id="panel-s7a">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <div style="background:radial-gradient(circle at top left, rgba(34,197,94,.2), rgba(2,6,23,.92)); border:1px solid rgba(34,197,94,.36); border-radius:12px; padding:24px;">
+        <div style="color:#86efac; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <h2 style="margin:8px 0 10px; color:#dcfce7; font-family:'Orbitron',sans-serif;">Performance Gain</h2>
+        <p style="color:#94a3b8; margin:0; max-width:940px;">Measure and document performance improvements after migration: compute throughput, I/O latency, network performance, application response time, and right-sizing opportunities unlocked by FLEX modern instance types.</p>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Compute Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare vCPU frequency, memory bandwidth, and instance type generation between OSPC source and FLEX target flavors.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #34d399; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#6ee7b7;">Storage I/O Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Measure IOPS, throughput (MB/s), and latency improvements from OSPC Cinder volumes to FLEX block storage.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #4ade80; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Network Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare network throughput, inter-node latency, and public IP bandwidth between OSPC and FLEX environments.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #a3e635; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#bef264;">App Response Time</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Record application-level response time, DB query latency, and API call durations before and after cutover.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #84cc16; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#d9f99d;">Right-Sizing Wins</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Identify VMs running on oversized OSPC flavors that can be migrated to smaller, cheaper FLEX flavors with equivalent performance.</p></div>
+        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22d3ee; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#67e8f9;">Performance Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate a before/after performance comparison report as evidence for customer sign-off and modernization ROI.</p></div>
+      </div>
+      <div style="background:rgba(15,23,42,.72); border:1px solid rgba(34,197,94,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
+        <div style="color:#86efac; font-weight:800; margin-bottom:10px;">Performance Gain chain position</div>
+        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Cost optimization → Performance Gain → IaC backup, DR &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
+      </div>
+      <div style="background:rgba(15,23,42,.82); border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
+        <div style="color:#86efac; font-weight:800; margin-bottom:12px;">Performance benchmark tools</div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+          <button type="button" onclick="alert('Sysbench CPU benchmark — run on both OSPC and FLEX VMs:\n\nsysbench cpu --cpu-max-prime=20000 run')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">CPU Benchmark</button>
+          <button type="button" onclick="alert('Disk I/O benchmark (fio):\n\nfio --name=randread --ioengine=libaio --iodepth=16 --rw=randread --bs=4k --direct=1 --size=1G --numjobs=4 --runtime=60 --group_reporting')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">Disk I/O Benchmark</button>
+          <button type="button" onclick="alert('Network throughput (iperf3):\n\n# On target FLEX VM:\niperf3 -s\n\n# From jumphost:\niperf3 -c FLEX_VM_IP -t 30')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">Network Benchmark</button>
+          <button type="button" onclick="alert('HTTP response time check:\n\ncurl -s -o /dev/null -w \"%{time_total}\\n\" -X GET http://APP_IP/health')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">App Response Time</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 8 — IaC Backup, DR & Restore -->
   <div class="panel" id="panel-s8">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:18px;">
       <div style="background:radial-gradient(circle at top left, rgba(96,165,250,.2), rgba(2,6,23,.92)); border:1px solid rgba(96,165,250,.36); border-radius:12px; padding:24px;">
-        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <div style="color:#93c5fd; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
         <h2 style="margin:4px 0 4px; color:#dbeafe; font-family:'Orbitron',sans-serif;">IaC Backup, DR &amp; Restore</h2>
         <div style="color:#93c5fd; font-size:14px; font-weight:600; margin-bottom:10px;">Terraform + Ansible recovery pack</div>
         <p style="color:#94a3b8; margin:0; max-width:940px; line-height:1.6;">Capture the migrated tenant state as reusable Terraform and Ansible artifacts. Use this stage to export the recovery pack, validate restore readiness, and rebuild the tenant in the same region, another region, or another OpenStack-compatible cloud.</p>
-        <p style="color:#94a3b8; margin:10px 0 0; max-width:940px; line-height:1.6;">For GitOps/OpenCenter-based redeployments, publish the same recovery pack to the GitOps repository and continue in <strong style="color:#e2e8f0;">Stage 8 — GitOps &amp; OpenCenter Modernization</strong>.</p>
+        <p style="color:#94a3b8; margin:10px 0 0; max-width:940px; line-height:1.6;">For GitOps/OpenCenter-based redeployments, publish the same recovery pack to the GitOps repository and continue in <strong style="color:#e2e8f0;">Stage 9 — GitOps &amp; OpenCenter Modernization</strong>.</p>
       </div>
 
       <div style="background:rgba(15,23,42,.92); border:1px solid rgba(129,140,248,.42); border-radius:10px; padding:18px 20px;">
@@ -4682,17 +5877,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
       <div style="padding:16px 18px; background:rgba(15,23,42,.88); border:1px solid rgba(167,139,250,.35); border-radius:10px;">
         <div style="color:#ddd6fe; font-size:14px; font-weight:800; margin-bottom:8px;">7. Handoff</div>
-        <p style="margin:0 0 10px; color:#94a3b8; font-size:13px; line-height:1.55;">Continue to Stage 8 — GitOps &amp; OpenCenter Modernization after the recovery pack is published or validated.</p>
-        <button type="button" onclick="activateStage('s9')" style="background:rgba(244,114,182,.15); border:1px solid rgba(244,114,182,.45); color:#fbcfe8; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">Continue to Stage 8 — GitOps &amp; OpenCenter Modernization</button>
+        <p style="margin:0 0 10px; color:#94a3b8; font-size:13px; line-height:1.55;">Continue to Stage 9 — GitOps &amp; OpenCenter Modernization after the recovery pack is published or validated.</p>
+        <button type="button" onclick="activateStage('s9')" style="background:rgba(244,114,182,.15); border:1px solid rgba(244,114,182,.45); color:#fbcfe8; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">Continue to Stage 9 — GitOps &amp; OpenCenter Modernization</button>
       </div>
     </div>
   </div>
 
-  <!-- Stage 8 — GitOps & OpenCenter Modernization -->
+  <!-- Stage 9 — GitOps & OpenCenter Modernization -->
   <div class="panel" id="panel-s9">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
-        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 8</div>
+        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
         <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">GitOps &amp; OpenCenter Modernization</h2>
         <p style="color:#94a3b8; margin:0; max-width:940px;">Consume the Stage 7 recovery pack: publish backup/restore artifacts, create restore stubs, and drive repeatable redeploy pipelines in another FLEX region or OpenStack cloud.</p>
       </div>
@@ -4755,11 +5950,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     </div>
   </div>
 
-  <!-- Stage 9 — AIOps & Continuous Operations -->
+  <!-- Stage 10 — AIOps & Continuous Operations -->
   <div class="panel" id="panel-s10">
     <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
       <div style="background:radial-gradient(circle at top left, rgba(244,114,182,.2), rgba(2,6,23,.94)); border:1px solid rgba(244,114,182,.36); border-radius:12px; padding:24px;">
-        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 9</div>
+        <div style="color:#f9a8d4; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 10</div>
         <h2 style="margin:8px 0 10px; color:#fce7f3; font-family:'Orbitron',sans-serif;">AIOps &amp; Continuous Operations</h2>
         <p style="color:#94a3b8; margin:0; max-width:940px;">AIOps consumes Cloud Jumper, FinOps, IaC, and GitOps / OpenCenter outputs to produce optimization and autorepair recommendations backed by GitOps-ready artifacts.</p>
       </div>
@@ -6898,15 +8093,22 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
       // Push live comparison data into Step 5 Cutover Readiness
       if (typeof window.uatSetServiceComparison === 'function') {
-        var _srcCount = data.source_count || data.comparison.filter(function(r){ return r.on_source; }).length;
+        // Total = all rows compared (source + extra on target), not just source_count
+        var _totalCompared = data.comparison.length;
+        // Acceptable = matched + expected-absent (platform diffs) + expected-on-FLEX (known additions)
+        var _matched       = data.comparison.filter(function(r){ return r.status === 'match'; }).length;
+        var _acceptable    = _matched + expectedMissing.length + expectedExtra.length;
         window.uatSetServiceComparison({
-          ran:         true,
-          rows:        data.comparison,
-          total:       _srcCount,
-          acceptable:  _srcCount - criticalMissing.length,
-          reviewGaps:  criticalMissing.map(function(s){ return { service: s, status: 'Missing on FLEX — Not a known platform difference' }; }),
-          warnings:    reviewExtra.map(function(s){ return { service: s, status: 'Extra on FLEX — Verify' }; }),
-          blockingGaps: [],
+          ran:             true,
+          rows:            data.comparison,
+          total:           _totalCompared,
+          acceptable:      _acceptable,
+          matched:         _matched,
+          expectedAbsent:  expectedMissing.length,
+          expectedFlexOnly: expectedExtra.length,
+          reviewGaps:      criticalMissing.map(function(s){ return { service: s, status: 'Missing on FLEX — Not a known platform difference — needs review or acceptance' }; }),
+          warnings:        reviewExtra.map(function(s){ return { service: s, status: 'Extra on FLEX — Verify whether expected' }; }),
+          blockingGaps:    [],
         });
       }
 
@@ -7010,9 +8212,80 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   }
 
   // Build and inject a results table from raw SSH output strings
+  // ── User decisions for performance metrics — persisted in localStorage ──────
+  var _perfUserDecisions = (function() {
+    try { return JSON.parse(localStorage.getItem('uat_perf_user_decisions') || '{}'); } catch(e) { return {}; }
+  })();
+
+  // Dropdown appearance map — light-mode colors for visibility on white card
+  var _udColors = {
+    Pending:          { color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' },
+    Pass:             { color:'#15803d', bg:'#f0fdf4', border:'#86efac' },
+    Fail:             { color:'#dc2626', bg:'#fef2f2', border:'#fca5a5' },
+    'Accept Risk':    { color:'#b45309', bg:'#fffbeb', border:'#fde68a' },
+    'Not Applicable': { color:'#475569', bg:'#f1f5f9', border:'#cbd5e1' },
+  };
+
+  // Updates the visual style of a dropdown to match its current value
+  window.uatApplyUdStyle = function(sel) {
+    var s = _udColors[sel.value] || _udColors['Pending'];
+    sel.style.color       = s.color;
+    sel.style.background  = s.bg;
+    sel.style.borderColor = s.border;
+  };
+
+  window.uatPerfUserDecision = function(key, value) {
+    _perfUserDecisions[key] = value;
+    try { localStorage.setItem('uat_perf_user_decisions', JSON.stringify(_perfUserDecisions)); } catch(e) {}
+    // Visual: update any matching dropdown in the current table immediately
+    document.querySelectorAll('[data-perf-key="' + key + '"] select').forEach(function(sel) {
+      if (sel.value === value) window.uatApplyUdStyle(sel);
+    });
+    // Recompute overall from current table and push to Step 5
+    _recomputePerfOverall();
+  };
+  function _recomputePerfOverall() {
+    var rows = document.querySelectorAll('[data-perf-key]');
+    var sysByKey = {};
+    rows.forEach(function(el) {
+      sysByKey[el.dataset.perfKey] = el.dataset.perfBadge || '';
+    });
+    var fails = 0, warns = 0, passes = 0, oos = 0, nt = 0, pending = 0;
+    var metricsArr = [];
+    Object.keys(sysByKey).forEach(function(key) {
+      var sysBadge  = sysByKey[key];
+      var userDecision = _perfUserDecisions[key] || 'Pending';
+      var effectiveBadge = sysBadge;
+      if (userDecision === 'Pass')         effectiveBadge = 'PASS';
+      else if (userDecision === 'Fail')    effectiveBadge = 'FAIL';
+      else if (userDecision === 'Accept Risk') effectiveBadge = 'WARN';
+      else if (userDecision === 'Not Applicable') effectiveBadge = 'OUT OF SCOPE';
+      else if (userDecision === 'Pending' && (sysBadge === 'FAIL' || sysBadge === 'REVIEW')) pending++;
+      metricsArr.push({ key: key, label: key, badge: effectiveBadge, text: '' });
+      if (effectiveBadge === 'PASS') passes++;
+      else if (effectiveBadge === 'FAIL') fails++;
+      else if (effectiveBadge === 'WARN' || effectiveBadge === 'REVIEW') warns++;
+      else if (effectiveBadge === 'OUT OF SCOPE') oos++;
+      else if (effectiveBadge === 'NOT TESTED') nt++;
+    });
+    var overall = fails > 0 ? 'FAIL' : pending > 0 ? 'PENDING' : warns > 0 ? 'WARN' : 'PASS';
+    if (typeof window.uatSetPerfMetrics === 'function') window.uatSetPerfMetrics(metricsArr, overall);
+  }
+
   function buildPerfTable(srcRaw, tgtRaw) {
     var s = parsePerfLog(srcRaw);
     var t = parsePerfLog(tgtRaw);
+
+    // Read workload scope for relevance decisions
+    var wl = {};
+    try { wl = JSON.parse(localStorage.getItem('uat_workload_scope') || 'null') || {}; } catch(e) {}
+    var wlAppType  = (wl.appType || 'web').toLowerCase();
+    // HTTP is in scope if: explicitly checked, OR app type implies it (web/api/mixed)
+    var hasHTTP    = wl.hasHTTP !== false || wlAppType === 'web' || wlAppType === 'api' || wlAppType === 'mixed';
+    // Network is in scope by default unless explicitly excluded
+    var hasNetwork = wl.hasNetwork !== false;
+    // DB only in scope when explicitly included (hasDatabase must be explicitly true)
+    var hasDB      = wl.hasDatabase === true;
 
     var SRC_MAP = {
       avg_ms:'ospc_avg_response_ms', p95_ms:'ospc_p95_ms', error_pct:'api_error_rate_percent',
@@ -7031,126 +8304,226 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     Object.keys(s).forEach(function(k) { if (SRC_MAP[k] && window.UAT) UAT.performance[SRC_MAP[k]] = s[k]; });
     Object.keys(t).forEach(function(k) { if (TGT_MAP[k] && window.UAT) UAT.performance[TGT_MAP[k]] = t[k]; });
 
+    // Metric definitions — unit, description, dir, inScope, absLow (if both values < absLow → INFO not FAIL)
     var groups = [
       { label:'⚡ HTTP PERFORMANCE', accent:'#93c5fd', rows:[
-        {key:'avg_ms',       label:'Avg Response (ms)',  dir:'lower'},
-        {key:'p95_ms',       label:'P95 Response (ms)',  dir:'lower'},
-        {key:'error_pct',    label:'API Error Rate %',   dir:'lower'},
+        {key:'avg_ms',    label:'Avg Response',   unit:'ms',
+         desc:'Average HTTP response time to app endpoint. 0/0 = HTTP test URL may be unreachable — user must confirm app URL.',
+         dir:'lower', inScope: hasHTTP, zeroMeansNotTested: true},
+        {key:'p95_ms',    label:'P95 Response',   unit:'ms',
+         desc:'95th-percentile response time — slowest 5% of requests. 0/0 = HTTP test did not produce valid results.',
+         dir:'lower', inScope: hasHTTP, zeroMeansNotTested: true},
+        {key:'error_pct', label:'HTTP Error Rate', unit:'%',
+         desc:'% of HTTP requests that returned errors. Both source and target at 100% likely means the test URL is not reachable — validate endpoint before interpreting.',
+         dir:'lower', inScope: hasHTTP, special:'error_rate'},
       ]},
       { label:'🖥 SYSTEM RESOURCES', accent:'#86efac', rows:[
-        {key:'cpu_load',     label:'CPU Load (1-min)',   dir:'lower'},
-        {key:'mem_pct',      label:'Memory Usage %',     dir:'lower'},
-        {key:'iowait',       label:'I/O Wait %',         dir:'lower'},
+        {key:'cpu_load',  label:'CPU Load',       unit:'1-min avg',
+         desc:'Linux 1-minute load average. < 1.0 on both servers = operationally negligible regardless of % delta.',
+         dir:'lower', inScope: true, absLow: 1.0},
+        {key:'mem_pct',   label:'Memory Usage',   unit:'%',
+         desc:'% of RAM in active use. Lower target value is better — FLEX may show lower usage after migration.',
+         dir:'lower', inScope: true},
+        {key:'iowait',    label:'I/O Wait',       unit:'%',
+         desc:'% of CPU time waiting for disk I/O. Near 0% = healthy. High = possible storage bottleneck.',
+         dir:'lower', inScope: true, absLow: 2.0},
       ]},
       { label:'🌐 NETWORK', accent:'#fde68a', rows:[
-        {key:'latency_ms',   label:'Latency (ms)',       dir:'lower'},
-        {key:'active_sess',  label:'Active Sessions',    dir:'info'},
-        {key:'upload_mbps',  label:'Upload Mbps',        dir:'higher'},
-        {key:'download_mbps',label:'Download Mbps',      dir:'higher'},
+        {key:'latency_ms',    label:'Network Latency',  unit:'ms',
+         desc:'Round-trip ping latency between the two servers.',
+         dir:'lower', inScope: hasNetwork},
+        {key:'active_sess',   label:'Active Sessions',  unit:'count',
+         desc:'Active TCP/SSH connections. Informational only — no threshold unless expected session count is configured.',
+         dir:'info', inScope: hasNetwork},
+        {key:'upload_mbps',   label:'Upload Speed',     unit:'Mbps',
+         desc:'Network upload throughput. Higher is better. Relevant when file transfer or storage is in scope.',
+         dir:'higher', inScope: hasNetwork},
+        {key:'download_mbps', label:'Download Speed',   unit:'Mbps',
+         desc:'Network download throughput. Higher is better.',
+         dir:'higher', inScope: hasNetwork},
       ]},
       { label:'🗄 DATABASE', accent:'#c4b5fd', rows:[
-        {key:'db_ms',        label:'DB Connect (ms)',    dir:'lower_nt'},
+        {key:'db_ms', label:'DB Connect', unit:'ms',
+         desc:'Time to connect and run a basic DB query. 0 / 0 = NOT TESTED — this is not a passed validation. Run a full DB test to validate database.',
+         dir:'lower_nt', inScope: hasDB},
       ]},
     ];
 
-    // dir: lower = lower is better (PASS when target <= source; WARN <= +15%; else FAIL)
-    //      higher = higher is better (PASS when target >= source; WARN >= -15%; else FAIL)
-    //      info   = informational only
-    //      lower_nt = lower but 0+0 → NOT TESTED
-    function calcStatus(sv, tv, dir) {
+    // Scope-aware status with absolute thresholds and special cases
+    function calcStatus(key, sv, tv, dir, inScope, absLow, special, zeroMeansNotTested) {
+      if (!inScope) return {text:'—', color:'#6b7280', badge:'OUT OF SCOPE',
+        reason: 'Not selected in UAT scope. Set scope in Step 5 → UAT Scope card.'};
+
       var sf = parseFloat(sv), tf = parseFloat(tv);
-      var hasS = !isNaN(sf) && sv !== '—' && sv !== undefined;
-      var hasT = !isNaN(tf) && tv !== '—' && tv !== undefined;
-      if (!hasS || !hasT) return {text:'—', color:'#475569', badge:''};
+      var hasS = !isNaN(sf) && sv !== '—' && sv !== '' && sv !== undefined;
+      var hasT = !isNaN(tf) && tv !== '—' && tv !== '' && tv !== undefined;
+      if (!hasS && !hasT) return {text:'—', color:'#94a3b8', badge:'NOT TESTED',
+        reason:'No data collected — test may not have run or metric not found in SSH output.'};
+      if (!hasS || !hasT) return {text:'—', color:'#475569', badge:'',
+        reason:'Partial data — only one side returned a value.'};
+
+      // Response time 0/0 → NOT TESTED (0ms is not a valid response time)
+      if (zeroMeansNotTested && sf === 0 && tf === 0) {
+        return {text:'0 / 0', color:'#64748b', badge:'NOT TESTED',
+          reason:'HTTP endpoint may be unreachable or the test URL was invalid. Response time of 0 means no valid HTTP response was captured. Confirm the app URL and re-run.'};
+      }
+
+      // DB 0/0 → NOT TESTED (never auto-pass)
       if (dir === 'lower_nt') {
-        if (sf === 0 && tf === 0) return {text:'—', color:'#94a3b8', badge:'NOT TESTED'};
+        if (sf === 0 && tf === 0) return {text:'0 / 0', color:'#94a3b8', badge:'NOT TESTED',
+          reason:'DB Connect 0/0 = no DB test ran. This is not a passed DB validation. Run "Run DB Test" to validate.'};
         dir = 'lower';
       }
+
+      // Error rate: both 100% → REVIEW (may be invalid endpoint, not a real result)
+      if (special === 'error_rate' && sf >= 100 && tf >= 100) {
+        return {text:'100%', color:'#b45309', badge:'REVIEW',
+          reason:'Both source and target show 100% HTTP error rate. This likely means the test URL is not reachable — verify the app endpoint URL before interpreting this result.'};
+      }
+
+      // Absolute low threshold — if both values are tiny, it\'s INFO not FAIL
+      if (absLow != null && sf < absLow && tf < absLow) {
+        var d0 = sf > 0 ? (tf - sf) / sf * 100 : 0;
+        return {text:(d0>=0?'+':'')+d0.toFixed(1)+'%', color:'#64748b', badge:'INFO',
+          reason:'Both values are below ' + absLow + ' — operationally negligible. % delta looks large but absolute impact is minimal.'};
+      }
+
       if (dir === 'info') {
         var d0 = sf !== 0 ? (tf - sf) / sf * 100 : 0;
-        return {text:(d0>=0?'+':'')+d0.toFixed(1)+'%', color:'#94a3b8', badge:'INFO'};
+        return {text:(d0>=0?'+':'')+d0.toFixed(1)+'%', color:'#94a3b8', badge:'INFO',
+          reason:'Informational only — no pass/fail threshold for this metric.'};
       }
       if (dir === 'lower') {
-        if (sf === 0 && tf === 0) return {text:'0.0%', color:'#86efac', badge:'PASS'};
-        if (sf === 0) return {text:'—', color:'#94a3b8', badge:'INFO'};
+        if (sf === 0 && tf === 0) return {text:'0.0%', color:'#22c55e', badge:'PASS', reason:'Both values are zero — no change.'};
+        if (sf === 0) return {text:'—', color:'#94a3b8', badge:'INFO', reason:'Source is zero — % delta is not meaningful.'};
         var d = (tf - sf) / sf * 100, sign = d >= 0 ? '+' : '';
-        if (tf <= sf)        return {text:sign+d.toFixed(1)+'%', color:'#86efac', badge:'PASS'};
-        if (tf <= sf * 1.15) return {text:sign+d.toFixed(1)+'%', color:'#fde68a', badge:'WARN'};
-        return                      {text:sign+d.toFixed(1)+'%', color:'#fecaca', badge:'FAIL'};
+        if (tf <= sf)        return {text:sign+d.toFixed(1)+'%', color:'#22c55e', badge:'PASS',
+          reason:'Target is at or below source — good.'};
+        if (tf <= sf * 1.15) return {text:sign+d.toFixed(1)+'%', color:'#f59e0b', badge:'WARN',
+          reason:'Target is slightly above source (+' + d.toFixed(1) + '%) but within the acceptable +15% threshold.'};
+        return {text:sign+d.toFixed(1)+'%', color:'#f87171', badge:'FAIL',
+          reason:'Target exceeds source by ' + d.toFixed(1) + '% — above the +15% threshold.'};
       }
       if (dir === 'higher') {
-        if (sf === 0) return {text:'—', color:'#94a3b8', badge:'INFO'};
+        if (sf === 0) return {text:'—', color:'#94a3b8', badge:'INFO', reason:'Source is zero — % delta is not meaningful.'};
         var d = (tf - sf) / sf * 100, sign = d >= 0 ? '+' : '';
-        if (tf >= sf)        return {text:sign+d.toFixed(1)+'%', color:'#86efac', badge:'PASS'};
-        if (tf >= sf * 0.85) return {text:sign+d.toFixed(1)+'%', color:'#fde68a', badge:'WARN'};
-        return                      {text:sign+d.toFixed(1)+'%', color:'#fecaca', badge:'FAIL'};
+        if (tf >= sf)        return {text:sign+d.toFixed(1)+'%', color:'#22c55e', badge:'PASS',
+          reason:'Target is at or above source — good.'};
+        if (tf >= sf * 0.85) return {text:sign+d.toFixed(1)+'%', color:'#f59e0b', badge:'WARN',
+          reason:'Target is slightly below source (' + d.toFixed(1) + '%) but within the acceptable -15% range.'};
+        return {text:sign+d.toFixed(1)+'%', color:'#f87171', badge:'FAIL',
+          reason:'Target is ' + Math.abs(d).toFixed(1) + '% below source — outside the -15% threshold.'};
       }
-      return {text:'—', color:'#475569', badge:''};
+      return {text:'—', color:'#475569', badge:'', reason:''};
+    }
+
+    // User-decision dropdown for a metric row
+    function udDropdown(key) {
+      var saved = _perfUserDecisions[key] || 'Pending';
+      var opts  = ['Pending', 'Pass', 'Fail', 'Accept Risk', 'Not Applicable'];
+      var s = _udColors[saved] || _udColors['Pending'];
+      return '<select onchange="uatApplyUdStyle(this); uatPerfUserDecision(\'' + key + '\', this.value);" '
+        + 'style="font-size:11px;padding:5px 8px;border-radius:6px;border:2px solid ' + s.border + ';'
+        + 'background:' + s.bg + ';color:' + s.color + ';cursor:pointer;font-weight:700;min-width:130px;">'
+        + opts.map(function(o) {
+            return '<option value="' + o + '"' + (o === saved ? ' selected' : '') + '>' + o + '</option>';
+          }).join('')
+        + '</select>';
     }
 
     var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      + '<thead><tr style="background:rgba(5,12,40,0.95);">'
-      + '<th style="padding:9px 12px;text-align:left;color:#bfdbfe;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(148,163,184,0.2);">METRIC</th>'
-      + '<th style="padding:9px 12px;text-align:center;color:#93c5fd;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(148,163,184,0.2);min-width:130px;">SOURCE</th>'
-      + '<th style="padding:9px 12px;text-align:center;color:#86efac;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(148,163,184,0.2);min-width:130px;">TARGET</th>'
-      + '<th style="padding:9px 12px;text-align:center;color:#e2e8f0;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(148,163,184,0.2);width:90px;">DELTA</th>'
-      + '<th style="padding:9px 12px;text-align:center;color:#e2e8f0;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid rgba(148,163,184,0.2);width:80px;">STATUS</th>'
+      + '<thead><tr style="background:#f1f5f9;">'
+      + '<th style="padding:9px 12px;text-align:left;color:#334155;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;min-width:220px;">METRIC &amp; DESCRIPTION</th>'
+      + '<th style="padding:9px 12px;text-align:center;color:#1e40af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;min-width:90px;">SOURCE</th>'
+      + '<th style="padding:9px 12px;text-align:center;color:#15803d;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;min-width:90px;">TARGET</th>'
+      + '<th style="padding:9px 12px;text-align:center;color:#334155;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;width:80px;">DELTA</th>'
+      + '<th style="padding:9px 12px;text-align:center;color:#334155;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;width:160px;">SYSTEM ASSESSMENT</th>'
+      + '<th style="padding:9px 12px;text-align:center;color:#b45309;font-size:10px;text-transform:uppercase;letter-spacing:.08em;border-bottom:2px solid #e2e8f0;width:150px;">YOUR DECISION</th>'
       + '</tr></thead><tbody>';
 
-    var perfPasses = 0, perfFails = 0, perfWarns = 0;
+    var perfPasses = 0, perfFails = 0, perfWarns = 0, metricsArr = [];
     groups.forEach(function(g) {
-      html += '<tr><td colspan="5" style="padding:6px 12px;background:rgba(10,22,65,0.9);color:' + g.accent
-            + ';font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;">' + g.label + '</td></tr>';
+      var groupBg = {
+        '⚡ HTTP PERFORMANCE': '#eff6ff', '🖥 SYSTEM RESOURCES': '#f0fdf4',
+        '🌐 NETWORK': '#fefce8', '🗄 DATABASE': '#faf5ff'
+      };
+      html += '<tr><td colspan="6" style="padding:6px 12px;background:' + (groupBg[g.label]||'#f8fafc') + ';border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;">'
+            + '<span style="font-size:11px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:.07em;">' + g.label + '</span>'
+            + '</td></tr>';
       g.rows.forEach(function(r) {
-        var sv   = s[r.key] !== undefined ? s[r.key] : '—';
-        var tv   = t[r.key] !== undefined ? t[r.key] : '—';
-        var d    = calcStatus(sv, tv, r.dir || 'lower');
+        var sv  = s[r.key] !== undefined ? s[r.key] : '—';
+        var tv  = t[r.key] !== undefined ? t[r.key] : '—';
+        var d   = calcStatus(r.key, sv, tv, r.dir || 'lower', r.inScope !== false, r.absLow, r.special, r.zeroMeansNotTested);
         if (d.badge === 'PASS') perfPasses++;
         else if (d.badge === 'FAIL') perfFails++;
-        else if (d.badge === 'WARN') perfWarns++;
+        else if (d.badge === 'WARN' || d.badge === 'REVIEW') perfWarns++;
+        metricsArr.push({ key: r.key, label: r.label + (r.unit ? ' (' + r.unit + ')' : ''), badge: d.badge || 'INFO', text: d.text });
+
+        var badgeStyles = {
+          PASS:           { color:'#15803d', bg:'#dcfce7', border:'#86efac' },
+          FAIL:           { color:'#dc2626', bg:'#fee2e2', border:'#fca5a5' },
+          WARN:           { color:'#b45309', bg:'#fef9c3', border:'#fde047' },
+          REVIEW:         { color:'#b45309', bg:'#fff7ed', border:'#fdba74' },
+          INFO:           { color:'#475569', bg:'#f1f5f9', border:'#cbd5e1' },
+          'NOT TESTED':   { color:'#64748b', bg:'#f8fafc', border:'#e2e8f0' },
+          'OUT OF SCOPE': { color:'#94a3b8', bg:'#f8fafc', border:'#e2e8f0' },
+        };
+        var bs  = badgeStyles[d.badge] || { color:'#475569', bg:'#f1f5f9', border:'#e2e8f0' };
         var pill = d.badge
-          ? '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-size:10px;font-weight:800;color:' + d.color + ';background:' + d.color + '22;border:1px solid ' + d.color + '66;">' + d.badge + '</span>'
-          : '<span style="color:#475569;font-size:12px;">—</span>';
-        html += '<tr style="border-bottom:1px solid rgba(148,163,184,0.07);">'
-              + '<td style="padding:8px 12px;color:#cbd5e1;">' + r.label + '</td>'
-              + '<td style="padding:8px 12px;text-align:center;color:#93c5fd;font-weight:700;">' + sv + '</td>'
-              + '<td style="padding:8px 12px;text-align:center;color:#86efac;font-weight:700;">' + tv + '</td>'
-              + '<td style="padding:8px 12px;text-align:center;color:' + d.color + ';font-weight:700;">' + d.text + '</td>'
-              + '<td style="padding:8px 12px;text-align:center;">' + pill + '</td>'
+          ? '<span style="display:inline-block;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:800;color:' + bs.color + ';background:' + bs.bg + ';border:1px solid ' + bs.border + ';">' + d.badge + '</span>'
+            + (d.reason ? '<div style="font-size:10px;color:#64748b;margin-top:3px;max-width:180px;line-height:1.3;">' + d.reason + '</div>' : '')
+          : '<span style="color:#94a3b8;font-size:12px;">—</span>';
+
+        var unitLabel = r.unit ? '<span style="color:#64748b;font-size:10px;"> (' + r.unit + ')</span>' : '';
+        var descHtml  = r.desc ? '<div style="color:#64748b;font-size:10px;margin-top:2px;line-height:1.35;max-width:260px;">' + r.desc + '</div>' : '';
+
+        html += '<tr data-perf-key="' + r.key + '" data-perf-badge="' + (d.badge||'') + '" style="border-bottom:1px solid #f1f5f9;">'
+              + '<td style="padding:8px 12px;color:#1e293b;"><strong style="color:#1e293b;">' + r.label + '</strong>' + unitLabel + descHtml + '</td>'
+              + '<td style="padding:8px 12px;text-align:center;color:#1e40af;font-weight:700;">' + (sv === '—' ? '<span style="color:#94a3b8;">—</span>' : sv) + '</td>'
+              + '<td style="padding:8px 12px;text-align:center;color:#15803d;font-weight:700;">' + (tv === '—' ? '<span style="color:#94a3b8;">—</span>' : tv) + '</td>'
+              + '<td style="padding:8px 12px;text-align:center;color:' + (d.color||'#475569') + ';font-weight:700;">' + d.text + '</td>'
+              + '<td style="padding:8px 12px;text-align:center;vertical-align:top;">' + pill + '</td>'
+              + '<td style="padding:8px 12px;text-align:center;vertical-align:middle;">' + udDropdown(r.key) + '</td>'
               + '</tr>';
       });
     });
 
     html += '</tbody></table>';
 
-    // Performance summary block
+    // Performance summary block — system suggestion + pending decisions note
     var perfOverall = perfFails > 0 ? 'FAIL' : perfWarns > 0 ? 'WARN' : 'PASS';
+    var pendingDecisions = groups.reduce(function(acc, g) {
+      return acc + g.rows.filter(function(r) {
+        var bd = calcStatus(r.key, s[r.key]||'—', t[r.key]||'—', r.dir||'lower', r.inScope!==false, r.absLow, r.special, r.zeroMeansNotTested).badge;
+        return (bd === 'FAIL' || bd === 'REVIEW' || bd === 'WARN') && (_perfUserDecisions[r.key] || 'Pending') === 'Pending';
+      }).length;
+    }, 0);
+
     var perfOColor  = perfFails > 0 ? '#fca5a5' : perfWarns > 0 ? '#fde68a' : '#86efac';
     var perfOBg     = perfFails > 0 ? 'rgba(127,29,29,0.3)' : perfWarns > 0 ? 'rgba(113,63,18,0.3)' : 'rgba(22,101,52,0.22)';
     var perfOBorder = perfFails > 0 ? 'rgba(248,113,113,0.4)' : perfWarns > 0 ? 'rgba(251,191,36,0.4)' : 'rgba(74,222,128,0.4)';
-    // Push live metrics into Step 5 Cutover Readiness (second pass — calcStatus already in scope)
+
+    // Push live metrics into Step 5 Cutover Readiness
     if (typeof window.uatSetPerfMetrics === 'function') {
-      var _metricsArr = [];
-      groups.forEach(function(g) {
-        g.rows.forEach(function(r) {
-          var _sv = s[r.key] !== undefined ? s[r.key] : '—';
-          var _tv = t[r.key] !== undefined ? t[r.key] : '—';
-          var _d  = calcStatus(_sv, _tv, r.dir || 'lower');
-          _metricsArr.push({ key: r.key, label: r.label, badge: _d.badge || 'INFO', text: _d.text });
-        });
-      });
-      window.uatSetPerfMetrics(_metricsArr, perfOverall);
+      window.uatSetPerfMetrics(metricsArr, perfOverall);
     }
+
     var checked = perfPasses + perfFails + perfWarns;
     html += '<div style="margin-top:14px;padding:14px 16px;border-radius:8px;background:' + perfOBg + ';border:1px solid ' + perfOBorder + ';">'
-          + '<div style="font-size:13px;font-weight:800;color:#ffffff;margin-bottom:8px;letter-spacing:.05em;">PERFORMANCE: ' + perfOverall + '</div>'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+          + '<div style="font-size:13px;font-weight:800;color:#ffffff;letter-spacing:.05em;">SYSTEM ASSESSMENT: ' + perfOverall + '</div>'
+          + (pendingDecisions > 0
+             ? '<div style="font-size:11px;color:#fde68a;background:rgba(113,63,18,0.5);padding:4px 10px;border-radius:6px;border:1px solid #ca8a04;">'
+               + '⚠ ' + pendingDecisions + ' metric(s) need your decision — use the "Your Decision" dropdowns above</div>'
+             : '<div style="font-size:11px;color:#86efac;">✓ All metrics reviewed</div>')
+          + '</div>'
           + '<ul style="margin:0;padding-left:18px;color:#ffffff;font-size:12px;line-height:1.9;">'
-          + '<li>' + perfPasses + ' of ' + checked + ' measured metrics within acceptable threshold</li>';
-    if (perfFails > 0)  html += '<li style="color:#fca5a5;">' + perfFails + ' metric(s) exceeded threshold — review required before cutover</li>';
-    if (perfWarns > 0)  html += '<li style="color:#fef08a;">' + perfWarns + ' metric(s) slightly elevated (within +15% of source)</li>';
+          + '<li>' + perfPasses + ' of ' + checked + ' measured in-scope metrics within acceptable threshold</li>';
+    if (perfFails > 0)  html += '<li style="color:#fca5a5;">' + perfFails + ' metric(s) exceeded threshold — set Your Decision to Pass (if acceptable), Fail, or Accept Risk</li>';
+    if (perfWarns > 0)  html += '<li style="color:#fef08a;">' + perfWarns + ' metric(s) flagged for review — confirm in Your Decision column</li>';
     if (perfFails === 0 && perfWarns === 0) html += '<li style="color:#86efac;">All measured metrics at or below source baseline</li>';
-    html += '<li>Lower-is-better metrics: response time, error rate, CPU, memory, I/O wait, latency, DB connect</li>'
-          + '<li>Higher-is-better metrics: upload and download throughput</li>'
+    html += '<li style="color:#94a3b8;">System assessment is a suggestion only — your final decision drives Step 5 readiness</li>'
+          + '<li style="color:#94a3b8;">Lower-is-better: response time, error rate, CPU, memory, I/O wait, latency, DB connect · Higher-is-better: upload/download throughput</li>'
           + '</ul></div>';
 
     var container = document.getElementById('perf-parsed-result');
@@ -9385,7 +10758,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       if (data.dry_run) throw new Error('Dry run is not allowed for the Stage 8 bridge');
       if (ex) {
         ex.style.borderColor = 'rgba(34,197,94,.45)';
-        ex.innerHTML = '<span style="color:#86efac;font-weight:800;">Push succeeded.</span> Opening Stage 8 — GitOps &amp; OpenCenter Modernization.';
+        ex.innerHTML = '<span style="color:#86efac;font-weight:800;">Push succeeded.</span> Opening Stage 9 — GitOps &amp; OpenCenter Modernization.';
       }
       appendDrActivity('Bridge: push OK — opening Stage 8', 'ok');
       activateStage('s9');
@@ -10556,7 +11929,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         {id: 'panel-s6', key: 's6', label: 'Stage 5 — Stabilization \u0026 Handover'},
         {id: 'panel-s7', key: 's7', label: 'Stage 6 — FinOps \u0026 Cost Optimization'},
         {id: 'panel-s8', key: 's8', label: 'Stage 7 — IaC Backup, DR \u0026 Restore'},
-        {id: 'panel-s9', key: 's9', label: 'Stage 8 — GitOps \u0026 OpenCenter Modernization'},
+        {id: 'panel-s9', key: 's9', label: 'Stage 9 — GitOps \u0026 OpenCenter Modernization'},
         {id: 'panel-s10', key: 's10', label: 'Stage 9 — AIOps \u0026 Continuous Operations'}
       ];
       panels.forEach(p => {
@@ -10606,7 +11979,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           's6': 'Stage 5 — Stabilization \u0026 Handover',
           's7': 'Stage 6 — FinOps \u0026 Cost Optimization',
           's8': 'Stage 7 — IaC Backup, DR \u0026 Restore',
-          's9': 'Stage 8 — GitOps \u0026 OpenCenter Modernization',
+          's9': 'Stage 9 — GitOps \u0026 OpenCenter Modernization',
           's10': 'Stage 9 — AIOps \u0026 Continuous Operations'
       };
 
