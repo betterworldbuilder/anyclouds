@@ -6054,9 +6054,16 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
         <!-- TCO Metrics -->
         <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
-          <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;">Cost Projection by Period</div>
-          <div id="tco-projection-chart" style="display:flex;flex-direction:column;gap:12px;">
-            <div style="color:#94a3b8;font-size:13px;font-style:italic;">Load UAT data to generate projections.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;">Cost Projection by Period</div>
+            <span id="tco-chart-demo-badge" style="font-size:10px;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:10px;font-weight:700;border:1px solid #fcd34d;">DEMO VALUES</span>
+          </div>
+          <div id="tco-projection-chart" style="display:flex;flex-direction:column;gap:0;">
+            <!-- pre-rendered demo bars; JS overwrites on load -->
+            <div id="tco-bar-monthly"></div>
+            <div id="tco-bar-1yr"></div>
+            <div id="tco-bar-3yr"></div>
+            <div id="tco-bar-5yr"></div>
           </div>
         </div>
 
@@ -6186,7 +6193,29 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       <!-- TCO JS engine -->
       <script>
       (function(){
-        var _tcoState = { srcMonthly:0, tgtMonthly:0, savings:0, savingsPct:0, servers:[], vmData:{} };
+        // Demo defaults: used immediately so charts/insights render without needing "Load from UAT"
+        var _demo = { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:26.2 };
+        var _demoVm = { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000, rows:4 };
+
+        // Try loading real data from localStorage immediately
+        var _initRaw = null;
+        try { _initRaw = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
+        var _initScope = null;
+        try { _initScope = JSON.parse(localStorage.getItem('osflex_uat_scope') || 'null'); } catch(_) {}
+
+        var _usingDemo = !_initRaw || !_initRaw.tcoData;
+        var _initT = _usingDemo ? _demo : _initRaw.tcoData;
+        var _initVm = _usingDemo ? _demoVm : (_initRaw.vmData || _demoVm);
+
+        var _tcoState = {
+          srcMonthly: parseFloat(_initT.srcMonthly) || _demo.srcMonthly,
+          tgtMonthly: parseFloat(_initT.tgtMonthly) || _demo.tgtMonthly,
+          savings:    parseFloat(_initT.savings)    || _demo.savings,
+          savingsPct: parseFloat(_initT.savingsPct) || _demo.savingsPct,
+          servers:    Array.isArray(_initScope) ? _initScope : [],
+          vmData:     _initVm,
+          isDemo:     _usingDemo
+        };
 
         function _fmt(n){ return '$' + Math.round(n).toLocaleString(); }
         function _fmtK(n){ return n >= 1000 ? '$' + (n/1000).toFixed(1) + 'K' : _fmt(n); }
@@ -6227,8 +6256,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
         window.tcoRecalc = function() {
           var s = _tcoState;
-          if (!s.srcMonthly && !s.tgtMonthly) return;
           var capex = _capex();
+          // Show/hide demo badge
+          var badge = document.getElementById('tco-chart-demo-badge');
+          if (badge) badge.style.display = s.isDemo ? 'inline' : 'none';
           var savMonthly = s.savings;
           var savAnnual  = savMonthly * 12;
           var sav3yr     = savAnnual * 3 - capex;
@@ -6260,24 +6291,32 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           var pb = document.getElementById('tco-payback');
           if (pb) pb.textContent = payback > 0 ? payback.toFixed(1) + ' months' : 'Immediate';
 
-          // Projection chart bars
+          // Projection chart bars — write to individual slots so pre-render layout is never blank
           var maxV = Math.max(ospcAnnual, flexAnnual, ospc3yr, flex3yr, ospc5yr, flex5yr, 1);
-          var chart = document.getElementById('tco-projection-chart');
-          if (chart) chart.innerHTML =
-            _renderBar('Monthly (×1)', s.srcMonthly, s.tgtMonthly, Math.max(s.srcMonthly, s.tgtMonthly, 1), 'mo')
-            + _renderBar('Year 1', ospcAnnual, flexAnnual, maxV, 'yr')
-            + _renderBar('Year 3 (incl. CAPEX)', ospc3yr, flex3yr, maxV, '3yr')
-            + _renderBar('Year 5 (incl. CAPEX)', ospc5yr, flex5yr, maxV, '5yr');
+          var moMax = Math.max(s.srcMonthly, s.tgtMonthly, 1);
+          var b1 = document.getElementById('tco-bar-monthly');
+          var b2 = document.getElementById('tco-bar-1yr');
+          var b3 = document.getElementById('tco-bar-3yr');
+          var b4 = document.getElementById('tco-bar-5yr');
+          if (b1) b1.innerHTML = _renderBar('Monthly', s.srcMonthly, s.tgtMonthly, moMax, 'mo');
+          if (b2) b2.innerHTML = _renderBar('Year 1', ospcAnnual, flexAnnual, maxV, 'yr');
+          if (b3) b3.innerHTML = _renderBar('Year 3 (incl. CAPEX)', ospc3yr, flex3yr, maxV, '3yr');
+          if (b4) b4.innerHTML = _renderBar('Year 5 (incl. CAPEX)', ospc5yr, flex5yr, maxV, '5yr');
 
-          // Insight cards
+          // Insight cards — always populate; use actual vmData when available, demo fallback otherwise
           var vm = s.vmData;
+          var vcpuSrc = vm.srcVcpu || 16, vcpuTgt = vm.tgtVcpu || 16;
+          var ramSrc  = vm.srcRam  || 64,  ramTgt  = vm.tgtRam  || 64;
+          var diskSrc = vm.srcDisk || 1000, diskTgt = vm.tgtDisk || 1000;
+          var demoLabel = s.isDemo ? ' (demo)' : '';
           _set('tco-insight-compute',
-            vm.srcVcpu ? 'Source: ' + vm.srcVcpu + ' vCPU / ' + (vm.srcRam||0) + ' GB RAM → FLEX: ' + (vm.tgtVcpu||0) + ' vCPU / ' + (vm.tgtRam||0) + ' GB RAM. Est. compute saves ~' + _fmtK(savMonthly * 0.6) + '/mo.' : 'Load UAT data to see compute cost breakdown.');
+            'Source: ' + vcpuSrc + ' vCPU / ' + ramSrc + ' GB RAM → FLEX: ' + vcpuTgt + ' vCPU / ' + ramTgt + ' GB RAM. Compute OPEX saves ~' + _fmtK(savMonthly * 0.6) + '/mo' + demoLabel + '.');
           _set('tco-insight-storage',
-            vm.srcDisk ? 'Source: ' + (vm.srcDisk||0) + ' GB → FLEX: ' + (vm.tgtDisk||0) + ' GB. Est. storage saves ~' + _fmtK(savMonthly * 0.2) + '/mo.' : 'Load UAT data to see storage cost breakdown.');
-          _set('tco-insight-license', 'FLEX: no vendor license fees. Est. license saves ~' + _fmtK(savMonthly * 0.1) + '/mo vs OSPC subscription model.');
+            'Source: ' + diskSrc + ' GB → FLEX: ' + diskTgt + ' GB. Storage OPEX saves ~' + _fmtK(savMonthly * 0.2) + '/mo' + demoLabel + '.');
+          _set('tco-insight-license',
+            'FLEX has no vendor license fees. License saves ~' + _fmtK(savMonthly * 0.1) + '/mo vs OSPC subscription model' + demoLabel + '.');
           _set('tco-insight-rightsizing',
-            n > 0 ? n + ' VMs identified from UAT. Right-sizing on FLEX can add up to 15% further savings (~' + _fmtK(s.tgtMonthly * 0.15) + '/mo).' : 'Load UAT data to identify right-sizing opportunities.');
+            (n > 0 ? n + ' VMs in scope.' : 'Est. ' + (vm.rows || 4) + ' VMs' + demoLabel + '.') + ' Right-sizing on modern FLEX flavors can add 10–15% further savings (~' + _fmtK(s.tgtMonthly * 0.15) + '/mo).');
 
           // Per-server table
           var tbody = document.getElementById('tco-server-tbody');
@@ -6351,12 +6390,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             return;
           }
           var t = raw.tcoData;
-          _tcoState.srcMonthly  = t.srcMonthly || 0;
-          _tcoState.tgtMonthly  = t.tgtMonthly || 0;
-          _tcoState.savings     = t.savings || 0;
-          _tcoState.savingsPct  = parseFloat(t.savingsPct || 0);
-          _tcoState.vmData      = (raw.vmData) || {};
+          _tcoState.srcMonthly  = parseFloat(t.srcMonthly) || 0;
+          _tcoState.tgtMonthly  = parseFloat(t.tgtMonthly) || 0;
+          _tcoState.savings     = parseFloat(t.savings)    || 0;
+          _tcoState.savingsPct  = parseFloat(t.savingsPct) || 0;
+          _tcoState.vmData      = raw.vmData || {};
           _tcoState.servers     = Array.isArray(scope) ? scope : [];
+          _tcoState.isDemo      = false;
 
           var tsEl = document.getElementById('tco-uat-ts');
           if (tsEl) tsEl.textContent = ts ? 'UAT: ' + ts.replace('T',' ').slice(0,16) + ' UTC' : '';
@@ -6399,16 +6439,20 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           URL.revokeObjectURL(url);
         };
 
-        // Auto-load if data already in storage
-        setTimeout(function(){
-          var raw = null;
-          try { raw = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
-          if (!raw && window._uatFlavorData) raw = window._uatFlavorData;
-          if (raw && raw.tcoData) tcoLoadFromUat();
-        }, 600);
-
-        // Recalc capex when inputs change
-        _capex();
+        // Render immediately when DOM is ready (always fires, even with demo data)
+        function _tcoInit() {
+          _capex();
+          tcoRecalc();
+          // Also try real UAT data from window._uatFlavorData (set by Stage 3 loader)
+          if (_tcoState.isDemo && window._uatFlavorData && window._uatFlavorData.tcoData) {
+            tcoLoadFromUat();
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', _tcoInit);
+        } else {
+          _tcoInit();
+        }
       })();
       </script>
 
