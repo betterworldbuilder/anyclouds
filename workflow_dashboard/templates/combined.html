@@ -5659,6 +5659,15 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #84cc16; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#d9f99d;">Right-Sizing Wins</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Identify VMs running on oversized OSPC flavors that can be migrated to smaller, cheaper FLEX flavors with equivalent performance.</p></div>
         <div style="background:rgba(0,0,0,.28); border-left:4px solid #22d3ee; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#67e8f9;">Performance Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate a before/after performance comparison report as evidence for customer sign-off and modernization ROI.</p></div>
       </div>
+      <!-- Source Infrastructure Snapshot (reads sessionStorage written by discovery dashboard) -->
+      <div style="background:rgba(15,23,42,.82); border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div style="color:#86efac; font-weight:800; font-size:14px;">Source Infrastructure Snapshot</div>
+          <button type="button" onclick="s7aRefreshSnapshot()" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.4); color:#86efac; padding:3px 10px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:700;">Refresh</button>
+        </div>
+        <div id="s7a-infra-cards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;"></div>
+        <div id="s7a-infra-empty" style="color:#64748b; font-size:13px; display:none;">No discovery data loaded — load an account_overview.csv in Stage 1 (Analyze OSPC CSV) first.</div>
+      </div>
       <div style="background:rgba(15,23,42,.72); border:1px solid rgba(34,197,94,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
         <div style="color:#86efac; font-weight:800; margin-bottom:10px;">Performance Gain chain position</div>
         <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Cost optimization → Performance Gain → IaC backup, DR &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
@@ -11142,6 +11151,40 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       }
     }
     requestAnimationFrame(syncVisibleIframeHeights);
+    if (stageId === 's7a') { try { s7aRefreshSnapshot(); } catch(e) {} }
+  }
+
+  function s7aRefreshSnapshot() {
+    const cardsEl = document.getElementById('s7a-infra-cards');
+    const emptyEl = document.getElementById('s7a-infra-empty');
+    if (!cardsEl || !emptyEl) return;
+    var snap = null;
+    try { snap = JSON.parse(sessionStorage.getItem('discovery_infra_snapshot') || 'null'); } catch(e) {}
+    if (!snap || (!snap.compute.servers && !snap.storage.vols)) {
+      cardsEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    var c = snap.compute, s = snap.storage;
+    function ic(label, value, color) {
+      return '<div style="background:rgba(0,0,0,.32); border:1px solid ' + (color||'rgba(34,197,94,.3)') + '; border-radius:8px; padding:12px 14px;">' +
+        '<div style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">' + label + '</div>' +
+        '<div style="font-size:18px; font-weight:800; color:#dcfce7;">' + value + '</div></div>';
+    }
+    var html = '';
+    if (c.servers) {
+      html += ic('Compute Servers', c.servers.toLocaleString());
+      html += ic('Active Utilization', c.pct + '% (' + c.active + ' active)', 'rgba(74,222,128,.3)');
+      if (c.vcpus)  html += ic('Total vCPUs', c.vcpus.toLocaleString(), 'rgba(56,189,248,.3)');
+      if (c.ramGb)  html += ic('Total RAM', c.ramGb >= 1024 ? (c.ramGb/1024).toFixed(1)+' TB' : Math.round(c.ramGb)+' GB', 'rgba(167,139,250,.3)');
+    }
+    if (s.vols) {
+      var szLabel = s.totalGb >= 1024 ? (s.totalGb/1024).toFixed(1)+' TB' : Math.round(s.totalGb)+' GB';
+      html += ic('Total Storage', szLabel + ' (' + s.vols + ' vols)', 'rgba(251,191,36,.3)');
+      html += ic('Storage Utilization', s.pct + '% in-use', 'rgba(251,146,60,.3)');
+    }
+    cardsEl.innerHTML = html;
   }
 
   function resizeEmbeddedIframe(iframe) {

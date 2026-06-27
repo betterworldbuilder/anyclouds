@@ -619,12 +619,15 @@ function renderSummary(rows, headers, summaryEl) {
   }
 
   // ── Compute & Storage resource totals (overview CSV) ─────────────────────
+  const _snapCompute = { servers: 0, active: 0, pct: 0, vcpus: 0, ramGb: 0 };
+  const _snapStorage = { totalGb: 0, vols: 0, inUse: 0, pct: 0 };
+
   if (headers.includes('service_type') && headers.includes('flavor_id')) {
     const serverRows  = rows.filter(r => r.service_type === 'cloud_server');
     const activeServers = serverRows.filter(r => (r.status || '').toUpperCase() === 'ACTIVE');
     let totalVcpus = 0, totalRamGb = 0;
     serverRows.forEach(r => {
-      const f = FLAVOR_CATALOG[(r.flavor_id || '').trim().toLowerCase()];
+      const f = sourceFlavorSpecs[(r.flavor_id || '').trim().toLowerCase()];
       if (f) { totalVcpus += f.vcpus; totalRamGb += f.ram_mb / 1024; }
     });
     if (serverRows.length > 0) {
@@ -633,6 +636,11 @@ function renderSummary(rows, headers, summaryEl) {
       cards.push(card('Active Utilization', computePct + '% (' + activeServers.length + ' active)'));
       if (totalVcpus > 0)  cards.push(card('Total vCPUs', totalVcpus.toLocaleString()));
       if (totalRamGb > 0)  cards.push(card('Total RAM', totalRamGb >= 1024 ? (totalRamGb / 1024).toFixed(1) + ' TB' : Math.round(totalRamGb) + ' GB'));
+      _snapCompute.servers = serverRows.length;
+      _snapCompute.active  = activeServers.length;
+      _snapCompute.pct     = computePct;
+      _snapCompute.vcpus   = totalVcpus;
+      _snapCompute.ramGb   = totalRamGb;
     }
   }
 
@@ -645,8 +653,19 @@ function renderSummary(rows, headers, summaryEl) {
       const sizeLabel  = totalGb >= 1024 ? (totalGb / 1024).toFixed(1) + ' TB' : Math.round(totalGb) + ' GB';
       cards.push(card('Total Storage', sizeLabel + ' (' + volRows.length + ' vols)'));
       cards.push(card('Storage Utilization', storagePct + '% in-use'));
+      _snapStorage.totalGb = totalGb;
+      _snapStorage.vols    = volRows.length;
+      _snapStorage.inUse   = inUseVols.length;
+      _snapStorage.pct     = storagePct;
     }
   }
+
+  // Persist stats so Performance Gain panel in parent can read them
+  try {
+    sessionStorage.setItem('discovery_infra_snapshot', JSON.stringify({
+      compute: _snapCompute, storage: _snapStorage, ts: Date.now()
+    }));
+  } catch(e) {}
   // ─────────────────────────────────────────────────────────────────────────
 
   if (headers.includes('target_flavor_name')) {
