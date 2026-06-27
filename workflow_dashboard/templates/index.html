@@ -14,43 +14,104 @@
   <link rel="stylesheet" href="/static/style.css" />
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
   <style>
-    /* ── Reset to dark FLEX theme ─────────────────────────────────────────── */
+    /* ── Dark theme (blue palette, matches CSV dashboard) ────────────────── */
     :root {
       --flex-red: #e4002b;
       --flex-red-glow: rgba(228,0,43,0.35);
       --flex-red-dim: rgba(228,0,43,0.12);
-      --card-bg: rgba(8,14,30,0.88);
-      --card-border: rgba(228,0,43,0.22);
-      --card-border-neutral: rgba(71,85,105,0.38);
-      --input-bg: rgba(255,255,255,0.05);
-      --input-border: rgba(148,163,184,0.22);
-      --text: #e2e8f0;
-      --muted: #94a3b8;
+      --card-bg: rgba(15,30,62,0.88);
+      --card-border: rgba(228,0,43,0.28);
+      --card-border-neutral: rgba(142,162,204,0.3);
+      --input-bg: rgba(255,255,255,0.08);
+      --input-border: rgba(142,162,204,0.35);
+      --text: #ffffff;
+      --muted: #d4ddf5;
+      --muted2: #a8b8d8;
       --green: #22c55e;
-      --blue: #3b82f6;
+      --blue: #6f7db0;
     }
     html, body { margin:0; padding:0; min-height:100vh; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      background: radial-gradient(ellipse at top left, #0d0520 0%, #06090f 40%, #0a0d1a 100%);
+      background: linear-gradient(120deg, #2a4e8d 0%, #374a86 45%, #5a4b72 100%);
       color: var(--text);
     }
-    /* Animated bg stars */
+    /* Subtle dot texture overlay */
     body::before {
       content:'';
       position:fixed; inset:0; z-index:0; pointer-events:none;
-      background-image: radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.18) 0%, transparent 100%),
-        radial-gradient(1px 1px at 60% 15%, rgba(255,255,255,.12) 0%, transparent 100%),
-        radial-gradient(1px 1px at 80% 55%, rgba(255,255,255,.14) 0%, transparent 100%),
-        radial-gradient(1px 1px at 45% 70%, rgba(255,255,255,.1) 0%, transparent 100%),
-        radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,.08) 0%, transparent 100%);
+      background-image: radial-gradient(circle at 25% 20%, rgba(255,255,255,.06) 0%, transparent 50%),
+        radial-gradient(circle at 75% 80%, rgba(90,75,114,.4) 0%, transparent 50%);
     }
+
+    /* ── Light theme overrides ───────────────────────────────────────────── */
+    body.light-theme {
+      background: #f5f7fb !important;
+      color: #151922 !important;
+    }
+    body.light-theme::before { display: none; }
+    body.light-theme .scanner-header {
+      background: #1e232b !important;
+      border-bottom-color: rgba(163,62,62,0.4) !important;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12) !important;
+    }
+    body.light-theme .scanner-header-desc { color: #94a3b8 !important; }
+    body.light-theme .fx-card {
+      background: #ffffff !important;
+      border-color: #e2e6ec !important;
+      box-shadow: 0 1px 4px rgba(15,23,42,.06) !important;
+    }
+    body.light-theme .fx-card.red-accent { border-color: #e8d0d0 !important; }
+    body.light-theme .fx-card.red-accent::before { background: linear-gradient(180deg, #a33e3e, rgba(163,62,62,0.15)) !important; }
+    body.light-theme .fx-card-title { color: #1e293b !important; }
+    body.light-theme .fx-section-label { color: #a33e3e !important; }
+    body.light-theme #runSummaryCard {
+      background: rgba(255,255,255,0.96) !important;
+      border-color: rgba(163,62,62,0.3) !important;
+      box-shadow: 0 2px 16px rgba(163,62,62,0.08) !important;
+    }
+    body.light-theme #runSummaryCard h2 { color: #a33e3e !important; }
+    body.light-theme .summary-grid div { color: #64748b !important; }
+    body.light-theme .summary-grid span { color: #1e293b !important; }
+    body.light-theme .fx-hint { color: #596273 !important; }
+    body.light-theme .fx-hint code { color: #1d4ed8 !important; }
+    body.light-theme label { color: #596273 !important; }
+    body.light-theme input[type="text"], body.light-theme input[type="password"],
+    body.light-theme select, body.light-theme textarea {
+      background: #fff !important; border-color: #d7dbe2 !important;
+      color: #151922 !important;
+    }
+    body.light-theme input[type="text"]:focus, body.light-theme select:focus {
+      border-color: rgba(163,62,62,0.5) !important;
+      box-shadow: 0 0 0 2px rgba(163,62,62,0.1) !important;
+    }
+    body.light-theme select option { background: #fff; color: #151922; }
+    body.light-theme .cred-panel { background: #f8fafc !important; border-color: #e2e6ec !important; }
+    body.light-theme .cred-panel.flex-panel { background: #fff5f5 !important; border-color: #f0c8c8 !important; }
+    body.light-theme .cred-panel-title { color: #374151 !important; border-bottom-color: rgba(0,0,0,0.08) !important; }
+    body.light-theme .file-list li { color: #596273 !important; border-bottom-color: rgba(0,0,0,0.06) !important; }
+    body.light-theme .file-list li::before { color: #a33e3e !important; }
+    body.light-theme #logBox { background: #1a1f2e !important; }
+    body.light-theme .log-tools button { background: #f1f5f9 !important; border-color: #d1d5db !important; color: #374151 !important; }
+    body.light-theme .log-tools button.active { background: #fee2e2 !important; border-color: #fca5a5 !important; color: #a33e3e !important; }
+    body.light-theme .next-step-card { background: linear-gradient(135deg,#fee2e2,#fff5f5) !important; border-color: #f0c8c8 !important; }
+    body.light-theme .next-step-card h2 { color: #a33e3e !important; }
+    body.light-theme .next-step-card p { color: #374151 !important; }
+    body.light-theme .scanner-step-chip { background: rgba(163,62,62,0.06) !important; border-color: rgba(163,62,62,0.18) !important; color: #7a3030 !important; }
+    body.light-theme .scanner-step-chip strong { color: #a33e3e !important; }
+    body.light-theme .region-checkboxes label { color: #374151 !important; }
+    body.light-theme .hint { color: #596273 !important; }
+    body.light-theme .hint code { color: #1d4ed8 !important; }
+    body.light-theme .status-chip.idle { background: rgba(219,234,254,0.8) !important; color: #1d4ed8 !important; border-color: rgba(59,130,246,0.3) !important; }
+    body.light-theme a { color: #a33e3e !important; }
+
     /* ── Header ─────────────────────────────────────────────────────────────── */
     .scanner-header {
       position: relative; z-index:10;
-      background: linear-gradient(180deg, #0a0d1a 0%, rgba(8,14,28,0.96) 100%);
+      background: rgba(15,26,58,0.72);
+      backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(228,0,43,0.28);
-      box-shadow: 0 4px 32px rgba(228,0,43,0.08);
+      box-shadow: 0 4px 32px rgba(0,0,0,0.2);
       padding: 0;
     }
     .scanner-header-inner {
@@ -76,7 +137,7 @@
     }
     .scanner-header-top h1 span { color: var(--flex-red); }
     .scanner-header-desc {
-      font-size: 12px; color: #64748b; max-width: 820px; line-height: 1.55;
+      font-size: 12px; color: var(--muted2, #a8b8d8); max-width: 820px; line-height: 1.55;
       margin: 0 0 10px;
     }
     .scanner-steps-row {
@@ -147,15 +208,15 @@
     .summary-grid {
       display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11px;
     }
-    .summary-grid div { color: #64748b; }
-    .summary-grid span { color: #e2e8f0; font-weight: 600; }
+    .summary-grid div { color: var(--muted2, #a8b8d8); }
+    .summary-grid span { color: var(--text, #fff); font-weight: 600; }
     /* ── File manager ────────────────────────────────────────────────────────── */
     .fx-hint {
-      font-size: 12px; color: #64748b; line-height: 1.6; margin: 0 0 12px;
+      font-size: 12px; color: var(--muted2, #a8b8d8); line-height: 1.6; margin: 0 0 12px;
     }
-    .fx-hint strong { color: #94a3b8; }
+    .fx-hint strong { color: var(--muted, #d4ddf5); }
     .fx-hint code { color: #7dd3fc; font-family: 'Share Tech Mono', monospace; font-size: 11px; }
-    .fx-hint em { color: #64748b; }
+    .fx-hint em { color: var(--muted2, #a8b8d8); }
     .file-upload-row {
       display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;
     }
@@ -186,7 +247,7 @@
       box-shadow: 0 0 0 2px rgba(228,0,43,0.12) !important;
     }
     select option { background: #0a0d1a; color: #e2e8f0; }
-    label { font-size: 12px; color: #64748b; display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; color: var(--muted2, #a8b8d8); display: flex; flex-direction: column; gap: 5px; }
     /* ── Buttons ─────────────────────────────────────────────────────────────── */
     button, .btn, input[type="button"], input[type="submit"] {
       background: linear-gradient(135deg, #c8002a, var(--flex-red)) !important;
@@ -286,7 +347,7 @@
       color: #fca5a5 !important;
     }
     /* ── Checkbox hints ──────────────────────────────────────────────────────── */
-    .hint { font-size: 12px; color: #64748b; margin: 0 0 6px; line-height: 1.6; }
+    .hint { font-size: 12px; color: var(--muted2, #a8b8d8); margin: 0 0 6px; line-height: 1.6; }
     .hint strong { color: #94a3b8; }
     .hint code { color: #7dd3fc; font-family: 'Share Tech Mono', monospace; font-size: 11px; }
     .hint-check { display: flex; align-items: center; gap: 6px; cursor: pointer; flex-direction: row; }
@@ -999,5 +1060,30 @@
 
   <script>window.OSFLEX_SCANNER_MODE = "{{ scanner_mode }}"; window.OSFLEX_SCANNER_PROVIDER = "{{ scanner_provider }}";</script>
   <script src="{{ url_for('static', filename='app.js') }}?v={{ cache_bust|default(6) }}"></script>
+  <script>
+  // ── Theme bridge: listen for theme broadcast from parent dashboard ────────
+  function applyGlobalTheme(theme) {
+    if (theme === 'flex-skyline' || theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+  }
+  // Listen for postMessage from combined.html parent
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'osflex-theme') {
+      applyGlobalTheme(e.data.theme);
+    }
+  });
+  // On load, try to read parent theme
+  (function() {
+    try {
+      var saved = window.parent && window.parent !== window
+        ? window.parent.localStorage.getItem('osflex_global_theme_v2')
+        : localStorage.getItem('osflex_global_theme_v2');
+      if (saved) applyGlobalTheme(saved);
+    } catch(_) {}
+  })();
+  </script>
 </body>
 </html>

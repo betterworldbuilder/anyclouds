@@ -98,6 +98,28 @@
       <p id="mapperMeta" class="meta">No flavor mapper file loaded</p>
     </section>
 
+    <section id="pricelist-upload-panel" class="panel hidden" style="display:none;flex-wrap:wrap;gap:16px;align-items:flex-start;padding:14px 18px;">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">OSPC Price List CSV</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="ospcPriceFile" type="file" accept=".csv,text/csv" style="display:none;" />
+          <button id="ospcPriceBtn" type="button" class="btn" onclick="document.getElementById('ospcPriceFile').click()">⬆ OSPC Price List</button>
+          <span id="ospcPriceMeta" style="font-size:11px;color:#64748b;">No file loaded</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">FLEX Price List CSV</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="flexPriceFile" type="file" accept=".csv,text/csv" style="display:none;" />
+          <button id="flexPriceBtn" type="button" class="btn" onclick="document.getElementById('flexPriceFile').click()">⬆ FLEX Price List</button>
+          <span id="flexPriceMeta" style="font-size:11px;color:#64748b;">No file loaded</span>
+        </div>
+      </div>
+      <p id="tco-assumption-note" style="width:100%;margin:4px 0 0;font-size:11px;color:#f59e0b;display:flex;align-items:center;gap:6px;">
+        <span>⚠</span><span>If no FLEX price list is present, OSPC is assumed <strong>2.45× more expensive</strong> than FLEX.</span>
+      </p>
+    </section>
+
     <section id="mapperSummary" class="summary hidden"></section>
 
     <section class="panel table-panel hidden" id="mapperTablePanel">
@@ -334,6 +356,27 @@
       const ts = new Date().toISOString().slice(0,10);
       XLSX.writeFile(wb, `ospc_inventory_${ts}.xlsx`);
     });
+  </script>
+  <script>
+  // ── Theme bridge: listen for theme from parent combined.html ──────────────
+  function applyGlobalTheme(theme) {
+    if (theme === 'flex-skyline' || theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+  }
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'osflex-theme') applyGlobalTheme(e.data.theme);
+  });
+  (function() {
+    try {
+      var saved = (window.parent && window.parent !== window)
+        ? window.parent.localStorage.getItem('osflex_global_theme_v2')
+        : localStorage.getItem('osflex_global_theme_v2');
+      if (saved) applyGlobalTheme(saved);
+    } catch(_) {}
+  })();
   </script>
 </body>
 </html>

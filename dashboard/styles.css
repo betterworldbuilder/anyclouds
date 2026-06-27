@@ -420,3 +420,68 @@ tr.row-missing-image td {
     opacity: 1;
   }
 }
+
+/* ── Light theme (Flex Skyline) ──────────────────────────────────────────── */
+body.light-theme {
+  --bg: #f5f7fb;
+  --ink: #151922;
+  --muted: #596273;
+  --panel: rgba(255,255,255,0.9);
+  --line: rgba(0,0,0,0.1);
+  --accent: #4a5568;
+  --accent-ink: #1e293b;
+  --chip: rgba(0,0,0,0.06);
+  background: #f5f7fb !important;
+  color: #151922 !important;
+}
+body.light-theme .bg-shape { display: none; }
+body.light-theme .app { background: #f5f7fb !important; }
+body.light-theme .hero { background: transparent !important; }
+body.light-theme .hero h1 { color: #1e293b !important; text-shadow: none !important; }
+body.light-theme .hero .eyebrow { color: #596273 !important; }
+body.light-theme .hero .sub { color: #64748b !important; }
+body.light-theme .hero code { background: #e8ecf3 !important; color: #1d4ed8 !important; }
+body.light-theme .panel {
+  background: #ffffff !important;
+  border-color: #e2e6ec !important;
+  box-shadow: 0 1px 4px rgba(15,23,42,.06) !important;
+}
+body.light-theme .upload-label { color: #374151 !important; }
+body.light-theme .meta { color: #64748b !important; }
+body.light-theme input[type="file"],
+body.light-theme input[type="text"],
+body.light-theme input[type="search"],
+body.light-theme select,
+body.light-theme textarea {
+  background: #fff !important;
+  border-color: #d7dbe2 !important;
+  color: #151922 !important;
+}
+body.light-theme select option { background: #fff; color: #151922; }
+body.light-theme label { color: #596273 !important; }
+body.light-theme .btn {
+  background: #4b5f91 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+body.light-theme .btn:hover { background: #374a7a !important; }
+body.light-theme .btn-xlsx { background: #166534 !important; }
+body.light-theme .summary-cards { background: transparent !important; }
+body.light-theme .stat-card {
+  background: #fff !important;
+  border-color: #e2e6ec !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06) !important;
+}
+body.light-theme .stat-label { color: #64748b !important; }
+body.light-theme .stat-value { color: #1e293b !important; }
+body.light-theme table { background: #fff !important; }
+body.light-theme th {
+  background: #f1f5f9 !important;
+  color: #374151 !important;
+  border-color: #e2e6ec !important;
+}
+body.light-theme td { color: #374151 !important; border-color: #f1f5f9 !important; }
+body.light-theme tr:hover td { background: #f8fafc !important; }
+body.light-theme .tco-table-wrap { background: #fff !important; }
+body.light-theme .pricelist-panel { background: #f8fafc !important; border-color: #e2e6ec !important; }
+body.light-theme .tco-note { color: #f59e0b !important; }
