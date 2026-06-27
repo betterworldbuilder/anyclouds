@@ -5408,10 +5408,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             <div style="display:flex;align-items:stretch;overflow-x:auto;padding-bottom:6px;gap:0;">
 
               <!-- Step 1 -->
-              <div id="co-step-precheck" style="flex:1;min-width:148px;background:#fff;border:2px solid #e5e7eb;border-radius:12px 0 0 12px;padding:16px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:5px;">STEP 1</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:8px;">Pre-checks</div>
+              <!-- Step 1 — Pre-checks -->
+              <div id="co-step-precheck" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-radius:12px 0 0 12px;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 1</div>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Pre-checks</div>
                 <span id="co-chip-precheck" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
+                <div style="background:#f8fafc;border-radius:8px;padding:8px 10px;margin-bottom:10px;border-left:3px solid #6b7280;">
+                  <div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:3px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#64748b;line-height:1.5;">Verify SSH access, disk space, service status and network reachability before go-live.</div>
+                  <div style="font-size:10px;color:#9ca3af;margin-top:5px;"><b>Script:</b> Manual checklist — no backend call</div>
+                  <div style="font-size:10px;color:#9ca3af;"><b>Output:</b> Operator reviews and marks Pass or Fail</div>
+                </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
                   <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunPrecheck(this)"><i class="fas fa-play"></i> Run Pre-checks</button>
                   <div id="co-mark-precheck" style="display:none;gap:4px;">
@@ -5422,13 +5429,23 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 2 -->
-              <div id="co-step-traffic" style="flex:1;min-width:148px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:5px;">STEP 2</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:8px;">Switch Traffic</div>
+              <!-- Step 2 — Switch Traffic (HAProxy) -->
+              <div id="co-step-traffic" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 2</div>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Switch Traffic</div>
                 <span id="co-chip-traffic" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
+                <div style="background:#eff6ff;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #3b82f6;">
+                  <div style="font-size:10px;font-weight:700;color:#1e40af;margin-bottom:3px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.5;">Configure HAProxy on the OSPC host to route live traffic to FLEX. Installs HAProxy, sets pool_ospc → pool_flex.</div>
+                  <div style="font-size:10px;color:#3b82f6;margin-top:5px;"><b>Script:</b> <code style="background:#dbeafe;padding:1px 4px;border-radius:3px;">ab_strategy</code> → /api/run/stage5_task</div>
+                  <div style="font-size:10px;color:#3b82f6;"><b>Output:</b> HAProxy configured, FLEX pool active, DB replication link established</div>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:10px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">HAProxy Server IP</label>
+                  <input id="co-haproxy-ip" type="text" placeholder="e.g. 10.0.0.5" style="width:100%;padding:5px 8px;font-size:11px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-family:monospace;">
+                </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('traffic_flex','traffic',this)"><i class="fas fa-traffic-light"></i> Confirm FLEX Traffic</button>
+                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTrafficSwitch(this)"><i class="fas fa-traffic-light"></i> Configure HAProxy</button>
                   <div id="co-mark-traffic" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('traffic','pass')">Pass</button>
                     <button class="btn btn-danger" style="font-size:10px;padding:4px 6px;width:48%;margin-left:4%;" onclick="coMarkStep('traffic','fail')">Fail</button>
@@ -5437,11 +5454,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 3 -->
-              <div id="co-step-app" style="flex:1;min-width:148px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:5px;">STEP 3</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:8px;">Validate App</div>
+              <!-- Step 3 — Validate App -->
+              <div id="co-step-app" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 3</div>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Validate App</div>
                 <span id="co-chip-app" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
+                <div style="background:#f0fdf4;border-radius:8px;padding:8px 10px;margin-bottom:10px;border-left:3px solid #22c55e;">
+                  <div style="font-size:10px;font-weight:700;color:#15803d;margin-bottom:3px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.5;">Validate app endpoints and transactions on FLEX. Confirm HTTP 200, API responses and session handling.</div>
+                  <div style="font-size:10px;color:#22c55e;margin-top:5px;"><b>Script:</b> <code style="background:#dcfce7;padding:1px 4px;border-radius:3px;">val_txn</code> → /api/run/stage5_task</div>
+                  <div style="font-size:10px;color:#22c55e;"><b>Output:</b> HTTP 200 OK, app to DB queries successful</div>
+                </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
                   <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('val_txn','app',this)"><i class="fas fa-check-circle"></i> Validate App</button>
                   <div id="co-mark-app" style="display:none;gap:4px;">
@@ -5452,16 +5475,22 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 4 — DB (scope-aware) -->
-              <div id="co-step-db" style="flex:1;min-width:148px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:5px;">STEP 4</div>
+              <!-- Step 4 — Validate DB (scope-aware, wired to db_health) -->
+              <div id="co-step-db" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 4</div>
                 <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Validate DB</div>
-                <span id="co-chip-db" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:8px;letter-spacing:.3px;">PENDING</span>
+                <span id="co-chip-db" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:6px;letter-spacing:.3px;">PENDING</span>
                 <label style="font-size:10px;color:#6b7280;display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:8px;">
                   <input type="checkbox" id="co-db-scope-toggle" checked onchange="coToggleDb()" style="accent-color:#3b82f6;"> DB in scope
                 </label>
+                <div style="background:#fefce8;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #f59e0b;">
+                  <div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:3px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.5;">SSH to OSPC DB master and FLEX DB replica. Verify <code>Seconds_Behind_Master = 0</code> before freeze.</div>
+                  <div style="font-size:10px;color:#d97706;margin-top:5px;"><b>Script:</b> <code style="background:#fef9c3;padding:1px 4px;border-radius:3px;">db_health</code> → /api/run/stage5_task (SSH)</div>
+                  <div style="font-size:10px;color:#d97706;"><b>Output:</b> Replication in sync, binlog positions matched</div>
+                </div>
                 <div id="co-db-btn-area" style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('val_db','db',this)"><i class="fas fa-database"></i> Validate DB</button>
+                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('db_health','db',this)"><i class="fas fa-database"></i> Check DB Health</button>
                   <div id="co-mark-db" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('db','pass')">Pass</button>
                     <button class="btn btn-danger" style="font-size:10px;padding:4px 6px;width:48%;margin-left:4%;" onclick="coMarkStep('db','fail')">Fail</button>
@@ -5470,11 +5499,24 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 5 -->
-              <div id="co-step-monitor" style="flex:1;min-width:148px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:5px;">STEP 5</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:8px;">Monitor</div>
+              <!-- Step 5 — Monitor + Grafana URL -->
+              <div id="co-step-monitor" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 5</div>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Monitor</div>
                 <span id="co-chip-monitor" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
+                <div style="background:#fdf4ff;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #a855f7;">
+                  <div style="font-size:10px;font-weight:700;color:#7e22ce;margin-bottom:3px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.5;">Capture CPU, memory and syslog baseline on FLEX post-cutover. Confirm &lt;60% utilization, no errors.</div>
+                  <div style="font-size:10px;color:#a855f7;margin-top:5px;"><b>Script:</b> <code style="background:#f3e8ff;padding:1px 4px;border-radius:3px;">mon_workloads</code> → /api/run/stage5_task</div>
+                  <div style="font-size:10px;color:#a855f7;"><b>Output:</b> CPU/mem &lt;60%, syslog clean, workloads stable</div>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <label style="font-size:10px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">Grafana Dashboard URL</label>
+                  <div style="display:flex;gap:4px;">
+                    <input id="co-grafana-url" type="text" placeholder="http://grafana:3000/d/..." style="flex:1;padding:5px 8px;font-size:10px;border:1.5px solid #d1d5db;border-radius:6px;min-width:0;font-family:monospace;">
+                    <button onclick="coOpenGrafana()" style="padding:5px 8px;font-size:10px;background:#a855f7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;flex-shrink:0;">Open</button>
+                  </div>
+                </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
                   <button class="btn btn-dark" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('mon_workloads','monitor',this)"><i class="fas fa-camera"></i> Capture Monitoring</button>
                   <div id="co-mark-monitor" style="display:none;gap:4px;">
@@ -5485,11 +5527,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 6 -->
-              <div id="co-step-close" style="flex:1;min-width:148px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-radius:0 12px 12px 0;padding:16px 14px;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:5px;">STEP 6</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:8px;">Close Window</div>
+              <!-- Step 6 — Close Window -->
+              <div id="co-step-close" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-radius:0 12px 12px 0;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 6</div>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Close Window</div>
                 <span id="co-chip-close" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
+                <div style="background:#f0fdf4;border-radius:8px;padding:8px 10px;margin-bottom:10px;border-left:3px solid #10b981;">
+                  <div style="font-size:10px;font-weight:700;color:#065f46;margin-bottom:3px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.5;">Officially close the cutover window. FLEX is committed as production. OSPC enters decommission state.</div>
+                  <div style="font-size:10px;color:#10b981;margin-top:5px;"><b>Script:</b> <code style="background:#dcfce7;padding:1px 4px;border-radius:3px;">close_rollback</code> → /api/run/stage5_task</div>
+                  <div style="font-size:10px;color:#10b981;"><b>Output:</b> Cutover marked COMPLETE, evidence archived</div>
+                </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
                   <button class="btn btn-success" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('close_rollback','close',this)"><i class="fas fa-lock"></i> Close Window</button>
                 </div>
@@ -5776,6 +5824,25 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var mark = document.getElementById('co-mark-precheck');
               if (mark) mark.style.display = 'flex';
               if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+            };
+
+            window.coRunTrafficSwitch = function(btn) {
+              var ip = (document.getElementById('co-haproxy-ip') || {}).value || '';
+              if (ip) {
+                // Store so executeStage5Task log shows it
+                window._coHaproxyIp = ip;
+              }
+              // Set lb_type to haproxy so ab_strategy uses HAProxy path in backend
+              var sel = document.getElementById('ab_lb_type');
+              if (sel) sel.value = 'haproxy';
+              coRunTask('ab_strategy', 'traffic', btn);
+            };
+
+            window.coOpenGrafana = function() {
+              var url = (document.getElementById('co-grafana-url') || {}).value || '';
+              if (!url) { alert('Enter a Grafana dashboard URL first.'); return; }
+              if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+              window.open(url, '_blank');
             };
 
             window.coRunTask = function(taskType, stepId, btn) {
