@@ -11108,6 +11108,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   }
 
   function activateStage(stageId) {
+    // Restore theme dropdown and body class when leaving UAT stage (s4)
+    if (stageId !== 's4') {
+      document.body.classList.remove('uat-dashboard-active');
+      const themeDD = document.getElementById('top-theme-dropdown');
+      if (themeDD) themeDD.style.display = '';
+    }
     stageBtns.forEach(b => {
       const isActive = b.dataset.stage === stageId;
       b.classList.toggle('active', isActive);
