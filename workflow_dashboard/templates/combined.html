@@ -5316,17 +5316,53 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div class="section-body">
 
           <!-- How-to banner -->
-          <div style="background:linear-gradient(90deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;border-radius:12px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px;">
-            <div style="font-size:20px;line-height:1;margin-top:1px;">📋</div>
-            <div>
-              <div style="font-size:12px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">How to use this cockpit</div>
-              <div style="font-size:12px;color:#374151;line-height:1.7;">
-                <b>1.</b> Click <b>Start Cutover</b> — the timer starts and steps unlock in sequence.&nbsp;&nbsp;
-                <b>2.</b> Work left-to-right: run each step, wait for PASS/FAIL.&nbsp;&nbsp;
-                <b>3.</b> If Step 4 (DB) is not in scope, uncheck <b>DB in scope</b> to skip it.&nbsp;&nbsp;
-                <b>4.</b> All steps pass → <b>Close Window</b> goes green; any critical failure → <b>Rollback</b> goes red.&nbsp;&nbsp;
-                <b>5.</b> Add operator notes, click <b>Archive Evidence</b>, then <b>Export Evidence Package</b> for sign-off.
+          <div style="background:linear-gradient(135deg,#f0f9ff,#f0fdf4);border:1.5px solid #bfdbfe;border-radius:14px;padding:20px 24px;margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+              <span style="font-size:18px;">📋</span>
+              <span style="font-size:13px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.8px;">How to run a cutover</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
+
+              <div style="background:#fff;border:1.5px solid #3b82f6;border-radius:10px;padding:14px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span style="background:#3b82f6;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</span>
+                  <span style="font-size:13px;font-weight:700;color:#1e40af;">Click Start Cutover</span>
+                </div>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">Starts the timer and activates the cockpit. Steps stay <b>locked</b> until you click this first.</p>
               </div>
+
+              <div style="background:#fff;border:1.5px solid #f59e0b;border-radius:10px;padding:14px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span>
+                  <span style="font-size:13px;font-weight:700;color:#92400e;">Click each step button</span>
+                </div>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">Work <b>left-to-right</b>. Each step has its own button — you must click it to run and confirm <b>PASS / FAIL</b>.</p>
+              </div>
+
+              <div style="background:#fff;border:1.5px solid #8b5cf6;border-radius:10px;padding:14px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span style="background:#8b5cf6;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</span>
+                  <span style="font-size:13px;font-weight:700;color:#5b21b6;">DB in scope? (Step 4)</span>
+                </div>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">If no DB migration, <b>uncheck "DB in scope"</b> in Step 4 to skip it without blocking the final decision.</p>
+              </div>
+
+              <div style="background:#fff;border:1.5px solid #10b981;border-radius:10px;padding:14px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span style="background:#10b981;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">4</span>
+                  <span style="font-size:13px;font-weight:700;color:#065f46;">Final decision unlocks</span>
+                </div>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">All steps pass → <b style="color:#10b981;">Close Window</b> turns green. Critical fail → <b style="color:#ef4444;">Rollback</b> turns red.</p>
+              </div>
+
+              <div style="background:#fff;border:1.5px solid #64748b;border-radius:10px;padding:14px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span style="background:#64748b;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">5</span>
+                  <span style="font-size:13px;font-weight:700;color:#334155;">Evidence &amp; sign-off</span>
+                </div>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">Add operator notes → <b>Archive Evidence</b> → <b>Export Evidence Package</b> for customer sign-off.</p>
+              </div>
+
             </div>
           </div>
 
