@@ -88,7 +88,11 @@ const state = {
   lbSourceName: '',
   editModePrimary: false,
   editModeMapper: false,
-  editModeBlock: false
+  editModeBlock: false,
+  ospcPriceMap: {},   // server_name -> monthly_cost_usd
+  flexPriceMap: {},   // flavor_name -> hourly_rate_usd
+  hasOspcPriceList: false,
+  hasFlexPriceList: false,
 };
 
 // Expose state for the XLSX export button in index.html
@@ -185,6 +189,57 @@ bindIf(els.exportMapperFiltered, 'click', exportMapperFiltered);
 bindIf(els.toggleEditMapper, 'click', () => toggleEditMode('mapper'));
 bindIf(els.exportEditedMapper, 'click', exportMapperEdited);
 bindIf(els.saveEditedMapper, 'click', saveMapperEdited);
+// Price list handlers
+const ospcPriceFileEl = document.getElementById('ospcPriceFile');
+const flexPriceFileEl = document.getElementById('flexPriceFile');
+const ospcPriceMeta   = document.getElementById('ospcPriceMeta');
+const flexPriceMeta   = document.getElementById('flexPriceMeta');
+
+function parsePriceListCsv(text, nameKeys, costKeys) {
+  const parsed = parseCSV(text);
+  const map = {};
+  for (const row of parsed.rows) {
+    const name = (nameKeys.map(k => row[k]).find(v => v) || '').trim().toLowerCase();
+    const cost = parseFloat((costKeys.map(k => row[k]).find(v => v) || '').replace(/[^0-9.]/g, ''));
+    if (name && !isNaN(cost) && cost > 0) map[name] = cost;
+  }
+  return map;
+}
+
+if (ospcPriceFileEl) {
+  ospcPriceFileEl.addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state.ospcPriceMap = parsePriceListCsv(ev.target.result,
+        ['server_name','name','instance','vm_name'],
+        ['monthly_cost_usd','monthly_cost','cost_monthly','cost_per_month','hourly_rate','hourly_cost']
+      );
+      state.hasOspcPriceList = Object.keys(state.ospcPriceMap).length > 0;
+      ospcPriceMeta.textContent = `${file.name} (${Object.keys(state.ospcPriceMap).length} entries)`;
+      if (state.mapperRows.length) renderMapperSummary(state.mapperRows);
+    };
+    reader.readAsText(file);
+  });
+}
+
+if (flexPriceFileEl) {
+  flexPriceFileEl.addEventListener('change', e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      state.flexPriceMap = parsePriceListCsv(ev.target.result,
+        ['flavor_name','name','flavor','target_flavor','instance_type'],
+        ['hourly_rate','cost_per_hour','hourly_cost','hourly_rate_usd','monthly_cost_usd','monthly_cost']
+      );
+      state.hasFlexPriceList = Object.keys(state.flexPriceMap).length > 0;
+      flexPriceMeta.textContent = `${file.name} (${Object.keys(state.flexPriceMap).length} entries)`;
+      if (state.mapperRows.length) renderMapperSummary(state.mapperRows);
+    };
+    reader.readAsText(file);
+  });
+}
+
 bindIf(els.blockFile, 'change', e => onFileSelect(e, 'block'));
 bindIf(els.blockFile, 'click', () => { els.blockFile.value = ''; });
 bindIf(els.blockSearch, 'input', applyBlockFilters);
@@ -563,6 +618,37 @@ function renderSummary(rows, headers, summaryEl) {
     cards.push(card('Regions', Object.keys(countBy(rows, 'region')).length));
   }
 
+  // ── Compute & Storage resource totals (overview CSV) ─────────────────────
+  if (headers.includes('service_type') && headers.includes('flavor_id')) {
+    const serverRows  = rows.filter(r => r.service_type === 'cloud_server');
+    const activeServers = serverRows.filter(r => (r.status || '').toUpperCase() === 'ACTIVE');
+    let totalVcpus = 0, totalRamGb = 0;
+    serverRows.forEach(r => {
+      const f = FLAVOR_CATALOG[(r.flavor_id || '').trim().toLowerCase()];
+      if (f) { totalVcpus += f.vcpus; totalRamGb += f.ram_mb / 1024; }
+    });
+    if (serverRows.length > 0) {
+      const computePct = Math.round((activeServers.length / serverRows.length) * 100);
+      cards.push(card('Compute Servers', serverRows.length.toLocaleString()));
+      cards.push(card('Active Utilization', computePct + '% (' + activeServers.length + ' active)'));
+      if (totalVcpus > 0)  cards.push(card('Total vCPUs', totalVcpus.toLocaleString()));
+      if (totalRamGb > 0)  cards.push(card('Total RAM', totalRamGb >= 1024 ? (totalRamGb / 1024).toFixed(1) + ' TB' : Math.round(totalRamGb) + ' GB'));
+    }
+  }
+
+  if (headers.includes('size_gb')) {
+    const volRows    = rows.filter(r => r.service_type === 'block_storage_volume' && parseFloat(r.size_gb) > 0);
+    const inUseVols  = volRows.filter(r => (r.status || '').toLowerCase() === 'in-use');
+    const totalGb    = volRows.reduce((s, r) => s + (parseFloat(r.size_gb) || 0), 0);
+    if (volRows.length > 0) {
+      const storagePct = Math.round((inUseVols.length / volRows.length) * 100);
+      const sizeLabel  = totalGb >= 1024 ? (totalGb / 1024).toFixed(1) + ' TB' : Math.round(totalGb) + ' GB';
+      cards.push(card('Total Storage', sizeLabel + ' (' + volRows.length + ' vols)'));
+      cards.push(card('Storage Utilization', storagePct + '% in-use'));
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   if (headers.includes('target_flavor_name')) {
     cards.push(card('Mapped Targets', rows.filter(r => r.target_flavor_name).length.toLocaleString()));
   }
@@ -571,27 +657,53 @@ function renderSummary(rows, headers, summaryEl) {
     cards.push(card('Source Flavors', rows.filter(r => r.source_flavor_id).length.toLocaleString()));
   }
 
+  // Show price list upload panel whenever flavormap is loaded
+  const pricePanel = document.getElementById('pricelist-upload-panel');
+  if (pricePanel) { pricePanel.style.display = 'flex'; pricePanel.classList.remove('hidden'); }
+
+  // Update 2.45x note visibility based on whether OSPC price list is loaded
+  const assumptionNote = document.getElementById('tco-assumption-note');
+  if (assumptionNote) assumptionNote.style.display = state.hasOspcPriceList ? 'none' : 'flex';
+
   let tcoTableHtml = '';
   if (headers.includes('target_daily_cost_min_usd') || headers.includes('target_monthly_cost_min_usd')) {
-    const flexDailyTotal = sumCurrency(rows, 'target_daily_cost_min_usd');
-    const flexMonthlyTotal = sumCurrency(rows, 'target_monthly_cost_min_usd');
-    
+    // FLEX total: use price list override if available, else CSV columns
+    let flexMonthlyTotal = 0;
+    if (state.hasFlexPriceList) {
+      for (const row of rows) {
+        const flavor = (row.target_flavor_name || row.target_flavor_id || '').trim().toLowerCase();
+        const rate = state.flexPriceMap[flavor];
+        if (rate != null) flexMonthlyTotal += rate <= 10 ? rate * 730 : rate; // hourly→monthly if small
+      }
+    }
+    if (!flexMonthlyTotal) flexMonthlyTotal = sumCurrency(rows, 'target_monthly_cost_min_usd');
+    const flexDailyTotal = flexMonthlyTotal / 30;
+
     if (flexMonthlyTotal > 0) {
-      // Automatically sum actual OSPC cost figures from the CSV, falling back to legacy multiplier if missing.
-      let ospcDailyTotal = sumCurrency(rows, 'source_daily_cost_usd') || sumCurrency(rows, 'source_daily_cost') || sumCurrency(rows, 'TCO_OSPC_Daily');
-      let ospcMonthlyTotal = sumCurrency(rows, 'source_monthly_cost_usd') || sumCurrency(rows, 'source_monthly_cost') || sumCurrency(rows, 'TCO_OSPC_Monthly') || sumCurrency(rows, 'TCO_OSPC_Estimate');
-      
+      // OSPC total: use price list override, else CSV columns, else 2.45× multiplier
+      let ospcMonthlyTotal = 0;
       let isEstimated = false;
+      if (state.hasOspcPriceList) {
+        for (const row of rows) {
+          const name = (row.server_name || row.source_server_name || row.name || '').trim().toLowerCase();
+          const cost = state.ospcPriceMap[name];
+          if (cost != null) ospcMonthlyTotal += cost;
+        }
+      }
       if (!ospcMonthlyTotal) {
-        const multiplier = 2.45; // Approx baseline OSPC vs target savings ratio
+        ospcMonthlyTotal = sumCurrency(rows, 'source_monthly_cost_usd') || sumCurrency(rows, 'source_monthly_cost') || sumCurrency(rows, 'TCO_OSPC_Monthly') || sumCurrency(rows, 'TCO_OSPC_Estimate');
+      }
+      let ospcDailyTotal = sumCurrency(rows, 'source_daily_cost_usd') || sumCurrency(rows, 'source_daily_cost') || sumCurrency(rows, 'TCO_OSPC_Daily');
+      if (!ospcMonthlyTotal) {
+        const multiplier = 2.45;
         ospcDailyTotal = flexDailyTotal * multiplier;
         ospcMonthlyTotal = flexMonthlyTotal * multiplier;
         isEstimated = true;
       } else if (!ospcDailyTotal && ospcMonthlyTotal > 0) {
         ospcDailyTotal = ospcMonthlyTotal / 30;
       }
-      
-      const ospcLabel = isEstimated ? 'Legacy OSPC (Estimated)' : 'Legacy OSPC (Actual)';
+
+      const ospcLabel = isEstimated ? 'Legacy OSPC (Estimated)' : (state.hasOspcPriceList ? 'Legacy OSPC (Price List)' : 'Legacy OSPC (Actual)');
       
       const monthlySavings = ospcMonthlyTotal - flexMonthlyTotal;
       const yearlySavings = monthlySavings * 12;
@@ -1192,10 +1304,17 @@ function escapeHtml(input) {
 // --- Auto-load server-side CSVs based on account ID ---
 async function loadServerCsv(filename, mode) {
   try {
-    const res = await fetch(`/api/file-content?name=${encodeURIComponent(filename)}`);
-    const data = await res.json();
-    if (!data.ok || !data.content) return;
-    const parsed = parseCSV(data.content);
+    const cacheKey = 'csv_cache:' + filename;
+    let csvText = sessionStorage.getItem(cacheKey);
+    if (!csvText) {
+      const safeName = filename.replace(/^uploads\//, '');
+      const res = await fetch(`/api/dashboard/csv-content/${encodeURIComponent(safeName)}`);
+      if (!res.ok) return;
+      csvText = await res.text();
+      if (!csvText || !csvText.trim()) return;
+      try { sessionStorage.setItem(cacheKey, csvText); } catch (_) {}
+    }
+    const parsed = parseCSV(csvText);
     if (!parsed.headers.length) return;
 
     const isMapper = mode === true;
@@ -1250,27 +1369,33 @@ async function loadServerCsv(filename, mode) {
   } catch (e) { console.warn('Auto-load failed:', e); }
 }
 
-// Auto-detect account ID and load matching CSVs
+// Auto-detect account ID and load matching CSVs from server uploads
 (async function autoLoadCsvs() {
   try {
     const res = await fetch('/api/files');
-    const files = await res.json();
-    if (!Array.isArray(files) || !files.length) return;
+    if (!res.ok) return;
+    const data = await res.json();
+    const files = Array.isArray(data) ? data : (data.files || []);
+    if (!files.length) return;
 
-    // Find account ID from overview files
-    const ovFile = files.find(f => f.endsWith('_overview.csv'));
+    // Find account ID prefix from overview file
+    const ovFile = files.find(f => f.endsWith('_overview.csv') && !f.includes('/'));
     if (!ovFile) return;
     const prefix = ovFile.split('_')[0];
 
-    // Load each matching file
-    const overview = files.find(f => f === prefix + '_overview.csv');
-    const flavormap = files.find(f => f === prefix + '_flavormap.csv');
-    const blockmap = files.find(f => f === prefix + '_blockmap.csv');
-    const lbmap = files.find(f => f === prefix + '_lbmap.csv');
+    // Exact prefix match, or fall back to first matching file of that type
+    const pick = (suffix) =>
+      files.find(f => f === prefix + suffix) ||
+      files.find(f => f.endsWith(suffix) && !f.includes('flex2flex') && !f.includes('/'));
 
-    if (overview) await loadServerCsv(overview, false);
+    const overview  = pick('_overview.csv');
+    const flavormap = pick('_flavormap.csv');
+    const blockmap  = pick('_blockmap.csv');
+    const lbmap     = pick('_lbmap.csv');
+
+    if (overview)  await loadServerCsv(overview,  false);
     if (flavormap) await loadServerCsv(flavormap, true);
-    if (blockmap) await loadServerCsv(blockmap, 'block');
-    if (lbmap) await loadServerCsv(lbmap, 'lb');
+    if (blockmap)  await loadServerCsv(blockmap,  'block');
+    if (lbmap)     await loadServerCsv(lbmap,     'lb');
   } catch (e) { console.warn('Auto-load error:', e); }
 })();
