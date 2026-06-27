@@ -11990,22 +11990,24 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
           let d = document.createElement('div');
           d.className = 'stage-status-ctrl';
-          d.style.margin = '15px 20px 0 20px';
-          d.style.padding = '15px'; d.style.background = 'rgba(0,0,0,0.4)';
-          d.style.borderRadius = '8px'; d.style.borderLeft = '4px solid #00f3ff';
-          d.style.display = 'flex'; d.style.alignItems = 'center'; d.style.gap = '25px';
+          d.style.margin = '0';
+          d.style.padding = '10px 24px'; d.style.background = 'rgba(0,5,18,0.72)';
+          d.style.borderRadius = '0'; d.style.borderLeft = 'none';
+          d.style.borderBottom = '1px solid rgba(0,243,255,0.22)';
+          d.style.display = 'flex'; d.style.alignItems = 'center'; d.style.gap = '18px';
+          d.style.flexWrap = 'wrap';
           d.style.backdropFilter = 'blur(10px)';
-          d.style.boxShadow = '0 0 10px rgba(0,243,255,0.2)';
+          d.style.boxShadow = '0 2px 12px rgba(0,243,255,0.08)';
 
           d.innerHTML = `
-              <strong style="color:#00f3ff; font-size:16px; text-shadow:0 0 5px rgba(0,243,255,0.5);">${cName} • ${p.label} Status:</strong>
-              <label style="cursor:pointer; display:flex; align-items:center; gap:5px; color:#00ff88; font-weight:800; font-size:14px; padding:6px 10px; background:rgba(0,255,136,0.1); border-radius:4px; border:1px solid #00ff88; box-shadow:0 0 8px rgba(0,255,136,0.3);">
+              <strong style="color:#00f3ff; font-size:12px; font-family:'Share Tech Mono',monospace; letter-spacing:0.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;">${cName} &bull; ${p.label} Status:</strong>
+              <label style="cursor:pointer; display:flex; align-items:center; gap:4px; color:#00ff88; font-weight:800; font-size:11px; padding:4px 10px; background:rgba(0,255,136,0.08); border-radius:20px; border:1px solid rgba(0,255,136,0.6); white-space:nowrap; flex-shrink:0;">
                  <input type="radio" name="${p.id}_st" value="Finished" onchange="submitStageStatus('${p.key}', 'Finished')"> ✅ DONE
               </label>
-              <label style="cursor:pointer; display:flex; align-items:center; gap:5px; color:#f39c12; font-weight:800; font-size:14px; padding:6px 10px; background:rgba(243,156,18,0.1); border-radius:4px; border:1px solid #f39c12; box-shadow:0 0 8px rgba(243,156,18,0.3);">
+              <label style="cursor:pointer; display:flex; align-items:center; gap:4px; color:#f39c12; font-weight:800; font-size:11px; padding:4px 10px; background:rgba(243,156,18,0.08); border-radius:20px; border:1px solid rgba(243,156,18,0.6); white-space:nowrap; flex-shrink:0;">
                  <input type="radio" name="${p.id}_st" value="In Progress" onchange="submitStageStatus('${p.key}', 'In Progress')"> ⏳ IN PROGRESS
               </label>
-              <label style="cursor:pointer; display:flex; align-items:center; gap:5px; color:#ff2a5f; font-weight:800; font-size:14px; padding:6px 10px; background:rgba(255,42,95,0.1); border-radius:4px; border:1px solid #ff2a5f; box-shadow:0 0 8px rgba(255,42,95,0.3);">
+              <label style="cursor:pointer; display:flex; align-items:center; gap:4px; color:#ff2a5f; font-weight:800; font-size:11px; padding:4px 10px; background:rgba(255,42,95,0.08); border-radius:20px; border:1px solid rgba(255,42,95,0.6); white-space:nowrap; flex-shrink:0;">
                  <input type="radio" name="${p.id}_st" value="Failed" onchange="submitStageStatus('${p.key}', 'Failed')"> ❌ FAILED
               </label>
           `;
