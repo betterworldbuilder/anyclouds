@@ -5315,6 +5315,21 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
         <div class="section-body">
 
+          <!-- How-to banner -->
+          <div style="background:linear-gradient(90deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;border-radius:12px;padding:14px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px;">
+            <div style="font-size:20px;line-height:1;margin-top:1px;">📋</div>
+            <div>
+              <div style="font-size:12px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">How to use this cockpit</div>
+              <div style="font-size:12px;color:#374151;line-height:1.7;">
+                <b>1.</b> Click <b>Start Cutover</b> — the timer starts and steps unlock in sequence.&nbsp;&nbsp;
+                <b>2.</b> Work left-to-right: run each step, wait for PASS/FAIL.&nbsp;&nbsp;
+                <b>3.</b> If Step 4 (DB) is not in scope, uncheck <b>DB in scope</b> to skip it.&nbsp;&nbsp;
+                <b>4.</b> All steps pass → <b>Close Window</b> goes green; any critical failure → <b>Rollback</b> goes red.&nbsp;&nbsp;
+                <b>5.</b> Add operator notes, click <b>Archive Evidence</b>, then <b>Export Evidence Package</b> for sign-off.
+              </div>
+            </div>
+          </div>
+
           <!-- A. Cutover Status -->
           <div id="co-status-card" style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:14px;padding:22px 28px;margin-bottom:20px;border:1px solid rgba(255,255,255,.1);">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
