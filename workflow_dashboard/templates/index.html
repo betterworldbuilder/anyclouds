@@ -8,27 +8,387 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% if is_flex2flex %}FLEX2FLEX Scanner and Deployment Script Generator{% elif is_hyperflex %}{{ provider_label }} Scanner and FLEX Deployment Script Generator{% else %}OSPC Scanner and Deployment Script Generator{% endif %}</title>
+  <title>{% if is_flex2flex %}FLEX2FLEX Scanner{% elif is_hyperflex %}{{ provider_label }} → FLEX Scanner{% else %}OSPC → FLEX Scanner{% endif %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
+  <style>
+    /* ── Reset to dark FLEX theme ─────────────────────────────────────────── */
+    :root {
+      --flex-red: #e4002b;
+      --flex-red-glow: rgba(228,0,43,0.35);
+      --flex-red-dim: rgba(228,0,43,0.12);
+      --card-bg: rgba(8,14,30,0.88);
+      --card-border: rgba(228,0,43,0.22);
+      --card-border-neutral: rgba(71,85,105,0.38);
+      --input-bg: rgba(255,255,255,0.05);
+      --input-border: rgba(148,163,184,0.22);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --green: #22c55e;
+      --blue: #3b82f6;
+    }
+    html, body { margin:0; padding:0; min-height:100vh; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: radial-gradient(ellipse at top left, #0d0520 0%, #06090f 40%, #0a0d1a 100%);
+      color: var(--text);
+    }
+    /* Animated bg stars */
+    body::before {
+      content:'';
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background-image: radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 60% 15%, rgba(255,255,255,.12) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 55%, rgba(255,255,255,.14) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 70%, rgba(255,255,255,.1) 0%, transparent 100%),
+        radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,.08) 0%, transparent 100%);
+    }
+    /* ── Header ─────────────────────────────────────────────────────────────── */
+    .scanner-header {
+      position: relative; z-index:10;
+      background: linear-gradient(180deg, #0a0d1a 0%, rgba(8,14,28,0.96) 100%);
+      border-bottom: 1px solid rgba(228,0,43,0.28);
+      box-shadow: 0 4px 32px rgba(228,0,43,0.08);
+      padding: 0;
+    }
+    .scanner-header-inner {
+      max-width: 1180px; margin: 0 auto;
+      padding: 18px 24px 14px;
+    }
+    .scanner-header-top {
+      display: flex; align-items: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .scanner-badge {
+      background: var(--flex-red); color: #fff;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 4px;
+      box-shadow: 0 0 12px var(--flex-red-glow);
+      white-space: nowrap;
+    }
+    .scanner-header-top h1 {
+      margin: 0; font-family: 'Orbitron', sans-serif;
+      font-size: clamp(14px, 2vw, 20px); font-weight: 900;
+      color: #f1f5f9;
+      letter-spacing: 0.5px;
+    }
+    .scanner-header-top h1 span { color: var(--flex-red); }
+    .scanner-header-desc {
+      font-size: 12px; color: #64748b; max-width: 820px; line-height: 1.55;
+      margin: 0 0 10px;
+    }
+    .scanner-steps-row {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    }
+    .scanner-step-chip {
+      background: rgba(228,0,43,0.08); border: 1px solid rgba(228,0,43,0.24);
+      color: #fca5a5; font-size: 11px; padding: 4px 10px; border-radius: 20px;
+      white-space: nowrap;
+    }
+    .scanner-step-chip strong { color: var(--flex-red); }
+    /* ── Main layout ─────────────────────────────────────────────────────────── */
+    main {
+      max-width: 1180px; margin: 0 auto;
+      padding: 18px 20px 40px;
+      display: flex; flex-direction: column; gap: 14px;
+      position: relative; z-index: 1;
+    }
+    /* ── Base card ───────────────────────────────────────────────────────────── */
+    .fx-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border-neutral);
+      border-radius: 12px;
+      padding: 20px 22px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      position: relative;
+    }
+    .fx-card.red-accent { border-color: var(--card-border); }
+    .fx-card.red-accent::before {
+      content:''; position:absolute; top:0; left:0;
+      width: 3px; height: 100%; border-radius: 12px 0 0 12px;
+      background: linear-gradient(180deg, var(--flex-red), rgba(228,0,43,0.2));
+    }
+    /* ── Card header row ─────────────────────────────────────────────────────── */
+    .fx-card-head {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .fx-card-title {
+      font-size: 14px; font-weight: 700; color: #f1f5f9;
+      font-family: 'Share Tech Mono', monospace; letter-spacing: 0.5px;
+    }
+    .fx-step-badge {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--flex-red), #b00020);
+      color: #fff; font-size: 14px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 14px var(--flex-red-glow);
+      font-family: 'Orbitron', sans-serif;
+    }
+    .fx-step-label {
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--flex-red); font-family: 'Share Tech Mono', monospace;
+    }
+    /* ── Run Summary sticky card ─────────────────────────────────────────────── */
+    #runSummaryCard {
+      position: sticky; top: 8px; z-index: 50;
+      background: rgba(6,9,15,0.95);
+      border: 1px solid rgba(228,0,43,0.4);
+      border-radius: 10px; padding: 12px 18px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 0 28px rgba(228,0,43,0.12), 0 4px 20px rgba(0,0,0,0.5);
+    }
+    #runSummaryCard h2 {
+      margin: 0 0 8px; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--flex-red); font-family: 'Share Tech Mono', monospace; font-weight: 700;
+    }
+    .summary-grid {
+      display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11px;
+    }
+    .summary-grid div { color: #64748b; }
+    .summary-grid span { color: #e2e8f0; font-weight: 600; }
+    /* ── File manager ────────────────────────────────────────────────────────── */
+    .fx-hint {
+      font-size: 12px; color: #64748b; line-height: 1.6; margin: 0 0 12px;
+    }
+    .fx-hint strong { color: #94a3b8; }
+    .fx-hint code { color: #7dd3fc; font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+    .fx-hint em { color: #64748b; }
+    .file-upload-row {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    input[type="file"] { font-size: 12px; color: #94a3b8; }
+    .file-list { list-style: none; margin: 0; padding: 0; max-height: 140px; overflow-y: auto; }
+    .file-list li {
+      padding: 4px 8px; font-size: 12px; color: #94a3b8;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .file-list li::before { content: '▸ '; color: var(--flex-red); }
+    /* ── Inputs / selects / textareas ─────────────────────────────────────────── */
+    input[type="text"], input[type="password"], input[type="email"],
+    select, textarea {
+      background: var(--input-bg) !important;
+      border: 1px solid var(--input-border) !important;
+      border-radius: 7px !important;
+      color: #e2e8f0 !important;
+      padding: 9px 12px !important;
+      font-size: 13px !important;
+      font-family: inherit !important;
+      width: 100%;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+      outline: none !important;
+      border-color: rgba(228,0,43,0.5) !important;
+      box-shadow: 0 0 0 2px rgba(228,0,43,0.12) !important;
+    }
+    select option { background: #0a0d1a; color: #e2e8f0; }
+    label { font-size: 12px; color: #64748b; display: flex; flex-direction: column; gap: 5px; }
+    /* ── Buttons ─────────────────────────────────────────────────────────────── */
+    button, .btn, input[type="button"], input[type="submit"] {
+      background: linear-gradient(135deg, #c8002a, var(--flex-red)) !important;
+      border: 1px solid rgba(228,0,43,0.5) !important;
+      color: #fff !important;
+      border-radius: 7px !important;
+      padding: 9px 18px !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      cursor: pointer !important;
+      letter-spacing: 0.5px;
+      transition: box-shadow .2s, transform .1s;
+      font-family: inherit !important;
+      text-shadow: none !important;
+    }
+    button:hover, .btn:hover { box-shadow: 0 0 16px rgba(228,0,43,0.4); transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    .btn-ghost {
+      background: rgba(255,255,255,0.05) !important;
+      border: 1px solid var(--card-border-neutral) !important;
+      color: #94a3b8 !important;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.08) !important; box-shadow: none; }
+    .btn-blue {
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6) !important;
+      border-color: rgba(59,130,246,0.4) !important;
+    }
+    .btn-green {
+      background: linear-gradient(135deg, #15803d, #22c55e) !important;
+      border-color: rgba(34,197,94,0.4) !important;
+    }
+    /* ── Grid helpers ────────────────────────────────────────────────────────── */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    @media(max-width:640px) { .grid, .grid-3 { grid-template-columns:1fr; } }
+    .span2 { grid-column: span 2; }
+    /* ── Credential panels ────────────────────────────────────────────────────── */
+    .cred-split {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+    @media(max-width:720px){ .cred-split{ grid-template-columns:1fr; } }
+    .cred-panel {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--card-border-neutral);
+      border-radius: 10px; padding: 16px 18px;
+    }
+    .cred-panel.flex-panel {
+      border-color: rgba(228,0,43,0.3);
+      background: rgba(228,0,43,0.04);
+    }
+    .cred-panel-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      font-family: 'Share Tech Mono', monospace;
+      margin: 0 0 14px; padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .cred-panel-title .cred-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .ospc-dot { background: #64748b; }
+    .flex-dot { background: var(--flex-red); box-shadow: 0 0 6px var(--flex-red-glow); }
+    .cred-fields { display: flex; flex-direction: column; gap: 10px; }
+    /* ── Status chips ────────────────────────────────────────────────────────── */
+    .status-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      border: 1px solid transparent; vertical-align: middle;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .status-chip.idle    { background: rgba(30,58,138,0.25); color: #93c5fd; border-color: rgba(59,130,246,0.25); }
+    .status-chip.running { background: rgba(22,163,74,0.2); color: #86efac; border-color: rgba(34,197,94,0.3); }
+    .status-chip.running::before { content:''; width:6px; height:6px; border-radius:50%; background:#22c55e; animation: pulse-dot 1s infinite; }
+    .status-chip.success { background: rgba(5,150,105,0.2); color: #6ee7b7; border-color: rgba(5,150,105,0.4); }
+    .status-chip.failed  { background: rgba(220,38,38,0.2); color: #fca5a5; border-color: rgba(220,38,38,0.3); }
+    @keyframes pulse-dot { 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
+    /* ── Log output ──────────────────────────────────────────────────────────── */
+    #logBox {
+      background: #030508 !important;
+      border: 1px solid rgba(34,197,94,0.18) !important;
+      border-radius: 8px; padding: 14px 16px;
+      font-family: 'Share Tech Mono', monospace; font-size: 12px;
+      color: #86efac; min-height: 160px; max-height: 480px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all;
+      line-height: 1.5;
+    }
+    .log-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .log-tools button {
+      padding: 5px 12px !important; font-size: 11px !important;
+      background: rgba(255,255,255,0.05) !important;
+      border: 1px solid var(--card-border-neutral) !important;
+      color: #94a3b8 !important;
+    }
+    .log-tools button.active, .log-tools button:hover {
+      background: var(--flex-red-dim) !important;
+      border-color: var(--flex-red-glow) !important;
+      color: #fca5a5 !important;
+    }
+    /* ── Checkbox hints ──────────────────────────────────────────────────────── */
+    .hint { font-size: 12px; color: #64748b; margin: 0 0 6px; line-height: 1.6; }
+    .hint strong { color: #94a3b8; }
+    .hint code { color: #7dd3fc; font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+    .hint-check { display: flex; align-items: center; gap: 6px; cursor: pointer; flex-direction: row; }
+    .hint-check input[type="checkbox"] {
+      width: 14px; height: 14px; flex-shrink: 0;
+      background: var(--input-bg) !important;
+      border: 1px solid var(--input-border) !important;
+      border-radius: 3px !important; padding: 0 !important;
+    }
+    /* ── Section divider label ────────────────────────────────────────────────── */
+    .fx-section-label {
+      font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--flex-red); font-family: 'Share Tech Mono', monospace;
+      margin: 0 0 6px;
+    }
+    /* ── Checkbox row ─────────────────────────────────────────────────────────── */
+    .checkbox-row { display: flex; flex-direction: column; gap: 4px; }
+    .checkbox-row label { flex-direction: row; align-items: center; gap: 6px; color: #94a3b8; }
+    .region-checkboxes { display: flex; gap: 10px; flex-wrap: wrap; }
+    .region-checkboxes label {
+      flex-direction: row; align-items: center; gap: 5px;
+      color: #94a3b8; font-size: 12px;
+    }
+    /* ── Findings / validation ────────────────────────────────────────────────── */
+    .findings-wrap { overflow-x: auto; }
+    .findings-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .findings-table th {
+      background: rgba(228,0,43,0.12); color: #fca5a5;
+      border: 1px solid rgba(228,0,43,0.2); padding: 7px 10px; text-align: left;
+    }
+    .findings-table td {
+      background: rgba(0,0,0,0.2); color: #cbd5e1;
+      border: 1px solid rgba(255,255,255,0.05); padding: 6px 10px;
+    }
+    /* ── Next Step call-out ───────────────────────────────────────────────────── */
+    .next-step-card {
+      background: linear-gradient(135deg, rgba(228,0,43,0.1), rgba(8,14,30,0.9));
+      border: 1px solid rgba(228,0,43,0.4);
+      border-radius: 12px; padding: 18px 22px;
+    }
+    .next-step-card h2 { color: var(--flex-red); margin: 0 0 8px; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; font-family: 'Share Tech Mono', monospace; }
+    .next-step-card p { color: #94a3b8; font-size: 13px; margin: 0; line-height: 1.6; }
+    .next-step-card strong { color: #e2e8f0; }
+    /* ── SG rule cards ────────────────────────────────────────────────────────── */
+    .sg-card{background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;transition:border-color .2s}
+    .sg-card:hover{border-color:rgba(228,0,43,.3)}
+    .sg-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;user-select:none}
+    .sg-card-header h3{margin:0;font-size:1.05rem;color:#fca5a5;flex:1}
+    .sg-card-header .sg-badge{background:rgba(228,0,43,.15);color:#fca5a5;font-size:.75rem;padding:2px 10px;border-radius:12px;white-space:nowrap}
+    .sg-card-header .sg-toggle{color:#d8dee9;font-size:.9rem;transition:transform .2s}
+    .sg-card-header .sg-toggle.open{transform:rotate(90deg)}
+    .sg-rules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:6px}
+    .sg-rule{background:rgba(30,30,40,.6);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:.85rem;transition:background .15s,border-color .15s}
+    .sg-rule:hover{background:rgba(45,30,35,.8);border-color:rgba(228,0,43,.2)}
+    .sg-rule-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .sg-pill{padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;letter-spacing:.03em}
+    .sg-pill.ingress{background:rgba(34,197,94,.18);color:#86efac}
+    .sg-pill.egress{background:rgba(228,0,43,.18);color:#fca5a5}
+    .sg-pill.proto{background:rgba(167,139,250,.18);color:#c4b5fd}
+    .sg-pill.port{background:rgba(251,191,36,.15);color:#fde68a;font-family:monospace}
+    .sg-pill.cidr{background:rgba(56,189,248,.1);color:#7dd3fc;font-family:monospace}
+    .sg-pill.ether{background:rgba(216,222,233,.08);color:#8a90a0;font-size:.7rem}
+    .sg-arrow{color:#616e88;font-size:.9rem}
+    a { color: var(--flex-red); font-size: 13px; }
+    a:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>{% if is_flex2flex %}FLEX2FLEX Scanner and Deployment Script Generator{% elif is_hyperflex %}{{ provider_label }} Scanner and FLEX Deployment Script Generator{% else %}OSPC Scanner and Deployment Script Generator{% endif %}</h1>
-    <p>{% if is_flex2flex %}Connects to your source FLEX project, scans existing OpenStack inventory, carries FLEX flavor and image selections into target FLEX mappings, validates the target environment, then auto-generates ready-to-run deployment shell scripts to clone FLEX infrastructure into another FLEX region or project.{% elif is_hyperflex %}Builds {{ provider_label }} to FLEX infrastructure discovery artifacts, maps source compute shape and image intent to FLEX deployment inputs, validates the target environment, then auto-generates ready-to-run deployment shell scripts using the same OSPC2FLEX generator workflow.{% else %}Connects to your OSPC Rackspace account, scans your existing server inventory, maps legacy OSPC flavors to equivalent FLEX flavors, validates your target environment, then auto-generates ready-to-run deployment shell scripts to clone your entire OSPC infrastructure into the Flex OpenStack cloud.{% endif %}</p>
-    <ul class="scanner-workflow-steps">
-      <li><strong>File Manager (Upload/View)</strong>: Visually tracks all generated shell scripts and allows you to manually inject external CSV lists (if bypassing Step 1).</li>
-      <li><strong>Step 1 (Overview)</strong>: {% if is_flex2flex %}Securely connects to FLEX/OpenStack APIs to discover source project servers, volumes, networks, security groups, and load balancers.{% elif is_hyperflex %}Creates the {{ provider_label }} source overview CSV using the same inventory schema consumed by the OSPC mapper and deployment generator.{% else %}Securely connects to Rackspace APIs to discover and download your legacy OSPC server inventory.{% endif %}</li>
-      <li><strong>Step 1.5 (App Mapping)</strong>: Actively scans instances to map live application and database dependencies via SSH.</li>
-      <li><strong>Step 2 (Flavor Mapping)</strong>: {% if is_flex2flex %}Creates FLEX-to-FLEX target mappings using the discovered source flavor and image names, producing the same flavor/block/LB map files as OSPC2FLEX.{% elif is_hyperflex %}Creates {{ provider_label }} to FLEX target mappings and emits the same flavor/block/LB map files as OSPC2FLEX.{% else %}Computes your legacy OSPC server sizes into modern OpenStack FLEX flavor equivalents.{% endif %}</li>
-      <li><strong>Step 3 (Validation)</strong>: Pre-flights your mappings against the live FLEX environment to ensure quotas and networks are valid before deploying.</li>
-      <li><strong>Step 4 (Deploy Generation)</strong>: Builds the infrastructure-as-code scripts (Networks, Keypairs, LBs, VMs) to spawn your FLEX clones.</li>
-      <li><strong>Next Step</strong>: Paste the generated deploy script into the FLEX Deployment Dashboard (Stage 2).</li>
-    </ul>
-  </header>
+
+  <!-- ── HEADER ───────────────────────────────────────────────────────────── -->
+  <div class="scanner-header">
+    <div class="scanner-header-inner">
+      <div class="scanner-header-top">
+        <span class="scanner-badge">
+          {% if is_flex2flex %}FLEX → FLEX{% elif is_hyperflex %}{{ provider_label }} → FLEX{% else %}OSPC → FLEX{% endif %}
+        </span>
+        <h1>
+          {% if is_flex2flex %}FLEX2FLEX <span>Scanner</span> &amp; Deploy Generator
+          {% elif is_hyperflex %}{{ provider_label }} <span>→ FLEX</span> Scanner &amp; Deploy Generator
+          {% else %}OSPC <span>→ FLEX</span> Scanner &amp; Deploy Generator{% endif %}
+        </h1>
+      </div>
+      <p class="scanner-header-desc">
+        {% if is_flex2flex %}Connects to your source FLEX project, discovers existing OpenStack inventory, carries flavor and image selections into target FLEX mappings, validates the target environment, then auto-generates ready-to-run deployment shell scripts to clone FLEX infrastructure into another region or project.
+        {% elif is_hyperflex %}Builds {{ provider_label }} to FLEX infrastructure discovery artifacts, maps source compute shapes and image intent to FLEX deployment inputs, validates the target environment, then auto-generates ready-to-run deployment shell scripts using the same OSPC2FLEX generator workflow.
+        {% else %}Connects to your Rackspace OSPC account, scans your server inventory, maps legacy OSPC flavors to equivalent FLEX flavors, validates your target environment, then auto-generates ready-to-run deployment shell scripts to clone your entire OSPC infrastructure into FLEX OpenStack cloud.{% endif %}
+      </p>
+      <div class="scanner-steps-row">
+        <div class="scanner-step-chip"><strong>File Manager</strong> Upload &amp; track scripts</div>
+        <div class="scanner-step-chip"><strong>Step 1</strong> {% if is_flex2flex %}FLEX Source Scan{% elif is_hyperflex %}{{ provider_label }} Discovery{% else %}OSPC Account Scan{% endif %}</div>
+        <div class="scanner-step-chip"><strong>Step 1.5</strong> App Dependency Mapping</div>
+        <div class="scanner-step-chip"><strong>Step 2</strong> Flavor + Block + LB Mapping</div>
+        <div class="scanner-step-chip"><strong>Step 3</strong> Pre-Deploy Validation</div>
+        <div class="scanner-step-chip"><strong>Step 4</strong> Generate Deploy Artifacts</div>
+      </div>
+    </div>
+  </div>
 
   <main>
-    <section id="runSummaryCard" class="card summary-card">
+
+    <!-- ── RUN SUMMARY ─────────────────────────────────────────────────────── -->
+    <section id="runSummaryCard">
       <h2>Run Summary</h2>
       <div class="summary-grid">
         <div><strong>Region:</strong> <span id="sumRegion">-</span></div>
@@ -42,200 +402,126 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>File Manager & Uploads</h2>
-      <p class="hint">For most typical migrations, you will execute <strong>Step 1</strong> to automatically generate your Server Inventory lists by pointing it directly at your Rackspace Account API.<br>
-      However, sometimes you will be given a massive spreadsheet list of servers manually by a client, or you will already have a <code>servers_to_migrate.csv</code> file created from a different tool.<br>
-      You can upload those files here so they appear in dropdowns across the dashboard! <em>(Uploaded files are stored in the <code>uploads/</code> directory)</em></p>
-      <div class="row">
+    <!-- ── FILE MANAGER ────────────────────────────────────────────────────── -->
+    <section class="fx-card">
+      <div class="fx-card-head">
+        <div>
+          <div class="fx-section-label">File Manager</div>
+          <div class="fx-card-title">Uploads &amp; Generated Scripts</div>
+        </div>
+      </div>
+      <p class="fx-hint">
+        For most typical migrations, execute <strong>Step 1</strong> to automatically generate your server inventory lists by pointing it at your Rackspace Account API.<br>
+        However, if you already have a <code>servers_to_migrate.csv</code> or a spreadsheet from a client, upload it here so it appears in dropdowns across the dashboard.
+        <em>(Uploaded files are stored in the <code>uploads/</code> directory)</em>
+      </p>
+      <div class="file-upload-row">
         <input type="file" id="uploadFile" />
         <button id="uploadBtn">Upload</button>
-        <button id="refreshFilesBtn">Refresh Files</button>
+        <button id="refreshFilesBtn" class="btn-ghost">Refresh Files</button>
       </div>
       <ul id="fileList" class="file-list"></ul>
     </section>
 
-    <!-- ══ CLOUD CREDENTIALS ══════════════════════════════════════════════ -->
-    <section class="card" id="cloudCredentialsCard" style="padding:24px 28px;">
-      <h2 style="margin-bottom:18px;display:flex;align-items:center;gap:10px;">
-        <span style="width:4px;height:22px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:2px;display:inline-block;"></span>
-        Cloud Credentials
-      </h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
-
-        <!-- Source cloud -->
+    <!-- ── CLOUD CREDENTIALS ───────────────────────────────────────────────── -->
+    <section class="fx-card" id="cloudCredentialsCard">
+      <div class="fx-card-head" style="margin-bottom:16px;">
         <div>
-          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">{% if is_flex2flex %}FLEX Source Credentials{% elif scanner_provider == 'aws' and is_hyperflex %}AWS Source Credentials{% elif scanner_provider == 'gcp' and is_hyperflex %}GCP Source Credentials{% elif scanner_provider == 'azure' and is_hyperflex %}Azure Source Credentials{% else %}OSPC Cloud Credentials{% endif %}</h3>
+          <div class="fx-section-label">Authentication</div>
+          <div class="fx-card-title">Cloud Credentials</div>
+        </div>
+      </div>
+      <div class="cred-split">
+
+        <!-- SOURCE CLOUD -->
+        <div class="cred-panel">
+          <div class="cred-panel-title">
+            <span class="cred-dot ospc-dot"></span>
+            {% if is_flex2flex %}FLEX Source (Origin)
+            {% elif scanner_provider == 'aws' and is_hyperflex %}AWS Source
+            {% elif scanner_provider == 'gcp' and is_hyperflex %}GCP Source
+            {% elif scanner_provider == 'azure' and is_hyperflex %}Azure Source
+            {% else %}OSPC Cloud{% endif %}
+          </div>
+          <div class="cred-fields">
           {% if is_flex2flex %}
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Origin Region
-              <select id="credSourceFlexRegion" class="flex-region-select" data-auth-target="credSourceFlexAuthUrl" style="background:rgba(15,30,62,0.9);border:1px solid rgba(165,180,252,.4);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+            <label>Origin Region
+              <select id="credSourceFlexRegion" class="flex-region-select" data-auth-target="credSourceFlexAuthUrl">
                 <option value="DFW3">DFW3</option><option value="IAD3">IAD3</option><option value="DFW">DFW</option><option value="IAD">IAD</option><option value="ORD">ORD</option><option value="SJC3">SJC3</option><option value="LON">LON</option><option value="SYD">SYD</option><option value="HKG">HKG</option>
               </select>
             </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Auth URL
-              <input id="credSourceFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
-              <input id="credSourceFlexUsername" type="text" placeholder="e.g. dzng.8294" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
-              <input id="credSourceFlexPassword" type="text" placeholder="FLEX source password" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
-              <input id="credSourceFlexProjectId" type="text" placeholder="source project UUID" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain
-              <input id="credSourceFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Import Origin OpenRC File
+            <label>Auth URL<input id="credSourceFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/" /></label>
+            <label>Username<input id="credSourceFlexUsername" type="text" placeholder="e.g. dzng.8294" /></label>
+            <label>Password<input id="credSourceFlexPassword" type="text" placeholder="FLEX source password" /></label>
+            <label>Project ID<input id="credSourceFlexProjectId" type="text" placeholder="source project UUID" /></label>
+            <label>Domain<input id="credSourceFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain" /></label>
+            <label>Import Origin OpenRC File
               <div style="display:flex;gap:8px;align-items:center;">
-                <input id="credSourceOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;font-size:.8rem;color:#94a3b8;" />
-                <button id="credSourceOpenrcImportBtn" type="button"
-                  style="padding:6px 14px;background:linear-gradient(135deg,#2563eb,#06b6d4);border:none;border-radius:6px;color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
-                  📂 Import Origin OpenRC
-                </button>
+                <input id="credSourceOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;" />
+                <button id="credSourceOpenrcImportBtn" type="button" class="btn-blue" style="white-space:nowrap;padding:6px 12px!important;">📂 Import OpenRC</button>
               </div>
             </label>
-          </div>
           {% elif scanner_provider == 'aws' and is_hyperflex %}
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Access Key ID
-              <input id="credAwsAccessKeyId" type="text" autocomplete="off" placeholder="AKIA... or ASIA..."
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Secret Access Key
-              <input id="credAwsSecretAccessKey" type="text" autocomplete="off" placeholder="AWS secret access key"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Session Token
-              <input id="credAwsSessionToken" type="text" autocomplete="off" placeholder="Optional STS session token"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Account ID
-                <input id="credAwsAccountId" type="text" placeholder="123456789012"
-                  style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-              </label>
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Default Region
-                <input id="credAwsRegion" type="text" placeholder="us-west-2"
-                  style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-              </label>
+            <label>AWS Access Key ID<input id="credAwsAccessKeyId" type="text" autocomplete="off" placeholder="AKIA... or ASIA..." /></label>
+            <label>AWS Secret Access Key<input id="credAwsSecretAccessKey" type="text" autocomplete="off" placeholder="AWS secret access key" /></label>
+            <label>AWS Session Token<input id="credAwsSessionToken" type="text" autocomplete="off" placeholder="Optional STS session token" /></label>
+            <div class="grid">
+              <label>AWS Account ID<input id="credAwsAccountId" type="text" placeholder="123456789012" /></label>
+              <label>Default Region<input id="credAwsRegion" type="text" placeholder="us-west-2" /></label>
             </div>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Assume Role ARN
-              <input id="credAwsRoleArn" type="text" placeholder="arn:aws:iam::123456789012:role/MigrationReadOnly"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">AWS Profile
-              <input id="credAwsProfile" type="text" placeholder="default or migration-profile"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-          </div>
+            <label>Assume Role ARN<input id="credAwsRoleArn" type="text" placeholder="arn:aws:iam::123456789012:role/MigrationReadOnly" /></label>
+            <label>AWS Profile<input id="credAwsProfile" type="text" placeholder="default or migration-profile" /></label>
           {% elif scanner_provider == 'gcp' and is_hyperflex %}
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">GCP Project ID
-              <input id="credGcpProjectId" type="text" placeholder="my-gcp-project"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Service Account JSON Path
-              <input id="credGcpCredentialsFile" type="text" placeholder="/path/to/service-account.json"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">GCP Region / Zone
-              <input id="credGcpRegion" type="text" placeholder="us-central1 / us-central1-a"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Service Account JSON Inline
-              <textarea id="credGcpServiceAccountJson" rows="4" placeholder='{"type":"service_account", ...}' style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.85rem;font-family:monospace;"></textarea>
-            </label>
-          </div>
+            <label>GCP Project ID<input id="credGcpProjectId" type="text" placeholder="my-gcp-project" /></label>
+            <label>Service Account JSON Path<input id="credGcpCredentialsFile" type="text" placeholder="/path/to/service-account.json" /></label>
+            <label>GCP Region / Zone<input id="credGcpRegion" type="text" placeholder="us-central1 / us-central1-a" /></label>
+            <label>Service Account JSON Inline<textarea id="credGcpServiceAccountJson" rows="4" placeholder='{"type":"service_account", ...}'></textarea></label>
           {% elif scanner_provider == 'azure' and is_hyperflex %}
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Tenant ID
-              <input id="credAzureTenantId" type="text" placeholder="Azure tenant UUID"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Subscription ID
-              <input id="credAzureSubscriptionId" type="text" placeholder="Azure subscription UUID"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Client ID
-              <input id="credAzureClientId" type="text" placeholder="Service principal client ID"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Client Secret
-              <input id="credAzureClientSecret" type="text" autocomplete="off" placeholder="Service principal secret"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Azure Region
-              <input id="credAzureRegion" type="text" placeholder="westus2"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-          </div>
+            <label>Tenant ID<input id="credAzureTenantId" type="text" placeholder="Azure tenant UUID" /></label>
+            <label>Subscription ID<input id="credAzureSubscriptionId" type="text" placeholder="Azure subscription UUID" /></label>
+            <label>Client ID<input id="credAzureClientId" type="text" placeholder="Service principal client ID" /></label>
+            <label>Client Secret<input id="credAzureClientSecret" type="text" autocomplete="off" placeholder="Service principal secret" /></label>
+            <label>Azure Region<input id="credAzureRegion" type="text" placeholder="westus2" /></label>
           {% else %}
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_hyperflex %}{{ provider_label }} Access ID / User{% else %}Username{% endif %}
-              <input id="credOspcUsername" type="text" placeholder="{% if is_hyperflex %}{{ provider_label }} access key, service account, or operator user{% else %}e.g. dzng.8294{% endif %}" value="{% if is_hyperflex %}{% else %}dzng.8294{% endif %}"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_hyperflex %}{{ provider_label }} Secret / Key{% else %}API Key / Password{% endif %}
-              <input id="credOspcApiKey" type="text" placeholder="{% if is_hyperflex %}{{ provider_label }} secret, token, or JSON key reference{% else %}Rackspace API key{% endif %}"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_hyperflex %}{{ provider_label }} Account / Project / Subscription{% else %}Account / Project ID{% endif %}
-              <input id="credOspcAccountId" type="text" placeholder="{% if scanner_provider == 'azure' %}subscription id{% elif scanner_provider == 'gcp' %}project id{% elif is_hyperflex %}account id{% else %}e.g. 1342314{% endif %}"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-          </div>
+            <label>Username<input id="credOspcUsername" type="text" placeholder="e.g. dzng.8294" value="{% if is_hyperflex %}{% else %}dzng.8294{% endif %}" /></label>
+            <label>API Key / Password<input id="credOspcApiKey" type="text" placeholder="Rackspace API key" /></label>
+            <label>Account / Project ID<input id="credOspcAccountId" type="text" placeholder="e.g. 1342314" /></label>
           {% endif %}
+          </div>
         </div>
 
-        <!-- FLEX -->
-        <div>
-          <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">{% if is_flex2flex %}Target FLEX Credentials{% elif is_hyperflex %}{{ provider_label }} - FLEX Credentials{% else %}FLEX Cloud Credentials{% endif %} <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">{% if is_flex2flex %}Target Region{% else %}FLEX Region{% endif %}
-              <select id="credFlexRegion" class="flex-region-select" data-auth-target="credFlexAuthUrl" style="background:rgba(15,30,62,0.9);border:1px solid rgba(165,180,252,.4);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;">
+        <!-- FLEX TARGET -->
+        <div class="cred-panel flex-panel">
+          <div class="cred-panel-title">
+            <span class="cred-dot flex-dot"></span>
+            {% if is_flex2flex %}Target FLEX{% elif is_hyperflex %}{{ provider_label }} → FLEX Target{% else %}FLEX Cloud{% endif %}
+            <span style="font-size:9px;color:#64748b;margin-left:4px;">(Keystone v3)</span>
+          </div>
+          <div class="cred-fields">
+            <label>{% if is_flex2flex %}Target Region{% else %}FLEX Region{% endif %}
+              <select id="credFlexRegion" class="flex-region-select" data-auth-target="credFlexAuthUrl">
                 <option value="IAD3">IAD3</option><option value="DFW3">DFW3</option><option value="DFW">DFW</option><option value="IAD">IAD</option><option value="ORD">ORD</option><option value="SJC3">SJC3</option><option value="LON">LON</option><option value="SYD">SYD</option><option value="HKG">HKG</option>
               </select>
             </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Auth URL
-              <input id="credFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Username
-              <input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Password
-              <input id="credFlexPassword" type="text" placeholder="FLEX password"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Project ID
-              <input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Domain
-              <input id="credFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain"
-                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
-            </label>
-            <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;">Import OpenRC File
+            <label>Auth URL<input id="credFlexAuthUrl" type="text" placeholder="https://keystone.api.dfw3.rackspacecloud.com/v3/" /></label>
+            <label>Username<input id="credFlexUsername" type="text" placeholder="e.g. dzng.8294" /></label>
+            <label>Password<input id="credFlexPassword" type="text" placeholder="FLEX password" /></label>
+            <label>Project ID<input id="credFlexProjectId" type="text" placeholder="e.g. 49a2c18a567c402ef560bb0f11821b61" /></label>
+            <label>Domain<input id="credFlexDomain" type="text" placeholder="rackspace_cloud_domain" value="rackspace_cloud_domain" /></label>
+            <label>Import OpenRC File
               <div style="display:flex;gap:8px;align-items:center;">
-                <input id="credOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;font-size:.8rem;color:#94a3b8;" />
-                <button id="credOpenrcImportBtn" type="button"
-                  style="padding:6px 14px;background:linear-gradient(135deg,#4f46e5,#6366f1);border:none;border-radius:6px;color:#fff;font-size:.8rem;cursor:pointer;white-space:nowrap;">
-                  📂 Import OpenRC File
-                </button>
+                <input id="credOpenrcFile" type="file" accept=".sh,.env,.rc,.txt" style="flex:1;" />
+                <button id="credOpenrcImportBtn" type="button" style="white-space:nowrap;padding:6px 12px!important;">📂 Import OpenRC</button>
               </div>
             </label>
           </div>
         </div>
 
       </div>
-
-      <!-- Auto-propagate hint -->
-      <p style="margin:14px 0 0;font-size:.75rem;color:#64748b;font-style:italic;">
-        {% if is_flex2flex %}✦ Origin FLEX credentials scan the source project. Target FLEX credentials validate and generate deployment output.{% elif is_hyperflex %}✦ {{ provider_label }} source fields auto-fill the scanner below where available. FLEX credentials remain available for validation and final deployment.{% else %}✦ OSPC credentials auto-fill the scanner fields below. FLEX credentials are available to Validation (Step 3) and Deploy Generation (Step 4).{% endif %}
+      <p style="margin:14px 0 0;font-size:11px;color:#475569;font-style:italic;">
+        {% if is_flex2flex %}✦ Origin FLEX credentials scan the source project. Target FLEX credentials validate and generate deployment output.
+        {% elif is_hyperflex %}✦ {{ provider_label }} source fields auto-fill the scanner below where available. FLEX credentials remain available for validation and final deployment.
+        {% else %}✦ OSPC credentials auto-fill the scanner fields below. FLEX credentials are available to Validation (Step 3) and Deploy Generation (Step 4).{% endif %}
       </p>
     </section>
 
@@ -306,7 +592,7 @@
       mig_credFlexDomain: 'rackspace_cloud_domain',
       mig_credFlexRegion: 'DFW3',
     };
-    
+
     function seedCloudCredentialDefaults() {
       Object.entries(CLOUD_CREDENTIAL_DEFAULTS).forEach(function(entry) {
         const key = entry[0];
@@ -350,9 +636,8 @@
         }
       });
     }
-    // Call on page load
     document.addEventListener('DOMContentLoaded', restoreOpenrcImportStatus);
-    restoreOpenrcImportStatus(); // Call immediately in case DOM is already loaded
+    restoreOpenrcImportStatus();
 
     const FLEX_AUTH_URLS = {
       DFW3: 'https://keystone.api.dfw3.rackspacecloud.com/v3/',
@@ -406,15 +691,11 @@
       sourceFieldIds().forEach(id => {
         document.getElementById(id)?.addEventListener('input', syncSourceCredentials);
       });
-      // Mark a field as manually edited so we stop overwriting it ONLY if it has actual changes
       ['ovUsername','ovApiKey','ovAccountId'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) {
-          el.addEventListener('change', function(){ this._manuallyEdited = true; });
-        }
+        if (el) { el.addEventListener('change', function(){ this._manuallyEdited = true; }); }
       });
-      // Sync immediately on page load with restored values from localStorage
-      setTimeout(() => syncSourceCredentials(), 100); 
+      setTimeout(() => syncSourceCredentials(), 100);
     })();
 
     // ── OpenRC file parser → FLEX fields + localStorage ───────────────────────
@@ -452,21 +733,18 @@
           if (el) { el.value = val; el.dispatchEvent(new Event('input')); filled++; }
           if (CRED_KEYS[id]) localStorage.setItem(CRED_KEYS[id], val);
         });
-        
-        // Save OpenRC import timestamp for restoration on page reload
         const timestamp = Date.now().toString();
         if (buttonId === 'credOpenrcImportBtn') {
           localStorage.setItem('openrc_flex_imported_timestamp', timestamp);
         } else if (buttonId === 'credSourceOpenrcImportBtn') {
           localStorage.setItem('openrc_source_flex_imported_timestamp', timestamp);
         }
-        
         const btn = document.getElementById(buttonId);
         if (btn) {
           const orig = btn.textContent;
           btn.textContent = filled > 0 ? `✅ Filled ${filled} fields` : '⚠️ No values found';
           btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#b45309,#f59e0b)';
-          setTimeout(() => { 
+          setTimeout(() => {
             btn.textContent = filled > 0 ? '✅ OpenRC imported' : orig;
             btn.style.background = filled > 0 ? 'linear-gradient(135deg,#16a34a,#22c55e)' : '';
           }, 3000);
@@ -488,17 +766,35 @@
     });
     </script>
 
-    <section class="card">
-      <h2>1) {% if is_flex2flex %}FLEX Source Project Inventory{% elif is_hyperflex %}{{ provider_label }} Source Inventory{% else %}OSPC Account Inventory{% endif %} <span id="statusOverview" class="status-chip idle">Idle</span></h2>
+    <!-- ── STEP 1: INVENTORY SCAN ─────────────────────────────────────────── -->
+    <section class="fx-card red-accent">
+      <div class="fx-card-head">
+        <div class="fx-step-badge">1</div>
+        <div>
+          <div class="fx-step-label">Step 1</div>
+          <div class="fx-card-title">
+            {% if is_flex2flex %}FLEX Source Project Inventory
+            {% elif is_hyperflex %}{{ provider_label }} Source Inventory
+            {% else %}OSPC Account Inventory{% endif %}
+          </div>
+        </div>
+        <span id="statusOverview" class="status-chip idle" style="margin-left:auto;">Idle</span>
+      </div>
       <p class="hint">{% if is_flex2flex %}Authenticate with source FLEX Keystone credentials or import an OpenRC file, then scan the source project inventory.{% elif is_hyperflex %}Create or load {{ provider_label }} source inventory artifacts, then generate FLEX-ready overview and mapping files.{% else %}Authenticate with your Rackspace OSPC Credentials and click the Run Account Scanning button below.{% endif %}</p>
-      <div class="grid">
-        <label>{% if is_flex2flex %}FLEX Username{% elif is_hyperflex %}{{ provider_label }} Account / Access ID{% else %}OSPC Username{% endif %} <input id="ovUsername" type="text" value="{% if is_flex2flex or is_hyperflex %}{% else %}dzng.8294{% endif %}" /></label>
-        <label>{% if is_flex2flex %}FLEX Password{% elif is_hyperflex %}{{ provider_label }} Secret / Key{% else %}OSPC API Key{% endif %} <input id="ovApiKey" type="text" /></label>
-        <label>{% if is_flex2flex %}FLEX Project ID{% elif is_hyperflex %}{{ provider_label }} Account / Project ID{% else %}OSPC Account ID{% endif %} <input id="ovAccountId" type="text" /></label>
-        <div style="grid-column: span 2;">
-          <label style="margin-bottom: 5px;">{% if is_flex2flex %}FLEX Regions to Scan{% elif is_hyperflex %}{{ provider_label }} Regions to Prepare{% else %}OSPC Regions to Scan{% endif %}</label>
+      <div class="grid" style="margin-bottom:12px;">
+        <label>{% if is_flex2flex %}FLEX Username{% elif is_hyperflex %}{{ provider_label }} Account / Access ID{% else %}OSPC Username{% endif %}
+          <input id="ovUsername" type="text" value="{% if is_flex2flex or is_hyperflex %}{% else %}dzng.8294{% endif %}" />
+        </label>
+        <label>{% if is_flex2flex %}FLEX Password{% elif is_hyperflex %}{{ provider_label }} Secret / Key{% else %}OSPC API Key{% endif %}
+          <input id="ovApiKey" type="text" />
+        </label>
+        <label>{% if is_flex2flex %}FLEX Project ID{% elif is_hyperflex %}{{ provider_label }} Account / Project ID{% else %}OSPC Account ID{% endif %}
+          <input id="ovAccountId" type="text" />
+        </label>
+        <div style="grid-column:span 2;">
+          <label style="margin-bottom:6px;">{% if is_flex2flex %}FLEX Regions to Scan{% elif is_hyperflex %}{{ provider_label }} Regions to Prepare{% else %}OSPC Regions to Scan{% endif %}</label>
           {% if is_hyperflex %}
-          <select id="ovRegionSelect" multiple size="7" style="width:100%;max-width:560px;background:#0f172a;border:1px solid #38bdf8;color:#e2e8f0;border-radius:7px;padding:8px 10px;margin-bottom:15px;">
+          <select id="ovRegionSelect" multiple size="7" style="width:100%;max-width:560px;">
             {% if scanner_provider == 'aws' %}
             <option value="us-east-1">us-east-1</option><option value="us-east-2">us-east-2</option><option value="us-west-1">us-west-1</option><option value="us-west-2" selected>us-west-2</option>
             <option value="ca-central-1">ca-central-1</option><option value="ca-west-1">ca-west-1</option><option value="eu-west-1">eu-west-1</option><option value="eu-west-2">eu-west-2</option><option value="eu-central-1">eu-central-1</option>
@@ -511,84 +807,74 @@
             <option value="westeurope">westeurope</option><option value="northeurope">northeurope</option><option value="uksouth">uksouth</option><option value="southeastasia">southeastasia</option><option value="australiaeast">australiaeast</option>
             {% endif %}
           </select>
-          <p class="hint" style="margin-top:-8px;">Select one or more {{ provider_label }} regions. Use Ctrl/Command-click for multiple regions.</p>
+          <p class="hint" style="margin-top:6px;">Select one or more {{ provider_label }} regions. Use Ctrl/Command-click for multiple.</p>
           {% else %}
-          <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;">
+          <div class="region-checkboxes">
             {% if is_flex2flex %}
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="sjc" checked> sjc</label>
+            <label><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
+            <label><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
+            <label><input type="checkbox" name="ovRegions" value="sjc" checked> sjc</label>
             {% else %}
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="ord" checked> ord</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="hkg" checked> hkg</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="syd" checked> syd</label>
-            <label style="display: flex; align-items: center; gap: 5px; font-weight: normal;"><input type="checkbox" name="ovRegions" value="lon"> lon</label>
+            <label><input type="checkbox" name="ovRegions" value="dfw" checked> dfw</label>
+            <label><input type="checkbox" name="ovRegions" value="iad" checked> iad</label>
+            <label><input type="checkbox" name="ovRegions" value="ord" checked> ord</label>
+            <label><input type="checkbox" name="ovRegions" value="hkg" checked> hkg</label>
+            <label><input type="checkbox" name="ovRegions" value="syd" checked> syd</label>
+            <label><input type="checkbox" name="ovRegions" value="lon"> lon</label>
             {% endif %}
           </div>
           {% endif %}
         </div>
       </div>
-      <button id="runOverviewBtn">{% if is_flex2flex %}Run FLEX Source Scanning{% elif is_hyperflex %}Generate {{ provider_label }} Source Overview{% else %}Run Account Scanning{% endif %}</button>
+      <button id="runOverviewBtn">{% if is_flex2flex %}Run FLEX Source Scanning{% elif is_hyperflex %}Generate {{ provider_label }} Source Overview{% else %}▶ Run Account Scanning{% endif %}</button>
     </section>
 
-    <!-- SG Rule Detail Cards (populated after Step 1 or CSV upload) -->
-    <section id="sgRulesCard" class="card" style="display:none;">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
-        <h2 style="margin:0">🛡️ Security Group Rules <span id="sgRulesCount" class="status-chip idle">0</span></h2>
-        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-          <span id="sgImportStatus" class="status-chip idle" style="font-size:.8rem"></span>
-          <button id="sgImportAllBtn" class="btn" style="padding:5px 16px;font-size:.82rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none"
-            onclick="importAllSGsToFlex()">⬆️ Import ALL SGs to FLEX</button>
+    <!-- ── SG Rule Cards ───────────────────────────────────────────────────── -->
+    <section id="sgRulesCard" class="fx-card" style="display:none;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <div class="fx-card-title">🛡️ Security Group Rules <span id="sgRulesCount" class="status-chip idle">0</span></div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <span id="sgImportStatus" class="status-chip idle" style="font-size:.8rem;"></span>
+          <button id="sgImportAllBtn" class="btn" style="padding:5px 16px;font-size:.82rem;" onclick="importAllSGsToFlex()">⬆️ Import ALL SGs to FLEX</button>
         </div>
       </div>
-      <p class="hint">Detailed firewall rules discovered from OSPC Neutron Security Groups. Each card shows ingress/egress rules with protocol, port range and CIDR. Use the per-SG or bulk import button to push groups directly into FLEX via the OpenStack CLI.</p>
-      <div id="sgRulesContainer" style="display:flex; flex-direction:column; gap:16px;"></div>
+      <p class="hint">Detailed firewall rules discovered from OSPC Neutron Security Groups. Each card shows ingress/egress rules with protocol, port range and CIDR. Use the per-SG or bulk import button to push groups directly into FLEX.</p>
+      <div id="sgRulesContainer" style="display:flex;flex-direction:column;gap:16px;"></div>
     </section>
 
-    <style>
-      .sg-card{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;transition:border-color .2s}
-      .sg-card:hover{border-color:rgba(136,192,208,.4)}
-      .sg-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;user-select:none}
-      .sg-card-header h3{margin:0;font-size:1.05rem;color:#88c0d0;flex:1}
-      .sg-card-header .sg-badge{background:rgba(136,192,208,.15);color:#88c0d0;font-size:.75rem;padding:2px 10px;border-radius:12px;white-space:nowrap}
-      .sg-card-header .sg-toggle{color:#d8dee9;font-size:.9rem;transition:transform .2s}
-      .sg-card-header .sg-toggle.open{transform:rotate(90deg)}
-      .sg-rules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:6px}
-      .sg-rule{background:rgba(46,52,64,.6);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;font-size:.85rem;transition:background .15s,border-color .15s}
-      .sg-rule:hover{background:rgba(59,66,82,.8);border-color:rgba(136,192,208,.25)}
-      .sg-rule-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-      .sg-pill{padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;letter-spacing:.03em}
-      .sg-pill.ingress{background:rgba(163,190,140,.2);color:#a3be8c}
-      .sg-pill.egress{background:rgba(208,135,112,.2);color:#d08770}
-      .sg-pill.proto{background:rgba(180,142,173,.2);color:#b48ead}
-      .sg-pill.port{background:rgba(235,203,139,.2);color:#ebcb8b;font-family:monospace}
-      .sg-pill.cidr{background:rgba(136,192,208,.12);color:#88c0d0;font-family:monospace}
-      .sg-pill.ether{background:rgba(216,222,233,.1);color:#8a90a0;font-size:.7rem}
-      .sg-arrow{color:#616e88;font-size:.9rem}
-    </style>
-
-    <!-- STAGE 1.5 -->
-    <section class="card">
-      <h2>1.5) Application Dependency Mapping <span id="statusAppDeps" class="status-chip idle">Idle</span></h2>
+    <!-- ── STEP 1.5: APP DEPENDENCY ───────────────────────────────────────── -->
+    <section class="fx-card red-accent">
+      <div class="fx-card-head">
+        <div class="fx-step-badge" style="font-size:11px;">1.5</div>
+        <div>
+          <div class="fx-step-label">Step 1.5</div>
+          <div class="fx-card-title">Application Dependency Mapping</div>
+        </div>
+        <span id="statusAppDeps" class="status-chip idle" style="margin-left:auto;">Idle</span>
+      </div>
       <p class="hint">Map application relationships using deep Active Scanning or intelligent Metadata Inference.</p>
-      <div class="grid">
-        <label>Select Overview CSV
-          <select id="admInventory"></select>
-        </label>
+      <div class="grid" style="max-width:560px; margin-bottom:12px;">
+        <label>Select Overview CSV<select id="admInventory"></select></label>
       </div>
-      <div class="row" style="margin-top: 10px;">
-        <button id="runAdmOptCBtn" class="btn">Option C: Generate Inference Plan</button>
-        <button id="runAdmOptABtn" class="btn" style="background-color: var(--nord14); color: var(--nord1);">Option A: Generate Active SSH Scanner</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button id="runAdmOptCBtn" class="btn-ghost btn">Option C: Generate Inference Plan</button>
+        <button id="runAdmOptABtn" class="btn">Option A: Generate Active SSH Scanner</button>
       </div>
     </section>
 
-    <section class="card">
-      <h2>2) Flavor + Block + LB Mapping <span id="statusMapper" class="status-chip idle">Idle</span></h2>
+    <!-- ── STEP 2: FLAVOR MAPPING ─────────────────────────────────────────── -->
+    <section class="fx-card red-accent">
+      <div class="fx-card-head">
+        <div class="fx-step-badge">2</div>
+        <div>
+          <div class="fx-step-label">Step 2</div>
+          <div class="fx-card-title">Flavor + Block + LB Mapping</div>
+        </div>
+        <span id="statusMapper" class="status-chip idle" style="margin-left:auto;">Idle</span>
+      </div>
       <p class="hint">{% if is_flex2flex %}Target region mirrors the Target FLEX Credentials selector above. Select your source overview, choose optional DB/Floating IP behaviors, and press <code>Run Flavor Mapper</code>.{% else %}Select your deployment region, then select your Account Overview file, choose any optional DB/Floating IP behaviors, and press <code>Run Flavor Mapper</code>.{% endif %}</p>
       <p class="hint">Regional target flavor catalogs are loaded from <code>uploads/flavors/</code>.</p>
-      <div class="grid">
+      <div class="grid" style="margin-bottom:10px;">
         <label {% if is_flex2flex %}style="display:none;"{% endif %}>{% if is_flex2flex %}Target FLEX Region{% else %}Deployment Region{% endif %}
           <select id="mapTargetRegion">
             <option value="">-- select region --</option>
@@ -597,36 +883,36 @@
             <option value="IAD">IAD</option>
           </select>
         </label>
-        <label>Overview CSV
-          <select id="mapInventory"></select>
-        </label>
+        <label>Overview CSV<select id="mapInventory"></select></label>
       </div>
-      <p class="hint"><label class="hint-check"><input id="mapIncludeDbAsServers" type="checkbox" /> Include <code>database_instance</code> rows as compute instance targets (opt-in).</label></p>
-      <p class="hint">Creates similar spec Compute Instances as targeted replacements for Cloud Database Instances.</p>
-      <p class="hint"><label class="hint-check"><input id="mapIncludeFloatingIps" type="checkbox" checked /> Include Floating IPs</label></p>
-      <p class="hint">Floating IPs will be assigned for every VM by default.</p>
-      <button id="runMapperBtn">Run Flavor Mapper</button>
+      <div class="checkbox-row" style="margin-bottom:12px;">
+        <label class="hint-check"><input id="mapIncludeDbAsServers" type="checkbox" /> Include <code>database_instance</code> rows as compute instance targets (opt-in).</label>
+        <label class="hint-check"><input id="mapIncludeFloatingIps" type="checkbox" checked /> Include Floating IPs</label>
+      </div>
+      <button id="runMapperBtn">▶ Run Flavor Mapper</button>
     </section>
 
-    <section class="card">
-      <h2>3) Pre-Deploy Validation <span id="statusValidate" class="status-chip idle">Idle</span></h2>
-      <p class="hint">Load your Flavor Mapping, Block Mapping, and optional LB Mapping files then click the <code>Validate Inputs</code> button.</p>
-      <div class="grid">
-        <label>Flavor Map CSV
-          <select id="valFlavorMap"></select>
-        </label>
-        <label>Block Map CSV
-          <select id="valBlockMap"></select>
-        </label>
-        <label>LB Map CSV (optional)
-          <select id="valLbMap"></select>
-        </label>
+    <!-- ── STEP 3: VALIDATION ────────────────────────────────────────────── -->
+    <section class="fx-card red-accent">
+      <div class="fx-card-head">
+        <div class="fx-step-badge">3</div>
+        <div>
+          <div class="fx-step-label">Step 3</div>
+          <div class="fx-card-title">Pre-Deploy Validation</div>
+        </div>
+        <span id="statusValidate" class="status-chip idle" style="margin-left:auto;">Idle</span>
       </div>
-      <button id="runValidateBtn">Validate Inputs</button>
+      <p class="hint">Load your Flavor Mapping, Block Mapping, and optional LB Mapping files then click <code>Validate Inputs</code>.</p>
+      <div class="grid-3" style="margin-bottom:12px;">
+        <label>Flavor Map CSV<select id="valFlavorMap"></select></label>
+        <label>Block Map CSV<select id="valBlockMap"></select></label>
+        <label>LB Map CSV (optional)<select id="valLbMap"></select></label>
+      </div>
+      <button id="runValidateBtn">▶ Validate Inputs</button>
     </section>
 
-    <section id="validationFindingsCard" class="card" style="display:none;">
-      <h2>Validation Findings</h2>
+    <section id="validationFindingsCard" class="fx-card" style="display:none;">
+      <div class="fx-card-head"><div class="fx-card-title">Validation Findings</div></div>
       <p id="validationFindingsSummary" class="hint"></p>
       <p id="validationFindingsSource" class="hint"></p>
       <div class="findings-wrap">
@@ -634,27 +920,28 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>4) Generate Deploy Artifacts <span id="statusDeployGen" class="status-chip idle">Idle</span></h2>
-      <p class="hint">If duplicate server names exist, generation auto-suffixes names (for example <code>linux-server-1-2</code>). This step can still run even if validation failed.</p>
-      <p class="hint">Generated deploy scripts continue on per-step errors by default and write a results CSV. Enable fail-fast to stop on first failed step.</p>
-      <p class="hint">Linux instances use <code>Key Name</code> and that keypair must already exist in the target project. Windows instances can auto-generate random admin passwords (12-16 chars, alphanumeric) and export them to a credentials CSV.</p>
-      <div class="grid">
-        <label>Flavor Map CSV
-          <select id="depFlavorMap"></select>
-        </label>
-        <label>Block Map CSV (optional)
-          <select id="depBlockMap"></select>
-        </label>
-        <label>LB Map CSV (optional)
-          <select id="depLbMap"></select>
-        </label>
-        <label>Public Network <input id="depPublicNet" type="text" value="PUBLICNET" /></label>
-        <label>Private Network <input id="depPrivateNet" type="text" value="tenant-net" /></label>
-        <label>Subnet Name <input id="depSubnetName" type="text" value="tenant-subnet" /></label>
-        <label>Subnet CIDR <input id="depSubnetCidr" type="text" value="10.60.0.0/24" /></label>
-        <label>Router Name <input id="depRouterName" type="text" value="tenant-router" /></label>
-        <label>Security Group (auto-create if missing) <input id="depSecGroup" type="text" value="default" /></label>
+    <!-- ── STEP 4: DEPLOY GENERATION ────────────────────────────────────── -->
+    <section class="fx-card red-accent">
+      <div class="fx-card-head">
+        <div class="fx-step-badge">4</div>
+        <div>
+          <div class="fx-step-label">Step 4</div>
+          <div class="fx-card-title">Generate Deploy Artifacts</div>
+        </div>
+        <span id="statusDeployGen" class="status-chip idle" style="margin-left:auto;">Idle</span>
+      </div>
+      <p class="hint">If duplicate server names exist, generation auto-suffixes names (e.g. <code>linux-server-1-2</code>). This step can still run even if validation failed.</p>
+      <p class="hint">Linux instances use <code>Key Name</code> and that keypair must already exist in the target project. Windows instances can auto-generate random admin passwords and export them to a credentials CSV.</p>
+      <div class="grid" style="margin-bottom:10px;">
+        <label>Flavor Map CSV<select id="depFlavorMap"></select></label>
+        <label>Block Map CSV (optional)<select id="depBlockMap"></select></label>
+        <label>LB Map CSV (optional)<select id="depLbMap"></select></label>
+        <label>Public Network<input id="depPublicNet" type="text" value="PUBLICNET" /></label>
+        <label>Private Network<input id="depPrivateNet" type="text" value="tenant-net" /></label>
+        <label>Subnet Name<input id="depSubnetName" type="text" value="tenant-subnet" /></label>
+        <label>Subnet CIDR<input id="depSubnetCidr" type="text" value="10.60.0.0/24" /></label>
+        <label>Router Name<input id="depRouterName" type="text" value="tenant-router" /></label>
+        <label>Security Group (auto-create if missing)<input id="depSecGroup" type="text" value="default" /></label>
         <label>Volume Type
           <select id="depVolumeType">
             <option value="Performance" selected>Performance</option>
@@ -664,35 +951,36 @@
             <option value="HA-Standard">HA-Standard</option>
           </select>
         </label>
-        <label>Key Name (optional SSH access for Linux VMs) <input id="depKeyName" type="text" /></label>
-        <label>SSH Public Key (Optional: Auto-import if Key Name is missing) <textarea id="depSshPubKey" rows="2" placeholder="ssh-rsa AAAAB3N..."></textarea></label>
-        <label>Windows Admin User <input id="depWindowsAdminUser" type="text" value="Administrator" /></label>
+        <label>Key Name (optional SSH access for Linux VMs)<input id="depKeyName" type="text" /></label>
+        <label>SSH Public Key (Optional: auto-import if Key Name missing)<textarea id="depSshPubKey" rows="2" placeholder="ssh-rsa AAAAB3N..."></textarea></label>
+        <label>Windows Admin User<input id="depWindowsAdminUser" type="text" value="Administrator" /></label>
         <label>Windows Password Length
           <select id="depWindowsPasswordLength">
-            <option value="12">12</option>
-            <option value="13">13</option>
-            <option value="14" selected>14</option>
-            <option value="15">15</option>
-            <option value="16">16</option>
+            <option value="12">12</option><option value="13">13</option>
+            <option value="14" selected>14</option><option value="15">15</option><option value="16">16</option>
           </select>
         </label>
-        <label>Output Prefix (optional) <input id="depOutputPrefix" type="text" /></label>
+        <label>Output Prefix (optional)<input id="depOutputPrefix" type="text" /></label>
       </div>
-      <p class="hint"><label class="hint-check"><input id="depGenerateWindowsPasswords" type="checkbox" checked /> Auto-generate Windows passwords and write <code>*_windows_credentials.csv</code>.</label></p>
-      <p class="hint"><label class="hint-check"><input id="depFailFast" type="checkbox" /> Fail fast (stop at first failed step).</label></p>
-      <button id="runDeployGenBtn">Generate Deployment Script</button>
+      <div class="checkbox-row" style="margin-bottom:12px;">
+        <label class="hint-check"><input id="depGenerateWindowsPasswords" type="checkbox" checked /> Auto-generate Windows passwords and write <code>*_windows_credentials.csv</code>.</label>
+        <label class="hint-check"><input id="depFailFast" type="checkbox" /> Fail fast (stop at first failed step).</label>
+      </div>
+      <button id="runDeployGenBtn">▶ Generate Deployment Script</button>
     </section>
 
-    <section class="card">
-      <h2>Next Step</h2>
-      <p class="hint">Take the generated <strong>&lt;account_id&gt;_tenant_deploy.sh</strong> script and paste it into <strong>Stage 2</strong> &raquo; <strong>Or Paste Deployment Script</strong> box in the FLEX Deployment Dashboard, which is already authenticated with your Rackspace OpenStack Flex project.</p>
-    </section>
+    <!-- ── NEXT STEP ──────────────────────────────────────────────────────── -->
+    <div class="next-step-card">
+      <h2>Next Step →</h2>
+      <p>Take the generated <strong>&lt;account_id&gt;_tenant_deploy.sh</strong> script and paste it into <strong>Stage 2 › Or Paste Deployment Script</strong> in the FLEX Deployment Dashboard, already authenticated with your Rackspace OpenStack FLEX project.</p>
+    </div>
 
-
-
-    <section class="card">
-      <h2>Execution Output</h2>
-      <div class="row log-tools">
+    <!-- ── EXECUTION LOG ─────────────────────────────────────────────────── -->
+    <section class="fx-card">
+      <div class="fx-card-head" style="margin-bottom:10px;">
+        <div class="fx-card-title">Execution Output</div>
+      </div>
+      <div class="log-tools">
         <button id="logFilterAll" class="active" type="button">All</button>
         <button id="logFilterInfo" type="button">Info</button>
         <button id="logFilterWarn" type="button">Warn</button>
@@ -703,9 +991,10 @@
       <pre id="logBox">Ready.</pre>
     </section>
 
-    <section class="card">
+    <section class="fx-card" style="text-align:center; padding:14px;">
       <a href="/readme" target="_blank" rel="noopener noreferrer">Open README (Plain Text)</a>
     </section>
+
   </main>
 
   <script>window.OSFLEX_SCANNER_MODE = "{{ scanner_mode }}"; window.OSFLEX_SCANNER_PROVIDER = "{{ scanner_provider }}";</script>
