@@ -1218,6 +1218,23 @@ def stream_cutover_tester_action(data: Dict[str, Any]) -> Iterator[str]:
     if action in {"traffic-ramp", "ramp", "run-ramp", "traffic-ramp-proof"}:
         yield from _stream_traffic_ramp(data)
         return
+    if action in {"dry-run", "dry-run-config-perf"}:
+        if not jumphost_ip:
+            yield "[ERROR] Select a Stage 2 jumphost before running the dry run."
+            return
+        yield "=== DRY RUN: CONFIGURATION & PERFORMANCE TEST ==="
+        yield "[INFO] No HAProxy changes. No live traffic weights will be modified."
+        dry_ok = yield from _stream_cutover_specific_tests(data, action, jumphost_ip, user, ssh_key, evidence)
+        ok = bool(dry_ok)
+        yield (
+            "[OK] Dry run passed — config and performance look good. Ready for full cutover test."
+            if ok else
+            "[ERROR] Dry run found issues. Fix before running the full cutover test."
+        )
+        artifacts = write_cutover_tester_evidence(action, data, {"ok": ok, "steps": evidence})
+        yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
+        yield f"[RESULT_TABLE] {json.dumps(load_cutover_tester_results(), sort_keys=True)}"
+        return
     if action in {"cutover-test", "full-cutover-test"}:
         if not jumphost_ip:
             yield "[ERROR] Select a Stage 2 jumphost before running the cutover test."

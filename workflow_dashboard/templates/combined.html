@@ -5193,6 +5193,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
         <div class="section-body">
           <div class="action-buttons-row">
+            <button class="btn btn-secondary light" onclick="cutoverTesterDryRun()" title="Validate config + performance only. No HAProxy changes, no traffic touched."><i class="fas fa-flask"></i> Dry Run (Config &amp; Perf)</button>
             <button class="btn btn-primary" onclick="cutoverTesterRun()"><i class="fas fa-play"></i> Cut over TEST</button>
             <button class="btn btn-danger" onclick="cutoverTesterStop()"><i class="fas fa-stop"></i> Stop Tester</button>
             <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Test Results CSV</button>
@@ -11817,6 +11818,28 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     try {
       await cutoverStream('/api/cutover-tester/run', cutoverTesterPayload('cutover-test'), 'cutover-tester-terminal-box', 'cutover-tester-log-output', 'cutover-tester-status-indicator');
       setGovStatus('cutover-tester-status', 'Cut over TEST finished. Review the card summary, result table, and CSV.', 'done');
+    } catch (err) {
+      setGovStatus('cutover-tester-status', err.message || String(err), 'error');
+    }
+  }
+
+  async function cutoverTesterDryRun() {
+    await cutoverTesterAutofillRequiredFields(false);
+    cutoverSyncMatrixFromInputs();
+    const selectedJumphost = cutoverTesterSelectedJumphost();
+    if (!selectedJumphost.jumphost_ip && !cutoverTesterValue('cutover_tester_api_url')) {
+      setGovStatus('cutover-tester-status', 'Choose a Stage 2 jumphost before running the dry run.', 'error');
+      return;
+    }
+    if (!cutoverTesterValue('cutover_tester_source_url') || !cutoverTesterValue('cutover_tester_target_url')) {
+      setGovStatus('cutover-tester-status', 'Source app URL and Target FLEX app URL are required for the dry run.', 'error');
+      return;
+    }
+    cutoverTesterCalculatePerformance();
+    try {
+      setGovStatus('cutover-tester-status', 'Dry Run: validating config & performance only — no HAProxy changes, no traffic touched.', 'warning');
+      await cutoverStream('/api/cutover-tester/run', cutoverTesterPayload('dry-run'), 'cutover-tester-terminal-box', 'cutover-tester-log-output', 'cutover-tester-status-indicator');
+      setGovStatus('cutover-tester-status', 'Dry Run finished. Review results — no traffic was modified.', 'done');
     } catch (err) {
       setGovStatus('cutover-tester-status', err.message || String(err), 'error');
     }
