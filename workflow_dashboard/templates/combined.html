@@ -7003,15 +7003,40 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
             window.coListIssues = function() {
               var issues = [];
-              // Collect failed / review steps
-              _co.steps.forEach(function(id) {
-                var st = _co.stepStatus[id];
-                if (st === 'fail' || st === 'review') {
-                  issues.push({ sev: st === 'fail' ? 'FAIL' : 'REVIEW', source: _co.stepLabels[id] || id,
-                    detail: st === 'fail' ? 'Step failed — re-run or mark manually.' : 'Step needs manual review before proceeding.' });
+              var inAdvMode = (function() {
+                var adv = document.getElementById('co-adv-dash');
+                return adv && adv.style.display !== 'none';
+              })();
+              if (inAdvMode) {
+                // Advanced pipeline: collect FAIL/WARNING steps from _advRun
+                var ar = window._advRun;
+                if (ar && ar.steps && ar.steps.length) {
+                  ar.steps.forEach(function(s) {
+                    if (s.status === 'FAIL')    issues.push({ sev:'FAIL',   source: s.name, detail: s.summary || 'Step failed in advanced pipeline.' });
+                    if (s.status === 'WARNING') issues.push({ sev:'REVIEW', source: s.name, detail: s.summary || 'Step completed with warnings.' });
+                  });
                 }
-              });
-              // Scan unified log for [ERROR] / [FAIL] lines
+                // Scan advanced log
+                var advLog = document.getElementById('adv-log-output');
+                if (advLog) {
+                  advLog.innerText.split('\n').forEach(function(l) {
+                    var t = l.trim();
+                    if (t.startsWith('[FAIL]') || t.startsWith('[ERROR]')) {
+                      issues.push({ sev:'ERROR', source:'Advanced Pipeline Log', detail: t.slice(0, 140) });
+                    }
+                  });
+                }
+              } else {
+                // Simple dashboard: collect failed / review steps
+                _co.steps.forEach(function(id) {
+                  var st = _co.stepStatus[id];
+                  if (st === 'fail' || st === 'review') {
+                    issues.push({ sev: st === 'fail' ? 'FAIL' : 'REVIEW', source: _co.stepLabels[id] || id,
+                      detail: st === 'fail' ? 'Step failed — re-run or mark manually.' : 'Step needs manual review before proceeding.' });
+                  }
+                });
+              }
+              // Always scan both logs
               var logEl = document.getElementById('s5-log-output');
               if (logEl) {
                 logEl.innerText.split('\n').forEach(function(l) {
@@ -7165,6 +7190,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             _renderChips();
             // Populate Step 2 preview from existing Section 2 form values
             setTimeout(coStep2Refresh, 400);
+            // Move cutover modals to <body> so they're never trapped inside display:none container
+            setTimeout(function() {
+              ['co-issues-modal','co-validation-modal'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) document.body.appendChild(el);
+              });
+            }, 0);
           })();
           </script>
 
@@ -7537,6 +7569,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             progressPercent:0, steps:[], results:null, logs:[],
             finalDecision:null
           };
+          window._advRun = _advRun;
           var _advCharts = {};
 
           var _ADV_MOCK = {
