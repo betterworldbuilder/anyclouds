@@ -1084,6 +1084,7 @@
     }
   </style>
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <script>
@@ -5272,13 +5273,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <p>Guided step-by-step cutover — run after Cutover TEST passes</p>
             </div>
           </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-right:12px;">
+            <button id="co-tab-simple" onclick="coSetDashMode('simple')" style="padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid #0ea5e9;background:#0ea5e9;color:#fff;transition:all .2s;"><i class="fas fa-list-check"></i> Simple</button>
+            <button id="co-tab-advanced" onclick="coSetDashMode('advanced')" style="padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid #bfdbfe;background:transparent;color:#1e40af;transition:all .2s;"><i class="fas fa-gauge-high"></i> Advanced</button>
+          </div>
           <div class="section-actions">
             <button id="co-auto-btn" onclick="coToggleAutoChain()" style="border:1.5px solid #10b981;background:#10b981;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;"><i class="fas fa-link"></i> Auto Chain: ON</button>
             <button class="btn btn-secondary light" onclick="coResetCockpit()"><i class="fas fa-redo"></i> Reset</button>
             <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Evidence</button>
           </div>
         </div>
-        <div class="section-body">
+        <div class="section-body" id="co-simple-dash-body">
 
           <!-- How-to banner -->
           <div style="background:linear-gradient(135deg,#f0f9ff,#f0fdf4);border:1.5px solid #bfdbfe;border-radius:14px;padding:20px 24px;margin-bottom:20px;">
@@ -7124,6 +7129,599 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           </script>
 
         </div>
+
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- ADVANCED CUTOVER DASHBOARD                                -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <div id="co-adv-dash" style="display:none;">
+          <style>
+            #co-adv-dash { font-family:'Inter',sans-serif; background:#f0f9ff; color:#0f172a; }
+            #co-adv-dash .adv-layout { display:flex; min-height:600px; }
+            #co-adv-dash .adv-sidebar { width:180px; flex-shrink:0; background:linear-gradient(180deg,#1e3a5f,#0f2744); border-radius:12px 0 0 12px; padding:16px 0; }
+            #co-adv-dash .adv-sidebar-logo { padding:0 16px 16px; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:8px; }
+            #co-adv-dash .adv-sidebar-logo span { font-size:11px; font-weight:800; color:#7dd3fc; text-transform:uppercase; letter-spacing:1px; }
+            #co-adv-dash .adv-nav-item { display:flex; align-items:center; gap:8px; padding:9px 16px; cursor:pointer; color:#94a3b8; font-size:12px; font-weight:600; transition:all .15s; border-left:3px solid transparent; }
+            #co-adv-dash .adv-nav-item:hover { background:rgba(255,255,255,.07); color:#e0f2fe; }
+            #co-adv-dash .adv-nav-item.active { background:rgba(14,165,233,.18); color:#38bdf8; border-left-color:#38bdf8; }
+            #co-adv-dash .adv-nav-item i { width:14px; text-align:center; }
+            #co-adv-dash .adv-main { flex:1; padding:20px; overflow-x:hidden; }
+            #co-adv-dash .adv-banner { border-radius:12px; padding:16px 20px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+            #co-adv-dash .adv-banner-left { display:flex; align-items:center; gap:12px; }
+            #co-adv-dash .adv-banner-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+            #co-adv-dash .adv-banner-title { font-size:16px; font-weight:800; }
+            #co-adv-dash .adv-banner-sub { font-size:12px; opacity:.75; margin-top:2px; }
+            #co-adv-dash .adv-banner-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+            #co-adv-dash .adv-btn { padding:7px 14px; border-radius:7px; font-size:12px; font-weight:700; cursor:pointer; border:none; transition:all .15s; }
+            #co-adv-dash .adv-btn-primary { background:#0ea5e9; color:#fff; }
+            #co-adv-dash .adv-btn-secondary { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); }
+            #co-adv-dash .adv-btn-outline { background:transparent; color:#1e40af; border:1.5px solid #bfdbfe; }
+            #co-adv-dash .adv-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:16px; }
+            #co-adv-dash .adv-kpi-card { background:#fff; border:1.5px solid #bfdbfe; border-radius:12px; padding:16px; position:relative; overflow:hidden; }
+            #co-adv-dash .adv-kpi-card::after { content:''; position:absolute; top:0; right:0; width:60px; height:60px; border-radius:0 0 0 60px; opacity:.06; }
+            #co-adv-dash .adv-kpi-label { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px; }
+            #co-adv-dash .adv-kpi-val { font-size:28px; font-weight:900; color:#0f172a; line-height:1; margin-bottom:4px; }
+            #co-adv-dash .adv-kpi-sub { font-size:11px; color:#64748b; }
+            #co-adv-dash .adv-kpi-badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; margin-top:6px; }
+            #co-adv-dash .adv-section-title { font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase; letter-spacing:.8px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+            #co-adv-dash .adv-section-anchor { scroll-margin-top:16px; }
+            #co-adv-dash .adv-card { background:#fff; border:1.5px solid #bfdbfe; border-radius:12px; padding:16px; margin-bottom:14px; }
+            #co-adv-dash .adv-card-title { font-size:12px; font-weight:800; color:#1e40af; margin-bottom:10px; }
+            #co-adv-dash .adv-3col { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:14px; }
+            #co-adv-dash .adv-4col { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:14px; }
+            #co-adv-dash .adv-step-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; }
+            #co-adv-dash .adv-step-row:last-child { border-bottom:none; }
+            #co-adv-dash .adv-step-icon { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
+            #co-adv-dash .adv-step-label { flex:1; font-size:12px; font-weight:600; color:#334155; }
+            #co-adv-dash .adv-step-status { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
+            #co-adv-dash .adv-table { width:100%; border-collapse:collapse; font-size:12px; }
+            #co-adv-dash .adv-table th { background:#f0f9ff; color:#1e40af; font-weight:700; padding:8px 10px; text-align:left; border-bottom:2px solid #bfdbfe; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+            #co-adv-dash .adv-table td { padding:8px 10px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:top; }
+            #co-adv-dash .adv-table tr:hover td { background:#f8fafc; }
+            #co-adv-dash .adv-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; }
+            #co-adv-dash .adv-badge-pass { background:#dcfce7; color:#15803d; }
+            #co-adv-dash .adv-badge-fail { background:#fee2e2; color:#dc2626; }
+            #co-adv-dash .adv-badge-warn { background:#fef9c3; color:#854d0e; }
+            #co-adv-dash .adv-badge-skip { background:#f1f5f9; color:#64748b; }
+            #co-adv-dash .adv-badge-run { background:#dbeafe; color:#1d4ed8; }
+            #co-adv-dash .adv-perf-bar-wrap { background:#f1f5f9; border-radius:4px; height:8px; overflow:hidden; margin-top:4px; }
+            #co-adv-dash .adv-perf-bar { height:100%; border-radius:4px; transition:width .5s; }
+            #co-adv-dash .adv-countdown { font-family:'Share Tech Mono',monospace; font-size:28px; font-weight:900; color:#0ea5e9; letter-spacing:3px; }
+            #co-adv-dash .adv-meta-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+            #co-adv-dash .adv-meta-item { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; }
+            #co-adv-dash .adv-meta-label { font-size:10px; color:#64748b; font-weight:600; margin-bottom:2px; }
+            #co-adv-dash .adv-meta-val { font-size:13px; font-weight:700; color:#0f172a; word-break:break-all; }
+            #co-adv-dash canvas.adv-chart { max-height:160px; }
+          </style>
+
+          <!-- Top bar -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px;border-bottom:1px solid #bfdbfe;margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:800;color:#1e40af;letter-spacing:.5px;"><i class="fas fa-gauge-high" style="margin-right:6px;color:#0ea5e9;"></i>Advanced Cutover Dashboard</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="adv-refresh-ts" style="font-size:10px;color:#64748b;"></span>
+              <button class="adv-btn adv-btn-outline" onclick="coAdvRefresh()"><i class="fas fa-rotate-right"></i> Refresh</button>
+              <button class="adv-btn adv-btn-outline" onclick="coSetDashMode('simple')"><i class="fas fa-arrow-left"></i> Back to Execution</button>
+            </div>
+          </div>
+
+          <div class="adv-layout">
+            <!-- Sidebar nav -->
+            <div class="adv-sidebar">
+              <div class="adv-sidebar-logo"><span>&#9658; Nav</span></div>
+              <div class="adv-nav-item active" id="adv-nav-overview" onclick="coAdvNav('adv-sec-overview',this)"><i class="fas fa-house"></i> Overview</div>
+              <div class="adv-nav-item" id="adv-nav-meta" onclick="coAdvNav('adv-sec-meta',this)"><i class="fas fa-circle-info"></i> Mission Info</div>
+              <div class="adv-nav-item" id="adv-nav-steps" onclick="coAdvNav('adv-sec-steps',this)"><i class="fas fa-list-check"></i> Steps</div>
+              <div class="adv-nav-item" id="adv-nav-perf" onclick="coAdvNav('adv-sec-perf',this)"><i class="fas fa-chart-line"></i> Performance</div>
+              <div class="adv-nav-item" id="adv-nav-tests" onclick="coAdvNav('adv-sec-tests',this)"><i class="fas fa-vial"></i> Test Results</div>
+              <div class="adv-nav-item" id="adv-nav-traffic" onclick="coAdvNav('adv-sec-traffic',this)"><i class="fas fa-network-wired"></i> Traffic</div>
+              <div class="adv-nav-item" id="adv-nav-matrix" onclick="coAdvNav('adv-sec-matrix',this)"><i class="fas fa-table"></i> Pair Matrix</div>
+              <div class="adv-nav-item" id="adv-nav-blockers" onclick="coAdvNav('adv-sec-blockers',this)"><i class="fas fa-triangle-exclamation"></i> Blockers</div>
+              <div class="adv-nav-item" id="adv-nav-log" onclick="coAdvViewLog()"><i class="fas fa-terminal"></i> Live Log</div>
+            </div>
+
+            <!-- Main content -->
+            <div class="adv-main">
+
+              <!-- SECTION: Overview KPIs -->
+              <div class="adv-section-anchor" id="adv-sec-overview">
+                <div id="adv-banner" class="adv-banner" style="background:linear-gradient(135deg,#dbeafe,#eff6ff);border:1.5px solid #bfdbfe;">
+                  <div class="adv-banner-left">
+                    <div class="adv-banner-dot" id="adv-status-dot" style="background:#94a3b8;"></div>
+                    <div>
+                      <div class="adv-banner-title" id="adv-status-title">NOT STARTED</div>
+                      <div class="adv-banner-sub" id="adv-status-sub">Cutover has not been initiated</div>
+                    </div>
+                  </div>
+                  <div class="adv-banner-right">
+                    <div style="text-align:right;">
+                      <div style="font-size:10px;color:#64748b;font-weight:600;">Elapsed</div>
+                      <div class="adv-countdown" id="adv-elapsed">—</div>
+                    </div>
+                    <button class="adv-btn adv-btn-primary" onclick="coAdvRefresh()"><i class="fas fa-rotate-right"></i> Refresh</button>
+                  </div>
+                </div>
+
+                <div class="adv-kpi-grid" id="adv-kpi-grid">
+                  <!-- rendered by _advRenderKpi() -->
+                </div>
+              </div>
+
+              <!-- SECTION: Mission Info -->
+              <div class="adv-section-anchor" id="adv-sec-meta" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-circle-info"></i> Mission Info</div>
+                <div class="adv-meta-grid" id="adv-meta-grid">
+                  <!-- rendered by _advRenderMeta() -->
+                </div>
+              </div>
+
+              <!-- SECTION: Cutover Steps -->
+              <div class="adv-section-anchor" id="adv-sec-steps" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-list-check"></i> Execution Steps</div>
+                <div class="adv-card">
+                  <div id="adv-steps-body">
+                    <!-- rendered by _advRenderSteps() -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION: Performance -->
+              <div class="adv-section-anchor" id="adv-sec-perf" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-chart-line"></i> Live Performance</div>
+                <div class="adv-4col" id="adv-perf-grid">
+                  <!-- rendered by _advRenderPerf() -->
+                </div>
+                <div class="adv-3col">
+                  <div class="adv-card" style="padding:12px;">
+                    <div class="adv-card-title">Response + Latency Trend</div>
+                    <canvas id="adv-chart-resp" class="adv-chart"></canvas>
+                  </div>
+                  <div class="adv-card" style="padding:12px;">
+                    <div class="adv-card-title">CPU % Trend</div>
+                    <canvas id="adv-chart-cpu" class="adv-chart"></canvas>
+                  </div>
+                  <div class="adv-card" style="padding:12px;">
+                    <div class="adv-card-title">Memory % Trend</div>
+                    <canvas id="adv-chart-mem" class="adv-chart"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION: Test Results -->
+              <div class="adv-section-anchor" id="adv-sec-tests" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-vial"></i> Test Results</div>
+                <div class="adv-card" style="padding:0;overflow:hidden;">
+                  <div id="adv-tests-body" style="overflow-x:auto;">
+                    <!-- rendered by _advRenderTests() -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION: Traffic Split -->
+              <div class="adv-section-anchor" id="adv-sec-traffic" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-network-wired"></i> Traffic Split</div>
+                <div class="adv-card" id="adv-traffic-card">
+                  <!-- rendered by _advRenderTraffic() -->
+                </div>
+              </div>
+
+              <!-- SECTION: Pair Matrix -->
+              <div class="adv-section-anchor" id="adv-sec-matrix" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-table"></i> Server Pair Matrix</div>
+                <div class="adv-card" style="padding:0;overflow:hidden;">
+                  <div id="adv-matrix-body" style="overflow-x:auto;">
+                    <!-- rendered by _advRenderMatrix() -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION: Blockers -->
+              <div class="adv-section-anchor" id="adv-sec-blockers" style="margin-top:8px;">
+                <div class="adv-section-title"><i class="fas fa-triangle-exclamation"></i> Blockers / Issues</div>
+                <div id="adv-blockers-body">
+                  <!-- rendered by _advRenderBlockers() -->
+                </div>
+              </div>
+
+            </div><!-- /adv-main -->
+          </div><!-- /adv-layout -->
+        </div><!-- /co-adv-dash -->
+
+        <script>
+        (function() {
+          'use strict';
+
+          var _advCharts = {};
+
+          /* ── mode switcher ──────────────────────────────────────── */
+          window.coSetDashMode = function(mode) {
+            var simple = document.getElementById('co-simple-dash-body');
+            var adv    = document.getElementById('co-adv-dash');
+            var tabS   = document.getElementById('co-tab-simple');
+            var tabA   = document.getElementById('co-tab-advanced');
+            if (mode === 'advanced') {
+              if (simple) simple.style.display = 'none';
+              if (adv)    adv.style.display = 'block';
+              if (tabS) { tabS.style.background='transparent'; tabS.style.color='#1e40af'; tabS.style.borderColor='#bfdbfe'; }
+              if (tabA) { tabA.style.background='#0ea5e9'; tabA.style.color='#fff'; tabA.style.borderColor='#0ea5e9'; }
+              localStorage.setItem('cutoverDashboardMode','advanced');
+              coAdvRefresh();
+            } else {
+              if (simple) simple.style.display = '';
+              if (adv)    adv.style.display = 'none';
+              if (tabS) { tabS.style.background='#0ea5e9'; tabS.style.color='#fff'; tabS.style.borderColor='#0ea5e9'; }
+              if (tabA) { tabA.style.background='transparent'; tabA.style.color='#1e40af'; tabA.style.borderColor='#bfdbfe'; }
+              localStorage.setItem('cutoverDashboardMode','simple');
+            }
+          };
+
+          /* ── nav ────────────────────────────────────────────────── */
+          window.coAdvNav = function(sectionId, el) {
+            document.querySelectorAll('#co-adv-dash .adv-nav-item').forEach(function(n){ n.classList.remove('active'); });
+            if (el) el.classList.add('active');
+            var sec = document.getElementById(sectionId);
+            if (sec) sec.scrollIntoView({ behavior:'smooth', block:'start' });
+          };
+
+          window.coAdvViewLog = function() {
+            coSetDashMode('simple');
+            setTimeout(function() {
+              var log = document.getElementById('s5-terminal-box') || document.querySelector('.co-exec-log');
+              if (log) log.scrollIntoView({ behavior:'smooth', block:'start' });
+            }, 300);
+          };
+
+          /* ── refresh ────────────────────────────────────────────── */
+          window.coAdvRefresh = function() {
+            _advRenderBanner();
+            _advRenderMeta();
+            _advRenderKpi();
+            _advRenderSteps();
+            _advRenderPerf();
+            _advRenderTests();
+            _advRenderTraffic();
+            _advRenderMatrix();
+            _advRenderBlockers();
+            _advInitCharts();
+            var ts = document.getElementById('adv-refresh-ts');
+            if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString();
+          };
+
+          /* ── banner ─────────────────────────────────────────────── */
+          function _advRenderBanner() {
+            if (typeof _co === 'undefined') return;
+            var statusMap = {
+              'not-started':    { label:'NOT STARTED',     dot:'#94a3b8', bg:'linear-gradient(135deg,#dbeafe,#eff6ff)', border:'#bfdbfe', sub:'Cutover has not been initiated' },
+              'in-progress':    { label:'IN PROGRESS',     dot:'#f59e0b', bg:'linear-gradient(135deg,#fef9c3,#fffbeb)', border:'#fde047', sub:'Cutover is actively running' },
+              'ready-to-close': { label:'READY TO CLOSE',  dot:'#22c55e', bg:'linear-gradient(135deg,#dcfce7,#f0fdf4)', border:'#86efac', sub:'All steps completed — proceed to cut over' },
+              'fix-required':   { label:'FIX REQUIRED',    dot:'#f59e0b', bg:'linear-gradient(135deg,#fef9c3,#fffbeb)', border:'#fde047', sub:'Issues require attention before proceeding' },
+              'rollback':       { label:'ROLLBACK',         dot:'#ef4444', bg:'linear-gradient(135deg,#fee2e2,#fff1f2)', border:'#fca5a5', sub:'Rolling back to source environment' }
+            };
+            var st = (_co.currentStatus || 'not-started');
+            var info = statusMap[st] || statusMap['not-started'];
+            var banner = document.getElementById('adv-banner');
+            var dot    = document.getElementById('adv-status-dot');
+            var title  = document.getElementById('adv-status-title');
+            var sub    = document.getElementById('adv-status-sub');
+            if (banner) { banner.style.background = info.bg; banner.style.borderColor = info.border; }
+            if (dot)    dot.style.background = info.dot;
+            if (title)  title.textContent = info.label;
+            if (sub)    sub.textContent = info.sub;
+            var el = document.getElementById('adv-elapsed');
+            if (el) {
+              if (_co.startTime) {
+                var secs = Math.floor((Date.now() - _co.startTime) / 1000);
+                var h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
+                el.textContent = (h?h+'h ':'') + (m?String(m).padStart(2,'0')+'m ':m===0&&h?'00m ':'') + String(s).padStart(2,'0')+'s';
+              } else {
+                el.textContent = '—';
+              }
+            }
+          }
+
+          /* ── meta ───────────────────────────────────────────────── */
+          function _advRenderMeta() {
+            var el = document.getElementById('adv-meta-grid');
+            if (!el) return;
+            var pair = (typeof cutoverBlueGreenRows !== 'undefined' && cutoverBlueGreenRows.length)
+              ? cutoverBlueGreenRows[0] : null;
+            var srcIp  = pair ? (pair.source_server_ip || pair.source_public_ip || '—') : '—';
+            var tgtIp  = pair ? (pair.target_server_ip || pair.target_public_ip || '—') : '—';
+            var srcName = pair ? (pair.source_server_name || '—') : '—';
+            var tgtName = pair ? (pair.target_server_name || '—') : '—';
+            var items = [
+              { label:'Source IP',      val: srcIp },
+              { label:'Source Name',    val: srcName },
+              { label:'FLEX IP',        val: tgtIp },
+              { label:'FLEX Name',      val: tgtName },
+              { label:'Start Time',     val: (typeof _co!=='undefined' && _co.startTime) ? new Date(_co.startTime).toLocaleTimeString() : '—' },
+              { label:'DB in Scope',    val: (typeof _co!=='undefined' && _co.dbInScope) ? 'Yes' : 'No' },
+              { label:'FLEX Resp',      val: (typeof _coMon!=='undefined' && _coMon.resp.length) ? (_coMon.resp[_coMon.resp.length-1]||0)+'ms' : '—' },
+              { label:'SRC Resp',       val: (typeof _coMon!=='undefined' && _coMon.srcResp.length) ? (_coMon.srcResp[_coMon.srcResp.length-1]||0)+'ms' : '—' }
+            ];
+            el.innerHTML = items.map(function(it) {
+              return '<div class="adv-meta-item"><div class="adv-meta-label">'+it.label+'</div><div class="adv-meta-val">'+it.val+'</div></div>';
+            }).join('');
+          }
+
+          /* ── KPI ────────────────────────────────────────────────── */
+          function _advRenderKpi() {
+            var el = document.getElementById('adv-kpi-grid');
+            if (!el) return;
+            var steps = (typeof _co !== 'undefined') ? _co.steps : [];
+            var statuses = (typeof _co !== 'undefined') ? _co.stepStatus : {};
+            var labels = (typeof _co !== 'undefined') ? _co.stepLabels : {};
+            var done  = steps.filter(function(s){ return statuses[s]==='pass'||statuses[s]==='skip'||statuses[s]==='skipped'; }).length;
+            var fail  = steps.filter(function(s){ return statuses[s]==='fail'; }).length;
+            var pct   = steps.length ? Math.round(done/steps.length*100) : 0;
+            var tests = (typeof cutoverTesterResults !== 'undefined') ? cutoverTesterResults : [];
+            var tPass = tests.filter(function(r){ return (r.status||r[4]||'').toLowerCase()==='pass'; }).length;
+            var tFail = tests.filter(function(r){ return (r.status||r[4]||'').toLowerCase()==='fail'; }).length;
+            var flexResp = (typeof _coMon!=='undefined' && _coMon.resp.length) ? _coMon.resp[_coMon.resp.length-1] : null;
+            var srcResp  = (typeof _coMon!=='undefined' && _coMon.srcResp.length) ? _coMon.srcResp[_coMon.srcResp.length-1] : null;
+            var kpis = [
+              { label:'Progress', val: pct+'%', sub: done+'/'+steps.length+' steps done',
+                badge: fail ? { text:fail+' FAILED', cls:'adv-badge-fail' } : pct===100 ? { text:'COMPLETE', cls:'adv-badge-pass' } : { text:'RUNNING', cls:'adv-badge-run' },
+                bar: pct, barColor: fail ? '#ef4444' : '#22c55e' },
+              { label:'Steps Passed', val: done, sub: steps.length ? (steps.length-done)+' remaining' : '—',
+                badge: null, bar: null },
+              { label:'Tests Pass', val: tPass, sub: tFail+' failed',
+                badge: tFail ? { text:'ISSUES', cls:'adv-badge-warn' } : { text:'OK', cls:'adv-badge-pass' },
+                bar: tests.length ? Math.round(tPass/tests.length*100) : 0, barColor: '#22c55e' },
+              { label:'FLEX Resp', val: flexResp!==null ? flexResp+'ms' : '—', sub: 'latest reading',
+                badge: flexResp!==null ? (flexResp>500 ? { text:'SLOW', cls:'adv-badge-fail' } : { text:'OK', cls:'adv-badge-pass' }) : null,
+                bar: null },
+              { label:'SRC Resp', val: srcResp!==null ? srcResp+'ms' : '—', sub: 'source baseline',
+                badge: null, bar: null },
+              { label:'Blockers', val: fail, sub: 'step failures',
+                badge: fail ? { text:'ACTION NEEDED', cls:'adv-badge-fail' } : { text:'CLEAR', cls:'adv-badge-pass' },
+                bar: null }
+            ];
+            el.innerHTML = kpis.map(function(k) {
+              var barHtml = (k.bar!==null && k.bar!==undefined) ?
+                '<div class="adv-perf-bar-wrap"><div class="adv-perf-bar" style="width:'+k.bar+'%;background:'+(k.barColor||'#0ea5e9')+';"></div></div>' : '';
+              var badgeHtml = k.badge ? '<span class="adv-badge '+k.badge.cls+'">'+k.badge.text+'</span>' : '';
+              return '<div class="adv-kpi-card">'+
+                '<div class="adv-kpi-label">'+k.label+'</div>'+
+                '<div class="adv-kpi-val">'+k.val+'</div>'+
+                '<div class="adv-kpi-sub">'+k.sub+'</div>'+
+                badgeHtml + barHtml +
+              '</div>';
+            }).join('');
+          }
+
+          /* ── steps ──────────────────────────────────────────────── */
+          function _advRenderSteps() {
+            var el = document.getElementById('adv-steps-body');
+            if (!el) return;
+            if (typeof _co === 'undefined' || !_co.steps.length) {
+              el.innerHTML = '<div style="color:#64748b;font-size:12px;padding:8px 0;">No steps loaded.</div>';
+              return;
+            }
+            var statusStyle = {
+              'pass':    { bg:'#dcfce7', color:'#15803d', icon:'fa-check',        cls:'adv-badge-pass' },
+              'fail':    { bg:'#fee2e2', color:'#dc2626', icon:'fa-xmark',        cls:'adv-badge-fail' },
+              'running': { bg:'#dbeafe', color:'#1d4ed8', icon:'fa-spinner fa-spin', cls:'adv-badge-run' },
+              'skip':    { bg:'#f1f5f9', color:'#64748b', icon:'fa-forward',      cls:'adv-badge-skip' },
+              'skipped': { bg:'#f1f5f9', color:'#64748b', icon:'fa-forward',      cls:'adv-badge-skip' },
+              'pending': { bg:'#f1f5f9', color:'#94a3b8', icon:'fa-clock',        cls:'adv-badge-skip' }
+            };
+            el.innerHTML = _co.steps.map(function(id, i) {
+              var st   = _co.stepStatus[id] || 'pending';
+              var sty  = statusStyle[st] || statusStyle['pending'];
+              var lbl  = _co.stepLabels[id] || id;
+              return '<div class="adv-step-row">'+
+                '<div class="adv-step-icon" style="background:'+sty.bg+';color:'+sty.color+';">'+
+                  '<i class="fas '+sty.icon+'"></i></div>'+
+                '<div class="adv-step-label">'+lbl+'</div>'+
+                '<span class="adv-step-status adv-badge '+sty.cls+'">'+st.toUpperCase()+'</span>'+
+              '</div>';
+            }).join('');
+          }
+
+          /* ── performance ────────────────────────────────────────── */
+          function _advRenderPerf() {
+            var el = document.getElementById('adv-perf-grid');
+            if (!el) return;
+            if (typeof _coMon === 'undefined') { el.innerHTML = ''; return; }
+            function last(arr) { return arr && arr.length ? arr[arr.length-1] : null; }
+            function avg(arr) { if (!arr||!arr.length) return null; return Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length); }
+            var metrics = [
+              { label:'FLEX Response', val: last(_coMon.resp), unit:'ms', warn:300, crit:500, src: last(_coMon.srcResp), srcLabel:'SRC' },
+              { label:'FLEX CPU',      val: last(_coMon.cpu),  unit:'%',  warn:60,  crit:80,  src: last(_coMon.srcCpu),  srcLabel:'SRC CPU' },
+              { label:'FLEX Memory',   val: last(_coMon.mem),  unit:'%',  warn:70,  crit:85,  src: last(_coMon.srcMem),  srcLabel:'SRC Mem' },
+              { label:'DB Latency',    val: last(_coMon.db),   unit:'ms', warn:100, crit:200, src: null }
+            ];
+            el.innerHTML = metrics.map(function(m) {
+              var v   = m.val;
+              var clr = v===null ? '#64748b' : v>=m.crit ? '#ef4444' : v>=m.warn ? '#f59e0b' : '#22c55e';
+              var pct = v!==null ? Math.min(100,Math.round(v/m.crit*100)) : 0;
+              var srcHtml = (m.src!==null && m.src!==undefined) ?
+                '<div style="font-size:10px;color:#ef4444;margin-top:4px;">'+m.srcLabel+': '+m.src+' '+m.unit+'</div>' : '';
+              return '<div class="adv-card" style="padding:12px;">'+
+                '<div class="adv-kpi-label">'+m.label+'</div>'+
+                '<div style="font-size:24px;font-weight:900;color:'+clr+';">'+
+                  (v!==null ? v+' '+m.unit : '—')+
+                '</div>'+
+                srcHtml+
+                (v!==null ? '<div class="adv-perf-bar-wrap" style="margin-top:6px;"><div class="adv-perf-bar" style="width:'+pct+'%;background:'+clr+';"></div></div>' : '')+
+              '</div>';
+            }).join('');
+          }
+
+          /* ── test results ───────────────────────────────────────── */
+          function _advRenderTests() {
+            var el = document.getElementById('adv-tests-body');
+            if (!el) return;
+            var rows = (typeof cutoverTesterResults !== 'undefined') ? cutoverTesterResults : [];
+            if (!rows.length) {
+              el.innerHTML = '<div style="padding:16px;color:#64748b;font-size:12px;">No test results yet. Run UAT tests first.</div>';
+              return;
+            }
+            var headers = ['#','Test','URL/Target','Result','Status','Notes'];
+            var html = '<table class="adv-table"><thead><tr>'+
+              headers.map(function(h){ return '<th>'+h+'</th>'; }).join('')+
+              '</tr></thead><tbody>';
+            rows.forEach(function(r, i) {
+              var st = (r.status||r[4]||'').toLowerCase();
+              var bc = st==='pass' ? 'adv-badge-pass' : st==='fail' ? 'adv-badge-fail' : 'adv-badge-warn';
+              var cells = [
+                i+1,
+                r.test||r[1]||r.name||'',
+                r.url||r[2]||r.target||'',
+                r.result||r[3]||'',
+                '<span class="adv-badge '+bc+'">'+(r.status||r[4]||'').toUpperCase()+'</span>',
+                r.notes||r[5]||''
+              ];
+              html += '<tr>'+cells.map(function(c){ return '<td>'+c+'</td>'; }).join('')+'</tr>';
+            });
+            el.innerHTML = html + '</tbody></table>';
+          }
+
+          /* ── traffic split ──────────────────────────────────────── */
+          function _advRenderTraffic() {
+            var el = document.getElementById('adv-traffic-card');
+            if (!el) return;
+            var flexW  = 0;
+            var srcW   = 100;
+            var gwEl   = document.getElementById('cutover_green_weight');
+            if (gwEl) { flexW = parseInt(gwEl.value)||0; srcW = 100-flexW; }
+            var flexClr = '#22c55e';
+            var srcClr  = '#ef4444';
+            el.innerHTML =
+              '<div class="adv-card-title">HAProxy Traffic Distribution</div>'+
+              '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
+                '<div style="flex:1;">'+
+                  '<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;margin-bottom:4px;">'+
+                    '<span style="color:'+srcClr+';">SOURCE (Blue) '+srcW+'%</span>'+
+                    '<span style="color:'+flexClr+';">FLEX (Green) '+flexW+'%</span>'+
+                  '</div>'+
+                  '<div style="height:20px;background:#fee2e2;border-radius:6px;overflow:hidden;border:1px solid #fca5a5;">'+
+                    '<div style="height:100%;width:'+flexW+'%;background:'+flexClr+';float:right;border-radius:0 6px 6px 0;transition:width .5s;"></div>'+
+                  '</div>'+
+                '</div>'+
+              '</div>'+
+              '<div style="display:flex;gap:20px;flex-wrap:wrap;">'+
+                '<div style="font-size:12px;color:#475569;">'+
+                  '<i class="fas fa-circle" style="color:'+srcClr+';font-size:8px;"></i> Source: <strong>'+srcW+'%</strong>'+
+                '</div>'+
+                '<div style="font-size:12px;color:#475569;">'+
+                  '<i class="fas fa-circle" style="color:'+flexClr+';font-size:8px;"></i> FLEX: <strong>'+flexW+'%</strong>'+
+                '</div>'+
+                '<div style="font-size:12px;color:#475569;">Status: <strong>'+(flexW===100?'Full FLEX':flexW===0?'Source Only':'Gradual Split')+'</strong></div>'+
+              '</div>';
+          }
+
+          /* ── pair matrix ────────────────────────────────────────── */
+          function _advRenderMatrix() {
+            var el = document.getElementById('adv-matrix-body');
+            if (!el) return;
+            var rows = (typeof cutoverBlueGreenRows !== 'undefined') ? cutoverBlueGreenRows : [];
+            if (!rows.length) {
+              el.innerHTML = '<div style="padding:16px;color:#64748b;font-size:12px;">No pairs configured. Set up the pairing matrix first.</div>';
+              return;
+            }
+            var html = '<table class="adv-table"><thead><tr>'+
+              ['#','Source Name','Source IP','FLEX Name','FLEX IP'].map(function(h){ return '<th>'+h+'</th>'; }).join('')+
+              '</tr></thead><tbody>';
+            rows.forEach(function(r, i) {
+              html += '<tr>'+
+                '<td>'+(i+1)+'</td>'+
+                '<td>'+(r.source_server_name||'—')+'</td>'+
+                '<td>'+(r.source_server_ip||r.source_public_ip||'—')+'</td>'+
+                '<td>'+(r.target_server_name||'—')+'</td>'+
+                '<td>'+(r.target_server_ip||r.target_public_ip||'—')+'</td>'+
+              '</tr>';
+            });
+            el.innerHTML = html + '</tbody></table>';
+          }
+
+          /* ── blockers ───────────────────────────────────────────── */
+          function _advRenderBlockers() {
+            var el = document.getElementById('adv-blockers-body');
+            if (!el) return;
+            var blockers = [];
+            if (typeof _co !== 'undefined') {
+              _co.steps.forEach(function(id) {
+                var st = _co.stepStatus[id];
+                if (st === 'fail') {
+                  blockers.push({ sev:'FAIL', source:_co.stepLabels[id]||id, msg:'Step failed during execution' });
+                }
+              });
+            }
+            if (typeof cutoverTesterResults !== 'undefined') {
+              cutoverTesterResults.forEach(function(r) {
+                var st = (r.status||r[4]||'').toLowerCase();
+                if (st === 'fail') {
+                  blockers.push({ sev:'FAIL', source:'UAT: '+(r.test||r[1]||'test'), msg: r.result||r[3]||'Test failed' });
+                }
+              });
+            }
+            if (!blockers.length) {
+              el.innerHTML = '<div class="adv-card" style="background:#f0fdf4;border-color:#86efac;"><div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-circle-check" style="color:#22c55e;font-size:18px;"></i><span style="font-size:13px;font-weight:700;color:#15803d;">No blockers detected — all clear</span></div></div>';
+              return;
+            }
+            el.innerHTML = blockers.map(function(b) {
+              return '<div class="adv-card" style="background:#fff5f5;border-color:#fca5a5;margin-bottom:8px;">'+
+                '<div style="display:flex;align-items:center;gap:8px;">'+
+                  '<i class="fas fa-circle-exclamation" style="color:#ef4444;font-size:16px;flex-shrink:0;"></i>'+
+                  '<div>'+
+                    '<div style="font-size:12px;font-weight:700;color:#dc2626;">'+b.source+' — '+b.sev+'</div>'+
+                    '<div style="font-size:11px;color:#7f1d1d;margin-top:2px;">'+b.msg+'</div>'+
+                  '</div>'+
+                '</div>'+
+              '</div>';
+            }).join('');
+          }
+
+          /* ── chart.js trend charts ──────────────────────────────── */
+          function _advInitCharts() {
+            if (typeof Chart === 'undefined') return;
+            if (typeof _coMon === 'undefined') return;
+            var FLEX_CLR = 'rgb(34,197,94)';
+            var SRC_CLR  = 'rgb(239,68,68)';
+            function makeLabels(arr) { return arr.map(function(_,i){ return i+1; }); }
+            function destroyAndCreate(canvasId, labels, datasets) {
+              if (_advCharts[canvasId]) { try { _advCharts[canvasId].destroy(); } catch(e){} }
+              var ctx = document.getElementById(canvasId);
+              if (!ctx) return;
+              _advCharts[canvasId] = new Chart(ctx.getContext('2d'), {
+                type: 'line',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                  responsive:true, maintainAspectRatio:true, animation:false,
+                  plugins:{ legend:{ display:true, position:'bottom', labels:{ font:{ size:10 }, boxWidth:12, padding:8 } } },
+                  scales:{
+                    x:{ display:false },
+                    y:{ ticks:{ font:{ size:10 }, color:'#64748b' }, grid:{ color:'rgba(0,0,0,.06)' } }
+                  }
+                }
+              });
+            }
+            var hasSrc = _coMon.srcResp && _coMon.srcResp.length > 0;
+            destroyAndCreate('adv-chart-resp', makeLabels(_coMon.resp), [
+              { label:'FLEX', data: _coMon.resp, borderColor: FLEX_CLR, backgroundColor:'rgba(34,197,94,.08)', tension:.3, pointRadius:0, borderWidth:2 },
+              hasSrc ? { label:'SRC', data: _coMon.srcResp, borderColor: SRC_CLR, backgroundColor:'rgba(239,68,68,.08)', tension:.3, pointRadius:0, borderWidth:2, borderDash:[4,3] } : null
+            ].filter(Boolean));
+            destroyAndCreate('adv-chart-cpu', makeLabels(_coMon.cpu), [
+              { label:'FLEX', data: _coMon.cpu, borderColor: FLEX_CLR, backgroundColor:'rgba(34,197,94,.08)', tension:.3, pointRadius:0, borderWidth:2 },
+              _coMon.srcCpu && _coMon.srcCpu.length ? { label:'SRC', data: _coMon.srcCpu, borderColor: SRC_CLR, backgroundColor:'rgba(239,68,68,.08)', tension:.3, pointRadius:0, borderWidth:2, borderDash:[4,3] } : null
+            ].filter(Boolean));
+            destroyAndCreate('adv-chart-mem', makeLabels(_coMon.mem), [
+              { label:'FLEX', data: _coMon.mem, borderColor: FLEX_CLR, backgroundColor:'rgba(34,197,94,.08)', tension:.3, pointRadius:0, borderWidth:2 },
+              _coMon.srcMem && _coMon.srcMem.length ? { label:'SRC', data: _coMon.srcMem, borderColor: SRC_CLR, backgroundColor:'rgba(239,68,68,.08)', tension:.3, pointRadius:0, borderWidth:2, borderDash:[4,3] } : null
+            ].filter(Boolean));
+          }
+
+          /* ── restore tab mode on load ───────────────────────────── */
+          (function _initDashMode() {
+            var saved = localStorage.getItem('cutoverDashboardMode');
+            if (saved === 'advanced') {
+              coSetDashMode('advanced');
+            }
+          })();
+
+        })();
+        </script>
+
       </div>
 
 
