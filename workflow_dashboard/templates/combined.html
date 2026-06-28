@@ -2913,6 +2913,9 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
                 <!-- C: STATUS BANNER -->
                 <div id="uat-s1-hero" class="ud-banner ud-banner--red"></div>
 
+                <!-- C2: SCOPE SUMMARY CARD -->
+                <div id="uat-scope-card-container" style="margin-bottom:10px;"></div>
+
                 <!-- D: READINESS / KPI / FLOW -->
                 <div class="ud-card ud-card--blue" style="margin-bottom:12px;">
                   <div class="ud-kpi-row">
@@ -3086,6 +3089,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           if (dbDetEl) dbDetEl.style.display = dbDetected ? 'inline' : 'none';
           var scope = { appType:appType, dbType:hasDB?dbType:'none', hasHTTP:hasHTTP, hasAPI:hasAPI, hasDatabase:hasDB, hasNetwork:hasNetwork };
           try { localStorage.setItem('uat_workload_scope', JSON.stringify(scope)); } catch(e) {}
+          // Keep UAT.workloadScope in sync so uat.js reads the latest without a page reload
+          if (window.UAT) window.UAT.workloadScope = scope;
           if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
         };
 

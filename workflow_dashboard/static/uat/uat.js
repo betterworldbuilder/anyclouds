@@ -380,6 +380,7 @@
   function renderSummary() {
     var a = calculateUatReadinessAnalysis();
     var fd = window._uatFlavorData || null;
+    _ud_scopeCard();
     _ud_hero(a);
     _ud_gauge(a);
     _ud_kpi(a);
@@ -393,6 +394,60 @@
     _ud_dbStatus(a);
     _ud_cta(a);
     _ud_footer();
+  }
+
+  function _ud_scopeCard() {
+    var el = $('uat-scope-card-container');
+    if (!el) return;
+
+    var wl = {};
+    try { wl = JSON.parse(localStorage.getItem('uat_workload_scope') || 'null') || {}; } catch(e) {}
+
+    var appType   = wl.appType  || 'web';
+    var dbType    = wl.dbType   || 'none';
+    var hasHTTP   = wl.hasHTTP  !== false || appType === 'web' || appType === 'api' || appType === 'mixed';
+    var hasAPI    = wl.hasAPI   !== false || appType === 'api' || appType === 'mixed';
+    var hasDB     = wl.hasDatabase === true;
+    var hasNet    = wl.hasNetwork !== false;
+
+    var appTypeLabels = {
+      web:'Web Application', api:'API / Microservice', db:'Database-Only',
+      mixed:'Mixed (Web + API + DB)', batch:'Batch / Background Jobs', other:'Other'
+    };
+    var appLabel = appTypeLabels[appType] || appType;
+
+    function chip(active, label, color) {
+      var bg      = active ? color + '15' : '#f1f5f9';
+      var border  = active ? color : '#e2e8f0';
+      var txtClr  = active ? color : '#94a3b8';
+      var icon    = active ? '&#10003;' : '&#8212;';
+      return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;border:1px solid '+border+';background:'+bg+';color:'+txtClr+';font-size:11px;font-weight:600;">'
+           + '<span style="font-size:11px;">'+icon+'</span> '+label+'</span>';
+    }
+
+    var dbChip = hasDB
+      ? chip(true, 'DB (' + (dbType !== 'none' ? dbType : 'any') + ')', '#7c3aed')
+      : chip(false, 'DB', '#7c3aed');
+
+    var editBtn = '<button onclick="var el=document.getElementById(\'uat-s3-scope\');if(el){el.style.display=el.style.display===\'none\'?\'block\':\'none\';}" '
+      + 'style="margin-left:auto;font-size:11px;font-weight:600;padding:4px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;">'
+      + '<i class="fas fa-pen" style="font-size:10px;margin-right:4px;"></i>Edit Scope</button>';
+
+    var pairs = UAT.scope || [];
+    var serverCount = pairs.length;
+    var srvChip = '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;border:1px solid '+(serverCount?'#2563eb':'#e2e8f0')+';background:'+(serverCount?'#eff6ff':'#f8fafc')+';color:'+(serverCount?'#1d4ed8':'#94a3b8')+';font-size:11px;font-weight:600;">'
+      + (serverCount ? '&#10003; ' : '— ') + serverCount + ' Server Pair' + (serverCount !== 1 ? 's' : '') + '</span>';
+
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.04);">'
+      + '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-right:4px;">UAT SCOPE</span>'
+      + '<span style="font-size:12px;font-weight:600;color:#1e293b;padding:3px 10px;border-radius:20px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;">'+esc(appLabel)+'</span>'
+      + chip(hasHTTP, 'HTTP', '#0ea5e9')
+      + chip(hasAPI,  'API',  '#0891b2')
+      + dbChip
+      + chip(hasNet,  'Network', '#16a34a')
+      + srvChip
+      + editBtn
+      + '</div>';
   }
 
   function renderArtifacts() {
