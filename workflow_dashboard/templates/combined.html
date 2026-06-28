@@ -452,7 +452,7 @@
     .panel.active { display: block; }
     #panel-s0 { width: 100%; max-width: 100%; }
     #panel-s_why { width: 100%; max-width: 100%; }
-    #panel-s5 { width: 100% !important; max-width: 100% !important; }
+    #panel-s5, #panel-s5b { width: 100% !important; max-width: 100% !important; }
     /* Skyline theme: white instead of grey everywhere */
     body.flex-skyline-mode .panel-area { background: #ffffff !important; }
     body.flex-skyline-mode .s0-feature-card { background: #ffffff !important; box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important; }
@@ -8220,12 +8220,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   <!-- ADVANCED BUSINESS SYSTEM CUTOVER (panel-s5b)                     -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <div class="panel" id="panel-s5b">
-    <div class="info-panel">
-      <h2>Advanced Business System Cutover</h2>
-      <p style="color:var(--muted);margin-bottom:12px;">Import UAT-approved business services, execute traffic switch, verify production readiness. Select a business service — the system handles all components.</p>
-    </div>
-
-    <div class="section-card" style="padding:0;overflow:hidden;">
+    <div class="section-card" style="padding:0;overflow:hidden;margin-top:0;">
       <!-- ── TOP BAR ───────────────────────────────────────────────── -->
       <div style="background:#1e293b;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div style="display:flex;align-items:center;gap:12px;">
