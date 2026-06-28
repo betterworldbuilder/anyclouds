@@ -3640,6 +3640,173 @@ def dashboard_csv_files():
     return jsonify({"ok": True, "files": csv_files})
 
 
+@app.get("/api/uat/flavor-summary")
+def uat_flavor_summary():
+    """Return VM shape and source/target flavor summary from the latest real flavor map."""
+    override = (request.args.get("flavor_map") or "").strip()
+
+    def display_path(path: Path) -> str:
+        try:
+            return str(path.resolve().relative_to(BASE_DIR.resolve()))
+        except Exception:
+            return str(path)
+
+    def flavor_candidates() -> List[Path]:
+        if override:
+            resolved = resolve_input_path(override)
+            return [resolved] if resolved and resolved.is_file() else []
+        roots = [BASE_DIR, UPLOAD_DIR]
+        paths: List[Path] = []
+        for root in roots:
+            try:
+                paths.extend(p for p in root.glob("*.csv") if p.is_file())
+            except Exception:
+                continue
+        paths = [
+            p for p in paths
+            if "flavormap" in p.name.lower()
+            and "validation" not in p.name.lower()
+            and "unresolved" not in p.name.lower()
+            and "deploy_plan" not in p.name.lower()
+            and "deploy_results" not in p.name.lower()
+            and "credentials" not in p.name.lower()
+        ]
+        def rank(path: Path) -> Tuple[int, float, str]:
+            name = path.name.lower()
+            try:
+                rel_parent = path.resolve().parent
+                in_uploads = rel_parent == UPLOAD_DIR.resolve()
+            except Exception:
+                in_uploads = False
+            if in_uploads and name.startswith("tco_flavormap_"):
+                bucket = 0
+            elif in_uploads:
+                bucket = 1
+            elif name.startswith("flex2flex_") or "_flex2flex_" in name:
+                bucket = 3
+            else:
+                bucket = 2
+            return (bucket, -(path.stat().st_mtime if path.exists() else 0), name)
+
+        return sorted(paths, key=rank)
+
+    def first(row: Dict[str, Any], keys: List[str]) -> str:
+        return _csv_first(row, keys)
+
+    def counter_rows(counter: Dict[str, int], limit: int = 5) -> List[Dict[str, Any]]:
+        ranked = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0].lower()))
+        return [{"name": name, "count": count} for name, count in ranked[:limit]]
+
+    def add_count(counter: Dict[str, int], value: str) -> None:
+        text = str(value or "").strip()
+        if text:
+            counter[text] = counter.get(text, 0) + 1
+
+    selected: Optional[Path] = None
+    selected_rows: List[Dict[str, str]] = []
+    for candidate in flavor_candidates():
+        try:
+            rows = read_csv_rows(candidate)
+        except Exception:
+            continue
+        useful = []
+        for row in rows:
+            include = first(row, ["include_in_deploy"])
+            if include and not is_truthy_text(include):
+                continue
+            source_flavor = first(row, ["source_flavor_name", "source_flavor_id", "flavor_name", "flavor_id"])
+            target_flavor = first(row, ["target_flavor_name", "target_flavor_id", "flavor_name", "target_flavor"])
+            source_type = first(row, ["source_resource_type", "resource_type"])
+            has_vm_shape = any(first(row, [k]) for k in ["source_vcpus", "target_vcpus", "source_ram_mb", "target_ram_mb"])
+            if source_flavor or target_flavor or source_type == "cloud_server" or has_vm_shape:
+                useful.append(row)
+        if useful:
+            selected = candidate
+            selected_rows = useful
+            break
+
+    if not selected:
+        return jsonify({"ok": False, "error": "No usable flavor map CSV found"}), 404
+
+    src_vcpus: List[float] = []
+    tgt_vcpus: List[float] = []
+    src_ram_gb: List[float] = []
+    tgt_ram_gb: List[float] = []
+    src_disk_gb: List[float] = []
+    tgt_disk_gb: List[float] = []
+    source_flavor_counts: Dict[str, int] = {}
+    target_flavor_counts: Dict[str, int] = {}
+    pair_counts: Dict[str, int] = {}
+    target_monthly_total = 0.0
+
+    for row in selected_rows:
+        source_flavor = first(row, ["source_flavor_name", "source_flavor_id", "flavor_name", "flavor_id"])
+        target_flavor = first(row, ["target_flavor_name", "target_flavor_id", "target_flavor"])
+        if not target_flavor:
+            target_flavor = first(row, ["flavor_name", "flavor_id"])
+        add_count(source_flavor_counts, source_flavor)
+        add_count(target_flavor_counts, target_flavor)
+        if source_flavor and target_flavor:
+            add_count(pair_counts, f"{source_flavor} -> {target_flavor}")
+
+        sv = _to_float(first(row, ["source_vcpus", "source_vcpu", "vcpus"]), 0.0)
+        srm = _to_float(first(row, ["source_ram_mb", "source_memory_mb", "ram_mb"]), 0.0)
+        tv = _to_float(first(row, ["target_vcpus", "target_vcpu"]), 0.0)
+        trm = _to_float(first(row, ["target_ram_mb", "target_memory_mb"]), 0.0)
+        if (not sv or not srm) and source_flavor:
+            parsed_v, parsed_ram = _parse_flex_flavor_shape(source_flavor)
+            sv = sv or parsed_v
+            srm = srm or parsed_ram
+        if (not tv or not trm) and target_flavor:
+            parsed_v, parsed_ram = _parse_flex_flavor_shape(target_flavor)
+            tv = tv or parsed_v
+            trm = trm or parsed_ram
+
+        sd = _to_float(first(row, ["source_disk_gb", "source_root_disk_gb", "boot_volume_source_size_gb"]), 0.0)
+        td = _to_float(first(row, ["target_disk_gb", "target_root_disk_gb", "boot_volume_target_size_gb"]), 0.0)
+        target_monthly = _to_float(first(row, ["target_monthly_cost_min_usd", "target_monthly_cost_usd", "flex_monthly_cost_usd"]), 0.0)
+
+        if sv > 0:
+            src_vcpus.append(sv)
+        if tv > 0:
+            tgt_vcpus.append(tv)
+        if srm > 0:
+            src_ram_gb.append(srm / 1024)
+        if trm > 0:
+            tgt_ram_gb.append(trm / 1024)
+        if sd > 0:
+            src_disk_gb.append(sd)
+        if td > 0:
+            tgt_disk_gb.append(td)
+        if target_monthly > 0:
+            target_monthly_total += target_monthly
+
+    def avg(values: List[float]) -> int:
+        return int(round(sum(values) / len(values))) if values else 0
+
+    return jsonify({
+        "ok": True,
+        "file": display_path(selected),
+        "rows": len(selected_rows),
+        "vmData": {
+            "srcVcpu": avg(src_vcpus),
+            "tgtVcpu": avg(tgt_vcpus),
+            "srcRam": avg(src_ram_gb),
+            "tgtRam": avg(tgt_ram_gb),
+            "srcDisk": avg(src_disk_gb),
+            "tgtDisk": avg(tgt_disk_gb),
+            "rows": len(selected_rows),
+            "targetMonthly": round(target_monthly_total, 2),
+            "sourceFlavorCount": len(source_flavor_counts),
+            "targetFlavorCount": len(target_flavor_counts),
+            "sourceFlavors": counter_rows(source_flavor_counts),
+            "targetFlavors": counter_rows(target_flavor_counts),
+            "flavorPairs": counter_rows(pair_counts, 4),
+            "flavorMapFile": display_path(selected),
+        },
+    })
+
+
 @app.get("/api/dashboard/csv-content/<path:filename>")
 def dashboard_csv_content(filename: str):
     """Serve raw CSV text from the project root or uploads directory."""

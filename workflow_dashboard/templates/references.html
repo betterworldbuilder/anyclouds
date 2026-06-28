@@ -110,6 +110,36 @@
       text-decoration: none;
     }
     .btn-export:hover { opacity: .88; }
+
+    /* ── Light theme (Flex Skyline) ──────────────────────────────────────── */
+    body.light-theme {
+      background: #f5f7fb !important;
+      color: #151922 !important;
+    }
+    body.light-theme .card {
+      background: #ffffff !important;
+      border-color: #e2e6ec !important;
+      box-shadow: 0 1px 4px rgba(15,23,42,.06) !important;
+    }
+    body.light-theme h1, body.light-theme h2 { color: #1e293b !important; }
+    body.light-theme .meta { color: #64748b !important; }
+    body.light-theme .pill { border-color: #d1d5db !important; color: #596273 !important; }
+    body.light-theme .table-wrap {
+      background: #ffffff !important;
+      border-color: #e2e6ec !important;
+    }
+    body.light-theme table { background: #ffffff !important; }
+    body.light-theme th {
+      background: #f1f5f9 !important;
+      color: #374151 !important;
+      border-color: #e2e6ec !important;
+    }
+    body.light-theme th.sortable:hover { background: #e8edf5 !important; }
+    body.light-theme td {
+      color: #374151 !important;
+      border-color: #f1f5f9 !important;
+    }
+    body.light-theme li { color: #374151 !important; }
   </style>
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
 </head>
@@ -314,6 +344,26 @@
       if (!imgs || !imgs.length) { alert('No images loaded yet.'); return; }
       downloadCSV(`${sourceKey}_images.csv`, imgs.map(name => ({ image_name: name })), ['image_name']);
     });
+  </script>
+  <script>
+    function applyGlobalTheme(theme) {
+      if (theme === 'flex-skyline' || theme === 'light') {
+        document.body.classList.add('light-theme');
+      } else {
+        document.body.classList.remove('light-theme');
+      }
+    }
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'osflex-theme') applyGlobalTheme(e.data.theme);
+    });
+    (function() {
+      try {
+        var saved = (window.parent && window.parent !== window)
+          ? window.parent.localStorage.getItem('osflex_global_theme_v2')
+          : localStorage.getItem('osflex_global_theme_v2');
+        if (saved) applyGlobalTheme(saved);
+      } catch(_) {}
+    })();
   </script>
 </body>
 </html>

@@ -60,6 +60,7 @@
   async function loadUAT() {
     const data = await api('/api/uat/state');
     Object.assign(UAT, data);
+    _persistScopeToStorage();
     renderAll();
   }
 
@@ -727,9 +728,25 @@
   async function saveScope() {
     const data = await api('/api/uat/scope', {method: 'POST', body: JSON.stringify({rows: UAT.scope})});
     UAT.scope = data.rows;
+    _persistScopeToStorage();
     renderScope();
     await refreshReadiness();
     setMessage('UAT scope saved to outputs/uat/uat_scope.csv.');
+  }
+
+  function _persistScopeToStorage() {
+    try {
+      var rows = (UAT.scope || []).map(function(r) {
+        return {
+          name:       r.business_system_name || '',
+          type:       r.system_type || '',
+          source_ip:  r.source_host || '',
+          target_ip:  r.target_ip || r.ssh_host || r.target_host || '',
+        };
+      }).filter(function(r) { return r.source_ip || r.target_ip; });
+      localStorage.setItem('osflex_uat_scope', JSON.stringify(rows));
+      localStorage.setItem('osflex_uat_scope_ts', new Date().toISOString());
+    } catch(_) {}
   }
 
   window.uatSaveScope = async function () {
@@ -2653,6 +2670,11 @@
           savingsPct: srcMonthly > 0 ? (savings / srcMonthly * 100).toFixed(1) : '0.0',
         },
       };
+      try {
+        var ts = new Date().toISOString();
+        localStorage.setItem('osflex_uat_flavor_data', JSON.stringify(window._uatFlavorData));
+        localStorage.setItem('osflex_uat_flavor_ts', ts);
+      } catch(_) {}
       if (typeof window.uatRerenderReadiness === 'function') window.uatRerenderReadiness();
       return window._uatFlavorData;
     } catch (e) {
@@ -2742,7 +2764,7 @@
         _scopeTimer = setTimeout(function() {
           readScopeTable();
           api('/api/uat/scope', {method: 'POST', body: JSON.stringify({rows: UAT.scope})})
-            .then(function(data) { UAT.scope = data.rows; })
+            .then(function(data) { UAT.scope = data.rows; _persistScopeToStorage(); })
             .catch(function() {});
         }, 800);
       }
@@ -2754,7 +2776,7 @@
         _scopeTimer = setTimeout(function() {
           readScopeTable();
           api('/api/uat/scope', {method: 'POST', body: JSON.stringify({rows: UAT.scope})})
-            .then(function(data) { UAT.scope = data.rows; })
+            .then(function(data) { UAT.scope = data.rows; _persistScopeToStorage(); })
             .catch(function() {});
         }, 800);
       }

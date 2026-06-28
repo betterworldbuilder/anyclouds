@@ -18,24 +18,27 @@
     if (g && g.value) return g.value;
     var ls = localStorage.getItem('mig_jarvis_gender');
     if (ls === 'female' || ls === 'male') return ls;
-    return 'male';
+    return 'female';
   }
 
+  // Known British female voice names (Chrome, Edge, Windows, macOS, iOS)
+  var BRIT_FEMALE = ['Google UK English Female', 'Libby', 'Mia', 'Sonia', 'Hazel', 'Serena',
+    'Fiona', 'Susan', 'Amy', 'Emma', 'Kate', 'Martha', 'Stephanie'];
+  // Known British male voice names
+  var BRIT_MALE   = ['Google UK English Male', 'Daniel', 'George', 'Arthur', 'Ryan', 'Oliver'];
+
   function pickBritishVoice(voices, gender) {
-    var preferred;
-    if (gender === 'female') {
-      preferred = voices.find(function (v) {
-        return v.name.includes('Google UK English Female') || v.name.includes('Hazel') || v.name.includes('Serena') ||
-          v.name.includes('Fiona') || v.name.includes('Susan') || (v.lang === 'en-GB' && v.name.includes('Female'));
-      });
-    } else {
-      preferred = voices.find(function (v) {
-        return v.name.includes('Google UK English Male') || v.name.includes('Daniel') || v.name.includes('George') ||
-          v.name.includes('Arthur') || (v.lang === 'en-GB' && v.name.includes('Male'));
-      });
+    var names = gender === 'female' ? BRIT_FEMALE : BRIT_MALE;
+    // 1. Exact name match against known list
+    var preferred = null;
+    for (var i = 0; i < names.length && !preferred; i++) {
+      preferred = voices.find(function (v) { return v.name.includes(names[i]); });
     }
-    if (!preferred) preferred = voices.find(function (v) { return v.lang === 'en-GB'; }) || voices[0];
-    return preferred;
+    // 2. Any en-GB voice (gender-matched list exhausted)
+    if (!preferred) preferred = voices.find(function (v) { return v.lang === 'en-GB' || v.lang === 'en_GB'; });
+    // 3. Any English voice
+    if (!preferred) preferred = voices.find(function (v) { return v.lang && v.lang.startsWith('en'); });
+    return preferred || voices[0];
   }
 
   function speak(text) {

@@ -140,6 +140,32 @@ body{font-family:'Outfit',sans-serif;color:var(--text);
 .toast.show{opacity:1;}
 </style>
 <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
+<style>
+body.light-theme {
+  --bg:#f5f7fb; --surface:rgba(255,255,255,0.95); --surface2:#f1f5f9;
+  --border:rgba(0,0,0,0.08); --border2:rgba(0,0,0,0.05);
+  --text:#151922; --muted:#596273; --code:#1d4ed8;
+  --header-bg:rgba(255,255,255,0.98);
+  background: #f5f7fb !important; background-attachment: unset !important;
+  color: #151922 !important;
+}
+body.light-theme .page-header { background: #ffffff !important; border-color: #e2e6ec !important; box-shadow: 0 1px 4px rgba(0,0,0,.06) !important; }
+body.light-theme .page-header h1 { color: #1e293b !important; }
+body.light-theme .page-header p { color: #596273 !important; }
+body.light-theme .var-panel { background: #ffffff !important; border-color: #e2e6ec !important; }
+body.light-theme .var-toggle { background: #f8fafc !important; }
+body.light-theme .var-toggle span { color: #374151 !important; }
+body.light-theme .var-body { background: #ffffff !important; }
+body.light-theme .var-group label { color: #64748b !important; }
+body.light-theme .var-group input { background: #ffffff !important; border-color: #d1d5db !important; color: #151922 !important; }
+body.light-theme .runbook-section { background: #ffffff !important; border-color: #e2e6ec !important; }
+body.light-theme .tab-nav { background: #f1f5f9 !important; border-color: #e2e6ec !important; }
+body.light-theme .tab-btn { color: #374151 !important; }
+body.light-theme .tab-btn.active { background: #ffffff !important; color: #1e40af !important; border-color: #e2e6ec !important; }
+body.light-theme .step-block { background: #f8fafc !important; border-color: #e2e6ec !important; }
+body.light-theme .step-cmd { background: #f1f5f9 !important; border-color: #e2e6ec !important; color: #1e293b !important; }
+body.light-theme .log-box { background: #f1f5f9 !important; border-color: #e2e6ec !important; color: #374151 !important; }
+</style>
 </head>
 <body>
 <div class="container">
@@ -648,6 +674,11 @@ function showToast(msg) {
 // ── Init ──────────────────────────────────────────────────────────────────
 renderAllTabs();
 logAdd('INFO', 'Loaded runbook. Fill in your IPs above and click Apply Variables.');
+</script>
+<script>
+function applyGlobalTheme(t){document.body.classList.toggle('light-theme',t==='flex-skyline'||t==='light');}
+window.addEventListener('message',function(e){if(e.data&&e.data.type==='osflex-theme')applyGlobalTheme(e.data.theme);});
+(function(){try{var s=(window.parent&&window.parent!==window)?window.parent.localStorage.getItem('osflex_global_theme_v2'):localStorage.getItem('osflex_global_theme_v2');if(s)applyGlobalTheme(s);}catch(_){}})();
 </script>
 </body>
 </html>

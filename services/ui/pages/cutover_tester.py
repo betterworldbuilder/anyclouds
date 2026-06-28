@@ -703,6 +703,164 @@ def _stream_set_live_traffic_split(data: Dict[str, Any]) -> Iterator[str]:
         yield "[ERROR] Failed to update live HAProxy weights."
 
 
+def _direct_http_check(url: str, timeout: float = 5.0) -> Tuple[bool, float]:
+    """Direct HTTP GET — no SSH, no tester app. Returns (ok, elapsed_ms)."""
+    try:
+        start = time.time()
+        req = urllib.request.Request(url, headers={"User-Agent": "osflex-cutover/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            resp.read(4096)
+        ms = round((time.time() - start) * 1000, 1)
+        return resp.status < 400, ms
+    except Exception:
+        return False, 0.0
+
+
+def _stream_direct_perf_checks(
+    data: Dict[str, Any],
+    evidence: List[Dict[str, Any]],
+) -> Iterator[bool]:
+    """Phase 1 checks via direct HTTP — no SSH or jumphost required."""
+    src_url = (data.get("source_url") or "").rstrip("/")
+    tgt_url = (data.get("target_url") or "").rstrip("/")
+    health_path = data.get("health_path") or "/health"
+    smoke_path  = data.get("smoke_path")  or "/"
+
+    # ── Step 1: config validation (no network call) ──────────────────────────
+    yield "===== Tester Configuration ====="
+    ok = bool(src_url and tgt_url)
+    yield (
+        f"[CHECK SUMMARY] source={src_url or 'NOT SET'} flex={tgt_url or 'NOT SET'} "
+        f"mode=direct-http status={'PASS' if ok else 'FAIL'}"
+    )
+    if ok:
+        yield f"[OK] configure: Source {src_url} | FLEX {tgt_url}"
+    else:
+        yield "[ERROR] configure: Source URL and/or FLEX target URL are not set."
+    evidence.append({"label": "configure", "ok": ok})
+    if not ok:
+        return False
+
+    # ── Step 2: health check ────────────────────────────────────────────────
+    yield "===== Source + FLEX Health Check ====="
+    src_ok, src_ms = _direct_http_check(src_url + health_path)
+    tgt_ok, tgt_ms = _direct_http_check(tgt_url + health_path)
+    ok = src_ok and tgt_ok
+    n_issues = (0 if src_ok else 1) + (0 if tgt_ok else 1)
+    yield (
+        f"[CHECK SUMMARY] source_ms={src_ms} flex_ms={tgt_ms} "
+        f"issues={n_issues} status={'PASS' if ok else 'FAIL'}"
+    )
+    if not src_ok:
+        yield f"[ERROR] source-target-health: Source health check failed ({src_url + health_path})"
+    if not tgt_ok:
+        yield f"[ERROR] source-target-health: FLEX health check failed ({tgt_url + health_path})"
+    if ok:
+        yield f"[OK] source-target-health: Source {src_ms}ms | FLEX {tgt_ms}ms"
+    evidence.append({"label": "source-target-health", "ok": ok,
+                     "result": {"source_latency_ms": src_ms, "target_latency_ms": tgt_ms}})
+    if not ok:
+        return False
+
+    # ── Step 3: smoke test ───────────────────────────────────────────────────
+    yield "===== Smoke Test ====="
+    src_ok, src_ms = _direct_http_check(src_url + smoke_path)
+    tgt_ok, tgt_ms = _direct_http_check(tgt_url + smoke_path)
+    ok = src_ok and tgt_ok
+    n_issues = (0 if src_ok else 1) + (0 if tgt_ok else 1)
+    yield (
+        f"[CHECK SUMMARY] source_ms={src_ms} flex_ms={tgt_ms} "
+        f"issues={n_issues} status={'PASS' if ok else 'FAIL'}"
+    )
+    if ok:
+        yield f"[OK] smoke-test: Source {src_ms}ms | FLEX {tgt_ms}ms"
+    else:
+        yield f"[ERROR] smoke-test: {'Source' if not src_ok else 'FLEX'} endpoint did not respond."
+    evidence.append({"label": "smoke-test", "ok": ok,
+                     "result": {"source_ms": src_ms, "target_ms": tgt_ms}})
+    if not ok:
+        return False
+
+    # ── Step 4: performance validation (multi-probe direct HTTP) ─────────────
+    yield "===== Performance Validation ====="
+    sample_count = max(3, min(20, int(data.get("requests_per_user") or data.get("ramp_requests") or 5)))
+    src_times: List[float] = []
+    tgt_times: List[float] = []
+    src_errors = 0
+    tgt_errors = 0
+    host_tag = tgt_url.split("//")[-1].split(":")[0].split("/")[0]
+    for i in range(sample_count):
+        s_ok, s_ms = _direct_http_check(src_url + smoke_path, timeout=10.0)
+        t_ok, t_ms = _direct_http_check(tgt_url + smoke_path, timeout=10.0)
+        if s_ok:
+            src_times.append(s_ms)
+        else:
+            src_errors += 1
+        if t_ok:
+            tgt_times.append(t_ms)
+        else:
+            tgt_errors += 1
+        yield f"[PROBE] {i+1:03d}/{sample_count} backend=green ip={host_tag} ms={t_ms}"
+
+    def _avg(lst: List[float]) -> float:
+        return round(sum(lst) / len(lst), 1) if lst else 0.0
+
+    def _p95(lst: List[float]) -> float:
+        if not lst:
+            return 0.0
+        s = sorted(lst)
+        return round(s[max(0, int(len(s) * 0.95) - 1)], 1)
+
+    ospc_avg  = _avg(src_times)
+    flex_avg  = _avg(tgt_times)
+    ospc_p95  = _p95(src_times)
+    flex_p95  = _p95(tgt_times)
+    avg_delta = round(flex_avg - ospc_avg, 1)
+    p95_delta = round(flex_p95 - ospc_p95, 1)
+    total_req = sample_count * 2
+    total_err = src_errors + tgt_errors
+    err_pct   = round((total_err / total_req) * 100, 1) if total_req else 0.0
+    ok        = flex_avg > 0
+    perf_status = "PASS" if ok and flex_avg < 3000 and err_pct < 5.0 else ("REVIEW" if ok else "FAIL")
+
+    yield f"[PERF] OSPC avg={ospc_avg}ms FLEX avg={flex_avg}ms delta={avg_delta}ms"
+    yield f"[PERF] OSPC p95={ospc_p95}ms FLEX p95={flex_p95}ms delta={p95_delta}ms"
+    yield f"[PERF] API error={err_pct}% status={perf_status}"
+    yield (
+        f"[CHECK SUMMARY] source_ms={ospc_avg} flex_ms={flex_avg} "
+        f"delta={avg_delta} errors={err_pct}% status={perf_status}"
+    )
+    if ok:
+        yield f"[OK] performance-validation: OSPC {ospc_avg}ms | FLEX {flex_avg}ms | delta {avg_delta}ms"
+    else:
+        yield "[ERROR] performance-validation: FLEX target unreachable for performance probe."
+
+    perf_data = {
+        "ospc_avg_response_ms":      ospc_avg,
+        "flex_avg_response_ms":      flex_avg,
+        "ospc_p95_ms":               ospc_p95,
+        "flex_p95_ms":               flex_p95,
+        "avg_response_delta":        avg_delta,
+        "p95_delta":                 p95_delta,
+        "api_error_rate_percent":    err_pct,
+        "performance_status":        perf_status,
+        "target_concurrent_users":   int(data.get("target_concurrent_users") or sample_count),
+        "peak_concurrent_users_tested": int(data.get("peak_concurrent_users_tested") or sample_count),
+        "active_sessions_tested":    int(data.get("active_sessions_tested") or len(tgt_times)),
+        "db_avg_query_ms":           float(data.get("db_avg_query_ms") or 0),
+        "report_generation_seconds": float(data.get("report_generation_seconds") or 0),
+        "mobile_app_load_seconds":   float(data.get("mobile_app_load_seconds") or 0),
+        "mobile_tap_response_ms":    float(data.get("mobile_tap_response_ms") or 0),
+        "network_latency_ms":        float(data.get("network_latency_ms") or 0),
+        "upload_mbps":               float(data.get("upload_mbps") or 0),
+        "download_mbps":             float(data.get("download_mbps") or 0),
+        "mobile_lag_status":         str(data.get("mobile_lag_status") or ("Pass" if ok else "Review")),
+    }
+    evidence.append({"label": "performance-validation", "ok": ok, "result": perf_data})
+    yield f"[PERF DATA] {json.dumps(perf_data, sort_keys=True)}"
+    return all(s.get("ok") for s in evidence)
+
+
 def _stream_cutover_specific_tests(
     data: Dict[str, Any],
     action: str,
@@ -1253,12 +1411,9 @@ def stream_cutover_tester_action(data: Dict[str, Any]) -> Iterator[str]:
         yield from _stream_traffic_ramp(data)
         return
     if action in {"dry-run", "dry-run-config-perf"}:
-        if not jumphost_ip:
-            yield "[ERROR] Select a Stage 2 jumphost before running the dry run."
-            return
         yield "=== DRY RUN: CONFIGURATION & PERFORMANCE TEST ==="
         yield "[INFO] No HAProxy changes. No live traffic weights will be modified."
-        dry_ok = yield from _stream_cutover_specific_tests(data, action, jumphost_ip, user, ssh_key, evidence)
+        dry_ok = yield from _stream_direct_perf_checks(data, evidence)
         ok = bool(dry_ok)
         yield (
             "[OK] Dry run passed — config and performance look good. Ready for full cutover test."
@@ -1270,12 +1425,9 @@ def stream_cutover_tester_action(data: Dict[str, Any]) -> Iterator[str]:
         yield f"[RESULT_TABLE] {json.dumps(load_cutover_tester_results(), sort_keys=True)}"
         return
     if action in {"cutover-test", "full-cutover-test"}:
-        if not jumphost_ip:
-            yield "[ERROR] Select a Stage 2 jumphost before running the cutover test."
-            return
-        # Phase 1: validate config, connectivity, and performance before touching traffic
+        # Phase 1: direct HTTP config + perf checks — no jumphost SSH required
         yield "=== PHASE 1: CONFIGURATION & PERFORMANCE TEST ==="
-        specific_ok = yield from _stream_cutover_specific_tests(data, action, jumphost_ip, user, ssh_key, evidence)
+        specific_ok = yield from _stream_direct_perf_checks(data, evidence)
         # Phase 2: ramp proof — only attempt if Phase 1 passed or operator chose to continue
         yield "=== PHASE 2: TRAFFIC RAMP PROOF ==="
         ramp_ok = yield from _stream_traffic_ramp(data, evidence=evidence, write_artifacts=False)

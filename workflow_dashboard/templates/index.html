@@ -19,7 +19,7 @@
       --flex-red: #e4002b;
       --flex-red-glow: rgba(228,0,43,0.35);
       --flex-red-dim: rgba(228,0,43,0.12);
-      --card-bg: rgba(15,30,62,0.88);
+      --card-bg: rgba(15,30,62,0.55);
       --card-border: rgba(228,0,43,0.28);
       --card-border-neutral: rgba(142,162,204,0.3);
       --input-bg: rgba(255,255,255,0.08);
@@ -33,15 +33,15 @@
     html, body { margin:0; padding:0; min-height:100vh; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      background: linear-gradient(120deg, #2a4e8d 0%, #374a86 45%, #5a4b72 100%);
+      background: linear-gradient(120deg, #2a4e8d 0%, #374a86 45%, #5a4b72 100%) !important;
       color: var(--text);
     }
-    /* Subtle dot texture overlay */
+    /* Subtle highlight overlay — no darkening */
     body::before {
       content:'';
       position:fixed; inset:0; z-index:0; pointer-events:none;
-      background-image: radial-gradient(circle at 25% 20%, rgba(255,255,255,.06) 0%, transparent 50%),
-        radial-gradient(circle at 75% 80%, rgba(90,75,114,.4) 0%, transparent 50%);
+      background-image: radial-gradient(circle at 15% 10%, rgba(255,255,255,.07) 0%, transparent 45%),
+        radial-gradient(circle at 85% 90%, rgba(122,93,164,.22) 0%, transparent 45%);
     }
 
     /* ── Light theme overrides ───────────────────────────────────────────── */
@@ -108,14 +108,14 @@
     /* ── Header ─────────────────────────────────────────────────────────────── */
     .scanner-header {
       position: relative; z-index:10;
-      background: rgba(15,26,58,0.72);
+      background: rgba(15,26,58,0.48);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(228,0,43,0.28);
       box-shadow: 0 4px 32px rgba(0,0,0,0.2);
       padding: 0;
     }
     .scanner-header-inner {
-      max-width: 1180px; margin: 0 auto;
+      max-width: 1280px; margin: 0 auto;
       padding: 18px 24px 14px;
     }
     .scanner-header-top {
@@ -151,7 +151,7 @@
     .scanner-step-chip strong { color: var(--flex-red); }
     /* ── Main layout ─────────────────────────────────────────────────────────── */
     main {
-      max-width: 1180px; margin: 0 auto;
+      max-width: 1280px; margin: 0 auto;
       padding: 18px 20px 40px;
       display: flex; flex-direction: column; gap: 14px;
       position: relative; z-index: 1;
@@ -195,7 +195,7 @@
     /* ── Run Summary sticky card ─────────────────────────────────────────────── */
     #runSummaryCard {
       position: sticky; top: 8px; z-index: 50;
-      background: rgba(6,9,15,0.95);
+      background: rgba(10,18,42,0.82);
       border: 1px solid rgba(228,0,43,0.4);
       border-radius: 10px; padding: 12px 18px;
       backdrop-filter: blur(20px);

@@ -50,6 +50,28 @@
     }
   </style>
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
+  <style>
+  body.light-theme { background: #f5f7fb !important; color: #151922 !important; }
+  body.light-theme #mc-header { background: #1e293b !important; }
+  body.light-theme .ip2-panel { background: #ffffff !important; border-color: #e2e6ec !important; }
+  body.light-theme .ip2-toggle { background: #f8fafc !important; }
+  body.light-theme .ip2-toggle span { color: #374151 !important; }
+  body.light-theme .ip2-body { background: #ffffff !important; }
+  body.light-theme .ip2-grp label { color: #64748b !important; }
+  body.light-theme .ip2-grp input { background: #ffffff !important; border-color: #d1d5db !important; color: #151922 !important; }
+  body.light-theme .k2-wrap { border-color: #e2e6ec !important; }
+  body.light-theme .k2-tbl th { background: #f1f5f9 !important; color: #374151 !important; border-bottom-color: #e2e6ec !important; }
+  body.light-theme .k2-tbl td { border-bottom-color: #f1f5f9 !important; }
+  body.light-theme .k2-tbl tr.k2-data:hover td { background: #f8fafc !important; }
+  body.light-theme .k2-step { color: #1e293b !important; }
+  body.light-theme .k2-cmd-ta { background: #f8fafc !important; border-color: #e2e6ec !important; color: #1e293b !important; }
+  body.light-theme .k2-log-inner { background: #f1f5f9 !important; color: #1e293b !important; border-top-color: #e2e6ec !important; }
+  body.light-theme .k2-progress-lbl { color: #596273 !important; }
+  body.light-theme .phase-pill { border-color: rgba(0,0,0,.15) !important; }
+  body.light-theme .card { background: #ffffff !important; border-color: #e2e6ec !important; color: #151922 !important; }
+  body.light-theme .card h2 { color: #1e293b !important; }
+  body.light-theme .hint { color: #596273 !important; }
+  </style>
 </head>
 <body>
   <!-- ── CONTROL TOWER HEADER ─────────────────────────────────────────── -->
@@ -1862,5 +1884,10 @@
   </main>
 
   <script src="/static/app.js?v=8"></script>
+  <script>
+  function applyGlobalTheme(t){document.body.classList.toggle('light-theme',t==='flex-skyline'||t==='light');}
+  window.addEventListener('message',function(e){if(e.data&&e.data.type==='osflex-theme')applyGlobalTheme(e.data.theme);});
+  (function(){try{var s=(window.parent&&window.parent!==window)?window.parent.localStorage.getItem('osflex_global_theme_v2'):localStorage.getItem('osflex_global_theme_v2');if(s)applyGlobalTheme(s);}catch(_){}})();
+  </script>
 </body>
 </html>

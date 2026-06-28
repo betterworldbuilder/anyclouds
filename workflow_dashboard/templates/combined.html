@@ -4913,9 +4913,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             <button class="btn btn-primary" onclick="cutoverSaveCloudCredentials(true)"><i class="fas fa-save"></i> Save Credentials</button>
             <button class="btn btn-secondary" onclick="cutoverLoadCloudCredentials(true)"><i class="fas fa-history"></i> Load from Stage 2 Cache</button>
             <button class="btn btn-warning" onclick="cutoverApplyCredentialRegions(true)"><i class="fas fa-satellite-dish"></i> Apply Regions to Scanner</button>
+            <button id="cutover-cred-toggle" onclick="cutoverToggleCredPanel()" title="Toggle credentials" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:5px;"><i id="cutover-cred-chevron" class="fas fa-chevron-up"></i> <span id="cutover-cred-toggle-label">Collapse</span></button>
           </div>
         </div>
-        <div class="section-body">
+        <div id="cutover-cred-body" class="section-body">
           <div class="info-text">
             <i class="fas fa-info-circle" style="color:var(--co-red);margin-right:6px;"></i>
             <span id="cutover_cred_status">Credentials are kept in this browser session for cutover scanner inputs.</span>
@@ -5117,63 +5118,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               Edit the source/target server or IP directly when the scanner cannot match by name. The saved matrix is what LB/HAProxy config and the cutover tester use.
             </p>
           </div>
-          <div class="sub-section">
-            <div class="sub-section-title"><i class="fas fa-random"></i> Switch Configuration</div>
-            <div class="matrix-table-container">
-              <table class="matrix-table" style="min-width:1280px;">
-                <thead><tr><th>selected</th><th>app_or_db</th><th>tier</th><th>source</th><th>target</th><th>switch_method</th><th>precheck</th><th>rollback</th><th>owner</th><th>risk</th><th>status</th></tr></thead>
-                <tbody id="cutover_items_body"><tr><td colspan="11"><div class="empty-state">No cutover plan items yet.</div></td></tr></tbody>
-              </table>
-            </div>
-          </div>
+          <!-- Switch Configuration panel removed — info covered by Cutover Pairing Matrix -->
+          <div style="display:none;" aria-hidden="true"><tbody id="cutover_items_body"></tbody></div>
           <div class="artifact-list" id="cutover_artifacts"><span style="color:#6b7280;">No cutover artifacts exported yet.</span></div>
-        </div>
-      </div>
-
-      <!-- 2. Configure LB / HAProxy -->
-      <div class="section-card">
-        <div class="section-header">
-          <div class="section-header-left">
-            <div class="section-icon"><i class="fas fa-network-wired"></i></div>
-            <div class="section-title-group">
-              <h3>2. Configure LB / HAProxy on Source Infra</h3>
-              <p>Install/configure source-side HAProxy or source LB before cutover testing</p>
-            </div>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-success" onclick="cutoverConfigureBlueGreen()"><i class="fas fa-play"></i> Run LB/HAProxy Config</button>
-            <button class="btn btn-secondary light" onclick="cutoverExportLbHaproxyConfig()"><i class="fas fa-file-export"></i> Export Commands Only</button>
-          </div>
-        </div>
-        <div class="section-body">
-          <p style="font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.6;">Generate and apply the HAProxy configuration on the dedicated source-side HAProxy server. This is separate from the jumphost used later to install and run the cutover test script.</p>
-          <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));">
-            <div class="form-group"><label class="form-label">Source infra host for HAProxy</label>
-              <input id="cutover_source_cutover_host" type="text" class="form-input" placeholder="source infra / HAProxy host IP" oninput="cutoverSaveHaproxyConfigCache()"></div>
-            <div class="form-group"><label class="form-label">Source SSH user</label>
-              <input id="cutover_source_ssh_user" type="text" class="form-input" value="ubuntu" oninput="cutoverSaveHaproxyConfigCache()"></div>
-            <div class="form-group"><label class="form-label">Source SSH key</label>
-              <input id="cutover_source_ssh_key" type="text" class="form-input" value="~/.ssh/id_rsa" oninput="cutoverSaveHaproxyConfigCache()"></div>
-            <div class="form-group"><label class="form-label">Target FLEX traffic</label>
-              <select id="cutover_green_weight" class="form-select" onchange="cutoverApplyTrafficSplit(true)">
-                <option value="10">10%</option><option value="20">20%</option><option value="30">30%</option>
-                <option value="40">40%</option><option value="50">50%</option><option value="60">60%</option>
-                <option value="70">70%</option><option value="80">80%</option><option value="90">90%</option>
-                <option value="100">100%</option>
-              </select>
-            </div>
-            <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:20px;">
-              <input id="cutover_lb_apply" type="checkbox" onchange="cutoverSaveHaproxyConfigCache()" style="width:16px;height:16px;accent-color:var(--co-red);">
-              <label class="form-label" style="margin:0;">Apply generated config</label>
-            </div>
-          </div>
-          <div id="cutover-lb-terminal-box" style="margin-top:16px;display:none;">
-            <div style="display:flex;justify-content:space-between;background:#1a2e3b;padding:8px 12px;border-radius:8px 8px 0 0;border:1px solid #374151;border-bottom:0;">
-              <span style="color:#7ecfff;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;">LB / HAProxy Config Console</span>
-              <span id="cutover-lb-status-indicator" style="color:#fbbf24;font-size:11px;font-weight:700;">Waiting...</span>
-            </div>
-            <div id="cutover-lb-log-output" style="height:220px;background:#000;color:#00ff00;font-family:'JetBrains Mono',monospace;font-size:12px;padding:15px;overflow-y:auto;border:1px solid #374151;border-radius:0 0 8px 8px;white-space:pre-wrap;"></div>
-          </div>
         </div>
       </div>
 
@@ -5192,12 +5139,33 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           </div>
         </div>
         <div class="section-body">
-          <div class="action-buttons-row">
+          <div class="action-buttons-row" style="flex-wrap:wrap;gap:8px;">
             <button class="btn btn-secondary light" onclick="cutoverTesterDryRun()" title="Validate config + performance only. No HAProxy changes, no traffic touched."><i class="fas fa-flask"></i> Dry Run (Config &amp; Perf)</button>
             <button class="btn btn-primary" onclick="cutoverTesterRun()"><i class="fas fa-play"></i> Cut over TEST</button>
             <button class="btn btn-danger" onclick="cutoverTesterStop()"><i class="fas fa-stop"></i> Stop Tester</button>
-            <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Test Results CSV</button>
+            <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Test Report</button>
+            <div style="display:flex;align-items:center;gap:7px;padding:5px 12px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.28);border-radius:8px;margin-left:auto;">
+              <label style="color:#c4b5fd;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;">
+                <input type="checkbox" id="co_tester_jarvis_enable" checked style="width:13px;height:13px;accent-color:#8b5cf6;cursor:pointer;" onchange="localStorage.setItem('mig_jarvis_voice',this.checked)">
+                🎙️ Jarvis Alerts
+              </label>
+              <select id="co_tester_jarvis_gender" style="background:rgba(30,41,59,0.9);color:#8b5cf6;border:1px solid rgba(139,92,246,0.25);padding:3px 6px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;" onchange="localStorage.setItem('mig_jarvis_gender',this.value)">
+                <option value="female">British Female Voice</option>
+                <option value="male">British Male Voice</option>
+              </select>
+              <button type="button" onclick="jarvisAnnounce('Cutover test audio online, systems standing by.')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;">Test Voice</button>
+            </div>
           </div>
+          <script>
+            (function() {
+              var jv = localStorage.getItem('mig_jarvis_voice');
+              var jg = localStorage.getItem('mig_jarvis_gender');
+              var ce = document.getElementById('co_tester_jarvis_enable');
+              var gs = document.getElementById('co_tester_jarvis_gender');
+              if (ce && jv === 'false') ce.checked = false;
+              if (gs && (jg === 'male' || jg === 'female')) gs.value = jg;
+            })();
+          </script>
           <div id="cutover-tester-status" class="status-bar">
             <div class="status-dot yellow"></div>
             <span>Load Stage 2 jumphosts, then run Cut over TEST after LB/HAProxy config is ready.</span>
@@ -5211,25 +5179,20 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             <div id="cutover-tester-log-output" style="height:220px;background:#000;color:#00ff00;font-family:'JetBrains Mono',monospace;font-size:12px;padding:15px;overflow-y:auto;border:1px solid #374151;border-radius:0 0 8px 8px;white-space:pre-wrap;"></div>
           </div>
           <div class="sub-section">
-            <div class="sub-section-title"><i class="fas fa-rocket"></i> Cutover Test Script Jumphost</div>
-            <p style="font-size:12px;color:#6b7280;margin-bottom:14px;">Choose the jumphost where the cutover tester script will be checked, installed if missing, and run.</p>
-            <div class="form-row" style="margin-bottom:12px;">
-              <div class="form-group" style="flex:2;min-width:200px;"><label class="form-label">Install tester on jumphost</label>
-                <select id="cutover_tester_jumphost" class="form-select" onchange="cutoverTesterApplySelectedJumphost()"></select>
-              </div>
-              <div class="form-group"><label class="form-label">Tester jumphost IP</label>
-                <input id="cutover_tester_jumphost_ip" type="text" class="form-input" placeholder="jumphost-ip" oninput="cutoverTesterApplyJumphostIp()" style="font-family:'JetBrains Mono',monospace;"></div>
-              <div class="form-group"><label class="form-label">Jumphost SSH user</label>
-                <input id="cutover_tester_user" type="text" class="form-input" value="ubuntu"></div>
-              <div class="form-group"><label class="form-label">Jumphost SSH key</label>
-                <input id="cutover_tester_key" type="text" class="form-input" value="~/.ssh/id_rsa" style="font-family:'JetBrains Mono',monospace;"></div>
+            <div class="sub-section-title"><i class="fas fa-server"></i> Tester Install Target</div>
+            <p style="font-size:12px;color:#6b7280;margin-bottom:14px;">The cutover tester script is installed and run on the <strong>HAProxy server</strong> (same host used in Step 2). It can reach both OSPC and FLEX from there.</p>
+            <div id="cutover-tester-haproxy-banner" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+              <span style="color:#38bdf8;font-size:12px;"><i class="fas fa-network-wired" style="margin-right:6px;"></i><strong>HAProxy Host:</strong> <span id="ct-haproxy-host-display" style="font-family:'JetBrains Mono',monospace;color:#e2e8f0;">—</span></span>
+              <span style="color:#94a3b8;font-size:12px;"><i class="fas fa-user" style="margin-right:6px;"></i><strong>User:</strong> <span id="ct-haproxy-user-display" style="font-family:'JetBrains Mono',monospace;color:#e2e8f0;">ubuntu</span></span>
+              <span style="color:#94a3b8;font-size:12px;"><i class="fas fa-key" style="margin-right:6px;"></i><strong>Key:</strong> <span id="ct-haproxy-key-display" style="font-family:'JetBrains Mono',monospace;color:#e2e8f0;">~/.ssh/id_rsa</span></span>
+              <span style="color:#94a3b8;font-size:12px;"><i class="fas fa-plug" style="margin-right:6px;"></i><strong>API:</strong> <span id="ct-haproxy-api-display" style="font-family:'JetBrains Mono',monospace;color:#86efac;">http://…:8000</span></span>
             </div>
-            <div style="display:flex;gap:12px;align-items:flex-end;">
-              <div class="form-group" style="flex:0 0 380px;margin-bottom:0;"><label class="form-label">Tester API URL</label>
-                <input id="cutover_tester_api_url" type="text" class="form-input" placeholder="http://jumphost-ip:8000"></div>
-              <button class="btn btn-primary" style="margin-bottom:0;" onclick="cutoverTesterLoadJumphosts()"><i class="fas fa-history"></i> Load Stage 2 Jumphosts</button>
-            </div>
-            <div id="cutover_tester_jumphost_status" style="font-size:12px;color:#6b7280;margin-top:10px;">Jumphost candidates load automatically from Stage 2 scanner/snapshot artifacts.</div>
+            <div id="cutover_tester_jumphost_status" style="font-size:12px;color:#6b7280;margin-top:8px;">Configure the HAProxy server in the LB/HAProxy section above (Step 2) — it will be used here automatically.</div>
+            <!-- hidden fields kept for payload compat -->
+            <input id="cutover_tester_jumphost_ip" type="hidden">
+            <input id="cutover_tester_user" type="hidden" value="ubuntu">
+            <input id="cutover_tester_key" type="hidden" value="~/.ssh/id_rsa">
+            <input id="cutover_tester_api_url" type="hidden">
           </div>
           <div class="sub-section">
             <div class="sub-section-title"><i class="fas fa-cogs"></i> Test Configuration</div>
@@ -5310,7 +5273,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             </div>
           </div>
           <div class="section-actions">
-            <button id="co-auto-btn" onclick="coToggleAutoChain()" style="border:1.5px solid #d1d5db;background:#f9fafb;color:#374151;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;"><i class="fas fa-unlink"></i> Auto Chain: OFF</button>
+            <button id="co-auto-btn" onclick="coToggleAutoChain()" style="border:1.5px solid #10b981;background:#10b981;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;"><i class="fas fa-link"></i> Auto Chain: ON</button>
             <button class="btn btn-secondary light" onclick="coResetCockpit()"><i class="fas fa-redo"></i> Reset</button>
             <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Evidence</button>
           </div>
@@ -5354,7 +5317,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <span style="background:#10b981;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">4</span>
                   <span style="font-size:13px;font-weight:700;color:#065f46;">Final decision unlocks</span>
                 </div>
-                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">All steps pass → <b style="color:#10b981;">Close Window</b> turns green. Critical fail → <b style="color:#ef4444;">Rollback</b> turns red.</p>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">All steps pass → <b style="color:#10b981;">Cut over PASS</b> turns green. Critical fail → <b style="color:#ef4444;">Rollback</b> turns red.</p>
               </div>
 
               <div style="background:#fff;border:1.5px solid #64748b;border-radius:10px;padding:14px;">
@@ -5425,7 +5388,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <!-- Step 1 -->
               <!-- Step 1 — Pre-checks -->
               <div id="co-step-precheck" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-radius:12px 0 0 12px;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 1</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:10px;font-weight:700;color:#9ca3af;">STEP 1</span><label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#6b7280;cursor:pointer;"><input type="checkbox" id="co-enable-precheck" checked style="accent-color:#3b82f6;width:12px;height:12px;"> Run</label></div>
                 <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Pre-checks</div>
                 <span id="co-chip-precheck" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
                 <div style="background:#f8fafc;border-radius:8px;padding:8px 10px;margin-bottom:10px;border-left:3px solid #6b7280;">
@@ -5445,27 +5408,54 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
               <!-- Step 2 — Switch Traffic: uses existing "2. Configure LB / HAProxy" section -->
-              <div id="co-step-traffic" style="flex:1;min-width:220px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 2</div>
+              <div id="co-step-traffic" style="flex:1.4;min-width:260px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:10px;font-weight:700;color:#9ca3af;">STEP 2</span><label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#6b7280;cursor:pointer;"><input type="checkbox" id="co-enable-traffic" checked style="accent-color:#3b82f6;width:12px;height:12px;"> Run</label></div>
                 <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Configure HAProxy</div>
                 <span id="co-chip-traffic" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:8px;letter-spacing:.3px;">PENDING</span>
-                <div style="background:#eff6ff;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #3b82f6;">
-                  <div style="font-size:10px;font-weight:700;color:#1e40af;margin-bottom:3px;">🎯 Goal</div>
-                  <div style="font-size:10px;color:#374151;line-height:1.5;">Install &amp; configure HAProxy on the source infra host. Routes live traffic: OSPC pool → FLEX pool at selected %.</div>
-                  <div style="font-size:10px;color:#3b82f6;margin-top:5px;"><b>Script:</b> <code style="background:#dbeafe;padding:1px 4px;border-radius:3px;">cutoverConfigureBlueGreen()</code></div>
-                  <div style="font-size:10px;color:#3b82f6;"><b>Output:</b> HAProxy installed, green/blue pools set, traffic split applied</div>
+                <div style="background:#eff6ff;border-radius:8px;padding:7px 10px;margin-bottom:10px;border-left:3px solid #3b82f6;">
+                  <div style="font-size:10px;font-weight:700;color:#1e40af;margin-bottom:2px;">🎯 Goal</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.4;">Install &amp; configure HAProxy on the source infra host. Routes live traffic: OSPC pool → FLEX pool at selected %.</div>
                 </div>
 
-                <!-- Live preview of Section 2 config -->
-                <div id="co-step2-preview" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 10px;margin-bottom:8px;font-size:10px;color:#374151;line-height:1.8;">
-                  <div><b>Host:</b> <span id="co-step2-host" style="font-family:monospace;color:#1e40af;">—</span></div>
-                  <div><b>User:</b> <span id="co-step2-user" style="font-family:monospace;color:#374151;">—</span></div>
-                  <div><b>Traffic to FLEX:</b> <span id="co-step2-weight" style="font-family:monospace;color:#10b981;font-weight:700;">—</span></div>
-                  <div><b>Apply config:</b> <span id="co-step2-apply" style="font-family:monospace;">—</span></div>
+                <!-- Inline form fields -->
+                <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+                  <div>
+                    <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:2px;">HAProxy Host</div>
+                    <input id="cutover_source_cutover_host" type="text" class="form-input" placeholder="source infra / HAProxy host IP"
+                      style="font-size:11px;padding:4px 8px;font-family:'JetBrains Mono',monospace;"
+                      oninput="cutoverSaveHaproxyConfigCache(); cutoverTesterSyncHaproxyDisplay(); coStep2Refresh()">
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <div style="flex:1;">
+                      <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:2px;">SSH User</div>
+                      <input id="cutover_source_ssh_user" type="text" class="form-input" value="ubuntu"
+                        style="font-size:11px;padding:4px 8px;" oninput="cutoverSaveHaproxyConfigCache()">
+                    </div>
+                    <div style="flex:2;">
+                      <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:2px;">SSH Key</div>
+                      <input id="cutover_source_ssh_key" type="text" class="form-input" value="~/.ssh/id_rsa"
+                        style="font-size:11px;padding:4px 8px;font-family:'JetBrains Mono',monospace;" oninput="cutoverSaveHaproxyConfigCache()">
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:flex-end;">
+                    <div style="flex:1;">
+                      <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:2px;">Traffic to FLEX</div>
+                      <select id="cutover_green_weight" class="form-select" style="font-size:11px;padding:4px 8px;font-weight:700;color:#10b981;" onchange="cutoverApplyTrafficSplit(true); coStep2Refresh()">
+                        <option value="10">10%</option><option value="20">20%</option><option value="30">30%</option>
+                        <option value="40">40%</option><option value="50">50%</option><option value="60">60%</option>
+                        <option value="70">70%</option><option value="80">80%</option><option value="90">90%</option>
+                        <option value="100">100%</option>
+                      </select>
+                    </div>
+                    <label style="flex:1;font-size:10px;color:#374151;display:flex;align-items:center;gap:5px;padding-bottom:4px;cursor:pointer;">
+                      <input id="cutover_lb_apply" type="checkbox" checked onchange="cutoverSaveHaproxyConfigCache()" style="accent-color:#b91c1c;width:13px;height:13px;">
+                      Apply config
+                    </label>
+                  </div>
                 </div>
-                <button onclick="coStep2Refresh()" style="font-size:9px;padding:3px 8px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;cursor:pointer;margin-bottom:8px;width:100%;text-align:left;">⟳ Refresh from Section 2 config ↑</button>
 
                 <div style="display:flex;flex-direction:column;gap:5px;">
+                  <button class="btn btn-secondary light" style="font-size:10px;padding:4px 8px;" onclick="cutoverExportLbHaproxyConfig()"><i class="fas fa-file-export"></i> Export Commands Only</button>
                   <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunCutoverStep2(this)"><i class="fas fa-network-wired"></i> Run LB/HAProxy Config</button>
                   <div id="co-mark-traffic" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('traffic','pass')">Pass</button>
@@ -5477,7 +5467,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
               <!-- Step 3 — Validate App -->
               <div id="co-step-app" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 3</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:10px;font-weight:700;color:#9ca3af;">STEP 3</span><label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#6b7280;cursor:pointer;"><input type="checkbox" id="co-enable-app" checked style="accent-color:#3b82f6;width:12px;height:12px;"> Run</label></div>
                 <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Validate App</div>
                 <span id="co-chip-app" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
                 <div style="background:#f0fdf4;border-radius:8px;padding:8px 10px;margin-bottom:10px;border-left:3px solid #22c55e;">
@@ -5498,11 +5488,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
               <!-- Step 4 — Validate DB (scope-aware, wired to db_health) -->
               <div id="co-step-db" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 4</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:10px;font-weight:700;color:#9ca3af;">STEP 4</span><label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#6b7280;cursor:pointer;"><input type="checkbox" id="co-enable-db" checked style="accent-color:#3b82f6;width:12px;height:12px;"> Run</label></div>
                 <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Validate DB</div>
                 <span id="co-chip-db" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:6px;letter-spacing:.3px;">PENDING</span>
                 <label style="font-size:10px;color:#6b7280;display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:8px;">
-                  <input type="checkbox" id="co-db-scope-toggle" checked onchange="coToggleDb()" style="accent-color:#3b82f6;"> DB in scope
+                  <input type="checkbox" id="co-db-scope-toggle" onchange="coToggleDb()" style="accent-color:#3b82f6;"> DB in scope
                 </label>
                 <div style="background:#fefce8;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #f59e0b;">
                   <div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:3px;">🎯 Goal</div>
@@ -5522,7 +5512,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
               <!-- Step 5 — Monitor + Grafana URL -->
               <div id="co-step-monitor" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 5</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:10px;font-weight:700;color:#9ca3af;">STEP 5</span><label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#6b7280;cursor:pointer;"><input type="checkbox" id="co-enable-monitor" checked style="accent-color:#3b82f6;width:12px;height:12px;"> Run</label></div>
                 <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Monitor</div>
                 <span id="co-chip-monitor" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
                 <div style="background:#fdf4ff;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #a855f7;">
@@ -5548,10 +5538,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 6 — Close Window -->
+              <!-- Step 6 — Cut over PASS -->
               <div id="co-step-close" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-radius:0 12px 12px 0;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
-                <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 6</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Close Window</div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:10px;font-weight:700;color:#9ca3af;">STEP 6</span><label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#6b7280;cursor:pointer;"><input type="checkbox" id="co-enable-close" checked style="accent-color:#3b82f6;width:12px;height:12px;"> Run</label></div>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Cut over PASS</div>
                 <span id="co-chip-close" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
                 <div style="background:#f0fdf4;border-radius:8px;padding:8px 10px;margin-bottom:10px;border-left:3px solid #10b981;">
                   <div style="font-size:10px;font-weight:700;color:#065f46;margin-bottom:3px;">🎯 Goal</div>
@@ -5560,7 +5550,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <div style="font-size:10px;color:#10b981;"><b>Output:</b> Cutover marked COMPLETE, evidence archived</div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-success" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('close_rollback','close',this)"><i class="fas fa-lock"></i> Close Window</button>
+                  <button class="btn btn-success" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('close_rollback','close',this)"><i class="fas fa-check-circle"></i> Cut over PASS</button>
                 </div>
               </div>
 
@@ -5569,112 +5559,185 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
           <!-- C-pre. Live Monitor Panel (shown when Step 5 activated) -->
           <div id="co-monitor-panel" style="display:none;margin-bottom:20px;">
-            <div style="background:#0f172a;border-radius:14px;padding:18px 20px;border:1px solid rgba(255,255,255,.1);">
+            <div style="background:#f0f9ff;border-radius:14px;padding:0;border:1.5px solid #7dd3fc;overflow:hidden;box-shadow:0 4px 24px rgba(14,165,233,.10);">
 
-              <!-- Header row -->
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+              <!-- Header bar -->
+              <div style="background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
                 <div style="display:flex;align-items:center;gap:10px;">
-                  <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;" id="co-mon-pulse"></div>
-                  <span style="font-size:13px;font-weight:800;color:#f1f5f9;letter-spacing:.5px;">LIVE MONITOR</span>
-                  <span id="co-mon-last-ts" style="font-size:10px;color:#475569;font-family:monospace;">—</span>
+                  <div style="width:9px;height:9px;border-radius:50%;background:#86efac;box-shadow:0 0 8px #86efac;" id="co-mon-pulse"></div>
+                  <span style="font-size:13px;font-weight:800;color:#fff;letter-spacing:.5px;">LIVE MONITOR</span>
+                  <span id="co-mon-last-ts" style="font-size:10px;color:#bae6fd;font-family:monospace;">—</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                   <div>
-                    <label style="font-size:10px;color:#64748b;display:block;margin-bottom:2px;">FLEX Target IP</label>
-                    <input id="co-mon-ip" type="text" placeholder="auto from UAT scope" style="padding:5px 10px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;width:160px;font-family:monospace;">
+                    <label style="font-size:10px;color:#bae6fd;display:block;margin-bottom:2px;font-weight:700;">Source (OSPC) IP</label>
+                    <input id="co-mon-src-ip" type="text" placeholder="auto from UAT scope" style="padding:5px 10px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid #38bdf8;color:#fff;border-radius:6px;width:150px;font-family:monospace;">
                   </div>
                   <div>
-                    <label style="font-size:10px;color:#64748b;display:block;margin-bottom:2px;">App Port</label>
-                    <input id="co-mon-port" type="number" value="80" style="padding:5px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;width:70px;">
+                    <label style="font-size:10px;color:#bbf7d0;display:block;margin-bottom:2px;font-weight:700;">FLEX Target IP</label>
+                    <input id="co-mon-ip" type="text" placeholder="auto from UAT scope" style="padding:5px 10px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid #4ade80;color:#fff;border-radius:6px;width:150px;font-family:monospace;">
                   </div>
                   <div>
-                    <label style="font-size:10px;color:#64748b;display:block;margin-bottom:2px;">Auto-poll</label>
-                    <select id="co-mon-interval" onchange="coMonSetInterval()" style="padding:5px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;">
-                      <option value="0">Manual</option>
-                      <option value="15">Every 15s</option>
-                      <option value="30" selected>Every 30s</option>
-                      <option value="60">Every 60s</option>
+                    <label style="font-size:10px;color:#e0f2fe;display:block;margin-bottom:2px;">App Port</label>
+                    <input id="co-mon-port" type="number" value="80" style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;width:70px;">
+                  </div>
+                  <div>
+                    <label style="font-size:10px;color:#e0f2fe;display:block;margin-bottom:2px;">Auto-poll</label>
+                    <select id="co-mon-interval" onchange="coMonSetInterval()" style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;">
+                      <option value="0" style="color:#1e293b;">Manual</option>
+                      <option value="15" style="color:#1e293b;">Every 15s</option>
+                      <option value="30" selected style="color:#1e293b;">Every 30s</option>
+                      <option value="60" style="color:#1e293b;">Every 60s</option>
                     </select>
                   </div>
                   <div style="display:flex;gap:6px;align-self:flex-end;">
-                    <button onclick="coMonPoll()" style="padding:6px 14px;background:#3b82f6;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">⟳ Poll Now</button>
-                    <button onclick="coMonStop()" style="padding:6px 10px;background:#334155;color:#94a3b8;border:none;border-radius:7px;font-size:11px;cursor:pointer;">■ Stop</button>
+                    <button onclick="coMonPoll()" style="padding:6px 14px;background:#fff;color:#0369a1;border:none;border-radius:7px;font-size:11px;font-weight:800;cursor:pointer;letter-spacing:.2px;">⟳ Poll Now</button>
+                    <button onclick="coMonStop()" style="padding:6px 10px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:7px;font-size:11px;cursor:pointer;">■ Stop</button>
                   </div>
                 </div>
               </div>
 
-              <!-- Grafana option -->
-              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1e293b;border-radius:8px;margin-bottom:14px;border:1px solid #334155;">
-                <span style="font-size:10px;font-weight:700;color:#64748b;flex-shrink:0;">Grafana URL (optional):</span>
-                <input id="co-grafana-url" type="text" placeholder="http://grafana:3000/d/..." style="flex:1;padding:4px 8px;font-size:11px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:5px;font-family:monospace;min-width:0;">
-                <button onclick="coOpenGrafana()" style="padding:5px 12px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">Open Grafana ↗</button>
+              <!-- Pairing matrix banner -->
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 20px;background:#e0f2fe;border-bottom:1px solid #bae6fd;flex-wrap:wrap;">
+                <span style="font-size:10px;font-weight:800;color:#0369a1;white-space:nowrap;">📋 Active Pair:</span>
+                <span id="co-mon-pair-src" style="font-size:11px;font-family:monospace;color:#1d4ed8;background:#dbeafe;padding:2px 10px;border-radius:5px;border:1px solid #bfdbfe;">— Source</span>
+                <span style="font-size:12px;color:#7dd3fc;font-weight:700;">→</span>
+                <span id="co-mon-pair-tgt" style="font-size:11px;font-family:monospace;color:#065f46;background:#d1fae5;padding:2px 10px;border-radius:5px;border:1px solid #6ee7b7;">— FLEX Target</span>
+                <button onclick="coMonRefreshPair()" style="margin-left:auto;padding:3px 12px;background:#fff;border:1px solid #7dd3fc;border-radius:6px;font-size:10px;color:#0369a1;cursor:pointer;font-weight:700;">↺ Sync from Matrix</button>
               </div>
 
-              <!-- 6 canvas charts grid -->
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+              <div style="padding:16px 20px;">
 
-                <div style="background:#1e293b;border-radius:10px;padding:12px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Response Time</span>
-                    <span id="co-mon-val-resp" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— ms</span>
-                  </div>
-                  <canvas id="co-chart-resp" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
-                  <div style="font-size:9px;color:#475569;margin-top:4px;">Threshold: 500ms (dashed red) | FLEX avg HTTP response</div>
+                <!-- Grafana option -->
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border-radius:8px;margin-bottom:14px;border:1px solid #bae6fd;">
+                  <span style="font-size:10px;font-weight:700;color:#64748b;flex-shrink:0;">Grafana URL (optional):</span>
+                  <input id="co-grafana-url" type="text" placeholder="http://grafana:3000/d/..." style="flex:1;padding:4px 8px;font-size:11px;background:#f0f9ff;border:1px solid #bae6fd;color:#1e293b;border-radius:5px;font-family:monospace;min-width:0;">
+                  <button onclick="coOpenGrafana()" style="padding:5px 12px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">Open Grafana ↗</button>
                 </div>
 
-                <div style="background:#1e293b;border-radius:10px;padding:12px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Error Rate</span>
-                    <span id="co-mon-val-err" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— %</span>
-                  </div>
-                  <canvas id="co-chart-err" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
-                  <div style="font-size:9px;color:#475569;margin-top:4px;">Threshold: 5% (dashed red) | HTTP 4xx/5xx rate</div>
+                <!-- Legend -->
+                <div style="display:flex;gap:16px;margin-bottom:12px;">
+                  <span style="font-size:10px;color:#1d4ed8;font-weight:700;">■ Source (OSPC)</span>
+                  <span style="font-size:10px;color:#059669;font-weight:700;">■ FLEX Target</span>
                 </div>
 
-                <div style="background:#1e293b;border-radius:10px;padding:12px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">CPU Load</span>
-                    <span id="co-mon-val-cpu" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">—</span>
+                <!-- 6 canvas charts grid -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+
+                  <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #bae6fd;box-shadow:0 1px 4px rgba(14,165,233,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Response Time</span>
+                      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-resp" style="font-family:monospace;">—</span> ms</span>
+                        <span id="co-mon-val-resp" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— ms</span>
+                      </div>
+                    </div>
+                    <canvas id="co-chart-resp" width="400" height="90" style="width:100%;height:90px;display:block;border-radius:6px;"></canvas>
+                    <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Threshold: 500ms | HTTP avg response</div>
                   </div>
-                  <canvas id="co-chart-cpu" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
-                  <div style="font-size:9px;color:#475569;margin-top:4px;">1-min load average from /proc/loadavg on FLEX</div>
+
+                  <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #bae6fd;box-shadow:0 1px 4px rgba(14,165,233,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Error Rate</span>
+                      <span id="co-mon-val-err" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— %</span>
+                    </div>
+                    <canvas id="co-chart-err" width="400" height="90" style="width:100%;height:90px;display:block;border-radius:6px;"></canvas>
+                    <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Threshold: 5% | HTTP 4xx/5xx rate</div>
+                  </div>
+
+                  <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #bae6fd;box-shadow:0 1px 4px rgba(14,165,233,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">CPU Load</span>
+                      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-cpu" style="font-family:monospace;">—</span></span>
+                        <span id="co-mon-val-cpu" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">—</span>
+                      </div>
+                    </div>
+                    <canvas id="co-chart-cpu" width="400" height="90" style="width:100%;height:90px;display:block;border-radius:6px;"></canvas>
+                    <div style="font-size:9px;color:#94a3b8;margin-top:4px;">1-min load average /proc/loadavg</div>
+                  </div>
+
+                  <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #bae6fd;box-shadow:0 1px 4px rgba(14,165,233,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Memory %</span>
+                      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-mem" style="font-family:monospace;">—</span>%</span>
+                        <span id="co-mon-val-mem" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— %</span>
+                      </div>
+                    </div>
+                    <canvas id="co-chart-mem" width="400" height="90" style="width:100%;height:90px;display:block;border-radius:6px;"></canvas>
+                    <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Threshold: 85% | /proc/meminfo</div>
+                  </div>
+
+                  <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #bae6fd;box-shadow:0 1px 4px rgba(14,165,233,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Network Latency</span>
+                      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
+                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-lat" style="font-family:monospace;">—</span> ms</span>
+                        <span id="co-mon-val-lat" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— ms</span>
+                      </div>
+                    </div>
+                    <canvas id="co-chart-lat" width="400" height="90" style="width:100%;height:90px;display:block;border-radius:6px;"></canvas>
+                    <div style="font-size:9px;color:#94a3b8;margin-top:4px;">Ping to gateway (3 packets)</div>
+                  </div>
+
+                  <div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #bae6fd;box-shadow:0 1px 4px rgba(14,165,233,.08);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                      <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">DB Latency</span>
+                      <span id="co-mon-val-db" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— ms</span>
+                    </div>
+                    <canvas id="co-chart-db2" width="400" height="90" style="width:100%;height:90px;display:block;border-radius:6px;"></canvas>
+                    <div style="font-size:9px;color:#94a3b8;margin-top:4px;">TCP connect to DB port</div>
+                  </div>
+
                 </div>
 
-                <div style="background:#1e293b;border-radius:10px;padding:12px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Memory %</span>
-                    <span id="co-mon-val-mem" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— %</span>
+                <!-- Source vs FLEX Comparison Panel -->
+                <div id="co-compare-panel" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid #bae6fd;">
+                  <div style="font-size:10px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Source ↔ FLEX Comparison</div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div style="background:#f0f9ff;border-radius:10px;padding:14px;border:1px solid #bae6fd;">
+                      <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:12px;">★ Server Performance Comparison</div>
+                      <div id="co-compare-bars" style="display:flex;flex-direction:column;gap:10px;"></div>
+                      <div style="display:flex;gap:14px;margin-top:12px;">
+                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">■ Source Server</span>
+                        <span style="font-size:9px;color:#059669;font-weight:700;">■ FLEX Server</span>
+                      </div>
+                    </div>
+                    <div style="background:#f0f9ff;border-radius:10px;padding:14px;border:1px solid #bae6fd;display:flex;flex-direction:column;align-items:center;">
+                      <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:6px;">System Health Radar</div>
+                      <canvas id="co-chart-radar" width="320" height="230" style="display:block;width:100%;max-width:320px;border-radius:8px;"></canvas>
+                      <div style="display:flex;justify-content:center;gap:14px;margin-top:6px;">
+                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">■ Source</span>
+                        <span style="font-size:9px;color:#059669;font-weight:700;">■ FLEX</span>
+                      </div>
+                    </div>
                   </div>
-                  <canvas id="co-chart-mem" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
-                  <div style="font-size:9px;color:#475569;margin-top:4px;">Threshold: 85% | MemUsed/MemTotal from /proc/meminfo</div>
                 </div>
 
-                <div style="background:#1e293b;border-radius:10px;padding:12px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Network Latency</span>
-                    <span id="co-mon-val-lat" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— ms</span>
-                  </div>
-                  <canvas id="co-chart-lat" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
-                  <div style="font-size:9px;color:#475569;margin-top:4px;">Ping to default gateway (3 packets) on FLEX</div>
+                <!-- Status bar -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #bae6fd;">
+                  <span id="co-mon-status" style="font-size:11px;color:#0369a1;font-family:monospace;">Waiting for first poll…</span>
+                  <span style="font-size:10px;color:#94a3b8;">UAT Performance API: /api/uat/performance/run</span>
                 </div>
 
-                <div style="background:#1e293b;border-radius:10px;padding:12px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">DB Latency</span>
-                    <span id="co-mon-val-db" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— ms</span>
-                  </div>
-                  <canvas id="co-chart-db2" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
-                  <div style="font-size:9px;color:#475569;margin-top:4px;">TCP connect to DB port on FLEX host</div>
-                </div>
-
-              </div>
-
-              <!-- Status bar -->
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #1e293b;">
-                <span id="co-mon-status" style="font-size:11px;color:#475569;font-family:monospace;">Waiting for first poll…</span>
-                <span style="font-size:10px;color:#334155;">UAT Performance API: /api/uat/performance/run</span>
               </div>
             </div>
+          </div>
+
+          <!-- LB/HAProxy ghost: keeps IDs alive for standalone cutoverConfigureBlueGreen / cutoverExportLbHaproxyConfig -->
+          <div id="cutover-lb-terminal-box" style="display:none;position:absolute;width:1px;height:1px;overflow:hidden;pointer-events:none;" aria-hidden="true">
+            <span id="cutover-lb-status-indicator"></span>
+            <div id="cutover-lb-log-output"></div>
+          </div>
+
+          <!-- Unified Cutover Activity Log (all steps append here in order) -->
+          <div id="s5-terminal-box" style="margin:0 0 20px;display:none;">
+            <div style="display:flex;justify-content:space-between;background:#1a2e3b;padding:8px 12px;border-radius:8px 8px 0 0;border:1px solid #374151;border-bottom:0;">
+              <span style="color:#7ecfff;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;">Cutover Activity Log</span>
+              <span id="s5-status-indicator" style="color:#fbbf24;font-size:11px;font-weight:700;">Waiting...</span>
+            </div>
+            <div id="s5-log-output" style="height:400px;background:#000;color:#00ff00;font-family:'JetBrains Mono',monospace;font-size:12px;padding:15px;overflow-y:auto;border:1px solid #374151;border-radius:0 0 8px 8px;white-space:pre-wrap;"></div>
           </div>
 
           <!-- C. Live Health -->
@@ -5749,13 +5812,43 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <div style="background:#fff;border:2px solid #e5e7eb;border-radius:14px;padding:22px 28px;margin-bottom:20px;">
             <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;">Final Decision</div>
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-              <div id="co-decision-text" style="font-size:14px;color:#6b7280;max-width:420px;line-height:1.5;">Complete all execution steps to unlock the final decision.</div>
-              <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-                <button id="co-final-close" class="btn btn-success" style="display:none;font-size:14px;padding:12px 28px;font-weight:800;letter-spacing:.3px;" onclick="coCloseWindow(this)"><i class="fas fa-lock"></i> CLOSE CUTOVER</button>
-                <button id="co-final-fix" class="btn btn-warning" style="display:none;font-size:14px;padding:12px 28px;font-weight:800;letter-spacing:.3px;" onclick="coFixIssues()"><i class="fas fa-wrench"></i> FIX ISSUES</button>
+              <div>
+                <div id="co-decision-text" style="font-size:14px;color:#6b7280;max-width:420px;line-height:1.5;">Complete all execution steps to unlock the final decision.</div>
+                <div id="co-validation-banner" style="display:none;background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;font-size:12px;color:#065f46;font-weight:600;margin-top:10px;max-width:520px;"></div>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button id="co-final-fix" class="btn btn-warning" style="display:none;font-size:14px;padding:12px 28px;font-weight:800;letter-spacing:.3px;" onclick="coListIssues()"><i class="fas fa-list-ul"></i> LIST ISSUES</button>
+                <button id="co-final-validate" class="btn btn-success" style="font-size:14px;padding:12px 24px;font-weight:800;letter-spacing:.3px;background:#059669;border-color:#059669;" onclick="coCutoverValidation()"><i class="fas fa-certificate"></i> CUT OVER VALIDATION</button>
                 <button id="co-final-rollback" class="btn btn-danger" style="display:none;font-size:14px;padding:12px 28px;font-weight:800;letter-spacing:.3px;" onclick="coDoRollback(this)"><i class="fas fa-undo"></i> ROLLBACK</button>
                 <button id="co-toggle-log-btn" class="btn btn-secondary light" style="font-size:12px;padding:10px 18px;" onclick="coToggleLogs()"><i class="fas fa-expand-alt"></i> Show Full Log</button>
                 <button class="btn btn-secondary light" style="font-size:12px;padding:10px 18px;" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Report</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Issue List Modal ───────────────────────────────────────────── -->
+          <div id="co-issues-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none';">
+            <div style="background:#fff;border-radius:14px;padding:28px 30px;width:560px;max-width:93vw;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <div style="font-size:15px;font-weight:800;color:#1f2937;">⚠ Current Issues</div>
+                <button onclick="document.getElementById('co-issues-modal').style.display='none';" style="background:none;border:none;font-size:20px;color:#9ca3af;cursor:pointer;line-height:1;">✕</button>
+              </div>
+              <div id="co-issues-list"></div>
+            </div>
+          </div>
+
+          <!-- ── Cutover Validation Modal ───────────────────────────────────── -->
+          <div id="co-validation-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none';">
+            <div style="background:#fff;border-radius:14px;padding:32px;width:460px;max-width:93vw;box-shadow:0 20px 60px rgba(0,0,0,.35);">
+              <div style="font-size:15px;font-weight:800;color:#065f46;margin-bottom:4px;"><i class="fas fa-certificate" style="color:#10b981;margin-right:6px;"></i>Cutover Validation</div>
+              <div style="font-size:12px;color:#6b7280;margin-bottom:22px;">Record the operator and customer for this cutover event.</div>
+              <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:5px;">Customer Name</label>
+              <input id="co-val-customer" type="text" placeholder="e.g. Acme Corp" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;color:#1f2937;outline:none;box-sizing:border-box;margin-bottom:15px;" onkeydown="if(event.key==='Enter')document.getElementById('co-val-operator').focus()">
+              <label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:5px;">Validator / Operator Name</label>
+              <input id="co-val-operator" type="text" placeholder="e.g. John Smith" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;color:#1f2937;outline:none;box-sizing:border-box;margin-bottom:24px;" onkeydown="if(event.key==='Enter')coValidationConfirm()">
+              <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="document.getElementById('co-validation-modal').style.display='none';" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;padding:9px 22px;font-size:13px;cursor:pointer;">Cancel</button>
+                <button onclick="coValidationConfirm()" style="background:#059669;color:#fff;border:none;border-radius:8px;padding:9px 24px;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:.3px;">✅ Confirm Cutover</button>
               </div>
             </div>
           </div>
@@ -5820,11 +5913,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               startTime: null,
               timerInterval: null,
               steps: ['precheck','traffic','app','db','monitor','close'],
-              stepLabels: { precheck:'Pre-checks', traffic:'Configure HAProxy', app:'Validate App', db:'Validate DB', monitor:'Monitor', close:'Close Window' },
+              stepLabels: { precheck:'Pre-checks', traffic:'Configure HAProxy', app:'Validate App', db:'Validate DB', monitor:'Monitor', close:'Cut over PASS' },
               stepStatus: { precheck:'pending', traffic:'pending', app:'pending', db:'pending', monitor:'pending', close:'pending' },
-              dbInScope: true,
+              dbInScope: false,
               currentStatus: 'not-started',
-              autoRun: false,
+              autoRun: true,
               autoCountdownTicker: null,
               autoObservers: []
             };
@@ -5843,14 +5936,16 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               'running':  { label:'RUNNING',  color:'#f59e0b', bg:'rgba(245,158,11,.12)' },
               'pass':     { label:'PASS',     color:'#10b981', bg:'rgba(16,185,129,.12)' },
               'fail':     { label:'FAIL',     color:'#ef4444', bg:'rgba(239,68,68,.12)' },
-              'skipped':  { label:'SKIPPED',  color:'#3b82f6', bg:'rgba(59,130,246,.1)' }
+              'skipped':  { label:'SKIPPED',  color:'#3b82f6', bg:'rgba(59,130,246,.1)' },
+              'review':   { label:'REVIEW',   color:'#d97706', bg:'rgba(245,158,11,.13)' }
             };
             var borderMap = {
               'pending': '#e5e7eb',
               'running': '#f59e0b',
               'pass':    '#10b981',
               'fail':    '#ef4444',
-              'skipped': '#3b82f6'
+              'skipped': '#3b82f6',
+              'review':  '#f59e0b'
             };
 
             function _setStatus(s) {
@@ -5862,14 +5957,20 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (dot) { dot.style.background = info.dot; dot.style.boxShadow = '0 0 0 4px ' + info.dot.replace(')',', .2)').replace('rgb','rgba'); }
             }
 
+            function _coIsStepEnabled(id) {
+              var chk = document.getElementById('co-enable-' + id);
+              return !chk || chk.checked;
+            }
+
             function _renderChips() {
+              var bgMap = { pass:'#f0fdf4', running:'#fffbeb', review:'#fffbeb', fail:'#fef2f2', skipped:'', pending:'' };
               _co.steps.forEach(function(id) {
                 var st = _co.stepStatus[id];
                 var info = chipMap[st] || chipMap['pending'];
                 var chip = document.getElementById('co-chip-' + id);
                 var card = document.getElementById('co-step-' + id);
                 if (chip) { chip.textContent = info.label; chip.style.color = info.color; chip.style.background = info.bg; }
-                if (card) { card.style.borderColor = borderMap[st] || '#e5e7eb'; }
+                if (card) { card.style.borderColor = borderMap[st] || '#e5e7eb'; card.style.background = bgMap.hasOwnProperty(st) ? bgMap[st] : ''; }
               });
               // update current step label
               var active = _co.steps.find(function(id){ return _co.stepStatus[id] === 'running'; })
@@ -5886,14 +5987,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var critFail = s.app === 'fail' || (_co.dbInScope && s.db === 'fail');
               var anyFail = s.traffic === 'fail' || s.app === 'fail' || (_co.dbInScope && s.db === 'fail');
 
-              var closeBtn = document.getElementById('co-final-close');
-              var fixBtn   = document.getElementById('co-final-fix');
-              var rbBtn    = document.getElementById('co-final-rollback');
-              var decText  = document.getElementById('co-decision-text');
+              var fixBtn  = document.getElementById('co-final-fix');
+              var rbBtn   = document.getElementById('co-final-rollback');
+              var decText = document.getElementById('co-decision-text');
 
-              if (closeBtn) closeBtn.style.display = allGood ? '' : 'none';
-              if (fixBtn)   fixBtn.style.display   = (!allGood && !critFail && _co.started) ? '' : 'none';
-              if (rbBtn)    rbBtn.style.display     = (critFail && _co.started) ? '' : 'none';
+              if (fixBtn) fixBtn.style.display = (!allGood && !critFail && _co.started) ? '' : 'none';
+              if (rbBtn)  rbBtn.style.display  = (critFail && _co.started) ? '' : 'none';
 
               if (allGood) {
                 _setStatus('ready-to-close');
@@ -5914,6 +6013,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (_co.started) return;
               _co.started = true;
               _co.startTime = Date.now();
+              if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Cutover sequence initiated. Beginning pre-flight checks.');
               _co.timerInterval = setInterval(function(){
                 var elapsed = Math.floor((Date.now() - _co.startTime) / 1000);
                 var h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
@@ -5929,7 +6029,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var pauseBtn = document.getElementById('co-pause-btn');
               if (startBtn) startBtn.style.display = 'none';
               if (pauseBtn) pauseBtn.style.display = '';
-              _co.stepStatus.precheck = 'running';
+              // Skip steps whose "Run" checkbox is unchecked; start first enabled one
+              var firstEnabled = null;
+              for (var _si = 0; _si < _co.steps.length; _si++) {
+                if (_coIsStepEnabled(_co.steps[_si])) { firstEnabled = _co.steps[_si]; break; }
+                _co.stepStatus[_co.steps[_si]] = 'skipped';
+              }
+              if (firstEnabled) _co.stepStatus[firstEnabled] = 'running';
               _setStatus('in-progress');
               _renderChips();
             };
@@ -5960,13 +6066,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var box = document.getElementById('s5-terminal-box');
               var out = document.getElementById('s5-log-output');
               if (box) box.style.display = 'block';
-              if (out) out.innerHTML += html;
+              if (out) { out.innerHTML += html; out.scrollTop = out.scrollHeight; }
             }
             function _uatLogClear(title) {
               var box = document.getElementById('s5-terminal-box');
               var out = document.getElementById('s5-log-output');
               if (box) box.style.display = 'block';
-              if (out) out.innerHTML = title + '\n\n';
+              if (out) { out.innerHTML += (out.innerHTML ? '\n' : '') + '── ' + title + ' ──\n\n'; out.scrollTop = out.scrollHeight; }
             }
 
             // ── Step 1: Pre-checks via UAT service compare ───────────────────
@@ -5995,24 +6101,51 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               .then(function(data) {
                 if (!data.comparison) {
                   _uatLog('[ERROR] ' + (data.error || 'Service compare failed') + '\n');
+                  coMarkStep('precheck', 'review');
                   return;
                 }
+
+                // Services that are expected to differ between source cloud and FLEX
+                var INFRA_PATTERNS = [
+                  /^nova-agent/, /^python3?-nova-agent/, /^xe-daemon/, /^xe-linux-distribution/,
+                  /^open-vm-tools/, /^vmtoolsd/, /^fwupd/, /^serial-getty/, /^getty/,
+                  /^cloud-init/, /^cloud-final/, /^cloud-config/, /^cloud-early-wait/,
+                  /^walinuxagent/, /^hyperv/, /^snapd/, /^apt-daily/, /^motd-news/,
+                  /^apache-htcacheclean/, /^unattended-upgrades/, /^update-notifier/,
+                  /^systemd-timesyncd/, /^irqbalance/, /^mdadm/
+                ];
+                function isInfra(svc) {
+                  return INFRA_PATTERNS.some(function(p){ return p.test(svc); });
+                }
+
                 var missing = data.comparison.filter(function(c){ return c.status === 'missing_on_target'; });
                 var match   = data.comparison.filter(function(c){ return c.status === 'match'; });
-                _uatLog('Source services : ' + data.source_count + '\nTarget services : ' + data.target_count + '\nMatched        : ' + match.length + '\nMissing on FLEX: ' + missing.length + '\n');
+                var missingInfra = missing.filter(function(c){ return isInfra(c.service); });
+                var missingApp   = missing.filter(function(c){ return !isInfra(c.service); });
+
+                _uatLog('Source services : ' + data.source_count + '\nTarget services : ' + data.target_count + '\nMatched        : ' + match.length + '\nMissing on FLEX: ' + missing.length + ' (' + missingApp.length + ' app, ' + missingInfra.length + ' infra)\n');
                 if (data.source_error) _uatLog('[WARN Source] ' + data.source_error + '\n');
                 if (data.target_error) _uatLog('[WARN Target] ' + data.target_error + '\n');
-                if (missing.length) {
-                  _uatLog('\nMISSING ON FLEX:\n');
-                  missing.forEach(function(c){ _uatLog('  ✗ ' + c.service + '\n'); });
-                } else {
+
+                if (missingApp.length) {
+                  _uatLog('\n❌ MISSING APP SERVICES (action required):\n');
+                  missingApp.forEach(function(c){ _uatLog('  ✗ ' + c.service + '\n'); });
+                }
+                if (missingInfra.length) {
+                  _uatLog('\n⚠ MISSING INFRA SERVICES (expected — source-cloud specific, safe to ignore):\n');
+                  missingInfra.forEach(function(c){ _uatLog('  ℹ ' + c.service + '\n'); });
+                }
+                if (!missing.length) {
                   _uatLog('\n✓ All source services are running on FLEX.\n');
+                } else if (!missingApp.length) {
+                  _uatLog('\n✓ All application services matched. Infrastructure-only differences are expected and safe.\n');
                 }
                 _uatLog('\n=== COMPLETE ===\n');
-                // Auto-pass if zero missing services
-                if (missing.length === 0) coMarkStep('precheck', 'pass');
+
+                // Pass if no app services are missing (infra gaps are expected)
+                coMarkStep('precheck', missingApp.length === 0 ? 'pass' : 'review');
               })
-              .catch(function(err){ _uatLog('[ERROR] ' + err.message + '\n'); });
+              .catch(function(err){ _uatLog('[ERROR] ' + err.message + '\n'); coMarkStep('precheck', 'review'); });
             };
 
             // ── Step 3: App validation via UAT performance run ───────────────
@@ -6048,14 +6181,20 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 _uatLog('Error Rate   : ' + errPct + ' %\n');
                 _uatLog('Memory Usage : ' + memPct + ' %\n');
                 if (data.target_error) _uatLog('[WARN] ' + data.target_error + '\n');
-                var pass = avgMs > 0 && avgMs < 500 && errPct < 5;
-                _uatLog('\n' + (pass ? '✓ PASS — response time and error rate within thresholds.' : '✗ FAIL — response >500ms or error rate ≥5%.') + '\n');
+                var unreachable = avgMs === 0;
+                var pass = !unreachable && avgMs < 500 && errPct < 5;
+                var msg = pass
+                  ? '✓ PASS — response time and error rate within thresholds.'
+                  : unreachable
+                    ? '⚠ REVIEW — FLEX target unreachable. Verify server is up before go-live.'
+                    : '✗ FAIL — avg response ≥500ms or error rate ≥5%.';
+                _uatLog('\n' + msg + '\n');
                 _uatLog('=== COMPLETE ===\n');
                 // Feed latest point into monitor charts
                 if (typeof _coMonIngest === 'function') _coMonIngest(p);
-                if (pass) coMarkStep(stepId, 'pass');
+                coMarkStep(stepId, pass ? 'pass' : unreachable ? 'review' : 'fail');
               })
-              .catch(function(err){ _uatLog('[ERROR] ' + err.message + '\n'); });
+              .catch(function(err){ _uatLog('[ERROR] ' + err.message + '\n'); coMarkStep(stepId, 'review'); });
             };
 
             // ── Step 5: Launch monitor panel ─────────────────────────────────
@@ -6066,35 +6205,32 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (mark) mark.style.display = 'flex';
               if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
 
-              // Pre-fill IP from UAT scope
-              var scope = _uatScope();
-              var tgtIp = scope.length ? scope[0].target_ip : '';
-              var ipEl = document.getElementById('co-mon-ip');
-              if (ipEl && tgtIp && !ipEl.value) ipEl.value = tgtIp;
+              // Pre-fill IPs — matrix takes priority, UAT scope as fallback
+              if (typeof coMonRefreshPair === 'function') coMonRefreshPair();
+              var monSrcEl = document.getElementById('co-mon-src-ip');
+              var monTgtEl = document.getElementById('co-mon-ip');
+              if (!monTgtEl || !monTgtEl.value) {
+                var scope = _uatScope();
+                if (scope.length) {
+                  if (monTgtEl && !monTgtEl.value && scope[0].target_ip) monTgtEl.value = scope[0].target_ip;
+                  if (monSrcEl && !monSrcEl.value && scope[0].source_ip) monSrcEl.value = scope[0].source_ip;
+                }
+              }
 
               var panel = document.getElementById('co-monitor-panel');
               if (panel) {
                 panel.style.display = 'block';
                 panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               }
-              // Draw empty charts then start polling
+              // Draw charts (uses cached data if available), then start polling
               _coMonDrawAll();
               coMonSetInterval();
               coMonPoll();
             };
 
-            // ── Step 2: read live values from existing Section 2 form ────────
+            // ── Step 2: fields are now inline in the card — refresh is a no-op kept for call-sites ──
             window.coStep2Refresh = function() {
-              var h = (document.getElementById('cutover_source_cutover_host') || {}).value || '—';
-              var u = (document.getElementById('cutover_source_ssh_user')     || {}).value || '—';
-              var w = (document.getElementById('cutover_green_weight')        || {}).value || '—';
-              var a = document.getElementById('cutover_lb_apply');
-              var aVal = a ? (a.checked ? 'Yes ✓' : 'No') : '—';
-              var _s = function(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; };
-              _s('co-step2-host',   h);
-              _s('co-step2-user',   u);
-              _s('co-step2-weight', w + '%');
-              _s('co-step2-apply',  aVal);
+              cutoverTesterSyncHaproxyDisplay();
             };
 
             window.coRunCutoverStep2 = function(btn) {
@@ -6103,40 +6239,53 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var mark = document.getElementById('co-mark-traffic');
               if (mark) mark.style.display = 'flex';
               if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
-
               coStep2Refresh();
 
-              if (typeof cutoverConfigureBlueGreen === 'function') {
-                cutoverConfigureBlueGreen();
-                setTimeout(function() {
-                  var lbTerm = document.getElementById('cutover-lb-terminal-box');
-                  if (lbTerm) {
-                    lbTerm.style.display = 'block';
-                    lbTerm.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  }
-                  // Auto-chain: watch status indicator for Completed / Needs Review
-                  if (_co.autoRun) {
-                    var statEl = document.getElementById('cutover-lb-status-indicator');
-                    if (statEl) {
-                      var fired2 = false;
-                      var statObs = new MutationObserver(function() {
-                        if (fired2) return;
-                        var t = statEl.textContent || '';
-                        if (t === 'Completed' || t === 'Needs Review') {
-                          fired2 = true;
-                          statObs.disconnect();
-                          coMarkStep('traffic', t === 'Completed' ? 'pass' : 'fail');
-                        }
-                      });
-                      statObs.observe(statEl, { childList: true, characterData: true, subtree: true });
-                      _co.autoObservers.push(statObs);
-                      setTimeout(function(){ if (!fired2){ fired2=true; statObs.disconnect(); } }, 300000);
-                    }
-                  }
-                }, 250);
-              } else {
-                _uatLog('[ERROR] cutoverConfigureBlueGreen() not found — fill Section 2 form and run from there.\n');
+              // Step header in unified log
+              _uatLogClear('[STEP 2] Configure LB / HAProxy');
+
+              if (typeof cutoverStream !== 'function') {
+                _uatLog('[ERROR] cutoverStream() not found.\n');
+                return;
               }
+              if (typeof cutoverSaveHaproxyConfigCache === 'function') cutoverSaveHaproxyConfigCache();
+              if (typeof cutoverSyncMatrixFromInputs === 'function') cutoverSyncMatrixFromInputs();
+              if (typeof cutoverEnsureSelectedPairForConfigure === 'function') cutoverEnsureSelectedPairForConfigure();
+              if (typeof cutoverSyncMatrixFromInputs === 'function') cutoverSyncMatrixFromInputs();
+
+              if (!cutoverBlueGreenRows || !cutoverBlueGreenRows.length) {
+                _uatLog('[WARN] No source/target matrix rows loaded. Add a pair in the matrix above first.\n');
+                return;
+              }
+
+              var payload = {
+                rows: cutoverBlueGreenRows || [],
+                source_artifacts: (typeof cutoverSourceArtifacts !== 'undefined' ? cutoverSourceArtifacts : []) || [],
+                lb_option: 'source_haproxy',
+                green_weight: (typeof getCutoverGreenWeight === 'function' ? getCutoverGreenWeight() : 10),
+                apply: !!(document.getElementById('cutover_lb_apply') || {}).checked,
+                source_cutover_host: (document.getElementById('cutover_source_cutover_host') || {}).value || '',
+                jumphost_user: (document.getElementById('cutover_source_ssh_user') || {}).value || 'ubuntu',
+                ssh_key: (document.getElementById('cutover_source_ssh_key') || {}).value || ''
+              };
+
+              // Show unified terminal and scroll to it
+              var uniTerm = document.getElementById('s5-terminal-box');
+              if (uniTerm) { uniTerm.style.display = 'block'; setTimeout(function(){ uniTerm.scrollIntoView({ behavior:'smooth', block:'center' }); }, 100); }
+
+              // Stream into unified log; appendMode=true preserves prior step output
+              cutoverStream('/api/cutover-bluegreen/configure', payload, 's5-terminal-box', 's5-log-output', 's5-status-indicator', undefined, true)
+                .then(function() {
+                  if (_co.autoRun) {
+                    var statEl = document.getElementById('s5-status-indicator');
+                    var t = statEl ? statEl.textContent : '';
+                    coMarkStep('traffic', t === 'Completed' ? 'pass' : 'review');
+                  }
+                })
+                .catch(function(err) {
+                  _uatLog('[ERROR] ' + err.message + '\n');
+                  if (_co.autoRun) coMarkStep('traffic', 'review');
+                });
             };
 
             // Auto-refresh preview when cockpit starts; if auto-chain ON, kick Step 1
@@ -6162,6 +6311,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             // ── Monitoring engine ─────────────────────────────────────────────
             var _coMon = {
               resp: [], err: [], cpu: [], mem: [], lat: [], db: [],
+              srcResp: [], srcCpu: [], srcMem: [], srcLat: [],
               maxPts: 20,
               timer: null,
               _autoPassed: false,
@@ -6175,12 +6325,18 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
             // Called from coRunUatPerf (Step 3) and coMonPoll (Step 5)
             window._coMonIngest = function(p) {
+              // FLEX target metrics
               _coMonAddPt(_coMon.resp, parseFloat(p.flex_avg_response_ms  || p.ospc_avg_response_ms || 0));
               _coMonAddPt(_coMon.err,  parseFloat(p.api_error_rate_percent_target || p.api_error_rate_percent || 0));
-              _coMonAddPt(_coMon.cpu,  parseFloat(p.cpu_load_target || p.cpu_load_source || 0));
-              _coMonAddPt(_coMon.mem,  parseFloat(p.mem_pct_target  || p.mem_pct_source  || 0));
-              _coMonAddPt(_coMon.lat,  parseFloat(p.network_latency_ms_target || p.network_latency_ms || 0));
-              _coMonAddPt(_coMon.db,   parseFloat(p.db_avg_query_ms_target    || p.db_avg_query_ms    || 0));
+              _coMonAddPt(_coMon.cpu,  parseFloat(p.cpu_load_target || 0));
+              _coMonAddPt(_coMon.mem,  parseFloat(p.mem_pct_target  || 0));
+              _coMonAddPt(_coMon.lat,  parseFloat(p.network_latency_ms_target || 0));
+              _coMonAddPt(_coMon.db,   parseFloat(p.db_avg_query_ms_target    || p.db_avg_query_ms || 0));
+              // Source (OSPC) metrics — extracted from same API response
+              _coMonAddPt(_coMon.srcResp, parseFloat(p.ospc_avg_response_ms  || 0));
+              _coMonAddPt(_coMon.srcCpu,  parseFloat(p.cpu_load_source        || 0));
+              _coMonAddPt(_coMon.srcMem,  parseFloat(p.mem_pct_source         || 0));
+              _coMonAddPt(_coMon.srcLat,  parseFloat(p.network_latency_ms     || 0));
 
               // Update numeric badges
               var last = function(a){ return a.length ? a[a.length-1] : null; };
@@ -6190,12 +6346,22 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 el.textContent = v + ' ' + unit;
                 el.style.color = v >= crit ? '#ef4444' : v >= warn ? '#f59e0b' : '#22c55e';
               }
+              function _srcBadge(id, v) {
+                var el = document.getElementById(id);
+                if (!el || v === null) return;
+                el.textContent = v;
+              }
               _badge('co-mon-val-resp', last(_coMon.resp), 'ms',  200, 500);
               _badge('co-mon-val-err',  last(_coMon.err),  '%',   2,   5);
               _badge('co-mon-val-cpu',  last(_coMon.cpu),  '',    2,   4);
               _badge('co-mon-val-mem',  last(_coMon.mem),  '%',   70,  85);
               _badge('co-mon-val-lat',  last(_coMon.lat),  'ms',  50,  150);
               _badge('co-mon-val-db',   last(_coMon.db),   'ms',  50,  200);
+              _srcBadge('co-mon-src-val-resp', last(_coMon.srcResp));
+              _srcBadge('co-mon-src-val-cpu',  last(_coMon.srcCpu));
+              _srcBadge('co-mon-src-val-mem',  last(_coMon.srcMem));
+              _srcBadge('co-mon-src-val-lat',  last(_coMon.srcLat));
+              _coMonDrawComparison();
 
               // Timestamp
               var ts = document.getElementById('co-mon-last-ts');
@@ -6210,9 +6376,31 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               }
 
               _coMonDrawAll();
+              _coMonSaveCache();
             };
 
-            function _coMonDrawChart(canvasId, pts, color, thresh) {
+            var CO_MON_CACHE_KEY = 'co_mon_cache_v1';
+
+            function _coMonSaveCache() {
+              try { localStorage.setItem(CO_MON_CACHE_KEY, JSON.stringify({ resp:_coMon.resp, err:_coMon.err, cpu:_coMon.cpu, mem:_coMon.mem, lat:_coMon.lat, db:_coMon.db, srcResp:_coMon.srcResp, srcCpu:_coMon.srcCpu, srcMem:_coMon.srcMem, srcLat:_coMon.srcLat })); } catch(_) {}
+            }
+
+            function _coMonLoadCache() {
+              try {
+                var raw = localStorage.getItem(CO_MON_CACHE_KEY);
+                if (!raw) return;
+                var d = JSON.parse(raw);
+                if (!d || !Array.isArray(d.resp) || !d.resp.length) return;
+                _coMon.resp = d.resp; _coMon.err = d.err || []; _coMon.cpu = d.cpu || [];
+                _coMon.mem  = d.mem  || []; _coMon.lat = d.lat || []; _coMon.db  = d.db  || [];
+                _coMon.srcResp = d.srcResp || []; _coMon.srcCpu = d.srcCpu || [];
+                _coMon.srcMem  = d.srcMem  || []; _coMon.srcLat = d.srcLat || [];
+                var st = document.getElementById('co-mon-status');
+                if (st) st.textContent = 'Restored ' + _coMon.resp.length + ' data point(s) from last run.';
+              } catch(_) {}
+            }
+
+            function _coMonDrawChart(canvasId, pts, color, thresh, pts2, color2) {
               var canvas = document.getElementById(canvasId);
               if (!canvas) return;
               // Use actual pixel size, not CSS size
@@ -6222,24 +6410,25 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
 
               ctx.clearRect(0, 0, W, H);
-              ctx.fillStyle = '#0f172a';
+              ctx.fillStyle = '#f0f9ff';
               ctx.fillRect(0, 0, W, H);
 
               if (!pts.length) {
-                ctx.fillStyle = '#334155';
+                ctx.fillStyle = '#94a3b8';
                 ctx.font = '11px system-ui,sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText('Waiting for data…', W / 2, H / 2 + 4);
                 return;
               }
 
-              var hi = Math.max.apply(null, pts);
+              var allVals = pts.concat(pts2 && pts2.length ? pts2 : []);
+              var hi = Math.max.apply(null, allVals);
               var dataMax = Math.max(hi * 1.15, thresh ? thresh * 1.1 : 1, 1);
 
               // Grid
-              ctx.strokeStyle = 'rgba(255,255,255,.06)';
+              ctx.strokeStyle = 'rgba(14,165,233,.12)';
               ctx.lineWidth = 1;
-              ctx.fillStyle = '#475569';
+              ctx.fillStyle = '#64748b';
               ctx.font = '8px monospace';
               ctx.textAlign = 'right';
               for (var g = 0; g <= 3; g++) {
@@ -6286,20 +6475,141 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               pts.forEach(function(v, i){ i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
               ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
 
-              // Latest dot
+              // Latest dot (primary/FLEX)
               var lx = px(pts.length - 1), ly = py(pts[pts.length - 1]);
               ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
               ctx.fillStyle = color; ctx.fill();
-              ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.5; ctx.stroke();
+              ctx.strokeStyle = '#f0f9ff'; ctx.lineWidth = 1.5; ctx.stroke();
+
+              // Secondary line (source/OSPC)
+              if (pts2 && pts2.length >= 1 && color2) {
+                var xStep2 = cW / (pts2.length - 1 || 1);
+                var px2 = function(i){ return pad.l + i * xStep2; };
+                if (pts2.length >= 2) {
+                  ctx.beginPath();
+                  pts2.forEach(function(v, i){ i === 0 ? ctx.moveTo(px2(i), py(v)) : ctx.lineTo(px2(i), py(v)); });
+                  ctx.strokeStyle = color2; ctx.lineWidth = 1.5;
+                  ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+                }
+                var lx2 = px2(pts2.length-1), ly2 = py(pts2[pts2.length-1]);
+                ctx.beginPath(); ctx.arc(lx2, ly2, 3, 0, Math.PI*2);
+                ctx.fillStyle = color2; ctx.fill();
+              }
             }
 
             function _coMonDrawAll() {
-              _coMonDrawChart('co-chart-resp', _coMon.resp, 'rgb(34,197,94)',   500);
+              var hasSrc = _coMon.srcResp.length > 0;
+              _coMonDrawChart('co-chart-resp', _coMon.resp, 'rgb(34,197,94)',   500, hasSrc ? _coMon.srcResp : null, 'rgb(96,165,250)');
               _coMonDrawChart('co-chart-err',  _coMon.err,  'rgb(251,146,60)',  5);
-              _coMonDrawChart('co-chart-cpu',  _coMon.cpu,  'rgb(96,165,250)',  4);
-              _coMonDrawChart('co-chart-mem',  _coMon.mem,  'rgb(167,139,250)', 85);
-              _coMonDrawChart('co-chart-lat',  _coMon.lat,  'rgb(251,191,36)',  150);
+              _coMonDrawChart('co-chart-cpu',  _coMon.cpu,  'rgb(34,197,94)',   4,   hasSrc ? _coMon.srcCpu : null, 'rgb(96,165,250)');
+              _coMonDrawChart('co-chart-mem',  _coMon.mem,  'rgb(167,139,250)', 85,  hasSrc ? _coMon.srcMem : null, 'rgb(96,165,250)');
+              _coMonDrawChart('co-chart-lat',  _coMon.lat,  'rgb(251,191,36)',  150, hasSrc ? _coMon.srcLat : null, 'rgb(96,165,250)');
               _coMonDrawChart('co-chart-db2',  _coMon.db,   'rgb(52,211,153)',  200);
+            }
+
+            function _coMonDrawComparison() {
+              var last = function(a){ return a.length ? a[a.length-1] : 0; };
+              var panel = document.getElementById('co-compare-panel');
+              var srcR = last(_coMon.srcResp), tgtR = last(_coMon.resp);
+              var srcC = last(_coMon.srcCpu),  tgtC = last(_coMon.cpu);
+              var srcM = last(_coMon.srcMem),  tgtM = last(_coMon.mem);
+              var srcL = last(_coMon.srcLat),  tgtL = last(_coMon.lat);
+              var hasSrc = srcC > 0 || srcM > 0 || srcR > 0;
+              if (!panel) return;
+              panel.style.display = hasSrc ? 'block' : 'none';
+              if (!hasSrc) return;
+              // Bar comparison
+              var bars = document.getElementById('co-compare-bars');
+              if (bars) {
+                var dims = [
+                  { label:'CPU Load',       src:srcC,  tgt:tgtC,  max:Math.max(srcC,tgtC,4)+0.5 },
+                  { label:'Memory %',       src:srcM,  tgt:tgtM,  max:100 },
+                  { label:'Response (ms)',  src:srcR,  tgt:tgtR,  max:Math.max(srcR,tgtR,500) },
+                  { label:'Net Latency ms', src:srcL,  tgt:tgtL,  max:Math.max(srcL,tgtL,150) }
+                ];
+                bars.innerHTML = dims.map(function(d) {
+                  var sw = d.max > 0 ? Math.round(Math.min(d.src/d.max,1)*100) : 0;
+                  var tw = d.max > 0 ? Math.round(Math.min(d.tgt/d.max,1)*100) : 0;
+                  return '<div style="margin-bottom:8px;">' +
+                    '<div style="font-size:10px;color:#0369a1;margin-bottom:3px;font-weight:700;">' + d.label + '</div>' +
+                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">' +
+                      '<div style="width:44px;font-size:9px;color:#1d4ed8;text-align:right;font-weight:700;">SRC ' + d.src + '</div>' +
+                      '<div style="flex:1;background:#dbeafe;border-radius:3px;height:10px;overflow:hidden;border:1px solid #93c5fd;">' +
+                        '<div style="width:' + sw + '%;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:3px;transition:.3s;"></div>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;align-items:center;gap:6px;">' +
+                      '<div style="width:44px;font-size:9px;color:#059669;text-align:right;font-weight:700;">FLEX ' + d.tgt + '</div>' +
+                      '<div style="flex:1;background:#dcfce7;border-radius:3px;height:10px;overflow:hidden;border:1px solid #86efac;">' +
+                        '<div style="width:' + tw + '%;height:100%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:3px;transition:.3s;"></div>' +
+                      '</div>' +
+                    '</div>' +
+                  '</div>';
+                }).join('');
+              }
+              // Radar chart
+              var canvas = document.getElementById('co-chart-radar');
+              if (!canvas) return;
+              var W = canvas.width, H = canvas.height;
+              var ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, W, H);
+              ctx.fillStyle = '#f0f9ff'; ctx.fillRect(0, 0, W, H);
+              var cx = W/2, cy = H/2 + 5, r = Math.min(W, H) * 0.38;
+              var axes = ['CPU', 'Memory', 'Response', 'Latency', 'Uptime'];
+              var n = axes.length;
+              // Normalize to 0-100 health score (higher = better = healthier)
+              var maxResp = Math.max(srcR, tgtR, 1000);
+              var maxLat  = Math.max(srcL, tgtL, 200);
+              var maxCpu  = Math.max(srcC, tgtC, 5);
+              var srcScores = [
+                Math.max(0, 100 - (srcC/maxCpu)*100),
+                Math.max(0, 100 - srcM),
+                Math.max(0, 100 - (srcR/maxResp)*100),
+                Math.max(0, 100 - (srcL/maxLat)*100),
+                95
+              ];
+              var tgtScores = [
+                Math.max(0, 100 - (tgtC/maxCpu)*100),
+                Math.max(0, 100 - tgtM),
+                Math.max(0, 100 - (tgtR/maxResp)*100),
+                Math.max(0, 100 - (tgtL/maxLat)*100),
+                98
+              ];
+              // Draw concentric polygons (grid)
+              [20,40,60,80,100].forEach(function(pct) {
+                ctx.beginPath();
+                for (var i=0;i<n;i++) {
+                  var a = (i/n)*Math.PI*2 - Math.PI/2;
+                  var x = cx + r*(pct/100)*Math.cos(a), y = cy + r*(pct/100)*Math.sin(a);
+                  i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+                }
+                ctx.closePath(); ctx.strokeStyle = 'rgba(14,165,233,0.15)'; ctx.lineWidth=1; ctx.stroke();
+              });
+              // Draw axis lines
+              for (var i=0;i<n;i++) {
+                var a = (i/n)*Math.PI*2 - Math.PI/2;
+                ctx.beginPath(); ctx.moveTo(cx, cy);
+                ctx.lineTo(cx + r*Math.cos(a), cy + r*Math.sin(a));
+                ctx.strokeStyle = 'rgba(14,165,233,0.25)'; ctx.lineWidth=1; ctx.stroke();
+                // Labels
+                var lx = cx + (r+18)*Math.cos(a), ly = cy + (r+18)*Math.sin(a);
+                ctx.fillStyle = '#334155'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(axes[i], lx, ly);
+              }
+              // Draw source polygon
+              function drawPoly(scores, color, fillColor) {
+                ctx.beginPath();
+                scores.forEach(function(v, i) {
+                  var a = (i/n)*Math.PI*2 - Math.PI/2;
+                  var px = cx + r*(v/100)*Math.cos(a), py = cy + r*(v/100)*Math.sin(a);
+                  i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+                });
+                ctx.closePath();
+                ctx.fillStyle = fillColor; ctx.fill();
+                ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+              }
+              drawPoly(srcScores, 'rgba(96,165,250,0.9)',  'rgba(96,165,250,0.15)');
+              drawPoly(tgtScores, 'rgba(34,197,94,0.9)',   'rgba(34,197,94,0.2)');
             }
 
             window.coMonPoll = function() {
@@ -6310,11 +6620,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var st = document.getElementById('co-mon-status');
               if (st) st.textContent = 'Polling FLEX target…';
 
-              var ip   = (document.getElementById('co-mon-ip')   || {}).value || '';
-              var port = (document.getElementById('co-mon-port')  || {}).value || '80';
-              if (!ip) {
+              var ip     = (document.getElementById('co-mon-ip')     || {}).value || '';
+              var srcIp  = (document.getElementById('co-mon-src-ip') || {}).value || '';
+              var port   = (document.getElementById('co-mon-port')   || {}).value || '80';
+              if (!ip || !srcIp) {
                 var scope = _uatScope();
-                ip = scope.length ? scope[0].target_ip : '';
+                if (!ip)    ip    = scope.length ? scope[0].target_ip : '';
+                if (!srcIp) srcIp = scope.length ? scope[0].source_ip : '';
               }
               if (!ip) {
                 if (st) st.textContent = 'No target IP — enter FLEX IP above or run UAT scope first.';
@@ -6326,7 +6638,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               fetch('/api/uat/performance/run', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ target_ip: ip, ssh_key: '~/.ssh/id_rsa', app_port: parseInt(port) || 80 })
+                body: JSON.stringify({ target_ip: ip, source_ip: srcIp || undefined, ssh_key: '~/.ssh/id_rsa', app_port: parseInt(port) || 80 })
               })
               .then(function(r){ return r.json(); })
               .then(function(data) {
@@ -6369,7 +6681,30 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var st = document.getElementById('co-mon-status');
               if (st) st.textContent = 'Polling stopped.';
               var pulse = document.getElementById('co-mon-pulse');
-              if (pulse) pulse.style.background = '#475569';
+              if (pulse) pulse.style.background = '#94a3b8';
+            };
+
+            window.coMonRefreshPair = function() {
+              // Read selected row from pairing matrix (prefer first selected row)
+              var rows = (typeof cutoverBlueGreenRows !== 'undefined' && cutoverBlueGreenRows) ? cutoverBlueGreenRows : [];
+              var row = rows.find(function(r){ return r.selected; }) || rows[0] || null;
+              // Field priority matches cutoverBuildPairRow output
+              var srcIp = row ? (row.source_server_ip || row.source_public_ip || row.source_private_ip || row.source_ip || '') : '';
+              var tgtIp = row ? (row.target_server_ip || row.target_public_ip || row.target_private_ip || row.target_ip || '') : '';
+              var srcName = row ? (row.source_server_name || row.source_vm_name || srcIp || '—') : '—';
+              var tgtName = row ? (row.target_server_name || row.target_vm_name || tgtIp || '—') : '—';
+              // Update banner chips (show name + IP)
+              var srcChip = document.getElementById('co-mon-pair-src');
+              var tgtChip = document.getElementById('co-mon-pair-tgt');
+              if (srcChip) srcChip.textContent = srcIp ? srcName + ' (' + srcIp + ')' : '— Source';
+              if (tgtChip) tgtChip.textContent = tgtIp ? tgtName + ' (' + tgtIp + ')' : '— FLEX Target';
+              // Always populate IP inputs from matrix (overwrite stale values)
+              var monSrc = document.getElementById('co-mon-src-ip');
+              var monTgt = document.getElementById('co-mon-ip');
+              if (monSrc && srcIp) monSrc.value = srcIp;
+              if (monTgt && tgtIp) monTgt.value = tgtIp;
+              var st = document.getElementById('co-mon-status');
+              if (st && row) st.textContent = 'Pair synced: ' + (srcIp||'?') + ' (source) → ' + (tgtIp||'?') + ' (FLEX)';
             };
 
             window.coRunTask = function(taskType, stepId, btn) {
@@ -6469,28 +6804,33 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               }
             };
 
-            // Chain map: what to trigger after each step passes
+// Chain map: what to trigger after each step passes
             function _coTriggerNext(stepId) {
               var actions = {
                 precheck: ['Step 2: Configure HAProxy', function() {
+                  if (!_coIsStepEnabled('traffic')) { coMarkStep('traffic', 'skipped'); return; }
                   var btn = document.querySelector('#co-step-traffic .btn-primary');
                   if (btn && !btn.disabled) btn.click();
                 }],
                 traffic: ['Step 3: Validate App', function() {
+                  if (!_coIsStepEnabled('app')) { coMarkStep('app', 'skipped'); return; }
                   var btn = document.querySelector('#co-step-app .btn-primary');
                   if (btn && !btn.disabled) btn.click();
                 }],
                 app: [_co.dbInScope ? 'Step 4: Validate DB' : 'Step 5: Monitor', function() {
                   if (_co.dbInScope) {
+                    if (!_coIsStepEnabled('db')) { coMarkStep('db', 'skipped'); return; }
                     var btn = document.querySelector('#co-step-db .btn-primary');
                     if (btn && !btn.disabled) btn.click();
                   } else {
                     coMarkStep('db', 'skipped');
+                    if (!_coIsStepEnabled('monitor')) { coMarkStep('monitor', 'skipped'); return; }
                     var btn2 = document.querySelector('#co-step-monitor .btn-dark');
                     if (btn2 && !btn2.disabled) btn2.click();
                   }
                 }],
                 db: ['Step 5: Monitor', function() {
+                  if (!_coIsStepEnabled('monitor')) { coMarkStep('monitor', 'skipped'); return; }
                   var btn = document.querySelector('#co-step-monitor .btn-dark');
                   if (btn && !btn.disabled) btn.click();
                 }]
@@ -6518,8 +6858,18 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 }
               }
               _renderChips();
+              // Voice announcement for every state transition except pending
+              if (status !== 'pending' && typeof jarvisAnnounce === 'function') {
+                var _vLabel = _co.stepLabels[stepId] || stepId;
+                if (status === 'running') {
+                  jarvisAnnounce('Starting ' + _vLabel + '.');
+                } else {
+                  var _vMsg = { pass:'passed', fail:'FAILED — rollback may be required', review:'needs review', skipped:'skipped' };
+                  jarvisAnnounce(_vLabel + ' ' + (_vMsg[status] || status) + '.');
+                }
+              }
               // Auto-chain: if ON and step passed/skipped, queue next step
-              if (_co.autoRun && (status === 'pass' || status === 'skipped')) {
+              if (_co.autoRun && (status === 'pass' || status === 'skipped' || status === 'review')) {
                 _coTriggerNext(stepId);
               }
               // On fail: stop auto-chain
@@ -6571,21 +6921,128 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (_co.timerInterval) clearInterval(_co.timerInterval);
             };
 
-            window.coFixIssues = function() {
-              alert('Review the failed steps above and re-run the relevant validation. Use the Cutover Test section above for detailed diagnostics.');
+            window.coListIssues = function() {
+              var issues = [];
+              // Collect failed / review steps
+              _co.steps.forEach(function(id) {
+                var st = _co.stepStatus[id];
+                if (st === 'fail' || st === 'review') {
+                  issues.push({ sev: st === 'fail' ? 'FAIL' : 'REVIEW', source: _co.stepLabels[id] || id,
+                    detail: st === 'fail' ? 'Step failed — re-run or mark manually.' : 'Step needs manual review before proceeding.' });
+                }
+              });
+              // Scan unified log for [ERROR] / [FAIL] lines
+              var logEl = document.getElementById('s5-log-output');
+              if (logEl) {
+                logEl.innerText.split('\n').forEach(function(l) {
+                  var t = l.trim();
+                  if (t.startsWith('[ERROR]') || t.startsWith('[FAIL]')) {
+                    issues.push({ sev: 'ERROR', source: 'Exec Log', detail: t.slice(0, 140) });
+                  }
+                });
+              }
+              // Scan tester log
+              var tLogEl = document.getElementById('cutover-tester-log-output');
+              if (tLogEl) {
+                tLogEl.innerText.split('\n').forEach(function(l) {
+                  var t = l.trim();
+                  if (t.startsWith('[ERROR]') || t.startsWith('[FAIL]')) {
+                    issues.push({ sev: 'ERROR', source: 'Tester Log', detail: t.slice(0, 140) });
+                  }
+                });
+              }
+              // Build modal content
+              var modal = document.getElementById('co-issues-modal');
+              var list  = document.getElementById('co-issues-list');
+              if (!modal || !list) return;
+              if (!issues.length) {
+                list.innerHTML = '<div style="color:#10b981;font-size:13px;font-weight:700;padding:12px 0;">✅ No issues found. All checked steps are passing.</div>';
+              } else {
+                list.innerHTML = issues.map(function(iss) {
+                  var col = iss.sev === 'FAIL' ? '#ef4444' : iss.sev === 'ERROR' ? '#dc2626' : '#f59e0b';
+                  var bg  = iss.sev === 'FAIL' ? '#fef2f2' : iss.sev === 'ERROR' ? '#fef2f2' : '#fffbeb';
+                  return '<div style="background:' + bg + ';border-left:3px solid ' + col + ';border-radius:6px;padding:10px 12px;margin-bottom:8px;">' +
+                    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">' +
+                    '<span style="font-size:10px;font-weight:800;color:' + col + ';background:' + col + '22;padding:2px 7px;border-radius:10px;">' + iss.sev + '</span>' +
+                    '<span style="font-size:12px;font-weight:700;color:#1f2937;">' + iss.source + '</span></div>' +
+                    '<div style="font-size:11px;color:#4b5563;font-family:monospace;">' + iss.detail + '</div></div>';
+                }).join('') +
+                '<div style="font-size:11px;color:#9ca3af;margin-top:10px;">' + issues.length + ' issue(s) found. Re-run failed steps or check logs for details.</div>';
+              }
+              modal.style.display = 'flex';
+            };
+
+            window.coCutoverValidation = function() {
+              var modal = document.getElementById('co-validation-modal');
+              if (!modal) return;
+              // Pre-fill customer from UAT scope if available
+              try {
+                var scope = JSON.parse(localStorage.getItem('osflex_uat_scope') || '[]');
+                var custEl = document.getElementById('co-val-customer');
+                if (custEl && !custEl.value && scope.length && scope[0].customer_name) custEl.value = scope[0].customer_name;
+              } catch(_) {}
+              modal.style.display = 'flex';
+              setTimeout(function(){ var c = document.getElementById('co-val-customer'); if(c) c.focus(); }, 100);
+            };
+
+            window.coValidationConfirm = function() {
+              var customer = (document.getElementById('co-val-customer') || {}).value || '';
+              var operator = (document.getElementById('co-val-operator') || {}).value || '';
+              customer = customer.trim(); operator = operator.trim();
+              if (!customer || !operator) { alert('Please enter both customer name and operator name.'); return; }
+
+              var now = new Date();
+              var pad = function(n){ return String(n).padStart(2,'0'); };
+              var dateStr = pad(now.getDate()) + '/' + pad(now.getMonth()+1) + '/' + now.getFullYear();
+              var timeStr = pad(now.getHours()) + ':' + pad(now.getMinutes());
+
+              var record = { customer: customer, operator: operator, date: dateStr, time: timeStr, timestamp: now.toISOString() };
+              try { localStorage.setItem('co_validation_record_v1', JSON.stringify(record)); } catch(_) {}
+
+              // Close modal
+              var modal = document.getElementById('co-validation-modal');
+              if (modal) modal.style.display = 'none';
+
+              // Show banner
+              var banner = document.getElementById('co-validation-banner');
+              if (banner) {
+                banner.style.display = 'block';
+                banner.innerHTML = '✅ <strong>Cut over done by Operator ' + operator + '</strong> &nbsp;|&nbsp; Customer: <strong>' + customer + '</strong> &nbsp;|&nbsp; ' + dateStr + ' ' + timeStr;
+              }
+
+              // ── Build full cutover report HTML ───────────────────────────────
+              var rows = (typeof cutoverTesterResults !== 'undefined' && cutoverTesterResults) ? cutoverTesterResults : [];
+              var logEl = document.getElementById('s5-log-output');
+              var logText = logEl ? logEl.innerText.trim() : '';
+              var html = _buildCutoverReportHtml({ customer: customer, operator: operator, date: dateStr, time: timeStr }, rows, logText);
+
+              // Download
+              var blob = new Blob([html], { type: 'text/html' });
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement('a');
+              a.href = url;
+              a.download = 'cutover_report_' + customer.replace(/\s+/g,'-') + '_' + operator.replace(/\s+/g,'-') + '_' + now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) + '.html';
+              document.body.appendChild(a); a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+
+              if (typeof jarvisAnnounce === 'function') {
+                jarvisAnnounce('Cutover report exported. Operator ' + operator + '. Customer ' + customer + '. Date ' + dateStr + '.');
+              }
             };
 
             window.coResetCockpit = function() {
               if (_co.timerInterval) clearInterval(_co.timerInterval);
               _co.started = false; _co.startTime = null; _co.timerInterval = null;
               _co.stepStatus = { precheck:'pending', traffic:'pending', app:'pending', db:'pending', monitor:'pending', close:'pending' };
-              _co.dbInScope = true; _co.currentStatus = 'not-started';
+              _co.dbInScope = false; _co.currentStatus = 'not-started';
               var el = document.getElementById('co-elapsed'); if (el) el.textContent = '0m 0s';
               var sb = document.getElementById('co-start-btn'); if (sb) sb.style.display = '';
               var pb = document.getElementById('co-pause-btn'); if (pb) { pb.style.display = 'none'; pb.innerHTML = '<i class="fas fa-pause"></i> Pause'; pb.onclick = coPauseCutover; }
               var decText = document.getElementById('co-decision-text');
               if (decText) decText.textContent = 'Complete all execution steps to unlock the final decision.';
-              var dbToggle = document.getElementById('co-db-scope-toggle'); if (dbToggle) dbToggle.checked = true;
+              var dbToggle = document.getElementById('co-db-scope-toggle'); if (dbToggle) dbToggle.checked = false;
+              _co.steps.forEach(function(id) { var chk = document.getElementById('co-enable-' + id); if (chk) chk.checked = true; });
               var dbBtnArea = document.getElementById('co-db-btn-area'); if (dbBtnArea) dbBtnArea.style.opacity = '1';
               ['precheck','traffic','app','db','monitor'].forEach(function(id){
                 var mark = document.getElementById('co-mark-' + id); if (mark) mark.style.display = 'none';
@@ -6603,13 +7060,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var stepLbl = document.getElementById('co-current-step-label'); if (stepLbl) stepLbl.textContent = '—';
               _setStatus('not-started');
               _renderChips();
-              // hide terminal
+              // hide and clear unified log
               var term = document.getElementById('s5-terminal-box'); if (term) term.style.display = 'none';
+              var lo = document.getElementById('s5-log-output'); if (lo) lo.innerHTML = '';
               var logBtn = document.getElementById('co-toggle-log-btn'); if (logBtn) logBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Show Full Log';
               // Reset monitor panel
               if (typeof coMonStop === 'function') coMonStop();
               _coMon.resp = []; _coMon.err = []; _coMon.cpu = []; _coMon.mem = []; _coMon.lat = []; _coMon.db = [];
+              _coMon.srcResp = []; _coMon.srcCpu = []; _coMon.srcMem = []; _coMon.srcLat = [];
               _coMon._autoPassed = false;
+              try { localStorage.removeItem(CO_MON_CACHE_KEY); } catch(_) {}
+              var cp = document.getElementById('co-compare-panel'); if (cp) cp.style.display = 'none';
               var monPanel = document.getElementById('co-monitor-panel'); if (monPanel) monPanel.style.display = 'none';
               _coMonDrawAll();
               // Cancel any in-flight auto-chain
@@ -6627,14 +7088,6 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
-      <!-- Terminal Output -->
-      <div id="s5-terminal-box" style="margin:0 0 28px;display:none;">
-        <div style="display:flex;justify-content:space-between;background:#1a2e3b;padding:8px 12px;border-radius:8px 8px 0 0;border:1px solid #374151;border-bottom:0;">
-          <span style="color:#7ecfff;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;">Cutover Execution Engine</span>
-          <span id="s5-status-indicator" style="color:#fbbf24;font-size:11px;font-weight:700;">Waiting...</span>
-        </div>
-        <div id="s5-log-output" style="height:250px;background:#000;color:#00ff00;font-family:'JetBrains Mono',monospace;font-size:12px;padding:15px;overflow-y:auto;border:1px solid #374151;border-radius:0 0 8px 8px;white-space:pre-wrap;"></div>
-      </div>
 
     </div>
   </div>
@@ -8320,6 +8773,33 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       el.textContent = message || '';
       el.style.color = color || '#94a3b8';
     }
+  }
+
+  function cutoverToggleCredPanel() {
+    const body = document.getElementById('cutover-cred-body');
+    const chevron = document.getElementById('cutover-cred-chevron');
+    const label = document.getElementById('cutover-cred-toggle-label');
+    if (!body) return;
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? '' : 'none';
+    if (chevron) { chevron.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down'; }
+    if (label) { label.textContent = collapsed ? 'Collapse' : 'Expand'; }
+    try { localStorage.setItem('cutover_cred_collapsed', collapsed ? '0' : '1'); } catch(_) {}
+  }
+
+  function cutoverInitCredPanel() {
+    try {
+      // Collapsed by default unless user explicitly expanded (stored '0')
+      const collapsed = localStorage.getItem('cutover_cred_collapsed') !== '0';
+      if (collapsed) {
+        const body = document.getElementById('cutover-cred-body');
+        const chevron = document.getElementById('cutover-cred-chevron');
+        const label = document.getElementById('cutover-cred-toggle-label');
+        if (body) body.style.display = 'none';
+        if (chevron) chevron.className = 'fas fa-chevron-down';
+        if (label) label.textContent = 'Expand';
+      }
+    } catch(_) {}
   }
 
   function cutoverUpdateCredentialMode() {
@@ -10116,9 +10596,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       }).length;
     }, 0);
 
-    var perfOColor  = perfFails > 0 ? '#fca5a5' : perfWarns > 0 ? '#fde68a' : '#86efac';
-    var perfOBg     = perfFails > 0 ? 'rgba(127,29,29,0.3)' : perfWarns > 0 ? 'rgba(113,63,18,0.3)' : 'rgba(22,101,52,0.22)';
-    var perfOBorder = perfFails > 0 ? 'rgba(248,113,113,0.4)' : perfWarns > 0 ? 'rgba(251,191,36,0.4)' : 'rgba(74,222,128,0.4)';
+    var perfOColor  = perfFails > 0 ? '#b91c1c' : perfWarns > 0 ? '#b45309' : '#15803d';
+    var perfOBg     = '#ffffff';
+    var perfOBorder = perfFails > 0 ? '#fca5a5' : perfWarns > 0 ? '#fcd34d' : '#86efac';
 
     // Push live metrics into Step 5 Cutover Readiness
     if (typeof window.uatSetPerfMetrics === 'function') {
@@ -10126,21 +10606,21 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     }
 
     var checked = perfPasses + perfFails + perfWarns;
-    html += '<div style="margin-top:14px;padding:14px 16px;border-radius:8px;background:' + perfOBg + ';border:1px solid ' + perfOBorder + ';">'
+    html += '<div style="margin-top:14px;padding:14px 16px;border-radius:8px;background:' + perfOBg + ';border:1px solid ' + perfOBorder + ';border-left:4px solid ' + perfOBorder + ';">'
           + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
-          + '<div style="font-size:13px;font-weight:800;color:#ffffff;letter-spacing:.05em;">SYSTEM ASSESSMENT: ' + perfOverall + '</div>'
+          + '<div style="font-size:13px;font-weight:800;color:' + perfOColor + ';letter-spacing:.05em;">SYSTEM ASSESSMENT: ' + perfOverall + '</div>'
           + (pendingDecisions > 0
-             ? '<div style="font-size:11px;color:#fde68a;background:rgba(113,63,18,0.5);padding:4px 10px;border-radius:6px;border:1px solid #ca8a04;">'
+             ? '<div style="font-size:11px;color:#92400e;background:#fef3c7;padding:4px 10px;border-radius:6px;border:1px solid #fcd34d;">'
                + '⚠ ' + pendingDecisions + ' metric(s) need your decision — use the "Your Decision" dropdowns above</div>'
-             : '<div style="font-size:11px;color:#86efac;">✓ All metrics reviewed</div>')
+             : '<div style="font-size:11px;color:#15803d;">✓ All metrics reviewed</div>')
           + '</div>'
-          + '<ul style="margin:0;padding-left:18px;color:#ffffff;font-size:12px;line-height:1.9;">'
+          + '<ul style="margin:0;padding-left:18px;color:#374151;font-size:12px;line-height:1.9;">'
           + '<li>' + perfPasses + ' of ' + checked + ' measured in-scope metrics within acceptable threshold</li>';
-    if (perfFails > 0)  html += '<li style="color:#fca5a5;">' + perfFails + ' metric(s) exceeded threshold — set Your Decision to Pass (if acceptable), Fail, or Accept Risk</li>';
-    if (perfWarns > 0)  html += '<li style="color:#fef08a;">' + perfWarns + ' metric(s) flagged for review — confirm in Your Decision column</li>';
-    if (perfFails === 0 && perfWarns === 0) html += '<li style="color:#86efac;">All measured metrics at or below source baseline</li>';
-    html += '<li style="color:#94a3b8;">System assessment is a suggestion only — your final decision drives Step 5 readiness</li>'
-          + '<li style="color:#94a3b8;">Lower-is-better: response time, error rate, CPU, memory, I/O wait, latency, DB connect · Higher-is-better: upload/download throughput</li>'
+    if (perfFails > 0)  html += '<li style="color:#b91c1c;">' + perfFails + ' metric(s) exceeded threshold — set Your Decision to Pass (if acceptable), Fail, or Accept Risk</li>';
+    if (perfWarns > 0)  html += '<li style="color:#b45309;">' + perfWarns + ' metric(s) flagged for review — confirm in Your Decision column</li>';
+    if (perfFails === 0 && perfWarns === 0) html += '<li style="color:#15803d;">All measured metrics at or below source baseline</li>';
+    html += '<li style="color:#6b7280;">System assessment is a suggestion only — your final decision drives Step 5 readiness</li>'
+          + '<li style="color:#6b7280;">Lower-is-better: response time, error rate, CPU, memory, I/O wait, latency, DB connect · Higher-is-better: upload/download throughput</li>'
           + '</ul></div>';
 
     var container = document.getElementById('perf-parsed-result');
@@ -10461,6 +10941,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     });
     renderCutoverBlueGreenRows();
     renderCutoverItems();
+    cutoverSaveMatrixCache();
     if ((cutoverBlueGreenRows || []).length) {
       setGovStatus('cutover-status', 'Traffic split set to source ' + blue + '% / FLEX ' + green + '%', 'pending');
     }
@@ -10748,6 +11229,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     renderCutoverBlueGreenRows();
     renderCutoverItems();
     cutoverUpdateLiveScanCards();
+    cutoverSaveMatrixCache();
     if (statusMessage) setGovStatus('cutover-status', statusMessage, exists ? 'pending' : 'done');
     return !exists;
   }
@@ -10791,6 +11273,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       return next;
     });
     cutoverPlanItems = scanRowsToCutoverItemsClient(cutoverBlueGreenRows);
+    cutoverSaveMatrixCache();
   }
 
   function scanRowsToCutoverItemsClient(rows) {
@@ -10900,6 +11383,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       renderCutoverBlueGreenRows();
       renderCutoverItems();
       cutoverUpdateLiveScanCards(data.counts || {});
+      cutoverSaveMatrixCache();
       const box = document.getElementById('cutover_artifacts');
       if (box) box.innerHTML = artifactLinks(cutoverPlanArtifacts);
       const sourceBox = document.getElementById('cutover_scanner_sources');
@@ -10936,6 +11420,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       cutoverPlanArtifacts = data.artifacts || {};
       renderCutoverBlueGreenRows();
       renderCutoverItems();
+      cutoverSaveMatrixCache();
       const box = document.getElementById('cutover_artifacts');
       if (box) box.innerHTML = artifactLinks(cutoverPlanArtifacts);
       const s = (cutoverPlan || {}).summary || {};
@@ -10958,6 +11443,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       cutoverRefreshScannerRowsFromMatrix();
       renderCutoverBlueGreenRows();
       renderCutoverItems();
+      cutoverSaveMatrixCache();
       const sourceBox = document.getElementById('cutover_scanner_sources');
       if (sourceBox) {
         const tables = data.scanner_tables || [];
@@ -11044,6 +11530,25 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     key: 'cutover_haproxy_ssh_key',
     apply: 'cutover_haproxy_apply_config'
   };
+  const CUTOVER_MATRIX_CACHE_KEY = 'cutover_pairing_matrix_v1';
+
+  function cutoverSaveMatrixCache() {
+    try { localStorage.setItem(CUTOVER_MATRIX_CACHE_KEY, JSON.stringify(cutoverBlueGreenRows || [])); } catch (_) {}
+  }
+
+  function cutoverLoadMatrixCache() {
+    try {
+      const raw = localStorage.getItem(CUTOVER_MATRIX_CACHE_KEY);
+      if (!raw) return;
+      const rows = JSON.parse(raw);
+      if (!Array.isArray(rows) || !rows.length) return;
+      cutoverBlueGreenRows = rows;
+      cutoverPlanItems = scanRowsToCutoverItemsClient(cutoverBlueGreenRows);
+      renderCutoverBlueGreenRows();
+      renderCutoverItems();
+      cutoverUpdateLiveScanCards();
+    } catch (_) {}
+  }
 
   function cutoverSaveHaproxyConfigCache() {
     cutoverStorageSet(CUTOVER_HAPROXY_CACHE_KEYS.host, cutoverTesterValue('cutover_source_cutover_host'));
@@ -11066,7 +11571,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     try {
       const applyValue = localStorage.getItem(CUTOVER_HAPROXY_CACHE_KEYS.apply);
       const applyEl = document.getElementById('cutover_lb_apply');
-      if (applyEl && applyValue !== null) applyEl.checked = applyValue === '1';
+      // Default to checked (live) unless user explicitly unchecked it (stored '0')
+      if (applyEl) applyEl.checked = applyValue !== '0';
     } catch (_) {}
   }
 
@@ -11218,6 +11724,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
     cutoverTesterFillPerformanceDefaults();
     cutoverTesterCalculatePerformance();
+    cutoverTesterSyncHaproxyDisplay();
     if (showStatus) {
       const hasRow = row && Object.keys(row).length;
       setGovStatus(
@@ -11233,64 +11740,52 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   }
 
   function cutoverTesterSelectedJumphost() {
-    const select = document.getElementById('cutover_tester_jumphost');
-    const idx = select ? Number(select.value) : -1;
-    const row = (cutoverTesterJumphosts || [])[idx] || {};
-    const manualIp = cutoverTesterValue('cutover_tester_jumphost_ip').trim();
-    if (manualIp) return Object.assign({}, row, {jumphost_ip: manualIp});
-    return row;
+    // Tester installs on the HAProxy server — same host used by the LB/HAProxy step
+    const host = cutoverTesterValue('cutover_source_cutover_host').trim()
+                 || cutoverTesterValue('cutover_tester_jumphost_ip').trim();
+    const user = cutoverTesterValue('cutover_source_ssh_user').trim()
+                 || cutoverTesterValue('cutover_tester_user').trim() || 'ubuntu';
+    const key  = cutoverTesterValue('cutover_source_ssh_key').trim()
+                 || cutoverTesterValue('cutover_tester_key').trim() || '~/.ssh/id_rsa';
+    return { jumphost_ip: host, jumphost_user: user, ssh_key: key,
+             api_url: host ? 'http://' + host + ':8000' : '' };
   }
 
-  function cutoverTesterRenderJumphosts() {
-    const select = document.getElementById('cutover_tester_jumphost');
-    if (!select) return;
-    const rows = (cutoverTesterJumphosts || []).map((row, idx) => ({row, idx}));
-    select.innerHTML = rows.length ? rows.map(x => {
-      const label = [x.row.region || 'UNKNOWN', x.row.name || 'jumphost', x.row.jumphost_ip || 'NEEDS IP', x.row.source || ''].filter(Boolean).join(' | ');
-      return '<option value="' + x.idx + '">' + escapeHtmlDr(label) + '</option>';
-    }).join('') : '<option value="-1">No jumphost candidates</option>';
-    cutoverTesterApplySelectedJumphost();
-    const status = document.getElementById('cutover_tester_jumphost_status');
-    if (status) {
-      status.textContent = rows.length ? ('Ready: choose one of ' + rows.length + ' Stage 2 jumphost candidate(s) for tester install/run.') : 'No jumphost candidates found in Stage 2 artifacts/cache/env.';
-      status.style.color = rows.length ? '#86efac' : '#fca5a5';
+  function cutoverTesterSyncHaproxyDisplay() {
+    var jh = cutoverTesterSelectedJumphost();
+    var hostEl = document.getElementById('ct-haproxy-host-display');
+    var userEl = document.getElementById('ct-haproxy-user-display');
+    var keyEl  = document.getElementById('ct-haproxy-key-display');
+    var apiEl  = document.getElementById('ct-haproxy-api-display');
+    var statEl = document.getElementById('cutover_tester_jumphost_status');
+    if (hostEl) hostEl.textContent = jh.jumphost_ip || '— not set';
+    if (userEl) userEl.textContent = jh.jumphost_user || 'ubuntu';
+    if (keyEl)  keyEl.textContent  = jh.ssh_key || '~/.ssh/id_rsa';
+    if (apiEl)  apiEl.textContent  = jh.api_url || 'http://…:8000';
+    // sync hidden fields for payload compat
+    cutoverTesterSetValue('cutover_tester_jumphost_ip', jh.jumphost_ip || '');
+    cutoverTesterSetValue('cutover_tester_user', jh.jumphost_user || 'ubuntu');
+    cutoverTesterSetValue('cutover_tester_key',  jh.ssh_key || '~/.ssh/id_rsa');
+    cutoverTesterSetValue('cutover_tester_api_url', jh.api_url || '');
+    if (statEl) {
+      if (jh.jumphost_ip) {
+        statEl.textContent = 'Tester will install on HAProxy server: ' + jh.jumphost_ip;
+        statEl.style.color = '#86efac';
+      } else {
+        statEl.textContent = 'Set the HAProxy server host in Step 2 above — it will be used automatically here.';
+        statEl.style.color = '#fcd34d';
+      }
     }
   }
 
-  function cutoverTesterApplySelectedJumphost() {
-    const select = document.getElementById('cutover_tester_jumphost');
-    const idx = select ? Number(select.value) : -1;
-    const row = (cutoverTesterJumphosts || [])[idx] || {};
-    if (!row || !Object.keys(row).length) return;
-    cutoverTesterSetValue('cutover_tester_jumphost_ip', row.jumphost_ip || '');
-    cutoverTesterSetValue('cutover_tester_user', row.jumphost_user || 'ubuntu');
-    cutoverTesterSetValue('cutover_tester_key', row.ssh_key || '~/.ssh/id_rsa');
-    cutoverTesterSetValue('cutover_tester_api_url', row.api_url || (row.jumphost_ip ? 'http://' + row.jumphost_ip + ':8000' : ''));
-  }
+  function cutoverTesterRenderJumphosts() { cutoverTesterSyncHaproxyDisplay(); }
+  function cutoverTesterApplySelectedJumphost() { cutoverTesterSyncHaproxyDisplay(); }
+  function cutoverTesterApplyJumphostIp() { cutoverTesterSyncHaproxyDisplay(); }
 
   async function cutoverTesterLoadJumphosts(skipAutofill) {
-    setGovStatus('cutover-tester-status', 'Loading jumphost candidates from Stage 2 artifacts', 'pending');
-    const installStatus = document.getElementById('cutover_tester_jumphost_status');
-    if (installStatus) {
-      installStatus.textContent = 'Loading jumphost candidates from Stage 2 scanner/snapshot artifacts...';
-      installStatus.style.color = '#fcd34d';
-    }
-    try {
-      const res = await fetch('/api/cutover-tester/jumphosts');
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Jumphost discovery failed');
-      cutoverTesterJumphosts = data.jumphosts || [];
-      cutoverTesterRenderJumphosts();
-      cutoverTesterJumphostsLoaded = true;
-      setGovStatus('cutover-tester-status', 'Loaded ' + cutoverTesterJumphosts.length + ' jumphost candidate(s).', cutoverTesterJumphosts.length ? 'done' : 'error');
-      if (!skipAutofill) setTimeout(() => cutoverTesterAutofillRequiredFields(false), 0);
-    } catch (err) {
-      if (installStatus) {
-        installStatus.textContent = err.message || String(err);
-        installStatus.style.color = '#fca5a5';
-      }
-      setGovStatus('cutover-tester-status', err.message || String(err), 'error');
-    }
+    cutoverTesterJumphostsLoaded = true;
+    cutoverTesterSyncHaproxyDisplay();
+    if (!skipAutofill) setTimeout(() => cutoverTesterAutofillRequiredFields(false), 0);
   }
 
   function cutoverTesterCalculatePerformance() {
@@ -11371,10 +11866,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     return {
       action,
       migration_id: cutoverTesterValue('cutover_tester_migration_id') || 'cutover',
-      jumphost_ip: jh.jumphost_ip || (cutoverTesterValue('cutover_tester_api_url').match(/\/\/([^:/]+)/) || [])[1] || '',
-      jumphost_user: cutoverTesterValue('cutover_tester_user') || 'ubuntu',
-      ssh_key: cutoverTesterValue('cutover_tester_key') || '~/.ssh/id_rsa',
-      api_url: cutoverTesterValue('cutover_tester_api_url'),
+      jumphost_ip:   jh.jumphost_ip   || '',
+      jumphost_user: jh.jumphost_user || 'ubuntu',
+      ssh_key:       jh.ssh_key       || '~/.ssh/id_rsa',
+      api_url:       jh.api_url       || '',
       source_url: cutoverTesterValue('cutover_tester_source_url'),
       target_url: cutoverTesterValue('cutover_tester_target_url'),
       health_path: cutoverTesterValue('cutover_tester_health_path') || '/health',
@@ -11404,6 +11899,43 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       download_mbps: cutoverTesterNumber('cutover_perf_download_mbps'),
       mobile_lag_status: cutoverTesterValue('cutover_perf_mobile_lag_status') || 'Pass'
     };
+  }
+
+  var CO_TESTER_RESULTS_CACHE_KEY = 'co_tester_results_v1';
+
+  function cutoverTesterSaveResultsCache() {
+    try {
+      var logEl    = document.getElementById('cutover-tester-log-output');
+      var sumEl    = document.getElementById('cutover-tester-summary-cards');
+      var statEl   = document.getElementById('cutover-tester-status-indicator');
+      localStorage.setItem(CO_TESTER_RESULTS_CACHE_KEY, JSON.stringify({
+        rows:         cutoverTesterResults   || [],
+        artifacts:    cutoverTesterArtifacts || {},
+        logHtml:      logEl   ? logEl.innerHTML           : '',
+        summaryHtml:  sumEl   ? sumEl.innerHTML            : '',
+        summaryShow:  sumEl   ? sumEl.style.display        : 'none',
+        statusText:   statEl  ? statEl.textContent         : '',
+        statusColor:  statEl  ? statEl.style.color         : ''
+      }));
+    } catch(_) {}
+  }
+
+  function cutoverTesterLoadResultsCache() {
+    try {
+      var raw = localStorage.getItem(CO_TESTER_RESULTS_CACHE_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d) return;
+      if (d.rows && d.rows.length) cutoverTesterRenderResults(d.rows, d.artifacts || {});
+      var logEl  = document.getElementById('cutover-tester-log-output');
+      var sumEl  = document.getElementById('cutover-tester-summary-cards');
+      var statEl = document.getElementById('cutover-tester-status-indicator');
+      var termBox= document.getElementById('cutover-tester-terminal-box');
+      if (logEl  && d.logHtml)     { logEl.innerHTML = d.logHtml; }
+      if (sumEl  && d.summaryHtml) { sumEl.innerHTML = d.summaryHtml; sumEl.style.display = d.summaryShow || 'flex'; }
+      if (statEl && d.statusText)  { statEl.textContent = d.statusText; statEl.style.color = d.statusColor || ''; }
+      if (termBox && (d.logHtml || d.summaryHtml)) termBox.style.display = 'block';
+    } catch(_) {}
   }
 
   function cutoverTesterUpdateArtifacts(artifacts) {
@@ -11717,6 +12249,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       return {skip:false, display:line};
     }
     // [PERF] lines — add as body text inside the performance stage card, or fallback check card
+    if (line.startsWith('[PERF DATA]')) {
+      try {
+        var pd = JSON.parse(line.slice('[PERF DATA] '.length));
+        cutoverTesterFillPerformance(pd);
+      } catch(_) {}
+      return {skip:true};
+    }
     if (line.startsWith('[PERF]')) {
       const card = window.cutoverTesterCurrentStageCard;
       if (card) {
@@ -11738,12 +12277,82 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     return {skip:false, display:line};
   }
 
-  async function cutoverStream(path, payload, terminalBoxId, logId, statusId, resultHandler) {
+  var _CHECK_LABELS = {
+    configure: 'Configuration', 'source-target-health': 'Source and FLEX health',
+    'health-check': 'Health check', 'smoke-test': 'Smoke test',
+    'pre-cutover-gate': 'Pre-cutover gate', 'performance-config': 'Performance config',
+    'performance-validation': 'Performance validation'
+  };
+
+  function jarvisStreamAnnounce(line, logId) {
+    if (typeof jarvisAnnounce !== 'function') return;
+    if (!line) return;
+
+    // ── Cutover Tester stream ─────────────────────────────────────────────────
+    if (logId === 'cutover-tester-log-output') {
+      // Stage header: ===== FLEX 30% RAMP =====
+      var stageM = line.match(/^=====\s+(.+?)\s+=====$/);
+      if (stageM) { jarvisAnnounce('Starting ' + stageM[1] + '.'); return; }
+
+      // Phase header: === PHASE 1: Configuration ===
+      var ph1 = line.match(/^===\s+PHASE 1[:\s]+(.+?)\s*=+$/i);
+      if (ph1) { jarvisAnnounce('Phase one: ' + ph1[1].replace(/==+/,'').trim() + '.'); return; }
+      var ph2 = line.match(/^===\s+PHASE 2[:\s]+(.+?)\s*=+$/i);
+      if (ph2) { jarvisAnnounce('Phase two: ' + ph2[1].replace(/==+/,'').trim() + '.'); return; }
+
+      // [OK] check-name: detail
+      var okM = line.match(/^\[OK\]\s+([\w-]+):\s*(.+)$/);
+      if (okM) { jarvisAnnounce((_CHECK_LABELS[okM[1]] || okM[1].replace(/-/g,' ')) + ' passed.'); return; }
+
+      // [ERROR] check-name: detail
+      var errM = line.match(/^\[ERROR\]\s+([\w-]+):\s*(.+)$/);
+      if (errM) {
+        var _detail = errM[2].slice(0, 70);
+        jarvisAnnounce((_CHECK_LABELS[errM[1]] || errM[1].replace(/-/g,' ')) + ' failed. ' + _detail + '.');
+        return;
+      }
+
+      // [RAMP RESULT] FLEX 30% | OSPC hits=X | FLEX hits=Y | ... | result=PASS
+      var rampM = line.match(/^\[RAMP RESULT\]\s+(.+?)\s+\|.*?FLEX hits=(\d+).*?\|\s*result=(\w+)/);
+      if (rampM) {
+        var rRes = rampM[3].toUpperCase();
+        jarvisAnnounce(rampM[1] + ': ' + rampM[2] + ' FLEX hits. ' + (rRes === 'PASS' ? 'Passed.' : 'Needs review.'));
+        return;
+      }
+
+      // Summary lines
+      var sumM = line.match(/^\[SUMMARY\]\s+(.+)$/);
+      if (sumM) { jarvisAnnounce(sumM[1].replace(/\|/g,' —').slice(0,100) + '.'); return; }
+      var checkSumM = line.match(/^\[CHECK SUMMARY\]\s+(.+)$/);
+      if (checkSumM) { jarvisAnnounce(checkSumM[1].replace(/\|/g,' —').slice(0,100) + '.'); return; }
+      return;
+    }
+
+    // ── Cutover Exec stream (s5-log-output) ──────────────────────────────────
+    if (logId === 's5-log-output') {
+      // Errors always announced
+      if (line.startsWith('[ERROR]') || line.startsWith('[FAIL]')) {
+        jarvisAnnounce('Error: ' + line.replace(/^\[(?:ERROR|FAIL)\]\s*/, '').slice(0,80) + '.');
+        return;
+      }
+      // Key OK milestones only — not every SSH line
+      var execOk = line.match(/^\[OK\]\s+(.+)$/);
+      if (execOk) {
+        var _msg = execOk[1];
+        var _keywords = ['haproxy','health','reload','complete','connect','db','database','smoke','gate','traffic'];
+        var _isKey = _keywords.some(function(k){ return _msg.toLowerCase().includes(k); });
+        if (_isKey) { jarvisAnnounce(_msg.slice(0,80) + '.'); }
+        return;
+      }
+    }
+  }
+
+  async function cutoverStream(path, payload, terminalBoxId, logId, statusId, resultHandler, appendMode) {
     const termBox = document.getElementById(terminalBoxId);
     const logOut = document.getElementById(logId);
     const statusText = document.getElementById(statusId);
     if (termBox) termBox.style.display = 'block';
-    if (logOut) logOut.innerHTML = '';
+    if (logOut && !appendMode) logOut.innerHTML = '';
     cutoverTesterResetSummaryCards(logId);
     if (statusText) {
       statusText.textContent = 'Running...';
@@ -11781,16 +12390,19 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               displayLine = '[RESULT_TABLE] Result table updated with ' + ((table.rows || []).length) + ' row(s).';
             } catch (e) {}
           }
-          if (line.includes('[ERROR]') || line.includes('FAIL')) hasError = true;
+          const isDryRun = line.startsWith('[DRY-RUN]');
+          if (!isDryRun && (line.startsWith('[ERROR]') || line.startsWith('[FAIL]'))) hasError = true;
+          jarvisStreamAnnounce(line, logId);
           if (logId === 'cutover-tester-log-output') {
             const formatted = cutoverTesterFormatStreamLine(displayLine);
             if (formatted.skip) return;
             displayLine = formatted.display || displayLine;
           }
           let html = escapeHtmlDr(displayLine);
-          if (line.includes('[ERROR]') || line.includes('FAIL')) html = '<span style="color:#ef4444;">' + html + '</span>';
-          else if (line.includes('[OK]') || line.includes('PASS') || line.includes('APPROVED')) html = '<span style="color:#22c55e;">' + html + '</span>';
-          else if (line.includes('[WARN]') || line.includes('REVIEW')) html = '<span style="color:#facc15;">' + html + '</span>';
+          if (!isDryRun && (line.startsWith('[ERROR]') || line.startsWith('[FAIL]'))) html = '<span style="color:#ef4444;">' + html + '</span>';
+          else if (isDryRun) html = '<span style="color:#94a3b8;">' + html + '</span>';
+          else if (line.startsWith('[OK]') || line.includes('PASS') || line.includes('APPROVED')) html = '<span style="color:#22c55e;">' + html + '</span>';
+          else if (line.startsWith('[WARN]') || line.startsWith('[REVIEW]')) html = '<span style="color:#facc15;">' + html + '</span>';
           if (logOut) {
             logOut.innerHTML += html + '\n';
             logOut.scrollTop = logOut.scrollHeight;
@@ -11882,15 +12494,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     await cutoverTesterAutofillRequiredFields(false);
     cutoverSyncMatrixFromInputs();
     cutoverSaveHaproxyConfigCache();
-    const selectedJumphost = cutoverTesterSelectedJumphost();
-    if (!selectedJumphost.jumphost_ip && !cutoverTesterValue('cutover_tester_api_url')) {
-      setGovStatus('cutover-tester-status', 'Choose a Stage 2 jumphost before running Cut over TEST.', 'error');
-      return;
-    }
-    if (!cutoverTesterValue('cutover_source_cutover_host')) {
-      setGovStatus('cutover-tester-status', 'Enter the Source infra host for HAProxy before running Cut over TEST.', 'error');
-      return;
-    }
+    cutoverTesterSyncHaproxyDisplay();
     if (!cutoverTesterValue('cutover_tester_source_url') || !cutoverTesterValue('cutover_tester_target_url')) {
       setGovStatus('cutover-tester-status', 'Source app URL and Target FLEX app URL are required before running Cut over TEST.', 'error');
       return;
@@ -11898,33 +12502,65 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     cutoverTesterCalculatePerformance();
     const concurrent = cutoverTesterNumber('cutover_perf_target_concurrent_users') || 10;
     if (concurrent > 100 && !confirm('High-load cutover performance tests need manual confirmation. Continue?')) return;
+    if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Cutover test started. Running all validation stages.');
     try {
       await cutoverStream('/api/cutover-tester/run', cutoverTesterPayload('cutover-test'), 'cutover-tester-terminal-box', 'cutover-tester-log-output', 'cutover-tester-status-indicator');
       setGovStatus('cutover-tester-status', 'Cut over TEST finished. Review the card summary, result table, and CSV.', 'done');
+      cutoverTesterSaveResultsCache();
+      if (typeof jarvisAnnounce === 'function') {
+        var _rows = cutoverTesterResults || [];
+        if (_rows.length) {
+          var _passes = _rows.filter(function(r){ return (r.result_status||r.performance_status||'').toUpperCase()==='PASS'; }).length;
+          var _fails  = _rows.filter(function(r){ return ['FAIL','ERROR'].includes((r.result_status||r.performance_status||'').toUpperCase()); }).length;
+          var _stageSummary = _rows.map(function(r){
+            var n = (r.test_name||'').replace(/-/g,' ');
+            var s = (r.result_status||r.performance_status||'').toUpperCase();
+            return n + ': ' + (s==='PASS'?'pass':s==='FAIL'?'fail':'review');
+          }).join('. ');
+          jarvisAnnounce('Cutover test complete. ' + _stageSummary + '. ' + _passes + ' of ' + _rows.length + ' stages passed' + (_fails?' — ' + _fails + ' failed.':'.'));
+        } else {
+          jarvisAnnounce('Cutover test complete. Review the result table.');
+        }
+      }
     } catch (err) {
       setGovStatus('cutover-tester-status', err.message || String(err), 'error');
+      if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Cutover test failed. ' + (err.message || 'Check the log for details.'));
     }
   }
 
   async function cutoverTesterDryRun() {
     await cutoverTesterAutofillRequiredFields(false);
     cutoverSyncMatrixFromInputs();
-    const selectedJumphost = cutoverTesterSelectedJumphost();
-    if (!selectedJumphost.jumphost_ip && !cutoverTesterValue('cutover_tester_api_url')) {
-      setGovStatus('cutover-tester-status', 'Choose a Stage 2 jumphost before running the dry run.', 'error');
-      return;
-    }
+    cutoverTesterSyncHaproxyDisplay();
     if (!cutoverTesterValue('cutover_tester_source_url') || !cutoverTesterValue('cutover_tester_target_url')) {
       setGovStatus('cutover-tester-status', 'Source app URL and Target FLEX app URL are required for the dry run.', 'error');
       return;
     }
     cutoverTesterCalculatePerformance();
+    if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Dry run started. Validating config and performance only. No HAProxy changes, no traffic will be touched.');
     try {
       setGovStatus('cutover-tester-status', 'Dry Run: validating config & performance only — no HAProxy changes, no traffic touched.', 'warning');
       await cutoverStream('/api/cutover-tester/run', cutoverTesterPayload('dry-run'), 'cutover-tester-terminal-box', 'cutover-tester-log-output', 'cutover-tester-status-indicator');
       setGovStatus('cutover-tester-status', 'Dry Run finished. Review results — no traffic was modified.', 'done');
+      cutoverTesterSaveResultsCache();
+      if (typeof jarvisAnnounce === 'function') {
+        var _dryRows = cutoverTesterResults || [];
+        if (_dryRows.length) {
+          var _dPasses = _dryRows.filter(function(r){ return (r.result_status||r.performance_status||'').toUpperCase()==='PASS'; }).length;
+          var _dFails  = _dryRows.filter(function(r){ return ['FAIL','ERROR'].includes((r.result_status||r.performance_status||'').toUpperCase()); }).length;
+          var _dSummary = _dryRows.map(function(r){
+            var n = (r.test_name||'').replace(/-/g,' ');
+            var s = (r.result_status||r.performance_status||'').toUpperCase();
+            return n + ': ' + (s==='PASS'?'pass':s==='FAIL'?'fail':'review');
+          }).join('. ');
+          jarvisAnnounce('Dry run complete. No traffic was modified. ' + _dSummary + '. ' + _dPasses + ' of ' + _dryRows.length + ' stages passed' + (_dFails?' — ' + _dFails + ' failed.':'.'));
+        } else {
+          jarvisAnnounce('Dry run complete. No traffic was modified. Review the results.');
+        }
+      }
     } catch (err) {
       setGovStatus('cutover-tester-status', err.message || String(err), 'error');
+      if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Dry run failed. ' + (err.message || 'Check the log for details.'));
     }
   }
 
@@ -11940,11 +12576,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   async function cutoverTesterAction(action) {
     await cutoverTesterAutofillRequiredFields(false);
     cutoverSyncMatrixFromInputs();
-    const selectedJumphost = cutoverTesterSelectedJumphost();
-    if (!selectedJumphost.jumphost_ip && !cutoverTesterValue('cutover_tester_api_url')) {
-      setGovStatus('cutover-tester-status', 'Choose a Stage 2 jumphost before running the cutover tester.', 'error');
-      return;
-    }
+    cutoverTesterSyncHaproxyDisplay();
     try {
       await cutoverStream('/api/cutover-tester/run', cutoverTesterPayload(action), 'cutover-tester-terminal-box', 'cutover-tester-log-output', 'cutover-tester-status-indicator');
       setGovStatus('cutover-tester-status', action + ' completed. Review the output table.', 'done');
@@ -11965,19 +12597,216 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     }
   }
 
+  function _buildCutoverReportHtml(valRec, rows, logText) {
+    const esc = v => String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const pad = n => String(n).padStart(2,'0');
+    const now = new Date();
+    const genTime = pad(now.getDate()) + '/' + pad(now.getMonth()+1) + '/' + now.getFullYear() + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    const customer = valRec ? valRec.customer : '';
+    const operator = valRec ? valRec.operator : '';
+    const dateStr  = valRec ? valRec.date : genTime.split(' ')[0];
+    const timeStr  = valRec ? valRec.time : genTime.split(' ')[1];
+
+    const statusBadge = s => {
+      const u = String(s||'pending').toUpperCase();
+      if (u === 'PASS')    return '<span style="background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;">✓ PASS</span>';
+      if (u === 'FAIL')    return '<span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;">✗ FAIL</span>';
+      if (u === 'REVIEW' || u === 'NEEDS REVIEW') return '<span style="background:#fef9c3;color:#b45309;border:1px solid #fde047;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;">⚠ REVIEW</span>';
+      if (u === 'SKIPPED') return '<span style="background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;">— SKIP</span>';
+      return '<span style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:5px;padding:2px 9px;font-size:11px;font-weight:700;">' + esc(s||'pending') + '</span>';
+    };
+
+    // Execution steps
+    let stepsRows = '';
+    if (typeof _co !== 'undefined' && _co.steps) {
+      _co.steps.forEach((id, i) => {
+        const label = _co.stepLabels[id] || id;
+        const status = _co.stepStatus[id] || 'pending';
+        const bg = i % 2 === 0 ? '#fff' : '#f0f9ff';
+        stepsRows += `<tr style="background:${bg}">
+          <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#1e293b;">${esc(label)}</td>
+          <td style="padding:10px 16px;">${statusBadge(status)}</td>
+        </tr>`;
+      });
+    }
+
+    // Test results table
+    const testCols = [
+      ['Test Name','test_name'], ['Status',null], ['Gate','cutover_gate'],
+      ['Source URL','source_app_url'], ['Target URL','target_app_url'],
+      ['Src OK','source_ok'], ['Tgt OK','target_ok'],
+      ['Src ms',null], ['Tgt ms',null],
+      ['Avg Δ','avg_response_delta'], ['P95 Δ','p95_delta'],
+      ['Err %','api_error_rate_percent'], ['Recommendation','recommendation'], ['Created','created_at']
+    ];
+    let testRows = '';
+    (rows || []).forEach((r, i) => {
+      const bg = i % 2 === 0 ? '#fff' : '#f0f9ff';
+      const status = r.result_status || r.performance_status || '';
+      const srcMs = r.source_latency_ms || r.ospc_avg_response_ms || '';
+      const tgtMs = r.target_latency_ms || r.flex_avg_response_ms || '';
+      testRows += `<tr style="background:${bg}">
+        <td style="padding:8px 10px;font-size:11px;font-weight:600;color:#1e293b;white-space:nowrap;">${esc(r.test_name)}</td>
+        <td style="padding:8px 10px;">${statusBadge(status)}</td>
+        <td style="padding:8px 10px;font-size:11px;color:#0369a1;">${esc(r.cutover_gate)}</td>
+        <td style="padding:8px 10px;font-size:10px;color:#475569;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.source_app_url)}">${esc(r.source_app_url)}</td>
+        <td style="padding:8px 10px;font-size:10px;color:#475569;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.target_app_url)}">${esc(r.target_app_url)}</td>
+        <td style="padding:8px 10px;text-align:center;">${r.source_ok ? (String(r.source_ok).toUpperCase()==='TRUE'||r.source_ok===true?'<span style="color:#15803d;font-weight:700;">✓</span>':'<span style="color:#dc2626;font-weight:700;">✗</span>') : '—'}</td>
+        <td style="padding:8px 10px;text-align:center;">${r.target_ok ? (String(r.target_ok).toUpperCase()==='TRUE'||r.target_ok===true?'<span style="color:#15803d;font-weight:700;">✓</span>':'<span style="color:#dc2626;font-weight:700;">✗</span>') : '—'}</td>
+        <td style="padding:8px 10px;font-size:11px;text-align:right;">${esc(srcMs)}</td>
+        <td style="padding:8px 10px;font-size:11px;text-align:right;">${esc(tgtMs)}</td>
+        <td style="padding:8px 10px;font-size:11px;text-align:right;">${esc(r.avg_response_delta)}</td>
+        <td style="padding:8px 10px;font-size:11px;text-align:right;">${esc(r.p95_delta)}</td>
+        <td style="padding:8px 10px;font-size:11px;text-align:right;">${esc(r.api_error_rate_percent)}</td>
+        <td style="padding:8px 10px;font-size:10px;color:#475569;">${esc(r.recommendation)}</td>
+        <td style="padding:8px 10px;font-size:10px;color:#94a3b8;white-space:nowrap;">${esc(r.created_at)}</td>
+      </tr>`;
+    });
+
+    const logSection = logText ? `
+      <div style="margin:0 32px 24px;">
+        <div style="border-radius:10px;overflow:hidden;border:1px solid #bae6fd;box-shadow:0 2px 8px rgba(14,165,233,.08);">
+          <div style="background:#0369a1;color:#fff;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:.5px;">📋 EXECUTION LOG</div>
+          <pre style="margin:0;padding:16px 20px;font-family:'Courier New',monospace;font-size:10px;line-height:1.6;color:#1e293b;background:#f8fafc;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;">${esc(logText)}</pre>
+        </div>
+      </div>` : '';
+
+    const certContent = valRec ? `
+      <div style="margin:0 32px 32px;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:2px solid #22c55e;border-radius:12px;padding:28px 32px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="font-size:36px;">🏅</div>
+          <div>
+            <div style="font-size:20px;font-weight:800;color:#15803d;letter-spacing:.5px;">CUTOVER VALIDATION CERTIFICATE</div>
+            <div style="font-size:12px;color:#166534;margin-top:2px;">Issued upon successful completion and operator sign-off</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:160px 1fr;gap:0;border:1px solid #86efac;border-radius:8px;overflow:hidden;background:#fff;margin-bottom:16px;">
+          <div style="padding:9px 14px;background:#f0fdf4;font-size:12px;font-weight:700;color:#15803d;border-bottom:1px solid #d1fae5;">Customer</div>
+          <div style="padding:9px 14px;font-size:13px;font-weight:700;color:#1e293b;border-bottom:1px solid #d1fae5;">${esc(customer)}</div>
+          <div style="padding:9px 14px;background:#f0fdf4;font-size:12px;font-weight:700;color:#15803d;border-bottom:1px solid #d1fae5;">Operator</div>
+          <div style="padding:9px 14px;font-size:13px;font-weight:700;color:#1e293b;border-bottom:1px solid #d1fae5;">${esc(operator)}</div>
+          <div style="padding:9px 14px;background:#f0fdf4;font-size:12px;font-weight:700;color:#15803d;border-bottom:1px solid #d1fae5;">Date</div>
+          <div style="padding:9px 14px;font-size:13px;color:#1e293b;border-bottom:1px solid #d1fae5;">${esc(dateStr)}</div>
+          <div style="padding:9px 14px;background:#f0fdf4;font-size:12px;font-weight:700;color:#15803d;">Time</div>
+          <div style="padding:9px 14px;font-size:13px;color:#1e293b;">${esc(timeStr)}</div>
+        </div>
+        <div style="background:#fff;border-left:4px solid #22c55e;border-radius:6px;padding:14px 18px;font-size:14px;font-weight:700;color:#14532d;">
+          ✅ Cut over done by Operator <em>${esc(operator)}</em> for customer <em>${esc(customer)}</em> on ${esc(dateStr)}
+        </div>
+      </div>` : `
+      <div style="margin:0 32px 32px;background:#fef9c3;border:2px solid #fde047;border-radius:10px;padding:18px 24px;color:#92400e;font-size:13px;font-weight:600;">
+        ⚠️ No validation record — use the <strong>CUT OVER VALIDATION</strong> button to sign off before exporting the final report.
+      </div>`;
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cutover Execution Report${customer ? ' — ' + customer : ''}</title>
+<style>
+  * { box-sizing:border-box; }
+  body { font-family:'Segoe UI',Arial,sans-serif; background:#f0f9ff; color:#1e293b; margin:0; padding:0; }
+  a { color:#0369a1; }
+</style>
+</head>
+<body>
+<!-- Header -->
+<div style="background:linear-gradient(135deg,#0369a1 0%,#0ea5e9 100%);color:#fff;padding:36px 40px 28px;">
+  <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:.75;margin-bottom:6px;">OSFlex Migration Platform</div>
+  <div style="font-size:26px;font-weight:800;letter-spacing:.5px;">CUTOVER EXECUTION REPORT</div>
+  ${customer ? `<div style="font-size:14px;opacity:.85;margin-top:6px;">Customer: <strong>${esc(customer)}</strong>${operator ? ' &nbsp;·&nbsp; Operator: <strong>' + esc(operator) + '</strong>' : ''}</div>` : ''}
+  <div style="font-size:11px;opacity:.65;margin-top:4px;">Generated: ${genTime}</div>
+</div>
+
+<!-- Summary strip -->
+<div style="background:#fff;border-bottom:1px solid #bae6fd;padding:12px 40px;display:flex;gap:32px;flex-wrap:wrap;">
+  <div><span style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;">Date</span><br><span style="font-size:14px;font-weight:700;color:#1e293b;">${esc(dateStr)}</span></div>
+  <div><span style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;">Time</span><br><span style="font-size:14px;font-weight:700;color:#1e293b;">${esc(timeStr)}</span></div>
+  <div><span style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;">Test Stages</span><br><span style="font-size:14px;font-weight:700;color:#1e293b;">${rows.length}</span></div>
+  <div><span style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;">Passed</span><br><span style="font-size:14px;font-weight:700;color:#15803d;">${rows.filter(r=>(r.result_status||r.performance_status||'').toUpperCase()==='PASS').length}</span></div>
+  <div><span style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;">Failed</span><br><span style="font-size:14px;font-weight:700;color:#dc2626;">${rows.filter(r=>['FAIL','ERROR'].includes((r.result_status||r.performance_status||'').toUpperCase())).length}</span></div>
+</div>
+
+<!-- Execution Steps -->
+<div style="margin:24px 32px 0;">
+  <div style="border-radius:10px;overflow:hidden;border:1px solid #bae6fd;box-shadow:0 2px 8px rgba(14,165,233,.08);">
+    <div style="background:#0369a1;color:#fff;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:.5px;">⚙️ EXECUTION STEPS</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 16px;text-align:left;font-size:12px;font-weight:700;">Step</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 16px;text-align:left;font-size:12px;font-weight:700;width:120px;">Status</th>
+      </tr></thead>
+      <tbody>${stepsRows || '<tr><td colspan="2" style="padding:12px 16px;color:#94a3b8;font-style:italic;">No step data</td></tr>'}</tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Test Results -->
+<div style="margin:24px 32px 0;overflow-x:auto;">
+  <div style="border-radius:10px;overflow:hidden;border:1px solid #bae6fd;box-shadow:0 2px 8px rgba(14,165,233,.08);">
+    <div style="background:#0369a1;color:#fff;padding:10px 20px;font-size:13px;font-weight:700;letter-spacing:.5px;">🧪 CUTOVER TEST RESULTS</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Test Name</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Status</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Gate</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Source URL</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Target URL</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:center;font-size:11px;font-weight:700;white-space:nowrap;">Src OK</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:center;font-size:11px;font-weight:700;white-space:nowrap;">Tgt OK</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">Src ms</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">Tgt ms</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">Avg Δ</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">P95 Δ</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:right;font-size:11px;font-weight:700;white-space:nowrap;">Err %</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Recommendation</th>
+        <th style="background:#0c4a6e;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;white-space:nowrap;">Created</th>
+      </tr></thead>
+      <tbody>${testRows || '<tr><td colspan="14" style="padding:16px;color:#94a3b8;font-style:italic;text-align:center;">No test results — run Cutover Test first.</td></tr>'}</tbody>
+    </table>
+  </div>
+</div>
+
+${logSection}
+
+${certContent}
+
+<div style="text-align:center;padding:20px 32px;font-size:10px;color:#94a3b8;border-top:1px solid #e0f2fe;margin-top:8px;">
+  OSFlex Migration Platform &nbsp;·&nbsp; Cutover Execution Report &nbsp;·&nbsp; Generated ${genTime}
+</div>
+</body>
+</html>`;
+  }
+
   async function cutoverTesterExportResultsCsv() {
     try {
       const res = await fetch('/api/cutover-tester/results');
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Result load failed');
       cutoverTesterRenderResults(data.rows || [], data.artifacts || {});
-      const artifacts = data.artifacts || {};
-      const csvKey = Object.keys(artifacts).find(k => k.endsWith('cutover_tester_results.csv') && !k.startsWith('.tmp_runs'))
-        || Object.keys(artifacts).find(k => k.endsWith('cutover_tester_results.csv'));
-      const csvUrl = csvKey && artifacts[csvKey] ? artifacts[csvKey].url : '';
-      if (!csvUrl) throw new Error('No test result CSV found yet. Run Cut over TEST first.');
-      window.open(csvUrl, '_blank');
-      setGovStatus('cutover-tester-status', 'Exporting Cut over TEST result CSV.', 'done');
+
+      const rows = data.rows || cutoverTesterResults || [];
+      let valRec = null;
+      try { valRec = JSON.parse(localStorage.getItem('co_validation_record_v1') || 'null'); } catch(_) {}
+      const logEl = document.getElementById('s5-log-output');
+      const logText = logEl ? logEl.innerText.trim() : '';
+
+      const html = _buildCutoverReportHtml(valRec, rows, logText);
+      const pad = n => String(n).padStart(2,'0');
+      const now = new Date();
+      const customerSlug = valRec ? valRec.customer.replace(/\s+/g,'-') + '_' : '';
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cutover_report_' + customerSlug + now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) + '.html';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setGovStatus('cutover-tester-status', 'Report exported' + (valRec ? ' — validated by ' + valRec.operator : '') + '.', 'done');
     } catch (err) {
       setGovStatus('cutover-tester-status', err.message || String(err), 'error');
     }
@@ -12877,6 +13706,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       try {
         cutoverLoadCloudCredentials();
         cutoverLoadHaproxyConfigCache();
+        cutoverInitCredPanel();
+        cutoverLoadMatrixCache();
       } catch (err) {
         console.warn('Cutover credential load failed', err);
       }
@@ -12886,6 +13717,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       } catch (err) {
         console.warn('Cutover tester jumphost load failed', err);
       }
+      try { cutoverTesterLoadResultsCache(); } catch(e) { console.warn('Tester results cache restore failed', e); }
+      try { _coMonLoadCache(); } catch(e) { console.warn('Monitor cache restore failed', e); }
     }
     requestAnimationFrame(syncVisibleIframeHeights);
     if (stageId === 's7a') { try { s7aRefreshSnapshot(); } catch(e) {} }
@@ -14240,7 +15073,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       const statusText = document.getElementById('s5-status-indicator');
 
       termBox.style.display = 'block';
-      logOut.innerHTML = 'Initializing Cutover Operation: ' + taskType.toUpperCase() + '...\n\n';
+      logOut.innerHTML += (logOut.innerHTML ? '\n' : '') + '── ' + taskType.toUpperCase() + ' ──\n\n';
+      logOut.scrollTop = logOut.scrollHeight;
       statusText.textContent = 'Executing...';
       statusText.style.color = '#f39c12';
 

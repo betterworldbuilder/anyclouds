@@ -29,6 +29,59 @@
     .browser-panel { border:1px solid rgba(125,211,252,.28); border-radius:8px; background:rgba(2,6,23,.55); padding:14px; display:grid; gap:10px; }
     .hidden { display:none; }
     a { color:#7dd3fc; }
+
+    /* ── Flex Skyline light theme ─────────────────────────────────────────── */
+    body.light-theme {
+      background: #f5f7fb !important;
+      color: #151922 !important;
+    }
+    body.light-theme .card {
+      background: #ffffff !important;
+      border-color: #e2e6ec !important;
+      box-shadow: 0 1px 4px rgba(15,23,42,.06) !important;
+    }
+    body.light-theme h1 { color: #1e293b !important; }
+    body.light-theme h2 { color: #1e40af !important; }
+    body.light-theme .meta { color: #596273 !important; }
+    body.light-theme label { color: #374151 !important; }
+    body.light-theme select, body.light-theme input[type="file"] {
+      background: #ffffff !important;
+      border-color: #d1d5db !important;
+      color: #151922 !important;
+    }
+    body.light-theme button {
+      background: linear-gradient(135deg,#1d4ed8,#2563eb) !important;
+      border-color: #3b82f6 !important;
+      color: #ffffff !important;
+    }
+    body.light-theme a { color: #1d4ed8 !important; }
+    body.light-theme .summary .metric {
+      background: #f8fafc !important;
+      border-color: #e2e6ec !important;
+    }
+    body.light-theme .metric div:first-child { color: #64748b !important; }
+    body.light-theme .metric div:last-child { color: #1e293b !important; }
+    body.light-theme .positive { color: #15803d !important; }
+    body.light-theme .negative { color: #dc2626 !important; }
+    body.light-theme .table-wrap {
+      background: #ffffff !important;
+      border-color: #e2e6ec !important;
+    }
+    body.light-theme table { background: #ffffff !important; }
+    body.light-theme th {
+      background: #f1f5f9 !important;
+      color: #374151 !important;
+      border-bottom-color: #e2e6ec !important;
+    }
+    body.light-theme td {
+      color: #374151 !important;
+      border-bottom-color: #f1f5f9 !important;
+    }
+    body.light-theme .browser-panel {
+      background: #f8fafc !important;
+      border-color: #e2e6ec !important;
+    }
+    body.light-theme #status { color: #596273 !important; }
   </style>
 </head>
 <body>
@@ -396,6 +449,11 @@
       downloadCsv(`tco_${s.source || 'source'}_${s.source_region || 'global'}_${stamp}.csv`, rows, headers);
     });
     load();
+  </script>
+  <script>
+    function applyGlobalTheme(t){document.body.classList.toggle('light-theme',t==='flex-skyline'||t==='light');}
+    window.addEventListener('message',function(e){if(e.data&&e.data.type==='osflex-theme')applyGlobalTheme(e.data.theme);});
+    (function(){try{var s=(window.parent&&window.parent!==window)?window.parent.localStorage.getItem('osflex_global_theme_v2'):localStorage.getItem('osflex_global_theme_v2');if(s)applyGlobalTheme(s);}catch(_){}})();
   </script>
 </body>
 </html>
