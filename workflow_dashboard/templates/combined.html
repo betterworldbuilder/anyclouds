@@ -5991,6 +5991,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var lbl = document.getElementById('co-current-step-label');
               if (lbl) lbl.textContent = active ? _co.stepLabels[active] : 'Done';
               _updateDecision();
+              // Keep advanced dashboard in sync whenever state changes
+              if (typeof coAdvRefresh === 'function' && localStorage.getItem('cutoverDashboardMode') === 'advanced') {
+                coAdvRefresh();
+              }
             }
 
             function _updateDecision() {
@@ -6030,8 +6034,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               _co.timerInterval = setInterval(function(){
                 var elapsed = Math.floor((Date.now() - _co.startTime) / 1000);
                 var h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
+                var ts = (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
                 var el = document.getElementById('co-elapsed');
-                if (el) el.textContent = (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
+                if (el) el.textContent = ts;
+                var advEl = document.getElementById('adv-elapsed');
+                if (advEl) advEl.textContent = ts;
               }, 1000);
               // Load IPs from cutover tester inputs
               var srcIp = (document.getElementById('cutover_tester_source_url')||{}).value || '—';
@@ -6042,6 +6049,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var pauseBtn = document.getElementById('co-pause-btn');
               if (startBtn) startBtn.style.display = 'none';
               if (pauseBtn) pauseBtn.style.display = '';
+              var advStartBtn = document.getElementById('adv-start-btn');
+              var advPauseBtn = document.getElementById('adv-pause-btn');
+              if (advStartBtn) advStartBtn.style.display = 'none';
+              if (advPauseBtn) advPauseBtn.style.display = '';
               // Skip steps whose "Run" checkbox is unchecked; start first enabled one
               var firstEnabled = null;
               for (var _si = 0; _si < _co.steps.length; _si++) {
@@ -6057,6 +6068,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (_co.timerInterval) { clearInterval(_co.timerInterval); _co.timerInterval = null; }
               var pauseBtn = document.getElementById('co-pause-btn');
               if (pauseBtn) { pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume'; pauseBtn.onclick = coResumeCutover; }
+              var advPauseBtn = document.getElementById('adv-pause-btn');
+              if (advPauseBtn) { advPauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume'; advPauseBtn.onclick = coResumeCutover; }
             };
 
             window.coResumeCutover = function() {
@@ -6064,11 +6077,16 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               _co.timerInterval = setInterval(function(){
                 var elapsed = pausedAt + Math.floor((Date.now() - _co.startTime) / 1000);
                 var h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
+                var ts = (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
                 var el = document.getElementById('co-elapsed');
-                if (el) el.textContent = (h > 0 ? h + 'h ' : '') + m + 'm ' + s + 's';
+                if (el) el.textContent = ts;
+                var advEl = document.getElementById('adv-elapsed');
+                if (advEl) advEl.textContent = ts;
               }, 1000);
               var pauseBtn = document.getElementById('co-pause-btn');
               if (pauseBtn) { pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause'; pauseBtn.onclick = coPauseCutover; }
+              var advPauseBtn = document.getElementById('adv-pause-btn');
+              if (advPauseBtn) { advPauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause'; advPauseBtn.onclick = coPauseCutover; }
             };
 
             // ── UAT helper: read scope IPs from localStorage ─────────────────
@@ -7080,8 +7098,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               _co.stepStatus = { precheck:'pending', traffic:'pending', app:'pending', db:'pending', monitor:'pending', close:'pending' };
               _co.dbInScope = false; _co.currentStatus = 'not-started';
               var el = document.getElementById('co-elapsed'); if (el) el.textContent = '0m 0s';
+              var advEl = document.getElementById('adv-elapsed'); if (advEl) advEl.textContent = '—';
               var sb = document.getElementById('co-start-btn'); if (sb) sb.style.display = '';
               var pb = document.getElementById('co-pause-btn'); if (pb) { pb.style.display = 'none'; pb.innerHTML = '<i class="fas fa-pause"></i> Pause'; pb.onclick = coPauseCutover; }
+              var asb = document.getElementById('adv-start-btn'); if (asb) asb.style.display = '';
+              var apb = document.getElementById('adv-pause-btn'); if (apb) { apb.style.display = 'none'; apb.innerHTML = '<i class="fas fa-pause"></i> Pause'; apb.onclick = coPauseCutover; }
               var decText = document.getElementById('co-decision-text');
               if (decText) decText.textContent = 'Complete all execution steps to unlock the final decision.';
               var dbToggle = document.getElementById('co-db-scope-toggle'); if (dbToggle) dbToggle.checked = false;
