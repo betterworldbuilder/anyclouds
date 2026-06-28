@@ -5429,23 +5429,29 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
               <div style="display:flex;align-items:center;padding:0 4px;background:#f1f5f9;color:#94a3b8;font-size:18px;font-weight:300;">›</div>
 
-              <!-- Step 2 — Switch Traffic (HAProxy) -->
-              <div id="co-step-traffic" style="flex:1;min-width:200px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
+              <!-- Step 2 — Switch Traffic: uses existing "2. Configure LB / HAProxy" section -->
+              <div id="co-step-traffic" style="flex:1;min-width:220px;background:#fff;border:2px solid #e5e7eb;border-left:none;border-right:none;padding:16px 14px;display:flex;flex-direction:column;gap:0;">
                 <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">STEP 2</div>
-                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Switch Traffic</div>
-                <span id="co-chip-traffic" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:10px;letter-spacing:.3px;">PENDING</span>
+                <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:6px;">Configure HAProxy</div>
+                <span id="co-chip-traffic" style="display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(107,114,128,.1);color:#6b7280;margin-bottom:8px;letter-spacing:.3px;">PENDING</span>
                 <div style="background:#eff6ff;border-radius:8px;padding:8px 10px;margin-bottom:8px;border-left:3px solid #3b82f6;">
                   <div style="font-size:10px;font-weight:700;color:#1e40af;margin-bottom:3px;">🎯 Goal</div>
-                  <div style="font-size:10px;color:#374151;line-height:1.5;">Configure HAProxy on the OSPC host to route live traffic to FLEX. Installs HAProxy, sets pool_ospc → pool_flex.</div>
-                  <div style="font-size:10px;color:#3b82f6;margin-top:5px;"><b>Script:</b> <code style="background:#dbeafe;padding:1px 4px;border-radius:3px;">ab_strategy</code> → /api/run/stage5_task</div>
-                  <div style="font-size:10px;color:#3b82f6;"><b>Output:</b> HAProxy configured, FLEX pool active, DB replication link established</div>
+                  <div style="font-size:10px;color:#374151;line-height:1.5;">Install &amp; configure HAProxy on the source infra host. Routes live traffic: OSPC pool → FLEX pool at selected %.</div>
+                  <div style="font-size:10px;color:#3b82f6;margin-top:5px;"><b>Script:</b> <code style="background:#dbeafe;padding:1px 4px;border-radius:3px;">cutoverConfigureBlueGreen()</code></div>
+                  <div style="font-size:10px;color:#3b82f6;"><b>Output:</b> HAProxy installed, green/blue pools set, traffic split applied</div>
                 </div>
-                <div style="margin-bottom:8px;">
-                  <label style="font-size:10px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">HAProxy Server IP</label>
-                  <input id="co-haproxy-ip" type="text" placeholder="e.g. 10.0.0.5" style="width:100%;padding:5px 8px;font-size:11px;border:1.5px solid #d1d5db;border-radius:6px;box-sizing:border-box;font-family:monospace;">
+
+                <!-- Live preview of Section 2 config -->
+                <div id="co-step2-preview" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px 10px;margin-bottom:8px;font-size:10px;color:#374151;line-height:1.8;">
+                  <div><b>Host:</b> <span id="co-step2-host" style="font-family:monospace;color:#1e40af;">—</span></div>
+                  <div><b>User:</b> <span id="co-step2-user" style="font-family:monospace;color:#374151;">—</span></div>
+                  <div><b>Traffic to FLEX:</b> <span id="co-step2-weight" style="font-family:monospace;color:#10b981;font-weight:700;">—</span></div>
+                  <div><b>Apply config:</b> <span id="co-step2-apply" style="font-family:monospace;">—</span></div>
                 </div>
+                <button onclick="coStep2Refresh()" style="font-size:9px;padding:3px 8px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;cursor:pointer;margin-bottom:8px;width:100%;text-align:left;">⟳ Refresh from Section 2 config ↑</button>
+
                 <div style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTrafficSwitch(this)"><i class="fas fa-traffic-light"></i> Configure HAProxy</button>
+                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunCutoverStep2(this)"><i class="fas fa-network-wired"></i> Run LB/HAProxy Config</button>
                   <div id="co-mark-traffic" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('traffic','pass')">Pass</button>
                     <button class="btn btn-danger" style="font-size:10px;padding:4px 6px;width:48%;margin-left:4%;" onclick="coMarkStep('traffic','fail')">Fail</button>
@@ -6059,16 +6065,51 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               coMonPoll();
             };
 
-            window.coRunTrafficSwitch = function(btn) {
-              var ip = (document.getElementById('co-haproxy-ip') || {}).value || '';
-              if (ip) {
-                // Store so executeStage5Task log shows it
-                window._coHaproxyIp = ip;
+            // ── Step 2: read live values from existing Section 2 form ────────
+            window.coStep2Refresh = function() {
+              var h = (document.getElementById('cutover_source_cutover_host') || {}).value || '—';
+              var u = (document.getElementById('cutover_source_ssh_user')     || {}).value || '—';
+              var w = (document.getElementById('cutover_green_weight')        || {}).value || '—';
+              var a = document.getElementById('cutover_lb_apply');
+              var aVal = a ? (a.checked ? 'Yes ✓' : 'No') : '—';
+              var _s = function(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; };
+              _s('co-step2-host',   h);
+              _s('co-step2-user',   u);
+              _s('co-step2-weight', w + '%');
+              _s('co-step2-apply',  aVal);
+            };
+
+            window.coRunCutoverStep2 = function(btn) {
+              _co.stepStatus.traffic = 'running';
+              _renderChips();
+              var mark = document.getElementById('co-mark-traffic');
+              if (mark) mark.style.display = 'flex';
+              if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+
+              // Refresh preview first
+              coStep2Refresh();
+
+              // Call the real existing function from Section 2
+              if (typeof cutoverConfigureBlueGreen === 'function') {
+                cutoverConfigureBlueGreen();
+                // Show Section 2's terminal and scroll to it
+                setTimeout(function() {
+                  var lbTerm = document.getElementById('cutover-lb-terminal-box');
+                  if (lbTerm) {
+                    lbTerm.style.display = 'block';
+                    lbTerm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }, 250);
+              } else {
+                _uatLog('[ERROR] cutoverConfigureBlueGreen() not found — fill Section 2 form and run from there.\n');
               }
-              // Set lb_type to haproxy so ab_strategy uses HAProxy path in backend
-              var sel = document.getElementById('ab_lb_type');
-              if (sel) sel.value = 'haproxy';
-              coRunTask('ab_strategy', 'traffic', btn);
+            };
+
+            // Auto-refresh preview when cockpit starts
+            var _coOrigStart = window.coStartCutover;
+            window.coStartCutover = function() {
+              if (typeof _coOrigStart === 'function') _coOrigStart();
+              setTimeout(coStep2Refresh, 100);
             };
 
             window.coOpenGrafana = function() {
@@ -6401,6 +6442,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             // init
             _setStatus('not-started');
             _renderChips();
+            // Populate Step 2 preview from existing Section 2 form values
+            setTimeout(coStep2Refresh, 400);
           })();
           </script>
 
