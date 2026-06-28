@@ -5420,7 +5420,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <div style="font-size:10px;color:#9ca3af;"><b>Output:</b> Operator reviews and marks Pass or Fail</div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunPrecheck(this)"><i class="fas fa-play"></i> Run Pre-checks</button>
+                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunPrecheck(this)"><i class="fas fa-shield-alt"></i> Run UAT Pre-checks</button>
                   <div id="co-mark-precheck" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('precheck','pass')">Pass</button>
                     <button class="btn btn-danger" style="font-size:10px;padding:4px 6px;width:48%;margin-left:4%;" onclick="coMarkStep('precheck','fail')">Fail</button>
@@ -5466,7 +5466,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <div style="font-size:10px;color:#22c55e;"><b>Output:</b> HTTP 200 OK, app to DB queries successful</div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('val_txn','app',this)"><i class="fas fa-check-circle"></i> Validate App</button>
+                  <button class="btn btn-primary" style="font-size:11px;padding:6px 8px;" onclick="coRunUatPerf('app',this)"><i class="fas fa-check-circle"></i> Run UAT App Test</button>
                   <div id="co-mark-app" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('app','pass')">Pass</button>
                     <button class="btn btn-danger" style="font-size:10px;padding:4px 6px;width:48%;margin-left:4%;" onclick="coMarkStep('app','fail')">Fail</button>
@@ -5518,7 +5518,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   </div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:5px;">
-                  <button class="btn btn-dark" style="font-size:11px;padding:6px 8px;" onclick="coRunTask('mon_workloads','monitor',this)"><i class="fas fa-camera"></i> Capture Monitoring</button>
+                  <button class="btn btn-dark" style="font-size:11px;padding:6px 8px;" onclick="coLaunchMonitor(this)"><i class="fas fa-chart-line"></i> Launch Monitor</button>
                   <div id="co-mark-monitor" style="display:none;gap:4px;">
                     <button class="btn btn-success" style="font-size:10px;padding:4px 6px;width:48%;" onclick="coMarkStep('monitor','pass')">Done</button>
                     <button class="btn btn-danger" style="font-size:10px;padding:4px 6px;width:48%;margin-left:4%;" onclick="coMarkStep('monitor','fail')">Fail</button>
@@ -5543,6 +5543,116 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          <!-- C-pre. Live Monitor Panel (shown when Step 5 activated) -->
+          <div id="co-monitor-panel" style="display:none;margin-bottom:20px;">
+            <div style="background:#0f172a;border-radius:14px;padding:18px 20px;border:1px solid rgba(255,255,255,.1);">
+
+              <!-- Header row -->
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;" id="co-mon-pulse"></div>
+                  <span style="font-size:13px;font-weight:800;color:#f1f5f9;letter-spacing:.5px;">LIVE MONITOR</span>
+                  <span id="co-mon-last-ts" style="font-size:10px;color:#475569;font-family:monospace;">—</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <div>
+                    <label style="font-size:10px;color:#64748b;display:block;margin-bottom:2px;">FLEX Target IP</label>
+                    <input id="co-mon-ip" type="text" placeholder="auto from UAT scope" style="padding:5px 10px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;width:160px;font-family:monospace;">
+                  </div>
+                  <div>
+                    <label style="font-size:10px;color:#64748b;display:block;margin-bottom:2px;">App Port</label>
+                    <input id="co-mon-port" type="number" value="80" style="padding:5px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;width:70px;">
+                  </div>
+                  <div>
+                    <label style="font-size:10px;color:#64748b;display:block;margin-bottom:2px;">Auto-poll</label>
+                    <select id="co-mon-interval" onchange="coMonSetInterval()" style="padding:5px 8px;font-size:11px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;">
+                      <option value="0">Manual</option>
+                      <option value="15">Every 15s</option>
+                      <option value="30" selected>Every 30s</option>
+                      <option value="60">Every 60s</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;gap:6px;align-self:flex-end;">
+                    <button onclick="coMonPoll()" style="padding:6px 14px;background:#3b82f6;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">⟳ Poll Now</button>
+                    <button onclick="coMonStop()" style="padding:6px 10px;background:#334155;color:#94a3b8;border:none;border-radius:7px;font-size:11px;cursor:pointer;">■ Stop</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Grafana option -->
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1e293b;border-radius:8px;margin-bottom:14px;border:1px solid #334155;">
+                <span style="font-size:10px;font-weight:700;color:#64748b;flex-shrink:0;">Grafana URL (optional):</span>
+                <input id="co-grafana-url" type="text" placeholder="http://grafana:3000/d/..." style="flex:1;padding:4px 8px;font-size:11px;background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:5px;font-family:monospace;min-width:0;">
+                <button onclick="coOpenGrafana()" style="padding:5px 12px;background:#f59e0b;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">Open Grafana ↗</button>
+              </div>
+
+              <!-- 6 canvas charts grid -->
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+
+                <div style="background:#1e293b;border-radius:10px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Response Time</span>
+                    <span id="co-mon-val-resp" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— ms</span>
+                  </div>
+                  <canvas id="co-chart-resp" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;">Threshold: 500ms (dashed red) | FLEX avg HTTP response</div>
+                </div>
+
+                <div style="background:#1e293b;border-radius:10px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Error Rate</span>
+                    <span id="co-mon-val-err" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— %</span>
+                  </div>
+                  <canvas id="co-chart-err" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;">Threshold: 5% (dashed red) | HTTP 4xx/5xx rate</div>
+                </div>
+
+                <div style="background:#1e293b;border-radius:10px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">CPU Load</span>
+                    <span id="co-mon-val-cpu" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">—</span>
+                  </div>
+                  <canvas id="co-chart-cpu" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;">1-min load average from /proc/loadavg on FLEX</div>
+                </div>
+
+                <div style="background:#1e293b;border-radius:10px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Memory %</span>
+                    <span id="co-mon-val-mem" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— %</span>
+                  </div>
+                  <canvas id="co-chart-mem" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;">Threshold: 85% | MemUsed/MemTotal from /proc/meminfo</div>
+                </div>
+
+                <div style="background:#1e293b;border-radius:10px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Network Latency</span>
+                    <span id="co-mon-val-lat" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— ms</span>
+                  </div>
+                  <canvas id="co-chart-lat" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;">Ping to default gateway (3 packets) on FLEX</div>
+                </div>
+
+                <div style="background:#1e293b;border-radius:10px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">DB Latency</span>
+                    <span id="co-mon-val-db" style="font-size:16px;font-weight:800;color:#22c55e;font-family:monospace;">— ms</span>
+                  </div>
+                  <canvas id="co-chart-db2" width="400" height="90" style="width:100%;height:90px;display:block;"></canvas>
+                  <div style="font-size:9px;color:#475569;margin-top:4px;">TCP connect to DB port on FLEX host</div>
+                </div>
+
+              </div>
+
+              <!-- Status bar -->
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #1e293b;">
+                <span id="co-mon-status" style="font-size:11px;color:#475569;font-family:monospace;">Waiting for first poll…</span>
+                <span style="font-size:10px;color:#334155;">UAT Performance API: /api/uat/performance/run</span>
+              </div>
             </div>
           </div>
 
@@ -5818,12 +5928,135 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (pauseBtn) { pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause'; pauseBtn.onclick = coPauseCutover; }
             };
 
+            // ── UAT helper: read scope IPs from localStorage ─────────────────
+            function _uatScope() {
+              try { return JSON.parse(localStorage.getItem('osflex_uat_scope') || 'null') || []; } catch(_) { return []; }
+            }
+            function _uatLog(html) {
+              var box = document.getElementById('s5-terminal-box');
+              var out = document.getElementById('s5-log-output');
+              if (box) box.style.display = 'block';
+              if (out) out.innerHTML += html;
+            }
+            function _uatLogClear(title) {
+              var box = document.getElementById('s5-terminal-box');
+              var out = document.getElementById('s5-log-output');
+              if (box) box.style.display = 'block';
+              if (out) out.innerHTML = title + '\n\n';
+            }
+
+            // ── Step 1: Pre-checks via UAT service compare ───────────────────
             window.coRunPrecheck = function(btn) {
               _co.stepStatus.precheck = 'running';
               _renderChips();
               var mark = document.getElementById('co-mark-precheck');
               if (mark) mark.style.display = 'flex';
               if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+
+              var scope = _uatScope();
+              var srcIp  = scope.length ? scope[0].source_ip  : '';
+              var tgtIp  = scope.length ? scope[0].target_ip  : '';
+              _uatLogClear('=== PRE-CHECK: UAT SERVICE COMPARE ===');
+              if (!tgtIp) {
+                _uatLog('[WARN] No UAT scope found in localStorage.\nRun UAT stage first or mark this step manually.\n');
+                return;
+              }
+              _uatLog('Source : ' + srcIp + '\nTarget : ' + tgtIp + '\n\nConnecting…\n');
+              fetch('/api/uat/service_compare', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ source_ip: srcIp, target_ip: tgtIp, ssh_key: '~/.ssh/id_rsa' })
+              })
+              .then(function(r){ return r.json(); })
+              .then(function(data) {
+                if (!data.comparison) {
+                  _uatLog('[ERROR] ' + (data.error || 'Service compare failed') + '\n');
+                  return;
+                }
+                var missing = data.comparison.filter(function(c){ return c.status === 'missing_on_target'; });
+                var match   = data.comparison.filter(function(c){ return c.status === 'match'; });
+                _uatLog('Source services : ' + data.source_count + '\nTarget services : ' + data.target_count + '\nMatched        : ' + match.length + '\nMissing on FLEX: ' + missing.length + '\n');
+                if (data.source_error) _uatLog('[WARN Source] ' + data.source_error + '\n');
+                if (data.target_error) _uatLog('[WARN Target] ' + data.target_error + '\n');
+                if (missing.length) {
+                  _uatLog('\nMISSING ON FLEX:\n');
+                  missing.forEach(function(c){ _uatLog('  ✗ ' + c.service + '\n'); });
+                } else {
+                  _uatLog('\n✓ All source services are running on FLEX.\n');
+                }
+                _uatLog('\n=== COMPLETE ===\n');
+                // Auto-pass if zero missing services
+                if (missing.length === 0) coMarkStep('precheck', 'pass');
+              })
+              .catch(function(err){ _uatLog('[ERROR] ' + err.message + '\n'); });
+            };
+
+            // ── Step 3: App validation via UAT performance run ───────────────
+            window.coRunUatPerf = function(stepId, btn) {
+              _co.stepStatus[stepId] = 'running';
+              _renderChips();
+              var mark = document.getElementById('co-mark-' + stepId);
+              if (mark) mark.style.display = 'flex';
+              if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+
+              var scope = _uatScope();
+              var tgtIp = scope.length ? scope[0].target_ip : '';
+              _uatLogClear('=== APP VALIDATION: UAT PERFORMANCE TEST ===');
+              if (!tgtIp) {
+                _uatLog('[WARN] No UAT scope found. Mark manually.\n');
+                return;
+              }
+              _uatLog('FLEX Target : ' + tgtIp + '\nRunning 5×HTTP + /proc metrics…\n\n');
+              fetch('/api/uat/performance/run', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ target_ip: tgtIp, ssh_key: '~/.ssh/id_rsa', app_port: 80 })
+              })
+              .then(function(r){ return r.json(); })
+              .then(function(data) {
+                var p = data.performance || {};
+                var avgMs  = parseFloat(p.flex_avg_response_ms  || p.ospc_avg_response_ms || 0);
+                var p95Ms  = parseFloat(p.flex_p95_ms  || p.ospc_p95_ms || 0);
+                var errPct = parseFloat(p.api_error_rate_percent_target || p.api_error_rate_percent || 0);
+                var memPct = parseFloat(p.mem_pct_target || p.mem_pct_source || 0);
+                _uatLog('Avg Response : ' + avgMs + ' ms\n');
+                _uatLog('P95 Response : ' + p95Ms + ' ms\n');
+                _uatLog('Error Rate   : ' + errPct + ' %\n');
+                _uatLog('Memory Usage : ' + memPct + ' %\n');
+                if (data.target_error) _uatLog('[WARN] ' + data.target_error + '\n');
+                var pass = avgMs > 0 && avgMs < 500 && errPct < 5;
+                _uatLog('\n' + (pass ? '✓ PASS — response time and error rate within thresholds.' : '✗ FAIL — response >500ms or error rate ≥5%.') + '\n');
+                _uatLog('=== COMPLETE ===\n');
+                // Feed latest point into monitor charts
+                if (typeof _coMonIngest === 'function') _coMonIngest(p);
+                if (pass) coMarkStep(stepId, 'pass');
+              })
+              .catch(function(err){ _uatLog('[ERROR] ' + err.message + '\n'); });
+            };
+
+            // ── Step 5: Launch monitor panel ─────────────────────────────────
+            window.coLaunchMonitor = function(btn) {
+              _co.stepStatus.monitor = 'running';
+              _renderChips();
+              var mark = document.getElementById('co-mark-monitor');
+              if (mark) mark.style.display = 'flex';
+              if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+
+              // Pre-fill IP from UAT scope
+              var scope = _uatScope();
+              var tgtIp = scope.length ? scope[0].target_ip : '';
+              var ipEl = document.getElementById('co-mon-ip');
+              if (ipEl && tgtIp && !ipEl.value) ipEl.value = tgtIp;
+
+              var panel = document.getElementById('co-monitor-panel');
+              if (panel) {
+                panel.style.display = 'block';
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+              // Draw empty charts then start polling
+              _coMonDrawAll();
+              coMonSetInterval();
+              coMonPoll();
             };
 
             window.coRunTrafficSwitch = function(btn) {
@@ -5843,6 +6076,212 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (!url) { alert('Enter a Grafana dashboard URL first.'); return; }
               if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
               window.open(url, '_blank');
+            };
+
+            // ── Monitoring engine ─────────────────────────────────────────────
+            var _coMon = {
+              resp: [], err: [], cpu: [], mem: [], lat: [], db: [],
+              maxPts: 20,
+              timer: null,
+              polling: false
+            };
+
+            function _coMonAddPt(arr, v) {
+              arr.push(isNaN(v) ? 0 : v);
+              if (arr.length > _coMon.maxPts) arr.shift();
+            }
+
+            // Called from coRunUatPerf (Step 3) and coMonPoll (Step 5)
+            window._coMonIngest = function(p) {
+              _coMonAddPt(_coMon.resp, parseFloat(p.flex_avg_response_ms  || p.ospc_avg_response_ms || 0));
+              _coMonAddPt(_coMon.err,  parseFloat(p.api_error_rate_percent_target || p.api_error_rate_percent || 0));
+              _coMonAddPt(_coMon.cpu,  parseFloat(p.cpu_load_target || p.cpu_load_source || 0));
+              _coMonAddPt(_coMon.mem,  parseFloat(p.mem_pct_target  || p.mem_pct_source  || 0));
+              _coMonAddPt(_coMon.lat,  parseFloat(p.network_latency_ms_target || p.network_latency_ms || 0));
+              _coMonAddPt(_coMon.db,   parseFloat(p.db_avg_query_ms_target    || p.db_avg_query_ms    || 0));
+
+              // Update numeric badges
+              var last = function(a){ return a.length ? a[a.length-1] : null; };
+              function _badge(id, v, unit, warn, crit) {
+                var el = document.getElementById(id);
+                if (!el || v === null) return;
+                el.textContent = v + ' ' + unit;
+                el.style.color = v >= crit ? '#ef4444' : v >= warn ? '#f59e0b' : '#22c55e';
+              }
+              _badge('co-mon-val-resp', last(_coMon.resp), 'ms',  200, 500);
+              _badge('co-mon-val-err',  last(_coMon.err),  '%',   2,   5);
+              _badge('co-mon-val-cpu',  last(_coMon.cpu),  '',    2,   4);
+              _badge('co-mon-val-mem',  last(_coMon.mem),  '%',   70,  85);
+              _badge('co-mon-val-lat',  last(_coMon.lat),  'ms',  50,  150);
+              _badge('co-mon-val-db',   last(_coMon.db),   'ms',  50,  200);
+
+              // Timestamp
+              var ts = document.getElementById('co-mon-last-ts');
+              if (ts) ts.textContent = 'Last poll: ' + new Date().toLocaleTimeString();
+              var st = document.getElementById('co-mon-status');
+              if (st) st.textContent = 'Poll ' + _coMon.resp.length + ' data points collected.';
+
+              _coMonDrawAll();
+            };
+
+            function _coMonDrawChart(canvasId, pts, color, thresh) {
+              var canvas = document.getElementById(canvasId);
+              if (!canvas) return;
+              // Use actual pixel size, not CSS size
+              var W = canvas.width, H = canvas.height;
+              var ctx = canvas.getContext('2d');
+              var pad = { t: 6, b: 16, l: 34, r: 6 };
+              var cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+
+              ctx.clearRect(0, 0, W, H);
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(0, 0, W, H);
+
+              if (!pts.length) {
+                ctx.fillStyle = '#334155';
+                ctx.font = '11px system-ui,sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Waiting for data…', W / 2, H / 2 + 4);
+                return;
+              }
+
+              var hi = Math.max.apply(null, pts);
+              var dataMax = Math.max(hi * 1.15, thresh ? thresh * 1.1 : 1, 1);
+
+              // Grid
+              ctx.strokeStyle = 'rgba(255,255,255,.06)';
+              ctx.lineWidth = 1;
+              ctx.fillStyle = '#475569';
+              ctx.font = '8px monospace';
+              ctx.textAlign = 'right';
+              for (var g = 0; g <= 3; g++) {
+                var gy = pad.t + (cH / 3) * g;
+                ctx.beginPath(); ctx.moveTo(pad.l, gy); ctx.lineTo(pad.l + cW, gy); ctx.stroke();
+                ctx.fillText(Math.round(dataMax - (dataMax / 3) * g), pad.l - 2, gy + 3);
+              }
+
+              // Threshold line
+              if (thresh && thresh < dataMax) {
+                var ty = pad.t + cH * (1 - thresh / dataMax);
+                ctx.save();
+                ctx.strokeStyle = 'rgba(239,68,68,.65)';
+                ctx.setLineDash([4, 3]);
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(pad.l, ty); ctx.lineTo(pad.l + cW, ty); ctx.stroke();
+                ctx.restore();
+              }
+
+              if (pts.length < 2) {
+                // Single dot
+                var sx = pad.l + cW / 2;
+                var sy = pad.t + cH * (1 - pts[0] / dataMax);
+                ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+                ctx.fillStyle = color; ctx.fill();
+                return;
+              }
+
+              var xStep = cW / (pts.length - 1);
+              function px(i){ return pad.l + i * xStep; }
+              function py(v){ return pad.t + cH * (1 - v / dataMax); }
+
+              // Fill
+              ctx.beginPath();
+              pts.forEach(function(v, i){ i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
+              ctx.lineTo(px(pts.length - 1), pad.t + cH);
+              ctx.lineTo(pad.l, pad.t + cH);
+              ctx.closePath();
+              ctx.fillStyle = color.replace('rgb(', 'rgba(').replace(')', ', 0.12)');
+              ctx.fill();
+
+              // Line
+              ctx.beginPath();
+              pts.forEach(function(v, i){ i === 0 ? ctx.moveTo(px(i), py(v)) : ctx.lineTo(px(i), py(v)); });
+              ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+
+              // Latest dot
+              var lx = px(pts.length - 1), ly = py(pts[pts.length - 1]);
+              ctx.beginPath(); ctx.arc(lx, ly, 3.5, 0, Math.PI * 2);
+              ctx.fillStyle = color; ctx.fill();
+              ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+
+            function _coMonDrawAll() {
+              _coMonDrawChart('co-chart-resp', _coMon.resp, 'rgb(34,197,94)',   500);
+              _coMonDrawChart('co-chart-err',  _coMon.err,  'rgb(251,146,60)',  5);
+              _coMonDrawChart('co-chart-cpu',  _coMon.cpu,  'rgb(96,165,250)',  4);
+              _coMonDrawChart('co-chart-mem',  _coMon.mem,  'rgb(167,139,250)', 85);
+              _coMonDrawChart('co-chart-lat',  _coMon.lat,  'rgb(251,191,36)',  150);
+              _coMonDrawChart('co-chart-db2',  _coMon.db,   'rgb(52,211,153)',  200);
+            }
+
+            window.coMonPoll = function() {
+              if (_coMon.polling) return;
+              _coMon.polling = true;
+              var pulse = document.getElementById('co-mon-pulse');
+              if (pulse) pulse.style.background = '#f59e0b';
+              var st = document.getElementById('co-mon-status');
+              if (st) st.textContent = 'Polling FLEX target…';
+
+              var ip   = (document.getElementById('co-mon-ip')   || {}).value || '';
+              var port = (document.getElementById('co-mon-port')  || {}).value || '80';
+              if (!ip) {
+                var scope = _uatScope();
+                ip = scope.length ? scope[0].target_ip : '';
+              }
+              if (!ip) {
+                if (st) st.textContent = 'No target IP — enter FLEX IP above or run UAT scope first.';
+                if (pulse) pulse.style.background = '#ef4444';
+                _coMon.polling = false;
+                return;
+              }
+
+              fetch('/api/uat/performance/run', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ target_ip: ip, ssh_key: '~/.ssh/id_rsa', app_port: parseInt(port) || 80 })
+              })
+              .then(function(r){ return r.json(); })
+              .then(function(data) {
+                _coMon.polling = false;
+                if (pulse) pulse.style.background = '#22c55e';
+                _coMonIngest(data.performance || {});
+                // Update Live Health row too
+                var lv = _coMon.resp.length ? _coMon.resp[_coMon.resp.length-1] : null;
+                if (lv !== null) {
+                  var hel = document.getElementById('co-health-latency-val');
+                  if (hel) { hel.textContent = lv + 'ms'; hel.style.color = lv < 200 ? '#10b981' : lv < 500 ? '#f59e0b' : '#ef4444'; }
+                }
+                var mv = _coMon.mem.length ? _coMon.mem[_coMon.mem.length-1] : null;
+                if (mv !== null) {
+                  var mel = document.getElementById('co-health-memory-val');
+                  if (mel) { mel.textContent = mv + '%'; mel.style.color = mv < 70 ? '#10b981' : mv < 85 ? '#f59e0b' : '#ef4444'; }
+                }
+                var cv = _coMon.cpu.length ? _coMon.cpu[_coMon.cpu.length-1] : null;
+                if (cv !== null) {
+                  var cel = document.getElementById('co-health-cpu-val');
+                  if (cel) { cel.textContent = cv; cel.style.color = '#10b981'; }
+                }
+              })
+              .catch(function(err) {
+                _coMon.polling = false;
+                if (pulse) pulse.style.background = '#ef4444';
+                var st2 = document.getElementById('co-mon-status');
+                if (st2) st2.textContent = 'Poll error: ' + err.message;
+              });
+            };
+
+            window.coMonSetInterval = function() {
+              if (_coMon.timer) { clearInterval(_coMon.timer); _coMon.timer = null; }
+              var secs = parseInt((document.getElementById('co-mon-interval') || {}).value || 0);
+              if (secs > 0) _coMon.timer = setInterval(coMonPoll, secs * 1000);
+            };
+
+            window.coMonStop = function() {
+              if (_coMon.timer) { clearInterval(_coMon.timer); _coMon.timer = null; }
+              var st = document.getElementById('co-mon-status');
+              if (st) st.textContent = 'Polling stopped.';
+              var pulse = document.getElementById('co-mon-pulse');
+              if (pulse) pulse.style.background = '#475569';
             };
 
             window.coRunTask = function(taskType, stepId, btn) {
@@ -5952,6 +6391,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               // hide terminal
               var term = document.getElementById('s5-terminal-box'); if (term) term.style.display = 'none';
               var logBtn = document.getElementById('co-toggle-log-btn'); if (logBtn) logBtn.innerHTML = '<i class="fas fa-expand-alt"></i> Show Full Log';
+              // Reset monitor panel
+              if (typeof coMonStop === 'function') coMonStop();
+              _coMon.resp = []; _coMon.err = []; _coMon.cpu = []; _coMon.mem = []; _coMon.lat = []; _coMon.db = [];
+              var monPanel = document.getElementById('co-monitor-panel'); if (monPanel) monPanel.style.display = 'none';
+              _coMonDrawAll();
             };
 
             // init
