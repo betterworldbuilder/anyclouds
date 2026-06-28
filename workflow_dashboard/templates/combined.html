@@ -7316,7 +7316,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <div class="adv-hdr-logo">4</div>
               <div>
                 <div class="adv-hdr-title">Cutover Execution Cockpit</div>
-                <div class="adv-hdr-sub">Guided step-by-step cutover &mdash; run after Cutover TEST passes</div>
+                <div class="adv-hdr-sub">Advanced Cut over Dashboard</div>
               </div>
             </div>
             <div class="adv-hdr-actions">
@@ -7507,6 +7507,14 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <button onclick="document.getElementById('adv-log-output').textContent=''" style="background:transparent;border:1px solid #e2e8f0;color:#64748b;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">Clear</button>
                 </div>
                 <div class="adv-log-box"><pre id="adv-log-output" style="margin:0;font-family:'Share Tech Mono',monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:280px;overflow-y:auto;line-height:1.6;"></pre></div>
+              </div>
+
+              <!-- CUTOVER VALIDATION BAR -->
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 0 4px 0;">
+                <button onclick="coListIssues()" id="adv-list-issues-btn" style="font-size:13px;padding:11px 22px;font-weight:800;letter-spacing:.3px;background:#a21919;color:#fff;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-list-ul"></i> LIST ISSUES</button>
+                <button onclick="coCutoverValidation()" style="font-size:13px;padding:11px 22px;font-weight:800;letter-spacing:.3px;background:#a21919;color:#fff;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-certificate"></i> CUT OVER VALIDATION</button>
+                <button onclick="coToggleLogs()" style="font-size:12px;padding:10px 18px;font-weight:600;background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;"><i class="fas fa-expand-alt"></i> Show Full Log</button>
+                <button onclick="cutoverTesterExportResultsCsv()" style="font-size:12px;padding:10px 18px;font-weight:600;background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;"><i class="fas fa-download"></i> Export Report</button>
               </div>
 
               <!-- DASHBOARD FOOTER -->
