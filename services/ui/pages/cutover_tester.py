@@ -721,34 +721,68 @@ def _stream_cutover_specific_tests(
     if not config_payload["source"]["base_url"] or not config_payload["target"]["base_url"]:
         yield "[ERROR] Source URL and target URL are required before cutover tests can run."
         return False
+
+    # ── Step 1: push source/target config to tester ───────────────────────────
+    yield "===== Tester Configuration ====="
     ok, _ = yield from _stream_api_call("POST", f"{api_url}/config", config_payload, "configure", evidence)
+    src_url = config_payload["source"]["base_url"]
+    tgt_url = config_payload["target"]["base_url"]
+    yield f"[CHECK SUMMARY] source={src_url} flex={tgt_url} mode={config_payload.get('traffic_mode','simulation')} status={'PASS' if ok else 'FAIL'}"
     if not ok:
         return False
-    for label, method, path in (
-        ("source-target-health", "GET", "/health-check"),
-        ("smoke-test", "GET", "/smoke-test"),
-        ("pre-cutover-gate", "POST", "/pre-cutover-check"),
+
+    # ── Steps 2–4: health, smoke, pre-cutover gate ───────────────────────────
+    for label, method, path, nice_label in (
+        ("source-target-health", "GET",  "/health-check",      "Source + FLEX Health Check"),
+        ("smoke-test",           "GET",  "/smoke-test",        "Smoke Test"),
+        ("pre-cutover-gate",     "POST", "/pre-cutover-check", "Pre-Cutover Gate"),
     ):
-        ok, _ = yield from _stream_api_call(method, f"{api_url}{path}", None, label, evidence)
+        yield f"===== {nice_label} ====="
+        ok, result = yield from _stream_api_call(method, f"{api_url}{path}", None, label, evidence)
+        src_ms   = result.get("source_latency_ms") or result.get("source_ms") or result.get("latency_ms") or "-"
+        tgt_ms   = result.get("target_latency_ms") or result.get("target_ms") or "-"
+        issues   = result.get("issues") or []
+        n_issues = len(issues) if isinstance(issues, list) else ("1" if not ok else "0")
+        yield (
+            f"[CHECK SUMMARY] source_ms={src_ms} flex_ms={tgt_ms} "
+            f"issues={n_issues} status={'PASS' if ok else 'FAIL'}"
+        )
         if not ok:
             return False
+
+    # ── Steps 5–6: performance config + run ──────────────────────────────────
     if data.get("include_performance", True) is not False:
         performance_config = build_performance_config_payload(data)
         if int(performance_config.get("concurrent_users") or 0) > 100:
             yield "[WARN] High-load performance test requested. Safe built-in runner will cap effective concurrency on the tester side."
+
+        yield "===== Performance Config ====="
         ok, _ = yield from _stream_api_call("POST", f"{api_url}/performance/config", performance_config, "performance-config", evidence)
+        n_users = performance_config.get("concurrent_users", 10)
+        rpu     = performance_config.get("requests_per_user", 5)
+        tout    = performance_config.get("timeout_seconds", 5)
+        yield f"[CHECK SUMMARY] concurrent={n_users} req_per_user={rpu} timeout={tout}s status={'PASS' if ok else 'FAIL'}"
         if not ok:
             return False
+
+        yield "===== Performance Validation ====="
         ok, perf = yield from _stream_api_call("POST", f"{api_url}/performance/run", None, "performance-validation", evidence)
         metrics = perf.get("metrics") if isinstance(perf.get("metrics"), dict) else {}
         if not metrics and isinstance(perf, dict):
             metrics = perf
+        ospc_avg   = metrics.get("ospc_avg_response_ms") or "-"
+        flex_avg   = metrics.get("flex_avg_response_ms") or "-"
+        delta      = metrics.get("avg_response_delta")    or "-"
+        err_pct    = metrics.get("api_error_rate_percent") or "0"
+        perf_status = str(metrics.get("performance_status") or ("PASS" if ok else "FAIL")).upper()
         if metrics:
-            yield f"[PERF] OSPC avg={metrics.get('ospc_avg_response_ms')}ms FLEX avg={metrics.get('flex_avg_response_ms')}ms delta={metrics.get('avg_response_delta')}ms"
+            yield f"[PERF] OSPC avg={ospc_avg}ms FLEX avg={flex_avg}ms delta={delta}ms"
             yield f"[PERF] OSPC p95={metrics.get('ospc_p95_ms')}ms FLEX p95={metrics.get('flex_p95_ms')}ms delta={metrics.get('p95_delta')}ms"
-            yield f"[PERF] API error={metrics.get('api_error_rate_percent')}% status={metrics.get('performance_status')}"
+            yield f"[PERF] API error={err_pct}% status={perf_status}"
+        yield f"[CHECK SUMMARY] source_ms={ospc_avg} flex_ms={flex_avg} delta={delta} errors={err_pct}% status={perf_status}"
         if not ok:
             return False
+
     if data.get("switch_after_gate") and evidence and evidence[-1].get("ok"):
         switch_payload = {"target_environment": "target", "require_target_healthy": True}
         ok, _ = yield from _stream_api_call("POST", f"{api_url}/switch", switch_payload, "switch-target", evidence)

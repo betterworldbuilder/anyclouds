@@ -11566,6 +11566,63 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       '</div>');
   }
 
+  // Parse space-separated key=value pairs from a [CHECK SUMMARY] line
+  function _parseCheckSummary(line) {
+    var pairs = {};
+    line.replace(/^\[CHECK SUMMARY\]\s*/, '').split(/\s+/).forEach(function(p) {
+      var eq = p.indexOf('=');
+      if (eq > 0) pairs[p.slice(0, eq)] = p.slice(eq + 1);
+    });
+    return pairs;
+  }
+
+  function cutoverTesterUpdateCheckSummary(line) {
+    var card = window.cutoverTesterCurrentStageCard;
+    if (!card) return;
+    var summary = card.querySelector('.cutover-stage-summary');
+    if (!summary) return;
+    var p = _parseCheckSummary(line);
+    var cells = '';
+    if ('source_ms' in p && 'flex_ms' in p && 'delta' in p) {
+      // Performance step
+      var deltaNum = parseFloat(p.delta) || 0;
+      var errNum   = parseFloat(p.errors) || 0;
+      cells =
+        cutoverTesterMetricCard('OSPC avg ms', p.source_ms, '#38bdf8') +
+        cutoverTesterMetricCard('FLEX avg ms', p.flex_ms,   '#22c55e') +
+        cutoverTesterMetricCard('Delta ms',    p.delta,     deltaNum > 100 ? '#f59e0b' : '#86efac') +
+        cutoverTesterMetricCard('Error %',     p.errors || '0', errNum > 0 ? '#ef4444' : '#86efac');
+    } else if ('source_ms' in p && 'flex_ms' in p) {
+      // Health / Smoke / Gate steps
+      var issNum = parseInt(p.issues) || 0;
+      cells =
+        cutoverTesterMetricCard('Source ms',  p.source_ms, '#38bdf8') +
+        cutoverTesterMetricCard('FLEX ms',    p.flex_ms,   '#22c55e') +
+        cutoverTesterMetricCard('Issues',     p.issues || '0', issNum > 0 ? '#ef4444' : '#86efac') +
+        cutoverTesterMetricCard('Status',     p.status || '-', p.status === 'PASS' ? '#22c55e' : '#ef4444');
+    } else if ('concurrent' in p) {
+      // Performance Config step
+      cells =
+        cutoverTesterMetricCard('Concurrent',    p.concurrent, '#e5f2ff') +
+        cutoverTesterMetricCard('Req / user',    p.req_per_user, '#e5f2ff') +
+        cutoverTesterMetricCard('Timeout',       p.timeout || '-', '#e5f2ff') +
+        cutoverTesterMetricCard('Status',        p.status || '-', p.status === 'PASS' ? '#22c55e' : '#ef4444');
+    } else if ('source' in p && 'flex' in p) {
+      // Config step — show URLs truncated
+      var truncate = function(s){ return s && s.length > 22 ? s.slice(0,22)+'…' : (s||'-'); };
+      cells =
+        cutoverTesterMetricCard('Source URL', truncate(p.source), '#38bdf8') +
+        cutoverTesterMetricCard('FLEX URL',   truncate(p.flex),   '#22c55e') +
+        cutoverTesterMetricCard('Mode',       p.mode || '-',      '#e5f2ff') +
+        cutoverTesterMetricCard('Status',     p.status || '-',    p.status === 'PASS' ? '#22c55e' : '#ef4444');
+    } else {
+      // Generic fallback
+      var keys = Object.keys(p).slice(0, 4);
+      cells = keys.map(function(k){ return cutoverTesterMetricCard(k.replace(/_/g,' '), p[k], '#e5f2ff'); }).join('');
+    }
+    summary.innerHTML = cells;
+  }
+
   function cutoverTesterFormatStreamLine(line) {
     if (!line) return {skip:false, display:line};
     if (line.startsWith('=== BLUE/GREEN CUTOVER TESTER ===')) {
@@ -11576,12 +11633,20 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       cutoverTesterAddFact('Proof mode', 'Traffic Ramp', '#a78bfa');
       return {skip:true};
     }
+    if (line.startsWith('=== DRY RUN:')) {
+      cutoverTesterAddFact('Mode', 'Dry Run — no traffic touched', '#f59e0b');
+      return {skip:true};
+    }
+    if (line.startsWith('=== PHASE 1: CONFIGURATION')) {
+      cutoverTesterAddFact('Phase 1', 'Config & Perf test', '#22c55e');
+      return {skip:true};
+    }
     if (line.startsWith('=== PHASE 1:')) {
-      cutoverTesterAddFact('Phase 1', 'Traffic ramp proof', '#a78bfa');
+      cutoverTesterAddFact('Phase 1', line.replace('=== PHASE 1:', '').replace(/==+/g,'').trim(), '#a78bfa');
       return {skip:true};
     }
     if (line.startsWith('=== PHASE 2:')) {
-      cutoverTesterAddFact('Phase 2', 'Cutover specific tests', '#22c55e');
+      cutoverTesterAddFact('Phase 2', line.replace('=== PHASE 2:', '').replace(/==+/g,'').trim(), '#22c55e');
       return {skip:true};
     }
     let match = line.match(/^\[INFO\]\s+(HAProxy host|Cutover hostname|Source\/blue|Target\/FLEX green|Requests per stage):\s*(.+)$/);
@@ -11608,6 +11673,10 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       cutoverTesterUpdateStageSummary(line);
       return {skip:true};
     }
+    if (line.startsWith('[CHECK SUMMARY]')) {
+      cutoverTesterUpdateCheckSummary(line);
+      return {skip:true};
+    }
     match = line.match(/^\[RAMP RESULT\]\s+(.+?)\s+\|\s+OSPC hits=(\d+)\s+\|\s+FLEX hits=(\d+)\s+\|\s+other=(\d+)\s+\|\s+errors=(\d+)\s+\|\s+avg_ms=([^\s]+)\s+\|\s+result=(\w+)/);
     if (match) {
       const ok = match[7].toUpperCase() === 'PASS';
@@ -11622,27 +11691,41 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       cutoverTesterSetStageStatus(true, 'PASS');
       return {skip:true};
     }
+    // [OK] / [ERROR] for config+perf steps — set stage card badge when inside one
     match = line.match(/^\[OK\]\s+(configure|source-target-health|health-check|smoke-test|pre-cutover-gate|performance-config|performance-validation):\s*(.+)$/);
     if (match) {
-      const labels = {
-        configure: 'Tester Configuration',
-        'source-target-health': 'Source + FLEX Health',
-        'health-check': 'Source + FLEX Health',
-        'smoke-test': 'Smoke Test',
-        'pre-cutover-gate': 'Pre-Cutover Gate',
-        'performance-config': 'Performance Config',
-        'performance-validation': 'Performance Validation'
-      };
-      cutoverTesterAddCheckCard(labels[match[1]] || match[1], 'PASS', match[2]);
+      if (window.cutoverTesterCurrentStageCard) {
+        cutoverTesterSetStageStatus(true, 'PASS');
+      } else {
+        const labels = {
+          configure: 'Tester Configuration', 'source-target-health': 'Source + FLEX Health',
+          'health-check': 'Source + FLEX Health', 'smoke-test': 'Smoke Test',
+          'pre-cutover-gate': 'Pre-Cutover Gate', 'performance-config': 'Performance Config',
+          'performance-validation': 'Performance Validation'
+        };
+        cutoverTesterAddCheckCard(labels[match[1]] || match[1], 'PASS', match[2]);
+      }
       return {skip:true};
     }
     match = line.match(/^\[ERROR\]\s+(configure|source-target-health|health-check|smoke-test|pre-cutover-gate|performance-config|performance-validation):\s*(.+)$/);
     if (match) {
-      cutoverTesterAddCheckCard(match[1], 'FAIL', match[2]);
+      if (window.cutoverTesterCurrentStageCard) {
+        cutoverTesterSetStageStatus(false, 'FAIL');
+      } else {
+        cutoverTesterAddCheckCard(match[1], 'FAIL', match[2]);
+      }
       return {skip:false, display:line};
     }
+    // [PERF] lines — add as body text inside the performance stage card, or fallback check card
     if (line.startsWith('[PERF]')) {
-      cutoverTesterAddCheckCard('Performance Metric', 'INFO', line.replace('[PERF] ', ''));
+      const card = window.cutoverTesterCurrentStageCard;
+      if (card) {
+        card.insertAdjacentHTML('beforeend',
+          '<div style="color:#94a3b8;font-size:10px;margin-top:4px;font-family:monospace;">' +
+          escapeHtmlDr(line.replace('[PERF] ', '')) + '</div>');
+      } else {
+        cutoverTesterAddCheckCard('Performance Metric', 'INFO', line.replace('[PERF] ', ''));
+      }
       return {skip:true};
     }
     if (line.includes('Ramp split') && line.includes('[ERROR]')) {
