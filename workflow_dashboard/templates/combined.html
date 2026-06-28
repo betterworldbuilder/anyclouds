@@ -7232,10 +7232,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     </div>
                   </div>
                   <div class="adv-banner-right">
-                    <div style="text-align:right;">
+                    <div style="text-align:right;margin-right:6px;">
                       <div style="font-size:10px;color:#64748b;font-weight:600;">Elapsed</div>
                       <div class="adv-countdown" id="adv-elapsed">—</div>
                     </div>
+                    <button id="adv-start-btn" class="adv-btn" style="background:#22c55e;color:#fff;font-size:13px;padding:9px 18px;" onclick="coStartCutover()"><i class="fas fa-play"></i> Start Cutover</button>
+                    <button id="adv-pause-btn" class="adv-btn" style="background:#f59e0b;color:#fff;display:none;" onclick="coPauseCutover()"><i class="fas fa-pause"></i> Pause</button>
+                    <button class="adv-btn" style="background:#ef4444;color:#fff;" onclick="coDoRollback(this)"><i class="fas fa-undo"></i> Rollback</button>
                     <button class="adv-btn adv-btn-primary" onclick="coAdvRefresh()"><i class="fas fa-rotate-right"></i> Refresh</button>
                   </div>
                 </div>
@@ -7415,6 +7418,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 el.textContent = '—';
               }
             }
+            // Mirror start/pause button visibility from simple dashboard
+            var simStart = document.getElementById('co-start-btn');
+            var simPause = document.getElementById('co-pause-btn');
+            var advStart = document.getElementById('adv-start-btn');
+            var advPause = document.getElementById('adv-pause-btn');
+            if (advStart && simStart) advStart.style.display = simStart.style.display || '';
+            if (advPause && simPause) advPause.style.display = simPause.style.display || 'none';
           }
 
           /* ── meta ───────────────────────────────────────────────── */
