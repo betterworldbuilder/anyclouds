@@ -8226,7 +8226,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <div style="width:36px;height:36px;background:#dc2626;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px;flex-shrink:0;">4B</div>
           <div>
             <div style="font-size:15px;font-weight:700;color:#fff;">Advanced Business System Cutover</div>
-            <div style="font-size:11px;color:#94a3b8;">Import UAT &#8594; Select Services &#8594; Readiness &#8594; Execute &#8594; Verify &#8594; Decide &#8594; Evidence &#8594; Cut over Execution</div>
+            <div style="font-size:11px;color:#94a3b8;">Import UAT &#8594; Select Services &#8594; Readiness &#8594; Execute &#8594; Verify &#8594; Decide &#8594; Evidence</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -8463,8 +8463,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     <script>
     (function(){
       'use strict';
-      var _b={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending',8:'pending'},pkg:null,rdns:null,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},logs:[],ev:{},tpct:0};
-      var STEPS=[{n:1,l:'Import UAT'},{n:2,l:'Select Services'},{n:3,l:'Readiness Check'},{n:4,l:'Execute Cutover'},{n:5,l:'Post-Cutover Verify'},{n:6,l:'Operator Decision'},{n:7,l:'Monitoring & Evidence'},{n:8,l:'Cut over Execution'}];
+      var _b={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},pkg:null,rdns:null,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},logs:[],ev:{},tpct:0};
+      var STEPS=[{n:1,l:'Import UAT'},{n:2,l:'Select Services'},{n:3,l:'Readiness Check'},{n:4,l:'Execute Cutover'},{n:5,l:'Post-Cutover Verify'},{n:6,l:'Operator Decision'},{n:7,l:'Monitoring & Evidence'}];
       var CL={load_balancer:'LB/HAProxy',api_gateway:'API GW',web_frontend:'Web',api_server:'API',app_server:'App',database:'DB',cache:'Cache',queue:'Queue',worker:'Worker',monitoring:'Monitor',file_storage:'Storage',custom:'Custom'};
       var CI={load_balancer:'fa-network-wired',api_gateway:'fa-shield-halved',web_frontend:'fa-globe',api_server:'fa-code',app_server:'fa-server',database:'fa-database',cache:'fa-bolt',queue:'fa-right-left',worker:'fa-gears',monitoring:'fa-chart-bar',file_storage:'fa-folder',custom:'fa-box'};
       function _rs(){var el=document.getElementById('bsc-stepper');if(!el)return;el.innerHTML=STEPS.map(function(s,i){var st=_b.ss[s.n]||'pending';var ic=st==='done'?'<i class="fas fa-check"></i>':st==='fail'?'<i class="fas fa-times"></i>':s.n;return '<div class="bsc-stp"><div class="bsc-stp-node '+st+'" onclick="bscGoStep('+s.n+')" title="'+s.l+'"><div class="bsc-stp-circle">'+ic+'</div><div class="bsc-stp-lbl">'+s.l+'</div></div>'+(i<STEPS.length-1?'<div class="bsc-stp-line'+(st==='done'?' done':'')+'"></div>':'')+'</div>';}).join('');}
@@ -8472,14 +8472,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         _b.step=n;
         STEPS.forEach(function(s){if(s.n<n&&_b.ss[s.n]!=='fail')_b.ss[s.n]='done';if(s.n===n)_b.ss[s.n]='active';if(s.n>n&&_b.ss[s.n]!=='fail')_b.ss[s.n]='pending';var el=document.getElementById('bsc-s'+s.n);if(el)el.style.display=s.n===n?'':'none';});
         _rs();var b=document.getElementById('bsc-step-badge');if(b)b.textContent='Step '+n+' — '+STEPS[n-1].l;
-        var adv=document.getElementById('co-adv-dash'),host=document.getElementById('bsc-exec-host'),home=document.getElementById('co-adv-home');
-        if(n===8){if(adv&&host&&adv.parentNode!==host)host.appendChild(adv);if(adv)adv.style.display='block';setTimeout(function(){try{coAdvRefresh();}catch(e){}},150);}
-        else{if(adv&&home&&adv.parentNode!==home){home.appendChild(adv);var sv=localStorage.getItem('cutoverDashboardMode');adv.style.display=(sv==='advanced')?'block':'none';}}
-        if(n===2)_rc2();if(n===3)_rc3();if(n===4)_rc4();if(n===5)_rc5();if(n===6)_rc6();if(n===7)_rc7();
+
+        if(n===2)_rc2();if(n===3)_rc3();if(n===4)_rc4();if(n===5)_rc5();if(n===6)_rc6();
       }
       window.bscGoStep=function(n){_ss(n);};
-      function _lg(m){_b.logs.push(m);var e=document.getElementById('bsc-log-out');if(e){e.textContent+='['+new Date().toLocaleTimeString()+'] '+m+'
-';e.scrollTop=e.scrollHeight;}}
+      function _lg(m){_b.logs.push(m);var e=document.getElementById('bsc-log-out');if(e){e.textContent+='['+new Date().toLocaleTimeString()+'] '+m+'\n';e.scrollTop=e.scrollHeight;}}
       function _mkS(id,nm,us,rs,own,cmps){return{id:id,name:nm,uatStatus:us,riskStatus:rs,owner:own,selected:false,components:cmps};}
       function _mkC(id,sid,nm,tp,us,src,tgt,port){return{id:id,sid:sid,name:nm,type:tp,uatStatus:us,source:src,target:tgt,ports:[port],selected:true,riskStatus:'None',owner:'operator',status:'pending'};}
       window.bscImportUAT=function(){
@@ -8546,9 +8543,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         _lg('Banking Mobile App loaded ('+svcs.length+' services, '+svcs.reduce(function(a,s){return a+s.components.length;},0)+' components)');
       };
 
-      window.bscReset=function(){if(!confirm('Reset all progress?'))return;_b={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending',8:'pending'},pkg:null,rdns:null,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},logs:[],ev:{},tpct:0};['bsc-pkg-badge','bsc-decision-badge','bsc-import-pkg-card','bsc-readiness-summary','bsc-verify-summary','bsc-decision-confirm','bsc-final-result','bsc-monitor-progress'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});var lo=document.getElementById('bsc-log-out');if(lo)lo.textContent='';var le=document.getElementById('bsc-exec-log-out');if(le)le.textContent='Awaiting cutover execution...';var su=document.getElementById('bsc-uat-summary');if(su)su.innerHTML='<span style="color:#94a3b8;">No UAT package imported yet</span>';var adv=document.getElementById('co-adv-dash'),home=document.getElementById('co-adv-home');if(adv&&home&&adv.parentNode!==home){home.appendChild(adv);var sv=localStorage.getItem('cutoverDashboardMode');adv.style.display=(sv==='advanced')?'block':'none';}_ss(1);};
+      window.bscReset=function(){if(!confirm('Reset all progress?'))return;_b={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},pkg:null,rdns:null,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},logs:[],ev:{},tpct:0};['bsc-pkg-badge','bsc-decision-badge','bsc-import-pkg-card','bsc-readiness-summary','bsc-verify-summary','bsc-decision-confirm','bsc-final-result','bsc-monitor-progress'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});var lo=document.getElementById('bsc-log-out');if(lo)lo.textContent='';var le=document.getElementById('bsc-exec-log-out');if(le)le.textContent='Awaiting cutover execution...';var su=document.getElementById('bsc-uat-summary');if(su)su.innerHTML='<span style="color:#94a3b8;">No UAT package imported yet</span>';var adv=document.getElementById('co-adv-dash'),home=document.getElementById('co-adv-home');if(adv&&home&&adv.parentNode!==home){home.appendChild(adv);var sv=localStorage.getItem('cutoverDashboardMode');adv.style.display=(sv==='advanced')?'block':'none';}_ss(1);};
       window.bscOnActivate=function(){
-        _rs(); /* re-render stepper now panel is visible */
+        if(_b.step===1||!_b.pkg)_ss(1); else _rs(); /* re-render stepper now panel is visible */
         if(!_b.pkg){
           var hasScope=false;
           if(window.UAT&&window.UAT.scope&&window.UAT.scope.length) hasScope=true;
@@ -8559,7 +8556,368 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           },300);
         }
       };
-      _rs();_rc7();
+      /* ── _pic: render imported package summary in step 1 ── */
+      function _pic(){
+        var pkg=_b.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices||[];
+        var tot=svcs.reduce(function(a,s){return a+s.components.length;},0);
+        var su=document.getElementById('bsc-uat-summary');
+        if(su){
+          var passed=svcs.filter(function(s){return s.uatStatus==='Passed';}).length;
+          var risks=pkg.acceptedRisks&&pkg.acceptedRisks.length?pkg.acceptedRisks.length:0;
+          su.innerHTML='<div style="width:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
+            +'<span style="background:#eff6ff;color:#1d4ed8;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:4px;"></i>'+passed+' / '+svcs.length+' Services Passed</span>'
+            +'<span style="background:#f0fdf4;color:#16a34a;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;"><i class="fas fa-cubes" style="margin-right:4px;"></i>'+tot+' Components</span>'
+            +(risks?'<span style="background:#fef9c3;color:#a16207;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;"><i class="fas fa-triangle-exclamation" style="margin-right:4px;"></i>'+risks+' Risk(s)</span>':'')
+            +'<span style="font-size:11px;color:#64748b;margin-left:4px;">'+pkg.customerName+' &mdash; '+pkg.uatRunId+'</span>'
+            +'</div>';
+        }
+        _b.ss[1]='done';_rs();
+        setTimeout(function(){_ss(2);},500);
+      }
+
+      /* ── _rc2: render service selection cards ── */
+      function _rc2(){
+        var pkg=_b.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices||[];
+        var el=document.getElementById('bsc-svc-cards');
+        if(!el)return;
+        el.innerHTML=svcs.map(function(s,i){
+          var passed=s.uatStatus==='Passed';
+          var clr=passed?'#16a34a':'#dc2626';
+          var bg=passed?'#f0fdf4':'#fef2f2';
+          var cmps=s.components.map(function(c){
+            return '<span style="font-size:10px;padding:2px 7px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;color:#475569;">'+c.name+'</span>';
+          }).join('');
+          return '<div class="bsc-svc-card" style="border-left:4px solid '+clr+';background:'+bg+';cursor:pointer;" onclick="bscToggleSvc('+i+',this)">'
+            +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+            +'<input type="checkbox" '+(s.selected?'checked':'')
+            +' onchange="bscToggleSvc('+i+',null,this.checked);event.stopPropagation();" style="width:15px;height:15px;cursor:pointer;accent-color:'+clr+';">'
+            +'<div style="font-size:13px;font-weight:700;color:#1e293b;flex:1;">'+s.name+'</div>'
+            +'<span style="font-size:10px;font-weight:700;color:'+clr+';">'+s.uatStatus+'</span>'
+            +'</div>'
+            +'<div style="font-size:10px;color:#64748b;margin-bottom:6px;">Owner: <b>'+s.owner+'</b> | Risk: '+s.riskStatus+'</div>'
+            +'<div style="display:flex;flex-wrap:wrap;gap:4px;">'+cmps+'</div>'
+            +'</div>';
+        }).join('');
+        /* update proceed button */
+        _rc2Btn();
+      }
+      function _rc2Btn(){
+        var pkg=_b.pkg;if(!pkg)return;
+        var sel=pkg.businessServices.filter(function(s){return s.selected;}).length;
+        var btn=document.getElementById('bsc-to-s3-btn');
+        if(btn){btn.disabled=sel===0;btn.style.opacity=sel?'1':'0.5';}
+      }
+      window.bscToggleSvc=function(i,card,checked){
+        var pkg=_b.pkg;if(!pkg)return;
+        var s=pkg.businessServices[i];if(!s)return;
+        if(typeof checked==='boolean') s.selected=checked;
+        else s.selected=!s.selected;
+        _rc2();
+      };
+      window.bscSelectAllPass=function(){
+        var pkg=_b.pkg;if(!pkg)return;
+        pkg.businessServices.forEach(function(s){s.selected=s.uatStatus==='Passed';});
+        _rc2();_lg('Selected all UAT-passed services');
+      };
+      window.bscToggleComponents=function(){
+        var cards=document.getElementById('bsc-svc-cards');
+        var table=document.getElementById('bsc-svc-table-wrap');
+        var btn=document.getElementById('bsc-toggle-comp-btn');
+        var show=table&&table.style.display==='none';
+        if(cards)cards.style.display=show?'none':'grid';
+        if(table)table.style.display=show?'block':'none';
+        if(btn)btn.innerHTML=show?'<i class="fas fa-th-large"></i> Card View':'<i class="fas fa-list"></i> Expand Components';
+      };
+
+      /* ── _rc3: render readiness check groups ── */
+      function _rc3(){
+        var pkg=_b.pkg;if(!pkg)return;
+        var el=document.getElementById('bsc-readiness-groups');
+        if(!el)return;
+        var checks=[
+          {g:'Connectivity',icon:'fa-network-wired',color:'#2563eb',items:['Source reachable','Target reachable','Port scan clear','DNS resolves']},
+          {g:'Database',icon:'fa-database',color:'#7c3aed',items:['Replica lag <1s','Schema matched','Backup verified','Connections healthy']},
+          {g:'Application',icon:'fa-server',color:'#0ea5e9',items:['Health endpoint OK','Config verified','Secrets mounted','Startup time OK']},
+          {g:'Traffic',icon:'fa-traffic-light',color:'#dc2626',items:['HAProxy reachable','SSL cert valid','Load balanced','Rollback tested']}
+        ];
+        el.innerHTML=checks.map(function(c){
+          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">'
+            +'<div style="font-size:11px;font-weight:700;color:'+c.color+';margin-bottom:10px;"><i class="fas '+c.icon+'" style="margin-right:5px;"></i>'+c.g+'</div>'
+            +'<div id="bsc-rdns-'+c.g.toLowerCase()+'">'+c.items.map(function(it){
+              return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;color:#94a3b8;">'
+                +'<i class="fas fa-circle" style="font-size:6px;"></i>'+it+'</div>';
+            }).join('')+'</div>'
+            +'</div>';
+        }).join('');
+        var btn=document.getElementById('bsc-to-s4-btn');
+        if(btn){btn.disabled=true;btn.style.opacity='0.5';}
+      }
+      window.bscRunReadiness=function(){
+        var el=document.getElementById('bsc-readiness-groups');
+        if(!el)return;
+        var btn=document.getElementById('bsc-readiness-btn');
+        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Running...';}
+        _lg('Running quick readiness checks...');
+        var checks=['connectivity','database','application','traffic'];
+        var delay=0;
+        checks.forEach(function(g){
+          var group=document.getElementById('bsc-rdns-'+g);
+          if(!group)return;
+          var rows=group.querySelectorAll('div');
+          rows.forEach(function(row,i){
+            delay+=220;
+            setTimeout(function(){
+              var pass=Math.random()>0.08;
+              row.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:'+(pass?'#16a34a':'#dc2626')+';">'
+                +'<i class="fas '+(pass?'fa-check-circle':'fa-times-circle')+'"></i>'
+                +row.textContent.trim()+'</div>';
+            },delay);
+          });
+        });
+        setTimeout(function(){
+          _b.rdns={passed:true,ts:new Date().toLocaleString()};
+          var sumEl=document.getElementById('bsc-readiness-summary');
+          if(sumEl){
+            sumEl.style.display='block';
+            sumEl.style.background='#f0fdf4';sumEl.style.border='1px solid #bbf7d0';sumEl.style.borderRadius='8px';sumEl.style.padding='14px 18px';
+            sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>Readiness checks complete — all systems GO</span>';
+          }
+          var toBtn=document.getElementById('bsc-to-s4-btn');
+          if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
+          if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-redo"></i> Re-run';}
+          _b.ss[3]='done';_rs();
+          _lg('Readiness: all checks passed');
+        },delay+300);
+      };
+      window.bscAcceptReadinessRisk=function(){
+        _b.rdns={passed:true,acceptedRisk:true,ts:new Date().toLocaleString()};
+        var toBtn=document.getElementById('bsc-to-s4-btn');
+        if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
+        var rBtn=document.getElementById('bsc-accept-risk-btn');
+        if(rBtn)rBtn.style.display='none';
+        _b.ss[3]='done';_rs();
+        _ss(4);
+      };
+
+      /* ── _rc4: traffic ramp ── */
+      function _rc4(){
+        _b.tpct=_b.tpct||0;
+        _updateTrafficUI(_b.tpct);
+      }
+      function _updateTrafficUI(pct){
+        var src=document.getElementById('bsc-src-pct');
+        var tgt=document.getElementById('bsc-tgt-pct');
+        var bar=document.getElementById('bsc-traffic-bar');
+        var st=document.getElementById('bsc-traffic-status');
+        if(src)src.textContent=(100-pct)+'%';
+        if(tgt)tgt.textContent=pct+'%';
+        if(bar)bar.style.width=pct+'%';
+        if(st){
+          if(pct===0)st.textContent='No traffic shifted yet';
+          else if(pct<100)st.textContent='Traffic ramp in progress — '+pct+'% on FLEX';
+          else st.textContent='100% traffic on FLEX — cutover complete';
+        }
+        document.querySelectorAll('.bsc-ramp-btn').forEach(function(b){
+          var active=parseInt(b.getAttribute('data-pct'))===pct;
+          b.style.background=active?'#2563eb':'#f1f5f9';
+          b.style.color=active?'#fff':'#475569';
+          b.style.border=active?'none':'1px solid #e2e8f0';
+        });
+      }
+      window.bscSetTraffic=function(pct){
+        _b.tpct=pct;
+        _updateTrafficUI(pct);
+        _lg('Traffic set: '+pct+'% FLEX / '+(100-pct)+'% OSPC');
+        if(pct===100){_b.ss[4]='done';_rs();}
+      };
+
+      /* ── _rc5: post-cutover verification ── */
+      function _rc5(){
+        var el=document.getElementById('bsc-verify-results');
+        if(!el)return;
+        var pkg=_b.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        el.innerHTML=svcs.map(function(s){
+          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">'
+            +'<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">'+s.name+'</div>'
+            +'<div id="bsc-v-'+s.id+'">'+s.components.map(function(c){
+              return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px;color:#94a3b8;">'
+                +'<i class="fas fa-circle" style="font-size:6px;"></i>'+c.name+'</div>';
+            }).join('')+'</div>'
+            +'</div>';
+        }).join('');
+        var btn=document.getElementById('bsc-to-s6-btn');
+        if(btn){btn.disabled=true;btn.style.opacity='0.5';}
+      }
+      window.bscRunVerification=function(){
+        var el=document.getElementById('bsc-verify-results');
+        if(!el)return;
+        var btn=document.getElementById('bsc-verify-btn');
+        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Verifying...';}
+        _lg('Running post-cutover verification...');
+        var pkg=_b.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var delay=0;
+        svcs.forEach(function(s){
+          var grpEl=document.getElementById('bsc-v-'+s.id);
+          if(!grpEl)return;
+          var rows=grpEl.querySelectorAll('div');
+          rows.forEach(function(row){
+            delay+=180;
+            setTimeout(function(){
+              var pass=Math.random()>0.05;
+              row.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:'+(pass?'#16a34a':'#dc2626')+';">'
+                +'<i class="fas '+(pass?'fa-check-circle':'fa-times-circle')+'"></i>'
+                +row.textContent.trim()+'</div>';
+            },delay);
+          });
+        });
+        setTimeout(function(){
+          _b.verif={passed:true,ts:new Date().toLocaleString()};
+          var sumEl=document.getElementById('bsc-verify-summary');
+          if(sumEl){
+            sumEl.style.display='block';
+            sumEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;margin-bottom:14px;';
+            sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>Verification complete — all services healthy on FLEX</span>';
+          }
+          var toBtn=document.getElementById('bsc-to-s6-btn');
+          if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
+          if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-redo"></i> Re-run';}
+          _b.ss[5]='done';_rs();
+          _lg('Verification: all checks passed');
+        },delay+300);
+      };
+
+      /* ── _rc6: operator decision summary ── */
+      function _rc6(){
+        var el=document.getElementById('bsc-decision-summary');
+        if(!el)return;
+        var pkg=_b.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var tot=svcs.reduce(function(a,s){return a+s.components.length;},0);
+        el.innerHTML=[
+          {l:'Services',v:svcs.length,c:'#2563eb',bg:'#eff6ff',ic:'fa-layer-group'},
+          {l:'Components',v:tot,c:'#7c3aed',bg:'#f5f3ff',ic:'fa-cubes'},
+          {l:'Traffic on FLEX',v:(_b.tpct||0)+'%',c:'#16a34a',bg:'#f0fdf4',ic:'fa-traffic-light'},
+          {l:'Readiness',v:_b.rdns?'PASS':'—',c:'#0ea5e9',bg:'#f0f9ff',ic:'fa-stethoscope'},
+          {l:'Verification',v:_b.verif?'PASS':'—',c:'#16a34a',bg:'#f0fdf4',ic:'fa-clipboard-check'},
+          {l:'Accepted Risks',v:(pkg.acceptedRisks&&pkg.acceptedRisks.length)||0,c:'#d97706',bg:'#fffbeb',ic:'fa-triangle-exclamation'}
+        ].map(function(m){
+          return '<div style="background:'+m.bg+';border-radius:8px;padding:12px 14px;text-align:center;">'
+            +'<i class="fas '+m.ic+'" style="color:'+m.c+';font-size:18px;margin-bottom:4px;display:block;"></i>'
+            +'<div style="font-size:18px;font-weight:800;color:'+m.c+';">'+m.v+'</div>'
+            +'<div style="font-size:10px;color:#64748b;font-weight:600;">'+m.l+'</div>'
+            +'</div>';
+        }).join('');
+      }
+      window.bscDecide=function(d){
+        _b.dec=d;
+        var conf=document.getElementById('bsc-decision-confirm');
+        if(conf)conf.style.display='block';
+        var title=document.getElementById('bsc-confirm-title');
+        var colors={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'};
+        var icons={PASS:'fa-circle-check',FIX:'fa-wrench',ROLLBACK:'fa-rotate-left'};
+        if(title)title.innerHTML='<i class="fas '+icons[d]+'" style="color:'+colors[d]+';margin-right:6px;"></i>'
+          +'Confirm: '+d+' CUTOVER';
+        _lg('Decision selected: '+d);
+      };
+      window.bscConfirmDecision=function(){
+        var reason=document.getElementById('bsc-dec-reason');
+        var appr=document.getElementById('bsc-dec-approved');
+        var jira=document.getElementById('bsc-dec-jira');
+        _b.ev.decision={d:_b.dec,reason:reason&&reason.value,approvedBy:appr&&appr.value,ts:new Date().toLocaleString()};
+        _b.ss[6]='done';_rs();
+        _lg('Decision confirmed: '+_b.dec+' by '+(appr&&appr.value||'operator'));
+        _ss(7);
+      };
+
+      /* ── Step 7 monitoring & evidence ── */
+      window.bscSetMonitorDuration=function(d,btn){
+        _b.mon.d=d;
+        document.querySelectorAll('.bsc-dur-btn').forEach(function(b){
+          b.classList.remove('bsc-dur-active');
+          b.style.background='';b.style.color='';b.style.border='';
+        });
+        if(btn){btn.classList.add('bsc-dur-active');}
+        _lg('Monitor duration set to '+d+' min');
+      };
+      window.bscStartMonitoring=function(){
+        if(_b.mon.r)return;
+        _b.mon.r=true;_b.mon.e=0;
+        var total=_b.mon.d*60;
+        var prog=document.getElementById('bsc-monitor-progress');
+        if(prog)prog.style.display='block';
+        _lg('Monitoring started ('+_b.mon.d+' min)');
+        _b.mon.t=setInterval(function(){
+          _b.mon.e++;
+          var pct=Math.min(100,Math.round(_b.mon.e/total*100));
+          var bar=document.getElementById('bsc-mon-bar');
+          var st=document.getElementById('bsc-mon-status');
+          var el=document.getElementById('bsc-mon-elapsed');
+          if(bar)bar.style.width=pct+'%';
+          var mm=Math.floor(_b.mon.e/60),ss2=_b.mon.e%60;
+          if(el)el.textContent=mm+':'+(ss2<10?'0':'')+ss2;
+          if(pct>=100){
+            clearInterval(_b.mon.t);_b.mon.r=false;
+            if(st)st.textContent='Monitoring complete';
+            if(bar)bar.style.background='#16a34a';
+            _b.ss[7]='done';_rs();
+            var capBtn=document.getElementById('bsc-capture-btn');
+            if(capBtn)capBtn.disabled=false;
+            _lg('Monitoring complete');
+          } else {
+            if(st)st.textContent='Monitoring… '+pct+'%';
+          }
+        },1000);
+      };
+      window.bscCaptureEvidence=function(){
+        var pkg=_b.pkg;if(!pkg)return;
+        _b.ev.captured=true;_b.ev.ts=new Date().toLocaleString();
+        var res=document.getElementById('bsc-final-result');
+        if(res){
+          res.style.display='block';
+          var d=_b.dec||'PASS';
+          var clr={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'}[d]||'#2563eb';
+          res.style.cssText='display:block;background:#f0fdf4;border:2px solid #bbf7d0;border-radius:10px;padding:18px 22px;';
+          res.innerHTML='<div style="font-size:16px;font-weight:800;color:'+clr+';margin-bottom:6px;"><i class="fas fa-flag-checkered" style="margin-right:8px;"></i>Cutover Evidence Captured</div>'
+            +'<div style="font-size:12px;color:#475569;">Customer: <b>'+pkg.customerName+'</b> | Decision: <b style="color:'+clr+';">'+d+'</b> | '+new Date().toLocaleString()+'</div>';
+        }
+        _lg('Evidence captured');
+      };
+      window.bscExportReport=function(){
+        var pkg=_b.pkg;if(!pkg){alert('No package loaded');return;}
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var lines=['# BSC Cutover Report','Customer: '+pkg.customerName,'Migration ID: '+pkg.migrationId,'UAT Run: '+pkg.uatRunId,'Decision: '+(_b.dec||'—'),'Date: '+new Date().toLocaleString(),'','## Services'];
+        svcs.forEach(function(s){
+          lines.push('- '+s.name+' ['+s.uatStatus+'] ('+s.components.length+' components)');
+        });
+        if(pkg.acceptedRisks&&pkg.acceptedRisks.length){
+          lines.push('','## Accepted Risks');
+          pkg.acceptedRisks.forEach(function(r){lines.push('- '+r);});
+        }
+        var blob=new Blob([lines.join('\n')],{type:'text/plain'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+        a.download='bsc-cutover-report-'+pkg.migrationId+'.txt';a.click();
+        _lg('Report exported');
+      };
+      window.bscExportEvidence=function(){
+        var pkg=_b.pkg;if(!pkg){alert('No package loaded');return;}
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var rows=['Service,Component,Type,Source,Target,UAT Status'];
+        svcs.forEach(function(s){
+          s.components.forEach(function(c){
+            rows.push([s.name,c.name,c.type,c.source,c.target,c.uatStatus].join(','));
+          });
+        });
+        var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+        a.download='bsc-evidence-'+pkg.migrationId+'.csv';a.click();
+        _lg('Evidence CSV exported');
+      };
+
+      _ss(1);
     })();
     </script>
   </div>
