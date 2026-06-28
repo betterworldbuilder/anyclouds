@@ -5582,6 +5582,14 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     <input id="co-mon-port" type="number" value="80" style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;width:70px;">
                   </div>
                   <div>
+                    <label style="font-size:10px;color:#e0f2fe;display:block;margin-bottom:2px;">DB Port</label>
+                    <input id="co-mon-db-port" type="number" placeholder="e.g. 5432" style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;width:80px;" title="Leave blank to skip DB latency check">
+                  </div>
+                  <div>
+                    <label style="font-size:10px;color:#e0f2fe;display:block;margin-bottom:2px;">SSH User</label>
+                    <input id="co-mon-ssh-user" type="text" value="ubuntu" style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;width:90px;font-family:monospace;">
+                  </div>
+                  <div>
                     <label style="font-size:10px;color:#e0f2fe;display:block;margin-bottom:2px;">Auto-poll</label>
                     <select id="co-mon-interval" onchange="coMonSetInterval()" style="padding:5px 8px;font-size:11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;">
                       <option value="0" style="color:#1e293b;">Manual</option>
@@ -6340,26 +6348,32 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
               // Update numeric badges
               var last = function(a){ return a.length ? a[a.length-1] : null; };
-              function _badge(id, v, unit, warn, crit) {
+              function _badge(id, v, unit, warn, crit, allowZero) {
                 var el = document.getElementById(id);
                 if (!el || v === null) return;
-                el.textContent = v + ' ' + unit;
+                if (!allowZero && v === 0) { el.textContent = '— ' + unit; el.style.color = '#94a3b8'; return; }
+                el.textContent = v + (unit ? ' ' + unit : '');
                 el.style.color = v >= crit ? '#ef4444' : v >= warn ? '#f59e0b' : '#22c55e';
               }
-              function _srcBadge(id, v) {
+              function _srcBadge(id, v, dp) {
                 var el = document.getElementById(id);
                 if (!el || v === null) return;
-                el.textContent = v;
+                el.textContent = (dp && typeof v === 'number') ? v.toFixed(dp) : v;
               }
               _badge('co-mon-val-resp', last(_coMon.resp), 'ms',  200, 500);
-              _badge('co-mon-val-err',  last(_coMon.err),  '%',   2,   5);
-              _badge('co-mon-val-cpu',  last(_coMon.cpu),  '',    2,   4);
+              _badge('co-mon-val-err',  last(_coMon.err),  '%',   2,   5,   true);
+              var _cpuV = last(_coMon.cpu);
+              var _cpuEl = document.getElementById('co-mon-val-cpu');
+              if (_cpuEl) {
+                if (_cpuV === null || _cpuV === 0) { _cpuEl.textContent = '0.00'; _cpuEl.style.color = '#22c55e'; }
+                else { _cpuEl.textContent = (typeof _cpuV === 'number' ? _cpuV.toFixed(2) : _cpuV); _cpuEl.style.color = _cpuV >= 4 ? '#ef4444' : _cpuV >= 2 ? '#f59e0b' : '#22c55e'; }
+              }
               _badge('co-mon-val-mem',  last(_coMon.mem),  '%',   70,  85);
               _badge('co-mon-val-lat',  last(_coMon.lat),  'ms',  50,  150);
               _badge('co-mon-val-db',   last(_coMon.db),   'ms',  50,  200);
               _srcBadge('co-mon-src-val-resp', last(_coMon.srcResp));
-              _srcBadge('co-mon-src-val-cpu',  last(_coMon.srcCpu));
-              _srcBadge('co-mon-src-val-mem',  last(_coMon.srcMem));
+              _srcBadge('co-mon-src-val-cpu',  last(_coMon.srcCpu), 2);
+              _srcBadge('co-mon-src-val-mem',  last(_coMon.srcMem), 1);
               _srcBadge('co-mon-src-val-lat',  last(_coMon.srcLat));
               _coMonDrawComparison();
 
@@ -6620,9 +6634,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var st = document.getElementById('co-mon-status');
               if (st) st.textContent = 'Polling FLEX target…';
 
-              var ip     = (document.getElementById('co-mon-ip')     || {}).value || '';
-              var srcIp  = (document.getElementById('co-mon-src-ip') || {}).value || '';
-              var port   = (document.getElementById('co-mon-port')   || {}).value || '80';
+              var ip      = (document.getElementById('co-mon-ip')       || {}).value || '';
+              var srcIp   = (document.getElementById('co-mon-src-ip')   || {}).value || '';
+              var port    = (document.getElementById('co-mon-port')     || {}).value || '80';
+              var dbPort  = (document.getElementById('co-mon-db-port')  || {}).value || '0';
+              var sshUser = (document.getElementById('co-mon-ssh-user') || {}).value || 'ubuntu';
               if (!ip || !srcIp) {
                 var scope = _uatScope();
                 if (!ip)    ip    = scope.length ? scope[0].target_ip : '';
@@ -6638,14 +6654,33 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               fetch('/api/uat/performance/run', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ target_ip: ip, source_ip: srcIp || undefined, ssh_key: '~/.ssh/id_rsa', app_port: parseInt(port) || 80 })
+                body: JSON.stringify({
+                  target_ip: ip,
+                  source_ip: srcIp || undefined,
+                  ssh_key: '~/.ssh/id_rsa',
+                  ssh_user: sshUser,
+                  app_port: parseInt(port) || 80,
+                  db_port: parseInt(dbPort) || 0
+                })
               })
               .then(function(r){ return r.json(); })
               .then(function(data) {
                 _coMon.polling = false;
-                if (pulse) pulse.style.background = '#22c55e';
+                var srcErr = data.source_error || '';
+                var tgtErr = data.target_error || '';
+                var hasErr = srcErr || tgtErr;
+                if (pulse) pulse.style.background = hasErr ? '#f59e0b' : '#22c55e';
                 _coMonIngest(data.performance || {});
-                // Update Live Health row too
+                // Surface SSH errors in status bar
+                if (hasErr) {
+                  var errParts = [];
+                  if (srcErr) errParts.push('SRC: ' + srcErr.slice(0, 80));
+                  if (tgtErr) errParts.push('FLEX: ' + tgtErr.slice(0, 80));
+                  if (st) { st.style.color = '#b45309'; st.textContent = '⚠ SSH error — ' + errParts.join(' | '); }
+                } else {
+                  if (st) { st.style.color = '#0369a1'; st.textContent = 'Poll ' + _coMon.resp.length + ' data points collected.'; }
+                }
+                // Update Live Health row
                 var lv = _coMon.resp.length ? _coMon.resp[_coMon.resp.length-1] : null;
                 if (lv !== null) {
                   var hel = document.getElementById('co-health-latency-val');
@@ -6666,7 +6701,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 _coMon.polling = false;
                 if (pulse) pulse.style.background = '#ef4444';
                 var st2 = document.getElementById('co-mon-status');
-                if (st2) st2.textContent = 'Poll error: ' + err.message;
+                if (st2) { st2.style.color = '#dc2626'; st2.textContent = '✗ Poll error: ' + err.message; }
               });
             };
 
