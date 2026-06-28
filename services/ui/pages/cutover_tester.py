@@ -1222,11 +1222,13 @@ def stream_cutover_tester_action(data: Dict[str, Any]) -> Iterator[str]:
         if not jumphost_ip:
             yield "[ERROR] Select a Stage 2 jumphost before running the cutover test."
             return
-        yield "=== PHASE 1: TRAFFIC RAMP PROOF ==="
-        ramp_ok = yield from _stream_traffic_ramp(data, evidence=evidence, write_artifacts=False)
-        yield "=== PHASE 2: CUTOVER SPECIFIC TESTS ==="
+        # Phase 1: validate config, connectivity, and performance before touching traffic
+        yield "=== PHASE 1: CONFIGURATION & PERFORMANCE TEST ==="
         specific_ok = yield from _stream_cutover_specific_tests(data, action, jumphost_ip, user, ssh_key, evidence)
-        ok = bool(ramp_ok) and bool(specific_ok)
+        # Phase 2: ramp proof — only attempt if Phase 1 passed or operator chose to continue
+        yield "=== PHASE 2: TRAFFIC RAMP PROOF ==="
+        ramp_ok = yield from _stream_traffic_ramp(data, evidence=evidence, write_artifacts=False)
+        ok = bool(specific_ok) and bool(ramp_ok)
         yield "[OK] Cut over TEST completed." if ok else "[ERROR] Cut over TEST completed with failed checks."
         artifacts = write_cutover_tester_evidence(action, data, {"ok": bool(ok), "steps": evidence})
         yield f"[ARTIFACTS] {json.dumps(artifacts, sort_keys=True)}"
