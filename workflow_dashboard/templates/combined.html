@@ -5608,7 +5608,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <!-- Pairing matrix banner -->
               <div style="display:flex;align-items:center;gap:10px;padding:8px 20px;background:#e0f2fe;border-bottom:1px solid #bae6fd;flex-wrap:wrap;">
                 <span style="font-size:10px;font-weight:800;color:#0369a1;white-space:nowrap;">📋 Active Pair:</span>
-                <span id="co-mon-pair-src" style="font-size:11px;font-family:monospace;color:#1d4ed8;background:#dbeafe;padding:2px 10px;border-radius:5px;border:1px solid #bfdbfe;">— Source</span>
+                <span id="co-mon-pair-src" style="font-size:11px;font-family:monospace;color:#dc2626;background:#fee2e2;padding:2px 10px;border-radius:5px;border:1px solid #fca5a5;">— Source</span>
                 <span style="font-size:12px;color:#7dd3fc;font-weight:700;">→</span>
                 <span id="co-mon-pair-tgt" style="font-size:11px;font-family:monospace;color:#065f46;background:#d1fae5;padding:2px 10px;border-radius:5px;border:1px solid #6ee7b7;">— FLEX Target</span>
                 <button onclick="coMonRefreshPair()" style="margin-left:auto;padding:3px 12px;background:#fff;border:1px solid #7dd3fc;border-radius:6px;font-size:10px;color:#0369a1;cursor:pointer;font-weight:700;">↺ Sync from Matrix</button>
@@ -5625,7 +5625,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
                 <!-- Legend -->
                 <div style="display:flex;gap:16px;margin-bottom:12px;">
-                  <span style="font-size:10px;color:#1d4ed8;font-weight:700;">■ Source (OSPC)</span>
+                  <span style="font-size:10px;color:#dc2626;font-weight:700;">■ Source (OSPC)</span>
                   <span style="font-size:10px;color:#059669;font-weight:700;">■ FLEX Target</span>
                 </div>
 
@@ -5636,7 +5636,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                       <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Response Time</span>
                       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-resp" style="font-family:monospace;">—</span> ms</span>
+                        <span style="font-size:9px;color:#dc2626;font-weight:700;">SRC <span id="co-mon-src-val-resp" style="font-family:monospace;">—</span> ms</span>
                         <span id="co-mon-val-resp" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— ms</span>
                       </div>
                     </div>
@@ -5657,7 +5657,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                       <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">CPU Load</span>
                       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-cpu" style="font-family:monospace;">—</span></span>
+                        <span style="font-size:9px;color:#dc2626;font-weight:700;">SRC <span id="co-mon-src-val-cpu" style="font-family:monospace;">—</span></span>
                         <span id="co-mon-val-cpu" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">—</span>
                       </div>
                     </div>
@@ -5669,7 +5669,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                       <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Memory %</span>
                       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-mem" style="font-family:monospace;">—</span>%</span>
+                        <span style="font-size:9px;color:#dc2626;font-weight:700;">SRC <span id="co-mon-src-val-mem" style="font-family:monospace;">—</span>%</span>
                         <span id="co-mon-val-mem" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— %</span>
                       </div>
                     </div>
@@ -5681,7 +5681,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                       <span style="font-size:11px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;">Network Latency</span>
                       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;">
-                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">SRC <span id="co-mon-src-val-lat" style="font-family:monospace;">—</span> ms</span>
+                        <span style="font-size:9px;color:#dc2626;font-weight:700;">SRC <span id="co-mon-src-val-lat" style="font-family:monospace;">—</span> ms</span>
                         <span id="co-mon-val-lat" style="font-size:13px;font-weight:800;color:#059669;font-family:monospace;">— ms</span>
                       </div>
                     </div>
@@ -5708,7 +5708,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                       <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:12px;">★ Server Performance Comparison</div>
                       <div id="co-compare-bars" style="display:flex;flex-direction:column;gap:10px;"></div>
                       <div style="display:flex;gap:14px;margin-top:12px;">
-                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">■ Source Server</span>
+                        <span style="font-size:9px;color:#dc2626;font-weight:700;">■ Source Server</span>
                         <span style="font-size:9px;color:#059669;font-weight:700;">■ FLEX Server</span>
                       </div>
                     </div>
@@ -5716,7 +5716,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                       <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:6px;">System Health Radar</div>
                       <canvas id="co-chart-radar" width="320" height="230" style="display:block;width:100%;max-width:320px;border-radius:8px;"></canvas>
                       <div style="display:flex;justify-content:center;gap:14px;margin-top:6px;">
-                        <span style="font-size:9px;color:#1d4ed8;font-weight:700;">■ Source</span>
+                        <span style="font-size:9px;color:#dc2626;font-weight:700;">■ Source</span>
                         <span style="font-size:9px;color:#059669;font-weight:700;">■ FLEX</span>
                       </div>
                     </div>
@@ -6511,14 +6511,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               }
             }
 
+            var _MON_CLR_FLEX = 'rgb(34,197,94)';   // green  — FLEX target
+            var _MON_CLR_SRC  = 'rgb(239,68,68)';   // red    — source (OSPC)
+
             function _coMonDrawAll() {
               var hasSrc = _coMon.srcResp.length > 0;
-              _coMonDrawChart('co-chart-resp', _coMon.resp, 'rgb(34,197,94)',   500, hasSrc ? _coMon.srcResp : null, 'rgb(96,165,250)');
-              _coMonDrawChart('co-chart-err',  _coMon.err,  'rgb(251,146,60)',  5);
-              _coMonDrawChart('co-chart-cpu',  _coMon.cpu,  'rgb(34,197,94)',   4,   hasSrc ? _coMon.srcCpu : null, 'rgb(96,165,250)');
-              _coMonDrawChart('co-chart-mem',  _coMon.mem,  'rgb(167,139,250)', 85,  hasSrc ? _coMon.srcMem : null, 'rgb(96,165,250)');
-              _coMonDrawChart('co-chart-lat',  _coMon.lat,  'rgb(251,191,36)',  150, hasSrc ? _coMon.srcLat : null, 'rgb(96,165,250)');
-              _coMonDrawChart('co-chart-db2',  _coMon.db,   'rgb(52,211,153)',  200);
+              _coMonDrawChart('co-chart-resp', _coMon.resp, _MON_CLR_FLEX, 500, hasSrc ? _coMon.srcResp : null, _MON_CLR_SRC);
+              _coMonDrawChart('co-chart-err',  _coMon.err,  _MON_CLR_FLEX, 5);
+              _coMonDrawChart('co-chart-cpu',  _coMon.cpu,  _MON_CLR_FLEX, 4,   hasSrc ? _coMon.srcCpu : null, _MON_CLR_SRC);
+              _coMonDrawChart('co-chart-mem',  _coMon.mem,  _MON_CLR_FLEX, 85,  hasSrc ? _coMon.srcMem : null, _MON_CLR_SRC);
+              _coMonDrawChart('co-chart-lat',  _coMon.lat,  _MON_CLR_FLEX, 150, hasSrc ? _coMon.srcLat : null, _MON_CLR_SRC);
+              _coMonDrawChart('co-chart-db2',  _coMon.db,   _MON_CLR_FLEX, 200);
             }
 
             function _coMonDrawComparison() {
@@ -6547,9 +6550,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   return '<div style="margin-bottom:8px;">' +
                     '<div style="font-size:10px;color:#0369a1;margin-bottom:3px;font-weight:700;">' + d.label + '</div>' +
                     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">' +
-                      '<div style="width:44px;font-size:9px;color:#1d4ed8;text-align:right;font-weight:700;">SRC ' + d.src + '</div>' +
-                      '<div style="flex:1;background:#dbeafe;border-radius:3px;height:10px;overflow:hidden;border:1px solid #93c5fd;">' +
-                        '<div style="width:' + sw + '%;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:3px;transition:.3s;"></div>' +
+                      '<div style="width:44px;font-size:9px;color:#dc2626;text-align:right;font-weight:700;">SRC ' + d.src + '</div>' +
+                      '<div style="flex:1;background:#fee2e2;border-radius:3px;height:10px;overflow:hidden;border:1px solid #fca5a5;">' +
+                        '<div style="width:' + sw + '%;height:100%;background:linear-gradient(90deg,#ef4444,#f87171);border-radius:3px;transition:.3s;"></div>' +
                       '</div>' +
                     '</div>' +
                     '<div style="display:flex;align-items:center;gap:6px;">' +
@@ -6622,8 +6625,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 ctx.fillStyle = fillColor; ctx.fill();
                 ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
               }
-              drawPoly(srcScores, 'rgba(96,165,250,0.9)',  'rgba(96,165,250,0.15)');
-              drawPoly(tgtScores, 'rgba(34,197,94,0.9)',   'rgba(34,197,94,0.2)');
+              drawPoly(srcScores, 'rgba(239,68,68,0.9)',   'rgba(239,68,68,0.12)');
+              drawPoly(tgtScores, 'rgba(34,197,94,0.9)',   'rgba(34,197,94,0.18)');
             }
 
             window.coMonPoll = function() {
