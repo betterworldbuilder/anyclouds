@@ -6098,12 +6098,25 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               var out = document.getElementById('s5-log-output');
               if (box) box.style.display = 'block';
               if (out) { out.innerHTML += html; out.scrollTop = out.scrollHeight; }
+              // Mirror to advanced dashboard log
+              var advOut = document.getElementById('adv-log-output');
+              if (advOut) {
+                var plain = html.replace(/<[^>]+>/g, '');
+                advOut.textContent += plain;
+                advOut.scrollTop = advOut.scrollHeight;
+              }
             }
             function _uatLogClear(title) {
               var box = document.getElementById('s5-terminal-box');
               var out = document.getElementById('s5-log-output');
               if (box) box.style.display = 'block';
               if (out) { out.innerHTML += (out.innerHTML ? '\n' : '') + '── ' + title + ' ──\n\n'; out.scrollTop = out.scrollHeight; }
+              // Mirror to advanced dashboard log
+              var advOut = document.getElementById('adv-log-output');
+              if (advOut) {
+                advOut.textContent += (advOut.textContent ? '\n' : '') + '── ' + title + ' ──\n\n';
+                advOut.scrollTop = advOut.scrollHeight;
+              }
             }
 
             // ── Step 1: Pre-checks via UAT service compare ───────────────────
@@ -7236,7 +7249,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <div class="adv-nav-item" id="adv-nav-traffic" onclick="coAdvNav('adv-sec-traffic',this)"><i class="fas fa-network-wired"></i> Traffic</div>
               <div class="adv-nav-item" id="adv-nav-matrix" onclick="coAdvNav('adv-sec-matrix',this)"><i class="fas fa-table"></i> Pair Matrix</div>
               <div class="adv-nav-item" id="adv-nav-blockers" onclick="coAdvNav('adv-sec-blockers',this)"><i class="fas fa-triangle-exclamation"></i> Blockers</div>
-              <div class="adv-nav-item" id="adv-nav-log" onclick="coAdvViewLog()"><i class="fas fa-terminal"></i> Live Log</div>
+              <div class="adv-nav-item" id="adv-nav-log" onclick="coAdvNav('adv-sec-log',this)"><i class="fas fa-terminal"></i> Exec Log</div>
             </div>
 
             <!-- Main content -->
@@ -7257,7 +7270,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                       <div style="font-size:10px;color:#64748b;font-weight:600;">Elapsed</div>
                       <div class="adv-countdown" id="adv-elapsed">—</div>
                     </div>
-                    <button id="adv-start-btn" class="adv-btn" style="background:#22c55e;color:#fff;font-size:13px;padding:9px 18px;" onclick="coStartCutover()"><i class="fas fa-play"></i> Start Cutover</button>
+                    <button id="adv-start-btn" class="adv-btn" style="background:#22c55e;color:#fff;font-size:13px;padding:9px 18px;" onclick="coAdvStartCutover()"><i class="fas fa-play"></i> Start Cutover</button>
                     <button id="adv-pause-btn" class="adv-btn" style="background:#f59e0b;color:#fff;display:none;" onclick="coPauseCutover()"><i class="fas fa-pause"></i> Pause</button>
                     <button class="adv-btn" style="background:#ef4444;color:#fff;" onclick="coDoRollback(this)"><i class="fas fa-undo"></i> Rollback</button>
                     <button class="adv-btn adv-btn-primary" onclick="coAdvRefresh()"><i class="fas fa-rotate-right"></i> Refresh</button>
@@ -7345,6 +7358,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 </div>
               </div>
 
+              <!-- SECTION: Execution Log -->
+              <div class="adv-section-anchor" id="adv-sec-log" style="margin-top:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                  <div class="adv-section-title" style="margin-bottom:0;"><i class="fas fa-terminal"></i> Execution Log</div>
+                  <button class="adv-btn adv-btn-outline" style="font-size:11px;padding:4px 10px;" onclick="document.getElementById('adv-log-output').textContent=''">Clear</button>
+                </div>
+                <div style="background:#0f172a;border-radius:10px;padding:14px 16px;border:1.5px solid #1e3a5f;">
+                  <pre id="adv-log-output" style="margin:0;font-family:'Share Tech Mono',monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:320px;overflow-y:auto;line-height:1.6;"></pre>
+                </div>
+              </div>
+
             </div><!-- /adv-main -->
           </div><!-- /adv-layout -->
         </div><!-- /co-adv-dash -->
@@ -7354,6 +7378,20 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           'use strict';
 
           var _advCharts = {};
+
+          /* ── advanced-specific start cutover ───────────────────── */
+          window.coAdvStartCutover = function() {
+            // Ensure we stay on advanced tab for all output
+            localStorage.setItem('cutoverDashboardMode', 'advanced');
+            // Clear advanced log before new run
+            var advOut = document.getElementById('adv-log-output');
+            if (advOut) advOut.textContent = '';
+            // Trigger the shared start logic
+            if (typeof coStartCutover === 'function') coStartCutover();
+            // Scroll to steps section so user sees progress
+            var sec = document.getElementById('adv-sec-steps');
+            if (sec) setTimeout(function(){ sec.scrollIntoView({ behavior:'smooth', block:'start' }); }, 200);
+          };
 
           /* ── mode switcher ──────────────────────────────────────── */
           window.coSetDashMode = function(mode) {
