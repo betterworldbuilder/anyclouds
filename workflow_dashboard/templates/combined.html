@@ -5309,6 +5309,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             </div>
           </div>
           <div class="section-actions">
+            <button id="co-auto-btn" onclick="coToggleAutoChain()" style="border:1.5px solid #d1d5db;background:#f9fafb;color:#374151;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;"><i class="fas fa-unlink"></i> Auto Chain: OFF</button>
             <button class="btn btn-secondary light" onclick="coResetCockpit()"><i class="fas fa-redo"></i> Reset</button>
             <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Evidence</button>
           </div>
@@ -5334,9 +5335,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <div style="background:#fff;border:1.5px solid #f59e0b;border-radius:10px;padding:14px;">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                   <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:800;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</span>
-                  <span style="font-size:13px;font-weight:700;color:#92400e;">Click each step button</span>
+                  <span style="font-size:13px;font-weight:700;color:#92400e;">Run steps — manual or auto</span>
                 </div>
-                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">Work <b>left-to-right</b>. Each step has its own button — you must click it to run and confirm <b>PASS / FAIL</b>.</p>
+                <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;"><b>Manual:</b> click each step button left-to-right. <b>Auto Chain:</b> toggle <b style="color:#10b981;">Auto Chain: ON</b> (top-right) before Start — steps run automatically in sequence, each with a 3-second cancel window.</p>
               </div>
 
               <div style="background:#fff;border:1.5px solid #8b5cf6;border-radius:10px;padding:14px;">
@@ -5400,6 +5401,19 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 <button class="btn btn-danger" onclick="coDoRollback(this)"><i class="fas fa-undo"></i> Rollback</button>
               </div>
             </div>
+          </div>
+
+          <!-- Auto-chain countdown banner -->
+          <div id="co-auto-banner" style="display:none;align-items:center;justify-content:space-between;background:linear-gradient(90deg,#0f172a,#1e293b);border:1px solid #22c55e;border-radius:10px;padding:10px 18px;margin-bottom:12px;gap:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;flex-shrink:0;"></div>
+              <span style="font-size:12px;font-weight:700;color:#f1f5f9;">Auto-starting:</span>
+              <span id="co-auto-next-label" style="font-size:12px;font-weight:800;color:#22c55e;">—</span>
+              <span style="font-size:12px;color:#94a3b8;">in</span>
+              <span id="co-auto-countdown" style="font-size:18px;font-weight:900;color:#22c55e;font-family:monospace;min-width:20px;">3</span>
+              <span style="font-size:12px;color:#94a3b8;">s…</span>
+            </div>
+            <button onclick="coAutoCancelNext()" style="padding:5px 14px;background:#ef4444;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">✕ Cancel</button>
           </div>
 
           <!-- B. Execution Steps -->
@@ -5805,10 +5819,13 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               startTime: null,
               timerInterval: null,
               steps: ['precheck','traffic','app','db','monitor','close'],
-              stepLabels: { precheck:'Pre-checks', traffic:'Switch Traffic', app:'Validate App', db:'Validate DB', monitor:'Monitor', close:'Close Window' },
+              stepLabels: { precheck:'Pre-checks', traffic:'Configure HAProxy', app:'Validate App', db:'Validate DB', monitor:'Monitor', close:'Close Window' },
               stepStatus: { precheck:'pending', traffic:'pending', app:'pending', db:'pending', monitor:'pending', close:'pending' },
               dbInScope: true,
-              currentStatus: 'not-started'
+              currentStatus: 'not-started',
+              autoRun: false,
+              autoCountdownTicker: null,
+              autoObservers: []
             };
             window._coCockpit = _co;
 
@@ -6086,18 +6103,34 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (mark) mark.style.display = 'flex';
               if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
 
-              // Refresh preview first
               coStep2Refresh();
 
-              // Call the real existing function from Section 2
               if (typeof cutoverConfigureBlueGreen === 'function') {
                 cutoverConfigureBlueGreen();
-                // Show Section 2's terminal and scroll to it
                 setTimeout(function() {
                   var lbTerm = document.getElementById('cutover-lb-terminal-box');
                   if (lbTerm) {
                     lbTerm.style.display = 'block';
                     lbTerm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                  // Auto-chain: watch status indicator for Completed / Needs Review
+                  if (_co.autoRun) {
+                    var statEl = document.getElementById('cutover-lb-status-indicator');
+                    if (statEl) {
+                      var fired2 = false;
+                      var statObs = new MutationObserver(function() {
+                        if (fired2) return;
+                        var t = statEl.textContent || '';
+                        if (t === 'Completed' || t === 'Needs Review') {
+                          fired2 = true;
+                          statObs.disconnect();
+                          coMarkStep('traffic', t === 'Completed' ? 'pass' : 'fail');
+                        }
+                      });
+                      statObs.observe(statEl, { childList: true, characterData: true, subtree: true });
+                      _co.autoObservers.push(statObs);
+                      setTimeout(function(){ if (!fired2){ fired2=true; statObs.disconnect(); } }, 300000);
+                    }
                   }
                 }, 250);
               } else {
@@ -6105,11 +6138,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               }
             };
 
-            // Auto-refresh preview when cockpit starts
+            // Auto-refresh preview when cockpit starts; if auto-chain ON, kick Step 1
             var _coOrigStart = window.coStartCutover;
             window.coStartCutover = function() {
               if (typeof _coOrigStart === 'function') _coOrigStart();
               setTimeout(coStep2Refresh, 100);
+              if (_co.autoRun) {
+                setTimeout(function() {
+                  var btn1 = document.querySelector('#co-step-precheck .btn-primary');
+                  if (btn1 && !btn1.disabled) btn1.click();
+                }, 600);
+              }
             };
 
             window.coOpenGrafana = function() {
@@ -6124,6 +6163,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               resp: [], err: [], cpu: [], mem: [], lat: [], db: [],
               maxPts: 20,
               timer: null,
+              _autoPassed: false,
               polling: false
             };
 
@@ -6161,6 +6201,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (ts) ts.textContent = 'Last poll: ' + new Date().toLocaleTimeString();
               var st = document.getElementById('co-mon-status');
               if (st) st.textContent = 'Poll ' + _coMon.resp.length + ' data points collected.';
+
+              // Auto-chain: first successful poll auto-passes monitor step
+              if (_co.autoRun && !_coMon._autoPassed && _coMon.resp.length >= 1) {
+                _coMon._autoPassed = true;
+                setTimeout(function(){ coMarkStep('monitor', 'pass'); }, 500);
+              }
 
               _coMonDrawAll();
             };
@@ -6332,7 +6378,126 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               if (mark) mark.style.display = 'flex';
               if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
               executeStage5Task(taskType, btn);
+              // Auto-chain: watch s5-status-indicator for task completion
+              if (_co.autoRun) {
+                var statEl2 = document.getElementById('s5-status-indicator');
+                if (statEl2) {
+                  var fired3 = false;
+                  var statObs2 = new MutationObserver(function() {
+                    if (fired3) return;
+                    var t = statEl2.textContent || '';
+                    if (t === 'Completed' || t === 'Failed') {
+                      fired3 = true;
+                      statObs2.disconnect();
+                      coMarkStep(stepId, t === 'Completed' ? 'pass' : 'fail');
+                    }
+                  });
+                  statObs2.observe(statEl2, { childList: true, characterData: true, subtree: true });
+                  _co.autoObservers.push(statObs2);
+                  setTimeout(function(){ if (!fired3){ fired3=true; statObs2.disconnect(); } }, 120000);
+                }
+              }
             };
+
+            // ── Auto-chain helpers ────────────────────────────────────────────
+            function _coAutoCancelAll() {
+              if (_co.autoCountdownTicker) clearInterval(_co.autoCountdownTicker);
+              _co.autoCountdownTicker = null;
+              _co.autoObservers.forEach(function(o){ try { o.disconnect(); } catch(_){} });
+              _co.autoObservers = [];
+              var b = document.getElementById('co-auto-banner');
+              if (b) b.style.display = 'none';
+            }
+
+            window.coAutoCancelNext = function() { _coAutoCancelAll(); };
+
+            function _coAutoCountdown(label, nextFn) {
+              _coAutoCancelAll();
+              var banner  = document.getElementById('co-auto-banner');
+              var labelEl = document.getElementById('co-auto-next-label');
+              var countEl = document.getElementById('co-auto-countdown');
+              if (banner)  banner.style.display = 'flex';
+              if (labelEl) labelEl.textContent = label;
+              var n = 3;
+              if (countEl) countEl.textContent = n;
+              _co.autoCountdownTicker = setInterval(function() {
+                n--;
+                if (countEl) countEl.textContent = n;
+                if (n <= 0) {
+                  clearInterval(_co.autoCountdownTicker);
+                  _co.autoCountdownTicker = null;
+                  if (banner) banner.style.display = 'none';
+                  nextFn();
+                }
+              }, 1000);
+            }
+
+            // Watch a DOM text node for completion keywords, then call back
+            function _coWatchLog(elId, onDone, ms) {
+              var el = document.getElementById(elId);
+              if (!el) return;
+              var fired = false;
+              function _check() {
+                if (fired) return;
+                var t = el.textContent || '';
+                if (t.includes('=== TASK COMPLETE ===') || t.includes('=== COMPLETE ===') || t.includes('=== PRE-CHECK COMPLETE ===')) {
+                  fired = true;
+                  obs.disconnect();
+                  clearTimeout(tout);
+                  onDone(!/\[ERROR\]|\[FAIL\]/i.test(t));
+                }
+              }
+              var obs = new MutationObserver(_check);
+              obs.observe(el, { childList: true, characterData: true, subtree: true });
+              var tout = setTimeout(function(){ if (!fired){ fired=true; obs.disconnect(); onDone(null); } }, ms||90000);
+              _co.autoObservers.push(obs);
+            }
+
+            window.coToggleAutoChain = function() {
+              _co.autoRun = !_co.autoRun;
+              var btn = document.getElementById('co-auto-btn');
+              if (btn) {
+                if (_co.autoRun) {
+                  btn.innerHTML = '<i class="fas fa-link"></i> Auto Chain: ON';
+                  btn.style.cssText = 'border:1.5px solid #10b981;background:#10b981;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;';
+                } else {
+                  btn.innerHTML = '<i class="fas fa-unlink"></i> Auto Chain: OFF';
+                  btn.style.cssText = 'border:1.5px solid #d1d5db;background:#f9fafb;color:#374151;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;';
+                  _coAutoCancelAll();
+                }
+              }
+            };
+
+            // Chain map: what to trigger after each step passes
+            function _coTriggerNext(stepId) {
+              var actions = {
+                precheck: ['Step 2: Configure HAProxy', function() {
+                  var btn = document.querySelector('#co-step-traffic .btn-primary');
+                  if (btn && !btn.disabled) btn.click();
+                }],
+                traffic: ['Step 3: Validate App', function() {
+                  var btn = document.querySelector('#co-step-app .btn-primary');
+                  if (btn && !btn.disabled) btn.click();
+                }],
+                app: [_co.dbInScope ? 'Step 4: Validate DB' : 'Step 5: Monitor', function() {
+                  if (_co.dbInScope) {
+                    var btn = document.querySelector('#co-step-db .btn-primary');
+                    if (btn && !btn.disabled) btn.click();
+                  } else {
+                    coMarkStep('db', 'skipped');
+                    var btn2 = document.querySelector('#co-step-monitor .btn-dark');
+                    if (btn2 && !btn2.disabled) btn2.click();
+                  }
+                }],
+                db: ['Step 5: Monitor', function() {
+                  var btn = document.querySelector('#co-step-monitor .btn-dark');
+                  if (btn && !btn.disabled) btn.click();
+                }]
+                // monitor → no auto; close window needs explicit human decision
+              };
+              var a = actions[stepId];
+              if (a) _coAutoCountdown(a[0], a[1]);
+            }
 
             window.coMarkStep = function(stepId, status) {
               _co.stepStatus[stepId] = status;
@@ -6352,6 +6517,14 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 }
               }
               _renderChips();
+              // Auto-chain: if ON and step passed/skipped, queue next step
+              if (_co.autoRun && (status === 'pass' || status === 'skipped')) {
+                _coTriggerNext(stepId);
+              }
+              // On fail: stop auto-chain
+              if (_co.autoRun && status === 'fail') {
+                _coAutoCancelAll();
+              }
             };
 
             window.coToggleDb = function() {
@@ -6435,8 +6608,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               // Reset monitor panel
               if (typeof coMonStop === 'function') coMonStop();
               _coMon.resp = []; _coMon.err = []; _coMon.cpu = []; _coMon.mem = []; _coMon.lat = []; _coMon.db = [];
+              _coMon._autoPassed = false;
               var monPanel = document.getElementById('co-monitor-panel'); if (monPanel) monPanel.style.display = 'none';
               _coMonDrawAll();
+              // Cancel any in-flight auto-chain
+              _coAutoCancelAll();
             };
 
             // init
