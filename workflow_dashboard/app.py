@@ -18802,25 +18802,40 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
 """.replace("__APP_PORT__", app_port).replace("__DB_PORT__", db_port)
 
     def ssh_run(ip):
+        if not ip:
+            return {}, None, ""
         script = PERF_SCRIPT
+        key_path = os.path.expanduser(ssh_key) if ssh_key else ""
         cmd = [
-            "ssh", "-i", ssh_key,
+            "ssh",
+            "-i", key_path,
             "-o", "StrictHostKeyChecking=no",
             "-o", "BatchMode=yes",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "LogLevel=ERROR",
             "-o", "ConnectTimeout=10",
+            "-o", "ServerAliveInterval=5",
+            "-o", "ServerAliveCountMax=2",
             "-p", ssh_port,
             f"{ssh_user}@{ip}",
-            "bash -s"
+            "bash", "-s"
         ]
         try:
             r = subprocess.run(cmd, input=script, capture_output=True, text=True, timeout=120)
             out = r.stdout.strip()
-            err = r.stderr.strip() or None
             parsed = {}
             for line in out.splitlines():
                 if "=" in line:
                     k, _, v = line.partition("=")
                     parsed[k.strip()] = v.strip()
+            # Only surface stderr as an error when the command actually failed
+            err = None
+            if r.returncode != 0 or not parsed:
+                raw_err = r.stderr.strip()
+                if raw_err:
+                    err = raw_err
+                elif r.returncode != 0:
+                    err = f"SSH exited with code {r.returncode}"
             return parsed, err, out
         except subprocess.TimeoutExpired as e:
             partial = (e.stdout or "").strip()
@@ -18944,17 +18959,24 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
 
     def _run_ssh(ip, label):
         cmd = [
-            "ssh", "-i", ssh_key,
+            "ssh", "-i", os.path.expanduser(ssh_key),
             "-o", "StrictHostKeyChecking=no",
             "-o", "BatchMode=yes",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "LogLevel=ERROR",
             "-o", "ConnectTimeout=10",
+            "-o", "ServerAliveInterval=5",
+            "-o", "ServerAliveCountMax=2",
             "-p", ssh_port,
             f"{ssh_user}@{ip}",
-            "bash -s",
+            "bash", "-s",
         ]
         try:
             r = subprocess.run(cmd, input=PERF_SCRIPT, capture_output=True, text=True, timeout=120)
-            q.put({"label": label, "out": r.stdout.strip(), "err": r.stderr.strip() or None})
+            err = None
+            if r.returncode != 0:
+                err = r.stderr.strip() or f"SSH exited with code {r.returncode}"
+            q.put({"label": label, "out": r.stdout.strip(), "err": err})
         except subprocess.TimeoutExpired as e:
             q.put({"label": label, "out": (e.stdout or "").strip(), "err": "SSH timeout after 120s"})
         except Exception as e:
