@@ -2746,8 +2746,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
               <!-- TOP HEADER -->
               <div id="uat-topbar">
                 <div>
-                  <div class="udtb-h">Step 5 — Cutover Readiness</div>
-                  <div class="udtb-s">Post-migration acceptance testing summary and decision</div>
+                  <div class="udtb-h" id="uat-tb-title">Step 5 — Cutover Readiness</div>
+                  <div class="udtb-s" id="uat-tb-sub">Post-migration acceptance testing summary and decision</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <div class="ud-mode-pill">
@@ -3037,6 +3037,19 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         };
 
         window.uatNavTo = function(step, instant) {
+          /* Update topbar title to reflect current step */
+          var _TITLES = {
+            1: ['Step 1 — Server Targets',         'Source OSPC and target FLEX server configuration'],
+            2: ['Step 2 — Service Comparison',     'OSPC → FLEX service-by-service comparison and validation'],
+            3: ['Step 3 — Performance Validation', 'Performance benchmarks and baseline comparison'],
+            4: ['Step 4 — Issues Tracker',         'Issue tracking, risk assessment and remediation'],
+            5: ['Step 5 — Cutover Readiness',      'Post-migration acceptance testing summary and decision']
+          };
+          var _t = _TITLES[Number(step)] || _TITLES[5];
+          var _th = document.getElementById('uat-tb-title');
+          var _ts = document.getElementById('uat-tb-sub');
+          if (_th) _th.textContent = _t[0];
+          if (_ts) _ts.textContent = _t[1];
           document.body.classList.add('uat-dashboard-active');
           var content = document.getElementById('uat-content');
           if (!content) return;
