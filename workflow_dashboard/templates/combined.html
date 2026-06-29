@@ -472,34 +472,6 @@
       background:linear-gradient(180deg,#1a3a6b 0%,#2e5fa3 15%,#4a8fd1 30%,#6bb5e0 45%,#8ecae6 55%,#a8d8ea 65%,#c4e8f5 75%,#d6f0fa 85%,#e8f7fc 100%);
       z-index:0;
     }
-    .s0-dawn-sun {
-      position:absolute; top:-55px; right:-55px; width:240px; height:240px;
-      border-radius:50%; z-index:2;
-      box-shadow:0 0 50px rgba(255,225,70,.8),0 0 100px rgba(255,200,40,.5),0 0 180px rgba(255,180,0,.25);
-      animation:s0SunPulse 5s ease-in-out infinite;
-      overflow:visible;
-    }
-    .s0-dawn-sun::before {
-      content:''; position:absolute;
-      top:-50%; left:-50%; width:200%; height:200%;
-      background:repeating-conic-gradient(
-        rgba(255,225,50,.45) 0deg 8deg, transparent 8deg 22.5deg
-      );
-      border-radius:50%;
-      animation:s0SunRays 18s linear infinite;
-    }
-    .s0-dawn-sun::after {
-      content:''; position:absolute; inset:0; border-radius:50%;
-      background:radial-gradient(circle,
-        #fffde0 0%,#fff07a 20%,#ffd200 45%,
-        rgba(255,180,0,.6) 68%,transparent 90%
-      );
-    }
-    @keyframes s0SunPulse {
-      0%,100% { transform:scale(1);   opacity:.92; }
-      50%      { transform:scale(1.05); opacity:1; }
-    }
-    @keyframes s0SunRays { to { transform:rotate(360deg); } }
     .s0-dawn-content {
       position:relative; z-index:2; text-align:center; max-width:900px;
     }
@@ -644,16 +616,17 @@
     @keyframes s03dRainbowPulse { 0%,100%{opacity:.9} 50%{opacity:1} }
     /* Bridge rainbow — large arch the viewer flies under */
     .s03d-bridge-arc {
-      width:900px; height:450px; overflow:hidden;
+      width:1300px; height:650px; overflow:hidden;
       animation:s03dRainbowPulse 4s ease-in-out infinite;
     }
-    .s03d-bridge-arc .rb-red    { width:900px;height:450px;border-width:26px; }
-    .s03d-bridge-arc .rb-orange { width:848px;height:424px;border-width:26px; }
-    .s03d-bridge-arc .rb-yellow { width:796px;height:398px;border-width:26px; }
-    .s03d-bridge-arc .rb-green  { width:744px;height:372px;border-width:26px; }
-    .s03d-bridge-arc .rb-blue   { width:692px;height:346px;border-width:26px; }
-    .s03d-bridge-arc .rb-indigo { width:640px;height:320px;border-width:26px; }
-    .s03d-bridge-arc .rb-violet { width:588px;height:294px;border-width:26px; }
+    .s03d-bridge-arc .s03d-rainbow-band { box-shadow:none; }
+    .s03d-bridge-arc .rb-red    { width:1300px;height:650px;border-width:28px; }
+    .s03d-bridge-arc .rb-orange { width:1232px;height:616px;border-width:28px; }
+    .s03d-bridge-arc .rb-yellow { width:1164px;height:582px;border-width:28px; }
+    .s03d-bridge-arc .rb-green  { width:1096px;height:548px;border-width:28px; }
+    .s03d-bridge-arc .rb-blue   { width:1028px;height:514px;border-width:28px; }
+    .s03d-bridge-arc .rb-indigo { width: 960px;height:480px;border-width:28px; }
+    .s03d-bridge-arc .rb-violet { width: 892px;height:446px;border-width:28px; }
     .s03d-fly-ctrl {
       position:absolute; bottom:16px; right:16px; z-index:15;
       display:flex; flex-direction:column; align-items:center; gap:4px;
@@ -1746,7 +1719,6 @@
       <div class="s0-dawn-hero">
         <button id="s0-view-toggle" onclick="s0Toggle3D()" title="Switch to 3D cloud fly-through view">&#127775; 3D View</button>
         <div class="s0-dawn-sky"></div>
-        <div class="s0-dawn-sun"></div>
         <div class="s0-dawn-cloud s0-c1"></div>
         <div class="s0-dawn-cloud s0-c2"></div>
         <div class="s0-dawn-cloud s0-c3"></div>
@@ -19689,7 +19661,7 @@ ${certContent}
 
   var _s03d_inited = false;
   var _s03d_clouds = [], _s03d_rainbows = [], _s03d_bridge = [];
-  var _s03d_offsetX = 0, _s03d_offsetY = 0, _s03d_flySpeed = 1;
+  var _s03d_offsetX = 0, _s03d_offsetY = 0, _s03d_flySpeed = 1.3;
   var _s03d_isFlying = { up:false, down:false, left:false, right:false };
   var _s03d_lastTime = 0;
 
@@ -19788,7 +19760,7 @@ ${certContent}
     (function() {
       var bEl = document.createElement('div');
       bEl.className = 's03d-rainbow';
-      bEl.style.top = '55%';
+      bEl.style.top = '8%';
       var bArc = document.createElement('div');
       bArc.className = 's03d-rainbow-arc s03d-bridge-arc';
       rainbowColors.forEach(function(band) {
@@ -19819,7 +19791,7 @@ ${certContent}
     var ctrBtn = document.getElementById('s0-btn-ctr');
     var spdEl  = document.getElementById('s0-3d-speed');
     if (ctrBtn) ctrBtn.addEventListener('click', function(){
-      _s03d_offsetX=0; _s03d_offsetY=0; _s03d_flySpeed=1;
+      _s03d_offsetX=0; _s03d_offsetY=0; _s03d_flySpeed=1.3;
       if (spdEl) spdEl.textContent='Speed: 1x';
     });
     document.addEventListener('keydown', function(e){
@@ -19878,10 +19850,10 @@ ${certContent}
         b.t += dt * 0.006 * _s03d_flySpeed;
         var prog = b.t % 1;
         var z    = -1200 + 1800 * prog;
-        var s    = 0.3  + 4.2  * prog;
-        var op   = 1.0;
-        if (prog < 0.05) op = prog / 0.05;
-        if (prog > 0.88) op = (1 - (prog - 0.88) / 0.12);
+        var s    = 0.3  + 6.0  * prog;
+        var op   = 0.50;
+        if (prog < 0.05) op *= prog / 0.05;
+        if (prog > 0.88) op *= (1 - (prog - 0.88) / 0.12);
         b.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
         b.el.style.opacity   = op;
       });
