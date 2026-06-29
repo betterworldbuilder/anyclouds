@@ -457,6 +457,112 @@
     body.flex-skyline-mode .panel-area { background: #ffffff !important; }
     body.flex-skyline-mode .s0-feature-card { background: #ffffff !important; box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important; }
     body.flex-skyline-mode .s0-table-wrap { background: #f8fafc !important; border-color: #e2e6ec !important; }
+    /* ── Stage 0 Dawn Hero ──────────────────────────────────────────────── */
+    .s0-dawn-hero {
+      position:relative; width:100%; min-height:360px;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:52px 20px; overflow:hidden;
+    }
+    .s0-dawn-sky {
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      background:linear-gradient(180deg,#1a3a6b 0%,#2e5fa3 15%,#4a8fd1 30%,#6bb5e0 45%,#8ecae6 55%,#a8d8ea 65%,#c4e8f5 75%,#d6f0fa 85%,#e8f7fc 100%);
+      z-index:0;
+    }
+    .s0-dawn-sun {
+      position:absolute; top:-80px; right:-60px; width:300px; height:300px;
+      background:radial-gradient(circle,rgba(255,230,150,0.4) 0%,rgba(255,210,100,0.2) 30%,rgba(255,200,80,0.1) 50%,transparent 70%);
+      border-radius:50%; z-index:1;
+      animation:s0SunPulse 6s ease-in-out infinite;
+    }
+    @keyframes s0SunPulse {
+      0%,100% { transform:scale(1); opacity:0.8; }
+      50%      { transform:scale(1.1); opacity:1; }
+    }
+    .s0-dawn-content {
+      position:relative; z-index:2; text-align:center; max-width:900px;
+    }
+    .s0-dawn-badge {
+      display:inline-flex; align-items:center; gap:8px;
+      background:rgba(255,255,255,0.25); backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,0.35); border-radius:50px;
+      padding:8px 20px; margin-bottom:24px;
+      font-size:12px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase;
+      color:#ffffff; text-shadow:0 1px 3px rgba(0,0,0,0.2);
+    }
+    .s0-dawn-badge-dot {
+      width:16px; height:16px; flex-shrink:0;
+      background:linear-gradient(135deg,#ff6b6b,#ee5a5a);
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:10px; color:white;
+    }
+    .s0-dawn-title {
+      font-size:36px; font-weight:900; color:#1a2a4a; margin:0 0 20px;
+      line-height:1.2; text-shadow:0 2px 10px rgba(255,255,255,0.3);
+    }
+    .s0-dawn-desc {
+      font-size:15px; line-height:1.7; color:#2a3a5a;
+      max-width:700px; margin:0 auto 40px;
+    }
+    .s0-dawn-desc strong { color:#1a2a4a; font-weight:700; }
+    .s0-dawn-stats {
+      display:flex; gap:16px; justify-content:center; flex-wrap:wrap;
+    }
+    .s0-dawn-stat {
+      background:rgba(255,255,255,0.2); backdrop-filter:blur(12px);
+      border:1px solid rgba(255,255,255,0.35); border-radius:12px;
+      padding:22px 32px; text-align:center; min-width:130px;
+      transition:transform 0.3s ease, box-shadow 0.3s ease; cursor:default;
+    }
+    .s0-dawn-stat:hover {
+      transform:translateY(-4px); box-shadow:0 12px 30px rgba(0,0,0,0.1);
+      background:rgba(255,255,255,0.3);
+    }
+    .s0-dawn-stat-num {
+      font-size:32px; font-weight:800; color:#ffffff;
+      text-shadow:0 2px 8px rgba(0,0,0,0.15); margin-bottom:6px;
+    }
+    .s0-dawn-stat-lbl {
+      font-size:10px; font-weight:600; letter-spacing:1.5px;
+      text-transform:uppercase; color:rgba(255,255,255,0.85);
+    }
+    /* Animated clouds */
+    .s0-dawn-cloud {
+      position:absolute; background:rgba(255,255,255,0.85);
+      border-radius:50px; z-index:1;
+      animation:s0CloudFloat linear infinite; filter:blur(1px);
+    }
+    .s0-dawn-cloud::before, .s0-dawn-cloud::after {
+      content:''; position:absolute;
+      background:rgba(255,255,255,0.85); border-radius:50px;
+    }
+    @keyframes s0CloudFloat {
+      0%   { transform:translateX(0); }
+      100% { transform:translateX(calc(100vw + 300px)); }
+    }
+    .s0-c1{width:160px;height:50px;top:12%;left:-10%;animation-duration:45s;opacity:.7}
+    .s0-c1::before{width:80px;height:80px;top:-40px;left:25px}
+    .s0-c1::after{width:60px;height:60px;top:-25px;left:70px}
+    .s0-c2{width:120px;height:40px;top:25%;left:-15%;animation-duration:55s;animation-delay:8s;opacity:.5}
+    .s0-c2::before{width:60px;height:60px;top:-30px;left:20px}
+    .s0-c2::after{width:45px;height:45px;top:-20px;left:55px}
+    .s0-c3{width:200px;height:60px;top:8%;left:-20%;animation-duration:50s;animation-delay:20s;opacity:.6}
+    .s0-c3::before{width:100px;height:100px;top:-50px;left:35px}
+    .s0-c3::after{width:70px;height:70px;top:-35px;left:95px}
+    .s0-c4{width:140px;height:45px;top:35%;left:-12%;animation-duration:60s;animation-delay:15s;opacity:.4}
+    .s0-c4::before{width:70px;height:70px;top:-35px;left:25px}
+    .s0-c4::after{width:50px;height:50px;top:-22px;left:65px}
+    .s0-c5{width:180px;height:55px;top:18%;left:-18%;animation-duration:48s;animation-delay:30s;opacity:.65}
+    .s0-c5::before{width:90px;height:90px;top:-45px;left:30px}
+    .s0-c5::after{width:65px;height:65px;top:-32px;left:85px}
+    .s0-c6{width:100px;height:35px;top:45%;left:-8%;animation-duration:65s;animation-delay:5s;opacity:.3}
+    .s0-c6::before{width:50px;height:50px;top:-25px;left:18px}
+    .s0-c6::after{width:35px;height:35px;top:-15px;left:50px}
+    .s0-c7{width:220px;height:65px;top:5%;left:-25%;animation-duration:52s;animation-delay:38s;opacity:.55}
+    .s0-c7::before{width:110px;height:110px;top:-55px;left:40px}
+    .s0-c7::after{width:80px;height:80px;top:-40px;left:110px}
+    .s0-c8{width:130px;height:42px;top:30%;left:-14%;animation-duration:58s;animation-delay:25s;opacity:.45}
+    .s0-c8::before{width:65px;height:65px;top:-32px;left:22px}
+    .s0-c8::after{width:48px;height:48px;top:-22px;left:60px}
     iframe { width: 100%; min-height: calc(100vh - 260px); height: 1200px; border: none; background: transparent; display: block; }
 
     /* Info panels */
@@ -1521,28 +1627,30 @@
   <div class="panel active" id="panel-s_why">
     <div id="s0-container" style="background:#f8fafc; padding:0; max-width:100%; margin:0; overflow:auto; height:100%;">
 
-      <!-- Hero banner -->
-      <div style="background:linear-gradient(160deg,#f0f9ff 0%,#e0f2fe 18%,#bae6fd 40%,#7dd3fc 65%,#38bdf8 85%,#0ea5e9 100%); padding:52px 60px 44px; text-align:center;">
-        <div style="display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:30px;padding:6px 18px;font-size:12px;font-weight:700;color:#e0f2fe;letter-spacing:.08em;text-transform:uppercase;margin-bottom:18px;">&#127919; Migration Strategy Guide</div>
-        <h1 style="color:#ffffff; font-size:38px; font-weight:800; margin:0 0 14px; letter-spacing:-.02em; line-height:1.15;">Who Why When What to Move to Flex?</h1>
-        <p style="color:rgba(255,255,255,0.82); font-size:16px; max-width:760px; margin:0 auto; line-height:1.75;">Before any technical migration begins, customers need a clear business answer: <strong style="color:#fff;">who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
-        <!-- Stat chips -->
-        <div style="display:flex;justify-content:center;gap:16px;margin-top:32px;flex-wrap:wrap;">
-          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:#fff;">4</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">Why Reasons</div>
+      <!-- Hero banner — Dawn Sky Edition -->
+      <div class="s0-dawn-hero">
+        <div class="s0-dawn-sky"></div>
+        <div class="s0-dawn-sun"></div>
+        <div class="s0-dawn-cloud s0-c1"></div>
+        <div class="s0-dawn-cloud s0-c2"></div>
+        <div class="s0-dawn-cloud s0-c3"></div>
+        <div class="s0-dawn-cloud s0-c4"></div>
+        <div class="s0-dawn-cloud s0-c5"></div>
+        <div class="s0-dawn-cloud s0-c6"></div>
+        <div class="s0-dawn-cloud s0-c7"></div>
+        <div class="s0-dawn-cloud s0-c8"></div>
+        <div class="s0-dawn-content">
+          <div class="s0-dawn-badge">
+            <span class="s0-dawn-badge-dot">&#9733;</span>
+            MIGRATION STRATEGY GUIDE
           </div>
-          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:#fff;">5</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">When Triggers</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:#fff;">8</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">Migration Triggers</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:#fff;">0</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">Vendor Lock-in</div>
+          <h1 class="s0-dawn-title">Who Why When What to Move to Flex?</h1>
+          <p class="s0-dawn-desc">Before any technical migration begins, customers need a clear business answer: <strong>who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
+          <div class="s0-dawn-stats">
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">4</div><div class="s0-dawn-stat-lbl">WHY REASONS</div></div>
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">5</div><div class="s0-dawn-stat-lbl">WHEN TRIGGERS</div></div>
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">8</div><div class="s0-dawn-stat-lbl">MIGRATION TRIGGERS</div></div>
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">0</div><div class="s0-dawn-stat-lbl">VENDOR LOCK-IN</div></div>
           </div>
         </div>
       </div>
