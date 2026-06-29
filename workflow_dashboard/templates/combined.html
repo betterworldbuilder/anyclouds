@@ -1136,11 +1136,11 @@
 .uat-s1-comp-chip { border:1px solid #bfdbfe;background:#f7fbff;color:#1e3a8a;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:800; }
 .uat-s1-status-line { display:flex;justify-content:space-between;gap:8px;border-top:1px dashed #dbe4f0;padding-top:8px;margin-top:8px;color:#64748b;font-size:11px; }
 
-.uat-s1-arch-panel { background:#0f1f3d;color:#fff;border-radius:16px;padding:16px; }
-.uat-s1-arch-panel h4 { margin:0 0 6px;font-size:16px; }
-.uat-s1-arch-panel p { color:rgba(255,255,255,.7);margin:0 0 14px;font-size:12px;line-height:1.4; }
-.uat-s1-tmpl-row { display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);border-radius:10px;padding:9px;font-size:12px;cursor:pointer; }
-.uat-s1-tmpl-row:hover { background:rgba(255,255,255,.1); }
+.uat-s1-arch-panel { background:#f8fafc;color:#0f172a;border:1px solid #dbe4f0;border-radius:16px;padding:16px; }
+.uat-s1-arch-panel h4 { margin:0 0 6px;font-size:16px;color:#0f172a; }
+.uat-s1-arch-panel p { color:#64748b;margin:0 0 14px;font-size:12px;line-height:1.4; }
+.uat-s1-tmpl-row { display:flex;justify-content:space-between;align-items:center;border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:9px;font-size:12px;cursor:pointer;color:#334155; }
+.uat-s1-tmpl-row:hover { background:#eef5ff;border-color:#bfdbfe; }
 
 .uat-s1-sa-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
 .uat-s1-sa-card { border:1px solid #dbe4f0;border-radius:14px;background:#fff;padding:14px;display:grid;gap:10px; }
@@ -17874,7 +17874,7 @@ ${certContent}
     el.innerHTML = Object.keys(_arch).map(function(key) {
       return '<div class="uat-s1-tmpl-row" data-arch-key="'+key+'">'
         +'<span>'+(_archLabels[key]||key)+'</span>'
-        +'<span style="color:rgba(255,255,255,.55);font-size:11px;">'+(_archSub[key]||'')+'</span>'
+        +'<span style="color:#64748b;font-size:11px;">'+(_archSub[key]||'')+'</span>'
         +'</div>';
     }).join('');
     el.addEventListener('click', function(e) {
