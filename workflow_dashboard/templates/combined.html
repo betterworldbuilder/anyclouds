@@ -598,13 +598,13 @@
     .gov-page .gov-table th { border-bottom-color: rgba(0, 212, 255, 0.5); color: #00d4ff; text-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
 
     .gov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .gov-section { background: rgba(15,23,42,0.4); border: 1px solid rgba(148,163,184,0.15); border-radius: 10px; padding: 15px; }
-    .gov-section h3 { font-size: 14px; color: #7ecfff; margin: 0 0 15px; text-transform: uppercase; letter-spacing: 1px; border-left: 3px solid #7ecfff; padding-left: 10px; }
+    .gov-section { background: rgba(186,230,253,0.35); border: 1px solid rgba(14,165,233,0.3); border-radius: 10px; padding: 15px; color: #0c4a6e; }
+    .gov-section h3 { font-size: 14px; color: #0284c7; margin: 0 0 15px; text-transform: uppercase; letter-spacing: 1px; border-left: 3px solid #0284c7; padding-left: 10px; }
 
     .gov-form-group { margin-bottom: 12px; }
-    .gov-label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
-    .gov-input, .gov-select { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(148,163,184,0.3); color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 13px; outline: none; }
-    .gov-input:focus { border-color: #7ecfff; box-shadow: 0 0 5px rgba(126,207,255,0.3); }
+    .gov-label { display: block; font-size: 11px; color: #0369a1; text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
+    .gov-input, .gov-select { width: 100%; background: rgba(240,249,255,0.95); border: 1px solid rgba(14,165,233,0.4); color: #0c4a6e; padding: 6px 10px; border-radius: 4px; font-size: 13px; outline: none; }
+    .gov-input:focus { border-color: #0ea5e9; box-shadow: 0 0 5px rgba(14,165,233,0.4); }
 
     .gov-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .gov-table th { text-align: left; padding: 8px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; }
@@ -619,7 +619,7 @@
     .btn-export { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.2); }
 
     .artifact-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .artifact-link { font-size: 11px; padding: 4px 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(148,163,184,0.3); border-radius: 4px; color: #cbd5e1; text-decoration: none; display: flex; align-items: center; gap: 4px; }
+    .artifact-link { font-size: 11px; padding: 4px 8px; background: rgba(186,230,253,0.4); border: 1px solid rgba(14,165,233,0.3); border-radius: 4px; color: #0369a1; text-decoration: none; display: flex; align-items: center; gap: 4px; }
     .artifact-link:hover { border-color: #7ecfff; color: #fff; }
 
     /* Flex Skyline global console skin */
@@ -2622,7 +2622,7 @@ uname -a</pre>
         <h2>☸️ Kubernetes Dual-Layer Scanner</h2>
         <p style="color:var(--muted); margin-bottom:12px;">Discover and map Kubernetes clusters to their underlying OpenStack compute and storage dependencies before migration.</p>
 
-        <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; border-left:4px solid #7ecfff; margin-bottom:20px;">
+        <div style="background:rgba(186,230,253,0.3); padding:20px; border-radius:8px; border-left:4px solid #7ecfff; margin-bottom:20px;">
           <h3 style="margin-top:0; color:#fff;">Run Automated K8s &amp; OSPC Dual-Scan</h3>
           <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Paste your <code>kubeconfig</code> below or connect to the Bastion node to automatically map Kubernetes workloads to OpenStack VMs.</p>
           <textarea placeholder="Paste kubeconfig here..." style="width:100%; height:80px; background:#111; color:#5eead4; border:1px solid #4b6fa0; border-radius:4px; padding:10px; font-family:monospace; margin-bottom:10px;"></textarea>
@@ -2633,7 +2633,7 @@ uname -a</pre>
         <p style="font-size:13px; color:#aaa; margin-bottom:15px;">The best file to get from the existing OSPC deployment relies entirely on how the cluster was built. Do not blindly copy VM nodes or disks.</p>
 
         <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #3498db;">
+          <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px; border-left:3px solid #3498db;">
             <h4 style="margin:0 0 10px 0; color:#fff;">1) Helm-Managed App (Highest Priority)</h4>
             <p style="font-size:12px; color:#ccc; margin-top:0;">Export the app configuration and rendered YAML. The <code>values.yaml</code> is the single most reusable import path for Flex.</p>
             <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">helm list -A
@@ -2641,24 +2641,24 @@ helm get values &lt;release&gt; -n &lt;namespace&gt; -a -o yaml &gt; &lt;release
 helm get manifest &lt;release&gt; -n &lt;namespace&gt; &gt; &lt;release&gt;-manifest.yaml</pre>
           </div>
 
-          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #f1c40f;">
+          <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px; border-left:3px solid #f1c40f;">
             <h4 style="margin:0 0 10px 0; color:#fff;">2) Kustomize-Managed App</h4>
             <p style="font-size:12px; color:#ccc; margin-top:0;">Download the entire repository folder containing the <code>kustomization.yaml</code>, base manifests, patches, and overlays.</p>
           </div>
 
-          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #e67e22;">
+          <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px; border-left:3px solid #e67e22;">
             <h4 style="margin:0 0 10px 0; color:#fff;">3) Raw Kubernetes YAML (Source Repo)</h4>
             <p style="font-size:12px; color:#ccc; margin-top:0;">If a Git repo exists without Helm/Kustomize, download all declarative objects: <code>deployment.yaml</code>, <code>statefulset.yaml</code>, <code>service.yaml</code>, <code>ingress.yaml</code>, <code>configmap.yaml</code>, <code>pvc.yaml</code>.</p>
           </div>
 
-          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #e74c3c;">
+          <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px; border-left:3px solid #e74c3c;">
             <h4 style="margin:0 0 10px 0; color:#fff;">4) Live Cluster Export (Fallback Path)</h4>
             <p style="font-size:12px; color:#ccc; margin-top:0;">If there is ZERO source repository, fallback to exporting exactly what is running on OSPC. Note: this YAML will be messy and contain runtime state strings.</p>
             <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get all,cm,secret,ingress,pvc,networkpolicy -A -o yaml &gt; k8s-inventory-main.yaml
 kubectl get storageclass,pv -o yaml &gt; k8s-storage-export.yaml</pre>
           </div>
 
-          <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:3px solid #9b59b6;">
+          <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px; border-left:3px solid #9b59b6;">
             <h4 style="margin:0 0 10px 0; color:#fff;">Infrastructure Mapping Database</h4>
             <p style="font-size:12px; color:#ccc; margin-top:0;">You MUST execute these to map Kubernetes to OpenStack Nova VMs and Cinder Storage.</p>
             <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get nodes -o wide
@@ -5135,7 +5135,7 @@ ssh <user>@<flex_app_ip> "tail -100 /var/log/syslog | grep -Ei 'cron|mail|report
         <!-- old automated engine removed -->
         <form id="uat-runner-form" novalidate onsubmit="return false;" style="display:none;">
             <!-- 1. CLOUD CREDENTIALS -->
-            <div style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:32px; background:rgba(0,0,0,0.2); border-radius:4px; padding:20px; border-left:4px solid #f39c12;">
+            <div style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:32px; background:rgba(186,230,253,0.3); border-radius:4px; padding:20px; border-left:4px solid #f39c12;">
                 <!-- OSPC -->
                 <div>
                     <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
@@ -5196,7 +5196,7 @@ ssh <user>@<flex_app_ip> "tail -100 /var/log/syslog | grep -Ei 'cron|mail|report
             </div>
 
             <!-- 1B. CROSS-CLOUD IDENTITY PARITY -->
-            <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #9b59b6; border-radius:4px;">
+            <div style="margin-bottom:20px; padding:15px; background:rgba(186,230,253,0.3); border-left:4px solid #9b59b6; border-radius:4px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
                         <h3 style="margin-top:0; color:#fb7185; font-size:14px;">1B. User Profile &amp; Target Permissions Matching (RBAC validation)</h3>
@@ -5317,7 +5317,7 @@ ssh <user>@<flex_app_ip> "tail -100 /var/log/syslog | grep -Ei 'cron|mail|report
             </div>
 
             <!-- 2. SPECIFIC TARGETS -->
-            <div style="margin-bottom:20px; padding:15px; background:rgba(0,0,0,0.2); border-left:4px solid #7ecfff; border-radius:4px;">
+            <div style="margin-bottom:20px; padding:15px; background:rgba(186,230,253,0.3); border-left:4px solid #7ecfff; border-radius:4px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
                     <div>
                         <h3 style="margin:0; color:#7ecfff; font-size:14px;">2. Explicit End-to-End Application Targets</h3>
@@ -5388,7 +5388,7 @@ ssh <user>@<flex_app_ip> "tail -100 /var/log/syslog | grep -Ei 'cron|mail|report
       </table>
       <h3>🛠 Automated Checking Commands</h3>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+        <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px;">
           <h4 style="margin:0 0 10px 0; color:#7ecfff;">Databases (Service &amp; Replication)</h4>
           <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># MySQL Replication Status
 ssh admin@&lt;db_ip&gt; 'mysql -e "SHOW SLAVE STATUS\\G" | grep "Running:"'
@@ -5396,7 +5396,7 @@ ssh admin@&lt;db_ip&gt; 'mysql -e "SHOW SLAVE STATUS\\G" | grep "Running:"'
 # PostgreSQL Replication
 ssh postgres@&lt;db_ip&gt; 'psql -xc "select * from pg_stat_replication;"'</pre>
         </div>
-        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+        <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px;">
           <h4 style="margin:0 0 10px 0; color:#7ecfff;">App Tiers (DNS &amp; Services)</h4>
           <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Check DNS Resolution
 dig @&lt;flex_dns&gt; +short &lt;app_url&gt;
@@ -5407,7 +5407,7 @@ curl -I -s https://&lt;app_url&gt; | head -n 1
 # Systemd Service Status
 ssh user@&lt;app_ip&gt; 'systemctl is-active &lt;service_name&gt;'</pre>
         </div>
-        <div style="background:rgba(0,0,0,0.2); padding:15px; border-radius:8px;">
+        <div style="background:rgba(186,230,253,0.3); padding:15px; border-radius:8px;">
           <h4 style="margin:0 0 10px 0; color:#7ecfff;">Containers (Pod/PVC Health)</h4>
           <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Verify Kubernetes Workload Health
 kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
@@ -8805,14 +8805,14 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   <div class="panel" id="panel-s5b">
 
     <!-- ── Header ── -->
-    <div style="background:#1e293b;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div style="background:#0284c7;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <span style="background:#dc2626;color:#fff;font-size:13px;font-weight:800;padding:5px 10px;border-radius:6px;letter-spacing:.02em;">4B</span>
       <div style="flex:1;">
         <div style="font-size:16px;font-weight:700;">Business System Cutover</div>
         <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Import UAT-approved business services &#8594; execute traffic switch &#8594; verify production readiness</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span id="bsc-pkg-badge" style="display:none;background:#0f172a;color:#38bdf8;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1px solid #1e40af;"></span>
+        <span id="bsc-pkg-badge" style="display:none;background:#0369a1;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1px solid #0284c7;"></span>
         <span id="bsc-step-badge" style="background:#2563eb;color:#fff;font-size:12px;font-weight:700;padding:6px 16px;border-radius:20px;">Step 1 — Import UAT</span>
         <button onclick="bscReset()" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Reset</button>
       </div>
@@ -9758,7 +9758,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       <h3>✅ Migration Checklist</h3>
       <div style="display:flex; flex-direction:column; gap:10px;">
         <!-- Stage 1 -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox1">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(186,230,253,0.3); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox1">
           <div><span id="stgIcon1" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 1:</strong> Discovery &amp; Assessment</div>
           <div style="display:flex; gap:8px;">
             <button onclick="setStageState(1, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
@@ -9767,7 +9767,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
 
         <!-- Stage 2 -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox2">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(186,230,253,0.3); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox2">
           <div><span id="stgIcon2" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 2:</strong> Infrastructure Cloned to FLEX</div>
           <div style="display:flex; gap:8px;">
             <button onclick="setStageState(2, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
@@ -9776,7 +9776,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
 
         <!-- Stage 3 -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox3">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(186,230,253,0.3); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox3">
           <div><span id="stgIcon3" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 3:</strong> Data Migrated Successfully</div>
           <div style="display:flex; gap:8px;">
             <button onclick="setStageState(3, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
@@ -9785,7 +9785,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
 
         <!-- Stage 4 -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox4">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(186,230,253,0.3); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox4">
           <div><span id="stgIcon4" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 4:</strong> Validation &amp; UAT Signed Off</div>
           <div style="display:flex; gap:8px;">
             <button onclick="setStageState(4, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
@@ -9794,7 +9794,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
 
         <!-- Stage 5 -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox5">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(186,230,253,0.3); padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox5">
           <div><span id="stgIcon5" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 5:</strong> Production Cutover Complete</div>
           <div style="display:flex; gap:8px;">
             <button onclick="setStageState(5, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
@@ -9803,9 +9803,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
-      <div style="margin-top:20px; padding:15px; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid #4b6fa0;">
+      <div style="margin-top:20px; padding:15px; background:rgba(186,230,253,0.3); border-radius:8px; border:1px solid #4b6fa0;">
         <h3 style="margin-top:0;">Update Migration Log</h3>
-        <p style="font-size:12px; color:#a8d8ff; margin-bottom:12px;">Finalize the customer migration status in the CRM Tracker.</p>
+        <p style="font-size:12px; color:#0369a1; margin-bottom:12px;">Finalize the customer migration status in the CRM Tracker.</p>
         <div style="display:flex; gap:10px;">
           <button id="btnStage6Success" style="background:#28a745; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">✅ Mark as Successful</button>
           <button id="btnStage6Fail" style="background:#dc3545; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">❌ Mark as Failed</button>
