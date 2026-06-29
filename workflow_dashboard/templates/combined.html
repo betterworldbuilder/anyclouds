@@ -1149,29 +1149,21 @@
 
 /* ── Archetype Selector (dark blue frame) ── */
 .uat-s1-arch-selector {
-  background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%);
+  background:#ffffff;
   border-radius:16px;padding:20px;
-  border:1px solid rgba(59,130,246,0.2);
-  box-shadow:0 0 0 1px rgba(59,130,246,0.08),0 0 32px rgba(59,130,246,0.06),0 8px 32px rgba(0,0,0,0.3);
+  border:1.5px solid #dbe4f0;
+  box-shadow:0 2px 8px rgba(0,0,0,0.06);
   position:relative;overflow:hidden;
 }
-.uat-s1-arch-selector::before {
-  content:'';position:absolute;inset:0;border-radius:16px;padding:1px;
-  background:linear-gradient(135deg,rgba(59,130,246,0.5),rgba(139,92,246,0.3),rgba(236,72,153,0.2),rgba(59,130,246,0.5));
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
-  animation:uatArchGlow 4s ease-in-out infinite;
-}
-@keyframes uatArchGlow { 0%,100%{opacity:0.5} 50%{opacity:1} }
 .uat-s1-arch-head {
   display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;position:relative;z-index:1;
 }
-.uat-s1-arch-title { font-size:16px;font-weight:700;color:#f8fafc; }
+.uat-s1-arch-title { font-size:16px;font-weight:700;color:#0f172a; }
 .uat-s1-arch-badge {
   padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
-  background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);
+  background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;
 }
-.uat-s1-arch-desc { font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.45;position:relative;z-index:1; }
+.uat-s1-arch-desc { font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.45;position:relative;z-index:1; }
 .uat-s1-arch-grid {
   display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;position:relative;z-index:1;
 }
@@ -1200,10 +1192,10 @@
 .uat-s1-arch-card.tmpl-custom    { background:linear-gradient(135deg,#581c87,#7c3aed); }
 .uat-s1-arch-footer {
   display:flex;align-items:center;gap:12px;position:relative;z-index:1;
-  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  background:#f8fafc;border:1px solid #e2e8f0;
   border-radius:10px;padding:12px 14px;
 }
-.uat-s1-arch-footer-text { font-size:11px;color:#94a3b8;flex:1;line-height:1.4; }
+.uat-s1-arch-footer-text { font-size:11px;color:#64748b;flex:1;line-height:1.4; }
 .uat-s1-arch-use-btn {
   padding:8px 16px;background:#3b82f6;color:#fff;border:none;border-radius:8px;
   font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.2s;
