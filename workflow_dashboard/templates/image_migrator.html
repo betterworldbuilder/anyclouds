@@ -13536,25 +13536,25 @@ function val(id) {
     if (regionLabel && targetAnchor) {
       const row = byId('flex2flex-target-region-row') || document.createElement('div');
       row.id = 'flex2flex-target-region-row';
-      row.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:18px 0 14px;padding:18px 20px;border:1px solid rgba(251,146,60,.92);border-radius:8px;background:linear-gradient(135deg,rgba(124,45,18,.46),rgba(15,23,42,.9));box-shadow:0 0 0 1px rgba(251,146,60,.24),0 12px 28px rgba(124,45,18,.3);';
+      row.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:18px 0 14px;padding:18px 20px;border:1px solid rgba(14,165,233,0.7);border-radius:8px;background:#e0f2fe;box-shadow:0 0 0 1px rgba(14,165,233,0.2),0 12px 28px rgba(14,165,233,0.12);';
       const note = document.createElement('div');
-      note.style.cssText = 'color:#fed7aa;font-size:12px;line-height:1.45;flex:1 1 520px;min-width:280px;max-width:760px;';
+      note.style.cssText = 'color:#0c4a6e;font-size:12px;line-height:1.45;flex:1 1 520px;min-width:280px;max-width:760px;';
       note.innerHTML = isFlexAnywhere
-        ? '<div style="color:#fb923c;font-size:15px;font-weight:900;letter-spacing:.01em;margin-bottom:4px;">FLEX Anywhere Source / Target</div><div style="color:#ffedd5;font-size:12px;">Use the same scanner/table and per-job terminals. Select direction/provider, then choose the FLEX or hyperscaler destination.</div>'
-        : '<div style="color:#fb923c;font-size:15px;font-weight:900;letter-spacing:.01em;margin-bottom:4px;">Flex2Flex Region Target</div><div style="color:#ffedd5;font-size:12px;">Source region is the scanner region. Target region below is the Flex Glance upload destination.</div>';
+        ? '<div style="color:#0284c7;font-size:15px;font-weight:900;letter-spacing:.01em;margin-bottom:4px;">FLEX Anywhere Source / Target</div><div style="color:#0c4a6e;font-size:12px;">Use the same scanner/table and per-job terminals. Select direction/provider, then choose the FLEX or hyperscaler destination.</div>'
+        : '<div style="color:#0284c7;font-size:15px;font-weight:900;letter-spacing:.01em;margin-bottom:4px;">Flex2Flex Region Target</div><div style="color:#0c4a6e;font-size:12px;">Source region is the scanner region. Target region below is the Flex Glance upload destination.</div>';
       const directionWrap = document.createElement('label');
-      directionWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;min-width:220px;flex:0 1 260px;color:#fdba74;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
-      directionWrap.innerHTML = '<span>Direction</span><select id="flexanywhere_direction_inline" style="width:100%;padding:10px 12px;background:#1f1308;border:1px solid #fb923c;border-radius:8px;color:#ffedd5;font-size:14px;text-transform:none;font-weight:600;"><option value="hyperscaler_to_flex" selected>AWS / Azure / GCP → FLEX</option><option value="flex_to_hyperscaler">FLEX → AWS / Azure / GCP</option></select>';
+      directionWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;min-width:220px;flex:0 1 260px;color:#0369a1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
+      directionWrap.innerHTML = '<span>Direction</span><select id="flexanywhere_direction_inline" style="width:100%;padding:10px 12px;background:#f0f9ff;border:1px solid rgba(14,165,233,0.5);border-radius:8px;color:#0c4a6e;font-size:14px;text-transform:none;font-weight:600;"><option value="hyperscaler_to_flex" selected>AWS / Azure / GCP → FLEX</option><option value="flex_to_hyperscaler">FLEX → AWS / Azure / GCP</option></select>';
       const providerWrap = document.createElement('label');
-      providerWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;min-width:180px;flex:0 1 220px;color:#fdba74;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
-      providerWrap.innerHTML = '<span>Hyperscaler</span><select id="flexanywhere_provider_inline" style="width:100%;padding:10px 12px;background:#1f1308;border:1px solid #fb923c;border-radius:8px;color:#ffedd5;font-size:14px;text-transform:none;font-weight:600;"><option value="aws" selected>AWS</option><option value="azure">Azure</option><option value="gcp">GCP</option></select>';
+      providerWrap.style.cssText = 'display:none;flex-direction:column;gap:6px;min-width:180px;flex:0 1 220px;color:#0369a1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
+      providerWrap.innerHTML = '<span>Hyperscaler</span><select id="flexanywhere_provider_inline" style="width:100%;padding:10px 12px;background:#f0f9ff;border:1px solid rgba(14,165,233,0.5);border-radius:8px;color:#0c4a6e;font-size:14px;text-transform:none;font-weight:600;"><option value="aws" selected>AWS</option><option value="azure">Azure</option><option value="gcp">GCP</option></select>';
       if (isFlexAnywhere) {
         directionWrap.style.display = 'flex';
         providerWrap.style.display = 'flex';
       }
       const methodWrap = document.createElement('label');
-      methodWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:320px;flex:0 1 420px;color:#fdba74;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
-      methodWrap.innerHTML = '<span>Migration Method</span><select id="flex2flex_clone_method" style="width:100%;padding:10px 12px;background:#1f1308;border:1px solid #fb923c;border-radius:8px;color:#ffedd5;font-size:14px;text-transform:none;font-weight:600;">' +
+      methodWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;min-width:320px;flex:0 1 420px;color:#0369a1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;';
+      methodWrap.innerHTML = '<span>Migration Method</span><select id="flex2flex_clone_method" style="width:100%;padding:10px 12px;background:#f0f9ff;border:1px solid rgba(14,165,233,0.5);border-radius:8px;color:#0c4a6e;font-size:14px;text-transform:none;font-weight:600;">' +
         (isFlexAnywhere
           ? '<option value="jumphost_glance_stream" selected>Jumphost image/volume pipeline</option>'
           : '<option value="jumphost_glance_stream" selected>Jumphost temp-file stream</option>') +
@@ -13563,14 +13563,14 @@ function val(id) {
       regionLabel.style.minWidth = '320px';
       regionLabel.style.maxWidth = '520px';
       regionLabel.style.flex = '0 1 420px';
-      regionLabel.style.color = '#fdba74';
+      regionLabel.style.color = '#0369a1';
       regionLabel.style.fontWeight = '700';
       regionLabel.style.textTransform = 'uppercase';
       regionLabel.style.letterSpacing = '.02em';
-      regionSelect.style.background = '#1f1308';
-      regionSelect.style.border = '1px solid #fb923c';
-      regionSelect.style.color = '#ffedd5';
-      regionSelect.style.boxShadow = '0 0 0 1px rgba(251,146,60,.18)';
+      regionSelect.style.background = '#f0f9ff';
+      regionSelect.style.border = '1px solid rgba(14,165,233,0.5)';
+      regionSelect.style.color = '#0c4a6e';
+      regionSelect.style.boxShadow = '0 0 0 1px rgba(14,165,233,0.15)';
       row.innerHTML = '';
       row.appendChild(note);
       row.appendChild(directionWrap);
