@@ -614,19 +614,28 @@
     .rb-indigo { width:360px;height:180px;border-width:14px;color:rgba(75,0,130,.8);  border-color:rgba(75,0,130,.8); }
     .rb-violet { width:332px;height:166px;border-width:14px;color:rgba(148,0,211,.8); border-color:rgba(148,0,211,.8); }
     @keyframes s03dRainbowPulse { 0%,100%{opacity:.9} 50%{opacity:1} }
-    /* Bridge rainbow — large arch the viewer flies under */
+    /* Bridge rainbow — photorealistic gradient arch, viewer flies under */
     .s03d-bridge-arc {
-      width:1300px; height:650px; overflow:hidden;
-      animation:s03dRainbowPulse 4s ease-in-out infinite;
+      width:2400px; height:1200px; overflow:hidden;
+      /* radial gradient centred at bottom — semicircle rainbow arch */
+      background: radial-gradient(ellipse 50% 100% at 50% 100%,
+        transparent 0%,
+        transparent 55%,
+        rgba(180,80,240,.04)  57%,
+        rgba(100,20,190,.09)  59%,
+        rgba(30,80,210,.12)   62%,
+        rgba(0,190,140,.20)   64%,
+        rgba(0,205,60,.35)    67%,
+        rgba(90,225,0,.35)    70%,
+        rgba(240,240,0,.34)   73%,
+        rgba(255,165,0,.24)   75%,
+        rgba(255,80,0,.22)    77%,
+        rgba(235,8,8,.32)     80%,
+        rgba(255,25,25,.14)   84%,
+        rgba(255,55,55,.05)   88%,
+        transparent 91%
+      );
     }
-    .s03d-bridge-arc .s03d-rainbow-band { box-shadow:none; }
-    .s03d-bridge-arc .rb-red    { width:1300px;height:650px;border-width:28px; }
-    .s03d-bridge-arc .rb-orange { width:1232px;height:616px;border-width:28px; }
-    .s03d-bridge-arc .rb-yellow { width:1164px;height:582px;border-width:28px; }
-    .s03d-bridge-arc .rb-green  { width:1096px;height:548px;border-width:28px; }
-    .s03d-bridge-arc .rb-blue   { width:1028px;height:514px;border-width:28px; }
-    .s03d-bridge-arc .rb-indigo { width: 960px;height:480px;border-width:28px; }
-    .s03d-bridge-arc .rb-violet { width: 892px;height:446px;border-width:28px; }
     .s03d-fly-ctrl {
       position:absolute; bottom:16px; right:16px; z-index:15;
       display:flex; flex-direction:column; align-items:center; gap:4px;
@@ -19756,24 +19765,17 @@ ${certContent}
       container.appendChild(el);
       _s03d_rainbows.push({ el:el, def:def, t:def.delay });
     });
-    // Bridge rainbow — huge arch, viewer flies underneath it
-    (function() {
+    // Bridge rainbow — 3 staggered gradient arches for continuous sequential fly-under
+    [0, 0.34, 0.67].forEach(function(offset) {
       var bEl = document.createElement('div');
       bEl.className = 's03d-rainbow';
-      bEl.style.top = '8%';
+      bEl.style.top = '2%';
       var bArc = document.createElement('div');
       bArc.className = 's03d-rainbow-arc s03d-bridge-arc';
-      rainbowColors.forEach(function(band) {
-        var bb = document.createElement('div');
-        bb.className = 's03d-rainbow-band ' + band.cls;
-        bb.style.borderColor = band.color;
-        bb.style.color = band.color;
-        bArc.appendChild(bb);
-      });
       bEl.appendChild(bArc);
       container.appendChild(bEl);
-      _s03d_bridge.push({ el:bEl, t:0 });
-    })();
+      _s03d_bridge.push({ el:bEl, t:offset });
+    });
     function setupBtn(id, dir) {
       var btn = document.getElementById(id);
       if (!btn) return;
@@ -19845,16 +19847,17 @@ ${certContent}
         r.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
         r.el.style.opacity   = op;
       });
-      // Animate bridge rainbow (slow fly-under cycle)
+      // Animate bridge rainbow — 3 arches rise from horizon, pass overhead
       _s03d_bridge.forEach(function(b) {
-        b.t += dt * 0.006 * _s03d_flySpeed;
+        b.t += dt * 0.010 * _s03d_flySpeed;
         var prog = b.t % 1;
-        var z    = -1200 + 1800 * prog;
-        var s    = 0.3  + 6.0  * prog;
-        var op   = 0.50;
-        if (prog < 0.05) op *= prog / 0.05;
-        if (prog > 0.88) op *= (1 - (prog - 0.88) / 0.12);
-        b.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
+        var z    = -2200 + 2800 * prog;
+        var s    = 0.4  + 5.6  * prog;
+        var flyY = 380 * (1 - prog * 1.7);   /* rises from +380 (horizon) to negative (overhead) */
+        var op   = 0.88;
+        if (prog < 0.07) op *= prog / 0.07;
+        if (prog > 0.78) op *= (1 - (prog - 0.78) / 0.22);
+        b.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+(flyY+_s03d_offsetY)+'px,'+z+'px) scale('+s+')';
         b.el.style.opacity   = op;
       });
       var sky = document.getElementById('s0-3d-sky');
