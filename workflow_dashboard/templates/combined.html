@@ -543,31 +543,85 @@
       0%   { transform:translateX(0); }
       100% { transform:translateX(calc(-100vw - 300px)); }
     }
-    .s0-c1{width:160px;height:50px;top:12%;left:110%;animation-duration:45s;opacity:.7}
-    .s0-c1::before{width:80px;height:80px;top:-40px;left:25px}
-    .s0-c1::after{width:60px;height:60px;top:-25px;left:70px}
-    .s0-c2{width:120px;height:40px;top:25%;left:115%;animation-duration:55s;animation-delay:8s;opacity:.5}
-    .s0-c2::before{width:60px;height:60px;top:-30px;left:20px}
-    .s0-c2::after{width:45px;height:45px;top:-20px;left:55px}
-    .s0-c3{width:200px;height:60px;top:8%;left:120%;animation-duration:50s;animation-delay:20s;opacity:.6}
-    .s0-c3::before{width:100px;height:100px;top:-50px;left:35px}
-    .s0-c3::after{width:70px;height:70px;top:-35px;left:95px}
-    .s0-c4{width:140px;height:45px;top:35%;left:112%;animation-duration:60s;animation-delay:15s;opacity:.4}
-    .s0-c4::before{width:70px;height:70px;top:-35px;left:25px}
-    .s0-c4::after{width:50px;height:50px;top:-22px;left:65px}
-    .s0-c5{width:180px;height:55px;top:18%;left:118%;animation-duration:48s;animation-delay:30s;opacity:.65}
-    .s0-c5::before{width:90px;height:90px;top:-45px;left:30px}
-    .s0-c5::after{width:65px;height:65px;top:-32px;left:85px}
-    .s0-c6{width:100px;height:35px;top:45%;left:108%;animation-duration:65s;animation-delay:5s;opacity:.3}
-    .s0-c6::before{width:50px;height:50px;top:-25px;left:18px}
-    .s0-c6::after{width:35px;height:35px;top:-15px;left:50px}
-    .s0-c7{width:220px;height:65px;top:5%;left:125%;animation-duration:52s;animation-delay:38s;opacity:.55}
-    .s0-c7::before{width:110px;height:110px;top:-55px;left:40px}
-    .s0-c7::after{width:80px;height:80px;top:-40px;left:110px}
-    .s0-c8{width:130px;height:42px;top:30%;left:114%;animation-duration:58s;animation-delay:25s;opacity:.45}
-    .s0-c8::before{width:65px;height:65px;top:-32px;left:22px}
-    .s0-c8::after{width:48px;height:48px;top:-22px;left:60px}
-    /* ── Stage 0: 3D Cloud View ──────────────────────────────────────────── */
+    .s0-c1{width:272px;height:85px;top:12%;left:110%;animation-duration:45s;opacity:.80}
+    .s0-c1::before{width:136px;height:136px;top:-68px;left:42px}
+    .s0-c1::after{width:102px;height:102px;top:-42px;left:119px}
+    .s0-c2{width:204px;height:68px;top:25%;left:115%;animation-duration:55s;animation-delay:8s;opacity:.62}
+    .s0-c2::before{width:102px;height:102px;top:-51px;left:34px}
+    .s0-c2::after{width:76px;height:76px;top:-34px;left:93px}
+    .s0-c3{width:340px;height:102px;top:8%;left:120%;animation-duration:50s;animation-delay:20s;opacity:.72}
+    .s0-c3::before{width:170px;height:170px;top:-85px;left:60px}
+    .s0-c3::after{width:119px;height:119px;top:-60px;left:162px}
+    .s0-c4{width:238px;height:76px;top:35%;left:112%;animation-duration:60s;animation-delay:15s;opacity:.52}
+    .s0-c4::before{width:119px;height:119px;top:-60px;left:42px}
+    .s0-c4::after{width:85px;height:85px;top:-37px;left:110px}
+    .s0-c5{width:306px;height:94px;top:18%;left:118%;animation-duration:48s;animation-delay:30s;opacity:.76}
+    .s0-c5::before{width:153px;height:153px;top:-76px;left:51px}
+    .s0-c5::after{width:110px;height:110px;top:-54px;left:144px}
+    .s0-c6{width:170px;height:60px;top:45%;left:108%;animation-duration:65s;animation-delay:5s;opacity:.42}
+    .s0-c6::before{width:85px;height:85px;top:-42px;left:30px}
+    .s0-c6::after{width:60px;height:60px;top:-26px;left:85px}
+    .s0-c7{width:374px;height:110px;top:5%;left:125%;animation-duration:52s;animation-delay:38s;opacity:.66}
+    .s0-c7::before{width:187px;height:187px;top:-94px;left:68px}
+    .s0-c7::after{width:136px;height:136px;top:-68px;left:187px}
+    .s0-c8{width:221px;height:71px;top:30%;left:114%;animation-duration:58s;animation-delay:25s;opacity:.56}
+    .s0-c8::before{width:110px;height:110px;top:-54px;left:37px}
+    .s0-c8::after{width:82px;height:82px;top:-37px;left:102px}
+    /* ── Biplane fly-through ────────────────────────────────────────── */
+    #s0-flex-cloud {
+      position:absolute; z-index:4; pointer-events:none;
+      top:16%; left:calc(50% - 160px);
+      width:400px; height:120px;
+      background:rgba(255,255,255,.93); border-radius:90px; filter:blur(1.5px);
+    }
+    #s0-flex-cloud::before {
+      content:''; position:absolute;
+      width:200px; height:200px;
+      background:rgba(255,255,255,.93); border-radius:50%;
+      top:-110px; left:70px;
+    }
+    #s0-flex-cloud::after {
+      content:''; position:absolute;
+      width:155px; height:155px;
+      background:rgba(255,255,255,.90); border-radius:50%;
+      top:-78px; left:215px;
+    }
+    #s0-plane-fly {
+      position:absolute; z-index:3; top:22%;
+      display:flex; align-items:center;
+      pointer-events:none;
+      animation: s0PlaneFly 30s linear infinite;
+    }
+    @keyframes s0PlaneFly {
+      0%   { left:-460px; }
+      100% { left:calc(100% + 260px); }
+    }
+    #s0-plane-bob {
+      animation: s0PlaneBob 2.6s ease-in-out infinite;
+      flex-shrink:0;
+    }
+    @keyframes s0PlaneBob {
+      0%,100% { transform:translateY(0) rotate(0deg); }
+      50%     { transform:translateY(-12px) rotate(-1.2deg); }
+    }
+    @keyframes s0PropSpin { to { transform:rotate(360deg); } }
+    #s0-banner-flag {
+      background:linear-gradient(135deg,#fefef0 0%,#f6f0d8 100%);
+      border:2.5px solid #c4a86a;
+      padding:9px 42px 9px 20px;
+      font-family:'Courier New',Courier,monospace;
+      font-weight:900; font-size:16px; color:#8b0000;
+      letter-spacing:2px; white-space:nowrap;
+      clip-path:polygon(0 0,84% 0,100% 50%,84% 100%,0 100%);
+      box-shadow:2px 3px 10px rgba(0,0,0,.22);
+      flex-shrink:0;
+      animation:s0BannerWave .55s ease-in-out infinite alternate;
+    }
+    @keyframes s0BannerWave {
+      0%   { transform:skewY(-.6deg) scaleX(1); }
+      100% { transform:skewY(.6deg) scaleX(.975); }
+    }
+        /* ── Stage 0: 3D Cloud View ──────────────────────────────────────────── */
     #s0-view-toggle {
       position:absolute; top:14px; right:14px; z-index:20;
       background:rgba(255,255,255,0.22); backdrop-filter:blur(10px);
@@ -1708,7 +1762,68 @@
         <div class="s0-dawn-cloud s0-c7"></div>
         <div class="s0-dawn-cloud s0-c8"></div>
         
-        <!-- 3D Cloud Fly-Through Overlay -->
+        <!-- FLEX Cloud: stationary at z-index:4, plane flies behind it -->
+        <div id="s0-flex-cloud"></div>
+        <!-- Biplane + banner flying left → right -->
+        <div id="s0-plane-fly">
+          <div id="s0-plane-bob">
+            <svg width="210" height="110" viewBox="0 0 210 110" xmlns="http://www.w3.org/2000/svg">
+              <!-- Spinning prop blur disk -->
+              <ellipse cx="18" cy="52" rx="4" ry="38" fill="rgba(55,55,55,.70)" style="transform-box:fill-box;transform-origin:center;animation:s0PropSpin .18s linear infinite;"/>
+              <!-- Engine -->
+              <ellipse cx="24" cy="52" rx="16" ry="20" fill="#111"/>
+              <!-- Fuselage body -->
+              <rect x="20" y="40" width="140" height="26" rx="10" fill="#cc2200"/>
+              <!-- Tail taper -->
+              <polygon points="158,40 202,47 202,55 158,66" fill="#cc2200"/>
+              <!-- Accent stripe -->
+              <rect x="30" y="61" width="124" height="5" rx="2" fill="#8a0000"/>
+              <!-- Cockpit bump -->
+              <rect x="42" y="34" width="56" height="20" rx="7" fill="#aa1700"/>
+              <!-- Windshields -->
+              <rect x="46" y="36" width="18" height="13" rx="3" fill="rgba(195,228,255,.55)" stroke="#888" stroke-width=".8"/>
+              <rect x="68" y="36" width="18" height="13" rx="3" fill="rgba(195,228,255,.55)" stroke="#888" stroke-width=".8"/>
+              <!-- TOP WING -->
+              <rect x="24" y="14" width="148" height="16" rx="6" fill="#e8d89e" stroke="#aa8840" stroke-width="1.2"/>
+              <!-- BOTTOM WING -->
+              <rect x="36" y="66" width="118" height="12" rx="5" fill="#e8d89e" stroke="#aa8840" stroke-width="1.2"/>
+              <!-- Wing struts -->
+              <line x1="56" y1="30" x2="54" y2="66" stroke="#8B6310" stroke-width="2.5"/>
+              <line x1="92" y1="30" x2="90" y2="66" stroke="#8B6310" stroke-width="2.5"/>
+              <line x1="128" y1="30" x2="126" y2="66" stroke="#8B6310" stroke-width="2.5"/>
+              <!-- Tail vertical fin -->
+              <polygon points="162,40 184,16 189,51" fill="#cc2200"/>
+              <!-- Tail stabilizer -->
+              <rect x="164" y="51" width="37" height="9" rx="3" fill="#e8d89e" stroke="#aa8840" stroke-width=".8"/>
+              <!-- Nose -->
+              <ellipse cx="17" cy="52" rx="9" ry="14" fill="#bb1d00"/>
+              <!-- Landing gear -->
+              <line x1="64" y1="78" x2="62" y2="96" stroke="#333" stroke-width="2.5"/>
+              <line x1="90" y1="78" x2="88" y2="96" stroke="#333" stroke-width="2.5"/>
+              <line x1="59" y1="97" x2="92" y2="97" stroke="#333" stroke-width="2"/>
+              <circle cx="62" cy="100" r="7" fill="#111" stroke="#444" stroke-width="1.5"/>
+              <circle cx="89" cy="100" r="7" fill="#111" stroke="#444" stroke-width="1.5"/>
+              <!-- Pilot 1 -->
+              <circle cx="57" cy="38" r="10" fill="#d49060"/>
+              <rect x="50" y="30" width="14" height="10" rx="5" fill="#5a2a18"/>
+              <rect x="52" y="37" width="11" height="7" rx="2" fill="rgba(160,215,240,.6)" stroke="#555" stroke-width=".5"/>
+              <!-- Pilot 2 -->
+              <circle cx="81" cy="38" r="10" fill="#d49060"/>
+              <rect x="74" y="30" width="14" height="10" rx="5" fill="#5a2a18"/>
+              <rect x="76" y="37" width="11" height="7" rx="2" fill="rgba(160,215,240,.6)" stroke="#555" stroke-width=".5"/>
+            </svg>
+          </div>
+          <!-- Tether lines from tail to banner rod -->
+          <svg width="58" height="52" viewBox="0 0 58 52" style="flex-shrink:0;overflow:visible;">
+            <line x1="1" y1="15" x2="57" y2="1" stroke="#666" stroke-width="1.5"/>
+            <line x1="1" y1="29" x2="57" y2="51" stroke="#666" stroke-width="1.5"/>
+          </svg>
+          <!-- Banner rod -->
+          <div style="width:8px;height:52px;background:linear-gradient(90deg,#7a5010,#d4a030,#7a5010);border-radius:3px;flex-shrink:0;"></div>
+          <!-- Banner flag -->
+          <div id="s0-banner-flag">Move&nbsp;to&nbsp;Flex</div>
+        </div>
+                <!-- 3D Cloud Fly-Through Overlay -->
         <div id="s0-hero-3d">
           <div id="s0-3d-sky" style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg,#1a3a6b 0%,#2e5fa3 15%,#4a8fd1 30%,#6bb5e0 45%,#8ecae6 55%,#a8d8ea 65%,#c4e8f5 75%,#d6f0fa 85%,#e8f7fc 100%);z-index:0;"></div>
           <div id="s0-3d-sun" style="position:absolute;top:-80px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(255,230,150,0.4) 0%,rgba(255,210,100,0.2) 30%,rgba(255,200,80,0.1) 50%,transparent 70%);border-radius:50%;z-index:1;animation:s0SunPulse 6s ease-in-out infinite;"></div>
