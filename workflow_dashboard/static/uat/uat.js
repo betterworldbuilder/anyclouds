@@ -2777,6 +2777,19 @@
     const content = document.getElementById('uat-content');
     if (!content) return;
     step = Number(step) || 5;
+    /* Update topbar title to match selected step */
+    var _TITLES = {
+      1: ['Step 1 — Server Targets',        'Define business systems, standalone servers, and databases'],
+      2: ['Step 2 — Service Comparison',    'OSPC → FLEX service-by-service comparison and validation'],
+      3: ['Step 3 — Performance Validation','Performance benchmarks and baseline comparison'],
+      4: ['Step 4 — Issues Tracker',        'Issue tracking, risk assessment and remediation'],
+      5: ['Step 5 — Cutover Readiness',     'Post-migration acceptance testing summary and decision']
+    };
+    var _t = _TITLES[step] || _TITLES[5];
+    var _th = document.getElementById('uat-tb-title');
+    var _ts = document.getElementById('uat-tb-sub');
+    if (_th) _th.textContent = _t[0];
+    if (_ts) _ts.textContent = _t[1];
     content.setAttribute('data-uat-mode', 'compact');
     ['compact', 'detailed'].forEach(function(m) {
       const btn = document.getElementById('uat-mode-' + m);
