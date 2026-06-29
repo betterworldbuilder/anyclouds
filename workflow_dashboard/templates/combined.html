@@ -1841,11 +1841,11 @@
 
   <!-- Customer Migration Tracker -->
   <div class="panel" id="panel-s0">
-    <div style="padding:20px 16px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%;">
+    <div style="padding:20px 16px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%; background:#f8fafc;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <div>
-          <h1 style="color:#7ecfff; margin:0; font-size:28px;">Customer Migration Tracker</h1>
-          <p style="color:#a8d8ff; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
+          <h1 style="color:#0f172a; margin:0; font-size:28px;">Customer Migration Tracker</h1>
+          <p style="color:#64748b; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
         </div>
         <div style="flex:1; display:flex; justify-content:center; padding:0 24px;">
           <button id="btnToggleProjectDocsUpload" style="padding:12px 20px; background:linear-gradient(135deg, #0f766e, #0891b2); color:white; border:1px solid #67e8f9; border-radius:8px; font-weight:700; cursor:pointer; box-shadow:0 0 16px rgba(34,211,238,0.18); white-space:nowrap;">
@@ -1873,41 +1873,41 @@
       </div>
 
       <div style="display:flex; gap:15px; margin-bottom:20px;">
-        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #fff; text-align:center;">
-          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">To Be Migrated</div>
-          <div id="kpiToMigrate" style="font-size:28px; font-weight:bold; color:#fff;">-</div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #64748b; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">To Be Migrated</div>
+          <div id="kpiToMigrate" style="font-size:28px; font-weight:bold; color:#0f172a;">-</div>
         </div>
-        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #f39c12; text-align:center;">
-          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Ready for Migration</div>
-          <div id="kpiReady" style="font-size:28px; font-weight:bold; color:#f39c12;">-</div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #f59e0b; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">Ready for Migration</div>
+          <div id="kpiReady" style="font-size:28px; font-weight:bold; color:#d97706;">-</div>
         </div>
-        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #2ecc71; text-align:center;">
-          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Successfully Migrated</div>
-          <div id="kpiSuccess" style="font-size:28px; font-weight:bold; color:#2ecc71;">-</div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #22c55e; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">Successfully Migrated</div>
+          <div id="kpiSuccess" style="font-size:28px; font-weight:bold; color:#16a34a;">-</div>
         </div>
-        <div style="flex:1; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border-left:4px solid #e74c3c; text-align:center;">
-          <div style="font-size:11px; text-transform:uppercase; color:#aaa; margin-bottom:5px;">Failed Migrations</div>
-          <div id="kpiFailed" style="font-size:28px; font-weight:bold; color:#e74c3c;">-</div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #f87171; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">Failed Migrations</div>
+          <div id="kpiFailed" style="font-size:28px; font-weight:bold; color:#dc2626;">-</div>
         </div>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
-        <input type="text" id="trackerSearch" placeholder="🔍 Search backlog by customer, status, readiness..." style="width:100%; max-width:400px; padding:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#fff; font-size:14px; outline:none;" />
+        <input type="text" id="trackerSearch" placeholder="🔍 Search backlog by customer, status, readiness..." style="width:100%; max-width:400px; padding:12px; border-radius:6px; border:1px solid #e2e8f0; background:#ffffff; color:#0f172a; font-size:14px; outline:none; box-shadow:0 1px 3px rgba(0,0,0,0.05);" />
       </div>
 
       <!-- top scrollbar mirror -->
       <div id="trackerTopScroll" style="width:100%;overflow-x:auto;overflow-y:hidden;margin-top:20px;height:14px;">
         <div id="trackerTopScrollInner" style="height:1px;"></div>
       </div>
-      <div id="trackerScrollWrap" style="width:100%; overflow-x:auto; background:rgba(0,0,0,0.2); border-radius:8px; border: 2px solid #00f3ff; box-shadow: 0 0 15px rgba(0,243,255,0.4), inset 0 0 10px rgba(0,243,255,0.2);">
+      <div id="trackerScrollWrap" style="width:100%; overflow-x:auto; background:#ffffff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 2px 12px rgba(0,0,0,0.06);">
         <table style="width:100%; border-collapse:collapse; white-space:nowrap;" id="trackerTable">
         <thead>
           <tr>
-            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Priority Rank</th>
-            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Customer Details</th>
-            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Status</th>
-            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Readiness &amp; Size</th>
-            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Progress</th>
-            <th style="padding:12px 15px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.05); background:#1a3a5c; color:#a8d8ff; font-weight:600; text-transform:uppercase; font-size:12px;">Action</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Priority Rank</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Customer Details</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Status</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Readiness &amp; Size</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Progress</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Action</th>
           </tr>
         </thead>
         <tbody id="trackerBody">
@@ -1917,11 +1917,11 @@
       </div>
 
       <!-- Documentation / Guidelines Tables -->
-      <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-        <h2 style="color:#2ecc71; margin-bottom:15px; font-size: 22px;">📚 Migration Prioritization Guidelines</h2>
+      <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <h2 style="color:#16a34a; margin-bottom:15px; font-size: 22px;">📚 Migration Prioritization Guidelines</h2>
 
-        <div style="background:rgba(0,0,0,0.2); padding:20px; border-radius:8px; margin-bottom: 30px;">
-          <h3 style="color:#f39c12; margin-top:0; font-size:16px;">1️⃣ What Can and Should be Migrated to Flex</h3>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; padding:20px; border-radius:10px; margin-bottom: 30px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+          <h3 style="color:#d97706; margin-top:0; font-size:16px;">1️⃣ What Can and Should be Migrated to Flex</h3>
           <div style="overflow-x:auto;">
             <table class="matrix-table" style="min-width: 1000px;">
               <thead>
@@ -1954,8 +1954,8 @@
         </div>
 
         <div style="display:flex; gap:30px; margin-bottom:30px;">
-          <div style="flex:1; background:rgba(0,0,0,0.2); padding:20px; border-radius:8px;">
-            <h3 style="color:#3498db; margin-top:0; font-size:16px;">2️⃣ Best Examples</h3>
+          <div style="flex:1; background:#ffffff; border:1px solid #e2e8f0; padding:20px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+            <h3 style="color:#2563eb; margin-top:0; font-size:16px;">2️⃣ Best Examples</h3>
             <div style="overflow-x:auto;">
               <table class="matrix-table" style="min-width: 500px;">
                 <thead>
@@ -1977,8 +1977,8 @@
             </div>
           </div>
 
-          <div style="flex:1; background:rgba(0,0,0,0.2); padding:20px; border-radius:8px;">
-            <h3 style="color:#9b59b6; margin-top:0; font-size:16px;">3️⃣ Migration Prioritization Guidelines</h3>
+          <div style="flex:1; background:#ffffff; border:1px solid #e2e8f0; padding:20px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+            <h3 style="color:#7c3aed; margin-top:0; font-size:16px;">3️⃣ Migration Prioritization Guidelines</h3>
             <div style="overflow-x:auto;">
               <table class="matrix-table" style="min-width: 500px;">
                 <thead>
