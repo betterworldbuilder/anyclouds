@@ -1519,207 +1519,284 @@
 
   <!-- Stage 0 — Who Why When What to Move to Flex? -->
   <div class="panel active" id="panel-s_why">
-    <div id="s0-container" style="padding:40px 56px; max-width:1280px; margin:0 auto; overflow:auto; height:100%;">
-      <h1 style="color:#7ecfff; font-size:36px; margin-bottom:10px; text-align:center;">Who Why When What to Move to Flex?</h1>
-      <p style="color:#a8d8ff; font-size:16px; text-align:center; margin-bottom:40px; max-width:820px; margin-left:auto; margin-right:auto; line-height:1.7;">Before any technical migration begins, customers need a clear business answer: <strong>who should move, why the move matters, and when the move makes sense.</strong> This stage positions FLEX not as a simple infrastructure replacement, but as the next-generation platform for customers who want better performance, stronger control, lower long-term TCO, and a more future-ready cloud foundation.</p>
+    <div id="s0-container" style="background:#f8fafc; padding:0; max-width:100%; margin:0; overflow:auto; height:100%;">
 
-      <div style="display:flex; flex-direction:column; gap:25px;">
+      <!-- Hero banner -->
+      <div style="background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 50%,#0ea5e9 100%); padding:52px 60px 44px; text-align:center;">
+        <div style="display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:30px;padding:6px 18px;font-size:12px;font-weight:700;color:#e0f2fe;letter-spacing:.08em;text-transform:uppercase;margin-bottom:18px;">&#127919; Migration Strategy Guide</div>
+        <h1 style="color:#ffffff; font-size:38px; font-weight:800; margin:0 0 14px; letter-spacing:-.02em; line-height:1.15;">Who Why When What to Move to Flex?</h1>
+        <p style="color:rgba(255,255,255,0.82); font-size:16px; max-width:760px; margin:0 auto; line-height:1.75;">Before any technical migration begins, customers need a clear business answer: <strong style="color:#fff;">who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
+        <!-- Stat chips -->
+        <div style="display:flex;justify-content:center;gap:16px;margin-top:32px;flex-wrap:wrap;">
+          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#fff;">4</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">Why Reasons</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#fff;">5</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">When Triggers</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#fff;">8</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">Migration Triggers</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:14px 22px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#fff;">0</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:.07em;margin-top:2px;">Vendor Lock-in</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content area -->
+      <div style="max-width:1160px;margin:0 auto;padding:40px 40px 60px;display:flex;flex-direction:column;gap:20px;">
 
         <!-- WHO -->
-        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #2ecc71; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-          <h2 style="color:#2ecc71; margin-top:0; margin-bottom:15px; font-size:22px;">&#127919; Who Should Move to FLEX?</h2>
-          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0 0 12px;">FLEX is ideal for OSPC customers who are ready to modernize their cloud environment without losing the openness and control they value from OpenStack.</p>
-          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0 0 12px;">The best candidates are customers who:</p>
-          <ul style="color:#ddd; line-height:1.9; font-size:15px; margin:0; padding-left:22px;">
-            <li>Run important production workloads on legacy OSPC.</li>
-            <li>Need better performance, scalability, and availability.</li>
-            <li>Want to reduce long-term operating cost and avoid proprietary lock-in.</li>
-            <li>Are planning new workloads such as AI, Kubernetes, analytics, or modern web applications.</li>
-            <li>Need hybrid cloud flexibility across public cloud, private cloud, and dedicated environments.</li>
-            <li>Want a safer migration path where workloads can move gradually instead of a risky big-bang cutover.</li>
-            <li>Require enterprise-grade support, security, and operational expertise.</li>
-          </ul>
-          <p style="color:#86efac; line-height:1.6; font-size:14px; margin:16px 0 0; font-style:italic;">In short, FLEX is for customers who want to keep the freedom of OpenStack while gaining a more modern, efficient, and future-ready platform.</p>
+        <div style="background:#ffffff;border-radius:16px;border:1px solid #dcfce7;border-top:4px solid #16a34a;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#127919;</div>
+            <div>
+              <h2 style="color:#14532d;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">Who Should Move to FLEX?</h2>
+              <p style="color:#4ade80;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Ideal Customer Profile</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 12px;">FLEX is ideal for OSPC customers ready to modernize without losing the openness and control they value from OpenStack. The best candidates are customers who:</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Run important production workloads on legacy OSPC.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Need better performance, scalability, and availability.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Want to reduce long-term cost and avoid vendor lock-in.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Planning AI, Kubernetes, analytics, or modern web apps.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Need hybrid cloud flexibility across public, private, and dedicated.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Want a phased migration path instead of a risky big-bang cutover.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;grid-column:1/-1;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Require enterprise-grade support, security, and operational expertise.</span>
+            </div>
+          </div>
+          <div style="background:#f0fdf4;border-left:3px solid #16a34a;border-radius:0 8px 8px 0;padding:12px 16px;">
+            <p style="color:#15803d;font-size:14px;margin:0;font-style:italic;line-height:1.6;">In short, FLEX is for customers who want the freedom of OpenStack with a more modern, efficient, and future-ready platform.</p>
+          </div>
         </div>
 
         <!-- WHY -->
-        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #f39c12; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-          <h2 style="color:#f39c12; margin-top:0; margin-bottom:15px; font-size:22px;">&#128161; Why Move to FLEX?</h2>
-          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0 0 20px;">The move to FLEX is not only a technical upgrade. It is a business opportunity. FLEX gives customers a stronger foundation for the next phase of their cloud strategy by improving performance, reducing operational friction, and creating more flexibility for future workloads.</p>
-
-          <h3 style="color:#fcd34d; font-size:16px; margin:0 0 8px;">1. Better Performance and Modern Infrastructure</h3>
-          <p style="color:#ddd; line-height:1.6; font-size:14px; margin:0 0 18px;">FLEX runs on a more modern cloud foundation designed for today&#x27;s workloads. Customers benefit from improved compute options, better scalability, stronger availability, and more flexible infrastructure design &mdash; critical for applications that need to grow, handle variable demand, support modern architectures, or prepare for AI and Kubernetes workloads.</p>
-
-          <h3 style="color:#fcd34d; font-size:16px; margin:0 0 8px;">2. Lower Long-Term TCO</h3>
-          <p style="color:#ddd; line-height:1.6; font-size:14px; margin:0 0 12px;">FLEX can help reduce long-term total cost of ownership through open-source economics, better resource efficiency, and more predictable cost management.</p>
-          <div style="background:rgba(0,0,0,0.3); border-radius:8px; overflow:hidden; border:1px solid rgba(243,156,18,0.3); margin-bottom:8px;">
-            <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
-              <thead style="background:rgba(243,156,18,0.15); border-bottom:1px solid rgba(243,156,18,0.25);">
-                <tr>
-                  <th style="padding:10px 14px; color:#fcd34d; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">Area</th>
-                  <th style="padding:10px 14px; color:#fcd34d; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">Why it matters</th>
-                  <th style="padding:10px 14px; color:#fcd34d; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:11px;">Business impact</th>
-                </tr>
-              </thead>
-              <tbody style="color:#cbd5e1;">
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                  <td style="padding:10px 14px; font-weight:600; color:#fff; vertical-align:top;">Open-source foundation</td>
-                  <td style="padding:10px 14px; vertical-align:top;">FLEX avoids proprietary platform lock-in and license-driven cost escalation.</td>
-                  <td style="padding:10px 14px; vertical-align:top;">Better long-term cost control.</td>
-                </tr>
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                  <td style="padding:10px 14px; font-weight:600; color:#fff; vertical-align:top;">Modern sizing</td>
-                  <td style="padding:10px 14px; vertical-align:top;">Customers can right-size workloads instead of carrying old OSPC-era overprovisioning.</td>
-                  <td style="padding:10px 14px; vertical-align:top;">Better utilization and lower waste.</td>
-                </tr>
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                  <td style="padding:10px 14px; font-weight:600; color:#fff; vertical-align:top;">Predictable bandwidth model</td>
-                  <td style="padding:10px 14px; vertical-align:top;">FLEX can reduce surprise-style network cost exposure compared with some cloud models.</td>
-                  <td style="padding:10px 14px; vertical-align:top;">More predictable monthly spend.</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px 14px; font-weight:600; color:#fff; vertical-align:top;">Operational efficiency</td>
-                  <td style="padding:10px 14px; vertical-align:top;">Newer tooling, support, and automation simplify operations.</td>
-                  <td style="padding:10px 14px; vertical-align:top;">Lower effort, faster delivery.</td>
-                </tr>
-              </tbody>
-            </table>
+        <div style="background:#ffffff;border-radius:16px;border:1px solid #fef3c7;border-top:4px solid #d97706;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#d97706,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128161;</div>
+            <div>
+              <h2 style="color:#78350f;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">Why Move to FLEX?</h2>
+              <p style="color:#f59e0b;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Business Value &amp; TCO</p>
+            </div>
           </div>
-          <p style="color:#94a3b8; line-height:1.5; font-size:12px; margin:0 0 18px; font-style:italic;">Per-VM pricing may vary by size, region, and workload profile, but the broader business case is usually strongest when customers evaluate total cost: compute, bandwidth, operations, licensing, support, performance, and future flexibility.</p>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 22px;">The move to FLEX is not only a technical upgrade. It is a business opportunity delivering better performance, lower operational friction, and flexibility for future workloads.</p>
 
-          <h3 style="color:#fcd34d; font-size:16px; margin:0 0 8px;">3. Less Risk, More Control</h3>
-          <p style="color:#ddd; line-height:1.6; font-size:14px; margin:0 0 18px;">FLEX allows customers to migrate gradually. They can move one application, one business system, or one wave at a time, validate results, and cut over only when the workload is ready. This reduces disruption and gives both the customer and Rackspace a safer, evidence-based migration path.</p>
-
-          <h3 style="color:#fcd34d; font-size:16px; margin:0 0 8px;">4. Future-Proof Cloud Strategy</h3>
-          <p style="color:#ddd; line-height:1.6; font-size:14px; margin:0 0 10px;">FLEX is positioned as the forward-looking platform for customers who want to continue using OpenStack while gaining more modern capabilities. It supports:</p>
-          <ul style="color:#ddd; line-height:1.9; font-size:14px; margin:0; padding-left:22px;">
-            <li>Hybrid cloud strategy</li>
-            <li>Kubernetes-ready workloads</li>
-            <li>AI and data workloads</li>
-            <li>Modern networking</li>
-            <li>Flexible storage options</li>
-            <li>Better automation</li>
-            <li>Enterprise security and expert support</li>
-          </ul>
-          <p style="color:#86efac; line-height:1.6; font-size:14px; margin:14px 0 0; font-style:italic;">The result is not just a migration away from legacy OSPC. It is a move toward a cloud platform that can support the customer&#x27;s next five to ten years of infrastructure strategy.</p>
+          <!-- 4 sub-reasons as mini cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px;">
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">1</div>
+                <strong style="color:#78350f;font-size:13px;">Better Performance &amp; Infrastructure</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Modern compute options, better scalability, stronger availability — critical for AI, Kubernetes, and variable-demand workloads.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">3</div>
+                <strong style="color:#78350f;font-size:13px;">Less Risk, More Control</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Migrate one application at a time. Validate results and cut over only when workloads are ready — reducing disruption for customer and Rackspace alike.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">4</div>
+                <strong style="color:#78350f;font-size:13px;">Future-Proof Cloud Strategy</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Supports hybrid cloud, Kubernetes, AI, modern networking, flexible storage, better automation, and enterprise security.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">2</div>
+                <strong style="color:#78350f;font-size:13px;">Lower Long-Term TCO</strong>
+              </div>
+              <!-- TCO mini table -->
+              <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #fde68a;">
+                    <th style="padding:5px 8px;text-align:left;color:#92400e;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;">Area</th>
+                    <th style="padding:5px 8px;text-align:left;color:#92400e;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;">Business Impact</th>
+                  </tr>
+                </thead>
+                <tbody style="color:#374151;">
+                  <tr style="border-bottom:1px solid #fef3c7;">
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Open-source foundation</td>
+                    <td style="padding:5px 8px;">Better long-term cost control.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #fef3c7;">
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Modern sizing</td>
+                    <td style="padding:5px 8px;">Better utilization, lower waste.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #fef3c7;">
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Predictable bandwidth</td>
+                    <td style="padding:5px 8px;">More predictable monthly spend.</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Operational efficiency</td>
+                    <td style="padding:5px 8px;">Lower effort, faster delivery.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style="background:#fffbeb;border-left:3px solid #d97706;border-radius:0 8px 8px 0;padding:12px 16px;">
+            <p style="color:#92400e;font-size:13px;margin:0;font-style:italic;line-height:1.6;">Not just a migration away from legacy OSPC — a move toward a platform that supports the next 5&ndash;10 years of infrastructure strategy.</p>
+          </div>
         </div>
 
         <!-- WHEN -->
-        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #3b82f6; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-          <h2 style="color:#60a5fa; margin-top:0; margin-bottom:15px; font-size:22px;">&#9200; When Should Customers Move to FLEX?</h2>
-          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0 0 18px;">Customers should consider moving to FLEX when one or more of the following triggers appear:</p>
+        <div style="background:#ffffff;border-radius:16px;border:1px solid #dbeafe;border-top:4px solid #2563eb;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#9200;</div>
+            <div>
+              <h2 style="color:#1e3a8a;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">When Should Customers Move to FLEX?</h2>
+              <p style="color:#3b82f6;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Migration Triggers</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 18px;">Customers should consider moving when one or more of the following triggers appear:</p>
 
-          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:28px;">
-            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:14px 16px;">
-              <strong style="color:#93c5fd; font-size:13px;">1. When OSPC limits performance or scalability</strong>
-              <p style="color:#ddd; font-size:13px; margin:6px 0 0; line-height:1.5;">If applications are growing, performance is inconsistent, or the current environment feels constrained, FLEX becomes a natural modernization path.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px;">
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">1</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">OSPC limits performance or scalability</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">Applications growing, performance inconsistent, or environment feels constrained.</p>
+              </div>
             </div>
-            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:14px 16px;">
-              <strong style="color:#93c5fd; font-size:13px;">2. When infrastructure cost needs optimization</strong>
-              <p style="color:#ddd; font-size:13px; margin:6px 0 0; line-height:1.5;">If the customer wants better long-term cost control, predictable spend, or better resource utilization, FLEX provides a strong TCO story.</p>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">2</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Infrastructure cost needs optimization</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">Customer wants better long-term cost control, predictable spend, or better utilization.</p>
+              </div>
             </div>
-            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:14px 16px;">
-              <strong style="color:#93c5fd; font-size:13px;">3. When new projects are being launched</strong>
-              <p style="color:#ddd; font-size:13px; margin:6px 0 0; line-height:1.5;">New applications, AI pilots, Kubernetes platforms, analytics systems, or modernization programs are ideal candidates to start directly on FLEX instead of expanding legacy OSPC usage.</p>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">3</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">New projects are being launched</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">AI pilots, Kubernetes, analytics, or modernization programs should start on FLEX directly.</p>
+              </div>
             </div>
-            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:14px 16px;">
-              <strong style="color:#93c5fd; font-size:13px;">4. When customers want to reduce migration risk</strong>
-              <p style="color:#ddd; font-size:13px; margin:6px 0 0; line-height:1.5;">FLEX supports a phased approach: discover, assess, migrate, validate, and cut over. Customers do not need to move everything at once.</p>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">4</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Reduce migration risk with phased move</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">FLEX supports discover &rarr; assess &rarr; migrate &rarr; validate &rarr; cut over. No big-bang required.</p>
+              </div>
             </div>
-            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.2); border-radius:8px; padding:14px 16px;">
-              <strong style="color:#93c5fd; font-size:13px;">5. When customers need a future-ready cloud foundation</strong>
-              <p style="color:#ddd; font-size:13px; margin:6px 0 0; line-height:1.5;">If the business strategy includes hybrid cloud, open-source flexibility, or long-term workload portability, FLEX is the right platform to evaluate now.</p>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;grid-column:1/-1;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">5</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Need a future-ready cloud foundation</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">Hybrid cloud, open-source flexibility, or long-term workload portability — FLEX is the right platform to evaluate now.</p>
+              </div>
             </div>
           </div>
 
-          <!-- OpenStack Service Compatibility (moved here from its own section) -->
-          <h3 style="color:#60a5fa; font-size:18px; font-weight:700; letter-spacing:-.01em; margin:0 0 4px;">OpenStack Service Compatibility</h3>
-          <p style="color:#7889a8; font-size:13px; margin-bottom:16px; letter-spacing:.01em;">OSPC (2024.2 Dalmatian) versus Rackspace FLEX (2025.1 Epoxy+)</p>
-          <div style="border-radius:14px; overflow:hidden; background:rgba(10,16,36,0.72); border:1px solid rgba(120,150,220,0.18); box-shadow:0 4px 32px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,0.05) inset; backdrop-filter:blur(16px); margin-bottom:28px;">
-            <table style="width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed;">
-              <colgroup>
-                <col style="width:13%">
-                <col style="width:15%">
-                <col style="width:7%">
-                <col style="width:7%">
-                <col style="width:13%">
-                <col style="width:14%">
-                <col style="width:17%">
-                <col style="width:14%">
-              </colgroup>
-              <thead>
-                <tr style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(120,150,220,0.2);">
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Service</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Role</th>
-                  <th style="padding:12px 16px; text-align:center; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">OSPC</th>
-                  <th style="padding:12px 16px; text-align:center; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">FLEX</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">OSPC Ver.</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">FLEX Min Ver.</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">What it does</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Benefit</th>
-                </tr>
-              </thead>
-              <tbody id="compatTbody"></tbody>
-            </table>
+          <!-- OpenStack Service Compatibility table -->
+          <div style="margin-bottom:28px;">
+            <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;">OpenStack Service Compatibility</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:14px;">OSPC (2024.2 Dalmatian) versus Rackspace FLEX (2025.1 Epoxy+)</p>
+            <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,0.05);">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+                <colgroup>
+                  <col style="width:13%"><col style="width:15%"><col style="width:7%"><col style="width:7%">
+                  <col style="width:13%"><col style="width:14%"><col style="width:17%"><col style="width:14%">
+                </colgroup>
+                <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                  <tr>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Service</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Role</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX Min Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">What it does</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Benefit</th>
+                  </tr>
+                </thead>
+                <tbody id="compatTbody"></tbody>
+              </table>
+            </div>
           </div>
 
-          <!-- Migration Trigger Conditions table (preserved) -->
-          <h3 style="color:#60a5fa; font-size:18px; font-weight:700; letter-spacing:-.01em; margin:0 0 4px;">Migration Trigger Conditions</h3>
-          <p style="color:#7889a8; font-size:13px; margin-bottom:16px;">Technical and business conditions triggering a migration from OSPC to FLEX.</p>
-          <div style="border-radius:14px; overflow:hidden; background:rgba(10,16,36,0.72); border:1px solid rgba(120,150,220,0.18); box-shadow:0 4px 32px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,0.05) inset; backdrop-filter:blur(16px);">
-            <table class="matrix-table" style="width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; margin-top:0;">
-              <colgroup>
-                <col style="width:25%">
-                <col style="width:40%">
-                <col style="width:35%">
-              </colgroup>
-              <thead>
-                <tr style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(120,150,220,0.2);">
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Condition / trigger</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Why it matters</th>
-                  <th style="padding:12px 16px; text-align:left; color:#6a7fa8; font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.09em;">Example use case</th>
+          <!-- Migration Trigger Conditions table -->
+          <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;">Migration Trigger Conditions</h3>
+          <p style="color:#64748b;font-size:13px;margin-bottom:14px;">Technical and business conditions driving migration from OSPC to FLEX.</p>
+          <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,0.05);">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;margin-top:0;">
+              <colgroup><col style="width:25%"><col style="width:40%"><col style="width:35%"></colgroup>
+              <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <tr>
+                  <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Condition / trigger</th>
+                  <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Why it matters</th>
+                  <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Example use case</th>
                 </tr>
               </thead>
 <tbody>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Need for modern, OpenStack-based infrastructure</td>
-                <td>FLEX runs on current-generation OpenStack with newer APIs, better automation, and alignment with upstream cloud standards, while OSPC is based on older, legacy Rackspace Cloud architecture.</td>
-                <td>A company operating a legacy PHP app on OSPC wants to automate deployments with Terraform and Kubernetes; FLEX's OpenStack API and ecosystem support tools like Magnum and Terraform more natively.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Need for modern, OpenStack-based infrastructure</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX runs on current-generation OpenStack with newer APIs, better automation, and alignment with upstream cloud standards, while OSPC is based on older, legacy Rackspace Cloud architecture.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A company operating a legacy PHP app on OSPC wants to automate deployments with Terraform and Kubernetes; FLEX's OpenStack API and ecosystem support tools like Magnum and Terraform more natively.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Desire for more flexible networking and segmentation</td>
-                <td>FLEX offers advanced networking (VLANs, segmentation within a single account, floating IPs, etc.), whereas OSPC has more rigid networking and lacks some modern segmentation capabilities.</td>
-                <td>An e-commerce platform needs separate isolated networks for PCI-compliant payment workloads and analytics; FLEX allows segmented networks under one account, which OSPC cannot easily support.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Desire for more flexible networking and segmentation</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX offers advanced networking (VLANs, segmentation within a single account, floating IPs, etc.), whereas OSPC has more rigid networking and lacks some modern segmentation capabilities.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">An e-commerce platform needs separate isolated networks for PCI-compliant payment workloads and analytics; FLEX allows segmented networks under one account, which OSPC cannot easily support.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Need to import custom images or use vendor images</td>
-                <td>FLEX supports custom image uploads and lets you consume upstream images from vendors like Red Hat, Canonical, Microsoft, and SUSE; OSPC is more limited in this regard.</td>
-                <td>A DevOps team wants to run a Red Hat Enterprise Linux image with a pre-built tuning profile; FLEX allows direct import or use of RH images, while OSPC would require extra workarounds.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Need to import custom images or use vendor images</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX supports custom image uploads and lets you consume upstream images from vendors like Red Hat, Canonical, Microsoft, and SUSE; OSPC is more limited in this regard.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A DevOps team wants to run a Red Hat Enterprise Linux image with a pre-built tuning profile; FLEX allows direct import or use of RH images, while OSPC would require extra workarounds.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Scaling beyond legacy limits or regions</td>
-                <td>FLEX provides better scalability, multi-tenant capacity, and newer hardware; OSPC is being sunsetted and does not scale as easily into newer regions or hardware generations.</td>
-                <td>A SaaS provider sees traffic doubling annually and wants to add bursting in a new region; FLEX lets them scale horizontally across regions with modern hardware, while OSPC will not be expanded.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Scaling beyond legacy limits or regions</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX provides better scalability, multi-tenant capacity, and newer hardware; OSPC is being sunsetted and does not scale as easily into newer regions or hardware generations.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A SaaS provider sees traffic doubling annually and wants to add bursting in a new region; FLEX lets them scale horizontally across regions with modern hardware, while OSPC will not be expanded.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Push toward cost-efficient, license-free infrastructure</td>
-                <td>FLEX is a license-free, open-source-based private cloud, which can reduce some licensing and vendor-lock-in costs compared with older OSPC models.</td>
-                <td>A financial services firm wants to cut licensing fees tied to proprietary cloud layers; they migrate app workloads from OSPC to FLEX to run on fully managed, open-source infrastructure.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Push toward cost-efficient, license-free infrastructure</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX is a license-free, open-source-based private cloud, which can reduce some licensing and vendor-lock-in costs compared with older OSPC models.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A financial services firm wants to cut licensing fees tied to proprietary cloud layers; they migrate app workloads from OSPC to FLEX to run on fully managed, open-source infrastructure.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Requirement for advanced automation and CI/CD pipelines</td>
-                <td>FLEX integrates well with modern CI/CD and orchestration tools (e.g., Kubernetes, Terraform, Ansible) because it is built on current OpenStack, while OSPC tooling is more constrained.</td>
-                <td>A startup wants GitOps-driven deployments using ArgoCD; FLEX's modern API and compute flavors make it easier to automate than OSPC's legacy surfaces.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Requirement for advanced automation and CI/CD pipelines</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX integrates well with modern CI/CD and orchestration tools (e.g., Kubernetes, Terraform, Ansible) because it is built on current OpenStack, while OSPC tooling is more constrained.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A startup wants GitOps-driven deployments using ArgoCD; FLEX's modern API and compute flavors make it easier to automate than OSPC's legacy surfaces.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Compliance or security posture upgrade</td>
-                <td>FLEX adds newer security and compliance features and supports more granular segmentation and isolation, while OSPC is being deprecated and will not receive further security enhancements.</td>
-                <td>A healthcare company must comply with updated data-residency and isolation rules; they migrate from OSPC to FLEX to leverage its improved security controls and segmentation.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Compliance or security posture upgrade</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX adds newer security and compliance features and supports more granular segmentation and isolation, while OSPC is being deprecated and will not receive further security enhancements.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A healthcare company must comply with updated data-residency and isolation rules; they migrate from OSPC to FLEX to leverage its improved security controls and segmentation.</td>
               </tr>
-              <tr>
-                <td style="color:#e2e8f0; font-weight:600;">Long-term roadmap: OSPC migration program</td>
-                <td>Rackspace explicitly encourages and plans migration of OSPC workloads to the Flex platform, providing migration guidance and support.</td>
-                <td>A customer still running legacy WebLogic servers on OSPC works with Rackspace to migrate those VMs to FLEX over a 6-month window, aligning with their expiry roadmap.</td>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Long-term roadmap: OSPC migration program</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">Rackspace explicitly encourages and plans migration of OSPC workloads to the Flex platform, providing migration guidance and support.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A customer still running legacy WebLogic servers on OSPC works with Rackspace to migrate those VMs to FLEX over a 6-month window, aligning with their expiry roadmap.</td>
               </tr>
             </tbody>
             </table>
@@ -1727,26 +1804,34 @@
         </div>
 
         <!-- STRATEGIC MESSAGE -->
-        <div style="background:rgba(0,0,0,0.25); border-left:4px solid #e056fd; padding:25px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-          <h2 style="color:#e056fd; margin-top:0; margin-bottom:15px; font-size:22px;">&#128203; Strategic Message</h2>
-          <p style="color:#ddd; line-height:1.6; font-size:15px; margin:0 0 16px;">The move from OSPC to FLEX should be presented as a business modernization journey, not just a cloud migration.</p>
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <div style="background:rgba(224,86,253,0.08); border:1px solid rgba(224,86,253,0.2); border-radius:8px; padding:12px 16px;">
-              <strong style="color:#e879f9; font-size:13px;">Who should move?</strong>
-              <p style="color:#ddd; font-size:13px; margin:4px 0 0; line-height:1.5;">Customers with important OSPC workloads who need performance, flexibility, cost control, and a future-ready platform.</p>
+        <div style="background:linear-gradient(135deg,#faf5ff,#f0f9ff);border-radius:16px;border:1px solid #e9d5ff;border-top:4px solid #9333ea;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#9333ea);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128203;</div>
+            <div>
+              <h2 style="color:#581c87;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">Strategic Message</h2>
+              <p style="color:#9333ea;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Executive Summary</p>
             </div>
-            <div style="background:rgba(224,86,253,0.08); border:1px solid rgba(224,86,253,0.2); border-radius:8px; padding:12px 16px;">
-              <strong style="color:#e879f9; font-size:13px;">Why move?</strong>
-              <p style="color:#ddd; font-size:13px; margin:4px 0 0; line-height:1.5;">To gain modern infrastructure, better scalability, stronger operational control, lower long-term TCO, and a safer path toward AI, Kubernetes, and hybrid cloud.</p>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 18px;">Present the OSPC to FLEX move as a <strong>business modernization journey</strong>, not just a cloud migration.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div style="background:#fff;border:1px solid #e9d5ff;border-radius:12px;padding:16px;">
+              <div style="font-size:22px;margin-bottom:8px;">&#127919;</div>
+              <strong style="color:#581c87;font-size:13px;display:block;margin-bottom:6px;">Who should move?</strong>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.5;">Customers with critical OSPC workloads needing performance, flexibility, cost control, and a future-ready platform.</p>
             </div>
-            <div style="background:rgba(224,86,253,0.08); border:1px solid rgba(224,86,253,0.2); border-radius:8px; padding:12px 16px;">
-              <strong style="color:#e879f9; font-size:13px;">When to move?</strong>
-              <p style="color:#ddd; font-size:13px; margin:4px 0 0; line-height:1.5;">When OSPC becomes a constraint, when new projects are planned, when cost optimization matters, or when the customer wants to modernize without disruption.</p>
+            <div style="background:#fff;border:1px solid #e9d5ff;border-radius:12px;padding:16px;">
+              <div style="font-size:22px;margin-bottom:8px;">&#128161;</div>
+              <strong style="color:#581c87;font-size:13px;display:block;margin-bottom:6px;">Why move?</strong>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.5;">Modern infrastructure, better scalability, lower long-term TCO, and a safer path toward AI, Kubernetes, and hybrid cloud.</p>
             </div>
-            <div style="background:rgba(224,86,253,0.15); border:1px solid rgba(224,86,253,0.35); border-radius:8px; padding:14px 16px;">
-              <strong style="color:#e879f9; font-size:14px;">Bottom line:</strong>
-              <p style="color:#f0d0ff; font-size:14px; margin:4px 0 0; line-height:1.5; font-weight:500;">FLEX gives OSPC customers a practical path to modernize today while preparing for tomorrow.</p>
+            <div style="background:#fff;border:1px solid #e9d5ff;border-radius:12px;padding:16px;">
+              <div style="font-size:22px;margin-bottom:8px;">&#9200;</div>
+              <strong style="color:#581c87;font-size:13px;display:block;margin-bottom:6px;">When to move?</strong>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.5;">When OSPC becomes a constraint, new projects are planned, cost matters, or the customer wants to modernize without disruption.</p>
             </div>
+          </div>
+          <div style="background:linear-gradient(135deg,#7c3aed,#2563eb);border-radius:12px;padding:18px 22px;text-align:center;">
+            <p style="color:#ffffff;font-size:16px;margin:0;font-weight:600;line-height:1.6;">&#128640;&nbsp; FLEX gives OSPC customers a practical path to modernize today while preparing for tomorrow.</p>
           </div>
         </div>
 
