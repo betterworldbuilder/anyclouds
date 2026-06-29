@@ -563,6 +563,65 @@
     .s0-c8{width:130px;height:42px;top:30%;left:-14%;animation-duration:58s;animation-delay:25s;opacity:.45}
     .s0-c8::before{width:65px;height:65px;top:-32px;left:22px}
     .s0-c8::after{width:48px;height:48px;top:-22px;left:60px}
+    /* ── Stage 0: 3D Cloud View ──────────────────────────────────────────── */
+    #s0-view-toggle {
+      position:absolute; top:14px; right:14px; z-index:20;
+      background:rgba(255,255,255,0.22); backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,0.4); border-radius:22px;
+      padding:7px 16px; font-size:11px; font-weight:700; letter-spacing:.06em;
+      color:#fff; cursor:pointer; text-shadow:0 1px 3px rgba(0,0,0,0.2);
+      transition:all .2s ease;
+    }
+    #s0-view-toggle:hover { background:rgba(255,255,255,0.38); transform:scale(1.04); }
+    #s0-hero-3d {
+      display:none; position:absolute; inset:0; z-index:1; overflow:hidden;
+    }
+    .s03d-clouds-wrap {
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      z-index:2; perspective:800px; overflow:hidden; transform-style:preserve-3d;
+    }
+    .s03d-cloud { position:absolute; left:50%; transform-origin:center center; will-change:transform,opacity; }
+    .s03d-cumulus     { background:rgba(255,255,255,.85); border-radius:50px;  filter:blur(1px);   }
+    .s03d-cumulus::before,.s03d-cumulus::after     { content:''; position:absolute; background:rgba(255,255,255,.85); border-radius:50px; }
+    .s03d-stratus     { background:rgba(255,255,255,.6);  border-radius:100px; filter:blur(3px); height:25px; }
+    .s03d-stratus::before,.s03d-stratus::after     { content:''; position:absolute; background:rgba(255,255,255,.5);  border-radius:100px; filter:blur(2px); }
+    .s03d-cirrus      { background:rgba(255,255,255,.4);  border-radius:50%;   filter:blur(4px);   }
+    .s03d-cirrus::before,.s03d-cirrus::after       { content:''; position:absolute; background:rgba(255,255,255,.35); border-radius:50%;   filter:blur(3px); }
+    .s03d-nimbus      { background:rgba(180,195,210,.75); border-radius:60px;  filter:blur(2px);   }
+    .s03d-nimbus::before,.s03d-nimbus::after       { content:''; position:absolute; background:rgba(160,180,200,.7);  border-radius:60px;  filter:blur(1px); }
+    .s03d-altocumulus { background:rgba(255,255,255,.7);  border-radius:40px;  filter:blur(1.5px); }
+    .s03d-altocumulus::before,.s03d-altocumulus::after { content:''; position:absolute; background:rgba(255,255,255,.65); border-radius:40px; }
+    .s03d-rainbow     { position:absolute; left:50%; z-index:3; pointer-events:none; will-change:transform,opacity; }
+    .s03d-rainbow-arc {
+      width:400px; height:200px; border-radius:200px 200px 0 0;
+      background:conic-gradient(from 180deg at 50% 100%,transparent 0deg,rgba(255,0,0,.6) 5deg,rgba(255,127,0,.6) 10deg,rgba(255,255,0,.6) 15deg,rgba(0,255,0,.6) 20deg,rgba(0,0,255,.6) 25deg,rgba(75,0,130,.6) 30deg,rgba(148,0,211,.6) 35deg,transparent 40deg,transparent 320deg,rgba(148,0,211,.6) 325deg,rgba(75,0,130,.6) 330deg,rgba(0,0,255,.6) 335deg,rgba(0,255,0,.6) 340deg,rgba(255,255,0,.6) 345deg,rgba(255,127,0,.6) 350deg,rgba(255,0,0,.6) 355deg,transparent 360deg);
+      mask:radial-gradient(circle at 50% 100%,transparent 55%,black 56%,black 70%,transparent 71%);
+      -webkit-mask:radial-gradient(circle at 50% 100%,transparent 55%,black 56%,black 70%,transparent 71%);
+      animation:s03dRainbowPulse 4s ease-in-out infinite;
+    }
+    @keyframes s03dRainbowPulse { 0%,100%{opacity:.7;transform:scale(1)} 50%{opacity:1;transform:scale(1.02)} }
+    .s03d-fly-ctrl {
+      position:absolute; bottom:16px; right:16px; z-index:15;
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      background:rgba(255,255,255,0.15); backdrop-filter:blur(15px);
+      border:1px solid rgba(255,255,255,0.3); border-radius:16px;
+      padding:10px; box-shadow:0 8px 32px rgba(0,0,0,0.15);
+    }
+    .s03d-ctrl-label { font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.8); margin-bottom:4px; text-align:center; }
+    .s03d-ctrl-row   { display:flex; gap:4px; align-items:center; justify-content:center; }
+    .s03d-btn {
+      width:38px; height:38px; border:none; border-radius:9px;
+      background:rgba(255,255,255,0.25); backdrop-filter:blur(5px);
+      color:#1a2a4a; font-size:16px; font-weight:700; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition:all .15s ease; box-shadow:0 2px 8px rgba(0,0,0,0.1);
+      user-select:none; -webkit-user-select:none;
+    }
+    .s03d-btn:hover { background:rgba(255,255,255,.45); transform:scale(1.08); }
+    .s03d-btn:active,.s03d-btn.s03d-active { transform:scale(.95); background:rgba(255,255,255,.55); }
+    .s03d-btn-ctr { background:rgba(255,200,100,.3); font-size:12px; }
+    .s03d-btn-ctr:hover { background:rgba(255,200,100,.5); }
+    .s03d-speed-ind { font-size:10px; font-weight:600; color:rgba(255,255,255,.7); margin-top:4px; text-align:center; }
     iframe { width: 100%; min-height: calc(100vh - 260px); height: 1200px; border: none; background: transparent; display: block; }
 
     /* Info panels */
@@ -1631,6 +1690,7 @@
 
       <!-- Hero banner — Dawn Sky Edition -->
       <div class="s0-dawn-hero">
+        <button id="s0-view-toggle" onclick="s0Toggle3D()" title="Switch to 3D cloud fly-through view">&#127775; 3D View</button>
         <div class="s0-dawn-sky"></div>
         <div class="s0-dawn-sun"></div>
         <div class="s0-dawn-cloud s0-c1"></div>
@@ -1641,6 +1701,20 @@
         <div class="s0-dawn-cloud s0-c6"></div>
         <div class="s0-dawn-cloud s0-c7"></div>
         <div class="s0-dawn-cloud s0-c8"></div>
+        
+        <!-- 3D Cloud Fly-Through Overlay -->
+        <div id="s0-hero-3d">
+          <div id="s0-3d-sky" style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg,#1a3a6b 0%,#2e5fa3 15%,#4a8fd1 30%,#6bb5e0 45%,#8ecae6 55%,#a8d8ea 65%,#c4e8f5 75%,#d6f0fa 85%,#e8f7fc 100%);z-index:0;"></div>
+          <div id="s0-3d-sun" style="position:absolute;top:-80px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(255,230,150,0.4) 0%,rgba(255,210,100,0.2) 30%,rgba(255,200,80,0.1) 50%,transparent 70%);border-radius:50%;z-index:1;animation:s0SunPulse 6s ease-in-out infinite;"></div>
+          <div id="s0-3d-clouds" class="s03d-clouds-wrap"></div>
+          <div class="s03d-fly-ctrl">
+            <div class="s03d-ctrl-label">Fly</div>
+            <div class="s03d-ctrl-row"><div style="width:38px;"></div><button id="s0-btn-up" class="s03d-btn">&#9650;</button><div style="width:38px;"></div></div>
+            <div class="s03d-ctrl-row"><button id="s0-btn-left" class="s03d-btn">&#9664;</button><button id="s0-btn-ctr" class="s03d-btn s03d-btn-ctr">&#9679;</button><button id="s0-btn-right" class="s03d-btn">&#9654;</button></div>
+            <div class="s03d-ctrl-row"><div style="width:38px;"></div><button id="s0-btn-down" class="s03d-btn">&#9660;</button><div style="width:38px;"></div></div>
+            <div class="s03d-speed-ind" id="s0-3d-speed">Speed: 1x</div>
+          </div>
+        </div>
         <div class="s0-dawn-content">
           <div class="s0-dawn-badge">
             <span class="s0-dawn-badge-dot">&#9733;</span>
@@ -19533,5 +19607,173 @@ ${certContent}
 </script>
 
 
+
+<script>
+/* ── Stage 0: 3D Cloud Fly-Through ─────────────────────────────────────── */
+(function() {
+  var _s03d_active = false;
+  var _s03d_rafId  = null;
+
+  window.s0Toggle3D = function() {
+    var overlay = document.getElementById('s0-hero-3d');
+    var btn     = document.getElementById('s0-view-toggle');
+    var s2d     = document.querySelectorAll('.s0-dawn-sky,.s0-dawn-sun,.s0-dawn-cloud');
+    if (!overlay) return;
+    _s03d_active = !_s03d_active;
+    overlay.style.display = _s03d_active ? 'block' : 'none';
+    s2d.forEach(function(el){ el.style.opacity = _s03d_active ? '0' : ''; });
+    if (btn) btn.textContent = _s03d_active ? '\u2601 2D View' : '\u2728 3D View';
+    if (_s03d_active) { s03dInit(); s03dStart(); }
+    else { if (_s03d_rafId) { cancelAnimationFrame(_s03d_rafId); _s03d_rafId = null; } }
+  };
+
+  var _s03d_inited = false;
+  var _s03d_clouds = [], _s03d_rainbows = [];
+  var _s03d_offsetX = 0, _s03d_offsetY = 0, _s03d_flySpeed = 1;
+  var _s03d_isFlying = { up:false, down:false, left:false, right:false };
+  var _s03d_lastTime = 0;
+
+  function s03dInit() {
+    if (_s03d_inited) return;
+    _s03d_inited = true;
+    var container = document.getElementById('s0-3d-clouds');
+    if (!container) return;
+    var cloudDefs = [
+      {type:'cirrus',     top:8,  w:120,h:8,  bw:80, bh:6,  bx:20,by:-4, brot:-15,aw:60,ah:5, ax:50,ay:3, arot:10, speed:0.35,zStart:-1200,zEnd:600, sStart:0.15,sEnd:2.0,opacity:0.50,delay:0  },
+      {type:'cirrus',     top:15, w:140,h:7,  bw:90, bh:5,  bx:25,by:-3, brot:-20,aw:70,ah:4, ax:55,ay:2, arot:12, speed:0.30,zStart:-1400,zEnd:700, sStart:0.12,sEnd:1.8,opacity:0.45,delay:5  },
+      {type:'cirrus',     top:22, w:100,h:6,  bw:70, bh:5,  bx:15,by:-3, brot:-10,aw:50,ah:4, ax:40,ay:2, arot:8,  speed:0.38,zStart:-1100,zEnd:550, sStart:0.18,sEnd:1.6,opacity:0.40,delay:12 },
+      {type:'cirrus',     top:5,  w:130,h:8,  bw:85, bh:6,  bx:22,by:-4, brot:-18,aw:65,ah:5, ax:48,ay:3, arot:15, speed:0.33,zStart:-1300,zEnd:650, sStart:0.14,sEnd:1.9,opacity:0.48,delay:18 },
+      {type:'altocumulus',top:28, w:50, h:16, bw:28, bh:22, bx:8, by:-10,brot:0,  aw:20,ah:18,ax:22,ay:-6,arot:0,  speed:0.45,zStart:-900, zEnd:450, sStart:0.25,sEnd:3.0,opacity:0.55,delay:2  },
+      {type:'altocumulus',top:35, w:55, h:18, bw:30, bh:24, bx:10,by:-11,brot:0,  aw:22,ah:20,ax:24,ay:-7,arot:0,  speed:0.42,zStart:-1000,zEnd:500, sStart:0.22,sEnd:3.2,opacity:0.50,delay:8  },
+      {type:'altocumulus',top:42, w:45, h:14, bw:25, bh:20, bx:7, by:-9, brot:0,  aw:18,ah:16,ax:20,ay:-5,arot:0,  speed:0.50,zStart:-800, zEnd:400, sStart:0.28,sEnd:2.8,opacity:0.48,delay:14 },
+      {type:'altocumulus',top:32, w:48, h:15, bw:26, bh:21, bx:8, by:-10,brot:0,  aw:19,ah:17,ax:21,ay:-6,arot:0,  speed:0.43,zStart:-950, zEnd:480, sStart:0.24,sEnd:3.1,opacity:0.52,delay:20 },
+      {type:'stratus',    top:55, w:180,h:25, bw:140,bh:18, bx:20,by:-8, brot:0,  aw:100,ah:15,ax:40,ay:5,arot:0,  speed:0.28,zStart:-600, zEnd:300, sStart:0.40,sEnd:2.5,opacity:0.60,delay:1  },
+      {type:'stratus',    top:62, w:200,h:25, bw:160,bh:20, bx:20,by:-9, brot:0,  aw:120,ah:16,ax:40,ay:6,arot:0,  speed:0.26,zStart:-700, zEnd:350, sStart:0.35,sEnd:2.8,opacity:0.55,delay:10 },
+      {type:'stratus',    top:68, w:160,h:25, bw:130,bh:17, bx:15,by:-7, brot:0,  aw:90, ah:14,ax:35,ay:5,arot:0,  speed:0.31,zStart:-550, zEnd:280, sStart:0.42,sEnd:2.3,opacity:0.50,delay:16 },
+      {type:'stratus',    top:58, w:190,h:25, bw:150,bh:19, bx:20,by:-8, brot:0,  aw:110,ah:15,ax:40,ay:6,arot:0,  speed:0.27,zStart:-650, zEnd:330, sStart:0.38,sEnd:2.6,opacity:0.58,delay:22 },
+      {type:'stratus',    top:65, w:170,h:25, bw:135,bh:18, bx:18,by:-8, brot:0,  aw:95, ah:14,ax:38,ay:5,arot:0,  speed:0.29,zStart:-580, zEnd:290, sStart:0.40,sEnd:2.4,opacity:0.52,delay:28 },
+      {type:'nimbus',     top:72, w:90, h:30, bw:50, bh:45, bx:15,by:-22,brot:0,  aw:38, ah:38,ax:38,ay:-16,arot:0,speed:0.36,zStart:-500, zEnd:250, sStart:0.45,sEnd:2.2,opacity:0.65,delay:4  },
+      {type:'nimbus',     top:78, w:100,h:32, bw:55, bh:48, bx:18,by:-24,brot:0,  aw:42, ah:40,ax:42,ay:-18,arot:0,speed:0.33,zStart:-550, zEnd:280, sStart:0.40,sEnd:2.4,opacity:0.60,delay:12 },
+      {type:'nimbus',     top:75, w:85, h:28, bw:48, bh:42, bx:14,by:-20,brot:0,  aw:36, ah:35,ax:36,ay:-15,arot:0,speed:0.38,zStart:-480, zEnd:240, sStart:0.48,sEnd:2.1,opacity:0.58,delay:20 },
+      {type:'cumulus',    top:18, w:60, h:20, bw:30, bh:30, bx:10,by:-15,brot:0,  aw:22, ah:22,ax:28,ay:-10,arot:0,speed:0.50,zStart:-800, zEnd:400, sStart:0.30,sEnd:3.0,opacity:0.30,delay:0  },
+      {type:'cumulus',    top:38, w:80, h:25, bw:40, bh:40, bx:15,by:-20,brot:0,  aw:30, ah:30,ax:38,ay:-14,arot:0,speed:0.40,zStart:-1000,zEnd:500, sStart:0.20,sEnd:4.0,opacity:0.35,delay:3  },
+      {type:'cumulus',    top:12, w:50, h:18, bw:25, bh:25, bx:8, by:-12,brot:0,  aw:18, ah:18,ax:22,ay:-8, arot:0,speed:0.55,zStart:-600, zEnd:300, sStart:0.40,sEnd:2.5,opacity:0.25,delay:6  },
+      {type:'cumulus',    top:45, w:70, h:22, bw:35, bh:35, bx:12,by:-17,brot:0,  aw:25, ah:25,ax:32,ay:-12,arot:0,speed:0.45,zStart:-900, zEnd:450, sStart:0.25,sEnd:3.5,opacity:0.30,delay:9  },
+      {type:'cumulus',    top:25, w:55, h:19, bw:28, bh:28, bx:10,by:-14,brot:0,  aw:20, ah:20,ax:26,ay:-9, arot:0,speed:0.42,zStart:-700, zEnd:350, sStart:0.35,sEnd:2.8,opacity:0.28,delay:12 },
+      {type:'cumulus',    top:48, w:65, h:21, bw:32, bh:32, bx:11,by:-16,brot:0,  aw:24, ah:24,ax:30,ay:-11,arot:0,speed:0.53,zStart:-850, zEnd:420, sStart:0.30,sEnd:3.2,opacity:0.32,delay:15 },
+      {type:'cumulus',    top:20, w:75, h:24, bw:38, bh:38, bx:14,by:-19,brot:0,  aw:28, ah:28,ax:36,ay:-13,arot:0,speed:0.48,zStart:-950, zEnd:480, sStart:0.22,sEnd:3.8,opacity:0.33,delay:1  },
+      {type:'cumulus',    top:40, w:58, h:19, bw:29, bh:29, bx:9, by:-14,brot:0,  aw:21, ah:21,ax:27,ay:-9, arot:0,speed:0.43,zStart:-750, zEnd:380, sStart:0.32,sEnd:2.9,opacity:0.27,delay:7  }
+    ];
+    var rainbowDefs = [
+      {top:30,speed:0.05,zStart:-5000,zEnd:800,sStart:0.1,sEnd:2.0,opacity:0.85,delay:0    },
+      {top:30,speed:0.05,zStart:-5000,zEnd:800,sStart:0.1,sEnd:2.0,opacity:0.85,delay:66.7 },
+      {top:30,speed:0.05,zStart:-5000,zEnd:800,sStart:0.1,sEnd:2.0,opacity:0.85,delay:133.3}
+    ];
+    cloudDefs.forEach(function(def) {
+      var el = document.createElement('div');
+      el.className = 's03d-cloud s03d-' + def.type;
+      el.style.width  = def.w + 'px';
+      el.style.height = def.h + 'px';
+      el.style.top    = def.top + '%';
+      var b = document.createElement('div');
+      b.style.cssText = 'position:absolute;width:'+def.bw+'px;height:'+def.bh+'px;top:'+def.by+'px;left:'+def.bx+'px;transform:rotate('+def.brot+'deg);background:inherit;border-radius:inherit;';
+      el.appendChild(b);
+      var a = document.createElement('div');
+      a.style.cssText = 'position:absolute;width:'+def.aw+'px;height:'+def.ah+'px;top:'+def.ay+'px;left:'+def.ax+'px;transform:rotate('+def.arot+'deg);background:inherit;border-radius:inherit;';
+      el.appendChild(a);
+      container.appendChild(el);
+      _s03d_clouds.push({ el:el, def:def, t:def.delay });
+    });
+    rainbowDefs.forEach(function(def) {
+      var el  = document.createElement('div');
+      el.className = 's03d-rainbow';
+      el.style.top = def.top + '%';
+      var arc = document.createElement('div');
+      arc.className = 's03d-rainbow-arc';
+      el.appendChild(arc);
+      container.appendChild(el);
+      _s03d_rainbows.push({ el:el, def:def, t:def.delay });
+    });
+    function setupBtn(id, dir) {
+      var btn = document.getElementById(id);
+      if (!btn) return;
+      var on  = function(e){ e.preventDefault(); _s03d_isFlying[dir]=true;  btn.classList.add('s03d-active'); };
+      var off = function(e){ e.preventDefault(); _s03d_isFlying[dir]=false; btn.classList.remove('s03d-active'); };
+      btn.addEventListener('mousedown', on);
+      btn.addEventListener('mouseup',   off);
+      btn.addEventListener('mouseleave',off);
+      btn.addEventListener('touchstart',on, {passive:false});
+      btn.addEventListener('touchend',  off);
+      btn.addEventListener('touchcancel',off);
+    }
+    setupBtn('s0-btn-up','up'); setupBtn('s0-btn-down','down');
+    setupBtn('s0-btn-left','left'); setupBtn('s0-btn-right','right');
+    var ctrBtn = document.getElementById('s0-btn-ctr');
+    var spdEl  = document.getElementById('s0-3d-speed');
+    if (ctrBtn) ctrBtn.addEventListener('click', function(){
+      _s03d_offsetX=0; _s03d_offsetY=0; _s03d_flySpeed=1;
+      if (spdEl) spdEl.textContent='Speed: 1x';
+    });
+    document.addEventListener('keydown', function(e){
+      if (!_s03d_active) return;
+      if (e.key==='ArrowUp'    || e.key==='w' || e.key==='W') _s03d_isFlying.up   =true;
+      if (e.key==='ArrowDown'  || e.key==='s' || e.key==='S') _s03d_isFlying.down =true;
+      if (e.key==='ArrowLeft'  || e.key==='a' || e.key==='A') _s03d_isFlying.left =true;
+      if (e.key==='ArrowRight' || e.key==='d' || e.key==='D') _s03d_isFlying.right=true;
+      if ((e.key==='+'||e.key==='=') && spdEl) { _s03d_flySpeed=Math.min(_s03d_flySpeed+0.5,5); spdEl.textContent='Speed: '+_s03d_flySpeed+'x'; }
+      if ((e.key==='-'||e.key==='_') && spdEl) { _s03d_flySpeed=Math.max(_s03d_flySpeed-0.5,0.5); spdEl.textContent='Speed: '+_s03d_flySpeed+'x'; }
+    });
+    document.addEventListener('keyup', function(e){
+      if (e.key==='ArrowUp'    || e.key==='w' || e.key==='W') _s03d_isFlying.up   =false;
+      if (e.key==='ArrowDown'  || e.key==='s' || e.key==='S') _s03d_isFlying.down =false;
+      if (e.key==='ArrowLeft'  || e.key==='a' || e.key==='A') _s03d_isFlying.left =false;
+      if (e.key==='ArrowRight' || e.key==='d' || e.key==='D') _s03d_isFlying.right=false;
+    });
+  }
+
+  function s03dStart() {
+    _s03d_lastTime = performance.now();
+    function tick(now) {
+      if (!_s03d_active) return;
+      var dt = Math.min((now - _s03d_lastTime) / 1000, 0.1);
+      _s03d_lastTime = now;
+      var sp = 200 * _s03d_flySpeed * dt;
+      if (_s03d_isFlying.up)    _s03d_offsetY -= sp;
+      if (_s03d_isFlying.down)  _s03d_offsetY += sp;
+      if (_s03d_isFlying.left)  _s03d_offsetX -= sp;
+      if (_s03d_isFlying.right) _s03d_offsetX += sp;
+      _s03d_clouds.forEach(function(c) {
+        c.t += dt * c.def.speed * _s03d_flySpeed;
+        var prog = (c.t % 28) / 28;
+        var z = c.def.zStart + (c.def.zEnd - c.def.zStart) * prog;
+        var s = c.def.sStart + (c.def.sEnd - c.def.sStart) * prog;
+        var op = c.def.opacity;
+        if (prog < 0.1) op *= prog / 0.1;
+        if (prog > 0.8) op *= (1 - (prog - 0.8) / 0.2);
+        c.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
+        c.el.style.opacity   = op;
+      });
+      _s03d_rainbows.forEach(function(r) {
+        r.t += dt * r.def.speed * _s03d_flySpeed;
+        var prog = (r.t % 200) / 200;
+        var z = r.def.zStart + (r.def.zEnd - r.def.zStart) * prog;
+        var s = r.def.sStart + (r.def.sEnd - r.def.sStart) * prog;
+        var op = r.def.opacity;
+        if (prog < 0.02) op *= prog / 0.02;
+        if (prog > 0.08 && prog < 0.10) op *= (1 - (prog - 0.08) / 0.02);
+        if (prog >= 0.10) op = 0;
+        r.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
+        r.el.style.opacity   = op;
+      });
+      var sky = document.getElementById('s0-3d-sky');
+      var sun = document.getElementById('s0-3d-sun');
+      if (sky) sky.style.backgroundPosition = (_s03d_offsetX*0.05)+'px '+(_s03d_offsetY*0.05)+'px';
+      if (sun) sun.style.transform = 'translate('+(_s03d_offsetX*0.02)+'px,'+(_s03d_offsetY*0.02)+'px)';
+      _s03d_rafId = requestAnimationFrame(tick);
+    }
+    _s03d_rafId = requestAnimationFrame(tick);
+  }
+})();
+</script>
 </body>
 </html>
