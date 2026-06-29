@@ -486,6 +486,7 @@
 
   function renderScope() {
     renderExecutionSystems();
+    if (!$('uat-scope-body')) return;
     $('uat-scope-body').innerHTML = UAT.scope.map((row, i) => {
       const isDB = row.system_type === 'DB';
       const dbEngineCell = isDB
@@ -2765,7 +2766,7 @@
       }
       if (msg) msg.style.display = '';
     } else if (typeof window.uatNavTo === 'function') {
-      window.uatNavTo(5, true);
+      window.uatNavTo(1, true);
     }
     if (!silent) {
       try { localStorage.setItem('uatMode', mode); } catch(e) {}
@@ -2776,7 +2777,7 @@
     hideGlobalThemeForUat();
     const content = document.getElementById('uat-content');
     if (!content) return;
-    step = Number(step) || 5;
+    step = Number(step) || 1;
     /* Update topbar title to match selected step */
     var _TITLES = {
       1: ['Step 1 — Server Targets',        'Define business systems, standalone servers, and databases'],
@@ -2818,7 +2819,7 @@
     if ($('uat-console')) {
       setTimeout(function() { window.uatSetMode('compact', true); }, 0);
       window.uatLoadFlavorData().catch(function() {});
-      loadUAT().catch(err => setMessage(err.message, false));
+      loadUAT().then(() => { const m=$('uat-message'); if(m) m.style.display='none'; }).catch(err => setMessage(err.message, false));
     }
   });
 
