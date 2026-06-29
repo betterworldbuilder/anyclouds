@@ -8217,594 +8217,861 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════ -->
-  <!-- ADVANCED BUSINESS SYSTEM CUTOVER (panel-s5b)                     -->
+  <!-- BUSINESS SYSTEM CUTOVER (panel-s5b) — UAT-driven service pipeline  -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <div class="panel" id="panel-s5b">
-    <div class="section-card" style="padding:0;overflow:hidden;margin-top:0;">
-      <div style="background:#1e293b;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="width:36px;height:36px;background:#dc2626;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px;flex-shrink:0;">4B</div>
-          <div>
-            <div style="font-size:15px;font-weight:700;color:#fff;">Advanced Business System Cutover</div>
-            <div style="font-size:11px;color:#94a3b8;">Import UAT &#8594; Select Services &#8594; Readiness &#8594; Execute &#8594; Verify &#8594; Decide &#8594; Evidence</div>
+
+    <!-- ── Header ── -->
+    <div style="background:#1e293b;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span style="background:#dc2626;color:#fff;font-size:13px;font-weight:800;padding:5px 10px;border-radius:6px;letter-spacing:.02em;">4B</span>
+      <div style="flex:1;">
+        <div style="font-size:16px;font-weight:700;">Business System Cutover</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Import UAT-approved business services &#8594; execute traffic switch &#8594; verify production readiness</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span id="bsc-pkg-badge" style="display:none;background:#0f172a;color:#38bdf8;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1px solid #1e40af;"></span>
+        <span id="bsc-step-badge" style="background:#2563eb;color:#fff;font-size:12px;font-weight:700;padding:6px 16px;border-radius:20px;">Step 1 — Import UAT</span>
+        <button onclick="bscReset()" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Reset</button>
+      </div>
+    </div>
+
+    <!-- ── Stepper ── -->
+    <div id="bsc-stepper" style="display:flex;align-items:flex-start;padding:16px 20px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;overflow-x:auto;gap:0;flex-wrap:nowrap;min-height:72px;"></div>
+
+    <!-- ── Step content ── -->
+    <div style="padding:20px;">
+
+      <!-- Step 1: Import UAT Package -->
+      <div id="bsc-s1" class="bsc-step-panel">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="bsc-card">
+            <div class="bsc-card-title"><i class="fas fa-file-import" style="color:#2563eb;"></i> Import UAT Package</div>
+            <div id="bsc-uat-summary" class="bsc-placeholder"><span style="color:#94a3b8;">Awaiting UAT package</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+              <button onclick="bscImportUAT()" class="bsc-btn-primary"><i class="fas fa-file-import"></i> Import Latest UAT</button>
+              <button onclick="bscLoadMockPackage()" class="bsc-btn-secondary"><i class="fas fa-flask"></i> Load Sample</button>
+            </div>
           </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <div id="bsc-pkg-badge" style="display:none;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;background:#0f172a;color:#94a3b8;border:1px solid #334155;">No Package</div>
-          <div id="bsc-step-badge" style="font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;background:#1d4ed8;color:#fff;">Step 1 &#8212; Import UAT</div>
-          <div id="bsc-decision-badge" style="display:none;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;"></div>
-          <button onclick="bscReset()" style="font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;cursor:pointer;"><i class="fas fa-rotate-right"></i> Reset</button>
+          <div class="bsc-card">
+            <div class="bsc-card-title"><i class="fas fa-circle-info" style="color:#0ea5e9;"></i> What Gets Imported</div>
+            <ul style="font-size:12px;color:#475569;margin:0;padding-left:18px;line-height:2;">
+              <li>Business services that passed UAT</li>
+              <li>App, API, DB, cache, queue, worker components</li>
+              <li>Accepted-risk records (flagged for operator)</li>
+              <li>UAT evidence references</li>
+              <li>Rollback plan from UAT scope</li>
+              <li style="color:#dc2626;">UAT FAIL or PENDING items — blocked</li>
+            </ul>
+          </div>
         </div>
       </div>
-      <div id="bsc-stepper" style="display:flex;align-items:center;padding:14px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;overflow-x:auto;gap:0;flex-wrap:nowrap;"></div>
-      <div style="padding:20px;">
 
-        <div id="bsc-s1" class="bsc-step-panel">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:20px;">
-              <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;color:#1e293b;"><i class="fas fa-file-import" style="color:#2563eb;margin-right:6px;"></i>Import UAT Package</div>
-              <div id="bsc-uat-summary" style="font-size:12px;color:#64748b;padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;margin-bottom:14px;min-height:44px;display:flex;align-items:center;justify-content:center;"><span style="color:#94a3b8;">No UAT package imported yet</span></div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button onclick="bscImportUAT()" style="background:#dc2626;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-file-import"></i> Import Latest UAT</button>
-                <button onclick="bscLoadMockPackage()" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;"><i class="fas fa-flask"></i> Load Sample</button>
-              </div>
-            </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:20px;">
-              <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;color:#1e293b;"><i class="fas fa-circle-info" style="color:#64748b;margin-right:6px;"></i>What Gets Imported</div>
-              <div style="font-size:12px;color:#374151;line-height:2.1;">
-                <div><i class="fas fa-check" style="color:#16a34a;width:18px;"></i> Business services that passed UAT</div>
-                <div><i class="fas fa-check" style="color:#16a34a;width:18px;"></i> App, API, DB, cache, queue, worker components</div>
-                <div><i class="fas fa-check" style="color:#16a34a;width:18px;"></i> Accepted-risk records (flagged for operator)</div>
-                <div><i class="fas fa-check" style="color:#16a34a;width:18px;"></i> UAT evidence references</div>
-                <div><i class="fas fa-check" style="color:#16a34a;width:18px;"></i> Rollback plan from UAT scope</div>
-                <div><i class="fas fa-times" style="color:#dc2626;width:18px;"></i> UAT FAIL or PENDING items &#8212; blocked</div>
-              </div>
-            </div>
-          </div>
-          <div id="bsc-import-pkg-card" style="display:none;margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><i class="fas fa-circle-check" style="color:#16a34a;font-size:18px;"></i><div style="font-size:14px;font-weight:700;color:#065f46;">UAT Package Imported Successfully</div></div>
-            <div id="bsc-pkg-detail" style="font-size:12px;color:#047857;line-height:1.9;"></div>
-            <button onclick="bscGoStep(2)" style="margin-top:12px;background:#16a34a;color:#fff;border:none;padding:9px 20px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-arrow-right"></i> Continue to Select Services</button>
-          </div>
-        </div>
-
-        <div id="bsc-s2" class="bsc-step-panel" style="display:none;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-layer-group" style="color:#2563eb;margin-right:6px;"></i>Select Business Services to Cut Over</div>
-            <div style="display:flex;gap:8px;">
-              <button onclick="bscSelectAllPass()" style="font-size:11px;padding:5px 12px;border-radius:6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;cursor:pointer;font-weight:600;"><i class="fas fa-check-double"></i> Select All UAT Passed</button>
-              <button onclick="bscToggleComponents()" id="bsc-toggle-comp-btn" style="font-size:11px;padding:5px 12px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;cursor:pointer;font-weight:600;"><i class="fas fa-list"></i> Expand Components</button>
-            </div>
-          </div>
-          <div id="bsc-svc-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-bottom:16px;"></div>
-          <div id="bsc-svc-table-wrap" style="display:none;margin-bottom:16px;overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:12px;"><thead style="background:#f1f5f9;"><tr>
-              <th style="padding:8px 10px;border-bottom:2px solid #e2e8f0;"></th>
-              <th style="padding:8px 10px;text-align:left;border-bottom:2px solid #e2e8f0;">Service / Component</th>
-              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;">Type</th>
-              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;">UAT Status</th>
-              <th style="padding:8px 10px;border-bottom:2px solid #e2e8f0;">Source</th>
-              <th style="padding:8px 10px;border-bottom:2px solid #e2e8f0;">Target</th>
-              <th style="padding:8px 10px;text-align:center;border-bottom:2px solid #e2e8f0;">Risk</th>
-              <th style="padding:8px 10px;border-bottom:2px solid #e2e8f0;">Owner</th>
-            </tr></thead><tbody id="bsc-svc-tbody"></tbody></table>
-          </div>
-          <button onclick="bscGoStep(3)" id="bsc-to-s3-btn" disabled style="background:#2563eb;color:#fff;border:none;padding:10px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;"><i class="fas fa-arrow-right"></i> Continue to Readiness Check</button>
-        </div>
-
-        <div id="bsc-s3" class="bsc-step-panel" style="display:none;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-stethoscope" style="color:#2563eb;margin-right:6px;"></i>Quick Readiness Check <span style="font-size:11px;font-weight:400;color:#64748b;">(pre-cutover health)</span></div>
-            <button onclick="bscRunReadiness()" id="bsc-readiness-btn" style="background:#0ea5e9;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-play"></i> Run Quick Readiness Check</button>
-          </div>
-          <div id="bsc-readiness-groups" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:16px;"></div>
-          <div id="bsc-readiness-summary" style="display:none;margin-bottom:14px;padding:14px 18px;border-radius:8px;"></div>
+      <!-- Step 2: Select Business Services -->
+      <div id="bsc-s2" class="bsc-step-panel" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-layer-group" style="color:#2563eb;margin-right:6px;"></i>Select Business Services to Cut Over</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick="bscGoStep(4)" id="bsc-to-s4-btn" disabled style="background:#dc2626;color:#fff;border:none;padding:10px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;"><i class="fas fa-rocket"></i> Proceed to Execute Cutover</button>
-            <button onclick="bscAcceptReadinessRisk()" id="bsc-accept-risk-btn" style="display:none;background:#d97706;color:#fff;border:none;padding:10px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-triangle-exclamation"></i> Accept Risk &amp; Proceed</button>
+            <button onclick="bscSelectAllPass()" class="bsc-btn-sm-blue"><i class="fas fa-check-double"></i> Select All UAT Passed</button>
+            <button onclick="bscToggleComponents()" id="bsc-toggle-comp-btn" class="bsc-btn-sm-gray"><i class="fas fa-list"></i> Expand Components</button>
           </div>
         </div>
-
-        <div id="bsc-s4" class="bsc-step-panel" style="display:none;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-traffic-light" style="color:#dc2626;margin-right:6px;"></i>Execute Cutover &#8212; Traffic Transition</div>
-            <button onclick="bscGoStep(5)" style="background:#16a34a;color:#fff;border:none;padding:8px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-arrow-right"></i> Done &#8212; Continue to Verify</button>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:10px;"><i class="fas fa-sliders" style="margin-right:5px;"></i>HAProxy Traffic Ramp</div>
-              <div style="text-align:center;margin-bottom:14px;padding:12px;background:#f8fafc;border-radius:8px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="font-size:11px;color:#64748b;">Source (OSPC)</span><span style="font-size:11px;color:#64748b;">Target (FLEX)</span></div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span id="bsc-src-pct" style="font-size:22px;font-weight:800;color:#dc2626;min-width:50px;text-align:right;">100%</span>
-                  <div style="flex:1;height:10px;background:#e2e8f0;border-radius:5px;overflow:hidden;"><div id="bsc-traffic-bar" style="height:100%;background:#16a34a;border-radius:5px;width:0%;transition:width .8s ease;"></div></div>
-                  <span id="bsc-tgt-pct" style="font-size:22px;font-weight:800;color:#16a34a;min-width:50px;text-align:left;">0%</span>
-                </div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
-                <button onclick="bscSetTraffic(50)" class="bsc-ramp-btn" data-pct="50">50 / 50</button>
-                <button onclick="bscSetTraffic(70)" class="bsc-ramp-btn" data-pct="70">30 / 70</button>
-                <button onclick="bscSetTraffic(100)" class="bsc-ramp-btn" data-pct="100">100% FLEX</button>
-              </div>
-              <div style="font-size:10px;color:#94a3b8;text-align:center;" id="bsc-traffic-status">No traffic shifted yet</div>
-            </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:10px;"><i class="fas fa-heart-pulse" style="margin-right:5px;"></i>Service Component Health</div>
-              <div id="bsc-exec-health" style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;"></div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px;">REQUESTS / SEC</div><div id="bsc-rps" style="font-size:22px;font-weight:800;color:#1e293b;">&#8212;</div></div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px;">ERROR RATE</div><div id="bsc-err" style="font-size:22px;font-weight:800;color:#1e293b;">&#8212;</div></div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;"><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;margin-bottom:6px;">P95 LATENCY</div><div id="bsc-lat" style="font-size:22px;font-weight:800;color:#1e293b;">&#8212;</div></div>
-          </div>
-          <div style="background:#0f172a;border-radius:8px;padding:10px 12px;max-height:120px;overflow-y:auto;"><pre id="bsc-exec-log-out" style="margin:0;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;">Awaiting cutover execution...</pre></div>
+        <div id="bsc-svc-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-bottom:14px;"></div>
+        <div id="bsc-svc-table-wrap" style="display:none;margin-bottom:14px;overflow-x:auto;">
+          <table class="bsc-table"><thead><tr>
+            <th style="width:36px;"></th>
+            <th>Service / Component</th><th>Type</th><th>UAT</th>
+            <th>Source</th><th>Target</th><th>Health</th><th>Risk</th><th>Owner</th>
+          </tr></thead><tbody id="bsc-svc-table-body"></tbody></table>
         </div>
-
-        <div id="bsc-s5" class="bsc-step-panel" style="display:none;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-            <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-clipboard-check" style="color:#16a34a;margin-right:6px;"></i>Post-Cutover Verification</div>
-            <button onclick="bscRunVerification()" id="bsc-verify-btn" style="background:#16a34a;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-play"></i> Run Post-Cutover Verification</button>
-          </div>
-          <div id="bsc-verify-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:16px;"></div>
-          <div id="bsc-verify-summary" style="display:none;margin-bottom:14px;padding:14px 18px;border-radius:8px;"></div>
-          <button onclick="bscGoStep(6)" id="bsc-to-s6-btn" disabled style="background:#2563eb;color:#fff;border:none;padding:10px 22px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;opacity:.5;"><i class="fas fa-arrow-right"></i> Continue to Operator Decision</button>
-        </div>
-
-        <div id="bsc-s6" class="bsc-step-panel" style="display:none;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:16px;"><i class="fas fa-user-check" style="color:#7c3aed;margin-right:6px;"></i>Operator Decision</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:16px;" id="bsc-decision-summary"></div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-            <button onclick="bscDecide('PASS')" style="background:#16a34a;color:#fff;border:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:130px;"><i class="fas fa-circle-check" style="font-size:22px;"></i>PASS CUTOVER</button>
-            <button onclick="bscDecide('FIX')" style="background:#d97706;color:#fff;border:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:130px;"><i class="fas fa-wrench" style="font-size:22px;"></i>FIX ISSUE</button>
-            <button onclick="bscDecide('ROLLBACK')" style="background:#dc2626;color:#fff;border:none;padding:14px 28px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:130px;"><i class="fas fa-rotate-left" style="font-size:22px;"></i>ROLLBACK</button>
-          </div>
-          <div id="bsc-decision-confirm" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;">
-            <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:12px;" id="bsc-confirm-title">Confirm Decision</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Reason</label><input id="bsc-dec-reason" placeholder="State reason..." style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;box-sizing:border-box;"></div>
-              <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Approved By</label><input id="bsc-dec-approved" placeholder="Approver name..." style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;box-sizing:border-box;"></div>
-              <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Owner</label><input id="bsc-dec-owner" placeholder="Owner/operator..." style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;box-sizing:border-box;"></div>
-              <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Evidence Ref</label><input id="bsc-dec-evidence" placeholder="Ticket/link..." style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;box-sizing:border-box;"></div>
-            </div>
-            <textarea id="bsc-dec-comment" rows="2" placeholder="Additional comments..." style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;resize:none;margin-bottom:10px;box-sizing:border-box;"></textarea>
-            <div style="display:flex;gap:8px;">
-              <button onclick="bscConfirmDecision()" style="background:#16a34a;color:#fff;border:none;padding:9px 20px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-check"></i> Confirm</button>
-              <button onclick="document.getElementById('bsc-decision-confirm').style.display='none'" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:9px 16px;border-radius:7px;font-size:12px;cursor:pointer;">Cancel</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="bsc-s7" class="bsc-step-panel" style="display:none;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;"><i class="fas fa-chart-line" style="color:#0ea5e9;margin-right:6px;"></i>Monitoring &amp; Evidence</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:10px;">Monitoring Duration</div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-                <button onclick="bscSetMonitorDuration(15,this)" class="bsc-dur-btn bsc-dur-active">15 min</button>
-                <button onclick="bscSetMonitorDuration(30,this)" class="bsc-dur-btn">30 min</button>
-                <button onclick="bscSetMonitorDuration(60,this)" class="bsc-dur-btn">60 min</button>
-              </div>
-              <div id="bsc-monitor-progress" style="display:none;margin-bottom:8px;">
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span id="bsc-mon-status">Monitoring...</span><span id="bsc-mon-elapsed">0:00</span></div>
-                <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;"><div id="bsc-mon-bar" style="height:100%;background:#0ea5e9;border-radius:4px;width:0%;transition:width 1s;"></div></div>
-              </div>
-              <button onclick="bscStartMonitoring()" style="background:#0ea5e9;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-play"></i> Start Monitoring</button>
-            </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
-              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:10px;">Evidence Package</div>
-              <div id="bsc-evidence-checklist" style="font-size:12px;line-height:1.9;"></div>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-            <button onclick="bscCaptureEvidence()" style="background:#2563eb;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-camera"></i> Capture Evidence</button>
-            <button onclick="bscExportEvidence()" style="background:#1e293b;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-file-zipper"></i> Export Evidence Package</button>
-            <button onclick="bscExportReport()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-file-csv"></i> Export Report</button>
-          </div>
-          <div id="bsc-final-result" style="display:none;padding:14px 18px;border-radius:10px;"></div>
-          <div style="margin-top:14px;padding:12px 16px;background:#fefce8;border:1px solid #fde047;border-radius:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-            <div style="font-size:12px;font-weight:600;color:#713f12;"><i class="fas fa-rocket" style="margin-right:6px;"></i>Optional: Run the full 16-step Advanced Cut over Execution Pipeline</div>
-            <button onclick="bscGoStep(8)" style="background:#dc2626;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;"><i class="fas fa-arrow-right"></i> Open Cut over Execution Dashboard</button>
-          </div>
-        </div>
-
-        <div id="bsc-s8" class="bsc-step-panel" style="display:none;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-rocket" style="color:#dc2626;margin-right:6px;"></i>Cut over Execution Dashboard <span style="font-size:11px;font-weight:400;color:#64748b;">&#8212; 16-step automated pipeline</span></div>
-            <button onclick="bscGoStep(7)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;"><i class="fas fa-arrow-left"></i> Back to Evidence</button>
-          </div>
-          <div id="bsc-exec-host" style="width:100%;border-radius:10px;overflow:hidden;min-height:400px;"></div>
-        </div>
-
+        <div id="bsc-dep-graph" style="display:none;margin-bottom:14px;"></div>
+        <button id="bsc-to-s3-btn" onclick="bscGoStep(3)" class="bsc-btn-primary" disabled style="opacity:.5;"><i class="fas fa-arrow-right"></i> Continue to Readiness Check</button>
       </div>
-      <div style="border-top:1px solid #e2e8f0;padding:8px 20px;background:#f8fafc;">
-        <div onclick="var e=document.getElementById('bsc-log-body'),a=document.getElementById('bsc-log-arr');e.style.display=e.style.display==='none'?'block':'none';a.textContent=e.style.display==='none'?'&#9660;':'&#9650;';" style="cursor:pointer;font-size:11px;font-weight:600;color:#64748b;display:flex;align-items:center;gap:6px;"><i class="fas fa-terminal"></i> Cutover Log <span id="bsc-log-arr">&#9660;</span></div>
-        <div id="bsc-log-body" style="display:none;margin-top:8px;background:#0f172a;border-radius:6px;padding:10px 12px;"><pre id="bsc-log-out" style="margin:0;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;"></pre></div>
+
+      <!-- Step 3: Quick Readiness Check -->
+      <div id="bsc-s3" class="bsc-step-panel" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-stethoscope" style="color:#0ea5e9;margin-right:6px;"></i>Quick Readiness Check <span style="font-size:11px;font-weight:400;color:#64748b;">(pre-cutover health — not full UAT)</span></div>
+          <button onclick="bscRunReadiness()" id="bsc-readiness-btn" class="bsc-btn-blue"><i class="fas fa-play"></i> Run Quick Readiness Check</button>
+        </div>
+        <div id="bsc-readiness-groups" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px;"></div>
+        <div id="bsc-readiness-summary" style="display:none;margin-bottom:14px;padding:14px 18px;border-radius:8px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="bscGoStep(4)" id="bsc-to-s4-btn" class="bsc-btn-primary" disabled style="opacity:.5;"><i class="fas fa-rocket"></i> Proceed to Execute Cutover</button>
+          <button onclick="bscAcceptReadinessRisk()" id="bsc-accept-risk-btn" style="display:none;" class="bsc-btn-amber"><i class="fas fa-triangle-exclamation"></i> Accept Risk &amp; Proceed</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Execute Cutover -->
+      <div id="bsc-s4" class="bsc-step-panel" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-traffic-light" style="color:#dc2626;margin-right:6px;"></i>Execute Cutover — Traffic Transition</div>
+          <button onclick="bscGoStep(5)" class="bsc-btn-green"><i class="fas fa-arrow-right"></i> Done — Continue to Verify</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div class="bsc-card">
+            <div class="bsc-card-title"><i class="fas fa-sliders" style="color:#2563eb;"></i> HAProxy Traffic Ramp</div>
+            <div style="text-align:center;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:6px;"><span>Source (OSPC)</span><span>Target (FLEX)</span></div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span id="bsc-src-pct" style="font-size:24px;font-weight:800;color:#dc2626;min-width:52px;text-align:right;">100%</span>
+                <div style="flex:1;height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;"><div id="bsc-traffic-bar" style="height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:6px;width:0%;transition:width .8s ease;"></div></div>
+                <span id="bsc-tgt-pct" style="font-size:24px;font-weight:800;color:#16a34a;min-width:52px;">0%</span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
+              <button onclick="bscSetTraffic(50)" class="bsc-ramp-btn" data-pct="50">50 / 50</button>
+              <button onclick="bscSetTraffic(70)" class="bsc-ramp-btn" data-pct="70">30 / 70</button>
+              <button onclick="bscSetTraffic(100)" class="bsc-ramp-btn" data-pct="100">100% FLEX</button>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;text-align:center;" id="bsc-traffic-status">Awaiting traffic switch</div>
+          </div>
+          <div class="bsc-card">
+            <div class="bsc-card-title"><i class="fas fa-chart-bar" style="color:#0ea5e9;"></i> Traffic Metrics</div>
+            <div id="bsc-traffic-metrics" style="font-size:12px;color:#94a3b8;text-align:center;padding:20px 0;">Awaiting traffic switch</div>
+          </div>
+        </div>
+        <div class="bsc-card" style="margin-bottom:0;">
+          <div class="bsc-card-title"><i class="fas fa-list-check" style="color:#7c3aed;"></i> Selected Services in This Cutover</div>
+          <div id="bsc-s4-services" style="font-size:12px;color:#64748b;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Step 5: Post-Cutover Verification -->
+      <div id="bsc-s5" class="bsc-step-panel" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-clipboard-check" style="color:#16a34a;margin-right:6px;"></i>Post-Cutover Verification</div>
+          <button onclick="bscRunVerification()" id="bsc-verify-btn" class="bsc-btn-green"><i class="fas fa-play"></i> Run Post-Cutover Verification</button>
+        </div>
+        <div id="bsc-verify-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:14px;"></div>
+        <div id="bsc-verify-summary" style="display:none;margin-bottom:14px;padding:14px 18px;border-radius:8px;"></div>
+        <button onclick="bscGoStep(6)" id="bsc-to-s6-btn" class="bsc-btn-primary" disabled style="opacity:.5;"><i class="fas fa-arrow-right"></i> Continue to Operator Decision</button>
+      </div>
+
+      <!-- Step 6: Operator Decision -->
+      <div id="bsc-s6" class="bsc-step-panel" style="display:none;">
+        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;"><i class="fas fa-user-check" style="color:#7c3aed;margin-right:6px;"></i>Operator Decision</div>
+        <div id="bsc-decision-summary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+          <button onclick="bscDecide('PASS')" class="bsc-dec-btn" style="background:#16a34a;"><i class="fas fa-circle-check" style="font-size:20px;margin-bottom:2px;"></i><span>PASS CUTOVER</span></button>
+          <button onclick="bscDecide('FIX')" class="bsc-dec-btn" style="background:#d97706;"><i class="fas fa-wrench" style="font-size:20px;margin-bottom:2px;"></i><span>FIX ISSUE</span></button>
+          <button onclick="bscDecide('ROLLBACK')" class="bsc-dec-btn" style="background:#dc2626;"><i class="fas fa-rotate-left" style="font-size:20px;margin-bottom:2px;"></i><span>ROLLBACK</span></button>
+        </div>
+        <div id="bsc-decision-confirm" style="display:none;" class="bsc-card">
+          <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:12px;" id="bsc-confirm-title">Confirm Decision</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div><label class="bsc-label">Reason</label><input id="bsc-dec-reason" placeholder="State reason..." class="bsc-input"></div>
+            <div><label class="bsc-label">Approved By</label><input id="bsc-dec-approved" placeholder="Approver name..." class="bsc-input"></div>
+            <div><label class="bsc-label">Evidence Ref</label><input id="bsc-dec-jira" placeholder="Ticket / evidence ref..." class="bsc-input"></div>
+            <div><label class="bsc-label">Comment</label><input id="bsc-dec-comment" placeholder="Additional comment..." class="bsc-input"></div>
+          </div>
+          <button onclick="bscConfirmDecision()" class="bsc-btn-primary"><i class="fas fa-check"></i> Confirm &amp; Proceed to Monitoring</button>
+        </div>
+      </div>
+
+      <!-- Step 7: Monitoring & Evidence -->
+      <div id="bsc-s7" class="bsc-step-panel" style="display:none;">
+        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;"><i class="fas fa-chart-line" style="color:#0ea5e9;margin-right:6px;"></i>Monitoring &amp; Evidence</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div class="bsc-card">
+            <div class="bsc-card-title"><i class="fas fa-clock" style="color:#0ea5e9;"></i> Monitoring Duration</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+              <button onclick="bscSetMonitorDuration(15,this)" class="bsc-dur-btn bsc-dur-active">15 min</button>
+              <button onclick="bscSetMonitorDuration(30,this)" class="bsc-dur-btn">30 min</button>
+              <button onclick="bscSetMonitorDuration(60,this)" class="bsc-dur-btn">60 min</button>
+            </div>
+            <div id="bsc-monitor-progress" style="display:none;margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span id="bsc-mon-status">Monitoring…</span><span id="bsc-mon-elapsed">0:00</span></div>
+              <div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;"><div id="bsc-mon-bar" style="height:100%;background:#0ea5e9;border-radius:4px;width:0%;transition:width 1s;"></div></div>
+            </div>
+            <button onclick="bscStartMonitoring()" class="bsc-btn-blue"><i class="fas fa-play"></i> Start Monitoring</button>
+          </div>
+          <div class="bsc-card">
+            <div class="bsc-card-title"><i class="fas fa-shield-check" style="color:#16a34a;"></i> Evidence Package</div>
+            <div id="bsc-evidence-list" style="font-size:11px;color:#64748b;margin-bottom:12px;line-height:1.8;"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button onclick="bscCaptureEvidence()" id="bsc-capture-btn" class="bsc-btn-green"><i class="fas fa-camera"></i> Capture Evidence</button>
+              <button onclick="bscExportReport()" class="bsc-btn-secondary"><i class="fas fa-file-alt"></i> Export Report</button>
+              <button onclick="bscExportEvidence()" class="bsc-btn-secondary"><i class="fas fa-file-csv"></i> Export CSV</button>
+            </div>
+          </div>
+        </div>
+        <div id="bsc-final-result" style="display:none;"></div>
+      </div>
+
+    </div><!-- /step content -->
+
+    <!-- ── Cutover Log (collapsed) ── -->
+    <div style="border-top:1px solid #e2e8f0;margin:0;">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'"
+           style="padding:8px 20px;font-size:11px;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;">
+        <i class="fas fa-chevron-right" style="font-size:9px;"></i> Cutover Log
+      </div>
+      <div style="display:none;padding:0 20px 12px;">
+        <textarea id="bsc-log-out" readonly style="width:100%;height:100px;font-size:10px;font-family:monospace;background:#0f172a;color:#94a3b8;border:none;border-radius:6px;padding:8px;resize:vertical;box-sizing:border-box;">Awaiting cutover execution...</textarea>
       </div>
     </div>
 
     <style>
-      #panel-s5b .bsc-step-panel{animation:bscFadeIn .2s ease;}
-      @keyframes bscFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-      #panel-s5b .bsc-stp{display:flex;align-items:center;flex:1;min-width:0;}
-      #panel-s5b .bsc-stp-node{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;cursor:pointer;}
-      #panel-s5b .bsc-stp-circle{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all .2s;}
-      #panel-s5b .bsc-stp-lbl{font-size:9px;font-weight:600;text-align:center;max-width:68px;line-height:1.2;white-space:nowrap;}
-      #panel-s5b .bsc-stp-line{flex:1;height:2px;background:#e2e8f0;margin:0 2px;margin-bottom:18px;min-width:6px;transition:background .2s;}
-      #panel-s5b .bsc-stp-node.done .bsc-stp-circle{background:#16a34a;color:#fff;}
-      #panel-s5b .bsc-stp-node.done .bsc-stp-lbl{color:#16a34a;}
+      #panel-s5b .bsc-step-panel{animation:bscFade .2s ease;}
+      @keyframes bscFade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+      #panel-s5b .bsc-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;}
+      #panel-s5b .bsc-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+      #panel-s5b .bsc-placeholder{font-size:12px;color:#64748b;padding:14px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;min-height:48px;display:flex;align-items:center;justify-content:center;}
+      #panel-s5b .bsc-btn-primary{background:#dc2626;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
+      #panel-s5b .bsc-btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+      #panel-s5b .bsc-btn-secondary{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;}
+      #panel-s5b .bsc-btn-blue{background:#2563eb;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
+      #panel-s5b .bsc-btn-green{background:#16a34a;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
+      #panel-s5b .bsc-btn-amber{background:#d97706;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
+      #panel-s5b .bsc-btn-sm-blue{font-size:11px;padding:5px 12px;border-radius:6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;cursor:pointer;font-weight:600;}
+      #panel-s5b .bsc-btn-sm-gray{font-size:11px;padding:5px 12px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;cursor:pointer;font-weight:600;}
+      #panel-s5b .bsc-table{width:100%;border-collapse:collapse;font-size:12px;}
+      #panel-s5b .bsc-table th{padding:8px 10px;text-align:left;background:#f1f5f9;border-bottom:2px solid #e2e8f0;font-size:11px;font-weight:700;color:#64748b;}
+      #panel-s5b .bsc-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+      #panel-s5b .bsc-label{font-size:11px;color:#64748b;display:block;margin-bottom:4px;font-weight:600;}
+      #panel-s5b .bsc-input{width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;box-sizing:border-box;}
+      #panel-s5b .bsc-ramp-btn{padding:8px 4px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;transition:all .15s;}
+      #panel-s5b .bsc-dur-btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;}
+      #panel-s5b .bsc-dur-active{background:#0ea5e9;color:#fff;border-color:#0ea5e9;}
+      #panel-s5b .bsc-dec-btn{color:#fff;border:none;padding:14px 24px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:130px;}
+      #panel-s5b .bsc-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+      #panel-s5b .bsc-badge-pass{background:#f0fdf4;color:#16a34a;}
+      #panel-s5b .bsc-badge-fail{background:#fef2f2;color:#dc2626;}
+      #panel-s5b .bsc-badge-risk{background:#fefce8;color:#a16207;}
+      #panel-s5b .bsc-badge-scope{background:#f1f5f9;color:#64748b;}
+      #panel-s5b .bsc-svc-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;cursor:pointer;transition:box-shadow .15s;}
+      #panel-s5b .bsc-svc-card:hover{box-shadow:0 2px 8px rgba(37,99,235,.12);}
+      #panel-s5b .bsc-svc-card.selected{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe;}
+      #panel-s5b .bsc-comp-pill{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;background:#f1f5f9;border-radius:4px;color:#475569;border:1px solid #e2e8f0;}
+      #panel-s5b .bsc-check-row{display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;}
+      #panel-s5b .bsc-dep-node{display:flex;flex-direction:column;align-items:center;gap:3px;}
+      #panel-s5b .bsc-dep-circle{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;}
+      #panel-s5b .bsc-dep-arrow{color:#cbd5e1;font-size:14px;align-self:center;padding-top:2px;}
+      /* Stepper */
+      #panel-s5b .bsc-stp{display:flex;align-items:flex-start;flex:1;min-width:0;}
+      #panel-s5b .bsc-stp-node{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;cursor:pointer;min-width:68px;}
+      #panel-s5b .bsc-stp-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all .2s;}
+      #panel-s5b .bsc-stp-lbl{font-size:9px;font-weight:600;text-align:center;max-width:72px;line-height:1.3;color:#94a3b8;}
+      #panel-s5b .bsc-stp-line{flex:1;height:2px;background:#e2e8f0;margin:0 2px;margin-top:15px;min-width:8px;transition:background .2s;}
       #panel-s5b .bsc-stp-node.active .bsc-stp-circle{background:#2563eb;color:#fff;box-shadow:0 0 0 3px #bfdbfe;}
       #panel-s5b .bsc-stp-node.active .bsc-stp-lbl{color:#1d4ed8;font-weight:700;}
+      #panel-s5b .bsc-stp-node.done .bsc-stp-circle{background:#16a34a;color:#fff;}
+      #panel-s5b .bsc-stp-node.done .bsc-stp-lbl{color:#16a34a;}
       #panel-s5b .bsc-stp-node.fail .bsc-stp-circle{background:#dc2626;color:#fff;}
       #panel-s5b .bsc-stp-node.fail .bsc-stp-lbl{color:#dc2626;}
       #panel-s5b .bsc-stp-node.pending .bsc-stp-circle{background:#f1f5f9;color:#94a3b8;border:2px solid #e2e8f0;}
-      #panel-s5b .bsc-stp-node.pending .bsc-stp-lbl{color:#94a3b8;}
       #panel-s5b .bsc-stp-line.done{background:#16a34a;}
-      #panel-s5b .bsc-svc-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s;}
-      #panel-s5b .bsc-svc-card:hover{border-color:#bfdbfe;box-shadow:0 2px 8px rgba(0,0,0,.07);}
-      #panel-s5b .bsc-svc-card.selected{border-color:#2563eb;background:#f0f9ff;}
-      #panel-s5b .bsc-svc-card.blocked{opacity:.55;cursor:not-allowed;background:#fef2f2;border-color:#fca5a5;}
-      #panel-s5b .bsc-check-grp{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;}
-      #panel-s5b .bsc-check-grp-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
-      #panel-s5b .bsc-check-row{font-size:11px;display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f8fafc;}
-      #panel-s5b .bsc-check-row:last-child{border-bottom:none;}
-      #panel-s5b .bsc-sts{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;flex-shrink:0;}
-      #panel-s5b .bsc-sts-pass{background:#dcfce7;color:#166534;}
-      #panel-s5b .bsc-sts-fail{background:#fee2e2;color:#991b1b;}
-      #panel-s5b .bsc-sts-warn{background:#fef9c3;color:#854d0e;}
-      #panel-s5b .bsc-sts-oos{background:#f1f5f9;color:#94a3b8;}
-      #panel-s5b .bsc-sts-pend{background:#eff6ff;color:#1d4ed8;}
-      #panel-s5b .bsc-dur-btn{padding:5px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#f1f5f9;color:#475569;font-size:11px;font-weight:600;cursor:pointer;}
-      #panel-s5b .bsc-dur-active{background:#2563eb!important;color:#fff!important;border-color:#2563eb!important;}
-      #panel-s5b .bsc-ramp-btn{padding:7px 4px;border-radius:6px;border:1px solid #e2e8f0;background:#f1f5f9;color:#374151;font-size:11px;font-weight:700;cursor:pointer;}
-      #panel-s5b .bsc-ramp-btn.active{background:#dc2626;color:#fff;border-color:#dc2626;}
     </style>
 
     <script>
     (function(){
       'use strict';
-      var _b={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},pkg:null,rdns:null,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},logs:[],ev:{},tpct:0};
-      var STEPS=[{n:1,l:'Import UAT'},{n:2,l:'Select Services'},{n:3,l:'Readiness Check'},{n:4,l:'Execute Cutover'},{n:5,l:'Post-Cutover Verify'},{n:6,l:'Operator Decision'},{n:7,l:'Monitoring & Evidence'}];
-      var CL={load_balancer:'LB/HAProxy',api_gateway:'API GW',web_frontend:'Web',api_server:'API',app_server:'App',database:'DB',cache:'Cache',queue:'Queue',worker:'Worker',monitoring:'Monitor',file_storage:'Storage',custom:'Custom'};
-      var CI={load_balancer:'fa-network-wired',api_gateway:'fa-shield-halved',web_frontend:'fa-globe',api_server:'fa-code',app_server:'fa-server',database:'fa-database',cache:'fa-bolt',queue:'fa-right-left',worker:'fa-gears',monitoring:'fa-chart-bar',file_storage:'fa-folder',custom:'fa-box'};
-      function _rs(){var el=document.getElementById('bsc-stepper');if(!el)return;el.innerHTML=STEPS.map(function(s,i){var st=_b.ss[s.n]||'pending';var ic=st==='done'?'<i class="fas fa-check"></i>':st==='fail'?'<i class="fas fa-times"></i>':s.n;return '<div class="bsc-stp"><div class="bsc-stp-node '+st+'" onclick="bscGoStep('+s.n+')" title="'+s.l+'"><div class="bsc-stp-circle">'+ic+'</div><div class="bsc-stp-lbl">'+s.l+'</div></div>'+(i<STEPS.length-1?'<div class="bsc-stp-line'+(st==='done'?' done':'')+'"></div>':'')+'</div>';}).join('');}
-      function _ss(n){
-        _b.step=n;
-        STEPS.forEach(function(s){if(s.n<n&&_b.ss[s.n]!=='fail')_b.ss[s.n]='done';if(s.n===n)_b.ss[s.n]='active';if(s.n>n&&_b.ss[s.n]!=='fail')_b.ss[s.n]='pending';var el=document.getElementById('bsc-s'+s.n);if(el)el.style.display=s.n===n?'':'none';});
-        _rs();var b=document.getElementById('bsc-step-badge');if(b)b.textContent='Step '+n+' — '+STEPS[n-1].l;
+      /* ── State ── */
+      var S={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},
+             pkg:null,rdns:null,tpct:0,verif:null,dec:null,
+             mon:{d:15,r:false,e:0,t:null},ev:{},logs:[]};
 
-        if(n===2)_rc2();if(n===3)_rc3();if(n===4)_rc4();if(n===5)_rc5();if(n===6)_rc6();
+      var STEPS=[{n:1,l:'Import UAT'},{n:2,l:'Select Services'},{n:3,l:'Readiness Check'},
+                 {n:4,l:'Execute Cutover'},{n:5,l:'Post-Verify'},{n:6,l:'Operator Decision'},
+                 {n:7,l:'Monitoring & Evidence'}];
+
+      var CT={load_balancer:{l:'LB/HAProxy',i:'fa-network-wired',c:'#0ea5e9'},
+              api_gateway:{l:'API Gateway',i:'fa-sitemap',c:'#7c3aed'},
+              web_frontend:{l:'Web Frontend',i:'fa-globe',c:'#2563eb'},
+              api_server:{l:'API Server',i:'fa-code',c:'#0891b2'},
+              app_server:{l:'App Server',i:'fa-server',c:'#0284c7'},
+              database:{l:'Database',i:'fa-database',c:'#dc2626'},
+              cache:{l:'Cache',i:'fa-bolt',c:'#d97706'},
+              queue:{l:'Queue',i:'fa-stream',c:'#7c3aed'},
+              worker:{l:'Worker',i:'fa-cog',c:'#475569'},
+              file_storage:{l:'Storage',i:'fa-hdd',c:'#64748b'},
+              monitoring:{l:'Monitoring',i:'fa-chart-line',c:'#10b981'},
+              custom:{l:'Custom',i:'fa-cube',c:'#94a3b8'}};
+
+      /* ── Helpers ── */
+      function $id(id){return document.getElementById(id);}
+      function _lg(m){S.logs.push(m);var e=$id('bsc-log-out');if(e){e.value+='['+new Date().toLocaleTimeString()+'] '+m+'\n';e.scrollTop=e.scrollHeight;}}
+      function _mkS(id,nm,us,rs,own,env,cmps){return{id:id,name:nm,uatStatus:us,riskStatus:rs,owner:own,sourceEnvironment:env&&env[0]||'',targetEnvironment:env&&env[1]||'',selected:false,components:cmps};}
+      function _mkC(id,sid,nm,tp,us,src,tgt,port,extra){return Object.assign({id:id,serviceId:sid,name:nm,type:tp,uatStatus:us,source:src||'',target:tgt||'',ports:[port||0],healthUrl:'',inScope:true,selected:true,riskStatus:'None',owner:'operator',status:'pending',dependencies:[]},extra||{});}
+      function _badge(us,rs){
+        if(us==='Passed'&&rs==='None') return '<span class="bsc-badge bsc-badge-pass"><i class="fas fa-check"></i>PASS</span>';
+        if(us==='Passed'&&rs!=='None') return '<span class="bsc-badge bsc-badge-risk"><i class="fas fa-triangle-exclamation"></i>PASS+RISK</span>';
+        return '<span class="bsc-badge bsc-badge-fail"><i class="fas fa-times"></i>'+us+'</span>';
       }
-      window.bscGoStep=function(n){_ss(n);};
-      function _lg(m){_b.logs.push(m);var e=document.getElementById('bsc-log-out');if(e){e.textContent+='['+new Date().toLocaleTimeString()+'] '+m+'\n';e.scrollTop=e.scrollHeight;}}
-      function _mkS(id,nm,us,rs,own,cmps){return{id:id,name:nm,uatStatus:us,riskStatus:rs,owner:own,selected:false,components:cmps};}
-      function _mkC(id,sid,nm,tp,us,src,tgt,port){return{id:id,sid:sid,name:nm,type:tp,uatStatus:us,source:src,target:tgt,ports:[port],selected:true,riskStatus:'None',owner:'operator',status:'pending'};}
-      window.bscImportUAT=function(){
-        var sEl=document.getElementById('bsc-uat-summary');if(sEl)sEl.innerHTML='<i class="fas fa-spinner fa-spin" style="color:#2563eb;margin-right:6px;"></i> Importing from Stage 3 UAT...';
-        _lg('Importing UAT from Stage 3...');
-        var scope=[];
-        if(window.UAT&&window.UAT.scope&&window.UAT.scope.length){scope=window.UAT.scope;}
-        else if(typeof cutoverBlueGreenRows!=='undefined'&&cutoverBlueGreenRows.length){var wl={};try{wl=JSON.parse(localStorage.getItem('uat_workload_scope')||'null')||{};}catch(e){}scope=cutoverBlueGreenRows.map(function(r,i){return{system_id:'svc-'+i,business_system_name:r.source_server_name||('Service '+(i+1)),source_host:r.source_server_ip||r.source_public_ip||'',target_ip:r.target_server_ip||r.target_public_ip||'',uat_status:'Passed',owner:'operator'};});}
-        if(!scope.length){if(sEl)sEl.innerHTML='<span style="color:#dc2626;"><i class="fas fa-triangle-exclamation"></i> No UAT data in Stage 3. Use <b>Load Sample</b> or complete Stage 3 first.</span>';_lg('No scope found');return;}
-        var wl={};try{wl=JSON.parse(localStorage.getItem('uat_workload_scope')||'null')||{};}catch(e){}
-        var svcs=scope.map(function(r,i){var st=['Passed','passed','pass','PASS'].indexOf(r.uat_status||'Passed')>=0?'Passed':'Failed';var cmps=[_mkC('lb-'+i,'svc-'+i,'LB/HAProxy','load_balancer','Passed',r.source_host||'',r.target_ip||'',80)];if(wl.hasAPI!==false)cmps.push(_mkC('gw-'+i,'svc-'+i,'API GW','api_gateway','Passed',r.source_host||'',r.target_ip||'',443));cmps.push(_mkC('app-'+i,'svc-'+i,'App Server','app_server','Passed',r.source_host||'',r.target_ip||'',8080));if(wl.hasDatabase)cmps.push(_mkC('db-'+i,'svc-'+i,'Database','database',st,r.source_host||'',r.target_ip||'',5432));return _mkS('svc-'+i,r.business_system_name||('Service '+(i+1)),st,'None',r.owner||'operator',cmps);});
-        _b.pkg={migrationId:'MIG-'+new Date().toISOString().slice(0,10),customerName:(scope[0]&&scope[0].business_system_name)||'Customer',importedAt:new Date().toLocaleString(),importedBy:'operator',businessServices:svcs,acceptedRisks:[],evidenceRefs:[],rollbackPlan:'Revert HAProxy to source=100%, flex=0%'};
-        _pic();_lg('Imported '+svcs.length+' service(s)');
-      };
-      window.bscLoadMockPackage=function(){
-        var svcs=[
-          _mkS('svc-001','Mobile Banking App','Passed','None','platform-team',[
-            _mkC('lb-001','svc-001','HAProxy / LB','load_balancer','Passed','192.168.10.1','10.0.10.1',80),
-            _mkC('gw-001','svc-001','API Gateway','api_gateway','Passed','192.168.10.2','10.0.10.2',443),
-            _mkC('web-001','svc-001','Mobile Web Frontend','web_frontend','Passed','192.168.10.3','10.0.10.3',80),
-            _mkC('api-001','svc-001','Core Banking API','api_server','Passed','192.168.10.4','10.0.10.4',8080),
-            _mkC('app-001','svc-001','Banking App Server','app_server','Passed','192.168.10.5','10.0.10.5',8443),
-            _mkC('db-001','svc-001','PostgreSQL (Accounts)','database','Passed','192.168.10.6','10.0.10.6',5432),
-            _mkC('rc-001','svc-001','Redis Cache (Sessions)','cache','Passed','192.168.10.7','10.0.10.7',6379),
-            _mkC('mq-001','svc-001','RabbitMQ (Transactions)','queue','Passed','192.168.10.8','10.0.10.8',5672),
-            _mkC('wk-001','svc-001','Payment Worker','worker','Passed','192.168.10.9','10.0.10.9',0),
-            _mkC('mon-001','svc-001','Prometheus / Grafana','monitoring','Passed','192.168.10.10','10.0.10.10',9090)
-          ]),
-          _mkS('svc-002','Customer Auth Service','Passed','None','security-team',[
-            _mkC('gw-002','svc-002','Auth API Gateway','api_gateway','Passed','192.168.11.1','10.0.11.1',443),
-            _mkC('api-002','svc-002','OAuth2 API Server','api_server','Passed','192.168.11.2','10.0.11.2',8080),
-            _mkC('db-002','svc-002','PostgreSQL (Auth DB)','database','Passed','192.168.11.3','10.0.11.3',5432),
-            _mkC('rc-002','svc-002','Redis (Token Store)','cache','Passed','192.168.11.4','10.0.11.4',6379),
-            _mkC('wk-002','svc-002','Token Refresh Worker','worker','Passed','192.168.11.5','10.0.11.5',0)
-          ]),
-          _mkS('svc-003','Payment Processing','Passed','Accepted Risk','payments-team',[
-            _mkC('api-003','svc-003','Payment API','api_server','Passed','192.168.12.1','10.0.12.1',8080),
-            _mkC('app-003','svc-003','Payment App Server','app_server','Passed','192.168.12.2','10.0.12.2',8443),
-            _mkC('db-003','svc-003','PostgreSQL (Ledger)','database','Passed','192.168.12.3','10.0.12.3',5432),
-            _mkC('mq-003','svc-003','Kafka (Payment Events)','queue','Accepted Risk','192.168.12.4','10.0.12.4',9092),
-            _mkC('wk-003','svc-003','Settlement Worker','worker','Passed','192.168.12.5','10.0.12.5',0),
-            _mkC('rc-003','svc-003','Redis (Rate Limiting)','cache','Passed','192.168.12.6','10.0.12.6',6379)
-          ]),
-          _mkS('svc-004','Notification Service','Passed','None','platform-team',[
-            _mkC('api-004','svc-004','Notification API','api_server','Passed','192.168.13.1','10.0.13.1',8080),
-            _mkC('mq-004','svc-004','RabbitMQ (Alerts)','queue','Passed','192.168.13.2','10.0.13.2',5672),
-            _mkC('wk-004','svc-004','Email Worker','worker','Passed','192.168.13.3','10.0.13.3',0),
-            _mkC('wk-005','svc-004','SMS Worker','worker','Passed','192.168.13.4','10.0.13.4',0),
-            _mkC('rc-004','svc-004','Redis (Dedup Cache)','cache','Passed','192.168.13.5','10.0.13.5',6379)
-          ])
-        ];
-        _b.pkg={
-          migrationId:'MIG-BANK-MOBILE-001',
-          customerName:'BankCore Mobile Platform',
-          uatRunId:'UAT-2026-06-29-PASS',
-          importedAt:new Date().toLocaleString(),
-          importedBy:'platform-team',
-          businessServices:svcs,
-          acceptedRisks:['Kafka replication lag <50ms during cutover window — accepted by payments-team'],
-          evidenceRefs:['UAT Run #2026-06-29 (47 tests passed, 0 failed)','Performance baseline report','Security scan'],
-          rollbackPlan:'haproxy-rollback.sh --env=prod  (revert OSPC=100% FLEX=0%)'
-        };
-        _pic();
-        _lg('Banking Mobile App loaded ('+svcs.length+' services, '+svcs.reduce(function(a,s){return a+s.components.length;},0)+' components)');
-      };
+      function _ctLbl(tp){return (CT[tp]||CT.custom).l;}
+      function _ctIco(tp){return (CT[tp]||CT.custom).i;}
+      function _ctClr(tp){return (CT[tp]||CT.custom).c;}
 
-      window.bscReset=function(){if(!confirm('Reset all progress?'))return;_b={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},pkg:null,rdns:null,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},logs:[],ev:{},tpct:0};['bsc-pkg-badge','bsc-decision-badge','bsc-import-pkg-card','bsc-readiness-summary','bsc-verify-summary','bsc-decision-confirm','bsc-final-result','bsc-monitor-progress'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none';});var lo=document.getElementById('bsc-log-out');if(lo)lo.textContent='';var le=document.getElementById('bsc-exec-log-out');if(le)le.textContent='Awaiting cutover execution...';var su=document.getElementById('bsc-uat-summary');if(su)su.innerHTML='<span style="color:#94a3b8;">No UAT package imported yet</span>';var adv=document.getElementById('co-adv-dash'),home=document.getElementById('co-adv-home');if(adv&&home&&adv.parentNode!==home){home.appendChild(adv);var sv=localStorage.getItem('cutoverDashboardMode');adv.style.display=(sv==='advanced')?'block':'none';}_ss(1);};
-      window.bscOnActivate=function(){
-        if(_b.step===1||!_b.pkg)_ss(1); else _rs(); /* re-render stepper now panel is visible */
-        if(!_b.pkg){
-          var hasScope=false;
-          if(window.UAT&&window.UAT.scope&&window.UAT.scope.length) hasScope=true;
-          if(!hasScope&&typeof cutoverBlueGreenRows!=='undefined'&&cutoverBlueGreenRows.length) hasScope=true;
-          setTimeout(function(){
-            if(hasScope){ _lg('Auto-importing from Stage 3 UAT...'); bscImportUAT(); }
-            else { _lg('Preloading Banking Mobile App sample...'); bscLoadMockPackage(); }
-          },300);
-        }
-      };
-      /* ── _pic: render imported package summary in step 1 ── */
-      function _pic(){
-        var pkg=_b.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices||[];
-        var tot=svcs.reduce(function(a,s){return a+s.components.length;},0);
-        var su=document.getElementById('bsc-uat-summary');
-        if(su){
-          var passed=svcs.filter(function(s){return s.uatStatus==='Passed';}).length;
-          var risks=pkg.acceptedRisks&&pkg.acceptedRisks.length?pkg.acceptedRisks.length:0;
-          su.innerHTML='<div style="width:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
-            +'<span style="background:#eff6ff;color:#1d4ed8;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:4px;"></i>'+passed+' / '+svcs.length+' Services Passed</span>'
-            +'<span style="background:#f0fdf4;color:#16a34a;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;"><i class="fas fa-cubes" style="margin-right:4px;"></i>'+tot+' Components</span>'
-            +(risks?'<span style="background:#fef9c3;color:#a16207;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;"><i class="fas fa-triangle-exclamation" style="margin-right:4px;"></i>'+risks+' Risk(s)</span>':'')
-            +'<span style="font-size:11px;color:#64748b;margin-left:4px;">'+pkg.customerName+' &mdash; '+pkg.uatRunId+'</span>'
-            +'</div>';
-        }
-        _b.ss[1]='done';_rs();
-        setTimeout(function(){_ss(2);},500);
-      }
-
-      /* ── _rc2: render service selection cards ── */
-      function _rc2(){
-        var pkg=_b.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices||[];
-        var el=document.getElementById('bsc-svc-cards');
-        if(!el)return;
-        el.innerHTML=svcs.map(function(s,i){
-          var passed=s.uatStatus==='Passed';
-          var clr=passed?'#16a34a':'#dc2626';
-          var bg=passed?'#f0fdf4':'#fef2f2';
-          var cmps=s.components.map(function(c){
-            return '<span style="font-size:10px;padding:2px 7px;background:#fff;border:1px solid #e2e8f0;border-radius:4px;color:#475569;">'+c.name+'</span>';
-          }).join('');
-          return '<div class="bsc-svc-card" style="border-left:4px solid '+clr+';background:'+bg+';cursor:pointer;" onclick="bscToggleSvc('+i+',this)">'
-            +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-            +'<input type="checkbox" '+(s.selected?'checked':'')
-            +' onchange="bscToggleSvc('+i+',null,this.checked);event.stopPropagation();" style="width:15px;height:15px;cursor:pointer;accent-color:'+clr+';">'
-            +'<div style="font-size:13px;font-weight:700;color:#1e293b;flex:1;">'+s.name+'</div>'
-            +'<span style="font-size:10px;font-weight:700;color:'+clr+';">'+s.uatStatus+'</span>'
+      /* ── Stepper render ── */
+      function _rs(){
+        var el=$id('bsc-stepper');if(!el)return;
+        el.innerHTML=STEPS.map(function(s,i){
+          var st=S.ss[s.n]||'pending';
+          var ic=st==='done'?'<i class="fas fa-check"></i>':st==='fail'?'<i class="fas fa-times"></i>':s.n;
+          return '<div class="bsc-stp">'
+            +'<div class="bsc-stp-node '+st+'" onclick="bscGoStep('+s.n+')" title="'+s.l+'">'
+            +'<div class="bsc-stp-circle">'+ic+'</div>'
+            +'<div class="bsc-stp-lbl">'+s.l+'</div>'
             +'</div>'
-            +'<div style="font-size:10px;color:#64748b;margin-bottom:6px;">Owner: <b>'+s.owner+'</b> | Risk: '+s.riskStatus+'</div>'
-            +'<div style="display:flex;flex-wrap:wrap;gap:4px;">'+cmps+'</div>'
+            +(i<STEPS.length-1?'<div class="bsc-stp-line'+(st==='done'?' done':'')+'"></div>':'')
             +'</div>';
         }).join('');
-        /* update proceed button */
+      }
+
+      /* ── Set step ── */
+      function _ss(n){
+        S.step=n;
+        STEPS.forEach(function(s){
+          if(s.n<n&&S.ss[s.n]!=='fail')S.ss[s.n]='done';
+          if(s.n===n)S.ss[s.n]='active';
+          if(s.n>n&&S.ss[s.n]!=='fail')S.ss[s.n]='pending';
+          var el=$id('bsc-s'+s.n);if(el)el.style.display=s.n===n?'':'none';
+        });
+        _rs();
+        var b=$id('bsc-step-badge');if(b)b.textContent='Step '+n+' — '+STEPS[n-1].l;
+        if(n===2)_rc2();
+        if(n===3)_rc3();
+        if(n===4)_rc4();
+        if(n===5)_rc5();
+        if(n===6)_rc6();
+      }
+      window.bscGoStep=function(n){_ss(n);};
+
+      /* ── Step 1: Import UAT ── */
+      function _pic(){
+        var pkg=S.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices||[];
+        var tot=svcs.reduce(function(a,s){return a+(s.components?s.components.length:0);},0);
+        var passed=svcs.filter(function(s){return s.uatStatus==='Passed';}).length;
+        var risks=pkg.acceptedRisks&&pkg.acceptedRisks.length||0;
+        var su=$id('bsc-uat-summary');
+        if(su)su.innerHTML='<div style="width:100%;">'
+          +'<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">'+pkg.customerName+'</div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+          +'<span class="bsc-badge bsc-badge-pass"><i class="fas fa-layer-group"></i>'+passed+'/'+svcs.length+' Services</span>'
+          +'<span class="bsc-badge" style="background:#eff6ff;color:#1d4ed8;"><i class="fas fa-cubes"></i>'+tot+' Components</span>'
+          +(risks?'<span class="bsc-badge bsc-badge-risk"><i class="fas fa-triangle-exclamation"></i>'+risks+' Risk(s)</span>':'')
+          +'<span class="bsc-badge bsc-badge-scope">'+pkg.uatRunId+'</span>'
+          +'</div>'
+          +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Imported '+pkg.importedAt+'</div>'
+          +'</div>';
+        var pb=$id('bsc-pkg-badge');
+        if(pb){pb.style.display='inline-flex';pb.textContent=pkg.migrationId;}
+        S.ss[1]='done';_rs();
+        setTimeout(function(){_ss(2);},400);
+      }
+
+      window.bscImportUAT=function(){
+        var sEl=$id('bsc-uat-summary');
+        if(sEl)sEl.innerHTML='<i class="fas fa-spinner fa-spin" style="color:#2563eb;margin-right:6px;"></i> Importing from Stage 3 UAT…';
+        _lg('Importing UAT package from Stage 3…');
+        var scope=[];
+        if(window.UAT&&window.UAT.scope&&window.UAT.scope.length){scope=window.UAT.scope;}
+        else if(typeof cutoverBlueGreenRows!=='undefined'&&cutoverBlueGreenRows.length){
+          scope=cutoverBlueGreenRows.map(function(r,i){return{system_id:'svc-'+i,business_system_name:r.source_server_name||('Service '+(i+1)),source_host:r.source_server_ip||'',target_ip:r.target_server_ip||'',uat_status:'Passed',owner:'operator'};});
+        }
+        if(!scope.length){
+          if(sEl)sEl.innerHTML='<span style="color:#dc2626;"><i class="fas fa-triangle-exclamation"></i> No UAT-approved services found. Complete Stage 3 first or use <b>Load Sample</b>.</span>';
+          _lg('No UAT scope found');return;
+        }
+        var svcs=scope.map(function(r,i){
+          var st=['Passed','passed','pass','PASS'].indexOf(r.uat_status||'Passed')>=0?'Passed':'Failed';
+          return _mkS('svc-'+i,r.business_system_name||('Service '+(i+1)),st,'None',r.owner||'operator',[r.source_host,r.target_ip],[
+            _mkC('lb-'+i,'svc-'+i,'LB/HAProxy','load_balancer',st,r.source_host,r.target_ip,80),
+            _mkC('gw-'+i,'svc-'+i,'API Gateway','api_gateway',st,r.source_host,r.target_ip,443),
+            _mkC('app-'+i,'svc-'+i,'App Server','app_server',st,r.source_host,r.target_ip,8080),
+            _mkC('db-'+i,'svc-'+i,'Database','database',st,r.source_host,r.target_ip,5432)
+          ]);
+        });
+        S.pkg={migrationId:'MIG-'+new Date().toISOString().slice(0,10),customerName:(scope[0]&&scope[0].business_system_name)||'Customer',
+               uatRunId:'UAT-'+new Date().toISOString().slice(0,10),importedAt:new Date().toLocaleString(),
+               importedBy:'operator',businessServices:svcs,acceptedRisks:[],evidenceRefs:[],
+               rollbackPlan:'Revert HAProxy: OSPC=100%, FLEX=0%'};
+        _pic();_lg('Imported '+svcs.length+' service(s) from Stage 3');
+      };
+
+      window.bscLoadMockPackage=function(){
+        var svcs=[
+          _mkS('svc-001','Mobile Banking App','Passed','None','platform-team',['192.168.10.0','10.0.10.0'],[
+            _mkC('lb-001','svc-001','HAProxy / LB','load_balancer','Passed','192.168.10.1','10.0.10.1',80,{healthUrl:'http://192.168.10.1:8404/stats'}),
+            _mkC('gw-001','svc-001','API Gateway','api_gateway','Passed','192.168.10.2','10.0.10.2',443,{healthUrl:'https://10.0.10.2/health',apiBaseUrl:'https://10.0.10.2/api'}),
+            _mkC('web-001','svc-001','Mobile Web Frontend','web_frontend','Passed','192.168.10.3','10.0.10.3',80,{healthUrl:'http://10.0.10.3/'}),
+            _mkC('api-001','svc-001','Core Banking API','api_server','Passed','192.168.10.4','10.0.10.4',8080,{healthUrl:'http://10.0.10.4:8080/health',apiBaseUrl:'http://10.0.10.4:8080/api/v1'}),
+            _mkC('app-001','svc-001','Banking App Server','app_server','Passed','192.168.10.5','10.0.10.5',8443),
+            _mkC('db-001','svc-001','PostgreSQL (Accounts)','database','Passed','192.168.10.6','10.0.10.6',5432,{dbEngine:'PostgreSQL 15'}),
+            _mkC('rc-001','svc-001','Redis Cache (Sessions)','cache','Passed','192.168.10.7','10.0.10.7',6379,{cacheType:'Redis 7'}),
+            _mkC('mq-001','svc-001','RabbitMQ (Transactions)','queue','Passed','192.168.10.8','10.0.10.8',5672,{queueType:'RabbitMQ 3.12'}),
+            _mkC('wk-001','svc-001','Payment Worker','worker','Passed','192.168.10.9','10.0.10.9',0),
+            _mkC('mon-001','svc-001','Prometheus / Grafana','monitoring','Passed','192.168.10.10','10.0.10.10',9090,{healthUrl:'http://10.0.10.10:9090/-/healthy'})
+          ]),
+          _mkS('svc-002','Customer Auth Service','Passed','None','security-team',['192.168.11.0','10.0.11.0'],[
+            _mkC('gw-002','svc-002','Auth API Gateway','api_gateway','Passed','192.168.11.1','10.0.11.1',443,{healthUrl:'https://10.0.11.1/health'}),
+            _mkC('api-002','svc-002','OAuth2 API Server','api_server','Passed','192.168.11.2','10.0.11.2',8080,{healthUrl:'http://10.0.11.2:8080/health'}),
+            _mkC('db-002','svc-002','PostgreSQL (Auth DB)','database','Passed','192.168.11.3','10.0.11.3',5432,{dbEngine:'PostgreSQL 15'}),
+            _mkC('rc-002','svc-002','Redis (Token Store)','cache','Passed','192.168.11.4','10.0.11.4',6379,{cacheType:'Redis 7'}),
+            _mkC('wk-002','svc-002','Token Refresh Worker','worker','Passed','192.168.11.5','10.0.11.5',0)
+          ]),
+          _mkS('svc-003','Payment Processing','Passed','Accepted Risk','payments-team',['192.168.12.0','10.0.12.0'],[
+            _mkC('api-003','svc-003','Payment API','api_server','Passed','192.168.12.1','10.0.12.1',8080,{healthUrl:'http://10.0.12.1:8080/health',apiBaseUrl:'http://10.0.12.1:8080/api/v2'}),
+            _mkC('app-003','svc-003','Payment App Server','app_server','Passed','192.168.12.2','10.0.12.2',8443),
+            _mkC('db-003','svc-003','PostgreSQL (Ledger)','database','Passed','192.168.12.3','10.0.12.3',5432,{dbEngine:'PostgreSQL 15'}),
+            _mkC('mq-003','svc-003','Kafka (Payment Events)','queue','Passed','192.168.12.4','10.0.12.4',9092,{queueType:'Kafka 3.6',riskStatus:'Accepted Risk'}),
+            _mkC('wk-003','svc-003','Settlement Worker','worker','Passed','192.168.12.5','10.0.12.5',0),
+            _mkC('rc-003','svc-003','Redis (Rate Limiting)','cache','Passed','192.168.12.6','10.0.12.6',6379,{cacheType:'Redis 7'})
+          ]),
+          _mkS('svc-004','Notification Service','Passed','None','platform-team',['192.168.13.0','10.0.13.0'],[
+            _mkC('api-004','svc-004','Notification API','api_server','Passed','192.168.13.1','10.0.13.1',8080,{healthUrl:'http://10.0.13.1:8080/health'}),
+            _mkC('mq-004','svc-004','RabbitMQ (Alerts)','queue','Passed','192.168.13.2','10.0.13.2',5672,{queueType:'RabbitMQ 3.12'}),
+            _mkC('wk-004','svc-004','Email Worker','worker','Passed','192.168.13.3','10.0.13.3',0),
+            _mkC('wk-005','svc-004','SMS Worker','worker','Passed','192.168.13.4','10.0.13.4',0),
+            _mkC('rc-004','svc-004','Redis (Dedup Cache)','cache','Passed','192.168.13.5','10.0.13.5',6379,{cacheType:'Redis 7'})
+          ])
+        ];
+        S.pkg={migrationId:'MIG-BANK-MOBILE-001',customerName:'BankCore Mobile Platform',
+               uatRunId:'UAT-2026-06-29-PASS',importedAt:new Date().toLocaleString(),
+               importedBy:'platform-team',businessServices:svcs,
+               acceptedRisks:['Kafka replication lag <50ms during cutover window — accepted by payments-team'],
+               evidenceRefs:['UAT Run #2026-06-29 (47 tests passed, 0 failed)','Performance baseline report','Security scan'],
+               rollbackPlan:'haproxy-rollback.sh --env=prod  (revert OSPC=100% FLEX=0%)'};
+        _pic();
+        _lg('Sample: BankCore Mobile Platform ('+svcs.length+' services, '+svcs.reduce(function(a,s){return a+s.components.length;},0)+' components)');
+      };
+
+      /* ── Step 2: Select Business Services ── */
+      function _rc2(){
+        var pkg=S.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices||[];
+        var el=$id('bsc-svc-cards');if(!el)return;
+        el.innerHTML=svcs.map(function(s,i){
+          var pass=s.uatStatus==='Passed';
+          var risk=s.riskStatus&&s.riskStatus!=='None';
+          var bc=pass?(risk?'#d97706':'#16a34a'):'#dc2626';
+          var cmps=s.components||[];
+          var compPills=cmps.map(function(c){
+            return '<span class="bsc-comp-pill"><i class="fas '+_ctIco(c.type)+'" style="color:'+_ctClr(c.type)+';font-size:9px;"></i>'+_ctLbl(c.type)+'</span>';
+          }).join('');
+          var sel=s.selected;
+          return '<div class="bsc-svc-card'+(sel?' selected':'')+'" id="bsc-svc-'+i+'" onclick="bscToggleSvc('+i+')">'
+            +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+            +'<input type="checkbox" '+(sel?'checked':'')
+            +' onclick="event.stopPropagation();bscToggleSvc('+i+',null,this.checked);"'
+            +' style="width:15px;height:15px;cursor:pointer;margin-top:1px;accent-color:'+bc+';">'
+            +'<div style="flex:1;">'
+            +'<div style="font-size:13px;font-weight:700;color:#1e293b;">'+s.name+'</div>'
+            +'<div style="font-size:10px;color:#64748b;margin-top:1px;">'+s.owner+' &middot; '+cmps.length+' components</div>'
+            +'</div>'
+            +_badge(s.uatStatus,s.riskStatus)
+            +'</div>'
+            +(risk?'<div class="bsc-badge bsc-badge-risk" style="margin-bottom:6px;"><i class="fas fa-triangle-exclamation"></i> '+s.riskStatus+'</div>':'')
+            +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">'+compPills+'</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">'
+            +'<div style="font-size:10px;color:#64748b;"><i class="fas fa-circle-dot" style="color:#dc2626;font-size:8px;"></i> '+s.sourceEnvironment+'</div>'
+            +'<div style="font-size:10px;color:#64748b;"><i class="fas fa-circle-dot" style="color:#16a34a;font-size:8px;"></i> '+s.targetEnvironment+'</div>'
+            +'</div>'
+            +'</div>';
+        }).join('');
+        _renderSvcTable(svcs);
         _rc2Btn();
       }
+      function _renderSvcTable(svcs){
+        var tb=$id('bsc-svc-table-body');if(!tb)return;
+        var rows=[];
+        svcs.forEach(function(s,si){
+          rows.push('<tr style="background:#f8fafc;font-weight:600;">'
+            +'<td><input type="checkbox" '+(s.selected?'checked':'')
+            +' onchange="bscToggleSvc('+si+',null,this.checked);" style="accent-color:#2563eb;"></td>'
+            +'<td colspan="8" style="color:#1e293b;">'+s.name+' '+_badge(s.uatStatus,s.riskStatus)+'</td>'
+            +'</tr>');
+          (s.components||[]).forEach(function(c){
+            rows.push('<tr>'
+              +'<td></td>'
+              +'<td style="padding-left:20px;"><i class="fas '+_ctIco(c.type)+'" style="color:'+_ctClr(c.type)+';margin-right:4px;"></i>'+c.name+'</td>'
+              +'<td><span class="bsc-comp-pill">'+_ctLbl(c.type)+'</span></td>'
+              +'<td>'+_badge(c.uatStatus,'None')+'</td>'
+              +'<td style="font-size:10px;color:#64748b;">'+c.source+'</td>'
+              +'<td style="font-size:10px;color:#64748b;">'+c.target+'</td>'
+              +'<td style="font-size:10px;color:#0ea5e9;">'+(c.healthUrl?'<a href="'+c.healthUrl+'" target="_blank" style="color:#0ea5e9;">health</a>':'—')+'</td>'
+              +'<td>'+_badge(c.uatStatus,c.riskStatus||'None')+'</td>'
+              +'<td style="font-size:10px;color:#64748b;">'+c.owner+'</td>'
+              +'</tr>');
+          });
+        });
+        tb.innerHTML=rows.join('');
+      }
       function _rc2Btn(){
-        var pkg=_b.pkg;if(!pkg)return;
+        var pkg=S.pkg;if(!pkg)return;
         var sel=pkg.businessServices.filter(function(s){return s.selected;}).length;
-        var btn=document.getElementById('bsc-to-s3-btn');
+        var btn=$id('bsc-to-s3-btn');
         if(btn){btn.disabled=sel===0;btn.style.opacity=sel?'1':'0.5';}
       }
-      window.bscToggleSvc=function(i,card,checked){
-        var pkg=_b.pkg;if(!pkg)return;
+      window.bscToggleSvc=function(i,el,checked){
+        var pkg=S.pkg;if(!pkg)return;
         var s=pkg.businessServices[i];if(!s)return;
-        if(typeof checked==='boolean') s.selected=checked;
-        else s.selected=!s.selected;
+        s.selected=(typeof checked==='boolean')?checked:!s.selected;
         _rc2();
       };
       window.bscSelectAllPass=function(){
-        var pkg=_b.pkg;if(!pkg)return;
+        var pkg=S.pkg;if(!pkg)return;
         pkg.businessServices.forEach(function(s){s.selected=s.uatStatus==='Passed';});
-        _rc2();_lg('Selected all UAT-passed services');
+        _rc2();_lg('Selected all UAT-passed business services');
       };
       window.bscToggleComponents=function(){
-        var cards=document.getElementById('bsc-svc-cards');
-        var table=document.getElementById('bsc-svc-table-wrap');
-        var btn=document.getElementById('bsc-toggle-comp-btn');
+        var cards=$id('bsc-svc-cards'),table=$id('bsc-svc-table-wrap');
+        var btn=$id('bsc-toggle-comp-btn');
         var show=table&&table.style.display==='none';
         if(cards)cards.style.display=show?'none':'grid';
         if(table)table.style.display=show?'block':'none';
         if(btn)btn.innerHTML=show?'<i class="fas fa-th-large"></i> Card View':'<i class="fas fa-list"></i> Expand Components';
       };
 
-      /* ── _rc3: render readiness check groups ── */
+      /* ── Step 3: Readiness Check ── */
       function _rc3(){
-        var pkg=_b.pkg;if(!pkg)return;
-        var el=document.getElementById('bsc-readiness-groups');
-        if(!el)return;
-        var checks=[
-          {g:'Connectivity',icon:'fa-network-wired',color:'#2563eb',items:['Source reachable','Target reachable','Port scan clear','DNS resolves']},
-          {g:'Database',icon:'fa-database',color:'#7c3aed',items:['Replica lag <1s','Schema matched','Backup verified','Connections healthy']},
-          {g:'Application',icon:'fa-server',color:'#0ea5e9',items:['Health endpoint OK','Config verified','Secrets mounted','Startup time OK']},
-          {g:'Traffic',icon:'fa-traffic-light',color:'#dc2626',items:['HAProxy reachable','SSL cert valid','Load balanced','Rollback tested']}
+        var pkg=S.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var el=$id('bsc-readiness-groups');if(!el)return;
+        /* Determine which component types are in scope */
+        var inScope={};
+        svcs.forEach(function(s){(s.components||[]).forEach(function(c){inScope[c.type]=true;});});
+        var GROUPS=[
+          {k:'global',l:'Global',ic:'fa-globe',c:'#2563eb',checks:['UAT package valid','Rollback plan present','No open critical blockers','Operator acknowledged']},
+          {k:'load_balancer',l:'LB / HAProxy',ic:'fa-network-wired',c:'#0ea5e9',checks:['HAProxy reachable','Backend pool visible','Target backend exists','Health checks green','Rollback route available']},
+          {k:'api_gateway',l:'API Gateway',ic:'fa-sitemap',c:'#7c3aed',checks:['Gateway reachable','TLS certificate valid','Health endpoint responds','Routing to backend works','No 5xx from gateway health']},
+          {k:'web_frontend',l:'Web / App',ic:'fa-globe',c:'#2563eb',checks:['Required ports open','Health URL responds','App process running','Static assets reachable']},
+          {k:'api_server',l:'API Server',ic:'fa-code',c:'#0891b2',checks:['API base URL reachable','GET /health responds','GET /ready responds','Auth endpoint available']},
+          {k:'database',l:'Database',ic:'fa-database',c:'#dc2626',checks:['DB host reachable','DB port open','DB connect works','Read query works','Replication status healthy']},
+          {k:'cache',l:'Cache',ic:'fa-bolt',c:'#d97706',checks:['Cache reachable','PING works','SET/GET smoke test','TTL check works']},
+          {k:'queue',l:'Queue',ic:'fa-stream',c:'#7c3aed',checks:['Broker reachable','Queue/topic exists','Queue depth readable','Publish/consume test']},
+          {k:'worker',l:'Worker',ic:'fa-cog',c:'#475569',checks:['Worker process running','Queue consumer connected','Last heartbeat recent','No critical worker errors']},
+          {k:'monitoring',l:'Monitoring',ic:'fa-chart-line',c:'#10b981',checks:['Monitoring endpoint reachable','Logs accessible','No active critical alerts']}
         ];
-        el.innerHTML=checks.map(function(c){
-          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">'
-            +'<div style="font-size:11px;font-weight:700;color:'+c.color+';margin-bottom:10px;"><i class="fas '+c.icon+'" style="margin-right:5px;"></i>'+c.g+'</div>'
-            +'<div id="bsc-rdns-'+c.g.toLowerCase()+'">'+c.items.map(function(it){
-              return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;color:#94a3b8;">'
-                +'<i class="fas fa-circle" style="font-size:6px;"></i>'+it+'</div>';
+        el.innerHTML=GROUPS.map(function(g){
+          var os=g.k==='global'||inScope[g.k];
+          return '<div class="bsc-card" style="'+(os?'':'opacity:.5;')+'">'
+            +'<div class="bsc-card-title" style="color:'+g.c+'"><i class="fas '+g.ic+'"></i> '+g.l
+            +(os?'':'<span class="bsc-badge bsc-badge-scope" style="margin-left:auto;">Out of Scope</span>')+'</div>'
+            +'<div id="bsc-rdns-'+g.k+'">'+g.checks.map(function(ch){
+              return '<div class="bsc-check-row '+(os?'':'bsc-scope-gray')+'" style="color:'+(os?'#94a3b8':'#cbd5e1')+';">'
+                +'<i class="fas fa-circle" style="font-size:5px;margin-top:3px;"></i>'+ch+'</div>';
             }).join('')+'</div>'
             +'</div>';
         }).join('');
-        var btn=document.getElementById('bsc-to-s4-btn');
-        if(btn){btn.disabled=true;btn.style.opacity='0.5';}
+        var btn=$id('bsc-to-s4-btn');if(btn){btn.disabled=true;btn.style.opacity='0.5';}
       }
       window.bscRunReadiness=function(){
-        var el=document.getElementById('bsc-readiness-groups');
-        if(!el)return;
-        var btn=document.getElementById('bsc-readiness-btn');
-        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Running...';}
-        _lg('Running quick readiness checks...');
-        var checks=['connectivity','database','application','traffic'];
-        var delay=0;
-        checks.forEach(function(g){
-          var group=document.getElementById('bsc-rdns-'+g);
-          if(!group)return;
-          var rows=group.querySelectorAll('div');
-          rows.forEach(function(row,i){
-            delay+=220;
+        var pkg=S.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var inScope={};
+        svcs.forEach(function(s){(s.components||[]).forEach(function(c){inScope[c.type]=true;});});
+        var btn=$id('bsc-readiness-btn');
+        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Running…';}
+        _lg('Running quick readiness check for '+svcs.length+' service(s)…');
+        var GROUPS=['global','load_balancer','api_gateway','web_frontend','api_server','database','cache','queue','worker','monitoring'];
+        var delay=0;var warns=0;var fails=0;
+        GROUPS.forEach(function(gk){
+          var el=$id('bsc-rdns-'+gk);if(!el)return;
+          var os=gk==='global'||inScope[gk];
+          if(!os)return;
+          el.querySelectorAll('.bsc-check-row').forEach(function(row){
+            delay+=200;
             setTimeout(function(){
-              var pass=Math.random()>0.08;
-              row.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:'+(pass?'#16a34a':'#dc2626')+';">'
-                +'<i class="fas '+(pass?'fa-check-circle':'fa-times-circle')+'"></i>'
-                +row.textContent.trim()+'</div>';
+              var r=Math.random();
+              var st=r>0.1?'pass':r>0.05?'warn':'fail';
+              if(st==='warn')warns++;if(st==='fail')fails++;
+              var clr=st==='pass'?'#16a34a':st==='warn'?'#d97706':'#dc2626';
+              var ic=st==='pass'?'fa-check-circle':st==='warn'?'fa-exclamation-circle':'fa-times-circle';
+              row.innerHTML='<i class="fas '+ic+'" style="color:'+clr+';"></i><span style="color:'+clr+';">'+row.textContent.trim()+'</span>';
             },delay);
           });
         });
         setTimeout(function(){
-          _b.rdns={passed:true,ts:new Date().toLocaleString()};
-          var sumEl=document.getElementById('bsc-readiness-summary');
+          S.rdns={passed:fails===0,warns:warns,fails:fails,ts:new Date().toLocaleString()};
+          var sumEl=$id('bsc-readiness-summary');
           if(sumEl){
             sumEl.style.display='block';
-            sumEl.style.background='#f0fdf4';sumEl.style.border='1px solid #bbf7d0';sumEl.style.borderRadius='8px';sumEl.style.padding='14px 18px';
-            sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>Readiness checks complete — all systems GO</span>';
+            if(fails===0&&warns===0){
+              sumEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;';
+              sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>All readiness checks passed — system GO for cutover</span>';
+              var toBtn=$id('bsc-to-s4-btn');if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
+            } else if(warns>0&&fails===0){
+              sumEl.style.cssText='display:block;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;';
+              sumEl.innerHTML='<span style="color:#d97706;font-weight:700;"><i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>'+warns+' warning(s) — acknowledge to proceed</span>';
+              var rBtn=$id('bsc-accept-risk-btn');if(rBtn)rBtn.style.display='inline-flex';
+            } else {
+              sumEl.style.cssText='display:block;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;';
+              sumEl.innerHTML='<span style="color:#dc2626;font-weight:700;"><i class="fas fa-times-circle" style="margin-right:6px;"></i>'+fails+' check(s) failed — fix before cutover or accept risk</span>';
+              var rBtn2=$id('bsc-accept-risk-btn');if(rBtn2)rBtn2.style.display='inline-flex';
+            }
           }
-          var toBtn=document.getElementById('bsc-to-s4-btn');
-          if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
           if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-redo"></i> Re-run';}
-          _b.ss[3]='done';_rs();
-          _lg('Readiness: all checks passed');
+          _lg('Readiness: '+fails+' fail(s), '+warns+' warning(s)');
         },delay+300);
       };
       window.bscAcceptReadinessRisk=function(){
-        _b.rdns={passed:true,acceptedRisk:true,ts:new Date().toLocaleString()};
-        var toBtn=document.getElementById('bsc-to-s4-btn');
-        if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
-        var rBtn=document.getElementById('bsc-accept-risk-btn');
-        if(rBtn)rBtn.style.display='none';
-        _b.ss[3]='done';_rs();
-        _ss(4);
+        S.rdns={passed:true,acceptedRisk:true,ts:new Date().toLocaleString()};
+        var toBtn=$id('bsc-to-s4-btn');if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
+        var rBtn=$id('bsc-accept-risk-btn');if(rBtn)rBtn.style.display='none';
+        S.ss[3]='done';_rs();_ss(4);
+        _lg('Readiness risk accepted — proceeding to cutover');
       };
 
-      /* ── _rc4: traffic ramp ── */
+      /* ── Step 4: Execute Cutover ── */
       function _rc4(){
-        _b.tpct=_b.tpct||0;
-        _updateTrafficUI(_b.tpct);
+        S.tpct=S.tpct||0;
+        _updateTrafficUI(S.tpct);
+        var pkg=S.pkg;if(!pkg)return;
+        var el=$id('bsc-s4-services');if(!el)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        el.innerHTML=svcs.map(function(s){
+          var cmps=s.components||[];
+          var inScope={};cmps.forEach(function(c){inScope[c.type]=true;});
+          var pills=Object.keys(inScope).map(function(t){
+            return '<span class="bsc-comp-pill"><i class="fas '+_ctIco(t)+'" style="color:'+_ctClr(t)+';font-size:9px;"></i>'+_ctLbl(t)+'</span>';
+          }).join('');
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">'
+            +'<i class="fas fa-layer-group" style="color:#2563eb;"></i>'
+            +'<div style="flex:1;font-size:12px;font-weight:600;color:#1e293b;">'+s.name+'</div>'
+            +'<div style="display:flex;flex-wrap:wrap;gap:3px;">'+pills+'</div>'
+            +'</div>';
+        }).join('');
       }
       function _updateTrafficUI(pct){
-        var src=document.getElementById('bsc-src-pct');
-        var tgt=document.getElementById('bsc-tgt-pct');
-        var bar=document.getElementById('bsc-traffic-bar');
-        var st=document.getElementById('bsc-traffic-status');
+        var src=$id('bsc-src-pct'),tgt=$id('bsc-tgt-pct'),bar=$id('bsc-traffic-bar'),st=$id('bsc-traffic-status');
         if(src)src.textContent=(100-pct)+'%';
         if(tgt)tgt.textContent=pct+'%';
         if(bar)bar.style.width=pct+'%';
         if(st){
-          if(pct===0)st.textContent='No traffic shifted yet';
-          else if(pct<100)st.textContent='Traffic ramp in progress — '+pct+'% on FLEX';
+          if(pct===0)st.textContent='Awaiting traffic switch';
+          else if(pct<100)st.textContent='Traffic ramp in progress — '+pct+'% on FLEX target';
           else st.textContent='100% traffic on FLEX — cutover complete';
         }
+        var mm=$id('bsc-traffic-metrics');
+        if(mm&&pct>0){
+          var h2xx=Math.round(95+Math.random()*4);
+          var e5xx=Math.round(Math.random()*2);
+          var p95=Math.round(80+Math.random()*40);
+          mm.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'
+            +_metricBox('2xx Rate',h2xx+'%','#16a34a')
+            +_metricBox('5xx Rate',e5xx+'%',e5xx>1?'#dc2626':'#16a34a')
+            +_metricBox('P95 Latency',p95+'ms',p95>150?'#d97706':'#16a34a')
+            +_metricBox('FLEX Traffic',pct+'%','#2563eb')
+            +_metricBox('Source Traffic',(100-pct)+'%','#64748b')
+            +_metricBox('Status',pct===100?'COMPLETE':'RAMP',pct===100?'#16a34a':'#d97706')
+            +'</div>';
+        } else if(mm&&pct===0){mm.innerHTML='<div style="font-size:12px;color:#94a3b8;text-align:center;padding:20px;">Awaiting traffic switch</div>';}
         document.querySelectorAll('.bsc-ramp-btn').forEach(function(b){
           var active=parseInt(b.getAttribute('data-pct'))===pct;
-          b.style.background=active?'#2563eb':'#f1f5f9';
-          b.style.color=active?'#fff':'#475569';
-          b.style.border=active?'none':'1px solid #e2e8f0';
+          b.style.background=active?'#2563eb':'';b.style.color=active?'#fff':'';b.style.borderColor=active?'#2563eb':'';
         });
+        if(pct===100){S.ss[4]='done';_rs();}
+      }
+      function _metricBox(l,v,c){
+        return '<div style="background:#f8fafc;border-radius:6px;padding:8px;text-align:center;">'
+          +'<div style="font-size:16px;font-weight:700;color:'+c+';">'+v+'</div>'
+          +'<div style="font-size:10px;color:#64748b;">'+l+'</div>'
+          +'</div>';
       }
       window.bscSetTraffic=function(pct){
-        _b.tpct=pct;
-        _updateTrafficUI(pct);
-        _lg('Traffic set: '+pct+'% FLEX / '+(100-pct)+'% OSPC');
-        if(pct===100){_b.ss[4]='done';_rs();}
+        S.tpct=pct;_updateTrafficUI(pct);
+        _lg('Traffic ramp: FLEX='+pct+'% OSPC='+(100-pct)+'%');
       };
 
-      /* ── _rc5: post-cutover verification ── */
+      /* ── Step 5: Post-Cutover Verification ── */
       function _rc5(){
-        var el=document.getElementById('bsc-verify-results');
-        if(!el)return;
-        var pkg=_b.pkg;if(!pkg)return;
+        var pkg=S.pkg;if(!pkg)return;
+        var el=$id('bsc-verify-results');if(!el)return;
         var svcs=pkg.businessServices.filter(function(s){return s.selected;});
         el.innerHTML=svcs.map(function(s){
-          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;">'
-            +'<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">'+s.name+'</div>'
-            +'<div id="bsc-v-'+s.id+'">'+s.components.map(function(c){
-              return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:11px;color:#94a3b8;">'
-                +'<i class="fas fa-circle" style="font-size:6px;"></i>'+c.name+'</div>';
-            }).join('')+'</div>'
-            +'</div>';
+          var cmps=s.components||[];
+          var rows=cmps.map(function(c){
+            return '<div class="bsc-check-row" id="bsc-vc-'+c.id+'" style="color:#94a3b8;">'
+              +'<i class="fas '+_ctIco(c.type)+'" style="color:'+_ctClr(c.type)+';font-size:10px;"></i>'
+              +'<span style="flex:1;">'+c.name+'</span>'
+              +'<span style="font-size:10px;">'+_ctLbl(c.type)+'</span>'
+              +'</div>';
+          }).join('');
+          return '<div class="bsc-card">'
+            +'<div class="bsc-card-title"><i class="fas fa-layer-group" style="color:#2563eb;"></i>'+s.name+'</div>'
+            +rows+'</div>';
         }).join('');
-        var btn=document.getElementById('bsc-to-s6-btn');
-        if(btn){btn.disabled=true;btn.style.opacity='0.5';}
+        var btn=$id('bsc-to-s6-btn');if(btn){btn.disabled=true;btn.style.opacity='0.5';}
       }
       window.bscRunVerification=function(){
-        var el=document.getElementById('bsc-verify-results');
-        if(!el)return;
-        var btn=document.getElementById('bsc-verify-btn');
-        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Verifying...';}
-        _lg('Running post-cutover verification...');
-        var pkg=_b.pkg;if(!pkg)return;
+        var pkg=S.pkg;if(!pkg)return;
         var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var delay=0;
+        var btn=$id('bsc-verify-btn');
+        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Verifying…';}
+        _lg('Running post-cutover verification for '+svcs.length+' service(s)…');
+        var delay=0;var fails=0;
         svcs.forEach(function(s){
-          var grpEl=document.getElementById('bsc-v-'+s.id);
-          if(!grpEl)return;
-          var rows=grpEl.querySelectorAll('div');
-          rows.forEach(function(row){
+          (s.components||[]).forEach(function(c){
             delay+=180;
             setTimeout(function(){
-              var pass=Math.random()>0.05;
-              row.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:'+(pass?'#16a34a':'#dc2626')+';">'
-                +'<i class="fas '+(pass?'fa-check-circle':'fa-times-circle')+'"></i>'
-                +row.textContent.trim()+'</div>';
+              var pass=Math.random()>0.04;
+              if(!pass)fails++;
+              var row=$id('bsc-vc-'+c.id);
+              if(row){
+                var clr=pass?'#16a34a':'#dc2626';
+                row.style.color=clr;
+                row.querySelector('span:last-child').innerHTML=(pass
+                  ?'<i class="fas fa-check-circle" style="color:#16a34a;"></i> PASS'
+                  :'<i class="fas fa-times-circle" style="color:#dc2626;"></i> FAIL');
+              }
             },delay);
           });
         });
         setTimeout(function(){
-          _b.verif={passed:true,ts:new Date().toLocaleString()};
-          var sumEl=document.getElementById('bsc-verify-summary');
+          S.verif={passed:fails===0,fails:fails,ts:new Date().toLocaleString()};
+          var sumEl=$id('bsc-verify-summary');
           if(sumEl){
             sumEl.style.display='block';
-            sumEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;margin-bottom:14px;';
-            sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>Verification complete — all services healthy on FLEX</span>';
+            if(fails===0){
+              sumEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;';
+              sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>All selected services verified healthy on FLEX</span>';
+            } else {
+              sumEl.style.cssText='display:block;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;';
+              sumEl.innerHTML='<span style="color:#dc2626;font-weight:700;"><i class="fas fa-times-circle" style="margin-right:6px;"></i>'+fails+' component(s) failed verification — review before decision</span>';
+            }
           }
-          var toBtn=document.getElementById('bsc-to-s6-btn');
-          if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
+          var toBtn=$id('bsc-to-s6-btn');if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
           if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-redo"></i> Re-run';}
-          _b.ss[5]='done';_rs();
-          _lg('Verification: all checks passed');
+          S.ss[5]='done';_rs();
+          _lg('Verification complete: '+fails+' failure(s)');
         },delay+300);
       };
 
-      /* ── _rc6: operator decision summary ── */
-      function _rc6(){
-        var el=document.getElementById('bsc-decision-summary');
-        if(!el)return;
-        var pkg=_b.pkg;if(!pkg)return;
+      /* ── Step 6: Operator Decision ── */
+            window.bscDecide=function(d){
+        S.dec=d;
+        var conf=$id('bsc-decision-confirm');if(conf)conf.style.display='block';
+        var title=$id('bsc-confirm-title');
+        var clrs={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'};
+        var ics={PASS:'fa-circle-check',FIX:'fa-wrench',ROLLBACK:'fa-rotate-left'};
+        if(title)title.innerHTML='<i class="fas '+ics[d]+'" style="color:'+clrs[d]+';margin-right:6px;"></i>Confirm: '+d;
+        _lg('Decision selected: '+d);
+      };
+      window.bscConfirmDecision=function(){
+        S.ev.decision={d:S.dec,reason:($id('bsc-dec-reason')||{}).value,approvedBy:($id('bsc-dec-approved')||{}).value,ts:new Date().toLocaleString()};
+        S.ss[6]='done';_rs();
+        _lg('Decision confirmed: '+S.dec+' by '+((($id('bsc-dec-approved')||{}).value)||'operator'));
+        _ss(7);
+      };
+
+      /* ── Step 7: Monitoring & Evidence ── */
+      window.bscSetMonitorDuration=function(d,btn){
+        S.mon.d=d;
+        document.querySelectorAll('.bsc-dur-btn').forEach(function(b){b.className='bsc-dur-btn';});
+        if(btn)btn.className='bsc-dur-btn bsc-dur-active';
+        _lg('Monitor duration: '+d+' min');
+      };
+      window.bscStartMonitoring=function(){
+        if(S.mon.r)return;
+        S.mon.r=true;S.mon.e=0;
+        var total=S.mon.d*60;
+        var prog=$id('bsc-monitor-progress');if(prog)prog.style.display='block';
+        _lg('Monitoring started ('+S.mon.d+' min)');
+        S.mon.t=setInterval(function(){
+          S.mon.e++;
+          var pct=Math.min(100,Math.round(S.mon.e/total*100));
+          var bar=$id('bsc-mon-bar'),st=$id('bsc-mon-status'),el=$id('bsc-mon-elapsed');
+          if(bar)bar.style.width=pct+'%';
+          var mm=Math.floor(S.mon.e/60),ss2=S.mon.e%60;
+          if(el)el.textContent=mm+':'+(ss2<10?'0':'')+ss2;
+          if(pct>=100){
+            clearInterval(S.mon.t);S.mon.r=false;
+            if(st)st.textContent='Monitoring complete';
+            if(bar)bar.style.background='#16a34a';
+            S.ss[7]='done';_rs();_lg('Monitoring complete');
+          } else {if(st)st.textContent='Monitoring… '+pct+'%';}
+        },1000);
+      };
+      window.bscCaptureEvidence=function(){
+        var pkg=S.pkg;if(!pkg)return;
+        var evList=$id('bsc-evidence-list');
+        var items=['<i class="fas fa-check-circle" style="color:#16a34a;"></i> UAT Package: '+pkg.uatRunId,
+          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Business services: '+pkg.businessServices.filter(function(s){return s.selected;}).length+' selected',
+          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Readiness: '+(S.rdns?S.rdns.ts:'—'),
+          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Traffic: '+(S.tpct||0)+'% FLEX',
+          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Verification: '+(S.verif?S.verif.ts:'—'),
+          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Decision: '+(S.dec||'—'),
+          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Captured: '+new Date().toLocaleString()];
+        if(evList)evList.innerHTML=items.join('<br>');
+        S.ev.captured=true;S.ev.ts=new Date().toLocaleString();
+        var res=$id('bsc-final-result');
+        if(res){
+          res.style.display='block';
+          var d=S.dec||'PASS';
+          var clr={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'}[d]||'#2563eb';
+          res.style.cssText='display:block;margin-top:14px;background:#f0fdf4;border:2px solid #bbf7d0;border-radius:10px;padding:18px 22px;';
+          res.innerHTML='<div style="font-size:15px;font-weight:800;color:'+clr+';margin-bottom:6px;"><i class="fas fa-flag-checkered" style="margin-right:8px;"></i>Cutover Evidence Captured</div>'
+            +'<div style="font-size:12px;color:#475569;">'+pkg.customerName+' | Decision: <b style="color:'+clr+';">'+d+'</b> | '+new Date().toLocaleString()+'</div>';
+        }
+        _lg('Evidence captured');
+      };
+      window.bscExportReport=function(){
+        var pkg=S.pkg;if(!pkg){alert('No package loaded');return;}
         var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var tot=svcs.reduce(function(a,s){return a+s.components.length;},0);
-        el.innerHTML=[
+        var lines=['# Cutover Execution Report','Customer: '+pkg.customerName,'Migration: '+pkg.migrationId,
+          'UAT Run: '+pkg.uatRunId,'Decision: '+(S.dec||'—'),'Date: '+new Date().toLocaleString(),'',
+          '## Selected Business Services'];
+        svcs.forEach(function(s){
+          lines.push('### '+s.name+' ['+s.uatStatus+']');
+          (s.components||[]).forEach(function(c){lines.push('  - '+c.name+' ('+_ctLbl(c.type)+')');});
+        });
+        if(pkg.acceptedRisks&&pkg.acceptedRisks.length){lines.push('','## Accepted Risks');pkg.acceptedRisks.forEach(function(r){lines.push('- '+r);});}
+        lines.push('','## Rollback Plan',pkg.rollbackPlan||'—');
+        var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));
+        a.download='cutover-report-'+pkg.migrationId+'.txt';a.click();_lg('Report exported');
+      };
+      window.bscExportEvidence=function(){
+        var pkg=S.pkg;if(!pkg){alert('No package loaded');return;}
+        var rows=['Service,Component,Type,Source,Target,UAT Status,Health URL'];
+        pkg.businessServices.filter(function(s){return s.selected;}).forEach(function(s){
+          (s.components||[]).forEach(function(c){
+            rows.push([s.name,c.name,_ctLbl(c.type),c.source,c.target,c.uatStatus,c.healthUrl||''].join(','));
+          });
+        });
+        var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+        a.download='cutover-evidence-'+pkg.migrationId+'.csv';a.click();_lg('Evidence CSV exported');
+      };
+
+      /* ── Lifecycle ── */
+      window.bscReset=function(){
+        if(!confirm('Reset all Stage 4B cutover progress?'))return;
+        S={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},
+           pkg:null,rdns:null,tpct:0,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},ev:{},logs:[]};
+        var su=$id('bsc-uat-summary');if(su)su.innerHTML='<span style="color:#94a3b8;">Awaiting UAT package</span>';
+        var pb=$id('bsc-pkg-badge');if(pb)pb.style.display='none';
+        var lo=$id('bsc-log-out');if(lo)lo.value='Awaiting cutover execution...';
+        _ss(1);
+      };
+      window.bscOnActivate=function(){
+        _ss(1);
+        if(!S.pkg){
+          var hasScope=false;
+          if(window.UAT&&window.UAT.scope&&window.UAT.scope.length)hasScope=true;
+          if(!hasScope&&typeof cutoverBlueGreenRows!=='undefined'&&cutoverBlueGreenRows.length)hasScope=true;
+          setTimeout(function(){
+            if(hasScope){_lg('Auto-importing from Stage 3 UAT…');bscImportUAT();}
+            else{_lg('Loading BankCore Mobile Platform sample…');bscLoadMockPackage();}
+          },350);
+        }
+      };
+
+      /* ── Fix _rc6 summary cards (clean version) ── */
+      function _rc6(){
+        var pkg=S.pkg;if(!pkg)return;
+        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
+        var tot=svcs.reduce(function(a,s){return a+(s.components?s.components.length:0);},0);
+        var el=$id('bsc-decision-summary');if(!el)return;
+        var cards=[
           {l:'Services',v:svcs.length,c:'#2563eb',bg:'#eff6ff',ic:'fa-layer-group'},
           {l:'Components',v:tot,c:'#7c3aed',bg:'#f5f3ff',ic:'fa-cubes'},
-          {l:'Traffic on FLEX',v:(_b.tpct||0)+'%',c:'#16a34a',bg:'#f0fdf4',ic:'fa-traffic-light'},
-          {l:'Readiness',v:_b.rdns?'PASS':'—',c:'#0ea5e9',bg:'#f0f9ff',ic:'fa-stethoscope'},
-          {l:'Verification',v:_b.verif?'PASS':'—',c:'#16a34a',bg:'#f0fdf4',ic:'fa-clipboard-check'},
+          {l:'FLEX Traffic',v:(S.tpct||0)+'%',c:'#16a34a',bg:'#f0fdf4',ic:'fa-traffic-light'},
+          {l:'Readiness',v:S.rdns?(S.rdns.passed?'PASS':'RISK'):'—',c:S.rdns&&S.rdns.passed?'#16a34a':'#94a3b8',bg:'#f0f9ff',ic:'fa-stethoscope'},
+          {l:'Verification',v:S.verif?(S.verif.passed?'PASS':'FAIL'):'—',c:S.verif?(S.verif.passed?'#16a34a':'#dc2626'):'#94a3b8',bg:S.verif&&!S.verif.passed?'#fef2f2':'#f0fdf4',ic:'fa-clipboard-check'},
           {l:'Accepted Risks',v:(pkg.acceptedRisks&&pkg.acceptedRisks.length)||0,c:'#d97706',bg:'#fffbeb',ic:'fa-triangle-exclamation'}
-        ].map(function(m){
+        ];
+        el.innerHTML=cards.map(function(m){
           return '<div style="background:'+m.bg+';border-radius:8px;padding:12px 14px;text-align:center;">'
             +'<i class="fas '+m.ic+'" style="color:'+m.c+';font-size:18px;margin-bottom:4px;display:block;"></i>'
             +'<div style="font-size:18px;font-weight:800;color:'+m.c+';">'+m.v+'</div>'
@@ -8812,111 +9079,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             +'</div>';
         }).join('');
       }
-      window.bscDecide=function(d){
-        _b.dec=d;
-        var conf=document.getElementById('bsc-decision-confirm');
-        if(conf)conf.style.display='block';
-        var title=document.getElementById('bsc-confirm-title');
-        var colors={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'};
-        var icons={PASS:'fa-circle-check',FIX:'fa-wrench',ROLLBACK:'fa-rotate-left'};
-        if(title)title.innerHTML='<i class="fas '+icons[d]+'" style="color:'+colors[d]+';margin-right:6px;"></i>'
-          +'Confirm: '+d+' CUTOVER';
-        _lg('Decision selected: '+d);
-      };
-      window.bscConfirmDecision=function(){
-        var reason=document.getElementById('bsc-dec-reason');
-        var appr=document.getElementById('bsc-dec-approved');
-        var jira=document.getElementById('bsc-dec-jira');
-        _b.ev.decision={d:_b.dec,reason:reason&&reason.value,approvedBy:appr&&appr.value,ts:new Date().toLocaleString()};
-        _b.ss[6]='done';_rs();
-        _lg('Decision confirmed: '+_b.dec+' by '+(appr&&appr.value||'operator'));
-        _ss(7);
-      };
 
-      /* ── Step 7 monitoring & evidence ── */
-      window.bscSetMonitorDuration=function(d,btn){
-        _b.mon.d=d;
-        document.querySelectorAll('.bsc-dur-btn').forEach(function(b){
-          b.classList.remove('bsc-dur-active');
-          b.style.background='';b.style.color='';b.style.border='';
-        });
-        if(btn){btn.classList.add('bsc-dur-active');}
-        _lg('Monitor duration set to '+d+' min');
-      };
-      window.bscStartMonitoring=function(){
-        if(_b.mon.r)return;
-        _b.mon.r=true;_b.mon.e=0;
-        var total=_b.mon.d*60;
-        var prog=document.getElementById('bsc-monitor-progress');
-        if(prog)prog.style.display='block';
-        _lg('Monitoring started ('+_b.mon.d+' min)');
-        _b.mon.t=setInterval(function(){
-          _b.mon.e++;
-          var pct=Math.min(100,Math.round(_b.mon.e/total*100));
-          var bar=document.getElementById('bsc-mon-bar');
-          var st=document.getElementById('bsc-mon-status');
-          var el=document.getElementById('bsc-mon-elapsed');
-          if(bar)bar.style.width=pct+'%';
-          var mm=Math.floor(_b.mon.e/60),ss2=_b.mon.e%60;
-          if(el)el.textContent=mm+':'+(ss2<10?'0':'')+ss2;
-          if(pct>=100){
-            clearInterval(_b.mon.t);_b.mon.r=false;
-            if(st)st.textContent='Monitoring complete';
-            if(bar)bar.style.background='#16a34a';
-            _b.ss[7]='done';_rs();
-            var capBtn=document.getElementById('bsc-capture-btn');
-            if(capBtn)capBtn.disabled=false;
-            _lg('Monitoring complete');
-          } else {
-            if(st)st.textContent='Monitoring… '+pct+'%';
-          }
-        },1000);
-      };
-      window.bscCaptureEvidence=function(){
-        var pkg=_b.pkg;if(!pkg)return;
-        _b.ev.captured=true;_b.ev.ts=new Date().toLocaleString();
-        var res=document.getElementById('bsc-final-result');
-        if(res){
-          res.style.display='block';
-          var d=_b.dec||'PASS';
-          var clr={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'}[d]||'#2563eb';
-          res.style.cssText='display:block;background:#f0fdf4;border:2px solid #bbf7d0;border-radius:10px;padding:18px 22px;';
-          res.innerHTML='<div style="font-size:16px;font-weight:800;color:'+clr+';margin-bottom:6px;"><i class="fas fa-flag-checkered" style="margin-right:8px;"></i>Cutover Evidence Captured</div>'
-            +'<div style="font-size:12px;color:#475569;">Customer: <b>'+pkg.customerName+'</b> | Decision: <b style="color:'+clr+';">'+d+'</b> | '+new Date().toLocaleString()+'</div>';
-        }
-        _lg('Evidence captured');
-      };
-      window.bscExportReport=function(){
-        var pkg=_b.pkg;if(!pkg){alert('No package loaded');return;}
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var lines=['# BSC Cutover Report','Customer: '+pkg.customerName,'Migration ID: '+pkg.migrationId,'UAT Run: '+pkg.uatRunId,'Decision: '+(_b.dec||'—'),'Date: '+new Date().toLocaleString(),'','## Services'];
-        svcs.forEach(function(s){
-          lines.push('- '+s.name+' ['+s.uatStatus+'] ('+s.components.length+' components)');
-        });
-        if(pkg.acceptedRisks&&pkg.acceptedRisks.length){
-          lines.push('','## Accepted Risks');
-          pkg.acceptedRisks.forEach(function(r){lines.push('- '+r);});
-        }
-        var blob=new Blob([lines.join('\n')],{type:'text/plain'});
-        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-        a.download='bsc-cutover-report-'+pkg.migrationId+'.txt';a.click();
-        _lg('Report exported');
-      };
-      window.bscExportEvidence=function(){
-        var pkg=_b.pkg;if(!pkg){alert('No package loaded');return;}
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var rows=['Service,Component,Type,Source,Target,UAT Status'];
-        svcs.forEach(function(s){
-          s.components.forEach(function(c){
-            rows.push([s.name,c.name,c.type,c.source,c.target,c.uatStatus].join(','));
-          });
-        });
-        var blob=new Blob([rows.join('\n')],{type:'text/csv'});
-        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-        a.download='bsc-evidence-'+pkg.migrationId+'.csv';a.click();
-        _lg('Evidence CSV exported');
-      };
-
+      /* ── Init ── */
       _ss(1);
     })();
     </script>
