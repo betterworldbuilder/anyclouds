@@ -807,6 +807,17 @@
     body.flex-skyline-mode .uat-panel-header h3,
     body.flex-skyline-mode #panel-s4 .uat-panel h2,
     body.flex-skyline-mode #panel-s4 .uat-panel h3 { color: #1e293b !important; }
+    body.flex-skyline-mode .uat-panel-header > span,
+    body.flex-skyline-mode .uat-panel-header > div > span { color: #64748b !important; }
+    body.flex-skyline-mode .uat-panel-body label { color: #334155 !important; }
+    body.flex-skyline-mode .uat-panel-body > p,
+    body.flex-skyline-mode .uat-panel-body > div > p { color: #334155 !important; }
+    body.flex-skyline-mode .uat-note { color: #64748b !important; }
+    body.flex-skyline-mode .uat-table th { background: #f1f5f9 !important; color: #334155 !important; border-bottom-color: #e2e8f0 !important; }
+    body.flex-skyline-mode .uat-table td { color: #1e293b !important; }
+    body.flex-skyline-mode .uat-table tr:hover td { background: #f8fafc !important; }
+    body.flex-skyline-mode #svc-next-step { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+    body.flex-skyline-mode #svc-next-step * { color: #334155 !important; }
     body.flex-skyline-mode #panel-s4 .uat-panel p,
     body.flex-skyline-mode #panel-s4 .uat-panel label,
     body.flex-skyline-mode #panel-s4 .uat-panel li,
@@ -3808,7 +3819,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         }
         #uat-content .uat-panel .uat-panel-header h3 { color: #1e3a6e !important; }
         #uat-content .uat-panel .uat-panel-body { padding: 14px 16px !important; }
-        #uat-content .uat-note { color: #93c5fd !important; }
+        #uat-content .uat-note { color: #64748b !important; }
 
         /* ── Step divider ── */
         #uat-step5-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 14px; }
@@ -4324,6 +4335,24 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         /* gov-section cards inside UAT panels */
         .uat-panel .gov-section h3 { color: #ffffff !important; border-color: rgba(147,197,253,0.5) !important; }
         .uat-panel .gov-section p  { color: #e2e8f0 !important; }
+
+        /* ── UAT light-theme: high-specificity overrides for Steps 1-4 ─────── */
+        /* Must come after the dark defaults above to win via specificity (#uat-content ID) */
+        #uat-content .uat-panel-header > span,
+        #uat-content .uat-panel-header > div > span { color: #64748b !important; }
+        #uat-content .uat-panel-body label { color: #334155 !important; }
+        #uat-content .uat-panel-body > p,
+        #uat-content .uat-panel-body > div > p { color: #334155 !important; }
+        #uat-content .uat-table th { color: #334155 !important; background: #f1f5f9 !important; border-bottom-color: #e2e8f0 !important; }
+        #uat-content .uat-table td { color: #1e293b !important; }
+        #uat-content .uat-table tr:hover td { background: #f8fafc !important; }
+        #uat-content #svc-next-step { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; }
+        #uat-content #svc-next-step * { color: #334155 !important; }
+        #uat-content .uat-panel .gov-section h3 { color: #1e3a6e !important; border-color: #dbe4f0 !important; }
+        #uat-content .uat-panel .gov-section p  { color: #475569 !important; }
+        #uat-content .uat-stat { background: #f0f4ff !important; border-color: #bfdbfe !important; }
+        #uat-content .uat-stat-label { color: #3b5bdb !important; }
+        #uat-content .uat-stat-value { color: #1e3a6e !important; }
         /* performance section (white background) */
         #perf-section { background: #ffffff !important; border-color: #e2e8f0 !important; }
         #perf-section .uat-panel-header { background: #f8fafc !important; border-bottom-color: #e2e8f0 !important; }
