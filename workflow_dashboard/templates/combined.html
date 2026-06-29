@@ -1147,35 +1147,69 @@
 .uat-s1-comp-chip { border:1px solid #bfdbfe;background:#f7fbff;color:#1e3a8a;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:800; }
 .uat-s1-status-line { display:flex;justify-content:space-between;gap:8px;border-top:1px dashed #dbe4f0;padding-top:8px;margin-top:8px;color:#64748b;font-size:11px; }
 
-.uat-s1-arch-panel { background:#f8fafc;color:#0f172a;border:1px solid #dbe4f0;border-radius:16px;padding:16px; }
-.uat-s1-arch-panel-title { font-size:14px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;margin-bottom:8px; }
-.uat-s1-arch-panel-title i { color:#6366f1; }
-.uat-s1-arch-panel p { color:#64748b;margin:0 0 14px;font-size:12px;line-height:1.4; }
-.uat-template-list { display:flex;flex-direction:column;gap:6px; }
-.uat-template-item {
-  display:flex;justify-content:space-between;align-items:center;
-  padding:11px 14px;background:#ffffff;border:1px solid #e2e8f0;
-  border-radius:10px;cursor:pointer;transition:all 0.2s;
+/* ── Archetype Selector (dark blue frame) ── */
+.uat-s1-arch-selector {
+  background:linear-gradient(135deg,#0f172a 0%,#1e293b 50%,#0f172a 100%);
+  border-radius:16px;padding:20px;
+  border:1px solid rgba(59,130,246,0.2);
+  box-shadow:0 0 0 1px rgba(59,130,246,0.08),0 0 32px rgba(59,130,246,0.06),0 8px 32px rgba(0,0,0,0.3);
   position:relative;overflow:hidden;
 }
-.uat-template-item::before {
-  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
-  background:var(--tmpl-color,#3b82f6);opacity:0;transition:opacity 0.2s;
+.uat-s1-arch-selector::before {
+  content:'';position:absolute;inset:0;border-radius:16px;padding:1px;
+  background:linear-gradient(135deg,rgba(59,130,246,0.5),rgba(139,92,246,0.3),rgba(236,72,153,0.2),rgba(59,130,246,0.5));
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+  animation:uatArchGlow 4s ease-in-out infinite;
 }
-.uat-template-item:hover { background:#f0f7ff;border-color:#bfdbfe;transform:translateX(3px); }
-.uat-template-item:hover::before { opacity:1; }
-.uat-template-name { font-size:13px;font-weight:500;color:#0f172a; }
-.uat-template-meta { font-size:11px;color:#64748b; }
-.tmpl-banking   { --tmpl-color:#3b82f6; }
-.tmpl-ecommerce { --tmpl-color:#8b5cf6; }
-.tmpl-crm       { --tmpl-color:#ec4899; }
-.tmpl-erp       { --tmpl-color:#f59e0b; }
-.tmpl-saas      { --tmpl-color:#06b6d4; }
-.tmpl-api       { --tmpl-color:#84cc16; }
-.tmpl-reporting { --tmpl-color:#f97316; }
-.tmpl-batch     { --tmpl-color:#6366f1; }
-.tmpl-data      { --tmpl-color:#14b8a6; }
-.tmpl-custom    { --tmpl-color:#94a3b8; }
+@keyframes uatArchGlow { 0%,100%{opacity:0.5} 50%{opacity:1} }
+.uat-s1-arch-head {
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;position:relative;z-index:1;
+}
+.uat-s1-arch-title { font-size:16px;font-weight:700;color:#f8fafc; }
+.uat-s1-arch-badge {
+  padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
+  background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);
+}
+.uat-s1-arch-desc { font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.45;position:relative;z-index:1; }
+.uat-s1-arch-grid {
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;position:relative;z-index:1;
+}
+.uat-s1-arch-card {
+  border-radius:12px;padding:14px;cursor:pointer;transition:all 0.22s;
+  border:2px solid transparent;position:relative;overflow:hidden;
+}
+.uat-s1-arch-card:hover { transform:translateY(-2px);border-color:rgba(255,255,255,0.2);box-shadow:0 8px 24px rgba(0,0,0,0.35); }
+.uat-s1-arch-card.selected { border-color:rgba(255,255,255,0.45);box-shadow:0 0 0 3px rgba(59,130,246,0.45); }
+.uat-s1-arch-card-icon {
+  width:34px;height:34px;background:rgba(255,255,255,0.15);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;
+  margin-bottom:9px;
+}
+.uat-s1-arch-card-name { font-size:13px;font-weight:700;color:#f8fafc;margin-bottom:2px; }
+.uat-s1-arch-card-sub  { font-size:10px;color:rgba(255,255,255,0.58); }
+.uat-s1-arch-card.tmpl-banking   { background:linear-gradient(135deg,#1e3a8a,#1e40af); }
+.uat-s1-arch-card.tmpl-ecommerce { background:linear-gradient(135deg,#78350f,#92400e); }
+.uat-s1-arch-card.tmpl-crm       { background:linear-gradient(135deg,#064e3b,#065f46); }
+.uat-s1-arch-card.tmpl-erp       { background:linear-gradient(135deg,#3b0764,#4c1d95); }
+.uat-s1-arch-card.tmpl-saas      { background:linear-gradient(135deg,#0c4a6e,#0369a1); }
+.uat-s1-arch-card.tmpl-api       { background:linear-gradient(135deg,#1e1b4b,#312e81); }
+.uat-s1-arch-card.tmpl-reporting { background:linear-gradient(135deg,#422006,#713f12); }
+.uat-s1-arch-card.tmpl-batch     { background:linear-gradient(135deg,#1e293b,#334155); }
+.uat-s1-arch-card.tmpl-data      { background:linear-gradient(135deg,#134e4a,#0f766e); }
+.uat-s1-arch-card.tmpl-custom    { background:linear-gradient(135deg,#581c87,#7c3aed); }
+.uat-s1-arch-footer {
+  display:flex;align-items:center;gap:12px;position:relative;z-index:1;
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;padding:12px 14px;
+}
+.uat-s1-arch-footer-text { font-size:11px;color:#94a3b8;flex:1;line-height:1.4; }
+.uat-s1-arch-use-btn {
+  padding:8px 16px;background:#3b82f6;color:#fff;border:none;border-radius:8px;
+  font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.2s;
+}
+.uat-s1-arch-use-btn:hover:not(:disabled) { background:#2563eb; }
+.uat-s1-arch-use-btn:disabled { background:#334155;color:#64748b;cursor:not-allowed; }
 
 .uat-s1-sa-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
 .uat-s1-sa-card { border:1px solid #dbe4f0;border-radius:14px;background:#fff;padding:14px;display:grid;gap:10px; }
@@ -2994,11 +3028,18 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
               <button class="uat-s1-btn-primary" onclick="uatS1OpenModal()">+ Add Business System</button>
             </div>
           </div>
-          <div class="uat-s1-arch-panel">
-            <div class="uat-s1-arch-panel-title"><i class="fas fa-wand-magic-sparkles"></i> Quick Templates</div>
-            <p>Use templates to create a complete UAT scope in seconds. Operators can edit every component before saving.</p>
-            <div id="uatS1ArchList" class="uat-template-list">
+          <div class="uat-s1-arch-selector">
+            <div class="uat-s1-arch-head">
+              <div class="uat-s1-arch-title">Archetype Templates</div>
+              <span class="uat-s1-arch-badge">10 Templates</span>
+            </div>
+            <p class="uat-s1-arch-desc">Use templates to create a complete UAT scope in seconds. Operators can edit every component before saving.</p>
+            <div id="uatS1ArchList" class="uat-s1-arch-grid">
               <!-- rendered by JS -->
+            </div>
+            <div class="uat-s1-arch-footer">
+              <span class="uat-s1-arch-footer-text">Selected template pre-fills components, generated checks, and UAT scope. Operators can still edit every field.</span>
+              <button class="uat-s1-arch-use-btn" id="uatS1UseTemplateBtn" disabled>Use Selected Template</button>
             </div>
           </div>
         </div>
@@ -17739,6 +17780,12 @@ ${certContent}
     erp:'Workflow + Batch + DB', saas:'Web + API + DB', api:'Gateway + API + Auth',
     reporting:'App + DB + Reports', batch:'Worker + Queue + DB', data:'Ingest + DB + Storage', custom:'Build manually'
   };
+  var _archIcons = {
+    banking:'fa-landmark', ecommerce:'fa-cart-shopping', crm:'fa-users',
+    erp:'fa-industry', saas:'fa-cloud', api:'fa-bolt',
+    reporting:'fa-chart-bar', batch:'fa-gear', data:'fa-database', custom:'fa-wand-magic-sparkles'
+  };
+  var _selectedArch = null;
 
   var _state = { systems: [], standalones: [], saType: 'server', editId: null, editSaId: null };
   try { var _d = localStorage.getItem('uatS1_systems'); if (_d) _state.systems = JSON.parse(_d) || []; } catch(e) {}
@@ -17920,19 +17967,30 @@ ${certContent}
     _renderKpis();
   }
 
-  /* ── render archetype sidebar ── */
+  /* ── render archetype grid ── */
   function _renderArch() {
     var el = document.getElementById('uatS1ArchList');
     if (!el) return;
     el.innerHTML = Object.keys(_arch).map(function(key) {
-      return '<div class="uat-template-item tmpl-'+key+'" data-arch-key="'+key+'">'
-        +'<span class="uat-template-name">'+(_archLabels[key]||key)+'</span>'
-        +'<span class="uat-template-meta">'+(_archSub[key]||'')+'</span>'
+      return '<div class="uat-s1-arch-card tmpl-'+key+'" data-arch-key="'+key+'">'
+        +'<div class="uat-s1-arch-card-icon"><i class="fas '+(_archIcons[key]||'fa-cube')+'"></i></div>'
+        +'<div class="uat-s1-arch-card-name">'+(_archLabels[key]||key)+'</div>'
+        +'<div class="uat-s1-arch-card-sub">'+(_archSub[key]||'')+'</div>'
         +'</div>';
     }).join('');
     el.addEventListener('click', function(e) {
-      var row = e.target.closest('[data-arch-key]');
-      if (row) uatS1OpenModal(null, row.getAttribute('data-arch-key'));
+      var card = e.target.closest('[data-arch-key]');
+      if (!card) return;
+      el.querySelectorAll('.uat-s1-arch-card').forEach(function(c){ c.classList.remove('selected'); });
+      card.classList.add('selected');
+      _selectedArch = card.getAttribute('data-arch-key');
+      var btn = document.getElementById('uatS1UseTemplateBtn');
+      if (btn) btn.disabled = false;
+      uatS1OpenModal(null, _selectedArch);
+    });
+    var useBtn = document.getElementById('uatS1UseTemplateBtn');
+    if (useBtn) useBtn.addEventListener('click', function() {
+      if (_selectedArch) uatS1OpenModal(null, _selectedArch);
     });
   }
 
