@@ -2570,31 +2570,6 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
   <!-- Stage 2 — Migrations -->
   <div class="panel" id="panel-s2">
 
-    <div class="gov-page" id="stage2_handoff_import_panel" style="display:block;margin-bottom:16px;">
-      <div class="gov-section">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;">
-          <div>
-            <h3 style="margin-top:0;">Stage 2 Handoff Import Queue</h3>
-            <p style="margin:0;color:#94a3b8;font-size:13px;">Import selected items from Stage 1 discovery outputs into the migration queue.</p>
-          </div>
-          <div class="gov-status-badge status-pending" id="stage2-queue-status">Status: Waiting for imports</div>
-        </div>
-        <div class="gov-actions" style="margin:12px 0;">
-          <button class="gov-btn btn-example" onclick="stage2ImportHandoffs(['appdep'])">📥 Import from App Dependency Discovery</button>
-          <button class="gov-btn btn-example" onclick="stage2ImportHandoffs(['readiness'])">📥 Import from Migration Readiness Scanner</button>
-          <button class="gov-btn btn-example" onclick="stage2ImportHandoffs(['preflight'])">📥 Import from Pre-Flight Check</button>
-          <button class="gov-btn btn-save" onclick="stage2ImportHandoffs(['appdep','readiness','preflight'])">📥 Import All Handoffs</button>
-        </div>
-        <div style="overflow:auto;">
-          <table class="gov-table" style="min-width:1700px;">
-            <thead><tr><th>selected</th><th>source_stage</th><th>source_cloud</th><th>source_region</th><th>target_region</th><th>resource_type</th><th>resource_name</th><th>resource_id</th><th>instance_id</th><th>volume_id</th><th>image_id</th><th>snapshot_id</th><th>workload_type</th><th>migration_method</th><th>readiness_status</th><th>preflight_status</th><th>risk_level</th><th>recommended_action</th><th>migration_status</th><th>notes</th></tr></thead>
-            <tbody id="stage2_queue_body"><tr><td colspan="20" style="color:#64748b;font-style:italic;">No Stage 2 handoff imports loaded yet.</td></tr></tbody>
-          </table>
-        </div>
-        <div class="artifact-list" id="stage2_queue_artifacts" style="margin-top:10px;"><span style="color:#64748b;">No queue artifacts generated yet.</span></div>
-      </div>
-    </div>
-
     <div id="s2fullmig-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
       <div class="gov-header">
         <div class="gov-title-area">
