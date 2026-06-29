@@ -7566,6 +7566,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             #co-adv-dash .adv-dash-foot a{color:#2563eb;cursor:pointer;}
             #co-adv-dash .adv-log-box{background:#0f172a;border-radius:8px;padding:12px 14px;}
             #co-adv-dash .adv-sec-anchor{scroll-margin-top:16px;}
+            #co-adv-dash .adv-highlighted{outline:2.5px solid #2563eb;outline-offset:3px;box-shadow:0 0 0 6px rgba(37,99,235,.07);transition:outline .2s,box-shadow .2s;}
             @media(max-width:1400px){ #co-adv-dash .adv-kpi-row{grid-template-columns:repeat(3,1fr);} #co-adv-dash .adv-mid{grid-template-columns:1fr;} #co-adv-dash .adv-bot{grid-template-columns:repeat(2,1fr);} #co-adv-dash .adv-foot{grid-template-columns:repeat(3,1fr);} }
             @media(max-width:900px){ #co-adv-dash .adv-wrap{flex-direction:column;} #co-adv-dash .adv-sidenav{width:100%;} #co-adv-dash .adv-kpi-row{grid-template-columns:repeat(2,1fr);} #co-adv-dash .adv-bot{grid-template-columns:1fr;} #co-adv-dash .adv-foot{grid-template-columns:1fr;} }
           </style>
@@ -7646,7 +7647,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               </div>
 
               <!-- KPI ROW (6 cards) -->
-              <div class="adv-kpi-row">
+              <div class="adv-kpi-row" id="adv-kpi-row">
                 <div class="adv-kc">
                   <div class="adv-kc-title">Readiness Score</div>
                   <div class="adv-gauge-wrap">
@@ -7694,7 +7695,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <div id="adv-lb-meta" style="margin-top:10px;font-size:11px;color:#64748b;"></div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:10px;">
-                  <div class="adv-card">
+                  <div class="adv-card" id="adv-sec-comp-health">
                     <div class="adv-sec-hdr"><span class="adv-sec-title">Service Component Health</span></div>
                     <div style="display:flex;gap:10px;font-size:10px;margin-bottom:8px;flex-wrap:wrap;">
                       <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Pass</span>
@@ -7725,7 +7726,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <div id="adv-perf-comp"></div>
                   <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Last 15 min average</div>
                 </div>
-                <div class="adv-card">
+                <div class="adv-card" id="adv-sec-radar">
                   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">System Health Radar</div>
                   <div class="adv-clegend"><span><span class="adv-ldot" style="background:#dc2626;"></span>Source</span><span><span class="adv-ldot" style="background:#16a34a;"></span>Target</span></div>
                   <div style="height:160px;display:flex;align-items:center;justify-content:center;"><canvas id="adv-radar-chart"></canvas></div>
@@ -7735,7 +7736,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   <div class="adv-clegend"><span><span class="adv-ldot" style="background:#dc2626;"></span>SRC CPU</span><span><span class="adv-ldot" style="background:#16a34a;"></span>TGT CPU</span><span><span class="adv-ldot" style="background:#94a3b8;"></span>SRC Lat</span><span><span class="adv-ldot" style="background:#22c55e;"></span>TGT Lat</span></div>
                   <div style="height:160px;"><canvas id="adv-trend-chart"></canvas></div>
                 </div>
-                <div class="adv-card">
+                <div class="adv-card" id="adv-sec-top-txns">
                   <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Top Transactions (24H)</div>
                   <table class="adv-table"><thead><tr><th>Transaction</th><th>Success Rate</th><th>P95 Latency</th></tr></thead><tbody id="adv-txn-body"><tr><td colspan="3" style="color:#94a3b8;text-align:center;padding:12px 0;">Mockup data</td></tr></tbody></table>
                   <div style="font-size:10px;color:#94a3b8;margin-top:8px;"><div>Success Rate Target: &ge; 99%</div><div>Latency Target: &le; 500 ms</div></div>
@@ -8387,9 +8388,36 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           window.coAdvNav = function(sectionId, el) {
             document.querySelectorAll('#co-adv-dash .adv-nav-item').forEach(function(n){ n.classList.remove('active'); });
             if (el) el.classList.add('active');
+            /* clear previous highlights */
+            document.querySelectorAll('#co-adv-dash .adv-highlighted').forEach(function(s){ s.classList.remove('adv-highlighted'); });
+            /* map each nav section to the card IDs it owns */
+            var _HM = {
+              'adv-sec-overview':  ['adv-sec-overview', 'adv-kpi-row'],
+              'adv-sec-traffic':   ['adv-sec-traffic', 'adv-sec-perf'],
+              'adv-sec-health':    ['adv-sec-health', 'adv-sec-comp-health'],
+              'adv-sec-system':    ['adv-sec-system', 'adv-sec-radar'],
+              'adv-sec-txns':      ['adv-sec-txns', 'adv-sec-top-txns'],
+              'adv-sec-blockers':  ['adv-sec-blockers'],
+              'adv-sec-actions':   ['adv-sec-actions'],
+              'adv-sec-matrix':    ['adv-sec-matrix'],
+              'adv-sec-evidence':  ['adv-sec-evidence', 'adv-sec-log']
+            };
+            (_HM[sectionId] || [sectionId]).forEach(function(id) {
+              var s = document.getElementById(id);
+              if (s) s.classList.add('adv-highlighted');
+            });
             var sec = document.getElementById(sectionId);
             if (sec) sec.scrollIntoView({behavior:'smooth',block:'start'});
           };
+          /* init: highlight overview cards on load */
+          (function() {
+            function _initHighlight() {
+              var ovEl = document.getElementById('adv-nav-overview');
+              if (ovEl) coAdvNav('adv-sec-overview', ovEl);
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _initHighlight);
+            else setTimeout(_initHighlight, 0);
+          })();
 
           window.coAdvRefresh = function() {
             _advRenderAll();
