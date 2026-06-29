@@ -642,6 +642,18 @@
     .rb-indigo { width:360px;height:180px;border-width:14px;color:rgba(75,0,130,.8);  border-color:rgba(75,0,130,.8); }
     .rb-violet { width:332px;height:166px;border-width:14px;color:rgba(148,0,211,.8); border-color:rgba(148,0,211,.8); }
     @keyframes s03dRainbowPulse { 0%,100%{opacity:.9} 50%{opacity:1} }
+    /* Bridge rainbow — large arch the viewer flies under */
+    .s03d-bridge-arc {
+      width:900px; height:450px; overflow:hidden;
+      animation:s03dRainbowPulse 4s ease-in-out infinite;
+    }
+    .s03d-bridge-arc .rb-red    { width:900px;height:450px;border-width:26px; }
+    .s03d-bridge-arc .rb-orange { width:848px;height:424px;border-width:26px; }
+    .s03d-bridge-arc .rb-yellow { width:796px;height:398px;border-width:26px; }
+    .s03d-bridge-arc .rb-green  { width:744px;height:372px;border-width:26px; }
+    .s03d-bridge-arc .rb-blue   { width:692px;height:346px;border-width:26px; }
+    .s03d-bridge-arc .rb-indigo { width:640px;height:320px;border-width:26px; }
+    .s03d-bridge-arc .rb-violet { width:588px;height:294px;border-width:26px; }
     .s03d-fly-ctrl {
       position:absolute; bottom:16px; right:16px; z-index:15;
       display:flex; flex-direction:column; align-items:center; gap:4px;
@@ -19676,7 +19688,7 @@ ${certContent}
   };
 
   var _s03d_inited = false;
-  var _s03d_clouds = [], _s03d_rainbows = [];
+  var _s03d_clouds = [], _s03d_rainbows = [], _s03d_bridge = [];
   var _s03d_offsetX = 0, _s03d_offsetY = 0, _s03d_flySpeed = 1;
   var _s03d_isFlying = { up:false, down:false, left:false, right:false };
   var _s03d_lastTime = 0;
@@ -19772,6 +19784,24 @@ ${certContent}
       container.appendChild(el);
       _s03d_rainbows.push({ el:el, def:def, t:def.delay });
     });
+    // Bridge rainbow — huge arch, viewer flies underneath it
+    (function() {
+      var bEl = document.createElement('div');
+      bEl.className = 's03d-rainbow';
+      bEl.style.top = '55%';
+      var bArc = document.createElement('div');
+      bArc.className = 's03d-rainbow-arc s03d-bridge-arc';
+      rainbowColors.forEach(function(band) {
+        var bb = document.createElement('div');
+        bb.className = 's03d-rainbow-band ' + band.cls;
+        bb.style.borderColor = band.color;
+        bb.style.color = band.color;
+        bArc.appendChild(bb);
+      });
+      bEl.appendChild(bArc);
+      container.appendChild(bEl);
+      _s03d_bridge.push({ el:bEl, t:0 });
+    })();
     function setupBtn(id, dir) {
       var btn = document.getElementById(id);
       if (!btn) return;
@@ -19842,6 +19872,18 @@ ${certContent}
         if (prog >= 0.10) op = 0;
         r.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
         r.el.style.opacity   = op;
+      });
+      // Animate bridge rainbow (slow fly-under cycle)
+      _s03d_bridge.forEach(function(b) {
+        b.t += dt * 0.006 * _s03d_flySpeed;
+        var prog = b.t % 1;
+        var z    = -1200 + 1800 * prog;
+        var s    = 0.3  + 4.2  * prog;
+        var op   = 1.0;
+        if (prog < 0.05) op = prog / 0.05;
+        if (prog > 0.88) op = (1 - (prog - 0.88) / 0.12);
+        b.el.style.transform = 'translate3d(calc(-50% + '+_s03d_offsetX+'px),'+_s03d_offsetY+'px,'+z+'px) scale('+s+')';
+        b.el.style.opacity   = op;
       });
       var sky = document.getElementById('s0-3d-sky');
       var sun = document.getElementById('s0-3d-sun');
