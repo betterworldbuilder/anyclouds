@@ -297,11 +297,11 @@
       position: absolute;
       top: 100%;
       left: 0;
-      background: rgba(15, 23, 42, 0.95);
+      background: #e0f2fe;
       min-width: 220px;
-      box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
       z-index: 100;
-      border: 1px solid rgba(0, 212, 255, 0.5);
+      border: 1px solid rgba(14,165,233,0.3);
       border-radius: 8px;
       padding: 8px;
       flex-direction: column;
@@ -316,9 +316,9 @@
     }
 
     .appdep-tab-btn {
-      border: 1px solid rgba(125, 211, 252, .35);
-      background: rgba(15, 23, 42, .72);
-      color: #cbd5e1;
+      border: 1px solid rgba(14,165,233,0.3);
+      background: #e0f2fe;
+      color: #0c4a6e;
       border-radius: 7px;
       padding: 8px 11px;
       font-weight: 800;
@@ -362,10 +362,10 @@
       font-weight: 700;
     }
     .appdep-cred-input {
-      background: rgba(15, 23, 42, .9);
-      border: 1px solid rgba(125, 211, 252, .35);
+      background: #e0f2fe;
+      border: 1px solid rgba(14,165,233,0.3);
       border-radius: 6px;
-      color: #e2e8f0;
+      color: #0c4a6e;
       padding: 9px 10px;
       min-height: 38px;
     }
@@ -397,9 +397,9 @@
     }
 
     .dr-restore-tab {
-      border: 1px solid rgba(99, 102, 241, 0.35);
-      background: rgba(15, 23, 42, 0.65);
-      color: #cbd5e1;
+      border: 1px solid rgba(14,165,233,0.3);
+      background: #e0f2fe;
+      color: #0c4a6e;
       padding: 10px 16px;
       border-radius: 8px 8px 0 0;
       cursor: pointer;
@@ -416,9 +416,9 @@
     }
 
     .s8-gitops-tab {
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      background: rgba(15, 23, 42, 0.65);
-      color: #cbd5e1;
+      border: 1px solid rgba(14,165,233,0.3);
+      background: #e0f2fe;
+      color: #0c4a6e;
       padding: 8px 14px;
       border-radius: 8px 8px 0 0;
       cursor: pointer;
@@ -963,6 +963,8 @@
     body.flex-skyline-mode .stage-fcard-grid > div p { color: #4b5563 !important; }
     body.flex-skyline-mode .stage-chain-box { background: #f8fafc !important; border-color: #e2e6ec !important; color: #374151 !important; }
     body.flex-skyline-mode .stage-chain-box > div:first-child { color: #1e293b !important; }
+    /* ── Sky-blue override: all stage-chain-box elements ─────────────────── */
+    .stage-chain-box { background: #e0f2fe !important; }
     body.flex-skyline-mode .stage-artifact-grid > div { background: #f1f5f9 !important; color: #374151 !important; }
     body.flex-skyline-mode .stage-iframe-box { background: #f8fafc !important; border-color: #e2e6ec !important; }
     body.flex-skyline-mode .stage-iframe-box > div:first-child { background: #f0f4ff !important; }
@@ -2353,9 +2355,9 @@
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px;">
-          <div style="background:rgba(15,23,42,.44);border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Workflow</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">1. Select source cloud. 2. Scan VMs or snapshots with the existing discovery engines. 3. Check reachable app VM rows. 4. Scan dependencies. 5. Export the report and wave plan.</p></div>
-          <div style="background:rgba(15,23,42,.44);border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Safe Commands</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">Runs hostname, IP, route, ss, systemctl, df, lsblk, fstab, ps, OS release, and uname only. No install, restart, firewall, disk, or mount changes.</p></div>
-          <div style="background:rgba(15,23,42,.44);border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Output</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">App servers, DBs, ports, services, attached volumes, important mounts, risks, complexity, and recommended migration waves.</p></div>
+          <div style="background:#e0f2fe;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Workflow</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">1. Select source cloud. 2. Scan VMs or snapshots with the existing discovery engines. 3. Check reachable app VM rows. 4. Scan dependencies. 5. Export the report and wave plan.</p></div>
+          <div style="background:#e0f2fe;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Safe Commands</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">Runs hostname, IP, route, ss, systemctl, df, lsblk, fstab, ps, OS release, and uname only. No install, restart, firewall, disk, or mount changes.</p></div>
+          <div style="background:#e0f2fe;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Output</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">App servers, DBs, ports, services, attached volumes, important mounts, risks, complexity, and recommended migration waves.</p></div>
         </div>
 
         <div style="background:rgba(3,7,18,.58);border:1px solid rgba(45,212,191,.34);border-radius:8px;padding:14px;margin-bottom:16px;">
@@ -2368,13 +2370,13 @@
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-bottom:12px;">
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">FLEX / Snapshot Runner IP
-              <input id="appdep_scan_runner_ip" type="text" placeholder="Jumphost / scanner VM IP" style="background:rgba(15,23,42,.9);border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_scan_runner_ip" type="text" placeholder="Jumphost / scanner VM IP" style="background:#e0f2fe;border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Runner User
-              <input id="appdep_scan_runner_user" type="text" value="ubuntu" placeholder="ubuntu" style="background:rgba(15,23,42,.9);border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_scan_runner_user" type="text" value="ubuntu" placeholder="ubuntu" style="background:#e0f2fe;border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Runner SSH Key
-              <input id="appdep_scan_runner_key" type="text" value="~/.ssh/id_rsa" placeholder="~/.ssh/id_rsa" style="background:rgba(15,23,42,.9);border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_scan_runner_key" type="text" value="~/.ssh/id_rsa" placeholder="~/.ssh/id_rsa" style="background:#e0f2fe;border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
           </div>
           <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;">
@@ -2390,22 +2392,22 @@
         <div style="background:rgba(2,6,23,.46);border:1px solid rgba(125,211,252,.28);border-radius:8px;padding:14px;margin-bottom:16px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end;">
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source Cloud
-              <select id="appdep_auto_source_cloud" style="background:rgba(15,23,42,.9);border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;"><option>OSPC</option><option>FLEX</option><option>AWS</option><option>Azure</option><option>GCP</option><option>Manual</option></select>
+              <select id="appdep_auto_source_cloud" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;"><option>OSPC</option><option>FLEX</option><option>AWS</option><option>Azure</option><option>GCP</option><option>Manual</option></select>
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source Region
-              <input id="appdep_auto_source_region" type="text" placeholder="All / IAD / DFW / us-east-1" style="background:rgba(15,23,42,.9);border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_auto_source_region" type="text" placeholder="All / IAD / DFW / us-east-1" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">VM Filter
-              <input id="appdep_vm_filter" type="text" placeholder="Search name, IP, ID, image..." oninput="appdepRenderVmInventory()" style="background:rgba(15,23,42,.9);border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_vm_filter" type="text" placeholder="Search name, IP, ID, image..." oninput="appdepRenderVmInventory()" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">SSH Username
-              <input id="appdep_auto_ssh_user" type="text" value="ubuntu" placeholder="ubuntu / root / cloud-user" style="background:rgba(15,23,42,.9);border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_auto_ssh_user" type="text" value="ubuntu" placeholder="ubuntu / root / cloud-user" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">SSH Port
-              <input id="appdep_auto_ssh_port" type="number" value="22" style="background:rgba(15,23,42,.9);border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_auto_ssh_port" type="number" value="22" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
             <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">SSH Key Path / Profile
-              <input id="appdep_auto_ssh_key" type="text" placeholder="~/.ssh/id_rsa" style="background:rgba(15,23,42,.9);border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+              <input id="appdep_auto_ssh_key" type="text" placeholder="~/.ssh/id_rsa" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
             </label>
           </div>
 
@@ -2420,7 +2422,7 @@
           </div>
         </div>
 
-        <div style="overflow:auto;margin-bottom:16px;border:1px solid rgba(125,211,252,.25);border-radius:8px;background:rgba(15,23,42,.36);">
+        <div style="overflow:auto;margin-bottom:16px;border:1px solid rgba(125,211,252,.25);border-radius:8px;background:#e0f2fe;">
           <table class="matrix-table" style="min-width:1420px;margin:0;">
             <thead><tr><th>Select</th><th>Source</th><th>Asset</th><th>VM / App Server</th><th>Instance / Source VM ID</th><th>IP Address</th><th>Snapshot / Image</th><th>Snapshot ID</th><th>Status</th><th>Size</th><th>Flavor</th><th>Image</th><th>Region</th><th>Scan Target</th></tr></thead>
             <tbody id="appdep_vm_inventory_body"><tr><td colspan="14" style="padding:18px;color:#64748b;font-style:italic;">No VM or snapshot list loaded yet.</td></tr></tbody>
@@ -2465,7 +2467,7 @@
           <div id="appdep_tab_raw" class="appdep-detail-tab" style="display:none;"><h3>Raw Evidence</h3><pre id="appdep_raw_evidence" style="white-space:pre-wrap;background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:8px;color:#cbd5e1;padding:12px;max-height:420px;overflow:auto;"></pre></div>
         </div>
 
-        <details style="margin-top:18px;border:1px solid rgba(148,163,184,.22);border-radius:8px;background:rgba(15,23,42,.32);padding:12px;">
+        <details style="margin-top:18px;border:1px solid rgba(148,163,184,.22);border-radius:8px;background:#e0f2fe;padding:12px;">
           <summary style="cursor:pointer;color:#cbd5e1;font-weight:900;">Advanced: Manual Paste Mode</summary>
           <div style="margin-top:12px;">
             <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
@@ -4678,7 +4680,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         /* tables */
         .uat-tbl { width:100%; border-collapse:collapse; font-size:0.8rem; }
         .uat-tbl th { padding:7px 12px; text-align:left; color:#7a9acc; font-size:0.69rem; font-weight:700;
-          text-transform:uppercase; background:rgba(0,0,0,.3); border-bottom:2px solid rgba(79,126,248,.18); white-space:nowrap; }
+          text-transform:uppercase; background:#e0f2fe; border-bottom:2px solid rgba(79,126,248,.18); white-space:nowrap; }
         .uat-tbl td { padding:6px 12px; border-bottom:1px solid rgba(79,126,248,.07); vertical-align:middle; }
         .uat-tbl tr:last-child td { border-bottom:none; }
         .uat-tbl tr:hover td { background:rgba(255,255,255,.02); }
@@ -9686,23 +9688,23 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
 
         <div class="stage-artifact-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:16px; font-family:'Share Tech Mono',monospace; color:#d1d5db; font-size:13px;">
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #38bdf8;">migration_manifest.json</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #38bdf8;">discovery-output bundle</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #0ea5e9;">stage2 migration output</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #22c55e;">terraform.tfvars.json</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #a78bfa;">ansible inventory</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f59e0b;">repaired image metadata</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #fb7185;">boot/test results</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #14b8a6;">dependency graph</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #818cf8;">uat-input bundle</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #34d399;">customer migration report</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f97316;">tco / finops bundle</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #22c55e;">opencenter output bundle</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #60a5fa;">tenant-iac-dr output bundle</div>
-          <div style="padding:10px 12px; background:rgba(15,23,42,.85); border-left:3px solid #f472b6;">ai-anywhere context bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #38bdf8;">migration_manifest.json</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #38bdf8;">discovery-output bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #0ea5e9;">stage2 migration output</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #22c55e;">terraform.tfvars.json</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #a78bfa;">ansible inventory</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #f59e0b;">repaired image metadata</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #fb7185;">boot/test results</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #14b8a6;">dependency graph</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #818cf8;">uat-input bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #34d399;">customer migration report</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #f97316;">tco / finops bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #22c55e;">opencenter output bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #60a5fa;">tenant-iac-dr output bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #f472b6;">ai-anywhere context bundle</div>
         </div>
 
-        <div id="migration-output-bundle-status" style="display:none; margin-top:16px; padding:12px; background:rgba(0,0,0,.28); border:1px solid rgba(148,163,184,.25); border-radius:8px; color:#cbd5e1; font-size:13px;"></div>
+        <div id="migration-output-bundle-status" style="display:none; margin-top:16px; padding:12px; background:#e0f2fe; border:1px solid rgba(148,163,184,.25); border-radius:8px; color:#cbd5e1; font-size:13px;"></div>
       </div>
 
       <section class="uat-panel" style="margin:18px 0;">
@@ -10280,15 +10282,15 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <p style="color:#94a3b8; margin:0; max-width:940px;">Measure and document performance improvements after migration: compute throughput, I/O latency, network performance, application response time, and right-sizing opportunities unlocked by FLEX modern instance types.</p>
       </div>
       <div class="stage-fcard-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Compute Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare vCPU frequency, memory bandwidth, and instance type generation between OSPC source and FLEX target flavors.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #34d399; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#6ee7b7;">Storage I/O Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Measure IOPS, throughput (MB/s), and latency improvements from OSPC Cinder volumes to FLEX block storage.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #4ade80; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Network Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare network throughput, inter-node latency, and public IP bandwidth between OSPC and FLEX environments.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #a3e635; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#bef264;">App Response Time</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Record application-level response time, DB query latency, and API call durations before and after cutover.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #84cc16; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#d9f99d;">Right-Sizing Wins</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Identify VMs running on oversized OSPC flavors that can be migrated to smaller, cheaper FLEX flavors with equivalent performance.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22d3ee; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#67e8f9;">Performance Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate a before/after performance comparison report as evidence for customer sign-off and modernization ROI.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Compute Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare vCPU frequency, memory bandwidth, and instance type generation between OSPC source and FLEX target flavors.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #34d399; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#6ee7b7;">Storage I/O Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Measure IOPS, throughput (MB/s), and latency improvements from OSPC Cinder volumes to FLEX block storage.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #4ade80; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Network Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare network throughput, inter-node latency, and public IP bandwidth between OSPC and FLEX environments.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #a3e635; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#bef264;">App Response Time</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Record application-level response time, DB query latency, and API call durations before and after cutover.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #84cc16; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#d9f99d;">Right-Sizing Wins</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Identify VMs running on oversized OSPC flavors that can be migrated to smaller, cheaper FLEX flavors with equivalent performance.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #22d3ee; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#67e8f9;">Performance Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate a before/after performance comparison report as evidence for customer sign-off and modernization ROI.</p></div>
       </div>
       <!-- UAT Performance Import -->
-      <div class="stage-chain-box" id="s7a-uat-perf-box" style="background:rgba(15,23,42,.82); border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
+      <div class="stage-chain-box" id="s7a-uat-perf-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
           <div style="color:#86efac; font-weight:800; font-size:14px;">📈 UAT Testing Performance &amp; VM Data</div>
           <button type="button" onclick="s7aLoadUatPerf()" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.4); color:#86efac; padding:4px 12px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:700;">Load from UAT</button>
@@ -10298,7 +10300,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       </div>
 
       <!-- Source Infrastructure Snapshot (reads sessionStorage written by discovery dashboard) -->
-      <div class="stage-chain-box" style="background:rgba(15,23,42,.82); border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
+      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
           <div style="color:#86efac; font-weight:800; font-size:14px;">Source Infrastructure Snapshot</div>
           <button type="button" onclick="s7aRefreshSnapshot()" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.4); color:#86efac; padding:3px 10px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:700;">Refresh</button>
@@ -10306,11 +10308,11 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div id="s7a-infra-cards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;"></div>
         <div id="s7a-infra-empty" style="color:#64748b; font-size:13px; display:none;">No discovery data loaded — load an account_overview.csv in Stage 1 (Analyze OSPC CSV) first.</div>
       </div>
-      <div class="stage-chain-box" style="background:rgba(15,23,42,.72); border:1px solid rgba(34,197,94,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
+      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
         <div style="color:#86efac; font-weight:800; margin-bottom:10px;">Performance Gain chain position</div>
         <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Cost optimization → Performance Gain → IaC backup, DR &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
       </div>
-      <div class="stage-chain-box" style="background:rgba(15,23,42,.82); border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
+      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
         <div style="color:#86efac; font-weight:800; margin-bottom:12px;">Performance benchmark tools</div>
         <div style="display:flex; flex-wrap:wrap; gap:10px;">
           <button type="button" onclick="alert('Sysbench CPU benchmark — run on both OSPC and FLEX VMs:\n\nsysbench cpu --cpu-max-prime=20000 run')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">CPU Benchmark</button>
@@ -10333,7 +10335,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <p style="color:#94a3b8; margin:10px 0 0; max-width:940px; line-height:1.6;">For GitOps/OpenCenter-based redeployments, publish the same recovery pack to the GitOps repository and continue in <strong style="color:#e2e8f0;">Stage 9 — GitOps &amp; OpenCenter Modernization</strong>.</p>
       </div>
 
-      <div class="stage-chain-box" style="background:rgba(15,23,42,.92); border:1px solid rgba(129,140,248,.42); border-radius:10px; padding:18px 20px;">
+      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(129,140,248,.42); border-radius:10px; padding:18px 20px;">
         <div style="color:#c4b5fd; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">How this stage works</div>
         <div style="margin-top:12px; color:#cbd5e1; font-size:13px; line-height:1.7;">
           <p style="margin:0 0 12px;"><strong style="color:#f8fafc;">1. Backup source</strong><br>
@@ -10359,7 +10361,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
-      <div class="stage-chain-box" style="background:rgba(15,23,42,.88); border:1px solid rgba(96,165,250,.38); border-radius:10px; padding:16px 18px;">
+      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(96,165,250,.38); border-radius:10px; padding:16px 18px;">
         <div style="color:#7dd3fc; font-size:14px; font-weight:800; margin-bottom:8px;">1. Backup Source</div>
         <ul id="s7-backup-source-rows" style="margin:0; padding-left:18px; color:#cbd5e1; font-size:13px; line-height:1.65;"></ul>
       </div>
@@ -10367,7 +10369,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <div style="color:#7dd3fc; font-size:14px; font-weight:800; margin-bottom:6px;">2. Target Cloud Profile</div>
         <div style="color:#bfdbfe; font-size:11px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Credentials</div>
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-top:10px;">
-          <div style="background:rgba(0,0,0,.25); border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
+          <div style="background:#e0f2fe; border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
             <h4 style="margin:0 0 8px; color:#cbd5e1;">Source (OSPC/FLEX)</h4>
             <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Username
               <input id="dr_source_username" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
@@ -10376,7 +10378,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               <input id="dr_source_project_id" type="text" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
             </label>
           </div>
-          <div style="background:rgba(0,0,0,.25); border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
+          <div style="background:#e0f2fe; border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:12px;">
             <h4 style="margin:0 0 8px; color:#cbd5e1;">Target Cloud (Flex/OpenStack)</h4>
             <label style="display:flex; flex-direction:column; gap:4px; color:#94a3b8; font-size:12px;">Provider
               <select id="dr_target_provider" onchange="updateDrRestoreUi()" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:7px 9px;">
@@ -10414,7 +10416,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
-      <div class="stage-chain-box" style="padding:16px 18px; background:rgba(15,23,42,.88); border:1px solid rgba(245,158,11,.35); border-radius:10px;">
+      <div class="stage-chain-box" style="padding:16px 18px; background:#e0f2fe; border:1px solid rgba(245,158,11,.35); border-radius:10px;">
         <div style="color:#fcd34d; font-size:14px; font-weight:800; margin-bottom:8px;">3. Restore Readiness</div>
         <ul id="s7-restore-readiness-rows" style="margin:0 0 12px; padding-left:18px; color:#cbd5e1; font-size:13px; line-height:1.65;"></ul>
         <div style="color:#94a3b8; font-size:11px; margin-bottom:8px;">API / bundle evidence (from latest Stage 5 output):</div>
@@ -10423,7 +10425,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
-      <div class="stage-chain-box" style="padding:18px; background:rgba(15,23,42,.85); border:1px solid rgba(99,102,241,.35); border-radius:12px;">
+      <div class="stage-chain-box" style="padding:18px; background:#e0f2fe; border:1px solid rgba(99,102,241,.35); border-radius:12px;">
         <div style="color:#a5b4fc; font-size:14px; font-weight:800; margin-bottom:6px;">4. Restore Path</div>
         <p style="color:#94a3b8; font-size:12px; margin:0 0 12px; max-width:980px; line-height:1.55;">
           <span style="color:#cbd5e1;">Backup scope (both paths):</span> tenant-project metadata and IaC—VM/network/SG/volume <em>definitions</em>, not app binaries or DB row data. Full detail: <code style="color:#7dd3fc;">tenant-iac-dr/dr/BACKUP_SCOPE.md</code>.
@@ -10488,7 +10490,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           </div>
         </div>
       </div>
-      <div class="stage-chain-box" style="padding:16px 18px; background:rgba(15,23,42,.88); border:1px solid rgba(34,197,94,.35); border-radius:10px;">
+      <div class="stage-chain-box" style="padding:16px 18px; background:#e0f2fe; border:1px solid rgba(34,197,94,.35); border-radius:10px;">
         <div style="color:#86efac; font-size:14px; font-weight:800; margin-bottom:8px;">5. Export / Publish Backup</div>
         <ul style="margin:0 0 12px; padding-left:18px; color:#cbd5e1; font-size:13px; line-height:1.65;">
           <li>Export local ZIP</li>
@@ -10509,7 +10511,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
-      <div class="stage-chain-box" style="padding:16px 18px; background:rgba(15,23,42,.88); border:1px solid rgba(59,130,246,.35); border-radius:10px;">
+      <div class="stage-chain-box" style="padding:16px 18px; background:#e0f2fe; border:1px solid rgba(59,130,246,.35); border-radius:10px;">
         <div style="color:#93c5fd; font-size:14px; font-weight:800; margin-bottom:8px;">6. Restore Execution</div>
         <ul style="margin:0; padding-left:18px; color:#cbd5e1; font-size:13px; line-height:1.65;">
           <li>Generate Terraform tfvars</li>
@@ -10522,7 +10524,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </ul>
       </div>
 
-      <div style="padding:16px 18px; background:rgba(15,23,42,.88); border:1px solid rgba(167,139,250,.35); border-radius:10px;">
+      <div style="padding:16px 18px; background:#e0f2fe; border:1px solid rgba(167,139,250,.35); border-radius:10px;">
         <div style="color:#ddd6fe; font-size:14px; font-weight:800; margin-bottom:8px;">7. Handoff</div>
         <p style="margin:0 0 10px; color:#94a3b8; font-size:13px; line-height:1.55;">Continue to Stage 9 — GitOps &amp; OpenCenter Modernization after the recovery pack is published or validated.</p>
         <button type="button" onclick="activateStage('s9')" style="background:rgba(244,114,182,.15); border:1px solid rgba(244,114,182,.45); color:#fbcfe8; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">Continue to Stage 9 — GitOps &amp; OpenCenter Modernization</button>
@@ -10539,7 +10541,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <p style="color:#94a3b8; margin:0; max-width:940px;">Consume the Stage 7 recovery pack: publish backup/restore artifacts, create restore stubs, and drive repeatable redeploy pipelines in another FLEX region or OpenStack cloud.</p>
       </div>
 
-      <div class="stage-chain-box" style="background:rgba(15,23,42,.9); border:1px solid rgba(56,189,248,.4); border-radius:12px; padding:18px 20px;">
+      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(56,189,248,.4); border-radius:12px; padding:18px 20px;">
         <div style="color:#7dd3fc; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Enable GitOps on your repo</div>
         <p style="margin:10px 0 12px; color:#94a3b8; font-size:13px; line-height:1.6;">After <code style="color:#7dd3fc;">push-backup</code>, each bundle includes <code style="color:#7dd3fc;">gitops-flux-stub/kustomization.yaml</code> (empty Kustomize root) so Flux or Argo can use <code style="color:#7dd3fc;">path:</code> immediately. Generate YAML below, apply to the cluster, then extend the stub directory in Git with real resources.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:12px;">
@@ -10561,38 +10563,38 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           <button type="button" id="tab-s8-flux-ks" class="s8-gitops-tab" onclick="selectS8GitopsTab('flux-ks')">Flux Kustomization</button>
           <button type="button" id="tab-s8-argocd" class="s8-gitops-tab" onclick="selectS8GitopsTab('argocd')">Argo CD Application</button>
         </div>
-        <div id="s8-panel-flux-gr" style="display:block; padding:12px; border:1px solid rgba(56,189,248,.35); border-top:none; border-radius:0 0 10px 10px; background:rgba(0,0,0,.25);">
-          <pre id="s8-pre-flux-gr" style="margin:0; max-height:280px; overflow:auto; font-size:11px; line-height:1.45; color:#cbd5e1; white-space:pre-wrap; word-break:break-word;">Click “Generate Flux / Argo snippets” (requires a Stage 5 bundle for the active customer).</pre>
+        <div id="s8-panel-flux-gr" style="display:block; padding:12px; border:1px solid rgba(56,189,248,.35); border-top:none; border-radius:0 0 10px 10px; background:#e0f2fe;">
+          <pre id="s8-pre-flux-gr" style="margin:0; max-height:280px; overflow:auto; font-size:11px; line-height:1.45; color:#0c4a6e; white-space:pre-wrap; word-break:break-word;">Click “Generate Flux / Argo snippets” (requires a Stage 5 bundle for the active customer).</pre>
         </div>
-        <div id="s8-panel-flux-ks" style="display:none; padding:12px; border:1px solid rgba(56,189,248,.35); border-top:none; border-radius:0 0 10px 10px; background:rgba(0,0,0,.25);">
-          <pre id="s8-pre-flux-ks" style="margin:0; max-height:280px; overflow:auto; font-size:11px; line-height:1.45; color:#cbd5e1; white-space:pre-wrap; word-break:break-word;"></pre>
+        <div id="s8-panel-flux-ks" style="display:none; padding:12px; border:1px solid rgba(56,189,248,.35); border-top:none; border-radius:0 0 10px 10px; background:#e0f2fe;">
+          <pre id="s8-pre-flux-ks" style="margin:0; max-height:280px; overflow:auto; font-size:11px; line-height:1.45; color:#0c4a6e; white-space:pre-wrap; word-break:break-word;"></pre>
         </div>
-        <div id="s8-panel-argocd" style="display:none; padding:12px; border:1px solid rgba(56,189,248,.35); border-top:none; border-radius:0 0 10px 10px; background:rgba(0,0,0,.25);">
-          <pre id="s8-pre-argocd" style="margin:0; max-height:280px; overflow:auto; font-size:11px; line-height:1.45; color:#cbd5e1; white-space:pre-wrap; word-break:break-word;"></pre>
+        <div id="s8-panel-argocd" style="display:none; padding:12px; border:1px solid rgba(56,189,248,.35); border-top:none; border-radius:0 0 10px 10px; background:#e0f2fe;">
+          <pre id="s8-pre-argocd" style="margin:0; max-height:280px; overflow:auto; font-size:11px; line-height:1.45; color:#0c4a6e; white-space:pre-wrap; word-break:break-word;"></pre>
         </div>
       </div>
 
       <div style="display:grid; grid-template-columns:minmax(260px,1fr) 38px minmax(260px,1fr) 38px minmax(280px,1.1fr); gap:14px; align-items:center; font-family:'Share Tech Mono',monospace;">
-        <div style="background:rgba(0,0,0,.28); border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:16px;">
+        <div style="background:#e0f2fe; border:1px solid rgba(56,189,248,.3); border-radius:8px; padding:16px;">
           <h3 style="margin:0 0 10px; color:#7dd3fc;">Inputs</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">migration manifest<br>terraform vars<br>ansible inventory<br>tenant iac-dr pack<br>backup scope</div>
+          <div style="color:#0c4a6e; font-size:12px; line-height:1.7;">migration manifest<br>terraform vars<br>ansible inventory<br>tenant iac-dr pack<br>backup scope</div>
         </div>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
-        <div style="background:rgba(0,0,0,.28); border:1px solid rgba(34,197,94,.3); border-radius:8px; padding:16px;">
+        <div style="background:#e0f2fe; border:1px solid rgba(34,197,94,.3); border-radius:8px; padding:16px;">
           <h3 style="margin:0 0 10px; color:#86efac;">Actions</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">push backup to gitops repo<br>prepare opencenter restore stubs<br>tag + commit orchestration<br>optional remote push</div>
+          <div style="color:#0c4a6e; font-size:12px; line-height:1.7;">push backup to gitops repo<br>prepare opencenter restore stubs<br>tag + commit orchestration<br>optional remote push</div>
         </div>
         <div style="text-align:center; color:#f9a8d4; font-size:28px;">→</div>
-        <div style="background:rgba(0,0,0,.28); border:1px solid rgba(244,114,182,.35); border-radius:8px; padding:16px;">
+        <div style="background:#e0f2fe; border:1px solid rgba(244,114,182,.35); border-radius:8px; padding:16px;">
           <h3 style="margin:0 0 10px; color:#f9a8d4;">Outputs</h3>
-          <div style="color:#cbd5e1; font-size:12px; line-height:1.7;">gitops backup manifest<br>opencenter restore pack<br>restore scripts + runbooks<br>commit/tag metadata</div>
+          <div style="color:#0c4a6e; font-size:12px; line-height:1.7;">gitops backup manifest<br>opencenter restore pack<br>restore scripts + runbooks<br>commit/tag metadata</div>
         </div>
       </div>
 
       <div class="stage-fcard-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Private AI Context</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Sensitive customer migration evidence stays packaged for private AI workflows instead of generic public prompting.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Autorepair Intelligence</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Failed boot, network, service, and dependency signals become repair plans with risk and rollback notes.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine IAC DR runbooks after each wave.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #f472b6; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Private AI Context</h3><p style="margin:0; color:#0369a1; font-size:13px;">Sensitive customer migration evidence stays packaged for private AI workflows instead of generic public prompting.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #f59e0b; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#fcd34d;">Autorepair Intelligence</h3><p style="margin:0; color:#0369a1; font-size:13px;">Failed boot, network, service, and dependency signals become repair plans with risk and rollback notes.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Optimization Loop</h3><p style="margin:0; color:#0369a1; font-size:13px;">Right-size flavors, improve Terraform/Ansible, and refine IAC DR runbooks after each wave.</p></div>
       </div>
     </div>
   </div>
@@ -10606,9 +10608,9 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <p style="color:#94a3b8; margin:0; max-width:940px;">AIOps consumes Cloud Jumper, FinOps, IaC, and GitOps / OpenCenter outputs to produce optimization and autorepair recommendations backed by GitOps-ready artifacts.</p>
       </div>
       <div class="stage-fcard-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px;">
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #7dd3fc; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size recommendations, capacity tuning, and infra patch proposals.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #f9a8d4; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Autorepair</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Boot, network, service, and runbook remediation plans with rollback hints.</p></div>
-        <div style="background:rgba(0,0,0,.28); border-left:4px solid #86efac; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">GitOps Delivery</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Publish AIOps outputs as reviewable change candidates for GitOps pipelines.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #7dd3fc; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#7dd3fc;">Optimization</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Right-size recommendations, capacity tuning, and infra patch proposals.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #f9a8d4; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#f9a8d4;">Autorepair</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Boot, network, service, and runbook remediation plans with rollback hints.</p></div>
+        <div style="background:#e0f2fe; border-left:4px solid #86efac; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">GitOps Delivery</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Publish AIOps outputs as reviewable change candidates for GitOps pipelines.</p></div>
       </div>
     </div>
   </div>
@@ -10898,7 +10900,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
       zipBtn +
       (otherLinks ? '<details style="margin-top:12px;color:#94a3b8;font-size:12px;"><summary style="cursor:pointer;color:#7dd3fc;font-weight:600;">All artifact download links</summary><div style="margin-top:8px;">' + otherLinks + '</div></details>' : '') +
       '</div>' +
-      '<div style="margin-top:12px;padding:14px 16px;background:rgba(15,23,42,.75);border:1px solid rgba(129,140,248,.38);border-radius:8px;">' +
+      '<div style="margin-top:12px;padding:14px 16px;background:#e0f2fe;border:1px solid rgba(129,140,248,.38);border-radius:8px;">' +
       '<div style="color:#ddd6fe;font-weight:800;margin-bottom:6px;font-size:13px;">2. Push to GitOps repo (optional)</div>' +
       '<p style="margin:0 0 10px;color:#94a3b8;font-size:12px;line-height:1.55;">Runs on the <strong style="color:#cbd5e1;">server</strong> that hosts this dashboard: copies this stamp into <code style="color:#7dd3fc;">GITOPS_REPO_PATH</code> or <code style="color:#7dd3fc;">IAC_BACKUP_GIT_REPO_PATH</code> (must be a Git clone that path can access). Set <code style="color:#7dd3fc;">GITOPS_PUSH_AFTER_COMMIT=true</code> to also <code style="color:#7dd3fc;">git push</code>. Same endpoint as Stage 7: <code style="color:#7dd3fc;">POST /api/gitops/push-backup</code>.</p>' +
       '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px;">' +
@@ -11576,7 +11578,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     });
     if (!warnings.length) warnings.push(['No high-signal warnings', 'No DB, important mount, mixed workload, failed scan, or IP dependency flags were found.', '#22c55e']);
     box.innerHTML = warnings.map(w => (
-      '<div style="border:1px solid ' + w[2] + '66;border-left:4px solid ' + w[2] + ';border-radius:8px;background:rgba(15,23,42,.48);padding:10px;">' +
+      '<div style="border:1px solid ' + w[2] + '66;border-left:4px solid ' + w[2] + ';border-radius:8px;background:#e0f2fe;padding:10px;">' +
       '<div style="color:' + w[2] + ';font-weight:900;">' + escapeHtmlDr(w[0]) + '</div>' +
       '<div style="color:#cbd5e1;font-size:12px;margin-top:4px;line-height:1.4;">' + escapeHtmlDr(w[1]) + '</div>' +
       '</div>'
@@ -12839,7 +12841,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         nextBody.innerHTML =
           '<div style="color:#ef4444;font-weight:700;margin-bottom:6px;">Service comparison found ' + criticalMissing.length + ' gap(s) needing attention before proceeding.</div>' +
           '<div style="color:#94a3b8;font-size:13px;margin-bottom:8px;">Start the missing service(s) on FLEX, or confirm they are intentionally absent, before running Post-Migration Health Validation.</div>' +
-          '<div style="font-size:12px;color:#fca5a5;font-family:monospace;background:rgba(0,0,0,.3);padding:8px 12px;border-radius:4px;margin-bottom:10px;">' +
+          '<div style="font-size:12px;color:#fca5a5;font-family:monospace;background:#e0f2fe;padding:8px 12px;border-radius:4px;margin-bottom:10px;">' +
           criticalMissing.map(function(s){ return 'sudo systemctl start ' + s; }).join('<br>') + '</div>' +
           '<button class="uat-btn" onclick="svcCompareRun()">Re-run Comparison</button>';
       }
@@ -14633,7 +14635,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     const color = backend === 'green' ? '#22c55e' : (backend === 'blue' ? '#38bdf8' : '#ef4444');
     const label = backend === 'green' ? 'FLEX' : (backend === 'blue' ? 'OSPC' : backend.toUpperCase());
     probes.insertAdjacentHTML('beforeend',
-      '<span title="' + escapeHtmlDr(match[4] + ' / ' + match[5] + ' ms') + '" style="border:1px solid ' + color + ';color:' + color + ';background:rgba(15,23,42,.88);border-radius:999px;padding:3px 7px;font-size:10px;font-weight:900;">' +
+      '<span title="' + escapeHtmlDr(match[4] + ' / ' + match[5] + ' ms') + '" style="border:1px solid ' + color + ';color:' + color + ';background:#e0f2fe;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:900;">' +
       escapeHtmlDr(match[1]) + ' ' + label + '</span>');
   }
 
@@ -16336,9 +16338,9 @@ ${certContent}
     emptyEl.style.display = 'none';
     var c = snap.compute, s = snap.storage;
     function ic(label, value, color) {
-      return '<div style="background:rgba(0,0,0,.32); border:1px solid ' + (color||'rgba(34,197,94,.3)') + '; border-radius:8px; padding:12px 14px;">' +
-        '<div style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">' + label + '</div>' +
-        '<div style="font-size:18px; font-weight:800; color:#dcfce7;">' + value + '</div></div>';
+      return '<div style="background:#e0f2fe; border:1px solid ' + (color||'rgba(34,197,94,.3)') + '; border-radius:8px; padding:12px 14px;">' +
+        '<div style="font-size:11px; color:#0369a1; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">' + label + '</div>' +
+        '<div style="font-size:18px; font-weight:800; color:#0c4a6e;">' + value + '</div></div>';
     }
     var html = '';
     if (c.servers) {
@@ -16371,10 +16373,10 @@ ${certContent}
       + '<div style="overflow:auto; border:1px solid rgba(100,116,139,.2); border-radius:7px; max-height:200px;">'
       + '<table style="width:100%; border-collapse:collapse; min-width:480px;">'
       + '<thead><tr>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:rgba(0,0,0,.25); border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">Server Name</th>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#3b82f6; background:rgba(0,0,0,.25); border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">OSPC Source IP</th>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#22c55e; background:rgba(0,0,0,.25); border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">FLEX Target IP</th>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:rgba(0,0,0,.25); border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">Type</th>'
+      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">Server Name</th>'
+      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#3b82f6; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">OSPC Source IP</th>'
+      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#22c55e; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">FLEX Target IP</th>'
+      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">Type</th>'
       + '</tr></thead>'
       + '<tbody>' + rows + '</tbody>'
       + '</table></div></div>';
@@ -16445,8 +16447,8 @@ ${certContent}
       return '<div style="display:grid; grid-template-columns:110px 1fr 56px; align-items:center; gap:8px; margin-bottom:8px;">'
         + '<div style="font-size:12px; color:#94a3b8;">' + m.label + '</div>'
         + '<div>'
-        + '<div style="display:flex; align-items:center; gap:4px; margin-bottom:3px;"><span style="font-size:10px; color:#3b82f6; width:28px;">SRC</span><div style="flex:1; background:rgba(0,0,0,.3); border-radius:3px; height:8px;"><div style="width:'+sp+'%; height:100%; background:#3b82f6; border-radius:3px;"></div></div><span style="font-size:10px; color:#94a3b8; width:46px; text-align:right;">' + m.src + ' ' + m.unit + '</span></div>'
-        + '<div style="display:flex; align-items:center; gap:4px;"><span style="font-size:10px; color:#22c55e; width:28px;">TGT</span><div style="flex:1; background:rgba(0,0,0,.3); border-radius:3px; height:8px;"><div style="width:'+tp+'%; height:100%; background:#22c55e; border-radius:3px;"></div></div><span style="font-size:10px; color:#94a3b8; width:46px; text-align:right;">' + m.tgt + ' ' + m.unit + '</span></div>'
+        + '<div style="display:flex; align-items:center; gap:4px; margin-bottom:3px;"><span style="font-size:10px; color:#3b82f6; width:28px;">SRC</span><div style="flex:1; background:#e0f2fe; border-radius:3px; height:8px;"><div style="width:'+sp+'%; height:100%; background:#3b82f6; border-radius:3px;"></div></div><span style="font-size:10px; color:#94a3b8; width:46px; text-align:right;">' + m.src + ' ' + m.unit + '</span></div>'
+        + '<div style="display:flex; align-items:center; gap:4px;"><span style="font-size:10px; color:#22c55e; width:28px;">TGT</span><div style="flex:1; background:#e0f2fe; border-radius:3px; height:8px;"><div style="width:'+tp+'%; height:100%; background:#22c55e; border-radius:3px;"></div></div><span style="font-size:10px; color:#94a3b8; width:46px; text-align:right;">' + m.tgt + ' ' + m.unit + '</span></div>'
         + '</div>'
         + '<div style="font-size:12px; font-weight:800; color:' + gainColor + '; text-align:right;">' + (parseFloat(gain) > 0 ? '+' : '') + gain + '%</div>'
         + '</div>';
