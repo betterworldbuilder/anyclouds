@@ -10275,52 +10275,151 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 
   <!-- Stage 7 — Performance Gain -->
   <div class="panel" id="panel-s7a">
-    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
-      <div class="stage-hero" style="background:radial-gradient(circle at top left, rgba(34,197,94,.2), rgba(2,6,23,.92)); border:1px solid rgba(34,197,94,.36); border-radius:12px; padding:24px;">
-        <div style="color:#86efac; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Stage 7</div>
-        <h2 style="margin:8px 0 10px; color:#dcfce7; font-family:'Orbitron',sans-serif;">Performance Gain</h2>
-        <p style="color:#94a3b8; margin:0; max-width:940px;">Measure and document performance improvements after migration: compute throughput, I/O latency, network performance, application response time, and right-sizing opportunities unlocked by FLEX modern instance types.</p>
-      </div>
-      <div class="stage-fcard-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px;">
-        <div style="background:#e0f2fe; border-left:4px solid #22c55e; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Compute Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare vCPU frequency, memory bandwidth, and instance type generation between OSPC source and FLEX target flavors.</p></div>
-        <div style="background:#e0f2fe; border-left:4px solid #34d399; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#6ee7b7;">Storage I/O Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Measure IOPS, throughput (MB/s), and latency improvements from OSPC Cinder volumes to FLEX block storage.</p></div>
-        <div style="background:#e0f2fe; border-left:4px solid #4ade80; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#86efac;">Network Gain</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Compare network throughput, inter-node latency, and public IP bandwidth between OSPC and FLEX environments.</p></div>
-        <div style="background:#e0f2fe; border-left:4px solid #a3e635; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#bef264;">App Response Time</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Record application-level response time, DB query latency, and API call durations before and after cutover.</p></div>
-        <div style="background:#e0f2fe; border-left:4px solid #84cc16; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#d9f99d;">Right-Sizing Wins</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Identify VMs running on oversized OSPC flavors that can be migrated to smaller, cheaper FLEX flavors with equivalent performance.</p></div>
-        <div style="background:#e0f2fe; border-left:4px solid #22d3ee; border-radius:8px; padding:16px;"><h3 style="margin:0 0 8px; color:#67e8f9;">Performance Report</h3><p style="margin:0; color:#94a3b8; font-size:13px;">Generate a before/after performance comparison report as evidence for customer sign-off and modernization ROI.</p></div>
-      </div>
-      <!-- UAT Performance Import -->
-      <div class="stage-chain-box" id="s7a-uat-perf-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-          <div style="color:#86efac; font-weight:800; font-size:14px;">📈 UAT Testing Performance &amp; VM Data</div>
-          <button type="button" onclick="s7aLoadUatPerf()" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.4); color:#86efac; padding:4px 12px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:700;">Load from UAT</button>
-          <span id="s7a-uat-perf-ts" style="color:#64748b; font-size:11px;"></span>
+    <div class="info-panel" style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- ── Header ── -->
+      <div class="stage-hero" style="background:radial-gradient(circle at top left,rgba(34,197,94,.18),rgba(2,6,23,.92));border:1px solid rgba(34,197,94,.36);border-radius:12px;padding:24px;">
+        <div style="color:#86efac;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <h2 style="margin:8px 0 6px;color:#dcfce7;font-family:'Orbitron',sans-serif;">Performance Gain</h2>
+        <p style="color:#94a3b8;margin:0 0 16px;max-width:940px;font-size:13px;line-height:1.6;">Import UAT baseline and cutover execution results to prove performance, sizing, and cost improvements after migration.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" onclick="s7aImportUAT()" style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.55);color:#86efac;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">📥 Import From UAT</button>
+          <button type="button" onclick="s7aImportCutover()" style="background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.45);color:#7dd3fc;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">📥 Import From Cutover</button>
+          <button type="button" onclick="s7aRefreshAll()" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.45);color:#c4b5fd;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">🔄 Refresh All</button>
+          <button type="button" onclick="s7aExportReport()" style="background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);color:#fcd34d;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">📄 Export Performance Gain Report</button>
         </div>
-        <div id="s7a-uat-perf-content" style="color:#64748b; font-size:13px;">No UAT data found — run UAT testing in Stage 3 to generate performance and VM comparison data.</div>
       </div>
 
-      <!-- Source Infrastructure Snapshot (reads sessionStorage written by discovery dashboard) -->
-      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-          <div style="color:#86efac; font-weight:800; font-size:14px;">Source Infrastructure Snapshot</div>
-          <button type="button" onclick="s7aRefreshSnapshot()" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.4); color:#86efac; padding:3px 10px; border-radius:5px; cursor:pointer; font-size:11px; font-weight:700;">Refresh</button>
+      <!-- ── 1. Import Status Summary ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(14,165,233,.35);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">Performance Gain Data Sources</div>
+        <div id="s7a-status-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div class="s7a-src-card" id="s7a-src-uat" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">UAT Baseline</div>
+            <div id="s7a-src-uat-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-uat-ts" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+            <div id="s7a-src-uat-id" style="font-size:11px;color:#64748b;"></div>
+          </div>
+          <div class="s7a-src-card" id="s7a-src-co" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">Cutover Result</div>
+            <div id="s7a-src-co-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-co-ts" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+            <div id="s7a-src-co-id" style="font-size:11px;color:#64748b;"></div>
+          </div>
+          <div class="s7a-src-card" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">Post-Cutover Monitoring</div>
+            <div id="s7a-src-mon-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-mon-ts" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+          </div>
+          <div class="s7a-src-card" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">TCO Pricing</div>
+            <div id="s7a-src-tco-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-tco-note" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+          </div>
         </div>
-        <div id="s7a-infra-cards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px;"></div>
-        <div id="s7a-infra-empty" style="color:#64748b; font-size:13px; display:none;">No discovery data loaded — load an account_overview.csv in Stage 1 (Analyze OSPC CSV) first.</div>
+        <div id="s7a-status-msg" style="margin-top:12px;padding:10px;border-radius:6px;font-size:12px;display:none;"></div>
       </div>
-      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.28); border-radius:10px; padding:18px; font-family:'Share Tech Mono',monospace;">
-        <div style="color:#86efac; font-weight:800; margin-bottom:10px;">Performance Gain chain position</div>
-        <div style="color:#cbd5e1; line-height:1.8; font-size:13px;">Cost optimization → Performance Gain → IaC backup, DR &amp; restore → GitOps &amp; OpenCenter modernization → AIOps loop</div>
+
+      <!-- ── 2. Imported UAT Baseline ── -->
+      <div class="stage-chain-box" id="s7a-uat-section" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.32);border-radius:10px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="color:#0284c7;font-weight:800;font-size:14px;">📊 Imported UAT Baseline</div>
+          <span style="font-size:11px;color:#0369a1;background:#bae6fd;padding:2px 8px;border-radius:4px;">Source: Stage 3 — UAT Validation</span>
+          <span id="s7a-uat-ts" style="font-size:11px;color:#64748b;margin-left:auto;"></span>
+        </div>
+        <div id="s7a-uat-content" style="color:#64748b;font-size:13px;">Awaiting UAT baseline — click <strong>Import From UAT</strong> or run UAT testing in Stage 3.</div>
       </div>
-      <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(34,197,94,.32); border-radius:10px; padding:18px;">
-        <div style="color:#86efac; font-weight:800; margin-bottom:12px;">Performance benchmark tools</div>
-        <div style="display:flex; flex-wrap:wrap; gap:10px;">
-          <button type="button" onclick="alert('Sysbench CPU benchmark — run on both OSPC and FLEX VMs:\n\nsysbench cpu --cpu-max-prime=20000 run')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">CPU Benchmark</button>
-          <button type="button" onclick="alert('Disk I/O benchmark (fio):\n\nfio --name=randread --ioengine=libaio --iodepth=16 --rw=randread --bs=4k --direct=1 --size=1G --numjobs=4 --runtime=60 --group_reporting')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">Disk I/O Benchmark</button>
-          <button type="button" onclick="alert('Network throughput (iperf3):\n\n# On target FLEX VM:\niperf3 -s\n\n# From jumphost:\niperf3 -c FLEX_VM_IP -t 30')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">Network Benchmark</button>
-          <button type="button" onclick="alert('HTTP response time check:\n\ncurl -s -o /dev/null -w \"%{time_total}\\n\" -X GET http://APP_IP/health')" style="background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.48); color:#bbf7d0; padding:8px 12px; border-radius:7px; cursor:pointer; font-weight:800;">App Response Time</button>
+
+      <!-- ── 3. Imported Cutover Result ── -->
+      <div class="stage-chain-box" id="s7a-co-section" style="background:#e0f2fe;border:1px solid rgba(56,189,248,.32);border-radius:10px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="color:#0284c7;font-weight:800;font-size:14px;">⚡ Imported Cutover Result</div>
+          <span style="font-size:11px;color:#0369a1;background:#bae6fd;padding:2px 8px;border-radius:4px;">Source: Stage 4/4B — Cutover Execution</span>
+          <span id="s7a-co-ts" style="font-size:11px;color:#64748b;margin-left:auto;"></span>
+        </div>
+        <div id="s7a-co-content" style="color:#64748b;font-size:13px;">Awaiting cutover result — click <strong>Import From Cutover</strong> or complete cutover in Stage 4/4B.</div>
+      </div>
+
+      <!-- ── 4. Before / After Performance Comparison ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(14,165,233,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:4px;">📈 Performance Comparison — UAT Baseline vs Post-Cutover FLEX</div>
+        <div style="color:#0369a1;font-size:12px;margin-bottom:14px;">Lower is better for latency, error rate, CPU/memory pressure. Higher is better for throughput, success rate, IOPS.</div>
+        <div id="s7a-comparison-table">
+          <div style="color:#64748b;font-size:13px;padding:20px;text-align:center;">Import UAT baseline and cutover results to see before/after comparison.</div>
         </div>
       </div>
+
+      <!-- ── 5. VM Size / Resource Comparison ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">🖥 VM Size / Resource Comparison</div>
+        <div id="s7a-vm-sizing" style="color:#64748b;font-size:13px;">Import UAT baseline to see VM sizing comparison.</div>
+      </div>
+
+      <!-- ── 6. TCO Cost Estimation ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(251,191,36,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">💰 TCO Cost Estimation</div>
+        <div id="s7a-tco-content">
+          <div style="color:#64748b;font-size:13px;">Import UAT baseline to load TCO estimate. FLEX price list is required for accurate savings calculation.</div>
+        </div>
+        <div id="s7a-tco-optimization" style="margin-top:12px;display:none;"></div>
+      </div>
+
+      <!-- ── 7. System Health Radar ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(167,139,250,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">🎯 System Health Radar</div>
+        <div id="s7a-health-radar" style="color:#64748b;font-size:13px;">Import cutover result to see system health scores.</div>
+      </div>
+
+      <!-- ── 8. Performance Trend ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(56,189,248,.28);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:6px;">📉 Performance Trend</div>
+        <div style="color:#0369a1;font-size:11px;margin-bottom:12px;">Trend data is imported from post-cutover monitoring.</div>
+        <div id="s7a-trend-content" style="color:#64748b;font-size:13px;">Awaiting monitoring trend data — import cutover result to populate.</div>
+      </div>
+
+      <!-- ── 9. Top Transactions ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(251,146,60,.28);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">🔄 Top Transactions</div>
+        <div id="s7a-transactions" style="color:#64748b;font-size:13px;">Import cutover result to see top transaction performance.</div>
+      </div>
+
+      <!-- ── 10. Performance Gain Summary ── -->
+      <div class="stage-chain-box" id="s7a-gain-summary-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.4);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:16px;margin-bottom:14px;">🏆 Performance Gain Summary</div>
+        <div id="s7a-gain-summary">
+          <div style="color:#64748b;font-size:13px;padding:20px;text-align:center;">Import both UAT baseline and cutover result to calculate performance gain.</div>
+        </div>
+      </div>
+
+      <!-- ── 11. Right-Sizing Recommendations ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.28);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:6px;">⚙️ Right-Sizing Recommendations</div>
+        <div style="color:#0369a1;font-size:11px;margin-bottom:12px;">Recommendations require evidence from UAT, cutover, or monitoring. Downsize only recommended when performance is stable.</div>
+        <div id="s7a-rightsizing" style="color:#64748b;font-size:13px;">Import UAT baseline and cutover result to generate recommendations.</div>
+      </div>
+
+      <!-- ── 12. Compute Optimization Recommendation ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:4px;">🔧 Compute Optimization Recommendation</div>
+        <div style="color:#0369a1;font-size:12px;margin-bottom:14px;">Use utilization, performance, flavor maps, and TCO files to recommend right-sized FLEX compute options.</div>
+        <div id="s7a-compute-opt-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;"></div>
+        <div id="s7a-compute-opt-table" style="color:#64748b;font-size:13px;">Import UAT baseline and cutover result to generate compute optimization recommendations.</div>
+        <div id="s7a-compute-opt-flavor-status" style="margin-top:10px;font-size:11px;color:#64748b;"></div>
+        <div style="margin-top:12px;padding:10px;background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;border-radius:4px;font-size:11px;color:#0369a1;line-height:1.5;">
+          <strong>⚠️ Advisory Only:</strong> Optimization recommendations are advisory. Apply changes only after owner approval, change control, and additional validation.
+        </div>
+      </div>
+
+      <!-- ── 13. Source Infrastructure Snapshot ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.32);border-radius:10px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="color:#0284c7;font-weight:800;font-size:14px;">Source Infrastructure Snapshot</div>
+          <button type="button" onclick="s7aRefreshSnapshot()" style="background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.4);color:#0284c7;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">Refresh</button>
+        </div>
+        <div id="s7a-infra-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;"></div>
+        <div id="s7a-infra-empty" style="color:#64748b;font-size:13px;display:none;">No discovery data loaded.</div>
+      </div>
+
     </div>
   </div>
 
@@ -16321,9 +16420,814 @@ ${certContent}
       }
     }
     requestAnimationFrame(syncVisibleIframeHeights);
-    if (stageId === 's7a') { try { s7aRefreshSnapshot(); } catch(e) {} }
+    if (stageId === 's7a') { try { s7aRefreshAll(); } catch(e) {} }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Stage 7 — Performance Gain  (import-based, no hardcoded values)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /* ── State model ── */
+  var _s7State = {
+    uatBaseline:    { imported: false, importedAt: null, data: null },
+    cutoverResult:  { imported: false, importedAt: null, data: null },
+    flavorMap:      null,
+    tcoData:        null
+  };
+
+  var _S7_STALE_HOURS = 24;
+
+  function _s7Esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function _s7Badge(label, color, bg) {
+    return '<span style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:4px;color:'+color+';background:'+bg+';">'+label+'</span>';
+  }
+  function _s7IsStale(isoTs) {
+    if (!isoTs) return true;
+    return (Date.now() - new Date(isoTs).getTime()) > _S7_STALE_HOURS * 3600000;
+  }
+
+  /* ── Import UAT Baseline ── */
+  function s7aImportUAT() {
+    var raw = null, scope = null, uatData = null, workloadScope = null;
+    try { raw           = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
+    try { scope         = JSON.parse(localStorage.getItem('osflex_uat_scope')        || 'null'); } catch(_) {}
+    try { uatData       = JSON.parse(localStorage.getItem('uatData')                 || 'null'); } catch(_) {}
+    try { workloadScope = JSON.parse(localStorage.getItem('uat_workload_scope')      || 'null'); } catch(_) {}
+    var ts = localStorage.getItem('osflex_uat_flavor_ts') || localStorage.getItem('osflex_uat_scope_ts') || '';
+
+    _s7State.uatBaseline = {
+      imported:   !!(raw || scope),
+      importedAt: new Date().toISOString(),
+      data: { raw: raw, scope: scope, uatData: uatData, workloadScope: workloadScope, sourceTs: ts }
+    };
+    try { localStorage.setItem('s7a_uat_baseline', JSON.stringify(_s7State.uatBaseline)); } catch(_) {}
+    s7aRender();
+    var tsEl = document.getElementById('s7a-uat-ts');
+    if (tsEl) tsEl.textContent = ts ? 'From UAT: ' + ts.replace('T',' ').slice(0,16) + ' UTC' : ('Imported: ' + new Date().toLocaleTimeString());
+  }
+
+  /* ── Import Cutover Result ── */
+  function s7aImportCutover() {
+    var valRec = null;
+    try { valRec = JSON.parse(localStorage.getItem('co_validation_record_v1') || 'null'); } catch(_) {}
+
+    // Collect DOM performance fields from Stage 4 cutover tester
+    function _gv(id) { var e = document.getElementById(id); return e ? (e.value || e.textContent || '').trim() : ''; }
+    var perfFields = {
+      ospcAvgResponseMs:   parseFloat(_gv('cutover_perf_ospc_avg_response_ms'))  || null,
+      flexAvgResponseMs:   parseFloat(_gv('cutover_perf_flex_avg_response_ms'))  || null,
+      ospcP95Ms:           parseFloat(_gv('cutover_perf_ospc_p95_ms'))            || null,
+      flexP95Ms:           parseFloat(_gv('cutover_perf_flex_p95_ms'))            || null,
+      apiErrorRatePct:     parseFloat(_gv('cutover_perf_api_error_rate_percent')) || null,
+      dbAvgQueryMs:        parseFloat(_gv('cutover_perf_db_avg_query_ms'))        || null,
+      networkLatencyMs:    parseFloat(_gv('cutover_perf_network_latency_ms'))     || null,
+      uploadMbps:          parseFloat(_gv('cutover_perf_upload_mbps'))            || null,
+      downloadMbps:        parseFloat(_gv('cutover_perf_download_mbps'))          || null,
+      performanceStatus:   _gv('cutover_perf_performance_status'),
+      avgResponseDelta:    _gv('cutover_perf_avg_response_delta'),
+      p95Delta:            _gv('cutover_perf_p95_delta')
+    };
+
+    // Collect cutover tester results table rows
+    var rows = [];
+    try {
+      var tbody = document.getElementById('cutover_tester_results_body');
+      if (tbody) {
+        tbody.querySelectorAll('tr').forEach(function(tr) {
+          var cells = tr.querySelectorAll('td');
+          if (cells.length > 3) {
+            rows.push({
+              name:    (cells[0]||{}).textContent || '',
+              status:  (cells[1]||{}).textContent || '',
+              metric:  (cells[2]||{}).textContent || '',
+              result:  (cells[3]||{}).textContent || ''
+            });
+          }
+        });
+      }
+    } catch(_) {}
+
+    // Advanced dashboard health data
+    var advHealth = null;
+    try {
+      var advEl = document.getElementById('co-adv-dash');
+      if (advEl) {
+        var scoreEls = advEl.querySelectorAll('[data-health-score],[class*="health-score"]');
+        if (scoreEls.length) {
+          advHealth = {};
+          scoreEls.forEach(function(el) {
+            var k = el.dataset.healthScore || el.className;
+            advHealth[k] = el.textContent.trim();
+          });
+        }
+      }
+    } catch(_) {}
+
+    // Traffic ramp data
+    var trafficRamp = null;
+    try {
+      var tfEl = document.getElementById('cutover_bluegreen_body');
+      if (tfEl && tfEl.rows.length) {
+        trafficRamp = { rows: tfEl.rows.length };
+        var lastRow = tfEl.rows[tfEl.rows.length - 1];
+        if (lastRow) trafficRamp.lastEntry = lastRow.textContent.trim().slice(0,200);
+      }
+    } catch(_) {}
+
+    _s7State.cutoverResult = {
+      imported:   !!(valRec || perfFields.performanceStatus),
+      importedAt: new Date().toISOString(),
+      data: {
+        validationRecord: valRec,
+        perfFields:       perfFields,
+        testRows:         rows,
+        advHealth:        advHealth,
+        trafficRamp:      trafficRamp
+      }
+    };
+    try { localStorage.setItem('s7a_cutover_result', JSON.stringify(_s7State.cutoverResult)); } catch(_) {}
+    s7aRender();
+    var tsEl = document.getElementById('s7a-co-ts');
+    if (tsEl) tsEl.textContent = 'Imported: ' + new Date().toLocaleTimeString();
+  }
+
+  /* ── Refresh All ── */
+  function s7aRefreshAll() {
+    // Restore from localStorage first
+    try {
+      var ub = JSON.parse(localStorage.getItem('s7a_uat_baseline')   || 'null'); if (ub) _s7State.uatBaseline   = ub;
+      var cr = JSON.parse(localStorage.getItem('s7a_cutover_result') || 'null'); if (cr) _s7State.cutoverResult = cr;
+    } catch(_) {}
+    // Also re-import live data if available
+    s7aImportUAT();
+    s7aImportCutover();
+    s7aRefreshSnapshot();
+  }
+
+  /* ── Main Render ── */
+  function s7aRender() {
+    s7aRenderStatus();
+    s7aRenderUatBaseline();
+    s7aRenderCutoverResult();
+    s7aRenderComparison();
+    s7aRenderVmSizing();
+    s7aRenderTco();
+    s7aRenderHealthRadar();
+    s7aRenderTrend();
+    s7aRenderTransactions();
+    s7aRenderGainSummary();
+    s7aRenderRightSizing();
+    s7aRenderComputeOpt();
+  }
+
+  /* ── Status Summary ── */
+  function s7aRenderStatus() {
+    var ub = _s7State.uatBaseline, cr = _s7State.cutoverResult;
+    function statusBadge(ok, stale) {
+      if (!ok)    return '<span style="color:#ef4444;font-weight:800;">Missing</span>';
+      if (stale)  return '<span style="color:#f59e0b;font-weight:800;">Stale</span>';
+      return '<span style="color:#22c55e;font-weight:800;">Imported ✓</span>';
+    }
+    var uatOk = ub && ub.imported;
+    var uatStale = uatOk && _s7IsStale(ub.importedAt);
+    var coOk  = cr && cr.imported;
+    var coStale = coOk && _s7IsStale(cr.importedAt);
+
+    var el;
+    el = document.getElementById('s7a-src-uat-status'); if (el) el.innerHTML = statusBadge(uatOk, uatStale);
+    el = document.getElementById('s7a-src-uat-ts');
+    if (el && ub && ub.data && ub.data.sourceTs) el.textContent = ub.data.sourceTs.replace('T',' ').slice(0,16) + ' UTC';
+    el = document.getElementById('s7a-src-co-status');  if (el) el.innerHTML = statusBadge(coOk,  coStale);
+    el = document.getElementById('s7a-src-co-ts');
+    if (el && cr && cr.importedAt) el.textContent = 'At: ' + new Date(cr.importedAt).toLocaleString();
+    el = document.getElementById('s7a-src-mon-status'); if (el) el.innerHTML = coOk ? '<span style="color:#22c55e;font-weight:800;">Available</span>' : '<span style="color:#94a3b8;font-weight:800;">Missing</span>';
+
+    var tcoEl = document.getElementById('s7a-src-tco-status');
+    var tcoNoteEl = document.getElementById('s7a-src-tco-note');
+    if (ub && ub.data && ub.data.raw && ub.data.raw.vmData) {
+      if (tcoEl) tcoEl.innerHTML = '<span style="color:#f59e0b;font-weight:800;">Estimate Only</span>';
+      if (tcoNoteEl) tcoNoteEl.textContent = 'Based on UAT flavor data. Load FLEX price list for accurate savings.';
+    } else {
+      if (tcoEl) tcoEl.innerHTML = '<span style="color:#94a3b8;font-weight:800;">Missing</span>';
+      if (tcoNoteEl) tcoNoteEl.textContent = 'Import UAT baseline first.';
+    }
+
+    var msgEl = document.getElementById('s7a-status-msg');
+    if (msgEl) {
+      var msgs = [];
+      if (!uatOk) msgs.push('UAT baseline missing — Stage 7 cannot calculate performance gain.');
+      if (!coOk)  msgs.push('Cutover result missing — showing awaiting cutover result.');
+      if (uatOk && coOk) msgs.push('Both data sources available — calculating performance gain.');
+      if (msgs.length) {
+        msgEl.style.display = 'block';
+        msgEl.style.background = (uatOk && coOk) ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)';
+        msgEl.style.color = (uatOk && coOk) ? '#166534' : '#92400e';
+        msgEl.innerHTML = msgs.map(function(m){ return '• ' + m; }).join('<br>');
+      } else {
+        msgEl.style.display = 'none';
+      }
+    }
+  }
+
+  /* ── UAT Baseline Section ── */
+  function s7aRenderUatBaseline() {
+    var el = document.getElementById('s7a-uat-content');
+    if (!el) return;
+    var ub = _s7State.uatBaseline;
+    if (!ub || !ub.imported || !ub.data) {
+      el.innerHTML = '<span style="color:#f59e0b;">Awaiting UAT baseline.</span>';
+      return;
+    }
+    var d = ub.data, vm = (d.raw && d.raw.vmData) ? d.raw.vmData : null;
+    var scope = d.scope || [];
+    var html = '';
+
+    if (vm) {
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;">';
+      [['vCPU', vm.srcVcpu||0, vm.tgtVcpu||0, 'cores'],
+       ['RAM',  vm.srcRam ||0, vm.tgtRam ||0, 'GB'],
+       ['Storage', vm.srcDisk||0, vm.tgtDisk||0, 'GB']].forEach(function(m) {
+        var gain = m[1] > 0 ? ((m[2]-m[1])/m[1]*100).toFixed(1) : '0.0';
+        var gc = parseFloat(gain) >= 0 ? '#22c55e' : '#ef4444';
+        html += '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.25);border-radius:8px;padding:12px;">'
+          + '<div style="font-size:11px;color:#0369a1;font-weight:700;text-transform:uppercase;margin-bottom:6px;">'+m[0]+'</div>'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+          + '<div><div style="font-size:10px;color:#64748b;">OSPC Source</div><div style="font-size:16px;font-weight:800;color:#0c4a6e;">'+m[1]+' <span style="font-size:11px;font-weight:400;">'+m[3]+'</span></div></div>'
+          + '<div style="font-size:18px;color:#0284c7;">→</div>'
+          + '<div><div style="font-size:10px;color:#64748b;">FLEX Target</div><div style="font-size:16px;font-weight:800;color:#0c4a6e;">'+m[2]+' <span style="font-size:11px;font-weight:400;">'+m[3]+'</span></div></div>'
+          + '<div style="font-size:13px;font-weight:800;color:'+gc+';">'+(parseFloat(gain)>0?'+':'')+gain+'%</div>'
+          + '</div></div>';
+      });
+      html += '</div>';
+
+      if (vm.sourceFlavors && vm.sourceFlavors.length) {
+        html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">'
+          + '<div><div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Source Flavors</div>'
+          + vm.sourceFlavors.slice(0,5).map(function(f){ return '<span style="display:inline-block;margin:2px;padding:2px 8px;border-radius:4px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:#0369a1;font-size:11px;">'+_s7Esc(f.name||f)+(f.count?(' ×'+f.count):'')+'</span>'; }).join('') + '</div>'
+          + (vm.targetFlavors&&vm.targetFlavors.length ? '<div><div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Target Flavors</div>'
+          + vm.targetFlavors.slice(0,5).map(function(f){ return '<span style="display:inline-block;margin:2px;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#166534;font-size:11px;">'+_s7Esc(f.name||f)+(f.count?(' ×'+f.count):'')+'</span>'; }).join('') + '</div>' : '')
+          + '</div>';
+      }
+    }
+
+    if (scope && scope.length) {
+      html += '<div style="overflow:auto;border:1px solid rgba(14,165,233,.2);border-radius:6px;max-height:220px;margin-top:10px;">'
+        + '<table style="width:100%;border-collapse:collapse;font-size:11px;min-width:420px;">'
+        + '<thead><tr style="background:#bae6fd;">'
+        + '<th style="padding:7px 10px;text-align:left;color:#0369a1;font-weight:700;">Server</th>'
+        + '<th style="padding:7px 10px;text-align:left;color:#0369a1;font-weight:700;">Source IP</th>'
+        + '<th style="padding:7px 10px;text-align:left;color:#0369a1;font-weight:700;">Target IP</th>'
+        + '<th style="padding:7px 10px;text-align:left;color:#0369a1;font-weight:700;">Type</th>'
+        + '</tr></thead><tbody>'
+        + scope.map(function(r,i){
+            return '<tr style="background:'+(i%2?'#f0f9ff':'#ffffff')+';border-bottom:1px solid rgba(14,165,233,.1);">'
+              +'<td style="padding:6px 10px;color:#0c4a6e;font-weight:600;">'+_s7Esc(r.name||'—')+'</td>'
+              +'<td style="padding:6px 10px;font-family:monospace;color:#1d4ed8;">'+_s7Esc(r.source_ip||'—')+'</td>'
+              +'<td style="padding:6px 10px;font-family:monospace;color:#166534;">'+_s7Esc(r.target_ip||'—')+'</td>'
+              +'<td style="padding:6px 10px;color:#0369a1;font-size:10px;font-weight:700;">'+_s7Esc(r.type||'App')+'</td>'
+              +'</tr>';
+          }).join('')
+        + '</tbody></table></div>';
+    }
+
+    if (!html) html = '<span style="color:#f59e0b;">UAT data found but contains no VM records. Re-run UAT testing in Stage 3.</span>';
+    el.innerHTML = html;
+  }
+
+  /* ── Cutover Result Section ── */
+  function s7aRenderCutoverResult() {
+    var el = document.getElementById('s7a-co-content');
+    if (!el) return;
+    var cr = _s7State.cutoverResult;
+    if (!cr || !cr.imported || !cr.data) {
+      el.innerHTML = '<span style="color:#f59e0b;">Awaiting cutover result.</span>';
+      return;
+    }
+    var d = cr.data, pf = d.perfFields || {}, vr = d.validationRecord || {};
+    var html = '';
+
+    if (vr.customer) {
+      html += '<div style="background:#f0f9ff;border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;">'
+        + '<div><div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;">Customer</div><div style="font-weight:700;color:#0c4a6e;">'+_s7Esc(vr.customer)+'</div></div>'
+        + '<div><div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;">Operator</div><div style="font-weight:700;color:#0c4a6e;">'+_s7Esc(vr.operator)+'</div></div>'
+        + '<div><div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;">Date / Time</div><div style="font-weight:700;color:#0c4a6e;">'+_s7Esc(vr.date+' '+vr.time)+'</div></div>'
+        + (pf.performanceStatus ? '<div><div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;">Performance Status</div><div style="font-weight:800;color:'+(pf.performanceStatus==='PASS'?'#166534':'#92400e')+';">'+_s7Esc(pf.performanceStatus)+'</div></div>' : '')
+        + '</div>';
+    }
+
+    var perfRows = [
+      ['Avg Response', pf.ospcAvgResponseMs, pf.flexAvgResponseMs, 'ms', true],
+      ['P95 Latency',  pf.ospcP95Ms,         pf.flexP95Ms,         'ms', true],
+      ['API Error Rate', null,               pf.apiErrorRatePct,  '%',  true],
+      ['DB Query',     null,                 pf.dbAvgQueryMs,     'ms', true],
+      ['Network Latency', null,              pf.networkLatencyMs, 'ms', true],
+      ['Upload',       null,                 pf.uploadMbps,       'Mbps', false],
+      ['Download',     null,                 pf.downloadMbps,     'Mbps', false]
+    ].filter(function(r){ return r[1] !== null || r[2] !== null; });
+
+    if (perfRows.length) {
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px;">';
+      perfRows.forEach(function(r) {
+        var lowerBetter = r[4];
+        var val = r[2] !== null ? r[2] : r[1];
+        var delta = (r[1] !== null && r[2] !== null) ? ((r[2]-r[1])/r[1]*100).toFixed(1) : null;
+        var good = delta !== null ? (lowerBetter ? parseFloat(delta)<0 : parseFloat(delta)>0) : null;
+        html += '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.2);border-radius:6px;padding:10px;">'
+          + '<div style="font-size:10px;color:#0369a1;font-weight:700;text-transform:uppercase;margin-bottom:4px;">'+r[0]+'</div>'
+          + (r[1]!==null ? '<div style="font-size:10px;color:#64748b;">OSPC: <strong>'+r[1]+' '+r[3]+'</strong></div>' : '')
+          + '<div style="font-size:14px;font-weight:800;color:#0c4a6e;">'+(val!==null?val+' '+r[3]:'—')+'</div>'
+          + (delta!==null ? '<div style="font-size:11px;font-weight:700;color:'+(good?'#166534':'#dc2626')+';">'+(parseFloat(delta)>0?'+':'')+delta+'%</div>' : '')
+          + '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (d.testRows && d.testRows.length) {
+      html += '<div style="font-size:11px;color:#0369a1;font-weight:700;margin-bottom:6px;">Cutover Test Results ('+d.testRows.length+' tests)</div>'
+        + '<div style="overflow:auto;max-height:150px;border:1px solid rgba(14,165,233,.2);border-radius:6px;">'
+        + '<table style="width:100%;border-collapse:collapse;font-size:11px;">'
+        + d.testRows.slice(0,20).map(function(r,i){
+            return '<tr style="background:'+(i%2?'#f0f9ff':'#fff')+';border-bottom:1px solid rgba(14,165,233,.08);">'
+              +'<td style="padding:5px 10px;color:#0c4a6e;">'+_s7Esc(r.name)+'</td>'
+              +'<td style="padding:5px 10px;color:#0369a1;font-weight:600;">'+_s7Esc(r.status)+'</td>'
+              +'<td style="padding:5px 10px;color:#64748b;">'+_s7Esc(r.metric)+'</td>'
+              +'<td style="padding:5px 10px;color:#0c4a6e;">'+_s7Esc(r.result)+'</td>'
+              +'</tr>';
+          }).join('')
+        + '</table></div>';
+    }
+
+    if (!html) html = '<span style="color:#f59e0b;">Cutover validation confirmed but no performance data captured. Check Stage 4 cutover tester.</span>';
+    el.innerHTML = html;
+  }
+
+  /* ── Before/After Comparison Table ── */
+  function s7aRenderComparison() {
+    var el = document.getElementById('s7a-comparison-table');
+    if (!el) return;
+    var ub = _s7State.uatBaseline, cr = _s7State.cutoverResult;
+    if (!ub || !ub.imported) { el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px;text-align:center;">Import UAT baseline to see comparison.</div>'; return; }
+
+    var vm  = (ub.data && ub.data.raw && ub.data.raw.vmData) ? ub.data.raw.vmData : {};
+    var pf  = (cr && cr.data && cr.data.perfFields) ? cr.data.perfFields : {};
+
+    function row(metric, baseline, postco, unit, lowerBetter, note) {
+      var b = baseline != null ? baseline : null;
+      var p = postco   != null ? postco   : null;
+      var delta = '', status = 'NOT AVAILABLE', statusColor = '#94a3b8', statusBg = '#f1f5f9';
+      if (b !== null && p !== null) {
+        var d = ((p - b) / Math.abs(b) * 100).toFixed(1);
+        delta = (parseFloat(d) > 0 ? '+' : '') + d + '%';
+        var improved = lowerBetter ? parseFloat(d) < -3 : parseFloat(d) > 3;
+        var degraded = lowerBetter ? parseFloat(d) > 5  : parseFloat(d) < -5;
+        if (improved) { status='IMPROVED'; statusColor='#166534'; statusBg='rgba(34,197,94,.12)'; }
+        else if (degraded) { status='DEGRADED'; statusColor='#dc2626'; statusBg='rgba(239,68,68,.12)'; }
+        else { status='EQUIVALENT'; statusColor='#0369a1'; statusBg='rgba(14,165,233,.1)'; }
+      } else if (b === null && p === null) {
+        status = 'NOT AVAILABLE'; delta = '—';
+      }
+      return '<tr style="border-bottom:1px solid rgba(14,165,233,.1);">'
+        + '<td style="padding:8px 12px;color:#0c4a6e;font-weight:600;">'+_s7Esc(metric)+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;color:#0369a1;">'+(b!==null ? b+' '+unit : '—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:right;font-family:monospace;color:#0c4a6e;font-weight:700;">'+(p!==null ? p+' '+unit : '—')+'</td>'
+        + '<td style="padding:8px 12px;text-align:center;font-weight:700;color:'+(parseFloat(delta)>0&&!lowerBetter||parseFloat(delta)<0&&lowerBetter?'#166534':'#dc2626')+';">'+delta+'</td>'
+        + '<td style="padding:8px 12px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;color:'+statusColor+';background:'+statusBg+';">'+status+'</span></td>'
+        + '<td style="padding:8px 12px;font-size:11px;color:#64748b;">'+_s7Esc(note||'')+'</td>'
+        + '</tr>';
+    }
+
+    var rows = [
+      row('vCPU Allocation',     vm.srcVcpu||null, vm.tgtVcpu||null, 'cores', false, 'Target allocation from UAT'),
+      row('RAM Allocation',      vm.srcRam ||null, vm.tgtRam ||null, 'GB',    false, 'Target allocation from UAT'),
+      row('Storage Allocation',  vm.srcDisk||null, vm.tgtDisk||null, 'GB',    false, 'Target allocation from UAT'),
+      row('Avg Response Time',   pf.ospcAvgResponseMs||null, pf.flexAvgResponseMs||null, 'ms', true, 'From cutover tester'),
+      row('P95 Latency',         pf.ospcP95Ms||null,         pf.flexP95Ms||null,         'ms', true, 'From cutover tester'),
+      row('API Error Rate',      null, pf.apiErrorRatePct||null, '%', true, 'From cutover tester'),
+      row('DB Query Avg',        null, pf.dbAvgQueryMs||null,    'ms', true, 'From cutover tester — if DB in scope'),
+      row('Network Latency',     null, pf.networkLatencyMs||null,'ms', true, 'From cutover tester'),
+      row('Upload Throughput',   null, pf.uploadMbps||null,      'Mbps',false,'From cutover tester'),
+      row('Download Throughput', null, pf.downloadMbps||null,    'Mbps',false,'From cutover tester')
+    ];
+
+    el.innerHTML = '<div style="overflow:auto;border:1px solid rgba(14,165,233,.2);border-radius:8px;">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px;">'
+      + '<thead><tr style="background:#bae6fd;">'
+      + '<th style="padding:9px 12px;text-align:left;color:#0284c7;font-weight:700;">Metric</th>'
+      + '<th style="padding:9px 12px;text-align:right;color:#0284c7;font-weight:700;">UAT Baseline</th>'
+      + '<th style="padding:9px 12px;text-align:right;color:#0284c7;font-weight:700;">Post-Cutover FLEX</th>'
+      + '<th style="padding:9px 12px;text-align:center;color:#0284c7;font-weight:700;">Delta</th>'
+      + '<th style="padding:9px 12px;text-align:left;color:#0284c7;font-weight:700;">Status</th>'
+      + '<th style="padding:9px 12px;text-align:left;color:#0284c7;font-weight:700;">Note</th>'
+      + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+  }
+
+  /* ── VM Sizing ── */
+  function s7aRenderVmSizing() {
+    var el = document.getElementById('s7a-vm-sizing');
+    if (!el) return;
+    var ub = _s7State.uatBaseline;
+    if (!ub || !ub.imported || !ub.data || !ub.data.raw) {
+      el.innerHTML = '<span style="color:#64748b;font-size:13px;">Import UAT baseline to see VM sizing comparison.</span>'; return;
+    }
+    var vm = ub.data.raw.vmData || {};
+    var srcV = vm.srcVcpu||0, tgtV = vm.tgtVcpu||0;
+    var srcR = vm.srcRam||0,  tgtR = vm.tgtRam||0;
+    var srcD = vm.srcDisk||0, tgtD = vm.tgtDisk||0;
+    var verdict = '', vc = '#0369a1';
+    if (tgtV < srcV && tgtR <= srcR) { verdict = 'Right-sizing opportunity achieved. '; vc='#166534'; }
+    else if (tgtV > srcV || tgtR > srcR) { verdict = 'Capacity increase / performance headroom. '; vc='#92400e'; }
+    else { verdict = 'Equivalent sizing.'; vc='#0369a1'; }
+
+    var pf = (_s7State.cutoverResult && _s7State.cutoverResult.data && _s7State.cutoverResult.data.perfFields) ? _s7State.cutoverResult.data.perfFields : {};
+    var perfOk = pf.performanceStatus === 'PASS' || pf.performanceStatus === 'REVIEW';
+
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;">'
+      + [['vCPU',srcV,tgtV,'cores'],['RAM',srcR,tgtR,'GB'],['Storage',srcD,tgtD,'GB']].map(function(m){
+          var chg = m[1]>0 ? ((m[2]-m[1])/m[1]*100).toFixed(0) : '0';
+          var c = parseFloat(chg)>=0 ? '#22c55e' : '#f59e0b';
+          return '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.25);border-radius:8px;padding:12px;text-align:center;">'
+            +'<div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:8px;">'+m[0]+'</div>'
+            +'<div style="font-size:22px;font-weight:900;color:#0c4a6e;">'+m[2]+' <span style="font-size:12px;font-weight:400;">'+m[3]+'</span></div>'
+            +'<div style="font-size:11px;color:#64748b;margin-top:2px;">from '+m[1]+' '+m[3]+' OSPC</div>'
+            +'<div style="font-size:12px;font-weight:800;color:'+c+';margin-top:4px;">'+(parseFloat(chg)>0?'+':'')+chg+'%</div>'
+            +'</div>';
+        }).join('')
+      + '</div>'
+      + '<div style="padding:12px;border-radius:8px;background:rgba(14,165,233,.08);border-left:4px solid #0284c7;">'
+      + '<strong style="color:'+vc+';">'+verdict+'</strong>'
+      + (perfOk && verdict.includes('Right-sizing') ? '<span style="color:#0369a1;font-size:12px;"> Performance passed validation — downsize candidate after stable monitoring period.</span>' : '')
+      + (vm.sourceFlavors&&vm.sourceFlavors.length?'<div style="margin-top:8px;font-size:11px;color:#0369a1;"><strong>Source flavors:</strong> '+vm.sourceFlavors.map(function(f){return _s7Esc(f.name||f);}).join(', ')+'</div>':'')
+      + (vm.targetFlavors&&vm.targetFlavors.length?'<div style="font-size:11px;color:#0369a1;"><strong>Target flavors:</strong> '+vm.targetFlavors.map(function(f){return _s7Esc(f.name||f);}).join(', ')+'</div>':'')
+      + '</div>';
+  }
+
+  /* ── TCO ── */
+  function s7aRenderTco() {
+    var el = document.getElementById('s7a-tco-content');
+    if (!el) return;
+    var ub = _s7State.uatBaseline;
+    var vm = (ub && ub.data && ub.data.raw) ? (ub.data.raw.vmData||{}) : null;
+    if (!vm) { el.innerHTML = '<span style="color:#64748b;font-size:13px;">Import UAT baseline to load TCO estimate.</span>'; return; }
+
+    var tcoData = null;
+    try { tcoData = JSON.parse(localStorage.getItem('osflex_tco_data')||'null'); } catch(_) {}
+    var srcCost = tcoData ? (tcoData.sourceMonthlyCost||null) : null;
+    var tgtCost = tcoData ? (tcoData.targetMonthlyCost||null) : null;
+    var saving  = (srcCost && tgtCost) ? srcCost - tgtCost : null;
+    var savingPct = (srcCost && saving) ? (saving/srcCost*100).toFixed(1) : null;
+
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px;">'
+      + '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.25);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:6px;">Source Monthly Cost</div>'
+        + '<div style="font-size:20px;font-weight:900;color:#0c4a6e;">'+(srcCost ? '$'+srcCost.toLocaleString() : '—')+'</div>'
+        + '<div style="font-size:10px;color:#64748b;">OSPC estimate</div>'
+      + '</div>'
+      + '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.25);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:6px;">Target Monthly Cost</div>'
+        + '<div style="font-size:20px;font-weight:900;color:#0c4a6e;">'+(tgtCost ? '$'+tgtCost.toLocaleString() : '—')+'</div>'
+        + '<div style="font-size:10px;color:#64748b;">FLEX estimate</div>'
+      + '</div>'
+      + '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:6px;">Monthly Savings</div>'
+        + '<div style="font-size:20px;font-weight:900;color:'+(saving&&saving>0?'#166534':'#94a3b8')+'">'+(saving ? '$'+Math.abs(saving).toLocaleString() : '—')+'</div>'
+        + (savingPct ? '<div style="font-size:11px;font-weight:700;color:#166534;">'+savingPct+'% savings</div>' : '')
+      + '</div>'
+      + '</div>'
+      + (!tcoData ? '<div style="padding:10px;background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;border-radius:4px;font-size:12px;color:#92400e;">FLEX price list not loaded. TCO estimate cannot be finalized. Load pricing in the TCO tool to enable accurate savings calculation.</div>' : '')
+      + '<div style="font-size:11px;color:#64748b;margin-top:8px;">Pricing data source: '+(tcoData ? _s7Esc(tcoData.source||'TCO tool') : 'Not configured')+'</div>';
+  }
+
+  /* ── Health Radar ── */
+  function s7aRenderHealthRadar() {
+    var el = document.getElementById('s7a-health-radar');
+    if (!el) return;
+    var cr = _s7State.cutoverResult;
+    if (!cr || !cr.imported) { el.innerHTML = '<span style="color:#64748b;font-size:13px;">Awaiting system health data — import cutover result.</span>'; return; }
+
+    var pf = (cr.data && cr.data.perfFields) || {};
+    var dims = [
+      { label:'App Response', score: pf.flexAvgResponseMs ? Math.max(0,100-pf.flexAvgResponseMs/10) : null },
+      { label:'P95 Latency',  score: pf.flexP95Ms         ? Math.max(0,100-pf.flexP95Ms/15)         : null },
+      { label:'Error Rate',   score: pf.apiErrorRatePct   ? Math.max(0,100-pf.apiErrorRatePct*20)   : null },
+      { label:'DB Query',     score: pf.dbAvgQueryMs       ? Math.max(0,100-pf.dbAvgQueryMs/5)       : null },
+      { label:'Throughput',   score: pf.downloadMbps       ? Math.min(100,pf.downloadMbps*2)         : null },
+      { label:'Network',      score: pf.networkLatencyMs   ? Math.max(0,100-pf.networkLatencyMs*2)   : null }
+    ].filter(function(d){ return d.score !== null; });
+
+    if (!dims.length) { el.innerHTML = '<span style="color:#f59e0b;font-size:13px;">No performance metrics in cutover result — run cutover tester in Stage 4.</span>'; return; }
+
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">';
+    dims.forEach(function(d) {
+      var s = Math.round(Math.min(100, Math.max(0, d.score)));
+      var color = s>=80 ? '#166534' : s>=60 ? '#0369a1' : s>=40 ? '#92400e' : '#dc2626';
+      var bg    = s>=80 ? 'rgba(34,197,94,.1)' : s>=60 ? 'rgba(14,165,233,.1)' : s>=40 ? 'rgba(245,158,11,.1)' : 'rgba(239,68,68,.1)';
+      html += '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.2);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:8px;">'+_s7Esc(d.label)+'</div>'
+        + '<div style="font-size:28px;font-weight:900;color:'+color+';">'+s+'</div>'
+        + '<div style="font-size:10px;color:#64748b;">/100</div>'
+        + '<div style="margin-top:6px;height:6px;background:#e0f2fe;border-radius:3px;">'
+          + '<div style="width:'+s+'%;height:100%;background:'+color+';border-radius:3px;"></div></div>'
+        + '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  /* ── Performance Trend ── */
+  function s7aRenderTrend() {
+    var el = document.getElementById('s7a-trend-content');
+    if (!el) return;
+    var cr = _s7State.cutoverResult;
+    if (!cr || !cr.imported || !cr.data) { el.innerHTML = '<span style="color:#64748b;font-size:13px;">Awaiting monitoring trend data.</span>'; return; }
+    var pf = cr.data.perfFields || {};
+    var tr = cr.data.trafficRamp;
+    var lines = [];
+    if (pf.flexAvgResponseMs)   lines.push('Target avg response: <strong>'+pf.flexAvgResponseMs+' ms</strong>');
+    if (pf.flexP95Ms)           lines.push('Target P95 latency: <strong>'+pf.flexP95Ms+' ms</strong>');
+    if (pf.apiErrorRatePct!==null&&pf.apiErrorRatePct!==undefined) lines.push('Error rate: <strong>'+pf.apiErrorRatePct+'%</strong>');
+    if (pf.downloadMbps)        lines.push('Throughput: <strong>'+pf.downloadMbps+' Mbps down / '+pf.uploadMbps+' Mbps up</strong>');
+    if (tr && tr.rows)          lines.push('Traffic ramp rows recorded: <strong>'+tr.rows+'</strong>');
+    if (!lines.length) { el.innerHTML = '<span style="color:#f59e0b;font-size:13px;">Cutover imported but no trend metrics captured. Run performance tests in Stage 4.</span>'; return; }
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">'
+      + lines.map(function(l){ return '<div style="padding:8px 12px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:4px;font-size:13px;color:#0c4a6e;">'+l+'</div>'; }).join('')
+      + '</div><div style="margin-top:10px;font-size:11px;color:#0369a1;font-style:italic;">For continuous trend monitoring, connect to post-cutover observability tools (Prometheus / Grafana).</div>';
+  }
+
+  /* ── Top Transactions ── */
+  function s7aRenderTransactions() {
+    var el = document.getElementById('s7a-transactions');
+    if (!el) return;
+    var cr = _s7State.cutoverResult;
+    if (!cr || !cr.imported || !cr.data || !cr.data.testRows || !cr.data.testRows.length) {
+      el.innerHTML = '<span style="color:#64748b;font-size:13px;">No business transactions configured — run cutover tester in Stage 4 to capture transaction results.</span>'; return;
+    }
+    var rows = cr.data.testRows;
+    el.innerHTML = '<div style="overflow:auto;border:1px solid rgba(14,165,233,.2);border-radius:8px;">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">'
+      + '<thead><tr style="background:#bae6fd;">'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Transaction</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Status</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Metric</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Result</th>'
+      + '</tr></thead><tbody>'
+      + rows.slice(0,20).map(function(r,i){
+          var statusOk = /pass|ok|success/i.test(r.status);
+          return '<tr style="background:'+(i%2?'#f0f9ff':'#fff')+';border-bottom:1px solid rgba(14,165,233,.08);">'
+            +'<td style="padding:7px 12px;color:#0c4a6e;font-weight:600;">'+_s7Esc(r.name)+'</td>'
+            +'<td style="padding:7px 12px;"><span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:3px;color:'+(statusOk?'#166534':'#dc2626')+';background:'+(statusOk?'rgba(34,197,94,.1)':'rgba(239,68,68,.1)')+';">'+_s7Esc(r.status)+'</span></td>'
+            +'<td style="padding:7px 12px;color:#0369a1;font-family:monospace;font-size:11px;">'+_s7Esc(r.metric)+'</td>'
+            +'<td style="padding:7px 12px;color:#0c4a6e;">'+_s7Esc(r.result)+'</td>'
+            +'</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  /* ── Gain Summary ── */
+  function s7aRenderGainSummary() {
+    var el = document.getElementById('s7a-gain-summary');
+    if (!el) return;
+    var ub = _s7State.uatBaseline, cr = _s7State.cutoverResult;
+    if (!ub || !ub.imported) { el.innerHTML = '<div style="color:#64748b;font-size:13px;padding:20px;text-align:center;">Import both UAT baseline and cutover result to calculate performance gain.</div>'; return; }
+
+    var vm = (ub.data && ub.data.raw && ub.data.raw.vmData) || {};
+    var pf = (cr && cr.data && cr.data.perfFields) || {};
+    var perf = pf.performanceStatus || (cr && cr.imported ? 'REVIEW' : null);
+    var label, labelColor, labelBg;
+    if (!cr || !cr.imported) { label='AWAITING DATA'; labelColor='#94a3b8'; labelBg='#f1f5f9'; }
+    else if (/pass/i.test(perf)) { label='PERFORMANCE IMPROVED'; labelColor='#166534'; labelBg='rgba(34,197,94,.12)'; }
+    else if (/review/i.test(perf)) { label='REVIEW PERFORMANCE'; labelColor='#92400e'; labelBg='rgba(245,158,11,.12)'; }
+    else if (/fail/i.test(perf)) { label='PERFORMANCE DEGRADED'; labelColor='#dc2626'; labelBg='rgba(239,68,68,.12)'; }
+    else { label='PERFORMANCE EQUIVALENT'; labelColor='#0369a1'; labelBg='rgba(14,165,233,.1)'; }
+
+    var gains = [];
+    if (vm.srcVcpu && vm.tgtVcpu) { var g=((vm.tgtVcpu-vm.srcVcpu)/vm.srcVcpu*100).toFixed(1); gains.push({l:'CPU Allocation',v:(g>0?'+':'')+g+'%'}); }
+    if (vm.srcRam  && vm.tgtRam)  { var g=((vm.tgtRam -vm.srcRam )/vm.srcRam *100).toFixed(1); gains.push({l:'Memory Allocation',v:(g>0?'+':'')+g+'%'}); }
+    if (vm.srcDisk && vm.tgtDisk) { var g=((vm.tgtDisk-vm.srcDisk)/vm.srcDisk*100).toFixed(1); gains.push({l:'Storage Allocation',v:(g>0?'+':'')+g+'%'}); }
+    if (pf.flexAvgResponseMs && pf.ospcAvgResponseMs) { var g=((pf.flexAvgResponseMs-pf.ospcAvgResponseMs)/pf.ospcAvgResponseMs*100).toFixed(1); gains.push({l:'Avg Response',v:(g>0?'+':'')+g+'% (lower better)'}); }
+
+    el.innerHTML = '<div style="text-align:center;padding:18px 12px 12px;">'
+      + '<div style="display:inline-block;padding:12px 28px;border-radius:12px;font-size:20px;font-weight:900;letter-spacing:.03em;color:'+labelColor+';background:'+labelBg+';border:2px solid '+labelColor+';margin-bottom:18px;">'+label+'</div>'
+      + '</div>'
+      + (gains.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;">'
+          + gains.map(function(g){ return '<div style="background:#f0f9ff;border:1px solid rgba(14,165,233,.25);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:10px;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:4px;">'+g.l+'</div><div style="font-size:16px;font-weight:800;color:#0c4a6e;">'+g.v+'</div></div>'; }).join('')
+          + '</div>' : '')
+      + '<div style="padding:12px;background:#f0f9ff;border-left:4px solid #0284c7;border-radius:4px;font-size:13px;color:#0c4a6e;line-height:1.6;">'
+      + (cr && cr.imported
+          ? 'Post-cutover FLEX performance '+(label.includes('IMPROVED')?'is improved':'has been reviewed')+' against UAT baseline. Application response and latency are within threshold. Storage capacity '+(vm.tgtDisk>vm.srcDisk?'increased.':'maintained.')
+          : 'Import cutover result to complete the performance gain assessment.')
+      + '</div>';
+  }
+
+  /* ── Right-Sizing ── */
+  function s7aRenderRightSizing() {
+    var el = document.getElementById('s7a-rightsizing');
+    if (!el) return;
+    var ub = _s7State.uatBaseline, cr = _s7State.cutoverResult;
+    var vm = (ub && ub.data && ub.data.raw && ub.data.raw.vmData) || {};
+    var pf = (cr && cr.data && cr.data.perfFields) || {};
+    var scope = (ub && ub.data && ub.data.scope) || [];
+    var recs = [];
+
+    // Simple logic per spec
+    var perfOk = pf.performanceStatus && /pass/i.test(pf.performanceStatus);
+    var perfDeg = pf.performanceStatus && /fail/i.test(pf.performanceStatus);
+    var highErr = pf.apiErrorRatePct && pf.apiErrorRatePct > 2;
+    var highDbLat = pf.dbAvgQueryMs && pf.dbAvgQueryMs > 500;
+
+    if (!ub || !ub.imported) { el.innerHTML = '<span style="color:#64748b;font-size:13px;">Import UAT baseline to generate recommendations.</span>'; return; }
+
+    if (perfDeg || highErr) {
+      recs.push({ type:'UPSIZE', text:'Performance degraded or error rate high — review current FLEX sizing and consider upsize.', risk:'High', color:'#dc2626', bg:'rgba(239,68,68,.1)' });
+    }
+    if (highDbLat) {
+      recs.push({ type:'REVIEW', text:'DB query latency exceeded threshold. Upgrade storage class or review DB-optimized flavor before optimization.', risk:'Medium', color:'#f59e0b', bg:'rgba(245,158,11,.1)' });
+    }
+    if (perfOk && !highErr && !highDbLat) {
+      recs.push({ type:'KEEP', text:'Performance passed validation. Keep current FLEX sizing. Review for downsize after 7 days stable monitoring.', risk:'Low', color:'#166534', bg:'rgba(34,197,94,.1)' });
+    }
+    if (!cr || !cr.imported) {
+      recs.push({ type:'REVIEW', text:'Cutover result not imported — cannot confirm performance stability for downsize recommendation.', risk:'N/A', color:'#0369a1', bg:'rgba(14,165,233,.1)' });
+    }
+    if (!recs.length) {
+      recs.push({ type:'REVIEW', text:'Insufficient data — import both UAT baseline and cutover result for recommendations.', risk:'N/A', color:'#94a3b8', bg:'#f1f5f9' });
+    }
+
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:10px;">'
+      + recs.map(function(r){
+          return '<div style="background:'+r.bg+';border-left:4px solid '+r.color+';border-radius:6px;padding:12px;display:flex;align-items:flex-start;gap:12px;">'
+            + '<span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;color:'+r.color+';background:rgba(255,255,255,.6);white-space:nowrap;">'+r.type+'</span>'
+            + '<div style="flex:1;font-size:13px;color:#0c4a6e;line-height:1.5;">'+_s7Esc(r.text)+'</div>'
+            + '<span style="font-size:10px;color:#64748b;white-space:nowrap;">Risk: '+r.risk+'</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  /* ── Compute Optimization ── */
+  function s7aRenderComputeOpt() {
+    var sumEl = document.getElementById('s7a-compute-opt-summary');
+    var tblEl = document.getElementById('s7a-compute-opt-table');
+    var flvEl = document.getElementById('s7a-compute-opt-flavor-status');
+    if (!tblEl) return;
+
+    var ub = _s7State.uatBaseline, cr = _s7State.cutoverResult;
+    var vm = (ub && ub.data && ub.data.raw && ub.data.raw.vmData) || {};
+    var pf = (cr && cr.data && cr.data.perfFields) || {};
+    var scope = (ub && ub.data && ub.data.scope) || [];
+
+    // Load flavor map + TCO from localStorage
+    var flavorMap = null, tcoData = null;
+    try { flavorMap = JSON.parse(localStorage.getItem('osflex_flavor_map')||'null'); } catch(_) {}
+    try { tcoData   = JSON.parse(localStorage.getItem('osflex_tco_data')  ||'null'); } catch(_) {}
+    if (flvEl) {
+      flvEl.innerHTML = (flavorMap ? '✓ Flavor map loaded' : '⚠ Flavor map not loaded (load via TCO / flavor reference)') + ' &nbsp;|&nbsp; '
+        + (tcoData ? '✓ TCO pricing loaded' : '⚠ TCO pricing not loaded');
+    }
+
+    if (!ub || !ub.imported) { tblEl.innerHTML = '<span style="color:#64748b;font-size:13px;">Import UAT baseline to generate compute optimization recommendations.</span>'; return; }
+
+    var perfOk  = pf.performanceStatus && /pass/i.test(pf.performanceStatus);
+    var perfDeg = pf.performanceStatus && /fail/i.test(pf.performanceStatus);
+    var highErr = pf.apiErrorRatePct && pf.apiErrorRatePct > 2;
+    var highDbLat = pf.dbAvgQueryMs && pf.dbAvgQueryMs > 500;
+    var hasCo = cr && cr.imported;
+
+    // Generate per-VM recommendations
+    var recs = [];
+    var servers = scope.length ? scope : (vm.srcVcpu ? [{ name:'(aggregated fleet)', type:'App', vcpu:vm.srcVcpu, ram:vm.srcRam }] : []);
+
+    servers.forEach(function(s) {
+      var type = (s.type||'App').toUpperCase();
+      var isDB = type === 'DB' || type === 'DATABASE';
+      var recType, reason, risk, saving = null, confidence;
+
+      if (!hasCo) {
+        recType = 'INSUFFICIENT_DATA'; reason = 'Cutover result not imported. Cannot assess post-cutover utilization.'; risk = 'N/A'; confidence = 'Low';
+      } else if (perfDeg || highErr) {
+        recType = isDB ? 'REVIEW_MANUALLY' : 'UPSIZE';
+        reason = 'Performance degraded or error rate above threshold. Review sizing before any optimization.';
+        risk = 'High'; confidence = 'High';
+      } else if (highDbLat && isDB) {
+        recType = 'REVIEW_MANUALLY'; reason = 'DB write latency exceeded threshold. Do not downsize. Review DB-optimized flavor.'; risk = 'Medium'; confidence = 'Medium';
+      } else if (perfOk && !isDB) {
+        recType = 'KEEP_CURRENT'; reason = 'Performance passed. Keep current FLEX size. Review for downsize after 7 days stable.'; risk = 'Low'; confidence = 'High';
+      } else if (isDB) {
+        recType = 'KEEP_CURRENT'; reason = 'DB node — keep current sizing. Do not downsize without DB performance owner approval.'; risk = 'Low'; confidence = 'Medium';
+      } else {
+        recType = 'REVIEW_MANUALLY'; reason = 'Insufficient performance data to recommend with confidence.'; risk = 'Medium'; confidence = 'Low';
+      }
+
+      recs.push({ vm: s.name||'VM', type: s.type||'App', srcIp: s.source_ip, tgtIp: s.target_ip, recType: recType, reason: reason, risk: risk, confidence: confidence });
+    });
+
+    // Summary cards
+    var cnt = { KEEP_CURRENT:0, DOWNSIZE:0, UPSIZE:0, CHANGE_FAMILY:0, REGROUP:0, REVIEW_MANUALLY:0, INSUFFICIENT_DATA:0 };
+    recs.forEach(function(r){ cnt[r.recType] = (cnt[r.recType]||0)+1; });
+
+    if (sumEl) {
+      var cards = [
+        { label:'VMs Analyzed',    v: recs.length,               c:'#0369a1', bg:'#f0f9ff' },
+        { label:'Keep Current',    v: cnt.KEEP_CURRENT,          c:'#166534', bg:'rgba(34,197,94,.1)' },
+        { label:'Upsize',          v: cnt.UPSIZE,                c:'#dc2626', bg:'rgba(239,68,68,.1)' },
+        { label:'Downsize',        v: cnt.DOWNSIZE,              c:'#22c55e', bg:'rgba(34,197,94,.08)' },
+        { label:'Review Manually', v: cnt.REVIEW_MANUALLY+(cnt.INSUFFICIENT_DATA||0), c:'#f59e0b', bg:'rgba(245,158,11,.1)' }
+      ];
+      sumEl.innerHTML = cards.map(function(c){
+        return '<div style="background:'+c.bg+';border:1px solid rgba(14,165,233,.2);border-radius:8px;padding:12px;text-align:center;">'
+          +'<div style="font-size:24px;font-weight:900;color:'+c.c+';">'+c.v+'</div>'
+          +'<div style="font-size:11px;color:#0369a1;font-weight:700;text-transform:uppercase;margin-top:2px;">'+c.label+'</div>'
+          +'</div>';
+      }).join('');
+    }
+
+    var typeColors = {KEEP_CURRENT:'#166534',DOWNSIZE:'#22c55e',UPSIZE:'#dc2626',CHANGE_FAMILY:'#7c3aed',REGROUP:'#0369a1',REVIEW_MANUALLY:'#f59e0b',INSUFFICIENT_DATA:'#94a3b8'};
+    var typeBgs    = {KEEP_CURRENT:'rgba(34,197,94,.1)',DOWNSIZE:'rgba(34,197,94,.08)',UPSIZE:'rgba(239,68,68,.1)',CHANGE_FAMILY:'rgba(124,58,237,.1)',REGROUP:'rgba(14,165,233,.1)',REVIEW_MANUALLY:'rgba(245,158,11,.1)',INSUFFICIENT_DATA:'#f1f5f9'};
+
+    tblEl.innerHTML = '<div style="overflow:auto;border:1px solid rgba(14,165,233,.2);border-radius:8px;">'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px;">'
+      + '<thead><tr style="background:#bae6fd;">'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">VM / Component</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Type</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Recommendation</th>'
+      + '<th style="padding:8px 12px;text-align:left;color:#0284c7;font-weight:700;">Reason</th>'
+      + '<th style="padding:8px 12px;text-align:center;color:#0284c7;font-weight:700;">Risk</th>'
+      + '<th style="padding:8px 12px;text-align:center;color:#0284c7;font-weight:700;">Confidence</th>'
+      + '</tr></thead><tbody>'
+      + recs.map(function(r,i){
+          var c = typeColors[r.recType]||'#0369a1', b = typeBgs[r.recType]||'#f0f9ff';
+          return '<tr style="background:'+(i%2?'#f0f9ff':'#fff')+';border-bottom:1px solid rgba(14,165,233,.08);">'
+            +'<td style="padding:8px 12px;color:#0c4a6e;font-weight:600;">'+_s7Esc(r.vm)+'</td>'
+            +'<td style="padding:8px 12px;color:#0369a1;font-size:11px;font-weight:700;">'+_s7Esc(r.type)+'</td>'
+            +'<td style="padding:8px 12px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;color:'+c+';background:'+b+';">'+r.recType.replace(/_/g,' ')+'</span></td>'
+            +'<td style="padding:8px 12px;color:#0c4a6e;font-size:12px;line-height:1.4;">'+_s7Esc(r.reason)+'</td>'
+            +'<td style="padding:8px 12px;text-align:center;font-weight:700;color:'+(r.risk==='Low'?'#166534':r.risk==='High'?'#dc2626':'#f59e0b')+';">'+r.risk+'</td>'
+            +'<td style="padding:8px 12px;text-align:center;color:#0369a1;font-weight:600;">'+r.confidence+'</td>'
+            +'</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  }
+
+  /* ── Export Report ── */
+  function s7aExportReport() {
+    var ub = _s7State.uatBaseline, cr = _s7State.cutoverResult;
+    var now = new Date();
+    var vm = (ub && ub.data && ub.data.raw && ub.data.raw.vmData) || {};
+    var pf = (cr && cr.data && cr.data.perfFields) || {};
+    var vr = (cr && cr.data && cr.data.validationRecord) || {};
+
+    function sec(title, body) {
+      return '<div style="margin-bottom:24px;"><h3 style="color:#0284c7;border-bottom:2px solid #bae6fd;padding-bottom:6px;margin:0 0 12px;">'+title+'</h3>'+body+'</div>';
+    }
+    function kv(k,v) { return '<div style="display:flex;gap:12px;margin-bottom:4px;font-size:13px;"><span style="width:200px;color:#0369a1;font-weight:600;">'+k+'</span><span style="color:#0c4a6e;">'+v+'</span></div>'; }
+
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Performance Gain Report</title>'
+      + '<style>body{font-family:Segoe UI,sans-serif;color:#0c4a6e;background:#f0f9ff;padding:32px;max-width:1100px;margin:0 auto;}h1{color:#0284c7;}h3{color:#0284c7;}</style>'
+      + '</head><body>'
+      + '<h1>🏆 Performance Gain Report</h1>'
+      + '<p style="color:#64748b;">Generated: '+now.toLocaleString()+'</p>'
+      + sec('1. Executive Summary',
+          kv('UAT Baseline', ub&&ub.imported ? 'Imported ✓ ('+((ub.data&&ub.data.sourceTs)||'')+ ')' : 'Missing')
+          + kv('Cutover Result', cr&&cr.imported ? 'Imported ✓' : 'Missing')
+          + kv('Performance Status', pf.performanceStatus||'N/A')
+          + kv('Customer', vr.customer||'N/A')
+          + kv('Operator', vr.operator||'N/A')
+          + kv('Cutover Date', (vr.date||'')+(vr.time?' '+vr.time:''))
+        )
+      + sec('2. UAT Baseline',
+          kv('vCPU (source→target)', (vm.srcVcpu||'—')+' → '+(vm.tgtVcpu||'—')+' cores')
+          + kv('RAM (source→target)', (vm.srcRam||'—')+' → '+(vm.tgtRam||'—')+' GB')
+          + kv('Storage (source→target)', (vm.srcDisk||'—')+' → '+(vm.tgtDisk||'—')+' GB')
+          + (vm.sourceFlavors&&vm.sourceFlavors.length ? kv('Source Flavors', vm.sourceFlavors.map(function(f){return f.name||f;}).join(', ')) : '')
+          + (vm.targetFlavors&&vm.targetFlavors.length ? kv('Target Flavors', vm.targetFlavors.map(function(f){return f.name||f;}).join(', ')) : '')
+        )
+      + sec('3. Post-Cutover Performance',
+          kv('OSPC Avg Response', (pf.ospcAvgResponseMs||'—')+' ms')
+          + kv('FLEX Avg Response', (pf.flexAvgResponseMs||'—')+' ms')
+          + kv('OSPC P95 Latency', (pf.ospcP95Ms||'—')+' ms')
+          + kv('FLEX P95 Latency', (pf.flexP95Ms||'—')+' ms')
+          + kv('API Error Rate', (pf.apiErrorRatePct!=null?pf.apiErrorRatePct+'%':'—'))
+          + kv('DB Query Avg', (pf.dbAvgQueryMs||'—')+' ms')
+          + kv('Network Latency', (pf.networkLatencyMs||'—')+' ms')
+          + kv('Download Throughput', (pf.downloadMbps||'—')+' Mbps')
+        )
+      + sec('4. Data Freshness',
+          kv('UAT Import Time', ub&&ub.importedAt ? new Date(ub.importedAt).toLocaleString() : 'Not imported')
+          + kv('Cutover Import Time', cr&&cr.importedAt ? new Date(cr.importedAt).toLocaleString() : 'Not imported')
+          + kv('Stale Threshold', _S7_STALE_HOURS+' hours')
+        )
+      + '<div style="margin-top:24px;padding:14px;background:#bae6fd;border-radius:8px;font-size:12px;color:#0369a1;">Report generated by Stage 7 — Performance Gain. Recommendations are advisory only.</div>'
+      + '</body></html>';
+
+    var blob = new Blob([html], {type:'text/html'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'performance_gain_report_' + now.toISOString().slice(0,10) + '.html';
+    a.click();
+  }
+
+  /* ── Snapshot (kept for infra cards) ── */
   function s7aRefreshSnapshot() {
     const cardsEl = document.getElementById('s7a-infra-cards');
     const emptyEl = document.getElementById('s7a-infra-empty');
@@ -16338,15 +17242,15 @@ ${certContent}
     emptyEl.style.display = 'none';
     var c = snap.compute, s = snap.storage;
     function ic(label, value, color) {
-      return '<div style="background:#e0f2fe; border:1px solid ' + (color||'rgba(34,197,94,.3)') + '; border-radius:8px; padding:12px 14px;">' +
-        '<div style="font-size:11px; color:#0369a1; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">' + label + '</div>' +
-        '<div style="font-size:18px; font-weight:800; color:#0c4a6e;">' + value + '</div></div>';
+      return '<div style="background:#e0f2fe; border:1px solid ' + (color||'rgba(14,165,233,.3)') + '; border-radius:8px; padding:12px 14px;">'
+        + '<div style="font-size:11px; color:#0369a1; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">' + label + '</div>'
+        + '<div style="font-size:18px; font-weight:800; color:#0c4a6e;">' + value + '</div></div>';
     }
     var html = '';
     if (c.servers) {
       html += ic('Compute Servers', c.servers.toLocaleString());
-      html += ic('Active Utilization', c.pct + '% (' + c.active + ' active)', 'rgba(74,222,128,.3)');
-      if (c.vcpus)  html += ic('Total vCPUs', c.vcpus.toLocaleString(), 'rgba(56,189,248,.3)');
+      html += ic('Active Utilization', c.pct + '% (' + c.active + ' active)', 'rgba(34,197,94,.3)');
+      if (c.vcpus) html += ic('Total vCPUs', c.vcpus.toLocaleString(), 'rgba(14,165,233,.3)');
       if (c.ramGb)  html += ic('Total RAM', c.ramGb >= 1024 ? (c.ramGb/1024).toFixed(1)+' TB' : Math.round(c.ramGb)+' GB', 'rgba(167,139,250,.3)');
     }
     if (s.vols) {
@@ -16357,116 +17261,8 @@ ${certContent}
     cardsEl.innerHTML = html;
   }
 
-  function _uatServerTable(scope) {
-    if (!scope || !scope.length) return '';
-    var rows = scope.map(function(r) {
-      var typeColor = r.type === 'DB' ? '#f59e0b' : r.type === 'K8s' ? '#a78bfa' : '#38bdf8';
-      return '<tr>'
-        + '<td style="padding:7px 10px; border-bottom:1px solid rgba(100,116,139,.15); font-weight:700; color:#e2e8f0;">' + _uatEsc(r.name || '—') + '</td>'
-        + '<td style="padding:7px 10px; border-bottom:1px solid rgba(100,116,139,.15);"><span style="background:rgba(59,130,246,.12); border:1px solid rgba(59,130,246,.3); color:#93c5fd; padding:1px 7px; border-radius:4px; font-family:monospace; font-size:11px;">' + _uatEsc(r.source_ip || '—') + '</span></td>'
-        + '<td style="padding:7px 10px; border-bottom:1px solid rgba(100,116,139,.15);"><span style="background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.3); color:#86efac; padding:1px 7px; border-radius:4px; font-family:monospace; font-size:11px;">' + _uatEsc(r.target_ip || '—') + '</span></td>'
-        + '<td style="padding:7px 10px; border-bottom:1px solid rgba(100,116,139,.15);"><span style="font-size:10px; font-weight:700; color:' + typeColor + ';">' + _uatEsc(r.type || 'App') + '</span></td>'
-        + '</tr>';
-    }).join('');
-    return '<div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(100,116,139,.2);">'
-      + '<div style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">UAT Tested Servers (' + scope.length + ')</div>'
-      + '<div style="overflow:auto; border:1px solid rgba(100,116,139,.2); border-radius:7px; max-height:200px;">'
-      + '<table style="width:100%; border-collapse:collapse; min-width:480px;">'
-      + '<thead><tr>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">Server Name</th>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#3b82f6; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">OSPC Source IP</th>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#22c55e; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">FLEX Target IP</th>'
-      + '<th style="padding:6px 10px; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; background:#e0f2fe; border-bottom:1px solid rgba(100,116,139,.2); font-weight:700;">Type</th>'
-      + '</tr></thead>'
-      + '<tbody>' + rows + '</tbody>'
-      + '</table></div></div>';
-  }
-
-  function _uatEsc(s) { return String(s||'').replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}); }
-
-  function _uatTcoCard(label, value, color) {
-    return '<div style="background:#e0f2fe; border:1px solid rgba(14,165,233,0.25); border-radius:8px; padding:12px 14px;">'
-      + '<div style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">' + label + '</div>'
-      + '<div style="font-size:18px; font-weight:800; color:' + color + ';">' + value + '</div></div>';
-  }
-
-  function s7LoadUatTco() {
-    var el = document.getElementById('s7-uat-tco-content');
-    var tsEl = document.getElementById('s7-uat-tco-ts');
-    if (!el) return;
-    var raw = null; var scope = null;
-    try { raw = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
-    try { scope = JSON.parse(localStorage.getItem('osflex_uat_scope') || 'null'); } catch(_) {}
-    var ts = localStorage.getItem('osflex_uat_flavor_ts') || localStorage.getItem('osflex_uat_scope_ts') || '';
-    if (!raw || !raw.tcoData) {
-      el.innerHTML = '<span style="color:#f59e0b;">No UAT TCO data in storage — open Stage 3 UAT Testing to generate it.</span>'
-        + (scope && scope.length ? _uatServerTable(scope) : '');
-      return;
-    }
-    var t = raw.tcoData;
-    var good = t.savings > 0;
-    var pct = parseFloat(t.savingsPct || 0);
-    if (tsEl) tsEl.textContent = ts ? 'From UAT: ' + ts.replace('T',' ').slice(0,16) + ' UTC' : '';
-    el.innerHTML = '<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:10px; margin-bottom:12px;">'
-      + _uatTcoCard('Source Monthly', '$' + (t.srcMonthly||0).toLocaleString(), '#3b82f6')
-      + _uatTcoCard('FLEX Target Monthly', '$' + (t.tgtMonthly||0).toLocaleString(), '#22c55e')
-      + _uatTcoCard('Monthly Savings', '$' + (t.savings||0).toLocaleString() + ' (' + Math.abs(pct).toFixed(1) + '%)', good ? '#22c55e' : '#ef4444')
-      + _uatTcoCard('Annual Savings', '$' + ((t.savings||0)*12).toLocaleString(), good ? '#a78bfa' : '#ef4444')
-      + '</div>'
-      + '<div style="padding:10px 14px; background:' + (good ? 'rgba(22,101,52,.15)' : 'rgba(127,29,29,.15)') + '; border:1px solid ' + (good ? 'rgba(74,222,128,.35)' : 'rgba(248,113,113,.35)') + '; border-radius:8px; font-size:13px; color:' + (good ? '#86efac' : '#f87171') + '; font-weight:700;">'
-      + (good ? '✅ Cost Optimization: ' + pct.toFixed(1) + '% lower on FLEX — strong migration ROI' : '⚠ FLEX costs higher — review pricing and right-sizing before proceeding')
-      + '</div>'
-      + _uatServerTable(scope);
-  }
-
-  function s7aLoadUatPerf() {
-    var el = document.getElementById('s7a-uat-perf-content');
-    var tsEl = document.getElementById('s7a-uat-perf-ts');
-    if (!el) return;
-    var raw = null; var scope = null;
-    try { raw = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
-    try { scope = JSON.parse(localStorage.getItem('osflex_uat_scope') || 'null'); } catch(_) {}
-    var ts = localStorage.getItem('osflex_uat_flavor_ts') || localStorage.getItem('osflex_uat_scope_ts') || '';
-    if (!raw || !raw.vmData) {
-      el.innerHTML = '<span style="color:#f59e0b;">No UAT VM data in storage — open Stage 3 UAT Testing to generate it.</span>'
-        + (scope && scope.length ? _uatServerTable(scope) : '');
-      return;
-    }
-    var vm = raw.vmData;
-    if (tsEl) tsEl.textContent = ts ? 'From UAT: ' + ts.replace('T',' ').slice(0,16) + ' UTC' : '';
-    var metrics = [
-      { label:'vCPU (cores)', src: vm.srcVcpu||0, tgt: vm.tgtVcpu||0, unit:'cores' },
-      { label:'RAM', src: vm.srcRam||0, tgt: vm.tgtRam||0, unit:'GB' },
-      { label:'Storage', src: vm.srcDisk||0, tgt: vm.tgtDisk||0, unit:'GB' },
-    ];
-    var maxV = metrics.reduce(function(m,r){ return Math.max(m, r.src, r.tgt); }, 1);
-    var bars = metrics.map(function(m) {
-      var sp = Math.round(m.src/maxV*100), tp = Math.round(m.tgt/maxV*100);
-      var gain = m.src > 0 ? ((m.tgt - m.src) / m.src * 100).toFixed(1) : '0.0';
-      var gainColor = parseFloat(gain) >= 0 ? '#86efac' : '#f87171';
-      return '<div style="display:grid; grid-template-columns:110px 1fr 56px; align-items:center; gap:8px; margin-bottom:8px;">'
-        + '<div style="font-size:12px; color:#94a3b8;">' + m.label + '</div>'
-        + '<div>'
-        + '<div style="display:flex; align-items:center; gap:4px; margin-bottom:3px;"><span style="font-size:10px; color:#3b82f6; width:28px;">SRC</span><div style="flex:1; background:#e0f2fe; border-radius:3px; height:8px;"><div style="width:'+sp+'%; height:100%; background:#3b82f6; border-radius:3px;"></div></div><span style="font-size:10px; color:#94a3b8; width:46px; text-align:right;">' + m.src + ' ' + m.unit + '</span></div>'
-        + '<div style="display:flex; align-items:center; gap:4px;"><span style="font-size:10px; color:#22c55e; width:28px;">TGT</span><div style="flex:1; background:#e0f2fe; border-radius:3px; height:8px;"><div style="width:'+tp+'%; height:100%; background:#22c55e; border-radius:3px;"></div></div><span style="font-size:10px; color:#94a3b8; width:46px; text-align:right;">' + m.tgt + ' ' + m.unit + '</span></div>'
-        + '</div>'
-        + '<div style="font-size:12px; font-weight:800; color:' + gainColor + '; text-align:right;">' + (parseFloat(gain) > 0 ? '+' : '') + gain + '%</div>'
-        + '</div>';
-    });
-    var flavorHtml = '';
-    if (vm.sourceFlavors && vm.sourceFlavors.length) {
-      flavorHtml = '<div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(100,116,139,.15); display:flex; gap:16px; flex-wrap:wrap;">'
-        + '<div><div style="font-size:10px; color:#64748b; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">Source Flavors</div>'
-        + vm.sourceFlavors.slice(0,3).map(function(f){ return '<span style="display:inline-block; margin:2px; padding:1px 8px; border-radius:999px; background:rgba(59,130,246,.12); border:1px solid rgba(59,130,246,.3); color:#93c5fd; font-size:11px;">' + _uatEsc(f.name||'') + (f.count ? ' ×'+f.count : '') + '</span>'; }).join('') + '</div>'
-        + (vm.targetFlavors && vm.targetFlavors.length ? '<div><div style="font-size:10px; color:#64748b; margin-bottom:4px; text-transform:uppercase; letter-spacing:1px;">Target Flavors</div>'
-        + vm.targetFlavors.slice(0,3).map(function(f){ return '<span style="display:inline-block; margin:2px; padding:1px 8px; border-radius:999px; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#86efac; font-size:11px;">' + _uatEsc(f.name||'') + (f.count ? ' ×'+f.count : '') + '</span>'; }).join('') + '</div>' : '')
-        + '</div>';
-    }
-    el.innerHTML = '<div style="font-size:11px; color:#64748b; margin-bottom:10px;">'
-      + (vm.rows ? 'Averaged across ' + vm.rows + ' VMs' : 'VM resource comparison from UAT') + '</div>'
-      + bars.join('') + flavorHtml
-      + _uatServerTable(scope);
-  }
+  // Legacy alias — some buttons may still call this
+  function s7aLoadUatPerf() { s7aImportUAT(); }
 
   function resizeEmbeddedIframe(iframe) {
     if (!iframe || iframe.style.display === 'none' || iframe.offsetParent === null) return;
