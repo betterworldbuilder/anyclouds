@@ -2769,12 +2769,11 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
                 <!-- STEP 1 -->
                 <section class="uat-panel" data-uat-step="1" style="display:none;">
-                  <!-- Step 1 header with view toggle -->
+                  <!-- header -->
                   <div class="uat-panel-header" style="flex-wrap:wrap;gap:8px;">
-                    <h3 id="bz-step1-title">Step 1 — Server Targets</h3>
+                    <h3 id="bz-step1-title" style="margin:0;">Step 1 — Systems Target</h3>
                     <div class="uat-actions" style="flex-wrap:wrap;gap:6px;align-items:center;">
-                      <!-- View toggle -->
-                      <div id="bz-view-tabs" style="display:flex;gap:4px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:3px;">
+                      <div id="bz-view-tabs" style="display:flex;gap:3px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:3px;">
                         <button id="bz-tab-systems" onclick="bzSetView('systems')"
                           style="padding:4px 10px;border-radius:6px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:#2563eb;color:#fff;">
                           Business Systems
@@ -2784,41 +2783,50 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
                           Raw Server Targets
                         </button>
                       </div>
-                      <!-- Action buttons (context-sensitive) -->
                       <button id="bz-btn-add-biz" class="uat-btn" onclick="bzOpenModal()" style="background:#2563eb;color:#fff;">+ Add Business System</button>
-                      <button id="bz-btn-add-srv" class="uat-btn" onclick="uatShowScopeForm()" style="display:none;">+ Add Server</button>
-                      <button id="bz-btn-automatch" class="uat-btn" onclick="bzAutoMapFromServers()" style="display:none;background:#0f172a;border:1px solid #334155;color:#94a3b8;font-size:11px;">Auto-map to Components</button>
+                      <button id="bz-btn-add-sa" class="uat-btn" onclick="bzOpenStandaloneModal()" style="background:#0f172a;border:1px solid #334155;color:#94a3b8;">+ Add Server / DB</button>
+                      <button id="bz-btn-add-srv" class="uat-btn" onclick="uatShowScopeForm()" style="display:none;">+ Add Server Row</button>
                       <button class="uat-btn uat-btn-good" onclick="uatSaveScope()" style="display:none;" id="bz-btn-save-srv">Save</button>
                     </div>
                   </div>
 
-                  <!-- ── Business Systems view ── -->
+                  <!-- Business Systems view -->
                   <div id="bz-systems-view" class="uat-panel-body">
-                    <!-- Summary bar -->
-                    <div id="bz-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:12px 14px;background:#0f172a;border:1px solid #1e293b;border-radius:10px;align-items:center;">
-                      <span style="font-size:12px;color:#64748b;flex:1;">No business systems defined yet. Add one to generate UAT scope and cutover components.</span>
-                    </div>
-                    <!-- Business system cards grid -->
-                    <div style="display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px;align-items:start;">
-                      <div id="bz-cards" style="display:flex;flex-direction:column;gap:10px;">
-                        <!-- cards rendered by bzRenderCards() -->
+                    <div id="bz-summary" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:12px 14px;background:#0f172a;border:1px solid #1e293b;border-radius:10px;">
+                      <div style="flex:1;min-width:180px;">
+                        <div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:2px;">Business-System-Aware UAT</div>
+                        <div style="font-size:11px;color:#475569;">Add full service stacks or standalone infrastructure below.</div>
                       </div>
-                      <!-- Archetype sidebar -->
-                      <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:14px;">
-                        <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">Archetype Templates</div>
-                        <div style="font-size:11px;color:#64748b;margin-bottom:12px;line-height:1.5;">Pre-fill standard components instantly. Edit everything before saving.</div>
-                        <div id="bz-archetype-list" style="display:flex;flex-direction:column;gap:6px;">
-                          <!-- rendered by bzRenderArchetypeList() -->
+                      <div id="bz-hero-kpis" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;align-items:start;">
+                      <div id="bz-cards" style="display:flex;flex-direction:column;gap:10px;"></div>
+                      <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:14px;position:sticky;top:0;">
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">Archetype Templates</div>
+                        <div style="font-size:11px;color:#475569;margin-bottom:10px;line-height:1.45;">Pre-fill standard components instantly.</div>
+                        <div id="bz-archetype-list" style="display:flex;flex-direction:column;gap:5px;"></div>
+                      </div>
+                    </div>
+                    <!-- Standalone section -->
+                    <div style="margin-top:16px;border-top:1px solid #1e293b;padding-top:14px;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;">
+                        <div>
+                          <span style="font-size:13px;font-weight:800;color:#e2e8f0;">Standalone Servers &amp; Databases</span>
+                          <span style="font-size:11px;color:#475569;margin-left:8px;">Not yet in a business system. Map later.</span>
                         </div>
+                        <button onclick="bzOpenStandaloneModal()" style="background:#0f172a;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:12px;font-weight:700;">+ Add Server / DB</button>
+                      </div>
+                      <div id="bz-standalone-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;min-height:40px;">
+                        <div style="color:#475569;font-size:12px;grid-column:1/-1;padding:10px 0;" id="bz-standalone-empty">No standalone servers or databases yet.</div>
                       </div>
                     </div>
                   </div>
 
-                  <!-- ── Raw Server Targets view ── -->
+                  <!-- Raw Server Targets view -->
                   <div id="bz-servers-view" class="uat-panel-body" style="display:none;">
                     <p style="margin:0 0 10px;font-size:12px;color:#bfdbfe;">Enter source OSPC and target FLEX server details. These auto-fill all tools below.</p>
                     <div id="uat-scope-form" class="uat-form-grid uat-hidden" style="margin-bottom:14px;">
-                      <label>Type<select class="uat-select" name="system_type" onchange="var lbl=document.getElementById('scope-form-db-engine-label');if(lbl)lbl.style.display=this.value==='DB'?'':\'none\';"><option>App</option><option>DB</option></select></label>
+                      <label>Type<select class="uat-select" name="system_type" onchange="var lbl=document.getElementById('scope-form-db-engine-label');if(lbl)lbl.style.display=this.value==='DB'?'':'none';"><option>App</option><option>DB</option></select></label>
                       <label>Name<input class="uat-input" name="business_system_name" placeholder="e.g. App Server"></label>
                       <label>Tier<select class="uat-select" name="tier"><option>Backend</option><option>Frontend</option><option>Database</option><option>Batch</option><option>External Integration</option></select></label>
                       <label>Source IP (OSPC)<input class="uat-input" name="source_host" id="scope-form-source-host" oninput="scopeFeedComparison(this)"></label>
@@ -2848,7 +2856,6 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
                       </table>
                     </div>
                   </div>
-
                 </section>
 
                 <!-- STEP 2 -->
@@ -3095,7 +3102,69 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
                         <button onclick="bzSaveSystem()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700;">Add Business System</button>
                       </div>
                     </div>
+                  
+              <!-- Standalone Server / DB Modal -->
+              <div id="bz-sa-backdrop" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,.65);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+                <div style="width:min(880px,100%);max-height:92vh;overflow:hidden;background:#0f172a;border:1px solid #1e3a5f;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.5);display:grid;grid-template-rows:auto 1fr auto;">
+                  <div style="padding:16px 20px;border-bottom:1px solid #1e293b;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                    <div>
+                      <div style="font-size:18px;font-weight:800;color:#e2e8f0;">Add Standalone Server or Database</div>
+                      <div style="font-size:12px;color:#64748b;margin-top:2px;">Infrastructure not yet in a business system. Map to one later.</div>
+                    </div>
+                    <button onclick="bzCloseStandaloneModal()" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;">&#x2715; Close</button>
                   </div>
+                  <div style="overflow:auto;padding:18px;background:#0a1628;display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;">
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                      <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:14px;">
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:10px;">1. What are you adding?</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+                          <div id="bz-sa-choice-server" onclick="bzSetStandaloneType('server')" style="border:2px solid #2563eb;background:#0d2045;border-radius:10px;padding:10px;cursor:pointer;">
+                            <div style="font-size:12px;font-weight:800;color:#60a5fa;margin-bottom:3px;">App Server</div>
+                            <div style="font-size:10px;color:#475569;">Web, API, worker, batch, monitoring</div>
+                          </div>
+                          <div id="bz-sa-choice-db" onclick="bzSetStandaloneType('db')" style="border:1px solid #1e3a5f;background:#0f172a;border-radius:10px;padding:10px;cursor:pointer;">
+                            <div style="font-size:12px;font-weight:800;color:#34d399;margin-bottom:3px;">Database</div>
+                            <div style="font-size:10px;color:#475569;">MySQL, PostgreSQL, MongoDB…</div>
+                          </div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Name</label><input id="bz-sa-name" value="" placeholder="e.g. standalone-app-01" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;box-sizing:border-box;"></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Criticality</label><select id="bz-sa-criticality" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Owner</label><input id="bz-sa-owner" value="" placeholder="e.g. platform-team" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;box-sizing:border-box;"></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Map to Business System</label><select id="bz-sa-map-to" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:13px;"><option value="">Keep standalone</option></select></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                      <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:14px;flex:1;">
+                        <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:10px;">2. Connection &amp; Test Inputs</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                          <div class="bz-sa-app-field"><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Component Role</label><select id="bz-sa-role" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;"><option>Web Frontend</option><option>API Server</option><option>Backend App Server</option><option>Worker / Batch</option><option>File Storage</option><option>Monitoring</option><option>Custom Server</option></select></div>
+                          <div class="bz-sa-db-field" style="display:none;"><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">DB Engine</label><select id="bz-sa-db-engine" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;"><option>MySQL / MariaDB</option><option>PostgreSQL</option><option>MongoDB</option><option>SQL Server</option><option>Oracle</option><option>Other</option></select></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Source IP (OSPC)</label><input id="bz-sa-src" placeholder="e.g. 192.168.10.1" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Target IP (FLEX)</label><input id="bz-sa-tgt" placeholder="e.g. 10.0.10.1" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">SSH User</label><input id="bz-sa-ssh-user" value="ubuntu" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">SSH Key</label><input id="bz-sa-ssh-key" value="~/.ssh/id_rsa" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div class="bz-sa-app-field"><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">App / Service Port</label><input id="bz-sa-app-port" value="80" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div class="bz-sa-db-field" style="display:none;"><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">DB Port</label><input id="bz-sa-db-port" value="3306" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div class="bz-sa-app-field"><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Health URL / Path</label><input id="bz-sa-health" value="/health" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                          <div class="bz-sa-db-field" style="display:none;"><label style="display:block;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Read Query</label><input id="bz-sa-db-query" value="SELECT 1" style="width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;box-sizing:border-box;"></div>
+                        </div>
+                      </div>
+                      <div style="background:#061b3b;border:1px dashed #1e3a5f;border-radius:10px;padding:12px;">
+                        <div style="font-size:12px;font-weight:800;color:#3b82f6;margin-bottom:8px;">Generated Standalone Tests</div>
+                        <div id="bz-sa-test-preview" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px;"></div>
+                        <div style="font-size:11px;color:#475569;margin-top:8px;">Tests run on this item independently. Map to a Business System later for full cutover coverage.</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="padding:14px 20px;border-top:1px solid #1e293b;display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+                    <button onclick="bzCloseStandaloneModal()" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;">Cancel</button>
+                    <button onclick="bzSaveStandalone()" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700;">Add Standalone</button>
+                  </div>
+                </div>
+              </div>
+</div>
 
             </div><!-- /uat-main -->
           </div><!-- /uat-layout -->
@@ -3176,7 +3245,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         window.uatNavTo = function(step, instant) {
           /* Update topbar title to reflect current step */
           var _TITLES = {
-            1: ['Step 1 — Server Targets',         'Source OSPC and target FLEX server configuration'],
+            1: ['Step 1 — Systems Target',          'Define business systems, standalone servers, and databases'],
             2: ['Step 2 — Service Comparison',     'OSPC → FLEX service-by-service comparison and validation'],
             3: ['Step 3 — Performance Validation', 'Performance benchmarks and baseline comparison'],
             4: ['Step 4 — Issues Tracker',         'Issue tracking, risk assessment and remediation'],
@@ -3501,31 +3570,31 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
           /* ── View toggle ── */
           window.bzSetView = function(view) {
-            var sysDom  = document.getElementById('bz-systems-view');
-            var srvDom  = document.getElementById('bz-servers-view');
-            var tabSys  = document.getElementById('bz-tab-systems');
-            var tabSrv  = document.getElementById('bz-tab-servers');
-            var btnBiz  = document.getElementById('bz-btn-add-biz');
-            var btnSrv  = document.getElementById('bz-btn-add-srv');
-            var btnAmap = document.getElementById('bz-btn-automatch');
-            var btnSave = document.getElementById('bz-btn-save-srv');
+            var sysDom = document.getElementById('bz-systems-view');
+            var srvDom = document.getElementById('bz-servers-view');
+            var tabSys = document.getElementById('bz-tab-systems');
+            var tabSrv = document.getElementById('bz-tab-servers');
+            var btnBiz = document.getElementById('bz-btn-add-biz');
+            var btnSa  = document.getElementById('bz-btn-add-sa');
+            var btnSrv = document.getElementById('bz-btn-add-srv');
+            var btnSave= document.getElementById('bz-btn-save-srv');
             if (view === 'systems') {
               if (sysDom) sysDom.style.display = '';
               if (srvDom) srvDom.style.display = 'none';
               if (tabSys) { tabSys.style.background='#2563eb'; tabSys.style.color='#fff'; }
               if (tabSrv) { tabSrv.style.background='transparent'; tabSrv.style.color='#94a3b8'; }
-              if (btnBiz)  btnBiz.style.display  = '';
-              if (btnSrv)  btnSrv.style.display  = 'none';
-              if (btnAmap) btnAmap.style.display = 'none';
+              if (btnBiz) btnBiz.style.display = '';
+              if (btnSa)  btnSa.style.display  = '';
+              if (btnSrv) btnSrv.style.display = 'none';
               if (btnSave) btnSave.style.display = 'none';
             } else {
               if (sysDom) sysDom.style.display = 'none';
               if (srvDom) srvDom.style.display = '';
               if (tabSys) { tabSys.style.background='transparent'; tabSys.style.color='#94a3b8'; }
               if (tabSrv) { tabSrv.style.background='#2563eb'; tabSrv.style.color='#fff'; }
-              if (btnBiz)  btnBiz.style.display  = 'none';
-              if (btnSrv)  btnSrv.style.display  = '';
-              if (btnAmap) btnAmap.style.display = '';
+              if (btnBiz) btnBiz.style.display = 'none';
+              if (btnSa)  btnSa.style.display  = '';
+              if (btnSrv) btnSrv.style.display = '';
               if (btnSave) btnSave.style.display = '';
             }
           };
@@ -3726,22 +3795,32 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
             }).join('');
           }
 
-          /* ── Render summary bar ── */
+          /* ── Render summary / hero KPIs ── */
           function bzRenderSummary() {
-            var el = document.getElementById('bz-summary');
-            if (!el) return;
             var sys = bzState.systems;
-            if (!sys.length) {
-              el.innerHTML = '<span style="font-size:12px;color:#64748b;flex:1;">No business systems defined yet. Add one to generate UAT scope and cutover components.</span>';
-              return;
-            }
+            var sas = window.bzStandaloneState ? window.bzStandaloneState.items : [];
             var totalComps = sys.reduce(function(a,s){ return a + s.components.length; }, 0);
-            var hasDB = sys.some(function(s){ return s.components.some(function(c){ return c.type==='database'; }); });
-            el.innerHTML =
-              '<span style="background:#1e3a5f;color:#60a5fa;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;">' + sys.length + ' System' + (sys.length!==1?'s':'') + '</span>'
-              + '<span style="background:#1e3a5f;color:#34d399;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;">' + totalComps + ' Components</span>'
-              + (hasDB ? '<span style="background:#1e3a5f;color:#fbbf24;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;">DB Validation In Scope</span>' : '')
-              + '<span style="color:#475569;font-size:11px;flex:1;text-align:right;">UAT scope and cutover package auto-updated</span>';
+            var hasDB = sys.some(function(s){ return s.components.some(function(c){ return c.type==='database'; }); })
+                     || sas.some(function(i){ return i.itemType === 'db'; });
+            var totalTests = totalComps * 3 + sas.length * 2;
+            var kpiEl = document.getElementById('bz-hero-kpis');
+            if (kpiEl) {
+              kpiEl.innerHTML =
+                kpiBadge('#60a5fa', sys.length + ' System' + (sys.length!==1?'s':''))
+                + kpiBadge('#34d399', totalComps + ' Component' + (totalComps!==1?'s':''))
+                + kpiBadge('#fbbf24', sas.length + ' Standalone')
+                + (hasDB ? kpiBadge('#a78bfa', 'DB In Scope') : '')
+                + kpiBadge('#94a3b8', totalTests + ' Tests');
+            }
+            var descEl = document.querySelector('#bz-summary > div:first-child > div:last-child');
+            if (descEl) {
+              descEl.textContent = (!sys.length && !sas.length)
+                ? 'Add a business system or standalone server to generate UAT scope.'
+                : sys.length + ' system' + (sys.length!==1?'s':'') + ', ' + sas.length + ' standalone — UAT scope auto-updated';
+            }
+          }
+          function kpiBadge(col, label) {
+            return '<span style="background:#1e293b;color:' + col + ';border:1px solid ' + col + '33;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;white-space:nowrap;">' + label + '</span>';
           }
 
           /* ── Render cards ── */
@@ -3826,6 +3905,123 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           } else {
             bzInit();
           }
+        // ── Standalone Servers & DBs ────────────────────────────────────────
+        (function() {
+          'use strict';
+          window.bzStandaloneState = { items: [], type: 'server' };
+          try { var _s = localStorage.getItem('bz_standalones'); if (_s) window.bzStandaloneState.items = JSON.parse(_s) || []; } catch(e) {}
+
+          function saGenId() { return 'sa-' + Date.now() + '-' + Math.floor(Math.random()*9999); }
+          function saSave() { try { localStorage.setItem('bz_standalones', JSON.stringify(window.bzStandaloneState.items)); } catch(e) {} }
+
+          var SA_APP_TESTS = [{l:'SSH reachable',c:'#60a5fa'},{l:'Port open',c:'#60a5fa'},{l:'HTTP health',c:'#60a5fa'},{l:'Perf baseline',c:'#fbbf24'}];
+          var SA_DB_TESTS  = [{l:'DB connect',c:'#34d399'},{l:'Read query',c:'#34d399'},{l:'Write test',c:'#fbbf24'},{l:'DB compare',c:'#a78bfa'}];
+
+          function saPopulateMapTo() {
+            var sel = document.getElementById('bz-sa-map-to'); if (!sel) return;
+            var cur = sel.value;
+            sel.innerHTML = '<option value="">Keep standalone</option>'
+              + (window.bzState ? window.bzState.systems : []).map(function(s){
+                  return '<option value="' + s.id + '">' + s.name + '</option>';
+                }).join('');
+            sel.value = cur;
+          }
+
+          window.bzOpenStandaloneModal = function() {
+            var bd = document.getElementById('bz-sa-backdrop'); if (bd) bd.style.display = 'flex';
+            saPopulateMapTo();
+            bzSetStandaloneType(window.bzStandaloneState.type || 'server');
+            var n = document.getElementById('bz-sa-name'); if (n) n.value = '';
+            var o = document.getElementById('bz-sa-owner'); if (o) o.value = '';
+          };
+
+          window.bzCloseStandaloneModal = function() {
+            var bd = document.getElementById('bz-sa-backdrop'); if (bd) bd.style.display = 'none';
+          };
+
+          window.bzSetStandaloneType = function(type) {
+            window.bzStandaloneState.type = type;
+            var cs = document.getElementById('bz-sa-choice-server');
+            var cd = document.getElementById('bz-sa-choice-db');
+            if (cs) { cs.style.border = type==='server'?'2px solid #2563eb':'1px solid #1e3a5f'; cs.style.background = type==='server'?'#0d2045':'#0f172a'; }
+            if (cd) { cd.style.border = type==='db'?'2px solid #34d399':'1px solid #1e3a5f'; cd.style.background = type==='db'?'#0a2a1e':'#0f172a'; }
+            document.querySelectorAll('.bz-sa-app-field').forEach(function(el) { el.style.display = type==='server'?'':'none'; });
+            document.querySelectorAll('.bz-sa-db-field').forEach(function(el) { el.style.display = type==='db'?'':'none'; });
+            var n = document.getElementById('bz-sa-name');
+            if (n && !n.value) n.value = type==='db'?'standalone-db-01':'standalone-app-01';
+            var tests = type==='db' ? SA_DB_TESTS : SA_APP_TESTS;
+            var prev = document.getElementById('bz-sa-test-preview');
+            if (prev) prev.innerHTML = tests.map(function(t){ return '<span style="background:#1e293b;color:'+t.c+';border:1px solid '+t.c+'33;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;">'+t.l+'</span>'; }).join('');
+          };
+
+          window.bzSaveStandalone = function() {
+            var name = (document.getElementById('bz-sa-name')||{}).value || '';
+            if (!name.trim()) { alert('Please enter a name.'); return; }
+            var type = window.bzStandaloneState.type || 'server';
+            window.bzStandaloneState.items.push({
+              id: saGenId(), name: name.trim(), itemType: type,
+              role: type==='server' ? ((document.getElementById('bz-sa-role')||{}).value||'') : ((document.getElementById('bz-sa-db-engine')||{}).value||''),
+              src:  (document.getElementById('bz-sa-src') ||{}).value||'',
+              tgt:  (document.getElementById('bz-sa-tgt') ||{}).value||'',
+              sshUser: (document.getElementById('bz-sa-ssh-user')||{}).value||'ubuntu',
+              sshKey:  (document.getElementById('bz-sa-ssh-key') ||{}).value||'~/.ssh/id_rsa',
+              port: type==='server' ? ((document.getElementById('bz-sa-app-port')||{}).value||'80') : ((document.getElementById('bz-sa-db-port')||{}).value||'3306'),
+              health: type==='server' ? ((document.getElementById('bz-sa-health')||{}).value||'/health') : ((document.getElementById('bz-sa-db-query')||{}).value||'SELECT 1'),
+              criticality: (document.getElementById('bz-sa-criticality')||{}).value||'High',
+              owner: (document.getElementById('bz-sa-owner')||{}).value||'',
+              mapTo: (document.getElementById('bz-sa-map-to')||{}).value||''
+            });
+            saSave();
+            bzCloseStandaloneModal();
+            window.bzRenderStandalones();
+            if (typeof bzRenderSummary === 'function') bzRenderSummary();
+          };
+
+          window.bzRenderStandalones = function() {
+            var container = document.getElementById('bz-standalone-cards');
+            var emptyEl   = document.getElementById('bz-standalone-empty');
+            if (!container) return;
+            var items = window.bzStandaloneState.items;
+            container.querySelectorAll('[data-sa-card]').forEach(function(el){ el.remove(); });
+            if (!items.length) { if (emptyEl) emptyEl.style.display=''; return; }
+            if (emptyEl) emptyEl.style.display='none';
+            items.forEach(function(item) {
+              var isDB = item.itemType==='db';
+              var bc = isDB?'#34d399':'#60a5fa'; var bb = isDB?'#0a2a1e':'#0d2045'; var bt = isDB?'DB':'APP';
+              var card = document.createElement('div');
+              card.setAttribute('data-sa-card', item.id);
+              card.style.cssText = 'background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;padding:12px;';
+              card.innerHTML =
+                '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">'
+                +'<div style="display:flex;gap:8px;align-items:center;">'
+                +'<div style="width:36px;height:36px;border-radius:10px;background:'+bb+';color:'+bc+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;">'+bt+'</div>'
+                +'<div><div style="font-size:14px;font-weight:800;color:#e2e8f0;">'+item.name+'</div>'
+                +'<div style="font-size:11px;color:#64748b;margin-top:1px;">'+item.role+' &bull; '+item.criticality+(item.owner?' &bull; '+item.owner:'')+'</div></div>'
+                +'</div>'
+                +'<button data-sa-del="'+item.id+'" style="background:transparent;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:2px 6px;">&#x2715;</button>'
+                +'</div>'
+                +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
+                +'<div style="background:#1e293b;border-radius:8px;padding:6px 8px;font-size:11px;"><span style="color:#475569;display:block;font-size:9px;font-weight:700;text-transform:uppercase;">Source</span><b style="color:#e2e8f0;">'+(item.src||'&mdash;')+'</b></div>'
+                +'<div style="background:#1e293b;border-radius:8px;padding:6px 8px;font-size:11px;"><span style="color:#475569;display:block;font-size:9px;font-weight:700;text-transform:uppercase;">Target</span><b style="color:#e2e8f0;">'+(item.tgt||'&mdash;')+'</b></div>'
+                +'<div style="background:#1e293b;border-radius:8px;padding:6px 8px;font-size:11px;"><span style="color:#475569;display:block;font-size:9px;font-weight:700;text-transform:uppercase;">Port</span><b style="color:#e2e8f0;">'+(item.port||'&mdash;')+'</b></div>'
+                +'<div style="background:#1e293b;border-radius:8px;padding:6px 8px;font-size:11px;"><span style="color:#475569;display:block;font-size:9px;font-weight:700;text-transform:uppercase;">'+(isDB?'Query':'Health')+'</span><b style="color:#e2e8f0;">'+(item.health||'&mdash;')+'</b></div>'
+                +'</div>';
+              card.querySelector('[data-sa-del]').addEventListener('click', function() {
+                var did = this.getAttribute('data-sa-del');
+                window.bzStandaloneState.items = window.bzStandaloneState.items.filter(function(i){ return i.id!==did; });
+                saSave(); window.bzRenderStandalones();
+                if (typeof bzRenderSummary==='function') bzRenderSummary();
+              });
+              container.appendChild(card);
+            });
+          };
+
+          (function saInit() {
+            window.bzRenderStandalones();
+            bzSetStandaloneType('server');
+          })();
+        })();
+
         })();
 
         // Static /static/uat/uat.js owns the active flavor loader.
