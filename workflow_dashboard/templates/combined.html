@@ -2527,6 +2527,13 @@
                 <button onclick="tourVidMgrSave('pnl-s10')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
               </div>
             </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Migration Log</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s0" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s0')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
         </div>
         <p style="color:#475569;font-size:11px;margin:12px 0 0;">&#128274; Links save to localStorage only — no server storage.</p>
       </div>
@@ -2803,10 +2810,16 @@
           <h1 style="color:#0f172a; margin:0; font-size:28px;">Customer Migration Tracker</h1>
           <p style="color:#64748b; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
         </div>
-        <div style="flex:1; display:flex; justify-content:center; padding:0 24px;">
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; padding:0 24px;">
           <button id="btnToggleProjectDocsUpload" style="padding:12px 20px; background:linear-gradient(135deg, #0f766e, #0891b2); color:white; border:1px solid #67e8f9; border-radius:8px; font-weight:700; cursor:pointer; box-shadow:0 0 16px rgba(34,211,238,0.18); white-space:nowrap;">
             ⬆ Upload projects data (docx, pdf, xls, ppt, visio)
           </button>
+          <div style="display:flex;align-items:center;gap:8px;width:100%;max-width:460px;">
+            <div style="background:#7f1d1d;border-radius:6px;padding:3px 8px;display:flex;align-items:center;gap:5px;flex-shrink:0;"><span style="font-size:11px;">📺</span><span style="color:#fca5a5;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">VIDEO TUTORIAL</span></div>
+            <div style="background:#172554;border-radius:4px;padding:2px 6px;flex-shrink:0;"><span style="color:#93c5fd;font-size:9px;font-weight:700;">YT</span></div>
+            <input id="stginp-pnl-s0" type="url" placeholder="Paste video URL to link tutorial..." style="flex:1;background:rgba(15,23,42,.06);border:1px solid rgba(14,165,233,.30);border-radius:4px;padding:5px 8px;color:#0c4a6e;font-size:10px;box-sizing:border-box;outline:none;min-width:0;" />
+            <button onclick="stgVidSave('pnl-s0')" style="background:rgba(37,99,235,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#10003; Save</button>
+          </div>
         </div>
         <div style="display:flex; gap:10px;">
           <button id="btnAddNewRow" style="padding:10px 15px; background:#17a2b8; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">➕ Add Row</button>
@@ -4293,7 +4306,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     {key:'pnl-s7a', def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {key:'pnl-s8',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {key:'pnl-s9',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
-    {key:'pnl-s10', def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+    {key:'pnl-s10', def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s0',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
   ];
   function tourVidLoad() {
     TOUR_VID_KEYS.forEach(function(v) {
@@ -4302,6 +4316,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
       if (el) el.href = url;
       var inp = document.getElementById('tvurl-' + v.key);
       if (inp) inp.value = localStorage.getItem('tour-vid-' + v.key) || '';
+      var stgInp = document.getElementById('stginp-' + v.key);
+      if (stgInp) { var s = localStorage.getItem('tour-vid-' + v.key); if (s) stgInp.value = s; }
     });
   }
   window.tourVidUpdateOne = function(key, url) {
