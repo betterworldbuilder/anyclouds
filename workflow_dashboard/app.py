@@ -107,10 +107,14 @@ if create_uat_blueprint:
 else:
     print(f"[STARTUP] UAT module disabled (import failed): {_uat_import_error}")
 
-# ── Always serve fresh templates — flush cache on every startup ──────────────
-app.config["TEMPLATES_AUTO_RELOAD"] = True
-app.jinja_env.auto_reload = True
-app.jinja_env.cache = {}   # clear in-memory bytecode cache
+# ── Template caching: reload once at startup, then serve from cache ──────────
+# TEMPLATES_AUTO_RELOAD=False stops Jinja2 re-parsing combined.html (1.35 MB)
+# mid-traffic whenever its mtime changes — that re-parse blocks Flask for
+# several seconds and causes nginx 502. We restart Flask after every UI edit
+# anyway, so auto-reload buys nothing and only causes downtime.
+app.config["TEMPLATES_AUTO_RELOAD"] = False
+app.jinja_env.auto_reload = False
+app.jinja_env.cache = {}   # clear in-memory bytecode cache at startup
 
 # Delete compiled template bytecode so Jinja2 re-reads from disk
 import glob as _glob, shutil as _shutil

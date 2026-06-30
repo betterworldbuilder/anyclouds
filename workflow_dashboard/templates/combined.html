@@ -253,6 +253,17 @@
       z-index: 10;
       text-shadow: none !important;
     }
+    .stage-tour-btn {
+      flex: 1 1 0; min-width: 0; border: 2px solid #6366f1 !important;
+      background: linear-gradient(135deg, rgba(49,46,129,0.8), rgba(67,56,202,0.7)) !important;
+      color: #c7d2fe !important; border-radius: 8px;
+      padding: 10px 10px; cursor: pointer; font-weight: 700; font-size: 14px;
+      text-align: center; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
+      line-height: 1.4; display: flex; flex-direction: column; justify-content: center; align-items: center;
+      box-shadow: 0 0 10px rgba(99,102,241,0.4) !important;
+    }
+    .stage-tour-btn:hover { background: linear-gradient(135deg, rgba(79,70,229,0.9), rgba(99,102,241,0.8)) !important; box-shadow: 0 0 18px rgba(99,102,241,.8) !important; }
     .stage-tracker-btn {
       flex: 1 1 0; min-width: 0; border: 2px solid #00f3ff !important;
       background: rgba(0, 24, 70, 0.7) !important; color: #fff; border-radius: 8px;
@@ -456,11 +467,78 @@
     .panel.active { display: block; }
     #panel-s0 { width: 100%; max-width: 100%; }
     #panel-s_why { width: 100%; max-width: 100%; }
+    #panel-s_tour { width: 100%; max-width: 100%; }
     #panel-s5, #panel-s5b { width: 100% !important; max-width: 100% !important; }
     /* Skyline theme: white instead of grey everywhere */
     body.flex-skyline-mode .panel-area { background: #ffffff !important; }
     body.flex-skyline-mode .s0-feature-card { background: #ffffff !important; box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important; }
     body.flex-skyline-mode .s0-table-wrap { background: #f8fafc !important; border-color: #e2e6ec !important; }
+    /* Skyline theme: Tutorial Video Manager — light panel */
+    body.flex-skyline-mode #tour-vid-mgr {
+      background: #f8fafc !important;
+      border-color: #e2e8f0 !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr > div:first-child > h3 {
+      color: #1e3a8a !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr > div:first-child > button {
+      color: #94a3b8 !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr > p {
+      color: #64748b !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr > div:nth-child(3) > div {
+      background: #ffffff !important;
+      border-color: #e2e8f0 !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr > div:nth-child(3) > div > div:first-child {
+      color: #1d4ed8 !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr input[type="url"] {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      color: #374151 !important;
+    }
+    body.flex-skyline-mode #tour-vid-mgr > p:last-child {
+      color: #94a3b8 !important;
+    }
+    /* Skyline theme: stage VIDEO TUTORIAL bar */
+    body.flex-skyline-mode .stage-vid-box {
+      background: #ffffff !important;
+      border-bottom-color: #e2e8f0 !important;
+    }
+    body.flex-skyline-mode .stage-vid-box input[type="url"] {
+      background: #f8fafc !important;
+      border-color: #cbd5e1 !important;
+      color: #374151 !important;
+    }
+    body.flex-skyline-mode .stage-vid-box input[type="url"]::placeholder {
+      color: #94a3b8 !important;
+    }
+    /* Skyline theme: stage status bar */
+    body.flex-skyline-mode .stage-status-ctrl {
+      background: #ffffff !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    }
+    body.flex-skyline-mode .stage-status-ctrl strong {
+      color: #1e3a8a !important;
+    }
+    body.flex-skyline-mode .stage-status-ctrl label[style*="#00ff88"] {
+      color: #15803d !important;
+      background: rgba(21,128,61,0.08) !important;
+      border-color: rgba(21,128,61,0.5) !important;
+    }
+    body.flex-skyline-mode .stage-status-ctrl label[style*="#f39c12"] {
+      color: #b45309 !important;
+      background: rgba(180,83,9,0.08) !important;
+      border-color: rgba(180,83,9,0.5) !important;
+    }
+    body.flex-skyline-mode .stage-status-ctrl label[style*="#ff2a5f"] {
+      color: #be123c !important;
+      background: rgba(190,18,60,0.08) !important;
+      border-color: rgba(190,18,60,0.5) !important;
+    }
     /* ── Stage 0 Dawn Hero ──────────────────────────────────────────────── */
     .s0-dawn-hero {
       position:relative; width:100%; min-height:360px;
@@ -520,61 +598,149 @@
       text-transform:uppercase; color:rgba(255,255,255,0.85);
     }
     /* Animated clouds */
-    .s0-dawn-cloud {
-      position:absolute; background:rgba(255,255,255,0.85);
-      border-radius:50px; z-index:1;
-      animation:s0CloudFloat linear infinite; filter:blur(1px);
+    /* ═══════════════════════════════════════════════════════════════
+       REALISTIC MULTI-LAYER CLOUD SYSTEM — Why Who What Hero
+       5 cloud types × multiple instances, 3 altitude bands
+       Layer speeds: Ci(fast) > Ac(medium) > Sc/Cu/St(slow)
+       ═══════════════════════════════════════════════════════════════ */
+
+    /* ── Shared drift animations per speed tier ── */
+    @keyframes cloudDrift-st  { 0%{transform:translateX(0)} 100%{transform:translateX(calc(-100vw - 700px))} }
+    @keyframes cloudDrift-sc  { 0%{transform:translateX(0)} 100%{transform:translateX(calc(-100vw - 650px))} }
+    @keyframes cloudDrift-cu  { 0%{transform:translateX(0)} 100%{transform:translateX(calc(-100vw - 650px))} }
+    @keyframes cloudDrift-ac  { 0%{transform:translateX(0)} 100%{transform:translateX(calc(-100vw - 600px))} }
+    @keyframes cloudDrift-ci  { 0%{transform:translateX(0) rotate(-7deg)} 100%{transform:translateX(calc(-100vw - 900px)) rotate(-7deg)} }
+
+    /* ─── STRATUS (St) — flat wide layer, z1, very slow ─── */
+    .s0-st {
+      position:absolute; border-radius:60%; z-index:1; pointer-events:none;
+      animation:cloudDrift-st linear infinite;
+      background:linear-gradient(180deg,
+        transparent 0%,
+        rgba(210,230,248,.40) 20%,
+        rgba(232,244,255,.68) 50%,
+        rgba(218,236,252,.45) 80%,
+        transparent 100%);
+      filter:blur(7px);
     }
-    .s0-dawn-cloud::before, .s0-dawn-cloud::after {
+    .st-1{width:1000px;height:32px;top:72%;left:106%;animation-duration:112s;opacity:.55;animation-delay:-28s}
+    .st-2{width:820px; height:24px;top:78%;left:114%;animation-duration:128s;opacity:.40;animation-delay:-58s}
+    .st-3{width:1200px;height:38px;top:66%;left:122%;animation-duration:98s; opacity:.35;animation-delay:-14s}
+
+    /* ─── PUFFY CLOUDS (Cl) — oval base + circular bumps, z2, right→left ─── */
+    /* Reference HTML approach: border-radius:50px base + rounded ::before/::after bumps */
+    /* Clouds positioned in lower half (top 42–68%); uses cloudDrift-cu animation         */
+    .s0-cl {
+      position:absolute;
+      background:rgba(255,255,255,.88);
+      border-radius:50px;
+      z-index:2; pointer-events:none;
+      animation:cloudDrift-cu linear infinite;
+      filter:blur(1px);
+    }
+    .s0-cl::before, .s0-cl::after {
       content:''; position:absolute;
-      background:rgba(255,255,255,0.85); border-radius:50px;
+      background:rgba(255,255,255,.88);
+      border-radius:50%;
     }
-    @keyframes s0CloudFloat {
-      0%   { transform:translateX(0); }
-      100% { transform:translateX(calc(-100vw - 300px)); }
+    /* Each cloud: width x height, unique top/left/duration/delay/opacity           */
+    /* ::before = larger dome (left side), ::after = smaller dome (right side)      */
+    .cl-1  { width:200px; height:62px; top:52%; left:108%; animation-duration:72s;  animation-delay:-18s; opacity:.84; }
+    .cl-1::before { width:106px; height:106px; top:-54px; left:28px;  }
+    .cl-1::after  { width:78px;  height:78px;  top:-40px; left:98px;  }
+    .cl-2  { width:145px; height:45px; top:61%; left:116%; animation-duration:88s;  animation-delay:-42s; opacity:.65; }
+    .cl-2::before { width:76px;  height:76px;  top:-39px; left:20px;  }
+    .cl-2::after  { width:56px;  height:56px;  top:-29px; left:72px;  }
+    .cl-3  { width:265px; height:80px; top:46%; left:126%; animation-duration:64s;  animation-delay:-8s;  opacity:.76; filter:blur(1px) drop-shadow(0 10px 24px rgba(100,138,180,.22)); }
+    .cl-3::before { width:136px; height:136px; top:-70px; left:36px;  }
+    .cl-3::after  { width:100px; height:100px; top:-52px; left:140px; }
+    .cl-4  { width:180px; height:56px; top:58%; left:120%; animation-duration:80s;  animation-delay:-55s; opacity:.70; }
+    .cl-4::before { width:96px;  height:96px;  top:-49px; left:24px;  }
+    .cl-4::after  { width:70px;  height:70px;  top:-36px; left:93px;  }
+    .cl-5  { width:325px; height:98px; top:42%; left:134%; animation-duration:58s;  animation-delay:-32s; opacity:.86; filter:blur(1px) drop-shadow(0 14px 32px rgba(90,128,175,.26)); }
+    .cl-5::before { width:166px; height:166px; top:-84px; left:44px;  }
+    .cl-5::after  { width:122px; height:122px; top:-62px; left:172px; }
+    .cl-6  { width:162px; height:50px; top:65%; left:112%; animation-duration:92s;  animation-delay:-64s; opacity:.55; }
+    .cl-6::before { width:85px;  height:85px;  top:-44px; left:22px;  }
+    .cl-6::after  { width:62px;  height:62px;  top:-32px; left:84px;  }
+    .cl-7  { width:235px; height:72px; top:50%; left:142%; animation-duration:68s;  animation-delay:-15s; opacity:.78; filter:blur(1px) drop-shadow(0 8px 20px rgba(95,135,178,.20)); }
+    .cl-7::before { width:122px; height:122px; top:-62px; left:32px;  }
+    .cl-7::after  { width:90px;  height:90px;  top:-46px; left:124px; }
+    .cl-8  { width:125px; height:38px; top:68%; left:118%; animation-duration:96s;  animation-delay:-76s; opacity:.45; }
+    .cl-8::before { width:64px;  height:64px;  top:-33px; left:17px;  }
+    .cl-8::after  { width:47px;  height:47px;  top:-24px; left:66px;  }
+    .cl-9  { width:285px; height:87px; top:44%; left:130%; animation-duration:62s;  animation-delay:-46s; opacity:.80; filter:blur(1px) drop-shadow(0 12px 28px rgba(88,128,175,.24)); }
+    .cl-9::before { width:148px; height:148px; top:-76px; left:40px;  }
+    .cl-9::after  { width:108px; height:108px; top:-56px; left:148px; }
+    .cl-10 { width:158px; height:48px; top:63%; left:138%; animation-duration:84s;  animation-delay:-30s; opacity:.60; }
+    .cl-10::before { width:82px; height:82px; top:-42px; left:22px;  }
+    .cl-10::after  { width:60px; height:60px; top:-31px; left:84px;  }
+
+        /* ─── ALTOCUMULUS (Ac) — organic 8-value border-radius, mid-fast, z4 ─── */
+    /* Irregular radii (52% 48% 44% 56% / 38% 46% 54% 62%) = no perfect circles */
+    .s0-ac {
+      position:absolute; z-index:4; pointer-events:none;
+      animation:cloudDrift-ac linear infinite;
+      border-radius:52% 48% 44% 56% / 38% 46% 54% 62%;
+      background:radial-gradient(ellipse 80% 100% at 44% 88%,
+        rgba(198,220,244,.36) 0%,
+        rgba(236,248,255,.82) 44%,
+        rgba(255,255,255,.92) 62%,
+        transparent 86%);
     }
-    .s0-c1{width:320px;height:100px;top:45%;left:110%;animation-duration:45s;opacity:.72}
-    .s0-c1::before{width:160px;height:160px;top:-80px;left:50px}
-    .s0-c1::after{width:120px;height:120px;top:-50px;left:140px}
-    .s0-c2{width:240px;height:80px;top:58%;left:115%;animation-duration:55s;animation-delay:8s;opacity:.55}
-    .s0-c2::before{width:120px;height:120px;top:-60px;left:40px}
-    .s0-c2::after{width:90px;height:90px;top:-40px;left:110px}
-    .s0-c3{width:400px;height:120px;top:41%;left:120%;animation-duration:50s;animation-delay:20s;opacity:.65}
-    .s0-c3::before{width:200px;height:200px;top:-100px;left:70px}
-    .s0-c3::after{width:140px;height:140px;top:-70px;left:190px}
-    .s0-c4{width:280px;height:90px;top:68%;left:112%;animation-duration:60s;animation-delay:15s;opacity:.48}
-    .s0-c4::before{width:140px;height:140px;top:-70px;left:50px}
-    .s0-c4::after{width:100px;height:100px;top:-44px;left:130px}
-    .s0-c5{width:360px;height:110px;top:51%;left:118%;animation-duration:48s;animation-delay:30s;opacity:.70}
-    .s0-c5::before{width:180px;height:180px;top:-90px;left:60px}
-    .s0-c5::after{width:130px;height:130px;top:-64px;left:170px}
-    .s0-c6{width:200px;height:70px;top:78%;left:108%;animation-duration:65s;animation-delay:5s;opacity:.40}
-    .s0-c6::before{width:100px;height:100px;top:-50px;left:36px}
-    .s0-c6::after{width:70px;height:70px;top:-30px;left:100px}
-    .s0-c7{width:440px;height:130px;top:38%;left:125%;animation-duration:52s;animation-delay:38s;opacity:.60}
-    .s0-c7::before{width:220px;height:220px;top:-110px;left:80px}
-    .s0-c7::after{width:160px;height:160px;top:-80px;left:220px}
-    .s0-c8{width:260px;height:84px;top:63%;left:114%;animation-duration:58s;animation-delay:25s;opacity:.50}
-    .s0-c8::before{width:130px;height:130px;top:-64px;left:44px}
-    .s0-c8::after{width:96px;height:96px;top:-44px;left:120px}
-    .s0-c9{width:380px;height:110px;top:71%;left:117%;animation-duration:62s;animation-delay:12s;opacity:.58}
-    .s0-c9::before{width:190px;height:190px;top:-95px;left:65px}
-    .s0-c9::after{width:140px;height:140px;top:-70px;left:200px}
-    .s0-c10{width:480px;height:140px;top:36%;left:122%;animation-duration:55s;animation-delay:35s;opacity:.55}
-    .s0-c10::before{width:240px;height:240px;top:-120px;left:80px}
-    .s0-c10::after{width:170px;height:170px;top:-85px;left:260px}
-    .s0-c11{width:220px;height:65px;top:83%;left:111%;animation-duration:70s;animation-delay:18s;opacity:.38}
-    .s0-c11::before{width:110px;height:110px;top:-55px;left:38px}
-    .s0-c11::after{width:80px;height:80px;top:-40px;left:110px}
-    .s0-c12{width:340px;height:100px;top:48%;left:119%;animation-duration:53s;animation-delay:42s;opacity:.63}
-    .s0-c12::before{width:170px;height:170px;top:-85px;left:58px}
-    .s0-c12::after{width:120px;height:120px;top:-60px;left:175px}
-    .s0-c13{width:420px;height:125px;top:61%;left:123%;animation-duration:60s;animation-delay:6s;opacity:.56}
-    .s0-c13::before{width:210px;height:210px;top:-105px;left:72px}
-    .s0-c13::after{width:155px;height:155px;top:-78px;left:230px}
-    .s0-c14{width:175px;height:55px;top:75%;left:116%;animation-duration:68s;animation-delay:48s;opacity:.35}
-    .s0-c14::before{width:88px;height:88px;top:-44px;left:30px}
-    .s0-c14::after{width:64px;height:64px;top:-32px;left:90px}
+    .s0-ac::before {
+      content:''; position:absolute;
+      border-radius:56% 44% 52% 48% / 58% 46% 54% 42%;
+      background:radial-gradient(ellipse 72% 100% at 48% 88%,
+        rgba(220,238,252,.28) 0%, rgba(254,255,255,.88) 48%, transparent 84%);
+      width:58%; height:130%; top:-60%; left:6%;
+    }
+    .s0-ac::after {
+      content:''; position:absolute;
+      border-radius:44% 58% 48% 52% / 52% 58% 42% 48%;
+      background:radial-gradient(ellipse 68% 100% at 52% 84%,
+        rgba(220,238,252,.24) 0%, rgba(254,255,255,.86) 48%, transparent 84%);
+      width:50%; height:118%; top:-52%; right:6%;
+    }
+    .ac-1{width:210px;height:58px;top:27%;left:107%;animation-duration:46s;opacity:.74;animation-delay:-12s;filter:blur(.5px) drop-shadow(0 6px 14px rgba(118,154,194,.18))}
+    .ac-2{width:158px;height:44px;top:33%;left:115%;animation-duration:40s;opacity:.64;animation-delay:-26s;filter:blur(.6px) drop-shadow(0 5px 12px rgba(118,154,194,.15))}
+    .ac-3{width:244px;height:66px;top:23%;left:123%;animation-duration:50s;opacity:.70;animation-delay:-38s;filter:blur(.4px) drop-shadow(0 6px 15px rgba(118,154,194,.16))}
+    .ac-4{width:178px;height:50px;top:31%;left:119%;animation-duration:44s;opacity:.60;animation-delay:-16s;filter:blur(.7px)}
+    .ac-5{width:222px;height:62px;top:25%;left:134%;animation-duration:48s;opacity:.66;animation-delay:-50s;filter:blur(.5px)}
+
+    /* ─── CIRRUS (Ci) — high altitude thin wisps, very fast, z5 ─── */
+    .s0-ci {
+      position:absolute; border-radius:50%; z-index:5; pointer-events:none;
+      animation:cloudDrift-ci linear infinite;
+      height:14px;
+      background:linear-gradient(90deg,
+        transparent 0%,
+        rgba(255,255,255,.60) 10%,
+        rgba(255,255,255,.90) 32%,
+        rgba(255,255,255,.96) 54%,
+        rgba(255,255,255,.72) 74%,
+        rgba(255,255,255,.32) 88%,
+        transparent 100%);
+      filter:blur(3px);
+    }
+    .s0-ci::before {
+      content:''; position:absolute; border-radius:50%;
+      background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,.50) 18%, rgba(255,255,255,.72) 55%, rgba(255,255,255,.36) 82%, transparent 100%);
+      width:72%; height:10px; top:-5px; left:10%;
+      filter:blur(2px); opacity:.55; transform:rotate(-4deg);
+    }
+    .s0-ci::after {
+      content:''; position:absolute; border-radius:50%;
+      background:linear-gradient(90deg, transparent 0%, rgba(255,255,255,.36) 18%, rgba(255,255,255,.58) 55%, rgba(255,255,255,.22) 82%, transparent 100%);
+      width:52%; height:8px; top:11px; left:28%;
+      filter:blur(3.5px); opacity:.40; transform:rotate(4deg);
+    }
+    .ci-1{width:520px;top:5%; left:108%;animation-duration:27s;opacity:.56;animation-delay:-6s}
+    .ci-2{width:390px;top:11%;left:116%;animation-duration:23s;opacity:.48;animation-delay:-15s}
+    .ci-3{width:640px;top:7%; left:126%;animation-duration:31s;opacity:.52;animation-delay:-24s}
+    .ci-4{width:300px;top:15%;left:113%;animation-duration:21s;opacity:.44;animation-delay:-9s}
+    .ci-5{width:465px;top:4%; left:122%;animation-duration:25s;opacity:.58;animation-delay:-40s}
+    .ci-6{width:355px;top:13%;left:136%;animation-duration:29s;opacity:.46;animation-delay:-52s}
     /* ── Stage 0: 3D Cloud View ──────────────────────────────────────────── */
     #s0-view-toggle {
       position:absolute; top:14px; right:14px; z-index:20;
@@ -836,6 +1002,7 @@
     }
     body.flex-skyline-mode .stage-btn,
     body.flex-skyline-mode .stage-tracker-btn,
+    body.flex-skyline-mode .stage-tour-btn,
     body.flex-skyline-mode .sub-btn,
     body.flex-skyline-mode .sub-btn-dropdown {
       background: #2b3039 !important;
@@ -1465,19 +1632,7 @@
   })();
 </script>
 
-<div id="top-theme-dropdown" aria-label="Global theme selector">
-  <button id="top-theme-trigger" type="button" onclick="toggleGlobalThemeMenu()" aria-haspopup="true" aria-expanded="false">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h16"></path>
-    </svg>
-    <span id="top-theme-label">Dark Theme</span>
-  </button>
-  <div id="top-theme-menu">
-    <button id="theme-dark-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('dark', true); closeGlobalThemeMenu();">Dark Theme</button>
-    <button id="theme-skyline-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('flex-skyline', true); closeGlobalThemeMenu();">Flex Skyline</button>
-    <button id="theme-apollo-btn" class="global-theme-option" type="button" onclick="applyGlobalTheme('apollo', true); closeGlobalThemeMenu();">Apollo Theme</button>
-  </div>
-</div>
+
 <script>
   const GLOBAL_THEME_KEY = 'osflex_global_theme_v2';
   function closeGlobalThemeMenu() {
@@ -1639,18 +1794,19 @@
 <!-- ── Mission stage buttons ─────────────────────────── -->
 <div class="stage-bar" id="stageBar">
   <button class="stage-btn stage-promo-btn active" data-stage="s_why">Why Who What When to<br>Move to Flex</button>
+  <button class="stage-btn stage-tour-btn" data-stage="s_tour">🎓 Quick Tour</button>
   <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Migration Log</button>
   <button class="stage-btn" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
   <button class="stage-btn" data-stage="s2">Stage 2<br><small>Migrations</small></button>
+  <button class="stage-btn" data-stage="s7">Stage 2b<br><small>Cost Optimization</small></button>
+  <button class="stage-btn" data-stage="s7a">Stage 2c<br><small>Performance Gain</small></button>
   <button class="stage-btn" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s5">Stage 4<br><small>Cutover &amp; Traffic Transition</small></button>
   <button class="stage-btn" data-stage="s5b">Stage 4B<br><small>Business System Cutover</small></button>
   <button class="stage-btn" data-stage="s6">Stage 5<br><small>Stabilization &amp; Handover</small></button>
-  <button class="stage-btn" data-stage="s7">Stage 6<br><small>Cost Optimization</small></button>
-  <button class="stage-btn" data-stage="s7a">Stage 7<br><small>Performance Gain</small></button>
-  <button class="stage-btn" data-stage="s8">Stage 8<br><small>IaC Backup, DR &amp; Restore</small></button>
-  <button class="stage-btn" data-stage="s9">Stage 9<br><small>GitOps &amp; OpenCenter Modernization</small></button>
-  <button class="stage-btn" data-stage="s10">Stage 10<br><small>AIOps &amp; Continuous Operations</small></button>
+  <button class="stage-btn" data-stage="s8">Stage 6<br><small>IaC Backup, DR &amp; Restore</small></button>
+  <button class="stage-btn" data-stage="s9">Stage 7<br><small>GitOps &amp; OpenCenter Modernization</small></button>
+  <button class="stage-btn" data-stage="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
@@ -1704,7 +1860,7 @@
   <button class="sub-btn" data-sub="s2flexanywhere">☁️ AWS · ☁️ GCP · ☁️ Azure 🌈 ☁️ FLEX — R3 HYPER FLEX</button>
   <button class="sub-btn" data-sub="s2flex2flex">🌐 R3 FLEX2FLEX-Region Cloning</button>
   <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
-  <button class="sub-btn" data-sub="s2fullmig">🧩 Stage 2 Full Migration</button>
+  <button class="sub-btn" data-sub="s2fullmig">🏢 Full Business System Migration</button>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
   <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ R6 Refactor / Rearchitect — K8s Modernization</button>
 
@@ -1722,20 +1878,34 @@
       <div class="s0-dawn-hero">
         <button id="s0-view-toggle" onclick="s0Toggle3D()" title="Switch to 3D cloud fly-through view">&#127775; 3D View</button>
         <div class="s0-dawn-sky"></div>
-        <div class="s0-dawn-cloud s0-c1"></div>
-        <div class="s0-dawn-cloud s0-c2"></div>
-        <div class="s0-dawn-cloud s0-c3"></div>
-        <div class="s0-dawn-cloud s0-c4"></div>
-        <div class="s0-dawn-cloud s0-c5"></div>
-        <div class="s0-dawn-cloud s0-c6"></div>
-        <div class="s0-dawn-cloud s0-c7"></div>
-        <div class="s0-dawn-cloud s0-c8"></div>
-        <div class="s0-dawn-cloud s0-c9"></div>
-        <div class="s0-dawn-cloud s0-c10"></div>
-        <div class="s0-dawn-cloud s0-c11"></div>
-        <div class="s0-dawn-cloud s0-c12"></div>
-        <div class="s0-dawn-cloud s0-c13"></div>
-        <div class="s0-dawn-cloud s0-c14"></div>
+        <!-- Stratus — flat layers, very slow, lowest z-index -->
+        <div class="s0-st st-1"></div>
+        <div class="s0-st st-2"></div>
+        <div class="s0-st st-3"></div>
+        <!-- Puffy clouds — oval base + circular bumps, right→left, lower sky -->
+        <div class="s0-cl cl-1"></div>
+        <div class="s0-cl cl-2"></div>
+        <div class="s0-cl cl-3"></div>
+        <div class="s0-cl cl-4"></div>
+        <div class="s0-cl cl-5"></div>
+        <div class="s0-cl cl-6"></div>
+        <div class="s0-cl cl-7"></div>
+        <div class="s0-cl cl-8"></div>
+        <div class="s0-cl cl-9"></div>
+        <div class="s0-cl cl-10"></div>
+        <!-- Altocumulus — mid level rounded puffs, medium-fast -->
+        <div class="s0-ac ac-1"></div>
+        <div class="s0-ac ac-2"></div>
+        <div class="s0-ac ac-3"></div>
+        <div class="s0-ac ac-4"></div>
+        <div class="s0-ac ac-5"></div>
+        <!-- Cirrus — high altitude thin wisps, very fast -->
+        <div class="s0-ci ci-1"></div>
+        <div class="s0-ci ci-2"></div>
+        <div class="s0-ci ci-3"></div>
+        <div class="s0-ci ci-4"></div>
+        <div class="s0-ci ci-5"></div>
+        <div class="s0-ci ci-6"></div>
         
         <!-- 3D Cloud Fly-Through Overlay -->
         <div id="s0-hero-3d">
@@ -1857,30 +2027,9 @@
           <!-- 4 sub-reasons as mini cards -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px;">
             <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">1</div>
-                <strong style="color:#78350f;font-size:13px;">Better Performance &amp; Infrastructure</strong>
-              </div>
-              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Modern compute options, better scalability, stronger availability — critical for AI, Kubernetes, and variable-demand workloads.</p>
-            </div>
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">3</div>
-                <strong style="color:#78350f;font-size:13px;">Less Risk, More Control</strong>
-              </div>
-              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Migrate one application at a time. Validate results and cut over only when workloads are ready — reducing disruption for customer and Rackspace alike.</p>
-            </div>
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">4</div>
-                <strong style="color:#78350f;font-size:13px;">Future-Proof Cloud Strategy</strong>
-              </div>
-              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Supports hybrid cloud, Kubernetes, AI, modern networking, flexible storage, better automation, and enterprise security.</p>
-            </div>
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">2</div>
-                <strong style="color:#78350f;font-size:13px;">Lower Long-Term TCO</strong>
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">1</div>
+                <strong style="color:#78350f;font-size:13px;">More than 2x Lower TCO</strong>
               </div>
               <!-- TCO mini table -->
               <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">
@@ -1910,11 +2059,152 @@
                 </tbody>
               </table>
             </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">2</div>
+                <strong style="color:#78350f;font-size:13px;">Better Performance &amp; Infrastructure</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Modern compute options, better scalability, stronger availability — critical for AI, Kubernetes, and variable-demand workloads.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">3</div>
+                <strong style="color:#78350f;font-size:13px;">Less Risk, More Control</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Migrate one application at a time. Validate results and cut over only when workloads are ready — reducing disruption for customer and Rackspace alike.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">4</div>
+                <strong style="color:#78350f;font-size:13px;">Future-Proof Cloud Strategy</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Supports hybrid cloud, Kubernetes, AI, modern networking, flexible storage, better automation, and enterprise security.</p>
+            </div>
           </div>
           <div style="background:#fffbeb;border-left:3px solid #d97706;border-radius:0 8px 8px 0;padding:12px 16px;">
             <p style="color:#92400e;font-size:13px;margin:0;font-style:italic;line-height:1.6;">Not just a migration away from legacy OSPC — a move toward a platform that supports the next 5&ndash;10 years of infrastructure strategy.</p>
           </div>
         </div>
+
+        <!-- ── REAL DASHBOARD PREVIEWS — TCO & CUTOVER ── -->
+        <div style="background:#f1f5f9;border-top:2px solid #e2e8f0;margin-top:40px;padding:44px 0 4px;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">&#128200; BUILT-IN LIVE DASHBOARDS</div>
+            <h2 style="font-size:24px;font-weight:900;color:#1e293b;margin:0 0 10px;">See the Gains In Action</h2>
+            <p style="color:#64748b;font-size:14px;max-width:580px;margin:0 auto;line-height:1.6;">These dashboards are built into the tool — showing real TCO savings and cutover performance metrics loaded from your actual UAT data.</p>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+            <!-- ── TCO SAVINGS CARD ── -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.07);">
+              <div style="background:linear-gradient(135deg,#065f46,#059669);padding:20px 24px;">
+                <div style="font-size:10px;font-weight:700;color:#a7f3d0;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">STAGE 6 &mdash; COST OPTIMIZATION</div>
+                <h3 style="color:#fff;font-size:18px;font-weight:800;margin:0 0 2px;">TCO Dashboard</h3>
+                <p style="color:#a7f3d0;font-size:12px;margin:0;">CAPEX &amp; OPEX analysis &mdash; monthly, 1-year, 3-year, 5-year projections</p>
+              </div>
+              <div style="padding:20px 24px;">
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">
+                  <div style="text-align:center;padding:12px 8px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+                    <div style="font-size:9px;font-weight:700;color:#15803d;text-transform:uppercase;margin-bottom:4px;">MONTHLY SAVINGS</div>
+                    <div style="font-size:22px;font-weight:900;color:#166534;">$3.5K</div>
+                  </div>
+                  <div style="text-align:center;padding:12px 8px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+                    <div style="font-size:9px;font-weight:700;color:#15803d;text-transform:uppercase;margin-bottom:4px;">SAVINGS %</div>
+                    <div style="font-size:22px;font-weight:900;color:#16a34a;">60%</div>
+                  </div>
+                  <div style="text-align:center;padding:12px 8px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+                    <div style="font-size:9px;font-weight:700;color:#15803d;text-transform:uppercase;margin-bottom:4px;">5-YEAR SAVINGS</div>
+                    <div style="font-size:22px;font-weight:900;color:#166534;">$194.7K</div>
+                  </div>
+                </div>
+                <div style="margin-bottom:16px;">
+                  <div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">Monthly Cost Comparison</div>
+                  <div style="margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:4px;"><span>OSPC</span><span style="color:#ef4444;font-weight:700;">$5.8K/mo</span></div>
+                    <div style="background:#fee2e2;border-radius:4px;height:14px;overflow:hidden;"><div style="background:#ef4444;height:14px;border-radius:4px;width:100%;"></div></div>
+                  </div>
+                  <div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-bottom:4px;"><span>FLEX</span><span style="color:#22c55e;font-weight:700;">$2.3K/mo</span></div>
+                    <div style="background:#dcfce7;border-radius:4px;height:14px;overflow:hidden;"><div style="background:#22c55e;height:14px;border-radius:4px;width:40%;"></div></div>
+                  </div>
+                </div>
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                  <div>
+                    <div style="font-size:9px;font-weight:700;color:#15803d;text-transform:uppercase;">ROI at 3 Years</div>
+                    <div style="font-size:20px;font-weight:900;color:#166534;">+859%</div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-size:9px;font-weight:700;color:#15803d;text-transform:uppercase;">Payback Period</div>
+                    <div style="font-size:20px;font-weight:900;color:#166534;">3.8 months</div>
+                  </div>
+                </div>
+                <button onclick="activateStage('s7')" style="width:100%;background:linear-gradient(135deg,#065f46,#059669);color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.01em;">&#128200; Open TCO Dashboard &#8594;</button>
+              </div>
+            </div>
+
+            <!-- ── CUTOVER PERFORMANCE CARD ── -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.07);">
+              <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:20px 24px;">
+                <div style="font-size:10px;font-weight:700;color:#bfdbfe;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">STAGE 4 &mdash; CUTOVER</div>
+                <h3 style="color:#fff;font-size:18px;font-weight:800;margin:0 0 2px;">Cutover Dashboard</h3>
+                <p style="color:#bfdbfe;font-size:12px;margin:0;">Real-time traffic ramp &amp; server performance comparison</p>
+              </div>
+              <div style="padding:20px 24px;">
+                <div style="margin-bottom:18px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;"><span>Traffic Ramp (OSPC &#8594; FLEX)</span><span style="color:#22c55e;background:#dcfce7;border-radius:4px;padding:2px 7px;">&#10003; COMPLETE</span></div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;text-align:center;">
+                      <div style="font-size:18px;font-weight:900;color:#1d4ed8;">60%</div>
+                      <div style="font-size:9px;color:#6b7280;margin-top:2px;">Stage 1</div>
+                    </div>
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;text-align:center;">
+                      <div style="font-size:18px;font-weight:900;color:#1d4ed8;">80%</div>
+                      <div style="font-size:9px;color:#6b7280;margin-top:2px;">Stage 2</div>
+                    </div>
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;text-align:center;">
+                      <div style="font-size:18px;font-weight:900;color:#166534;">100%</div>
+                      <div style="font-size:9px;color:#15803d;font-weight:700;margin-top:2px;">LIVE &#11044;</div>
+                    </div>
+                  </div>
+                </div>
+                <div style="margin-bottom:16px;">
+                  <div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">Server Performance: OSPC vs FLEX</div>
+                  <div style="display:grid;gap:8px;">
+                    <div style="display:grid;grid-template-columns:70px 1fr 1fr;gap:8px;align-items:center;">
+                      <span style="font-size:11px;color:#6b7280;">CPU Usage</span>
+                      <div><div style="background:#fee2e2;border-radius:3px;height:10px;overflow:hidden;"><div style="background:#ef4444;height:10px;border-radius:3px;width:82%;"></div></div><div style="color:#ef4444;font-size:10px;font-weight:600;margin-top:2px;">82% OSPC</div></div>
+                      <div><div style="background:#dcfce7;border-radius:3px;height:10px;overflow:hidden;"><div style="background:#22c55e;height:10px;border-radius:3px;width:41%;"></div></div><div style="color:#22c55e;font-size:10px;font-weight:600;margin-top:2px;">41% FLEX &#8595;50%</div></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:70px 1fr 1fr;gap:8px;align-items:center;">
+                      <span style="font-size:11px;color:#6b7280;">Memory</span>
+                      <div><div style="background:#fee2e2;border-radius:3px;height:10px;overflow:hidden;"><div style="background:#ef4444;height:10px;border-radius:3px;width:78%;"></div></div><div style="color:#ef4444;font-size:10px;font-weight:600;margin-top:2px;">78% OSPC</div></div>
+                      <div><div style="background:#dcfce7;border-radius:3px;height:10px;overflow:hidden;"><div style="background:#22c55e;height:10px;border-radius:3px;width:56%;"></div></div><div style="color:#22c55e;font-size:10px;font-weight:600;margin-top:2px;">56% FLEX &#8595;28%</div></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:70px 1fr 1fr;gap:8px;align-items:center;">
+                      <span style="font-size:11px;color:#6b7280;">Latency P95</span>
+                      <div><div style="background:#fee2e2;border-radius:3px;height:10px;overflow:hidden;"><div style="background:#ef4444;height:10px;border-radius:3px;width:100%;"></div></div><div style="color:#ef4444;font-size:10px;font-weight:600;margin-top:2px;">118ms OSPC</div></div>
+                      <div><div style="background:#dcfce7;border-radius:3px;height:10px;overflow:hidden;"><div style="background:#22c55e;height:10px;border-radius:3px;width:27%;"></div></div><div style="color:#22c55e;font-size:10px;font-weight:600;margin-top:2px;">32ms FLEX &#8595;73%</div></div>
+                    </div>
+                  </div>
+                </div>
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                  <div>
+                    <div style="font-size:9px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">Readiness Score</div>
+                    <div style="font-size:20px;font-weight:900;color:#1e3a8a;">78% <span style="font-size:13px;color:#22c55e;">Good</span></div>
+                  </div>
+                  <div style="text-align:right;">
+                    <div style="font-size:9px;font-weight:700;color:#1d4ed8;text-transform:uppercase;">Checks Passed</div>
+                    <div style="font-size:20px;font-weight:900;color:#1e3a8a;">14 / 18</div>
+                  </div>
+                </div>
+                <button onclick="activateStage('s5')" style="width:100%;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.01em;">&#9201; Open Cutover Dashboard &#8594;</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
 
         <!-- WHEN -->
         <div style="background:#ffffff;border-radius:16px;border:1px solid #dbeafe;border-top:4px solid #2563eb;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
@@ -1965,32 +2255,7 @@
             </div>
           </div>
 
-          <!-- OpenStack Service Compatibility table -->
-          <div style="margin-bottom:28px;">
-            <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;">OpenStack Service Compatibility</h3>
-            <p style="color:#64748b;font-size:13px;margin-bottom:14px;">OSPC (2024.2 Dalmatian) versus Rackspace FLEX (2025.1 Epoxy+)</p>
-            <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,0.05);">
-              <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
-                <colgroup>
-                  <col style="width:13%"><col style="width:15%"><col style="width:7%"><col style="width:7%">
-                  <col style="width:13%"><col style="width:14%"><col style="width:17%"><col style="width:14%">
-                </colgroup>
-                <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
-                  <tr>
-                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Service</th>
-                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Role</th>
-                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC</th>
-                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX</th>
-                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC Ver.</th>
-                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX Min Ver.</th>
-                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">What it does</th>
-                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Benefit</th>
-                  </tr>
-                </thead>
-                <tbody id="compatTbody"></tbody>
-              </table>
-            </div>
-          </div>
+
 
           <!-- Migration Trigger Conditions table -->
           <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;">Migration Trigger Conditions</h3>
@@ -2051,12 +2316,467 @@
           </div>
         </div>
 
+        <!-- OSPC vs FLEX Services table (moved to bottom) -->
+        <div style="margin-top:40px;padding:0 0 8px;">
+          <!-- OSPC vs FLEX Services table -->
+          <div style="margin-bottom:28px;">
+            <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;padding-top:4px;">OpenStack Service Compatibility</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:14px;">OpenStack service availability — OSPC (2024.2 Dalmatian) vs FLEX (2025.1 Epoxy+)</p>
+            <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,0.05);">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+                <colgroup>
+                  <col style="width:13%"><col style="width:15%"><col style="width:7%"><col style="width:7%">
+                  <col style="width:13%"><col style="width:14%"><col style="width:17%"><col style="width:14%">
+                </colgroup>
+                <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                  <tr>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Service</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Role</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX Min Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">What it does</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Benefit</th>
+                  </tr>
+                </thead>
+                <tbody id="compatTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
 
       </div>
     </div>
   </div>
 
   <!-- Customer Migration Tracker -->
+  <div class="panel" id="panel-s_tour" style="overflow:auto;background:#0f172a;">
+    <div style="max-width:1320px;margin:0 auto;padding:32px 24px 48px;">
+
+      <!-- HEADER -->
+      <div style="text-align:center;margin-bottom:40px;">
+        <div style="font-size:48px;margin-bottom:12px;">&#127891;</div>
+        <h1 style="font-size:32px;font-weight:900;color:#e2e8f0;margin:0 0 10px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="46" height="32" aria-hidden="true" style="vertical-align:middle;margin-right:6px;filter:drop-shadow(0 2px 6px rgba(147,197,253,0.75));"><path fill="white" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>AnyWhere → FLEX Migration — Quick Tour</h1>
+        <p style="color:#94a3b8;font-size:16px;max-width:640px;margin:0 auto;">A complete guide to migrating your infrastructure from OSPC to FLEX. Follow the stages from discovery to continuous operations.</p>
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;">
+          <button class="gov-btn btn-save" onclick="activateStage('s_why')" style="font-size:13px;padding:10px 20px;">&#127775; Start with Why</button>
+          <button class="gov-btn btn-example" onclick="activateStage('s1')" style="font-size:13px;padding:10px 20px;">&#128640; Jump to Stage 1</button>
+          <button onclick="tourVidMgrToggle()" style="font-size:13px;padding:10px 20px;background:rgba(30,58,95,.8);border:1px solid #3b82f6;border-radius:6px;color:#93c5fd;cursor:pointer;font-weight:700;">&#127909; Manage Videos</button>
+        </div>
+      </div>
+
+      <!-- Tutorial Video Manager panel (collapsed by default) -->
+      <div id="tour-vid-mgr" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h3 style="color:#7dd3fc;margin:0;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">&#127909; Tutorial Video Manager</h3>
+          <button onclick="tourVidMgrToggle()" style="background:none;border:none;color:#64748b;font-size:20px;cursor:pointer;padding:0;line-height:1;">&#10005;</button>
+        </div>
+        <p style="color:#64748b;font-size:12px;margin:0 0 14px;">Paste YouTube or direct video URLs below. Click Save to update a link — changes persist across sessions in your browser.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Why Move to FLEX</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-why" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('why')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 1 — Discovery</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-s1" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('s1')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 2 — VM Snapshot</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-s2vm" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('s2vm')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 2 — DB Replication</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-s2db" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('s2db')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 2b — Cost & Perf</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-s2b" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('s2b')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 3 — UAT</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-s3" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('s3')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 4 — Cutover</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-s4" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('s4')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Quick Start</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-start" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('start')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 1 — Discovery</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s1" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s1')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 2 — Migrations</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s2" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s2')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 3 — UAT</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s4" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s4')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 4 — Cutover</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s5" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s5')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 4B — Biz Cutover</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s5b" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s5b')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 5 — Stabilization</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s6" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s6')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 6 — FinOps</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s7" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s7')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 6A — Perf Gain</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s7a" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s7a')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 7 — IaC / DR</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s8" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s8')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 8 — GitOps</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s9" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s9')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;">
+              <div style="font-size:10px;font-weight:700;color:#93c5fd;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Stage 9 — AIOps</div>
+              <div style="display:flex;gap:6px;">
+                <input id="tvmgr-pnl-s10" type="url" placeholder="YouTube / video URL..." style="flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 8px;color:#93c5fd;font-size:11px;box-sizing:border-box;outline:none;" />
+                <button onclick="tourVidMgrSave('pnl-s10')" style="background:#2563eb;border:none;border-radius:4px;padding:6px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+            </div>
+        </div>
+        <p style="color:#475569;font-size:11px;margin:12px 0 0;">&#128274; Links save to localStorage only — no server storage.</p>
+      </div>
+
+      <!-- WORKFLOW OVERVIEW BAR -->
+      <div id="s-tour-journey" class="tour-section" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:32px;">
+        <h3 style="color:#7dd3fc;margin:0 0 16px;font-size:14px;text-transform:uppercase;letter-spacing:.08em;">Migration Journey — 10 Stages</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <div style="background:#7c3aed;color:#e9d5ff;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s1')">Stage 1<br>Discovery</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#2563eb;color:#bfdbfe;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s2')">Stage 2<br>Migration</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#0891b2;color:#bae6fd;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s7')">Stage 2b<br>Cost Opt</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#0891b2;color:#bae6fd;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s7a')">Stage 2c<br>Perf Gain</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#16a34a;color:#bbf7d0;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s4')">Stage 3<br>UAT</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#d97706;color:#fde68a;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s5')">Stage 4<br>Cutover</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#be185d;color:#fce7f3;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s6')">Stage 5<br>Stabilize</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#475569;color:#e2e8f0;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s8')">Stage 6<br>IaC / DR</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#475569;color:#e2e8f0;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s9')">Stage 7<br>GitOps</div>
+          <div style="color:#475569;font-size:16px;">&#8594;</div>
+          <div style="background:#475569;color:#e2e8f0;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;" onclick="activateStage('s10')">Stage 8<br>AIOps</div>
+        </div>
+      </div>
+
+      <!-- STAGE CARDS GRID -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-bottom:32px;">
+
+        <!-- WHY WHO WHAT -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#312e81,#1e1b4b);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#127775;</div>
+            <h3 style="margin:0;color:#c7d2fe;font-size:16px;">Why Move to FLEX?</h3>
+            <p style="margin:4px 0 0;color:#a5b4fc;font-size:12px;">Business case, decision framework, TCO comparison</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li>Understand the migration value proposition</li>
+              <li>Identify who should move (workload types)</li>
+              <li>Determine the right migration timing and wave</li>
+            </ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#312e81;border-radius:8px;">
+              <div style="font-size:11px;color:#a5b4fc;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIAL</div>
+              <a id="tour-vid-why" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                OSPC to FLEX — Business Case Overview (8 min)
+              </a>
+              
+            </div>
+            <button class="gov-btn btn-example" onclick="activateStage('s_why')" style="width:100%;margin-top:10px;font-size:12px;">Open Why Who What &#8594;</button>
+          </div>
+        </div>
+
+        <!-- QUICK START GUIDE -->
+        <div class="tour-card tour-card-featured" style="background:#1e293b;border:2px solid #7dd3fc;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#0f172a,#1e3a5f);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#9889;</div>
+            <h3 style="margin:0;color:#7dd3fc;font-size:16px;">Quick Start</h3>
+            <p style="margin:4px 0 0;color:#93c5fd;font-size:12px;">Get your first VM migrated in under 30 minutes</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ol style="margin:0;padding:0 0 0 16px;color:#e2e8f0;font-size:13px;line-height:2;">
+              <li>&#128270; <strong>Stage 1:</strong> Run OSPC Scanner &#8594; pick 1 test VM</li>
+              <li>&#128640; <strong>Stage 2:</strong> Open Linux Snapshot Mig &#8594; migrate VM</li>
+              <li>&#9989; <strong>Stage 3 UAT:</strong> Add server target pair &#8594; run health check</li>
+              <li>&#128200; <strong>Stage 2b:</strong> Review TCO savings vs OSPC baseline</li>
+              <li>&#9201; <strong>Stage 4:</strong> Cutover DNS &#8594; production go-live</li>
+            </ol>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#1e3a5f;border-radius:8px;">
+              <div style="font-size:11px;color:#7dd3fc;font-weight:600;margin-bottom:6px;">&#127909; GETTING STARTED VIDEO</div>
+              <a id="tour-vid-start" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                Your First OSPC → FLEX Migration in 30 Minutes
+              </a>
+              
+            </div>
+            <button class="gov-btn btn-save" onclick="activateStage('s1')" style="width:100%;margin-top:10px;font-size:13px;padding:10px;">&#128640; Start Stage 1 Discovery</button>
+          </div>
+        </div>
+
+        <!-- STAGE 1 -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#128269;</div>
+            <h3 style="margin:0;color:#e9d5ff;font-size:16px;">Stage 1 — Discovery &amp; Assessment</h3>
+            <p style="margin:4px 0 0;color:#c4b5fd;font-size:12px;">Scan, analyze, and plan the migration scope</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li>Run OSPC Infrastructure Scanner to inventory VMs</li>
+              <li>Scan networks, volumes, security groups, LBs</li>
+              <li>Define Business Systems with archetype templates</li>
+              <li>App Dependency &amp; Service Comparison analysis</li>
+              <li>Performance baseline (CPU, RAM, IOPS, network)</li>
+            </ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#4c1d95;border-radius:8px;">
+              <div style="font-size:11px;color:#c4b5fd;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIAL</div>
+              <a id="tour-vid-s1" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                Stage 1: OSPC Scanner &amp; Assessment Guide (12 min)
+              </a>
+              
+            </div>
+            <button class="gov-btn btn-save" onclick="activateStage('s1')" style="width:100%;margin-top:10px;font-size:12px;">Open Stage 1 &#8594;</button>
+          </div>
+        </div>
+
+        <!-- STAGE 2 -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#1e40af,#2563eb);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#128640;</div>
+            <h3 style="margin:0;color:#bfdbfe;font-size:16px;">Stage 2 — Migrations</h3>
+            <p style="margin:4px 0 0;color:#93c5fd;font-size:12px;">VM Snapshot, DB Replication, Infra Clone, K8s</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li><strong style="color:#86efac;">Full Business System Migration</strong> — orchestrate all components</li>
+              <li>Linux/Windows VM Snapshot &amp; Volume Migration</li>
+              <li>App &amp; Database Replication (MySQL, Postgres, MongoDB)</li>
+              <li>Infra Clone: networks, subnets, security groups, LBs</li>
+              <li>K8s Modernization with architecture templates</li>
+            </ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#1e3a5f;border-radius:8px;">
+              <div style="font-size:11px;color:#93c5fd;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIALS</div>
+              <a id="tour-vid-s2vm" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:block;margin-bottom:4px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                VM Snapshot Migration — Linux &amp; Windows (15 min)
+              </a>
+              
+              <a id="tour-vid-s2db" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:block;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                Database Replication to FLEX (10 min)
+              </a>
+              
+            </div>
+            <button class="gov-btn btn-save" onclick="activateStage('s2')" style="width:100%;margin-top:10px;font-size:12px;">Open Stage 2 &#8594;</button>
+          </div>
+        </div>
+
+        <!-- STAGE 2b/2c — TCO + PERF -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#0c4a6e,#0891b2);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#128200;</div>
+            <h3 style="margin:0;color:#bae6fd;font-size:16px;">Stage 2b/2c — Cost &amp; Performance</h3>
+            <p style="margin:4px 0 0;color:#7dd3fc;font-size:12px;">TCO comparison and performance baseline on FLEX</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li>Compare OSPC vs FLEX monthly cost per VM</li>
+              <li>TCO savings projection over 1, 3, 5 years</li>
+              <li>Post-migration performance benchmarking</li>
+              <li>Flavor right-sizing recommendations</li>
+              <li>Identify over-provisioned vs under-provisioned resources</li>
+            </ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#0c4a6e;border-radius:8px;">
+              <div style="font-size:11px;color:#7dd3fc;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIAL</div>
+              <a id="tour-vid-s2b" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                TCO Analysis &amp; Performance Gain on FLEX (9 min)
+              </a>
+              
+            </div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="gov-btn btn-example" onclick="activateStage('s7')" style="flex:1;font-size:11px;">Cost Opt &#8594;</button>
+              <button class="gov-btn btn-example" onclick="activateStage('s7a')" style="flex:1;font-size:11px;">Perf Gain &#8594;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STAGE 3 UAT -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#14532d,#16a34a);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#9989;</div>
+            <h3 style="margin:0;color:#bbf7d0;font-size:16px;">Stage 3 — Validation &amp; UAT</h3>
+            <p style="margin:4px 0 0;color:#86efac;font-size:12px;">Business-System-Aware testing and validation</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li>Server target comparison (OSPC vs FLEX side-by-side)</li>
+              <li>Business system component health checks</li>
+              <li>Database comparison queries (SELECT 1, row counts)</li>
+              <li>Application endpoint smoke tests (HTTP health)</li>
+              <li>Performance readiness gate before cutover</li>
+            </ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#14532d;border-radius:8px;">
+              <div style="font-size:11px;color:#86efac;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIAL</div>
+              <a id="tour-vid-s3" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                UAT Validation — Business System Checks (11 min)
+              </a>
+              
+            </div>
+            <button class="gov-btn btn-save" onclick="activateStage('s4')" style="width:100%;margin-top:10px;font-size:12px;">Open Stage 3 UAT &#8594;</button>
+          </div>
+        </div>
+
+        <!-- STAGE 4 CUTOVER -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#78350f,#d97706);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#9201;</div>
+            <h3 style="margin:0;color:#fde68a;font-size:16px;">Stage 4 — Cutover &amp; Traffic Transition</h3>
+            <p style="margin:4px 0 0;color:#fcd34d;font-size:12px;">DNS switch, traffic redirect, go-live coordination</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li>Cutover checklist with owner assignments</li>
+              <li>DNS record updates and TTL management</li>
+              <li>Traffic transition (blue/green, weighted routing)</li>
+              <li>Business system cutover sequencing</li>
+              <li>Rollback plan with one-click revert</li>
+            </ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#78350f;border-radius:8px;">
+              <div style="font-size:11px;color:#fcd34d;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIAL</div>
+              <a id="tour-vid-s4" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                Production Cutover — Zero-Downtime Transition (14 min)
+              </a>
+              
+            </div>
+            <button class="gov-btn btn-save" onclick="activateStage('s5')" style="width:100%;margin-top:10px;font-size:12px;">Open Stage 4 Cutover &#8594;</button>
+          </div>
+        </div>
+
+        <!-- STAGE 5 + REST -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#881337,#be185d);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#127807;</div>
+            <h3 style="margin:0;color:#fce7f3;font-size:16px;">Stages 5–8 — Operations &amp; Modernization</h3>
+            <p style="margin:4px 0 0;color:#f9a8d4;font-size:12px;">Stabilize → IaC → GitOps → AIOps</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
+              <li><strong style="color:#f9a8d4;">Stage 5:</strong> Stabilization, monitoring, knowledge transfer</li>
+              <li><strong style="color:#c4b5fd;">Stage 6:</strong> IaC, Backup, Disaster Recovery, Restore testing</li>
+              <li><strong style="color:#86efac;">Stage 7:</strong> GitOps, OpenCenter Modernization, CI/CD</li>
+              <li><strong style="color:#7dd3fc;">Stage 8:</strong> AIOps, predictive scaling, continuous operations</li>
+            </ul>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">
+              <button class="gov-btn btn-example" onclick="activateStage('s6')" style="font-size:11px;padding:5px 10px;">Stage 5 &#8594;</button>
+              <button class="gov-btn btn-example" onclick="activateStage('s8')" style="font-size:11px;padding:5px 10px;">Stage 6 &#8594;</button>
+              <button class="gov-btn btn-example" onclick="activateStage('s9')" style="font-size:11px;padding:5px 10px;">Stage 7 &#8594;</button>
+              <button class="gov-btn btn-example" onclick="activateStage('s10')" style="font-size:11px;padding:5px 10px;">Stage 8 &#8594;</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- KEYBOARD SHORTCUTS & TIPS -->
+      <div id="s-tour-tips" class="tour-section" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:20px;">
+        <h3 style="color:#7dd3fc;margin:0 0 14px;font-size:14px;">&#9889; Tips &amp; Shortcuts</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">
+          <div class="tour-tip-item" style="background:#0f172a;border-radius:8px;padding:10px 14px;color:#94a3b8;font-size:13px;"><span style="color:#fcd34d;font-weight:700;">Ctrl+K</span> — Jump to any stage quickly</div>
+          <div class="tour-tip-item" style="background:#0f172a;border-radius:8px;padding:10px 14px;color:#94a3b8;font-size:13px;"><span style="color:#fcd34d;font-weight:700;">&#127775; 3D View</span> — Enable in Why Who What for cloud flythrough</div>
+          <div class="tour-tip-item" style="background:#0f172a;border-radius:8px;padding:10px 14px;color:#94a3b8;font-size:13px;"><span style="color:#fcd34d;font-weight:700;">&#127776; Load Demo</span> — Seed banking system for a live demo walkthrough</div>
+          <div class="tour-tip-item" style="background:#0f172a;border-radius:8px;padding:10px 14px;color:#94a3b8;font-size:13px;"><span style="color:#fcd34d;font-weight:700;">Export UAT Package</span> — Download all tests + server targets as JSON</div>
+          <div class="tour-tip-item" style="background:#0f172a;border-radius:8px;padding:10px 14px;color:#94a3b8;font-size:13px;"><span style="color:#fcd34d;font-weight:700;">Migration Log</span> — Track all operations with timestamps</div>
+          <div class="tour-tip-item" style="background:#0f172a;border-radius:8px;padding:10px 14px;color:#94a3b8;font-size:13px;"><span style="color:#fcd34d;font-weight:700;">Start Fresh</span> — Each migration engine has a clean-state checkbox</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <div class="panel" id="panel-s0">
     <div style="padding:20px 16px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%; background:#f8fafc;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -2830,57 +3550,113 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     <div id="s2fullmig-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
       <div class="gov-header">
         <div class="gov-title-area">
-          <h2>🧩 Stage 2 Full Migration — Infra + VM Images + Volumes</h2>
-          <p>One control view for cloning the FLEX landing zone, Linux/Windows VM snapshots, data volumes, floating IPs, and load balancer links from the generated CSVs.</p>
+          <h2>🏢 Full Business System Migration</h2>
+          <p>Select a business system from Stage 1 and migrate all its components — VMs, databases, volumes, load balancers — using the Stage 2 tools.</p>
         </div>
-        <div class="gov-status-badge status-pending" id="s2fullmig-status">Status: Not loaded</div>
+        <div class="gov-status-badge status-pending" id="s2fullmig-status">Select a System</div>
       </div>
-
-      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-        <div class="gov-section"><h3>Best Link Step</h3><p id="s2fullmig-best-link" style="color:#cbd5e1;margin:0;">Load the plan to see the current source-to-target link strategy.</p></div>
-        <div class="gov-section"><h3>Planned VMs</h3><div id="s2fullmig-card-vms" style="font-size:28px;font-weight:900;color:#7dd3fc;">0</div></div>
-        <div class="gov-section"><h3>Ready</h3><div id="s2fullmig-card-ready" style="font-size:28px;font-weight:900;color:#86efac;">0</div></div>
-        <div class="gov-section"><h3>Needs Mapping</h3><div id="s2fullmig-card-map" style="font-size:28px;font-weight:900;color:#fcd34d;">0</div></div>
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="gov-section"><h3>Business Systems</h3><div id="fsm-stat-sys" style="font-size:28px;font-weight:900;color:#7dd3fc;">0</div></div>
+        <div class="gov-section"><h3>Total Components</h3><div id="fsm-stat-comp" style="font-size:28px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Migrated</h3><div id="fsm-stat-done" style="font-size:28px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Pending</h3><div id="fsm-stat-pending" style="font-size:28px;font-weight:900;color:#fcd34d;">0</div></div>
       </div>
-
       <div class="gov-section">
-        <h3>CSV Inputs → Terraform / Ansible / Full Migration Plan</h3>
-        <div style="overflow:auto;">
-          <table class="gov-table" style="min-width:980px;">
-            <thead><tr><th>CSV</th><th>Used For</th><th>Terraform Template</th><th>Ansible Template</th><th>Full Migration Role</th></tr></thead>
-            <tbody>
-              <tr><td><code>*_overview.csv</code></td><td>Source inventory: networks, subnets, security groups, LBs, VMs, volumes</td><td><code>networks</code>, <code>subnets</code>, <code>security_groups</code></td><td>Inventory seed when target IPs exist</td><td>Build infra scaffold before VM clone</td></tr>
-              <tr><td><code>*_flavormap.csv</code></td><td>Source VM → target FLEX VM name/flavor/image/boot/FIP plan</td><td><code>openstack_compute_instance_v2</code>, FIP resources</td><td><code>hosts.ini</code> source/target flavor vars</td><td>Main join key: <code>source_server_id</code>; target name: <code>target_server_name</code></td></tr>
-              <tr><td><code>*_blockmap.csv</code></td><td>Source volume → target volume + attach device</td><td><code>openstack_blockstorage_volume_v3</code>, volume attach</td><td><code>group_vars/all.yml</code> volume map</td><td>Attach cloned volumes after VM is ACTIVE</td></tr>
-              <tr><td><code>*_lbmap.csv</code></td><td>LB/listener/pool/member relationships</td><td><code>openstack_lb_*</code> templates</td><td>LB validation targets</td><td>Reattach LB members after VM private IP is known</td></tr>
-            </tbody>
-          </table>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">Business Systems &nbsp;<span id="fsm-sys-badge" style="background:#1e3a5f;color:#7dd3fc;border-radius:12px;padding:2px 10px;font-size:12px;">0</span></h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="gov-btn btn-example" onclick="uatS1OpenModal(null)">+ Add Business System</button>
+            <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#1e3a5f;border:1px solid #7c3aed;color:#c4b5fd;" onclick="fsmLoadDemo()">🏦 Load Banking Demo</button>
+            <button class="gov-btn btn-save" onclick="fsmRefresh()">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="fsm-systems-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+        <div id="fsm-empty" style="color:#64748b;font-style:italic;padding:24px 0;text-align:center;display:none;">
+          No business systems defined yet.
+          <a href="#" onclick="fsmGoToOntology();return false;" style="color:#7dd3fc;">Add in Stage 1 Business System Ontology</a>
+           or
+          <a href="#" onclick="fsmLoadDemo();return false;" style="color:#c4b5fd;">load the banking demo</a>.
         </div>
       </div>
-
+      <div id="fsm-plan-section" class="gov-section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">
+            Component Migration Plan —
+            <span id="fsm-plan-name" style="color:#7dd3fc;"></span>
+            <span id="fsm-plan-wave" style="background:#1e3a5f;color:#94a3b8;border-radius:12px;padding:2px 10px;font-size:12px;margin-left:6px;"></span>
+          </h3>
+          <button class="gov-btn" style="padding:5px 10px;font-size:12px;background:#0f172a;border:1px solid #475569;color:#94a3b8;" onclick="fsmMarkAllMigrated()">✓ Mark All Migrated</button>
+        </div>
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Each component maps to its Stage 2 migration tool. Track progress row by row.</p>
+        <div style="overflow:auto;"><table class="gov-table" style="min-width:860px;">
+          <thead><tr><th>Component</th><th>Kind</th><th>Migration Tool</th><th>Status</th><th>Set Status</th></tr></thead>
+          <tbody id="fsm-plan-body"></tbody>
+        </table></div>
+        <div class="gov-actions" style="margin-top:14px;">
+          <button class="gov-btn btn-save" onclick="stage2BuildFullMigrationPlan()">🔄 Build CSV Plan</button>
+          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p1')">🛠 Infra Builder</button>
+          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2image')">📸 VM Snapshot</button>
+          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p2_1')">⚙️ App &amp; DB Replication</button>
+          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2flex2flex')">🌐 FLEX2FLEX</button>
+        </div>
+      </div>
+      <div class="gov-section">
+        <h3>CSV Reference — Terraform / Ansible Inputs</h3>
+        <div style="overflow:auto;"><table class="gov-table" style="min-width:980px;">
+          <thead><tr><th>CSV</th><th>Used For</th><th>Terraform Template</th><th>Ansible Template</th><th>Full Migration Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>*_overview.csv</code></td><td>Source inventory: networks, subnets, security groups, LBs, VMs, volumes</td><td><code>networks</code>, <code>subnets</code>, <code>security_groups</code></td><td>Inventory seed when target IPs exist</td><td>Build infra scaffold before VM clone</td></tr>
+            <tr><td><code>*_flavormap.csv</code></td><td>Source VM → target FLEX VM name/flavor/image/boot/FIP plan</td><td><code>openstack_compute_instance_v2</code>, FIP resources</td><td><code>hosts.ini</code> source/target flavor vars</td><td>Main join key: <code>source_server_id</code>; target name: <code>target_server_name</code></td></tr>
+            <tr><td><code>*_blockmap.csv</code></td><td>Source volume → target volume + attach device</td><td><code>openstack_blockstorage_volume_v3</code>, volume attach</td><td><code>group_vars/all.yml</code> volume map</td><td>Attach cloned volumes after VM is ACTIVE</td></tr>
+            <tr><td><code>*_lbmap.csv</code></td><td>LB/listener/pool/member relationships</td><td><code>openstack_lb_*</code> templates</td><td>LB validation targets</td><td>Reattach LB members after VM private IP is known</td></tr>
+          </tbody>
+        </table></div>
+      </div>
       <div class="gov-section">
         <h3>Full Migration Execution Order</h3>
-        <div style="overflow:auto;">
-          <table class="gov-table" style="min-width:1000px;">
-            <thead><tr><th>Stage</th><th>Name</th><th>Input CSV</th><th>Output</th><th>Notes</th></tr></thead>
-            <tbody id="s2fullmig-stages-body"><tr><td colspan="5" style="color:#64748b;font-style:italic;">No plan loaded yet.</td></tr></tbody>
-          </table>
-        </div>
+        <div style="overflow:auto;"><table class="gov-table" style="min-width:1000px;">
+          <thead><tr><th>Stage</th><th>Name</th><th>Input CSV</th><th>Output</th><th>Notes</th></tr></thead>
+          <tbody id="s2fullmig-stages-body"><tr><td colspan="5" style="color:#64748b;font-style:italic;">No plan loaded yet.</td></tr></tbody>
+        </table></div>
       </div>
-
       <div class="gov-section">
         <h3>Source VM → FLEX Clone Link Map</h3>
-        <div style="overflow:auto;max-height:420px;">
-          <table class="gov-table" style="min-width:1700px;">
-            <thead><tr><th>#</th><th>Source VM</th><th>Source ID</th><th>Source Region</th><th>Target Region</th><th>Original Flavor</th><th>Target FLEX VM</th><th>Target Flavor</th><th>Target Image</th><th>Volumes</th><th>LBs</th><th>FIP</th><th>Status</th><th>Link Step</th><th>Blockers</th></tr></thead>
-            <tbody id="s2fullmig-links-body"><tr><td colspan="15" style="color:#64748b;font-style:italic;">No link map loaded yet.</td></tr></tbody>
-          </table>
-        </div>
+        <div style="overflow:auto;max-height:420px;"><table class="gov-table" style="min-width:1700px;">
+          <thead><tr><th>#</th><th>Source VM</th><th>Source ID</th><th>Source Region</th><th>Target Region</th><th>Original Flavor</th><th>Target FLEX VM</th><th>Target Flavor</th><th>Target Image</th><th>Volumes</th><th>LBs</th><th>FIP</th><th>Status</th><th>Link Step</th><th>Blockers</th></tr></thead>
+          <tbody id="s2fullmig-links-body"><tr><td colspan="15" style="color:#64748b;font-style:italic;">No link map loaded yet.</td></tr></tbody>
+        </table></div>
       </div>
-
       <div class="gov-section">
         <h3>Artifacts</h3>
         <div class="artifact-list" id="s2fullmig-artifacts"><span style="color:#64748b;">No full migration plan generated yet.</span></div>
+      </div>
+      <!-- MIGRATION ENGINES — embedded iframes, lazy-loaded on tab click -->
+      <div class="gov-section" id="fsm-engines-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">🔧 Migration Engines</h3>
+          <span style="font-size:12px;color:#64748b;">Select the engine matching the component type you are migrating</span>
+        </div>
+        <!-- Engine selector tabs -->
+        <div id="fsm-engine-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:0;border-bottom:2px solid #1e3a5f;padding-bottom:0;">
+          <button id="fsm-etab-vm"    class="fsm-etab fsm-etab-active" onclick="fsmShowEngine('vm')"   style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#1e3a5f;color:#7dd3fc;border-bottom:2px solid #7dd3fc;margin-bottom:-2px;">📸 Linux / Windows VM Snapshot</button>
+          <button id="fsm-etab-vol"   class="fsm-etab"                 onclick="fsmShowEngine('vol')"  style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">💾 Volume Snapshot</button>
+          <button id="fsm-etab-db"    class="fsm-etab"                 onclick="fsmShowEngine('db')"   style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">⚙️ App &amp; DB Replication</button>
+          <button id="fsm-etab-infra" class="fsm-etab"                 onclick="fsmShowEngine('infra')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">🛠 Infra Clone &amp; Adapt</button>
+        </div>
+        <!-- Engine frames -->
+        <div id="fsm-engine-vm"    style="height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
+          <iframe id="fsm-iframe-vm"    src=""                                          style="width:100%;height:100%;border:none;" title="VM Snapshot Migration"></iframe>
+        </div>
+        <div id="fsm-engine-vol"   style="display:none;height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
+          <iframe id="fsm-iframe-vol"   src=""                                          style="width:100%;height:100%;border:none;" title="Volume Snapshot Migration"></iframe>
+        </div>
+        <div id="fsm-engine-db"    style="display:none;height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
+          <iframe id="fsm-iframe-db"    src=""                                          style="width:100%;height:100%;border:none;" title="DB Replication"></iframe>
+        </div>
+        <div id="fsm-engine-infra" style="display:none;height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
+          <iframe id="fsm-iframe-infra" src=""                                          style="width:100%;height:100%;border:none;" title="Infra Clone"></iframe>
+        </div>
+        <p style="color:#475569;font-size:11px;margin:8px 0 0;text-align:right;">Engines are loaded on first click. Each engine is an independent session.</p>
       </div>
 
       <div class="gov-actions">
@@ -3055,7 +3831,527 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     <iframe id="s2flex2flex-pane" src="/image_migrator/?mode=flex2flex&v={{ cache_bust|default('') }}" title="R3 FLEX2FLEX-Region Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2flexanywhere-pane" src="/image_migrator/?mode=flexanywhere&v={{ cache_bust|default('') }}" title="R3 FLEX Anywhere Hyperscaler Bridge" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
-    <iframe id="s2rehost_p2_2-pane" src="/migrate/" title="REHOST Data Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <div id="s2rehost_p2_2-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>☸️ R6 Refactor / Rearchitect — K8s Modernization</h2>
+          <p>Select an architecture template for your business system. Each template pre-fills the component topology — Frontend, Cache/LB, API, Backend, Databases — ready for K8s deployment on FLEX.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r6-status">Select a Template</div>
+      </div>
+
+      <!-- Stats -->
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="gov-section"><h3>Templates</h3><div style="font-size:26px;font-weight:900;color:#7dd3fc;">8</div></div>
+        <div class="gov-section"><h3>Selected</h3><div id="r6-sel-count" style="font-size:26px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Components</h3><div id="r6-comp-count" style="font-size:26px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>K8s Workloads</h3><div id="r6-k8s-count" style="font-size:26px;font-weight:900;color:#fcd34d;">0</div></div>
+      </div>
+
+      <!-- Architecture Template Cards -->
+      <div class="gov-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h3 style="margin:0;">Architecture Templates</h3>
+          <div style="display:flex;gap:8px;">
+            <button class="gov-btn btn-example" onclick="r6ClearAll()">✕ Clear All</button>
+            <button class="gov-btn btn-save" onclick="r6GenerateManifests()">⚡ Generate K8s Manifests</button>
+          </div>
+        </div>
+        <div id="r6-template-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+      </div>
+
+      <!-- Selected System Component Topology -->
+      <div id="r6-topology-section" class="gov-section" style="display:none;">
+        <h3>Component Topology — <span id="r6-topo-name" style="color:#7dd3fc;"></span></h3>
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Each component maps to a K8s workload type. Review and adjust before generating manifests.</p>
+        <div style="overflow:auto;">
+          <table class="gov-table" style="min-width:820px;">
+            <thead><tr><th>Layer</th><th>Component</th><th>K8s Kind</th><th>Replicas</th><th>Image Placeholder</th><th>Resources</th></tr></thead>
+            <tbody id="r6-topo-body"></tbody>
+          </table>
+        </div>
+        <div class="gov-actions" style="margin-top:12px;">
+          <button class="gov-btn btn-save" onclick="r6GenerateManifests()">⚡ Generate Helm / K8s Manifests</button>
+          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p2_1')">⚙️ Also Run DB Replication</button>
+          <button class="gov-btn btn-export" onclick="r6ExportTopology()">📥 Export Topology JSON</button>
+        </div>
+      </div>
+
+      <!-- K8s Manifests Output -->
+      <div id="r6-manifests-section" class="gov-section" style="display:none;">
+        <h3>Generated K8s Manifests</h3>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button class="gov-btn btn-save" onclick="r6CopyManifests()">📋 Copy All</button>
+          <button class="gov-btn btn-export" onclick="r6DownloadManifests()">📥 Download YAML</button>
+        </div>
+        <pre id="r6-manifests-out" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:16px;color:#86efac;font-size:11px;overflow:auto;max-height:480px;white-space:pre-wrap;"></pre>
+      </div>
+
+      <script>
+      (function() {
+        var R6_TEMPLATES = [
+          {
+            id:'web3tier', icon:'🌐', name:'3-Tier Web App', color:'#2563eb',
+            desc:'Classic web tier: Load Balancer → Frontend → API → Database',
+            layers:[
+              {layer:'Frontend',  name:'Web Frontend',        kind:'Deployment',    replicas:2, image:'nginx:1.25-alpine', cpu:'100m',  mem:'128Mi'},
+              {layer:'Network',   name:'Load Balancer',        kind:'Service/LB',   replicas:1, image:'—',                  cpu:'—',     mem:'—'},
+              {layer:'API',       name:'REST API Server',      kind:'Deployment',    replicas:3, image:'node:20-alpine',    cpu:'200m',  mem:'256Mi'},
+              {layer:'Backend',   name:'App Backend',          kind:'Deployment',    replicas:2, image:'python:3.11-slim',  cpu:'300m',  mem:'512Mi'},
+              {layer:'Database',  name:'Primary Database',     kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'500m',  mem:'1Gi'},
+              {layer:'Database',  name:'DB Read Replica',      kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'250m',  mem:'512Mi'},
+              {layer:'Cache',     name:'Cache Layer',          kind:'Deployment',    replicas:1, image:'redis:7-alpine',    cpu:'100m',  mem:'256Mi'},
+            ]
+          },
+          {
+            id:'microsvcs', icon:'🔀', name:'Microservices Platform', color:'#7c3aed',
+            desc:'API Gateway + service mesh + independent backend microservices',
+            layers:[
+              {layer:'Network',   name:'API Gateway',          kind:'Deployment',    replicas:2, image:'kong:3.4',          cpu:'200m',  mem:'256Mi'},
+              {layer:'Frontend',  name:'Web Frontend',         kind:'Deployment',    replicas:2, image:'nginx:1.25-alpine', cpu:'100m',  mem:'128Mi'},
+              {layer:'API',       name:'Auth Service',         kind:'Deployment',    replicas:2, image:'node:20-alpine',    cpu:'150m',  mem:'192Mi'},
+              {layer:'API',       name:'User Service',         kind:'Deployment',    replicas:2, image:'go:1.21',           cpu:'200m',  mem:'256Mi'},
+              {layer:'API',       name:'Order Service',        kind:'Deployment',    replicas:2, image:'java:21-slim',      cpu:'300m',  mem:'512Mi'},
+              {layer:'Database',  name:'Users DB',             kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'300m',  mem:'512Mi'},
+              {layer:'Database',  name:'Orders DB',            kind:'StatefulSet',   replicas:1, image:'mysql:8.0',         cpu:'300m',  mem:'512Mi'},
+              {layer:'Cache',     name:'Session Cache',        kind:'Deployment',    replicas:1, image:'redis:7-alpine',    cpu:'100m',  mem:'256Mi'},
+              {layer:'Queue',     name:'Message Broker',       kind:'StatefulSet',   replicas:3, image:'rabbitmq:3-mgmt',   cpu:'250m',  mem:'512Mi'},
+            ]
+          },
+          {
+            id:'banking', icon:'🏦', name:'Banking Core Platform', color:'#0891b2',
+            desc:'Banking system: Web + API Gateway + Core Banking Backend + DBs',
+            layers:[
+              {layer:'Frontend',  name:'Banking Web Portal',   kind:'Deployment',    replicas:3, image:'nginx:1.25-alpine', cpu:'150m',  mem:'192Mi'},
+              {layer:'Network',   name:'API Gateway / LB',     kind:'Deployment',    replicas:2, image:'kong:3.4',          cpu:'200m',  mem:'256Mi'},
+              {layer:'API',       name:'REST API Server',      kind:'Deployment',    replicas:3, image:'java:21-slim',      cpu:'400m',  mem:'768Mi'},
+              {layer:'API',       name:'Auth / SSO Service',   kind:'Deployment',    replicas:2, image:'node:20-alpine',    cpu:'150m',  mem:'256Mi'},
+              {layer:'Backend',   name:'Core Banking Engine',  kind:'Deployment',    replicas:2, image:'java:21-slim',      cpu:'600m',  mem:'1.5Gi'},
+              {layer:'Database',  name:'Core Banking DB',      kind:'StatefulSet',   replicas:1, image:'oracle:21c-xe',     cpu:'800m',  mem:'2Gi'},
+              {layer:'Database',  name:'Transaction DB',       kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'500m',  mem:'1Gi'},
+              {layer:'Cache',     name:'Cache Layer',          kind:'Deployment',    replicas:2, image:'redis:7-alpine',    cpu:'150m',  mem:'512Mi'},
+              {layer:'Queue',     name:'Message Queue',        kind:'StatefulSet',   replicas:3, image:'rabbitmq:3-mgmt',   cpu:'200m',  mem:'512Mi'},
+            ]
+          },
+          {
+            id:'dataplatform', icon:'📊', name:'Data Platform', color:'#16a34a',
+            desc:'Big data ingestion pipeline: Ingest → Process → Store → Serve',
+            layers:[
+              {layer:'API',       name:'Ingestion Endpoint',   kind:'Deployment',    replicas:3, image:'python:3.11-slim',  cpu:'300m',  mem:'512Mi'},
+              {layer:'Queue',     name:'Stream Queue',         kind:'StatefulSet',   replicas:3, image:'kafka:3.5',         cpu:'500m',  mem:'1Gi'},
+              {layer:'Backend',   name:'Processing Worker',    kind:'Deployment',    replicas:4, image:'spark:3.4',         cpu:'500m',  mem:'2Gi'},
+              {layer:'Database',  name:'Data Warehouse',       kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'800m',  mem:'4Gi'},
+              {layer:'Storage',   name:'Object Storage',       kind:'PVC/S3',        replicas:1, image:'minio:latest',      cpu:'200m',  mem:'512Mi'},
+              {layer:'API',       name:'Query / Report API',   kind:'Deployment',    replicas:2, image:'python:3.11-slim',  cpu:'200m',  mem:'256Mi'},
+              {layer:'Frontend',  name:'BI Dashboard',         kind:'Deployment',    replicas:1, image:'grafana:10',        cpu:'200m',  mem:'256Mi'},
+            ]
+          },
+          {
+            id:'saas', icon:'☁️', name:'SaaS Platform', color:'#d97706',
+            desc:'Multi-tenant SaaS: Web + API + DB per tenant',
+            layers:[
+              {layer:'Frontend',  name:'SaaS Web App',         kind:'Deployment',    replicas:3, image:'react:18',          cpu:'100m',  mem:'128Mi'},
+              {layer:'Network',   name:'Ingress Controller',   kind:'DaemonSet',     replicas:1, image:'ingress-nginx:1.8', cpu:'100m',  mem:'90Mi'},
+              {layer:'API',       name:'SaaS API Server',      kind:'Deployment',    replicas:4, image:'node:20-alpine',    cpu:'300m',  mem:'512Mi'},
+              {layer:'API',       name:'Auth / JWT Service',   kind:'Deployment',    replicas:2, image:'go:1.21',           cpu:'150m',  mem:'192Mi'},
+              {layer:'Backend',   name:'Tenant Router',        kind:'Deployment',    replicas:2, image:'go:1.21',           cpu:'200m',  mem:'256Mi'},
+              {layer:'Database',  name:'Shared Database',      kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'600m',  mem:'2Gi'},
+              {layer:'Cache',     name:'Session Cache',        kind:'Deployment',    replicas:2, image:'redis:7-alpine',    cpu:'100m',  mem:'256Mi'},
+            ]
+          },
+          {
+            id:'ecommerce', icon:'🛒', name:'E-Commerce Platform', color:'#be185d',
+            desc:'Full e-commerce: Catalog + Cart + Payment + Order management',
+            layers:[
+              {layer:'Frontend',  name:'Storefront Web',       kind:'Deployment',    replicas:3, image:'nextjs:14',         cpu:'200m',  mem:'256Mi'},
+              {layer:'Network',   name:'CDN / Load Balancer',  kind:'Service/LB',   replicas:1, image:'—',                  cpu:'—',     mem:'—'},
+              {layer:'API',       name:'Product Catalog API',  kind:'Deployment',    replicas:3, image:'node:20-alpine',    cpu:'200m',  mem:'256Mi'},
+              {layer:'API',       name:'Cart / Session API',   kind:'Deployment',    replicas:3, image:'go:1.21',           cpu:'150m',  mem:'192Mi'},
+              {layer:'API',       name:'Payment Connector',    kind:'Deployment',    replicas:2, image:'java:21-slim',      cpu:'300m',  mem:'512Mi'},
+              {layer:'Backend',   name:'Order Processing',     kind:'Deployment',    replicas:3, image:'python:3.11-slim',  cpu:'300m',  mem:'512Mi'},
+              {layer:'Database',  name:'Product DB',           kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'500m',  mem:'1Gi'},
+              {layer:'Database',  name:'Order DB',             kind:'StatefulSet',   replicas:1, image:'mysql:8.0',         cpu:'500m',  mem:'1Gi'},
+              {layer:'Cache',     name:'Product Cache',        kind:'Deployment',    replicas:2, image:'redis:7-alpine',    cpu:'150m',  mem:'512Mi'},
+              {layer:'Search',    name:'Search Engine',        kind:'StatefulSet',   replicas:1, image:'opensearch:2.11',   cpu:'500m',  mem:'2Gi'},
+            ]
+          },
+          {
+            id:'crm', icon:'👥', name:'CRM System', color:'#7c3aed',
+            desc:'Customer management: Web + API + Reporting + File Storage',
+            layers:[
+              {layer:'Frontend',  name:'CRM Web Portal',       kind:'Deployment',    replicas:2, image:'nginx:1.25-alpine', cpu:'100m',  mem:'128Mi'},
+              {layer:'API',       name:'CRM API Server',       kind:'Deployment',    replicas:2, image:'python:3.11-slim',  cpu:'250m',  mem:'384Mi'},
+              {layer:'Backend',   name:'Integration API',      kind:'Deployment',    replicas:2, image:'node:20-alpine',    cpu:'200m',  mem:'256Mi'},
+              {layer:'Backend',   name:'Report Generator',     kind:'Deployment',    replicas:1, image:'java:21-slim',      cpu:'300m',  mem:'768Mi'},
+              {layer:'Database',  name:'CRM Database',         kind:'StatefulSet',   replicas:1, image:'postgres:15',       cpu:'500m',  mem:'1Gi'},
+              {layer:'Storage',   name:'File Storage',         kind:'PVC/S3',        replicas:1, image:'minio:latest',      cpu:'100m',  mem:'256Mi'},
+              {layer:'Cache',     name:'App Cache',            kind:'Deployment',    replicas:1, image:'redis:7-alpine',    cpu:'100m',  mem:'256Mi'},
+            ]
+          },
+          {
+            id:'custom', icon:'🪄', name:'Custom Architecture', color:'#475569',
+            desc:'Build your own topology manually. Start with empty layers.',
+            layers:[
+              {layer:'Frontend',  name:'Web / UI Layer',        kind:'Deployment',   replicas:2, image:'nginx:latest',      cpu:'100m',  mem:'128Mi'},
+              {layer:'Network',   name:'Load Balancer / Proxy', kind:'Service/LB',   replicas:1, image:'—',                 cpu:'—',     mem:'—'},
+              {layer:'API',       name:'API Service',           kind:'Deployment',   replicas:2, image:'node:20',           cpu:'200m',  mem:'256Mi'},
+              {layer:'Backend',   name:'Backend Service',       kind:'Deployment',   replicas:2, image:'python:3.11',       cpu:'300m',  mem:'512Mi'},
+              {layer:'Database',  name:'Primary Database',      kind:'StatefulSet',  replicas:1, image:'postgres:15',       cpu:'500m',  mem:'1Gi'},
+              {layer:'Cache',     name:'Cache',                 kind:'Deployment',   replicas:1, image:'redis:7',           cpu:'100m',  mem:'256Mi'},
+            ]
+          }
+        ];
+
+        var _r6sel = null;
+
+        var LAYER_COLORS = {
+          Frontend:'#2563eb', Network:'#0891b2', API:'#7c3aed',
+          Backend:'#16a34a', Database:'#dc2626', Cache:'#d97706',
+          Queue:'#db2777', Storage:'#475569', Search:'#92400e'
+        };
+        var LAYER_ICONS = {
+          Frontend:'🖥', Network:'🌐', API:'⚡',
+          Backend:'⚙️', Database:'📦', Cache:'⚡',
+          Queue:'📨', Storage:'💾', Search:'🔍'
+        };
+
+        function r6RenderTemplates() {
+          var grid = document.getElementById('r6-template-grid');
+          if (!grid) return;
+          grid.innerHTML = '';
+          R6_TEMPLATES.forEach(function(tmpl) {
+            var card = document.createElement('div');
+            card.className = 'r6-tmpl-card';
+            var isSel = _r6sel === tmpl.id;
+            card.style.cssText = 'background:#1e293b;border:2px solid ' + (isSel ? tmpl.color : '#334155') + ';border-radius:12px;padding:16px;cursor:pointer;transition:border-color .15s;';
+            card.onmouseover = function() { this.style.borderColor = tmpl.color; };
+            card.onmouseout  = function() { this.style.borderColor = _r6sel === tmpl.id ? tmpl.color : '#334155'; };
+
+            // Count layer types for pills
+            var layerCounts = {};
+            tmpl.layers.forEach(function(l) { layerCounts[l.layer] = (layerCounts[l.layer]||0)+1; });
+            var pills = Object.keys(layerCounts).map(function(k) {
+              var c = LAYER_COLORS[k] || '#64748b';
+              return '<span style="font-size:10px;background:' + c + '22;color:' + c + ';border-radius:4px;padding:2px 6px;">' + (LAYER_ICONS[k]||'') + ' ' + k + (layerCounts[k]>1?' \xd7'+layerCounts[k]:'') + '</span>';
+            }).join('');
+
+            card.innerHTML = '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;">'
+              + '<div style="width:44px;height:44px;border-radius:10px;background:' + tmpl.color + '22;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">' + tmpl.icon + '</div>'
+              + '<div><div style="font-weight:700;color:#e2e8f0;font-size:15px;">' + tmpl.name + '</div>'
+              + '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + tmpl.desc + '</div></div></div>'
+              + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">' + pills + '</div>'
+              + '<div style="font-size:11px;color:#64748b;margin-bottom:10px;">' + tmpl.layers.length + ' components · ' + tmpl.layers.filter(function(l){return l.kind==='StatefulSet'||l.layer==='Database';}).length + ' stateful workloads</div>';
+
+            var btn = document.createElement('button');
+            btn.className = 'gov-btn btn-save';
+            btn.style.cssText = 'width:100%;font-size:12px;padding:7px;';
+            btn.textContent = isSel ? '✓ Selected — View Topology' : 'Use This Template';
+            btn.style.background = isSel ? tmpl.color : '';
+            btn.style.borderColor = isSel ? tmpl.color : '';
+            (function(t){ btn.onclick = function(){ r6SelectTemplate(t.id); }; })(tmpl);
+            card.appendChild(btn);
+            grid.appendChild(card);
+          });
+
+          // Stats
+          var total = R6_TEMPLATES.reduce(function(a,t){ return a + t.layers.length; }, 0);
+          var k8s = R6_TEMPLATES.reduce(function(a,t){ return a + t.layers.filter(function(l){ return l.kind !== 'Service/LB' && l.kind !== 'PVC/S3'; }).length; }, 0);
+          var el = function(id){ return document.getElementById(id); };
+          if(el('r6-sel-count')) el('r6-sel-count').textContent = _r6sel ? '1' : '0';
+          if(el('r6-comp-count')) el('r6-comp-count').textContent = _r6sel ? R6_TEMPLATES.find(function(t){return t.id===_r6sel;}).layers.length : 0;
+          if(el('r6-k8s-count')) el('r6-k8s-count').textContent = _r6sel ? R6_TEMPLATES.find(function(t){return t.id===_r6sel;}).layers.filter(function(l){return l.kind!=='Service/LB'&&l.kind!=='PVC/S3';}).length : 0;
+        }
+
+        window.r6SelectTemplate = function(id) {
+          _r6sel = id;
+          r6RenderTemplates();
+          var tmpl = R6_TEMPLATES.find(function(t){ return t.id === id; });
+          if (!tmpl) return;
+          var sec = document.getElementById('r6-topology-section');
+          var nameEl = document.getElementById('r6-topo-name');
+          var tbody = document.getElementById('r6-topo-body');
+          if (!sec || !tbody) return;
+          sec.style.display = '';
+          if(nameEl) nameEl.textContent = tmpl.name;
+          var stat = document.getElementById('r6-status');
+          if(stat){ stat.textContent = 'Template: ' + tmpl.name; stat.className = 'gov-status-badge status-done'; }
+
+          tbody.innerHTML = tmpl.layers.map(function(l) {
+            var c = LAYER_COLORS[l.layer] || '#64748b';
+            var ki = l.kind === 'StatefulSet' ? '📦' : l.kind === 'DaemonSet' ? '\U0001f4e1' : l.kind === 'Service/LB' ? '🌐' : l.kind === 'PVC/S3' ? '💾' : '🖥';
+            return '<tr>'
+              + '<td><span style="font-size:11px;background:' + c + '22;color:' + c + ';border-radius:4px;padding:2px 8px;font-weight:600;">' + l.layer + '</span></td>'
+              + '<td><strong>' + l.name + '</strong></td>'
+              + '<td><span style="font-size:11px;color:#94a3b8;">' + ki + ' ' + l.kind + '</span></td>'
+              + '<td><input class="gov-input" type="number" value="' + l.replicas + '" min="1" max="20" style="width:56px;padding:3px 6px;font-size:12px;"></td>'
+              + '<td><span style="font-family:monospace;font-size:11px;color:#86efac;">' + l.image + '</span></td>'
+              + '<td style="font-size:11px;color:#94a3b8;">' + l.cpu + ' / ' + l.mem + '</td>'
+              + '</tr>';
+          }).join('');
+
+          setTimeout(function(){ try{ sec.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }, 80);
+        };
+
+        window.r6ClearAll = function() {
+          _r6sel = null;
+          r6RenderTemplates();
+          var sec = document.getElementById('r6-topology-section');
+          var man = document.getElementById('r6-manifests-section');
+          if(sec) sec.style.display = 'none';
+          if(man) man.style.display = 'none';
+          var stat = document.getElementById('r6-status');
+          if(stat){ stat.textContent = 'Select a Template'; stat.className = 'gov-status-badge status-pending'; }
+        };
+
+        window.r6GenerateManifests = function() {
+          if(!_r6sel) { alert('Select a template first'); return; }
+          var tmpl = R6_TEMPLATES.find(function(t){ return t.id===_r6sel; });
+          if(!tmpl) return;
+          var yaml = '# ' + tmpl.name + ' — K8s Manifests\n# Generated by OSPC2FLEX Migration Dashboard\n# Apply: kubectl apply -f manifests.yaml\n\n';
+          tmpl.layers.forEach(function(l) {
+            if(l.kind === 'Service/LB' || l.kind === 'PVC/S3') return;
+            var name = l.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+            yaml += '---\napiVersion: apps/v1\nkind: ' + l.kind + '\nmetadata:\n  name: ' + name + '\n  labels:\n    app: ' + name + '\nspec:\n  replicas: ' + l.replicas + '\n  selector:\n    matchLabels:\n      app: ' + name + '\n  template:\n    metadata:\n      labels:\n        app: ' + name + '\n    spec:\n      containers:\n      - name: ' + name + '\n        image: ' + l.image + '\n        resources:\n          requests:\n            cpu: "' + l.cpu + '"\n            memory: "' + l.mem + '"\n          limits:\n            cpu: "' + (parseInt(l.cpu)||200)*2 + 'm"\n            memory: "' + l.mem + '"\n';
+            if(l.kind === 'StatefulSet') yaml += '  serviceName: ' + name + '\n';
+            yaml += '---\napiVersion: v1\nkind: Service\nmetadata:\n  name: ' + name + '\nspec:\n  selector:\n    app: ' + name + '\n  ports:\n  - port: 80\n    targetPort: 8080\n\n';
+          });
+          var out = document.getElementById('r6-manifests-out');
+          var sec = document.getElementById('r6-manifests-section');
+          if(out) out.textContent = yaml;
+          if(sec) { sec.style.display=''; try{sec.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){} }
+        };
+
+        window.r6CopyManifests = function() {
+          var out = document.getElementById('r6-manifests-out');
+          if(!out) return;
+          try{ navigator.clipboard.writeText(out.textContent); alert('Copied!'); }catch(e){ alert('Select text manually'); }
+        };
+
+        window.r6DownloadManifests = function() {
+          var out = document.getElementById('r6-manifests-out');
+          if(!out||!out.textContent) return;
+          var blob = new Blob([out.textContent], {type:'text/yaml'});
+          var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='k8s-manifests.yaml'; a.click();
+        };
+
+      
+  // Apply light header colors to tour cards when skyline theme is active
+  (function() {
+    var LIGHT_HDRS = {
+      '#312e81': { bg: 'linear-gradient(135deg,#eef2ff,#e0e7ff)', color: '#312e81', border: '#a5b4fc' },
+      '#4c1d95': { bg: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', color: '#4c1d95', border: '#c4b5fd' },
+      '#1e40af': { bg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', color: '#1e40af', border: '#93c5fd' },
+      '#0c4a6e': { bg: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)', color: '#0c4a6e', border: '#7dd3fc' },
+      '#14532d': { bg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', color: '#14532d', border: '#86efac' },
+      '#78350f': { bg: 'linear-gradient(135deg,#fffbeb,#fef3c7)', color: '#78350f', border: '#fcd34d' },
+      '#881337': { bg: 'linear-gradient(135deg,#fff1f2,#fce7f3)', color: '#881337', border: '#fbcfe8' },
+      '#0f172a': { bg: 'linear-gradient(135deg,#f8fafc,#eff6ff)', color: '#1e3a5f', border: '#bfdbfe' },
+    };
+    function isSkyline() { return document.body.classList.contains('flex-skyline-mode'); }
+
+    function applyTourTheme() {
+      var hdrs = document.querySelectorAll('.tour-card-hdr');
+      var skyline = isSkyline();
+      hdrs.forEach(function(h) {
+        if (skyline) {
+          var darkGrad = h.getAttribute('data-dark') || '';
+          // Extract first color from dark gradient e.g. #312e81
+          var m = darkGrad.match(/#[0-9a-f]{6}/i);
+          var key = m ? m[0].toLowerCase() : '';
+          var cfg = LIGHT_HDRS[key] || { bg: 'linear-gradient(135deg,#f8fafc,#f1f5f9)', color: '#1e293b', border: '#e2e8f0' };
+          h.style.setProperty('background', cfg.bg, 'important');
+          h.style.setProperty('border-bottom', '2px solid ' + cfg.border, 'important');
+          // Darken text children
+          var hd = h.querySelector('h3');
+          if (hd) { hd.style.setProperty('color', cfg.color, 'important'); hd.style.setProperty('text-shadow', 'none', 'important'); }
+          var pd = h.querySelector('p');
+          if (pd) pd.style.setProperty('color', '#475569', 'important');
+        } else {
+          // Restore dark gradient
+          var darkGrad = h.getAttribute('data-dark') || '';
+          h.style.removeProperty('background');
+          h.style.removeProperty('border-bottom');
+          var hd = h.querySelector('h3'); if (hd) { hd.style.removeProperty('color'); hd.style.removeProperty('text-shadow'); }
+          var pd = h.querySelector('p');  if (pd) pd.style.removeProperty('color');
+        }
+      });
+
+      // Tour sections (journey bar + tips bar)
+      document.querySelectorAll('.tour-section').forEach(function(el) {
+        if (skyline) {
+          el.style.setProperty('background', '#ffffff', 'important');
+          el.style.setProperty('border-color', '#d1d9e6', 'important');
+        } else {
+          el.style.removeProperty('background');
+          el.style.removeProperty('border-color');
+        }
+      });
+      // Tour cards
+      document.querySelectorAll('.tour-card').forEach(function(el) {
+        if (skyline) {
+          el.style.setProperty('background', '#ffffff', 'important');
+          el.style.setProperty('border-color', '#dde3ed', 'important');
+        } else {
+          el.style.removeProperty('background');
+          el.style.removeProperty('border-color');
+        }
+      });
+      // Video boxes
+      document.querySelectorAll('.tour-video-box').forEach(function(el) {
+        if (skyline) {
+          el.style.setProperty('background', '#eff6ff', 'important');
+          el.style.setProperty('border', '1px solid #bfdbfe', 'important');
+        } else {
+          el.style.removeProperty('background');
+          el.style.removeProperty('border');
+        }
+      });
+      // Tip items
+      document.querySelectorAll('.tour-tip-item').forEach(function(el) {
+        if (skyline) {
+          el.style.setProperty('background', '#f1f5f9', 'important');
+          el.style.setProperty('color', '#374151', 'important');
+        } else {
+          el.style.removeProperty('background');
+          el.style.removeProperty('color');
+        }
+      });
+      // R6 template cards (dynamically rendered)
+      document.querySelectorAll('.r6-tmpl-card').forEach(function(el) {
+        if (skyline) {
+          el.style.setProperty('background', '#ffffff', 'important');
+        } else {
+          el.style.setProperty('background', '#1e293b', 'important');
+        }
+      });
+      // Manifests output
+      var mo = document.getElementById('r6-manifests-out');
+      if (mo) {
+        if (skyline) {
+          mo.style.setProperty('background', '#f1f5f9', 'important');
+          mo.style.setProperty('color', '#1e293b', 'important');
+        } else {
+          mo.style.removeProperty('background');
+          mo.style.removeProperty('color');
+        }
+      }
+    }
+
+    // Hook into existing applyGlobalTheme
+    var _origAGT = window.applyGlobalTheme;
+    if (typeof _origAGT === 'function') {
+      window.applyGlobalTheme = function(theme, save) {
+        _origAGT(theme, save);
+        setTimeout(applyTourTheme, 30);
+      };
+    }
+
+    // Run on load in case skyline is already active
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { setTimeout(applyTourTheme, 100); });
+    } else {
+      setTimeout(applyTourTheme, 100);
+    }
+  })();
+
+  // ── Tour Video URL Editor ────────────────────────────────────────────
+  var TOUR_VID_KEYS = [
+    {key:'why',   def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'s1',    def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'s2vm',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'s2db',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'s2b',   def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'s3',    def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'s4',    def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'start',   def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s1',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s2',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s4',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s5',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s5b', def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s6',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s7',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s7a', def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s8',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s9',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'pnl-s10', def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}
+  ];
+  function tourVidLoad() {
+    TOUR_VID_KEYS.forEach(function(v) {
+      var url = localStorage.getItem('tour-vid-' + v.key) || v.def;
+      var el  = document.getElementById('tour-vid-' + v.key);
+      if (el) el.href = url;
+      var inp = document.getElementById('tvurl-' + v.key);
+      if (inp) inp.value = localStorage.getItem('tour-vid-' + v.key) || '';
+    });
+  }
+  window.tourVidUpdateOne = function(key, url) {
+    if (!url || !url.trim()) return;
+    url = url.trim();
+    localStorage.setItem('tour-vid-' + key, url);
+    var el = document.getElementById('tour-vid-' + key);
+    if (el) el.href = url;
+  };
+  window.tourVidSaveOne = function(key) {
+    var wrap = document.getElementById('tvurl-' + key);
+    if (!wrap) return;
+    var url = wrap.value ? wrap.value.trim() : '';
+    if (!url) return;
+    tourVidUpdateOne(key, url);
+    var btn = wrap.parentElement ? wrap.parentElement.querySelector('button') : null;
+    if (btn) { btn.textContent = '\u2713 Saved'; setTimeout(function(){ btn.innerHTML = '&#10003; Save'; }, 1400); }
+  };
+  window.tourVidMgrToggle = function() {
+    var p = document.getElementById('tour-vid-mgr');
+    if (!p) return;
+    var shown = p.style.display !== 'none';
+    p.style.display = shown ? 'none' : 'block';
+    if (!shown) {
+      TOUR_VID_KEYS.forEach(function(v) {
+        var inp = document.getElementById('tvmgr-' + v.key);
+        if (inp) inp.value = localStorage.getItem('tour-vid-' + v.key) || '';
+      });
+      p.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }
+  };
+  window.tourVidMgrSave = function(key) {
+    var inp = document.getElementById('tvmgr-' + key);
+    if (!inp || !inp.value.trim()) return;
+    var url = inp.value.trim();
+    tourVidUpdateOne(key, url);
+    var inl = document.getElementById('tvurl-' + key);
+    if (inl) inl.value = url;
+    var btn = inp.nextElementSibling;
+    if (btn) { btn.textContent = '\u2713 Saved!'; setTimeout(function(){ btn.textContent = 'Save'; }, 1500); }
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tourVidLoad);
+  } else { tourVidLoad(); }
+
+  window.r6ExportTopology = function() {
+          if(!_r6sel) return;
+          var tmpl = R6_TEMPLATES.find(function(t){ return t.id===_r6sel; });
+          if(!tmpl) return;
+          var blob = new Blob([JSON.stringify(tmpl,null,2)], {type:'application/json'});
+          var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='topology-'+_r6sel+'.json'; a.click();
+        };
+
+        // Init on pane show
+        document.addEventListener('DOMContentLoaded', function() {
+          r6RenderTemplates();
+        });
+
+        // Also re-render when pane becomes visible
+        var _origAS2 = window.activateSub;
+        if(typeof _origAS2 === 'function') {
+          window.activateSub = function(panes, id) {
+            _origAS2(panes, id);
+            if(id === 's2rehost_p2_2') setTimeout(r6RenderTemplates, 60);
+          };
+        }
+      })();
+      </script>
+    </div>
     <!-- s2rehost_manual-pane removed (runbook moved to Stage 2 documentation; not part of cost flow) -->
 
     <!-- R7 Repurchase -->
@@ -18278,22 +19574,26 @@ ${certContent}
 
   window.renderGlobalStageHeaders = function(cName = "No Active Customer Selected") {
       const panels = [
-        {id: 'panel-s1', key: 's1', label: 'Stage 1 — Discovery \u0026 Assessment'},
-        {id: 'panel-s2', key: 's2', label: 'Stage 2 — Migrations'},
-        {id: 'panel-s4', key: 's4', label: 'Stage 3 — Validation \u0026 UAT'},
-        {id: 'panel-s5', key: 's5', label: 'Stage 4 — Cutover \u0026 Traffic Transition'},
-        {id: 'panel-s6', key: 's6', label: 'Stage 5 — Stabilization \u0026 Handover'},
-        {id: 'panel-s7', key: 's7', label: 'Stage 6 — FinOps \u0026 Cost Optimization'},
-        {id: 'panel-s8', key: 's8', label: 'Stage 7 — IaC Backup, DR \u0026 Restore'},
-        {id: 'panel-s9', key: 's9', label: 'Stage 9 — GitOps \u0026 OpenCenter Modernization'},
-        {id: 'panel-s10', key: 's10', label: 'Stage 9 — AIOps \u0026 Continuous Operations'}
+        {id:'panel-s1',  key:'s1',  label:'Stage 1 — Discovery \u0026 Assessment',       vidKey:'pnl-s1',  vidTitle:'Stage 1 \u2014 Discovery \u0026 Assessment Tutorial'},
+        {id:'panel-s2',  key:'s2',  label:'Stage 2 — Migrations',                         vidKey:'pnl-s2',  vidTitle:'Stage 2 \u2014 Migrations Tutorial'},
+        {id:'panel-s4',  key:'s4',  label:'Stage 3 — Validation \u0026 UAT',             vidKey:'pnl-s4',  vidTitle:'Stage 3 \u2014 Validation \u0026 UAT Tutorial'},
+        {id:'panel-s5',  key:'s5',  label:'Stage 4 — Cutover \u0026 Traffic Transition', vidKey:'pnl-s5',  vidTitle:'Stage 4 \u2014 Cutover \u0026 Traffic Transition Tutorial'},
+        {id:'panel-s5b', key:'s5b', label:'Stage 4B — Business System Cutover',           vidKey:'pnl-s5b', vidTitle:'Stage 4B \u2014 Business System Cutover Tutorial'},
+        {id:'panel-s6',  key:'s6',  label:'Stage 5 — Stabilization \u0026 Handover',     vidKey:'pnl-s6',  vidTitle:'Stage 5 \u2014 Stabilization \u0026 Handover Tutorial'},
+        {id:'panel-s7',  key:'s7',  label:'Stage 6 — FinOps \u0026 Cost Optimization',   vidKey:'pnl-s7',  vidTitle:'Stage 6 \u2014 FinOps \u0026 Cost Optimization Tutorial'},
+        {id:'panel-s7a', key:'s7a', label:'Stage 6A — Performance Gain',                  vidKey:'pnl-s7a', vidTitle:'Stage 6A \u2014 Performance Gain Tutorial'},
+        {id:'panel-s8',  key:'s8',  label:'Stage 7 — IaC Backup, DR \u0026 Restore',     vidKey:'pnl-s8',  vidTitle:'Stage 7 \u2014 IaC Backup, DR \u0026 Restore Tutorial'},
+        {id:'panel-s9',  key:'s9',  label:'Stage 8 — GitOps \u0026 OpenCenter Mod.',      vidKey:'pnl-s9',  vidTitle:'Stage 8 \u2014 GitOps \u0026 OpenCenter Modernization Tutorial'},
+        {id:'panel-s10', key:'s10', label:'Stage 9 — AIOps \u0026 Continuous Ops',        vidKey:'pnl-s10', vidTitle:'Stage 9 \u2014 AIOps \u0026 Continuous Operations Tutorial'}
       ];
       panels.forEach(p => {
-          const panelEl = document.querySelector(`#${p.id}`);
+          const panelEl = document.querySelector('#' + p.id);
           if(!panelEl) return;
 
-          let old = panelEl.querySelector('.stage-status-ctrl');
-          if(old) old.remove();
+          var oldCtrl = panelEl.querySelector('.stage-status-ctrl');
+          if(oldCtrl) oldCtrl.remove();
+          var oldVid = panelEl.querySelector('.stage-vid-box');
+          if(oldVid) oldVid.remove();
 
           let d = document.createElement('div');
           d.className = 'stage-status-ctrl';
@@ -18318,13 +19618,35 @@ ${certContent}
                  <input type="radio" name="${p.id}_st" value="Failed" onchange="submitStageStatus('${p.key}', 'Failed')"> ❌ FAILED
               </label>
           `;
-
           panelEl.insertBefore(d, panelEl.firstChild);
+
+          var savedUrl = localStorage.getItem('tour-vid-' + p.vidKey) || '';
+          var v = document.createElement('div');
+          v.className = 'stage-vid-box';
+          v.style.cssText = 'padding:9px 24px;background:rgba(0,5,18,0.88);border-bottom:1px solid rgba(0,243,255,0.10);display:flex;align-items:center;gap:10px;';
+          v.innerHTML = '<div style="background:#7f1d1d;border-radius:6px;padding:3px 8px;display:flex;align-items:center;gap:5px;flex-shrink:0;">'
+            + '<span style="font-size:11px;">📺</span>'
+            + '<span style="color:#fca5a5;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">VIDEO TUTORIAL</span></div>'
+            + '<div style="background:#172554;border-radius:4px;padding:2px 6px;flex-shrink:0;"><span style="color:#93c5fd;font-size:9px;font-weight:700;">YT</span></div>'
+            + '<input id="stginp-' + p.vidKey + '" type="url" value="' + savedUrl.replace(/"/g,'&quot;') + '" placeholder="Paste video URL to link tutorial..." style="flex:1;background:rgba(0,0,0,.35);border:1px solid rgba(147,197,253,.25);border-radius:4px;padding:5px 8px;color:#93c5fd;font-size:10px;box-sizing:border-box;outline:none;min-width:0;" />'
+            + '<button onclick="stgVidSave(\'' + p.vidKey + '\')" style="background:rgba(37,99,235,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#10003; Save</button>';
+          panelEl.insertBefore(v, panelEl.firstChild);
       });
   };
 
   // Run on first load
   renderGlobalStageHeaders();
+
+  window.stgVidSave = function(key) {
+    var inp = document.getElementById('stginp-' + key);
+    if (!inp || !inp.value.trim()) return;
+    var url = inp.value.trim();
+    localStorage.setItem('tour-vid-' + key, url);
+    var link = document.getElementById('tour-vid-' + key);
+    if (link) link.href = url;
+    var btn = inp.nextElementSibling;
+    if (btn) { btn.textContent = '✓ Saved!'; setTimeout(function() { btn.innerHTML = '&#10003; Save'; }, 1500); }
+  };
 
   window.submitStageStatus = function(stageName, status) {
       let payload = { status: status };
@@ -18872,7 +20194,149 @@ ${certContent}
   ❤️ Made with Love by 👤 <span class="footer-accent" style="color: #00d4ff;">Dzoan.nguyen@Rackspace.com</span> using 👤 <span class="footer-accent" style="color: #00d4ff;">brian.abshier@RACKSPACE.COM</span> awesome 🛠️ <span class="footer-accent" style="color: #00d4ff;">OSFLEX Topology Builder</span> tool.
 </div>
 <style>
-  .flex-skyline-mode #site-footer { color: #1e293b !important; border-top-color: rgba(0,0,0,0.12) !important; }
+
+  /* ───── Tour button in Skyline mode ───── */
+  body.flex-skyline-mode .stage-tour-btn {
+    background: #ffffff !important;
+    border: 1px solid #3b424e !important;
+    color: #4338ca !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+  }
+  body.flex-skyline-mode .stage-tour-btn.active {
+    background: linear-gradient(135deg, #bbf7d0, #86efac) !important;
+    border-color: #22c55e !important;
+    color: #064e3b !important;
+  }
+
+  /* ───── Quick Tour page — Skyline / light mode ───── */
+  body.flex-skyline-mode #panel-s_tour {
+    background: #f4f7fb !important;
+  }
+  body.flex-skyline-mode #panel-s_tour > div {
+    background: transparent !important;
+  }
+  /* Page title */
+  body.flex-skyline-mode #panel-s_tour h1,
+  body.flex-skyline-mode #panel-s_tour h2 {
+    color: #1e293b !important;
+    text-shadow: none !important;
+  }
+  body.flex-skyline-mode #panel-s_tour > div > div:first-child p {
+    color: #475569 !important;
+  }
+
+  /* Journey flow bar + tips bar */
+  body.flex-skyline-mode .tour-section {
+    background: #ffffff !important;
+    border-color: #d1d9e6 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05) !important;
+  }
+  body.flex-skyline-mode .tour-section h3 {
+    color: #1e3a8a !important;
+  }
+
+  /* Tips items */
+  body.flex-skyline-mode .tour-tip-item {
+    background: #f1f5f9 !important;
+    color: #374151 !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  /* Stage cards — white background, light border */
+  body.flex-skyline-mode .tour-card {
+    background: #ffffff !important;
+    border: 1px solid #dde3ed !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06) !important;
+  }
+  body.flex-skyline-mode .tour-card-featured {
+    border: 2px solid #3b82f6 !important;
+    box-shadow: 0 2px 12px rgba(59,130,246,.15) !important;
+  }
+
+  /* Card headers — light pastel via data-light attribute not reachable in CSS,
+     so we use a universal rule: remove dark gradient, apply a light neutral */
+  body.flex-skyline-mode .tour-card-hdr {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  /* Card header text: dark in skyline */
+  body.flex-skyline-mode .tour-card-hdr h3 {
+    color: #1e293b !important;
+    text-shadow: none !important;
+  }
+  body.flex-skyline-mode .tour-card-hdr p {
+    color: #475569 !important;
+  }
+  /* Big emoji icon — keep vivid */
+  body.flex-skyline-mode .tour-card-hdr > div:first-child {
+    /* emoji stays as-is */
+  }
+
+  /* Card body (the div after the header) */
+  body.flex-skyline-mode .tour-card > div:last-child {
+    background: #ffffff !important;
+  }
+  body.flex-skyline-mode .tour-card ul {
+    color: #374151 !important;
+  }
+  body.flex-skyline-mode .tour-card li,
+  body.flex-skyline-mode #panel-s_tour li {
+    color: #374151 !important;
+  }
+  body.flex-skyline-mode .tour-card p,
+  body.flex-skyline-mode #panel-s_tour p {
+    color: #475569 !important;
+  }
+  body.flex-skyline-mode .tour-card strong {
+    color: #1e293b !important;
+  }
+  body.flex-skyline-mode #panel-s_tour h3 {
+    color: #1e3a8a !important;
+  }
+
+  /* Video tutorial boxes → soft blue-white */
+  body.flex-skyline-mode .tour-video-box {
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+  }
+  body.flex-skyline-mode .tour-video-box > div:first-child {
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+  }
+  body.flex-skyline-mode .tour-video-box a {
+    color: #1d4ed8 !important;
+  }
+  /* All links inside tour panel */
+  body.flex-skyline-mode #panel-s_tour a {
+    color: #1d4ed8 !important;
+  }
+  /* Numbered quick-start steps */
+  body.flex-skyline-mode #panel-s_tour ol li {
+    color: #1e293b !important;
+  }
+
+  /* ───── Rearchitect (R6) pane — Skyline / light mode ───── */
+  body.flex-skyline-mode .r6-tmpl-card {
+    background: #ffffff !important;
+    border-color: #d1d9e6 !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,.07) !important;
+  }
+  body.flex-skyline-mode .r6-tmpl-card > div {
+    color: #1e293b !important;
+  }
+  body.flex-skyline-mode #r6-manifests-out {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border-color: #cbd5e1 !important;
+  }
+  body.flex-skyline-mode #r6-topology-section {
+    background: #ffffff !important;
+  }
+
+    .flex-skyline-mode #site-footer { color: #1e293b !important; border-top-color: rgba(0,0,0,0.12) !important; }
   .flex-skyline-mode #site-footer .footer-accent { color: #1d4ed8 !important; }
 </style>
 
@@ -19090,11 +20554,14 @@ ${certContent}
         _sv('uatS1BOwner', sys.bowner||''); _sv('uatS1TOwner', sys.towner||'');
         _sv('uatS1Wave', sys.wave||'Wave 1'); _sv('uatS1Risk', sys.risk||'Medium');
         _sv('uatS1Desc', sys.desc||'');
+        _activeComps = (sys.components||[]).map(function(c){ return c.name; });
+        _rebuildEditor(sys.components||[]);
+        _rebuildPreview();
+        return;
       }
-    } else {
-      _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1Desc','');
-      _sv('uatS1ArchSel', presetArch||'banking');
     }
+    _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1Desc','');
+    _sv('uatS1ArchSel', presetArch||'banking');
     uatS1ApplyArchetype();
   };
   window.uatS1CloseModal = function() {
@@ -19102,31 +20569,104 @@ ${certContent}
     if (bd) bd.classList.remove('open');
   };
 
-  /* ── archetype apply ── */
-  window.uatS1ApplyArchetype = function() {
-    var key   = (_gv('uatS1ArchSel')||'banking');
-    var comps = _arch[key] || [];
-    var editor  = document.getElementById('uatS1CompEditor');
+  /* ── active component state + full library ── */
+  var _activeComps = [];
+  var _compLib = [
+    'Web Frontend','API Gateway','API Server','Auth / SSO',
+    'Core Banking Backend','Backend App Server','Backend Service','ERP Backend','Integration API',
+    'Database','Cache','Queue','File Storage','Object Storage',
+    'Worker','Batch Worker','Scheduler',
+    'Payment Connector','Search Service','Reporting App','Export Service',
+    'Product Catalog Backend','Ingestion Endpoint','Monitoring'
+  ];
+
+  /* Build a single component editor row with Remove button + 3 inputs */
+  function _buildCompRow(name, saved) {
+    var col = name.includes('Database')?'green':name.includes('Queue')?'purple':'blue';
+    var sv = (saved && saved.src)  || _sSrc(name);
+    var tv = (saved && saved.tgt)  || _sTgt(name);
+    var pv = (saved && saved.path) || _sPath(name);
+    return '<div class="uat-s1-comp-row" data-comp="'+name+'">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+      +'<div><strong>'+name+'</strong><small style="margin-left:8px;">'+_sType(name)+'</small></div>'
+      +'<button data-comp="'+name+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="background:none;border:1px solid #dc2626;color:#dc2626;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;flex-shrink:0;">&#10005; Remove</button>'
+      +'</div>'
+      +'<div class="uat-s1-form-grid" style="grid-template-columns:1fr 1fr 1fr;">'
+      +'<div class="uat-s1-field"><label>OSPC Source IP / URL</label><input data-field="src" placeholder="http://OSPC-IP:PORT" value="'+sv+'" /></div>'
+      +'<div class="uat-s1-field"><label>FLEX Target IP / URL</label><input data-field="tgt" placeholder="http://FLEX-IP:PORT" value="'+tv+'" /></div>'
+      +'<div class="uat-s1-field"><label>Health / Test Path</label><input data-field="path" value="'+pv+'" /></div>'
+      +'</div>'
+      +'<span class="uat-s1-pill '+col+'">In Scope</span>'
+      +'</div>';
+  }
+
+  /* Capture current src/tgt/path values from DOM before a rebuild */
+  function _captureInputs() {
+    var out = [];
+    document.querySelectorAll('#uatS1CompEditor .uat-s1-comp-row').forEach(function(row) {
+      var n = (row.querySelector('strong')||{textContent:''}).textContent;
+      out.push({ name:n,
+        src:  (row.querySelector('[data-field="src"]') ||{value:''}).value,
+        tgt:  (row.querySelector('[data-field="tgt"]') ||{value:''}).value,
+        path: (row.querySelector('[data-field="path"]')||{value:''}).value });
+    });
+    return out;
+  }
+
+  /* Rebuild the component editor rows + library palette */
+  function _rebuildEditor(savedList) {
+    var editor = document.getElementById('uatS1CompEditor');
+    if (!editor) return;
+    var sl = savedList || [];
+    var rowsHtml = _activeComps.length
+      ? _activeComps.map(function(name) {
+          var sv = sl.find(function(x){ return x.name===name; });
+          return _buildCompRow(name, sv);
+        }).join('')
+      : '<div style="padding:16px 0;color:#94a3b8;font-size:13px;">No components in scope. Click <b>+ Add component</b> badges below to build your stack.</div>';
+    /* Library palette: show all components NOT yet in _activeComps */
+    var libItems = _compLib.filter(function(n){ return _activeComps.indexOf(n) < 0; });
+    var libHtml = libItems.length
+      ? '<div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border-radius:8px;border:1px dashed #94a3b8;">'
+        +'<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">&#43; Add component</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+        +libItems.map(function(n) {
+            var c = n.includes('Database')?'green':n.includes('Queue')||n.includes('Cache')?'purple':'blue';
+            return '<span class="uat-s1-pill '+c+'" data-comp="'+n+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="cursor:pointer;opacity:.55;user-select:none;border-style:dashed;" title="Add '+n+'">&#43; '+n+'</span>';
+          }).join('')
+        +'</div></div>'
+      : '';
+    editor.innerHTML = rowsHtml + libHtml;
+  }
+
+  /* Rebuild the Generated UAT Scope Preview badge row */
+  function _rebuildPreview() {
     var preview = document.getElementById('uatS1ScopePreview');
-    if (editor) {
-      editor.innerHTML = comps.length ? comps.map(function(name) {
-        var col = name.includes('Database')?'green':name.includes('Queue')?'purple':'blue';
-        return '<div class="uat-s1-comp-row">'
-          +'<div><strong>'+name+'</strong><small>'+_sType(name)+'</small></div>'
-          +'<div class="uat-s1-form-grid">'
-          +'<div class="uat-s1-field"><label>Source / Target</label><input value="'+_sEndpt(name)+'" /></div>'
-          +'<div class="uat-s1-field"><label>Health / Test Path</label><input value="'+_sPath(name)+'" /></div>'
-          +'</div>'
-          +'<span class="uat-s1-pill '+col+'">In Scope</span>'
-          +'</div>';
-      }).join('') : '<div class="uat-s1-preview-box" style="color:#64748b;"><b>Custom archetype:</b> define your own stack after adding.</div>';
-    }
-    if (preview) {
-      preview.innerHTML = comps.length ? comps.map(function(n){
-        var c = n.includes('Database')?'green':n.includes('Queue')?'purple':'blue';
-        return '<span class="uat-s1-pill '+c+'">'+n+'</span>';
-      }).join('') : '<span class="uat-s1-pill gray">No default components</span>';
-    }
+    if (!preview) return;
+    preview.innerHTML = _activeComps.length
+      ? _activeComps.map(function(n) {
+          var c = n.includes('Database')?'green':n.includes('Queue')||n.includes('Cache')?'purple':'blue';
+          return '<span class="uat-s1-pill '+c+'" data-comp="'+n+'" onclick="uatS1ToggleComp(this.dataset.comp)" style="cursor:pointer;" title="Click to remove from scope">'+n+' &#10005;</span>';
+        }).join('')
+      : '<span class="uat-s1-pill gray">No components selected</span>';
+  }
+
+  /* ── archetype apply: reset _activeComps from archetype defaults ── */
+  window.uatS1ApplyArchetype = function() {
+    var key = _gv('uatS1ArchSel') || 'banking';
+    _activeComps = (_arch[key] || []).slice();
+    _rebuildEditor();
+    _rebuildPreview();
+  };
+
+  /* Toggle a component in/out of scope, preserving existing input values */
+  window.uatS1ToggleComp = function(name) {
+    var saved = _captureInputs();
+    var idx = _activeComps.indexOf(name);
+    if (idx >= 0) _activeComps.splice(idx, 1);
+    else _activeComps.push(name);
+    _rebuildEditor(saved);
+    _rebuildPreview();
   };
 
   function _sType(n) {
@@ -19138,12 +20678,19 @@ ${certContent}
     if(n.includes('Monitoring')) return 'Component Type: Monitoring';
     return 'Component Type: Application';
   }
-  function _sEndpt(n) {
-    if(n.includes('Database')) return 'mysql://source:3306 → target:3306';
-    if(n.includes('Gateway'))  return 'https://gateway.example.com';
-    if(n.includes('Cache'))    return 'redis://target:6379';
-    if(n.includes('Queue'))    return 'rabbitmq://target:5672';
-    return 'http://source:80 → http://target:80';
+  function _sSrc(n) {
+    if(n.includes('Database')) return 'mysql://OSPC-IP:3306';
+    if(n.includes('Gateway'))  return 'https://gateway.ospc.local';
+    if(n.includes('Cache'))    return 'redis://OSPC-IP:6379';
+    if(n.includes('Queue'))    return 'rabbitmq://OSPC-IP:5672';
+    return 'http://OSPC-IP:80';
+  }
+  function _sTgt(n) {
+    if(n.includes('Database')) return 'mysql://FLEX-IP:3306';
+    if(n.includes('Gateway'))  return 'https://gateway.flex.cloud';
+    if(n.includes('Cache'))    return 'redis://FLEX-IP:6379';
+    if(n.includes('Queue'))    return 'rabbitmq://FLEX-IP:5672';
+    return 'http://FLEX-IP:80';
   }
   function _sPath(n) {
     if(n.includes('Database')) return 'SELECT 1';
@@ -19159,7 +20706,17 @@ ${certContent}
     var name = (_gv('uatS1Name')||'').trim();
     if (!name) { alert('Please enter a Business System Name.'); return; }
     var arch  = _gv('uatS1ArchSel')||'banking';
-    var comps = (_arch[arch]||[]).map(function(n){ return { name:n, type:_sType(n) }; });
+    var _editor = document.getElementById('uatS1CompEditor');
+    var _rows = _editor ? Array.from(_editor.querySelectorAll('.uat-s1-comp-row')) : [];
+    var comps = _rows.length ? _rows.map(function(row) {
+      var n = (row.querySelector('strong')||{textContent:''}).textContent;
+      return { name:n, type:_sType(n),
+        src:  (row.querySelector('[data-field="src"]') ||{value:''}).value,
+        tgt:  (row.querySelector('[data-field="tgt"]') ||{value:''}).value,
+        path: (row.querySelector('[data-field="path"]')||{value:''}).value };
+    }) : _activeComps.map(function(n){
+      return { name:n, type:_sType(n), src:_sSrc(n), tgt:_sTgt(n), path:_sPath(n) };
+    });
     var sys = {
       id:          _state.editId || _id(),
       name:        name,
@@ -19518,7 +21075,7 @@ ${certContent}
   window.s0Toggle3D = function() {
     var overlay = document.getElementById('s0-hero-3d');
     var btn     = document.getElementById('s0-view-toggle');
-    var s2d     = document.querySelectorAll('.s0-dawn-sky,.s0-dawn-sun,.s0-dawn-cloud');
+    var s2d     = document.querySelectorAll('.s0-dawn-sky,.s0-dawn-sun,.s0-dawn-cloud,.s0-st,.s0-cl,.s0-ac,.s0-ci');
     if (!overlay) return;
     _s03d_active = !_s03d_active;
     overlay.style.display = _s03d_active ? 'block' : 'none';
@@ -19533,6 +21090,414 @@ ${certContent}
   var _s03d_offsetX = 0, _s03d_offsetY = 0, _s03d_flySpeed = 1.3;
   var _s03d_isFlying = { up:false, down:false, left:false, right:false };
   var _s03d_lastTime = 0;
+
+
+  // ============================================================
+  //  Full Business System Migration (FSM)
+  // ============================================================
+  var _fsmSelId = null;
+
+  var FSM_DEMO_DATA = [
+    {
+      id: 'demo-bank-001',
+      name: 'Banking Core Platform',
+      archetype: 'banking',
+      criticality: 'Critical',
+      wave: 'Wave 1',
+      bowner: 'Finance CTO',
+      towner: 'Platform Ops',
+      risk: 'High',
+      desc: 'Core banking system with front-end, API gateway, backend services and databases',
+      env: 'Production',
+      status: 'Active',
+      createdAt: '2026-06-30T00:00:00.000Z',
+      components: [
+        { name: 'Web Frontend',          type: 'Component Type: Application' },
+        { name: 'REST API Gateway',       type: 'Component Type: Gateway'     },
+        { name: 'Backend Services',       type: 'Component Type: Application' },
+        { name: 'Core Banking Database',  type: 'Component Type: Database'    },
+        { name: 'Transaction Database',   type: 'Component Type: Database'    },
+        { name: 'Auth Service',           type: 'Component Type: Application' },
+        { name: 'Message Queue',          type: 'Component Type: Queue'       },
+        { name: 'Cache Layer',            type: 'Component Type: Cache'       },
+        { name: 'Reporting Service',      type: 'Component Type: Application' },
+        { name: 'Network Load Balancer',  type: 'Component Type: Gateway'     }
+      ]
+    }
+  ];
+
+  function fsmCompTool(compName) {
+    var n = (compName || '').toLowerCase();
+    if (n.indexOf('database') >= 0 || n === 'db' || n.indexOf(' db') >= 0 ||
+        n.indexOf('mysql') >= 0 || n.indexOf('postgres') >= 0 ||
+        n.indexOf('mongo') >= 0 || n.indexOf('oracle') >= 0 || n.indexOf('mssql') >= 0)
+      return { label: 'App & DB Replication',  sub: 's2rehost_p2_1', badge: 'DB',    color: '#16a34a' };
+    if (n.indexOf('kubernetes') >= 0 || n.indexOf('k8s') >= 0 ||
+        n.indexOf('container') >= 0 || n.indexOf('docker') >= 0)
+      return { label: 'K8s Modernization',     sub: 's2rehost_p2_2', badge: 'K8S',   color: '#7c3aed' };
+    if (n.indexOf('load balancer') >= 0 || n.indexOf('network load') >= 0 ||
+        n.indexOf('gateway') >= 0 || n.indexOf('network infra') >= 0)
+      return { label: 'Infra Clone & Adapt',   sub: 's2rehost_p1',   badge: 'INFRA', color: '#0891b2' };
+    if (n.indexOf('storage') >= 0 || n.indexOf('volume') >= 0 ||
+        n.indexOf('nfs') >= 0 || n.indexOf('san') >= 0)
+      return { label: 'Volume Snapshot',       sub: 's2image',        badge: 'VOL',   color: '#d97706' };
+    return   { label: 'VM Snapshot',           sub: 's2image',        badge: 'VM',    color: '#2563eb' };
+  }
+
+  function fsmStatusKey(sysId, compName) {
+    return 'fsm_s_' + sysId + '_' + compName.replace(/\s+/g, '_');
+  }
+  function fsmGetStatus(sysId, compName) {
+    try { return localStorage.getItem(fsmStatusKey(sysId, compName)) || 'Pending'; } catch(e) { return 'Pending'; }
+  }
+  function fsmSetStatus(sysId, compName, status) {
+    try { localStorage.setItem(fsmStatusKey(sysId, compName), status); } catch(e) {}
+    fsmRenderPlan(_fsmSelId);
+    fsmUpdateStats();
+    var badge = document.getElementById('s2fullmig-status');
+    if (badge) {
+      badge.textContent = status === 'Migrated' ? 'Component Migrated' : 'In Progress';
+      badge.className = 'gov-status-badge ' + (status === 'Migrated' ? 'status-done' : 'status-pending');
+    }
+  }
+
+  function fsmLoadDemo() {
+    try {
+      var existing = [];
+      try { var d = localStorage.getItem('uatS1_systems'); if (d) existing = JSON.parse(d) || []; } catch(e2) {}
+      var hasDemo = false;
+      for (var i = 0; i < existing.length; i++) { if (existing[i].id === 'demo-bank-001') { hasDemo = true; break; } }
+      if (!hasDemo) existing = FSM_DEMO_DATA.concat(existing);
+      localStorage.setItem('uatS1_systems', JSON.stringify(existing));
+    } catch(e) {}
+    fsmRefresh();
+    setTimeout(function() { fsmSelectSystem('demo-bank-001'); }, 80);
+  }
+
+  function fsmSeedIfEmpty() {
+    try {
+      var d = localStorage.getItem('uatS1_systems');
+      var arr = d ? JSON.parse(d) : [];
+      if (!arr || !arr.length) fsmLoadDemo();
+      else fsmRefresh();
+    } catch(e) { fsmLoadDemo(); }
+    fsmInitEngines();
+  }
+
+  function fsmMarkAllMigrated() {
+    if (!_fsmSelId) return;
+    var systems = [];
+    try { var d = localStorage.getItem('uatS1_systems'); if (d) systems = JSON.parse(d) || []; } catch(e) {}
+    for (var i = 0; i < systems.length; i++) {
+      if (systems[i].id === _fsmSelId) {
+        var comps = systems[i].components || [];
+        for (var j = 0; j < comps.length; j++) {
+          try { localStorage.setItem(fsmStatusKey(_fsmSelId, comps[j].name), 'Migrated'); } catch(e2) {}
+        }
+        break;
+      }
+    }
+    fsmRenderPlan(_fsmSelId);
+    fsmUpdateStats();
+  }
+
+  function fsmMakeCell(text, style) {
+    var td = document.createElement('td');
+    if (style) td.style.cssText = style;
+    if (text !== undefined && text !== null) td.textContent = text;
+    return td;
+  }
+
+  function fsmRefresh() {
+    var systems = [];
+    try { var d = localStorage.getItem('uatS1_systems'); if (d) systems = JSON.parse(d) || []; } catch(e) {}
+    var grid  = document.getElementById('fsm-systems-grid');
+    var empty = document.getElementById('fsm-empty');
+    var badge = document.getElementById('fsm-sys-badge');
+    if (!grid) return;
+    if (badge) badge.textContent = systems.length;
+    grid.innerHTML = '';
+
+    if (!systems.length) {
+      if (empty) empty.style.display = '';
+      fsmUpdateStats([]);
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+
+    for (var si = 0; si < systems.length; si++) {
+      (function(sys) {
+        var critCol = { Critical: '#dc2626', High: '#f59e0b', Medium: '#2563eb', Low: '#16a34a' }[sys.criticality] || '#64748b';
+        var comps = sys.components || [];
+        var done = 0;
+        for (var ci = 0; ci < comps.length; ci++) {
+          if (fsmGetStatus(sys.id, comps[ci].name) === 'Migrated') done++;
+        }
+        var pct = comps.length ? Math.round(done / comps.length * 100) : 0;
+        var isSelected = _fsmSelId === sys.id;
+
+        // Build tool counts
+        var toolCounts = {}, toolColors = {};
+        for (var ti = 0; ti < comps.length; ti++) {
+          var t = fsmCompTool(comps[ti].name);
+          toolCounts[t.badge] = (toolCounts[t.badge] || 0) + 1;
+          toolColors[t.badge] = t.color;
+        }
+
+        var card = document.createElement('div');
+        card.setAttribute('data-sys-id', sys.id);
+        card.style.cssText = 'background:#1e293b;border:2px solid ' + (isSelected ? '#7dd3fc' : '#334155') + ';border-radius:12px;padding:14px;transition:border-color .15s;';
+        card.onmouseover = function() { this.style.borderColor = '#7dd3fc'; };
+        card.onmouseout  = function() { this.style.borderColor = _fsmSelId === sys.id ? '#7dd3fc' : '#334155'; };
+
+        // Header row
+        var hdr = document.createElement('div');
+        hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;';
+        var left = document.createElement('div');
+        left.style.cssText = 'display:flex;gap:10px;align-items:center;';
+        var avatar = document.createElement('div');
+        avatar.style.cssText = 'width:38px;height:38px;border-radius:8px;background:' + critCol + ';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;flex-shrink:0;';
+        avatar.textContent = sys.name.slice(0, 2).toUpperCase();
+        var info = document.createElement('div');
+        var nameDiv = document.createElement('div');
+        nameDiv.style.cssText = 'font-weight:700;color:#e2e8f0;font-size:14px;';
+        nameDiv.textContent = sys.name;
+        var metaDiv = document.createElement('div');
+        metaDiv.style.cssText = 'font-size:11px;color:#94a3b8;';
+        metaDiv.textContent = (sys.wave || 'Wave 1') + ' · ' + (sys.archetype || '') + ' · ' + comps.length + ' components';
+        info.appendChild(nameDiv);
+        info.appendChild(metaDiv);
+        left.appendChild(avatar);
+        left.appendChild(info);
+        var doneBadge = document.createElement('span');
+        doneBadge.style.cssText = 'font-size:11px;background:#0f172a;color:' + (done === comps.length && comps.length ? '#86efac' : '#fcd34d') + ';border-radius:10px;padding:2px 8px;white-space:nowrap;';
+        doneBadge.textContent = done + '/' + comps.length + ' done';
+        hdr.appendChild(left);
+        hdr.appendChild(doneBadge);
+        card.appendChild(hdr);
+
+        // Progress bar
+        var barWrap = document.createElement('div');
+        barWrap.style.cssText = 'height:4px;background:#1e3a5f;border-radius:2px;margin-bottom:8px;';
+        var barFill = document.createElement('div');
+        barFill.style.cssText = 'height:4px;border-radius:2px;background:' + (pct === 100 ? '#86efac' : '#3b82f6') + ';width:' + pct + '%;transition:width .3s;';
+        barWrap.appendChild(barFill);
+        card.appendChild(barWrap);
+
+        // Tool pills
+        var pillRow = document.createElement('div');
+        pillRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;';
+        for (var bk in toolCounts) {
+          var pill = document.createElement('span');
+          pill.style.cssText = 'font-size:10px;background:' + toolColors[bk] + '22;color:' + toolColors[bk] + ';border-radius:4px;padding:2px 6px;';
+          pill.textContent = bk + ' \xd7' + toolCounts[bk];
+          pillRow.appendChild(pill);
+        }
+        card.appendChild(pillRow);
+
+        // View plan button — use closure, no onclick string
+        var btn = document.createElement('button');
+        btn.className = 'gov-btn btn-save';
+        btn.style.cssText = 'width:100%;font-size:12px;padding:6px;';
+        btn.textContent = 'View Migration Plan';
+        (function(id) { btn.onclick = function() { fsmSelectSystem(id); }; })(sys.id);
+        card.appendChild(btn);
+
+        grid.appendChild(card);
+      })(systems[si]);
+    }
+    fsmUpdateStats(systems);
+  }
+
+  function fsmUpdateStats(systems) {
+    if (!systems) {
+      try { var d = localStorage.getItem('uatS1_systems'); systems = d ? JSON.parse(d) : []; } catch(e) { systems = []; }
+    }
+    var totalComp = 0, done = 0;
+    for (var i = 0; i < systems.length; i++) {
+      var comps = systems[i].components || [];
+      totalComp += comps.length;
+      for (var j = 0; j < comps.length; j++) {
+        if (fsmGetStatus(systems[i].id, comps[j].name) === 'Migrated') done++;
+      }
+    }
+    function st(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    st('fsm-stat-sys',     systems.length);
+    st('fsm-stat-comp',    totalComp);
+    st('fsm-stat-done',    done);
+    st('fsm-stat-pending', totalComp - done);
+  }
+
+  function fsmSelectSystem(sysId) {
+    _fsmSelId = sysId;
+    fsmRefresh();
+    fsmRenderPlan(sysId);
+    var badge = document.getElementById('s2fullmig-status');
+    if (badge) { badge.textContent = 'System Selected'; badge.className = 'gov-status-badge status-done'; }
+    var sec = document.getElementById('fsm-plan-section');
+    if (sec) { try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {} }
+  }
+
+  function fsmRenderPlan(sysId) {
+    var systems = [];
+    try { var d = localStorage.getItem('uatS1_systems'); if (d) systems = JSON.parse(d) || []; } catch(e) {}
+    var sys = null;
+    for (var i = 0; i < systems.length; i++) { if (systems[i].id === sysId) { sys = systems[i]; break; } }
+    var section = document.getElementById('fsm-plan-section');
+    if (!sys || !section) { if (section) section.style.display = 'none'; return; }
+    section.style.display = '';
+    var nameEl = document.getElementById('fsm-plan-name');
+    var waveEl = document.getElementById('fsm-plan-wave');
+    if (nameEl) nameEl.textContent = sys.name;
+    if (waveEl) waveEl.textContent = (sys.wave || 'Wave 1') + ' · ' + (sys.criticality || 'Critical');
+
+    var tbody = document.getElementById('fsm-plan-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    var comps = sys.components || [];
+    if (!comps.length) {
+      var emptyRow = document.createElement('tr');
+      var emptyTd  = document.createElement('td');
+      emptyTd.setAttribute('colspan', '5');
+      emptyTd.style.cssText = 'color:#64748b;font-style:italic;';
+      emptyTd.textContent = 'No components. Edit this system in Stage 1 Business System Ontology.';
+      emptyRow.appendChild(emptyTd);
+      tbody.appendChild(emptyRow);
+      return;
+    }
+
+    var sColors = { Migrated: '#86efac', 'In Progress': '#fcd34d', Failed: '#fca5a5', Pending: '#94a3b8' };
+
+    for (var ci = 0; ci < comps.length; ci++) {
+      (function(c) {
+        var tool   = fsmCompTool(c.name);
+        var status = fsmGetStatus(sysId, c.name);
+        var sCol   = sColors[status] || '#94a3b8';
+
+        var tr = document.createElement('tr');
+
+        // Name cell
+        var tdName = document.createElement('td');
+        var strong = document.createElement('strong');
+        strong.textContent = c.name;
+        tdName.appendChild(strong);
+        tr.appendChild(tdName);
+
+        // Kind badge cell
+        var tdKind = document.createElement('td');
+        var kindSpan = document.createElement('span');
+        kindSpan.style.cssText = 'font-size:11px;background:' + tool.color + '22;color:' + tool.color + ';border-radius:4px;padding:2px 7px;';
+        kindSpan.textContent = tool.badge;
+        tdKind.appendChild(kindSpan);
+        tr.appendChild(tdKind);
+
+        // Tool link cell
+        var tdTool = document.createElement('td');
+        var toolLink = document.createElement('a');
+        toolLink.href = '#';
+        toolLink.style.color = '#7dd3fc';
+        toolLink.textContent = tool.label;
+        (function(sub) { toolLink.onclick = function() { stage2OpenPath(sub); return false; }; })(tool.sub);
+        tdTool.appendChild(toolLink);
+        tr.appendChild(tdTool);
+
+        // Status cell
+        var tdStatus = document.createElement('td');
+        var statusSpan = document.createElement('span');
+        statusSpan.style.cssText = 'color:' + sCol + ';font-weight:600;';
+        statusSpan.textContent = status;
+        tdStatus.appendChild(statusSpan);
+        tr.appendChild(tdStatus);
+
+        // Action buttons cell — pure DOM, no onclick string escaping needed
+        var tdActions = document.createElement('td');
+        tdActions.style.cssText = 'display:flex;gap:3px;flex-wrap:wrap;';
+        var statuses = ['Pending', 'In Progress', 'Migrated', 'Failed'];
+        for (var si = 0; si < statuses.length; si++) {
+          (function(s) {
+            var active = status === s;
+            var btn = document.createElement('button');
+            btn.className = 'gov-btn';
+            btn.style.cssText = 'padding:3px 7px;font-size:10px;background:' + (active ? '#1e3a5f' : 'transparent') + ';border:1px solid ' + (active ? '#7dd3fc' : '#334155') + ';color:' + (active ? '#e2e8f0' : '#64748b') + ';border-radius:4px;';
+            btn.textContent = s;
+            (function(sid, cn, st) { btn.onclick = function() { fsmSetStatus(sid, cn, st); }; })(sysId, c.name, s);
+            tdActions.appendChild(btn);
+          })(statuses[si]);
+        }
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      })(comps[ci]);
+    }
+  }
+
+
+  var _fsmEngineLoaded = {};
+  var _fsmEngineUrls = {
+    vm:    '/image_migrator/',
+    vol:   '/image_migrator/?mode=volume',
+    db:    '/agent1/',
+    infra: '/designer/?source=ospc'
+  };
+
+  function fsmShowEngine(engine) {
+    // Switch tab highlight
+    var tabs = document.querySelectorAll('.fsm-etab');
+    for (var i = 0; i < tabs.length; i++) {
+      var id = tabs[i].id;
+      var isActive = id === 'fsm-etab-' + engine;
+      tabs[i].style.background    = isActive ? '#1e3a5f' : '#0f172a';
+      tabs[i].style.color         = isActive ? '#7dd3fc' : '#64748b';
+      tabs[i].style.borderBottom  = isActive ? '2px solid #7dd3fc' : '2px solid transparent';
+    }
+    // Show/hide engine panels
+    var panels = ['vm', 'vol', 'db', 'infra'];
+    for (var pi = 0; pi < panels.length; pi++) {
+      var panel = document.getElementById('fsm-engine-' + panels[pi]);
+      if (panel) panel.style.display = panels[pi] === engine ? '' : 'none';
+    }
+    // Lazy-load iframe on first open
+    if (!_fsmEngineLoaded[engine]) {
+      var iframe = document.getElementById('fsm-iframe-' + engine);
+      if (iframe && _fsmEngineUrls[engine]) {
+        iframe.src = _fsmEngineUrls[engine];
+        _fsmEngineLoaded[engine] = true;
+      }
+    }
+    // Scroll engine section into view
+    var sec = document.getElementById('fsm-engines-section');
+    if (sec) { try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {} }
+  }
+
+  // Load VM engine immediately when FSM pane activates (first touch)
+  function fsmInitEngines() {
+    if (!_fsmEngineLoaded['vm']) {
+      var iframe = document.getElementById('fsm-iframe-vm');
+      if (iframe) { iframe.src = _fsmEngineUrls['vm']; _fsmEngineLoaded['vm'] = true; }
+    }
+  }
+
+  function fsmGoToOntology() {
+    if (typeof activateStage === 'function') activateStage('s1');
+    var btns = document.querySelectorAll('#subBar1 .sub-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-sub') === 's1business_ontology');
+    }
+    if (typeof activateSub === 'function' && typeof s1Panes !== 'undefined') {
+      activateSub(s1Panes, 's1business_ontology');
+    }
+  }
+
+  // Auto-seed demo + refresh when FSM pane activates
+  (function() {
+    var _orig = window.activateSub;
+    if (typeof _orig === 'function') {
+      window.activateSub = function(panes, id) {
+        _orig(panes, id);
+        if (id === 's2fullmig') setTimeout(fsmSeedIfEmpty, 80);
+      };
+    }
+  })();
 
   function s03dInit() {
     if (_s03d_inited) return;

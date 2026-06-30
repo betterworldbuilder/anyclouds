@@ -23,8 +23,6 @@ echo " Starting OSPC to FLEX Migration Dashboard "
 echo "================================================"
 
 echo "-> Cleaning up previous background instances..."
-pkill -f "python3 app.py" 2>/dev/null || true
-fuser -k 5001/tcp >/dev/null 2>&1 || true
 fuser -k 5005/tcp >/dev/null 2>&1 || true
 sleep 1
 
@@ -44,10 +42,16 @@ if ! python3 -B -m py_compile app.py; then
     exit 1
 fi
 
-# Start the Flask app in the background
-echo "-> Starting Flask application..."
-python3 app.py &> "$SCRIPT_DIR/dashboard.log" &
-APP_PID=$!
+# Start Flask via systemd user service (keeps it alive across sessions, no port conflicts)
+echo "-> Starting Flask application (via systemd user service)..."
+if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
+    systemctl --user restart osflex-dashboard
+    APP_PID=$(systemctl --user show osflex-dashboard --value --property MainPID 2>/dev/null || echo "")
+else
+    # Fallback: direct launch if service not installed
+    python3 app.py &>> "$SCRIPT_DIR/dashboard.log" &
+    APP_PID=$!
+fi
 
 # Serve the FLEX cloud mockup HTML on its own lightweight local port.
 MOCKUP_HTML="$SCRIPT_DIR/Flex-Skyline-New-Ui.html"
@@ -64,7 +68,13 @@ fi
 echo "-> Waiting for server to initialize (up to 30s)..."
 for i in $(seq 1 30); do
     sleep 1
-    if ! kill -0 "$APP_PID" 2>/dev/null; then
+    # Check via systemd if managed, else check PID directly
+    if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
+        if ! systemctl --user is-active --quiet osflex-dashboard; then
+            echo "ERROR: Flask service failed. Check: journalctl --user -u osflex-dashboard -n 30"
+            exit 1
+        fi
+    elif ! kill -0 "$APP_PID" 2>/dev/null; then
         echo "ERROR: Flask app exited unexpectedly. Check $SCRIPT_DIR/dashboard.log for details."
         cat "$SCRIPT_DIR/dashboard.log" | tail -20
         exit 1
@@ -115,5 +125,11 @@ echo " Logs: $SCRIPT_DIR/dashboard.log"
 [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup logs: $MOCKUP_LOG"
 echo "================================================"
 
-trap "echo 'Shutting down dashboard...'; kill $APP_PID 2>/dev/null; [[ -n \"$MOCKUP_PID\" ]] && kill $MOCKUP_PID 2>/dev/null; exit 0" SIGINT SIGTERM
-wait $APP_PID
+trap "echo 'Shutting down dashboard...'; [[ -n \"$MOCKUP_PID\" ]] && kill \$MOCKUP_PID 2>/dev/null; exit 0" SIGINT SIGTERM
+# If using systemd service, just wait in the foreground (service manages Flask)
+if systemctl --user is-enabled osflex-dashboard >/dev/null 2>&1; then
+    echo "(Flask managed by systemd — ctrl+C to exit this script, Flask stays running)"
+    wait
+else
+    wait $APP_PID
+fi
