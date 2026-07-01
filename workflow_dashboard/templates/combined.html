@@ -577,18 +577,42 @@
     .s0-dawn-title-word {
       display:inline-block;
       margin-right:6px;
+      font-size:1.2em;
+      animation-duration:6s;
+      animation-iteration-count:infinite;
+      animation-timing-function:ease-in-out;
     }
     .s0-title-why {
       color:#ffffff;
+      animation-name:s0-title-glow-why;
     }
     .s0-title-who {
       color:#facc15;
+      animation-name:s0-title-glow-who;
     }
     .s0-title-what {
       color:#f87171;
+      animation-name:s0-title-glow-what;
     }
     .s0-title-when {
-      color:#86efac;
+      color:#22c55e;
+      animation-name:s0-title-glow-when;
+    }
+    @keyframes s0-title-glow-why {
+      0%, 13%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
+      18%, 78%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
+    }
+    @keyframes s0-title-glow-who {
+      0%, 18%, 38%, 78%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
+      23%, 33%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
+    }
+    @keyframes s0-title-glow-what {
+      0%, 38%, 58%, 78%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
+      43%, 53%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
+    }
+    @keyframes s0-title-glow-when {
+      0%, 58%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
+      63%, 78%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
     }
     .s0-dawn-title-highlight {
       display:inline-block;
@@ -1996,16 +2020,21 @@
             </div>
           </div>
           <p style="color:#0c4a6e;line-height:1.7;font-size:15px;margin:0 0 18px;">Any Cloud or Legacy infra to Flex migration is not just a Migration — it's a <strong>Business Modernization Journey</strong>, with better <strong>Performances</strong>, <strong>Flexibility</strong>, <strong>Resiliency</strong> and <strong>Services</strong> for your Business and your Customers.</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
-            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
-              <div style="font-size:22px;margin-bottom:8px;">&#127919;</div>
-              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">Who should move?</strong>
-              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Customers with critical workloads on any Infrastructure needing performance, flexibility, cost control, and a future-ready platform.</p>
-            </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;">
             <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
               <div style="font-size:22px;margin-bottom:8px;">&#128161;</div>
               <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">Why move?</strong>
-              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Modern infrastructure, better scalability, lower long-term TCO, and a safer path toward AI, Kubernetes, and hybrid cloud.</p>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Lower TCO, stronger performance, less operational drag, and a safer path to modern digital growth.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
+              <div style="font-size:22px;margin-bottom:8px;">&#127919;</div>
+              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">Who should move?</strong>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Customers with critical workloads needing performance, flexibility, cost control, and a future-ready platform.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
+              <div style="font-size:22px;margin-bottom:8px;">&#9889;</div>
+              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">What moves?</strong>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Business systems, apps, databases, images, networks, security rules, and operating patterns move into FLEX.</p>
             </div>
             <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
               <div style="font-size:22px;margin-bottom:8px;">&#9200;</div>
@@ -2016,7 +2045,7 @@
         </div>
 
         <!-- WHO -->
-        <div style="background:#ffffff;border-radius:16px;border:1px solid #dcfce7;border-top:4px solid #16a34a;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+        <div style="order:20;background:#ffffff;border-radius:16px;border:1px solid #dcfce7;border-top:4px solid #16a34a;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
             <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#127919;</div>
             <div>
@@ -2061,7 +2090,7 @@
         </div>
 
         <!-- WHY -->
-        <div style="background:#ffffff;border-radius:16px;border:1px solid #fef3c7;border-top:4px solid #d97706;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+        <div style="order:10;background:#ffffff;border-radius:16px;border:1px solid #fef3c7;border-top:4px solid #d97706;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
             <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#d97706,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128161;</div>
             <div>
@@ -2134,7 +2163,7 @@
         </div>
 
         <!-- ── REAL DASHBOARD PREVIEWS — TCO & CUTOVER ── -->
-        <div style="background:#f1f5f9;border-top:2px solid #e2e8f0;margin-top:40px;padding:44px 0 4px;">
+        <div style="order:45;background:#f1f5f9;border-top:2px solid #e2e8f0;margin-top:40px;padding:44px 0 4px;">
           <div style="text-align:center;margin-bottom:32px;">
             <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">&#128200; BUILT-IN LIVE DASHBOARDS</div>
             <h2 style="font-size:24px;font-weight:900;color:#1e293b;margin:0 0 10px;">See the Gains In Action</h2>
@@ -2253,8 +2282,74 @@
         </div>
 
 
+        <!-- WHAT -->
+        <div style="order:30;background:#ffffff;border-radius:16px;border:1px solid #fecdd3;border-top:4px solid #f43f5e;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#e11d48,#fb7185);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#9889;</div>
+            <div>
+              <h2 style="color:#881337;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">What Moves to FLEX?</h2>
+              <p style="color:#fb7185;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Modernization Scope</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 18px;">FLEX is not just a landing zone for virtual machines. It is the next operating foundation for the business systems, application patterns, data services, network controls, security posture, and automation practices that keep customers running.</p>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:18px;">
+            <div style="background:linear-gradient(160deg,#fff1f2,#ffe4e6);border:1px solid #fecdd3;border-radius:14px;padding:18px 20px;">
+              <h3 style="color:#9f1239;font-size:15px;font-weight:800;margin:0 0 12px;">Move the Workloads That Matter</h3>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;">
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Business Systems</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">ERP, CRM, commerce, portals, batch jobs, and internal apps.</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Application Tiers</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">Web, API, middleware, worker, and integration services.</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Data Foundations</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">Databases, file services, object patterns, backups, and sync plans.</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Cloud Controls</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">Images, flavors, networks, security groups, IPs, and access models.</span>
+                </div>
+              </div>
+            </div>
+            <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;padding:18px 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08);">
+              <div style="font-size:10px;font-weight:800;color:#fda4af;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Outcome</div>
+              <h3 style="color:#f8fafc;font-size:17px;font-weight:900;margin:0 0 10px;">A cleaner, faster, future-ready platform.</h3>
+              <p style="color:#cbd5e1;font-size:13px;line-height:1.65;margin:0 0 14px;">The migration captures what exists, maps what must change, and lands each workload on FLEX with the right sizing, network design, governance, and validation.</p>
+              <div style="display:grid;gap:8px;">
+                <div style="display:flex;gap:9px;align-items:flex-start;color:#e2e8f0;font-size:12px;line-height:1.45;"><span style="color:#fb7185;font-weight:900;">01</span><span>Discover application dependency and business criticality.</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start;color:#e2e8f0;font-size:12px;line-height:1.45;"><span style="color:#fb7185;font-weight:900;">02</span><span>Map compute, storage, network, security, and cutover requirements.</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start;color:#e2e8f0;font-size:12px;line-height:1.45;"><span style="color:#fb7185;font-weight:900;">03</span><span>Validate performance, resiliency, access, and rollback readiness.</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:16px;">
+            <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:800;color:#be123c;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">From</div>
+              <p style="color:#475569;font-size:13px;line-height:1.55;margin:0;">Legacy OSPC patterns, aging images, fixed designs, manual runbooks, and infrastructure constraints.</p>
+            </div>
+            <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:800;color:#c2410c;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Through</div>
+              <p style="color:#475569;font-size:13px;line-height:1.55;margin:0;">Discovery, assessment, right-sizing, migration waves, UAT, staged cutover, and rollback planning.</p>
+            </div>
+            <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">To</div>
+              <p style="color:#475569;font-size:13px;line-height:1.55;margin:0;">Modern OpenStack services, better economics, stronger automation, and a cloud foundation ready for AI and Kubernetes.</p>
+            </div>
+          </div>
+
+          <div style="background:#fff1f2;border-left:3px solid #f43f5e;border-radius:0 8px 8px 0;padding:12px 16px;">
+            <p style="color:#9f1239;font-size:13px;margin:0;font-style:italic;line-height:1.6;">The WHAT is the customer’s complete operating footprint: the workloads, data, controls, and confidence needed to keep the business moving while the platform becomes stronger.</p>
+          </div>
+        </div>
+
+
         <!-- WHEN -->
-        <div style="background:#ffffff;border-radius:16px;border:1px solid #dbeafe;border-top:4px solid #2563eb;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+        <div style="order:40;background:#ffffff;border-radius:16px;border:1px solid #dbeafe;border-top:4px solid #2563eb;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
             <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#9200;</div>
             <div>
@@ -2364,7 +2459,7 @@
         </div>
 
         <!-- OSPC vs FLEX Services table (moved to bottom) -->
-        <div style="margin-top:40px;padding:0 0 8px;">
+        <div style="order:50;margin-top:40px;padding:0 0 8px;">
           <!-- OSPC vs FLEX Services table -->
           <div style="margin-bottom:28px;">
             <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;padding-top:4px;">OpenStack Service Compatibility</h3>
