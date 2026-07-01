@@ -4,6 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Visual OpenStack FLEX Topology Builder and Deployer</title>
+  <script>
+    if (new URLSearchParams(window.location.search).get('embed') === 'fullwidth') {
+      document.documentElement.classList.add('designer-embed-fullwidth');
+    }
+  </script>
   <style>
     :root {
       --bg: #233a6b;
@@ -547,6 +552,34 @@
       min-height: 0;
       max-height: none;
       height: 100%;
+    }
+
+    html.designer-embed-fullwidth body {
+      width: 100%;
+      overflow-x: hidden;
+    }
+
+    html.designer-embed-fullwidth header {
+      padding: 10px 12px;
+    }
+
+    html.designer-embed-fullwidth header > div {
+      max-width: none !important;
+      margin: 8px 0 0 !important;
+    }
+
+    html.designer-embed-fullwidth .layout {
+      width: 100%;
+      max-width: none;
+      padding: 6px;
+    }
+
+    html.designer-embed-fullwidth .top-grid {
+      grid-template-columns: 240px minmax(0, 1fr) 320px;
+    }
+
+    html.designer-embed-fullwidth .bottom-grid {
+      grid-template-columns: repeat(4, minmax(260px, 1fr));
     }
 
     @media (max-width: 1200px) {

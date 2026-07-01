@@ -3485,6 +3485,11 @@ def index():
     return render_template("combined.html", cache_bust=_CACHE_BUST)
 
 
+@app.get("/business-system-template-das/")
+def business_system_template_das():
+    return send_from_directory(str(BASE_DIR), "businesstemplates.html")
+
+
 @app.get("/run/")
 def run_ui():
     return render_template("index.html", scanner_mode="ospc")
@@ -10978,15 +10983,18 @@ def run_image_migrator():
         import re as _re
         label_raw = str(req.get('snapshot_name') or req.get('server_name') or _snapshot_id_for_linux).strip()
         label_safe = _re.sub(r'[^A-Za-z0-9._-]+', '_', label_raw).strip('_') or "linux-snapshot"
-        local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_linux_snap_migrate.sh")
-        local_repair_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_offline_repair.sh")
-        local_centos_bridge = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_centos_repair.py")
+        local_script = str(BASE_DIR / "working script" / "ospc2flex_linux_snap_migrate.sh")
+        local_repair_script = str(BASE_DIR / "working script" / "ospc2flex_offline_repair.sh")
+        local_centos_bridge = str(BASE_DIR / "working script" / "ospc2flex_centos_repair.py")
         local_centos_module = str(BASE_DIR / "migration" / "os_repair" / "centos_repair.py")
         if not os.path.isfile(local_script):
             return jsonify({"error": f"ospc2flex_linux_snap_migrate.sh not found at {local_script}"}), 500
         for _required in (local_repair_script, local_centos_bridge, local_centos_module):
             if not os.path.isfile(_required):
                 return jsonify({"error": f"Linux snapshot helper not found at {_required}"}), 500
+        for _required in (local_script, local_repair_script, local_centos_bridge, local_centos_module):
+            if os.path.getsize(_required) <= 0:
+                return jsonify({"error": f"Linux snapshot helper is empty or invalid: {_required}"}), 500
 
         ssh_key_raw = (req.get('process_ssh_key') or req.get('ssh_key_path') or '~/.ssh/id_rsa').strip()
         if ssh_key_raw.startswith('/.ssh/'):
@@ -11067,6 +11075,28 @@ def run_image_migrator():
                         _linsnap_time.sleep(wait)
                 raise RuntimeError(str(last))
 
+            def _file_sha256(path):
+                h = _hashlib.sha256()
+                with open(path, "rb") as fh:
+                    for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                        h.update(chunk)
+                return h.hexdigest()
+
+            def _verify_remote_sha256(label, local_path, remote_path):
+                local_hash = _file_sha256(local_path)
+                remote_cmd = (
+                    f"test -s {_shlex.quote(remote_path)} && "
+                    f"sha256sum {_shlex.quote(remote_path)} | awk '{{print $1}}'"
+                )
+                proc = _run(label, ssh_base + [remote_cmd], timeout=60)
+                remote_hash = (proc.stdout or "").strip().splitlines()[-1:] or [""]
+                remote_hash = remote_hash[0].strip()
+                if remote_hash != local_hash:
+                    raise RuntimeError(
+                        f"{label} checksum mismatch local={local_hash} remote={remote_hash or 'missing'} path={remote_path}"
+                    )
+                yield f"data: [LINSNAP] Verified jumphost script current: {remote_path} sha256={local_hash[:12]}\n\n"
+
             try:
                 os_type = str(req.get('os_type') or req.get('os_type_override') or '').strip()
                 if os_type.lower() == 'alma':
@@ -11098,11 +11128,11 @@ def run_image_migrator():
                     f"OSPC2FLEX_JUMPHOST_IP={_shlex.quote(process_ip)} "
                     "OSPC2FLEX_LINUX_SNAP_SKIP_REPAIRED=0 "
                     "OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 "
-                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=1 "
+                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 "
                     "OSPC2FLEX_RETRY_FAILED_CF_EXPORT=1 "
-                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=7200 "
+                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=1800 "
                     "OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB=75 "
-                    "OSPC2FLEX_CINDER_CREATE_ATTEMPTS=3 "
+                    "OSPC2FLEX_CINDER_CREATE_ATTEMPTS=1 "
                     "OSPC2FLEX_CINDER_CREATE_RETRY_WAIT=45 "
                     "OSPC2FLEX_LIVE_ORIGIN_FALLBACK=1"
                 )
@@ -11231,6 +11261,11 @@ def run_image_migrator():
                     ],
                     timeout=60,
                 )
+                yield from _verify_remote_sha256("linux snapshot script verify", local_script, remote_script)
+                yield from _verify_remote_sha256("linux snapshot job script verify", local_script, remote_job_script)
+                yield from _verify_remote_sha256("offline repair script verify", local_repair_script, "/tmp/ospc2flex_offline_repair.sh")
+                yield from _verify_remote_sha256("centos repair bridge verify", local_centos_bridge, "/tmp/ospc2flex_centos_repair.py")
+                yield from _verify_remote_sha256("centos repair module verify", local_centos_module, "/tmp/migration/os_repair/centos_repair.py")
                 yield "data: [LINSNAP] Scripts and OpenRC files staged on jumphost.\n\n"
 
                 remote_cmd = f"{remote_env} {' '.join(_shlex.quote(x) for x in lcmd)}"
@@ -11271,6 +11306,73 @@ def run_image_migrator():
                     if "__LINSNAP_LOG__" in text:
                         return "log", text
                     return "unknown", text
+                def _follow_remote_linsnap_until_done(start_line=1):
+                    next_line = max(1, int(start_line or 1))
+                    empty_polls = 0
+                    while True:
+                        poll_cmd = (
+                            f"if [ -f {_shlex.quote(remote_log)} ]; then "
+                            f"total=$(wc -l < {_shlex.quote(remote_log)} 2>/dev/null || echo 0); "
+                            f"if [ \"$total\" -ge {next_line} ]; then sed -n '{next_line},'\"$total\"'p' {_shlex.quote(remote_log)}; fi; "
+                            "echo __LINSNAP_LINECOUNT__:$total; "
+                            "else echo __LINSNAP_LINECOUNT__:0; fi; "
+                            f"if pgrep -af -- {_shlex.quote(remote_job_script)} | grep -v 'pgrep -af' >/dev/null; "
+                            "then echo __LINSNAP_STILL_RUNNING__; else echo __LINSNAP_NOT_RUNNING__; fi"
+                        )
+                        try:
+                            poll = subprocess.run(
+                                ssh_base + [poll_cmd],
+                                check=False,
+                                timeout=45,
+                                capture_output=True,
+                                text=True,
+                            )
+                            text = ((poll.stdout or "") + "\n" + (poll.stderr or "")).strip()
+                        except Exception as poll_exc:
+                            empty_polls += 1
+                            yield f"data: [LINSNAP] remote log follow delayed: {poll_exc}; next_check=30s\n\n"
+                            _linsnap_time.sleep(30)
+                            continue
+                        still_running = "__LINSNAP_STILL_RUNNING__" in text
+                        new_total = None
+                        new_lines = []
+                        for raw in text.splitlines():
+                            if raw.startswith("__LINSNAP_LINECOUNT__:"):
+                                try:
+                                    new_total = int(raw.split(":", 1)[1].strip() or "0")
+                                except Exception:
+                                    new_total = None
+                                continue
+                            if raw in ("__LINSNAP_STILL_RUNNING__", "__LINSNAP_NOT_RUNNING__"):
+                                continue
+                            if raw:
+                                new_lines.append(raw)
+                        if new_total is not None:
+                            next_line = max(next_line, new_total + 1)
+                        if new_lines:
+                            empty_polls = 0
+                            for raw in new_lines:
+                                yield f"data: {raw}\n\n"
+                        else:
+                            empty_polls += 1
+                            if still_running and empty_polls % 3 == 0:
+                                yield "data: [LINSNAP] remote job still running; waiting for new Cinder/download progress...\n\n"
+                        if not still_running:
+                            break
+                        _linsnap_time.sleep(20)
+                    remote_state, remote_text = _remote_linsnap_after_stream_exit()
+                    if remote_state == "success":
+                        yield "data: [LINSNAP] Remote log confirms migration completed successfully.\n\n"
+                        return 0
+                    if remote_state == "failed":
+                        tail_excerpt = "\n".join((remote_text or "").splitlines()[-30:])
+                        if tail_excerpt:
+                            yield f"data: [LINSNAP] Remote job failed; latest remote log excerpt:\n{tail_excerpt}\n\n"
+                        return 1
+                    tail_excerpt = "\n".join((remote_text or "").splitlines()[-20:])
+                    if tail_excerpt:
+                        yield f"data: [LINSNAP] Remote job finished without a clear success marker; latest remote text:\n{tail_excerpt}\n\n"
+                    return 1
                 process = subprocess.Popen(
                     ssh_base + [remote_run],
                     stdout=subprocess.PIPE,
@@ -11283,9 +11385,11 @@ def run_image_migrator():
                 ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[label_safe] = process
                 with ACTIVE_MIGRATOR_LAUNCH_LOCK:
                     ACTIVE_MIGRATOR_LAUNCHING_LABELS.discard(label_safe)
+                streamed_remote_lines = 0
                 for line in iter(process.stdout.readline, ''):
                     if not line:
                         break
+                    streamed_remote_lines += 1
                     yield f"data: {line.rstrip()}\n\n"
                 process.wait()
                 ACTIVE_MIGRATOR_PROCESSES.discard(process)
@@ -11296,10 +11400,9 @@ def run_image_migrator():
                     if remote_state == "running":
                         yield (
                             "data: [LINSNAP] Dashboard SSH log stream exited, but the nohup-protected "
-                            f"remote migration is still running on {ssh_usr}@{process_ip}; keeping UI status non-error. "
-                            f"Reconnect or inspect {remote_log} for live progress.\n\n"
+                            f"remote migration is still running on {ssh_usr}@{process_ip}; re-attaching to {remote_log}.\n\n"
                         )
-                        effective_rc = 0
+                        effective_rc = yield from _follow_remote_linsnap_until_done(streamed_remote_lines + 1)
                     elif remote_state == "success":
                         yield "data: [LINSNAP] Remote log confirms migration completed successfully after stream exit.\n\n"
                         effective_rc = 0
@@ -17478,10 +17581,13 @@ def agent1_run_discovery():
         if scan_result:
             servers_raw   = scan_result.get("servers", [])
             databases_raw = scan_result.get("databases", [])
+            image_snapshots_raw = scan_result.get("image_snapshots", [])
+            db_snapshots_raw = scan_result.get("db_snapshots", [])
+            load_balancers_raw = scan_result.get("load_balancers", [])
             log("[SUCCESS] Authenticated successfully.")
             log("[INFO] Scanning OSPC Tenancy for Compute Instances (Nova)...")
             time.sleep(0.5)
-            log(f"[SUCCESS] Found {len(servers_raw)} Managed Instances and {len(databases_raw)} Databases.")
+            log(f"[SUCCESS] Found {len(servers_raw)} Managed Instances, {len(image_snapshots_raw)} server snapshots, {len(databases_raw)} databases, {len(db_snapshots_raw)} DB snapshots, and {len(load_balancers_raw)} load balancers.")
         else:
             # Hard failure — no CSV fallback. User must fix credentials.
             if not (ospc_user and ospc_key and ospc_tenant):
@@ -17535,13 +17641,60 @@ def agent1_run_discovery():
                 "ram": "—", "disk": "—", "replicas": "—"
             })
 
+        image_snapshots = []
+        for snap in image_snapshots_raw:
+            image_snapshots.append({
+                "name": snap.get("name", "?"),
+                "id": snap.get("id", ""),
+                "status": snap.get("status", "UNKNOWN"),
+                "created": snap.get("created", ""),
+                "server_id": snap.get("server_id", ""),
+                "os": snap.get("os_label", ""),
+                "os_type": snap.get("os_type", ""),
+                "os_distro": snap.get("os_distro", ""),
+                "os_version": snap.get("os_version", ""),
+                "region": snap.get("region", ospc_region),
+            })
+
+        db_snapshots = []
+        for snap in db_snapshots_raw:
+            db_snapshots.append({
+                "name": snap.get("name", "?"),
+                "id": snap.get("id", ""),
+                "status": snap.get("status", "UNKNOWN"),
+                "created": snap.get("created", ""),
+                "parent": snap.get("parent", ""),
+                "parent_id": snap.get("parent_id", ""),
+                "engine": snap.get("engine", ""),
+                "region": snap.get("region", ospc_region),
+            })
+
+        load_balancers = []
+        for lb in load_balancers_raw:
+            load_balancers.append({
+                "name": lb.get("name", "?"),
+                "id": lb.get("id", ""),
+                "vip": lb.get("vip", ""),
+                "protocol": lb.get("protocol", "TCP"),
+                "port": lb.get("port", ""),
+                "members": lb.get("members", "—"),
+                "status": lb.get("status", "ACTIVE"),
+                "region": lb.get("region", ospc_region),
+            })
+
         topology = {
             "nodes": topology_nodes,
             "networks": [
                 {"name": "OSPC-ServiceNet", "cidr": "10.176.0.0/16", "subnet": "ServiceNet", "gateway": "—"},
                 {"name": "OSPC-PublicNet",  "cidr": "0.0.0.0/0",     "subnet": "PublicNet",  "gateway": "—"}
             ],
-            "volumes": [], "databases": db_nodes, "backups": [], "security_groups": []
+            "volumes": [],
+            "image_snapshots": image_snapshots,
+            "databases": db_nodes,
+            "db_snapshots": db_snapshots,
+            "load_balancers": load_balancers,
+            "backups": db_snapshots,
+            "security_groups": []
         }
 
         with open("ospc-discovery/outputs/topology.json", "w") as jf:

@@ -102,7 +102,7 @@ except Exception as e:
     sys.exit(1)
 
 # ── Step 2: Resolve endpoints ─────────────────────────────────────────────────
-nova_url = trove_url = None
+nova_url = trove_url = lb_url = None
 for svc in auth["access"]["serviceCatalog"]:
     stype = svc.get("type", "")
     for ep in svc.get("endpoints", []):
@@ -113,6 +113,8 @@ for svc in auth["access"]["serviceCatalog"]:
             nova_url = pub
         if stype in ("rax:database", "database") and not trove_url:
             trove_url = pub
+        if stype in ("rax:load-balancer", "load-balancer", "rax:loadbalancer") and not lb_url:
+            lb_url = pub
 
 if not nova_url:
     print(json.dumps({"error": f"No Nova endpoint for region {REGION}"}))
@@ -142,6 +144,41 @@ try:
             image_cache[img["id"]] = img
 except Exception:
     pass
+
+image_snapshots = []
+for img in image_cache.values():
+    meta = img.get("metadata") or img.get("properties") or {}
+    name = img.get("name", "") or img.get("originalName", "")
+    status = img.get("status", "")
+    img_type = str(meta.get("image_type") or meta.get("org.openstack__1__image_type") or "").lower()
+    server_ref = meta.get("instance_uuid") or meta.get("server_id") or meta.get("base_image_ref") or ""
+    likely_snapshot = (
+        img_type == "snapshot"
+        or bool(server_ref)
+        or "snapshot" in name.lower()
+        or "snap" in name.lower()
+    )
+    if not likely_snapshot:
+        continue
+    os_type, os_distro, os_version = guess_os(" ".join([
+        name,
+        str(meta.get("os_type", "")),
+        str(meta.get("os_distro", "")),
+        str(meta.get("os_version", "")),
+    ]))
+    image_snapshots.append({
+        "name": name or img.get("id", ""),
+        "id": img.get("id", ""),
+        "status": status or "UNKNOWN",
+        "created": img.get("created") or img.get("created_at") or "",
+        "server_id": server_ref,
+        "os_type": meta.get("os_type") or os_type,
+        "os_distro": meta.get("os_distro") or os_distro,
+        "os_version": meta.get("os_version") or os_version,
+        "os_label": make_label(meta.get("os_type") or os_type, meta.get("os_distro") or os_distro, meta.get("os_version") or os_version),
+        "service_type": "server_image_snapshot",
+        "region": REGION,
+    })
 
 
 def get_image(image_id):
@@ -227,6 +264,7 @@ for s in all_servers:
 
 # ── Step 6: Fetch databases (Trove) ──────────────────────────────────────────
 databases = []
+db_snapshots = []
 if trove_url:
     try:
         for db in curl_get(f"{trove_url}/instances", token).get("instances", []):
@@ -251,12 +289,61 @@ if trove_url:
             })
     except Exception:
         pass
+    for backup_path in ("backups", "backups/detail"):
+        try:
+            backups_payload = curl_get(f"{trove_url}/{backup_path}", token)
+            for b in backups_payload.get("backups", []):
+                inst = b.get("instance") or {}
+                db_snapshots.append({
+                    "name": b.get("name") or b.get("id", ""),
+                    "id": b.get("id", ""),
+                    "status": b.get("status", "UNKNOWN"),
+                    "created": b.get("created") or b.get("created_at") or b.get("updated", ""),
+                    "parent": inst.get("name", "") if isinstance(inst, dict) else "",
+                    "parent_id": inst.get("id", "") if isinstance(inst, dict) else "",
+                    "engine": b.get("datastore", {}).get("type", "") if isinstance(b.get("datastore"), dict) else "",
+                    "service_type": "database_snapshot",
+                    "region": REGION,
+                })
+            if db_snapshots:
+                break
+        except Exception:
+            continue
+
+load_balancers = []
+if lb_url:
+    try:
+        lbs_payload = curl_get(f"{lb_url}/loadbalancers", token)
+        for lb in lbs_payload.get("loadBalancers", lbs_payload.get("loadbalancers", [])):
+            vip = lb.get("virtualIps") or lb.get("virtual_ips") or []
+            vip_addr = ""
+            if isinstance(vip, list) and vip:
+                vip_addr = vip[0].get("address", "") or vip[0].get("ip", "")
+            load_balancers.append({
+                "name": lb.get("name") or lb.get("id", ""),
+                "id": lb.get("id", ""),
+                "vip": vip_addr or lb.get("vip", "") or lb.get("address", ""),
+                "protocol": lb.get("protocol", "TCP"),
+                "port": lb.get("port") or lb.get("protocolPort") or "",
+                "status": lb.get("status", "UNKNOWN"),
+                "members": len(lb.get("nodes", []) or lb.get("members", []) or []),
+                "service_type": "load_balancer",
+                "region": REGION,
+            })
+    except Exception:
+        pass
 
 # ── Output ────────────────────────────────────────────────────────────────────
 print(json.dumps({
-    "servers":   servers,
-    "databases": databases,
-    "count":     len(servers),
-    "db_count":  len(databases),
-    "region":    REGION,
+    "servers":         servers,
+    "image_snapshots": image_snapshots,
+    "databases":       databases,
+    "db_snapshots":    db_snapshots,
+    "load_balancers":  load_balancers,
+    "count":           len(servers),
+    "snapshot_count":  len(image_snapshots),
+    "db_count":        len(databases),
+    "db_snapshot_count": len(db_snapshots),
+    "lb_count":        len(load_balancers),
+    "region":          REGION,
 }))

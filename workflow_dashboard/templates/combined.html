@@ -468,6 +468,7 @@
     #panel-s0 { width: 100%; max-width: 100%; }
     #panel-s_why { width: 100%; max-width: 100%; }
     #panel-s_tour { width: 100%; max-width: 100%; }
+    #panel-s2 { width: 100%; max-width: 100%; }
     #panel-s5, #panel-s5b { width: 100% !important; max-width: 100% !important; }
     /* Skyline theme: white instead of grey everywhere */
     body.flex-skyline-mode .panel-area { background: #ffffff !important; }
@@ -916,6 +917,67 @@
     .gov-table { width: 100%; border-collapse: collapse; font-size: 12px; }
     .gov-table th { text-align: left; padding: 8px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; }
     .gov-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .gov-table tr.fsm-component-row-pending > td {
+      background: #e0f7ff !important;
+      border-bottom-color: #bae6fd !important;
+    }
+    .gov-table tr.fsm-component-row-selected > td {
+      background: #dcfce7 !important;
+      border-bottom-color: #86efac !important;
+    }
+    .gov-table tr.fsm-component-row > td {
+      height: 46px !important;
+      min-height: 46px !important;
+      vertical-align: middle !important;
+      box-sizing: border-box !important;
+    }
+    .gov-table tr.fsm-component-row-pending > td:first-child {
+      border-left: 4px solid #38bdf8 !important;
+    }
+    .gov-table tr.fsm-component-row-selected > td:first-child {
+      border-left: 4px solid #22c55e !important;
+    }
+    .gov-table tr.fsm-snapshot-row > td {
+      background: #ffffff !important;
+      border-bottom-color: #e2e8f0 !important;
+    }
+    .gov-table .fsm-endpoint-btn {
+      padding: 3px 8px !important;
+      font-size: 10px !important;
+      border-radius: 4px !important;
+      font-weight: 900 !important;
+      white-space: nowrap !important;
+    }
+    .gov-table tr.fsm-component-row-pending .fsm-endpoint-btn {
+      background: #a63b3b !important;
+      border: 1px solid #7f1d1d !important;
+      color: #ffffff !important;
+    }
+    .gov-table tr.fsm-component-row-selected .fsm-endpoint-btn {
+      background: #166534 !important;
+      border: 1px solid #14532d !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,.28), 0 2px 8px rgba(20,83,45,.22) !important;
+    }
+    .gov-table .fsm-endpoint-btn.fsm-endpoint-btn-selected {
+      background: #166534 !important;
+      border: 1px solid #14532d !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,.28), 0 2px 8px rgba(20,83,45,.22) !important;
+    }
+    #fsm-endpoint-warning.fsm-terminal-output {
+      background: #020617 !important;
+      border: 1px solid #39ff14 !important;
+      color: #39ff14 !important;
+      border-radius: 8px !important;
+      font-family: 'Share Tech Mono', 'Consolas', 'Courier New', monospace !important;
+      font-size: 12px !important;
+      font-weight: 800 !important;
+      line-height: 1.45 !important;
+      letter-spacing: .01em !important;
+      box-shadow: inset 0 0 18px rgba(57,255,20,.08), 0 0 12px rgba(57,255,20,.12) !important;
+      white-space: pre-wrap !important;
+    }
 
     .gov-actions { display: flex; gap: 10px; margin-top: 10px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
     .gov-btn { padding: 8px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; font-size: 12px; display: flex; align-items: center; gap: 6px; }
@@ -1175,6 +1237,36 @@
       box-shadow: none !important;
       text-shadow: none !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+    }
+    body.flex-skyline-mode .gov-table .fsm-endpoint-btn.fsm-endpoint-btn-selected {
+      background: #166534 !important;
+      border-color: #14532d !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,.28), 0 2px 8px rgba(20,83,45,.22) !important;
+    }
+    body.flex-skyline-mode button.fsm-endpoint-btn.fsm-endpoint-btn-selected:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown) {
+      background: #166534 !important;
+      border-color: #14532d !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,.28), 0 2px 8px rgba(20,83,45,.22) !important;
+    }
+    body.flex-skyline-mode button.fsm-volume-snapshot-btn.fsm-volume-snapshot-btn-selected:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown) {
+      background: #166534 !important;
+      border-color: #14532d !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,.28), 0 2px 8px rgba(20,83,45,.22) !important;
+    }
+    body.flex-skyline-mode button.fsm-migration-status-btn-active-pending:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown),
+    body.flex-skyline-mode button.fsm-volume-status-btn-active-pending:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown) {
+      background: #1e3a5f !important;
+      border-color: #7dd3fc !important;
+      color: #e2e8f0 !important;
+    }
+    body.flex-skyline-mode button.fsm-migration-status-btn-active-migrated:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown),
+    body.flex-skyline-mode button.fsm-volume-status-btn-active-migrated:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown) {
+      background: #166534 !important;
+      border-color: #14532d !important;
+      color: #ffffff !important;
     }
     body.flex-skyline-mode .sub-bar .sub-btn,
     body.flex-skyline-mode .sub-bar .sub-btn-dropdown {
@@ -1580,6 +1672,22 @@
   display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;position:relative;z-index:1;
 }
 .uat-s1-arch-title { font-size:16px;font-weight:700;color:#0f172a; }
+.uat-s1-template-tabs {
+  display:flex;gap:6px;align-items:center;margin:10px 0 12px;position:relative;z-index:1;
+  background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:4px;
+}
+.uat-s1-template-tab {
+  flex:1;border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#475569;
+  font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;transition:all .18s;
+}
+.uat-s1-template-tab:hover { background:#eff6ff;color:#1d4ed8; }
+.uat-s1-template-tab.active { background:#1e3a8a;color:#fff;box-shadow:0 3px 8px rgba(30,58,138,.18); }
+.uat-s1-template-pane { display:none;position:relative;z-index:1; }
+.uat-s1-template-pane.active { display:block; }
+.uat-s1-template-das-frame {
+  width:100%;height:620px;border:1px solid #dbe4f0;border-radius:12px;background:#06080d;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);display:block;
+}
 .uat-s1-arch-badge {
   padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
   background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;
@@ -1590,27 +1698,29 @@
 }
 .uat-s1-arch-card {
   border-radius:12px;padding:14px;cursor:pointer;transition:all 0.22s;
-  border:2px solid transparent;position:relative;overflow:hidden;
+  border:2px solid rgba(148,163,184,.28);position:relative;overflow:hidden;
+  background:var(--tmpl-bg,#f8fafc);color:var(--tmpl-fg,#334155);
 }
-.uat-s1-arch-card:hover { transform:translateY(-2px);border-color:rgba(255,255,255,0.2);box-shadow:0 8px 24px rgba(0,0,0,0.35); }
-.uat-s1-arch-card.selected { border-color:rgba(255,255,255,0.45);box-shadow:0 0 0 3px rgba(59,130,246,0.45); }
+.uat-s1-arch-card:hover { transform:translateY(-2px);border-color:rgba(59,130,246,0.42);box-shadow:0 8px 22px rgba(15,23,42,0.12); }
+.uat-s1-arch-card.selected { border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.25); }
 .uat-s1-arch-card-icon {
-  width:34px;height:34px;background:rgba(255,255,255,0.15);border-radius:9px;
-  display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;
+  width:34px;height:34px;background:rgba(255,255,255,0.55);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;color:var(--tmpl-fg,#334155);font-size:18px;
   margin-bottom:9px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);
 }
-.uat-s1-arch-card-name { font-size:13px;font-weight:700;color:#f8fafc;margin-bottom:2px; }
-.uat-s1-arch-card-sub  { font-size:10px;color:rgba(255,255,255,0.58); }
-.uat-s1-arch-card.tmpl-banking   { background:linear-gradient(135deg,#1e3a8a,#1e40af); }
-.uat-s1-arch-card.tmpl-ecommerce { background:linear-gradient(135deg,#78350f,#92400e); }
-.uat-s1-arch-card.tmpl-crm       { background:linear-gradient(135deg,#064e3b,#065f46); }
-.uat-s1-arch-card.tmpl-erp       { background:linear-gradient(135deg,#3b0764,#4c1d95); }
-.uat-s1-arch-card.tmpl-saas      { background:linear-gradient(135deg,#0c4a6e,#0369a1); }
-.uat-s1-arch-card.tmpl-api       { background:linear-gradient(135deg,#1e1b4b,#312e81); }
-.uat-s1-arch-card.tmpl-reporting { background:linear-gradient(135deg,#422006,#713f12); }
-.uat-s1-arch-card.tmpl-batch     { background:linear-gradient(135deg,#1e293b,#334155); }
-.uat-s1-arch-card.tmpl-data      { background:linear-gradient(135deg,#134e4a,#0f766e); }
-.uat-s1-arch-card.tmpl-custom    { background:linear-gradient(135deg,#581c87,#7c3aed); }
+.uat-s1-arch-card-name { font-size:13px;font-weight:800;color:var(--tmpl-fg,#334155);margin-bottom:2px; }
+.uat-s1-arch-card-sub  { font-size:10px;color:var(--tmpl-fg,#334155);opacity:.78; }
+.uat-s1-arch-card.tmpl-banking   { --tmpl-bg:#E0F2FE; --tmpl-fg:#0369A1; }
+.uat-s1-arch-card.tmpl-ecommerce { --tmpl-bg:#FFEDD5; --tmpl-fg:#C2410C; }
+.uat-s1-arch-card.tmpl-crm       { --tmpl-bg:#D1FAE5; --tmpl-fg:#047857; }
+.uat-s1-arch-card.tmpl-erp       { --tmpl-bg:#EDE9FE; --tmpl-fg:#6D28D9; }
+.uat-s1-arch-card.tmpl-saas      { --tmpl-bg:#E0F2FE; --tmpl-fg:#0284C7; }
+.uat-s1-arch-card.tmpl-api       { --tmpl-bg:#E0E7FF; --tmpl-fg:#4338CA; }
+.uat-s1-arch-card.tmpl-reporting { --tmpl-bg:#FEF3C7; --tmpl-fg:#B45309; }
+.uat-s1-arch-card.tmpl-batch     { --tmpl-bg:#F1F5F9; --tmpl-fg:#334155; }
+.uat-s1-arch-card.tmpl-data      { --tmpl-bg:#CCFBF1; --tmpl-fg:#0F766E; }
+.uat-s1-arch-card.tmpl-custom    { --tmpl-bg:#FCE7F3; --tmpl-fg:#BE185D; }
 .uat-s1-arch-footer {
   display:flex;align-items:center;gap:12px;position:relative;z-index:1;
   background:#f8fafc;border:1px solid #e2e8f0;
@@ -2758,7 +2868,7 @@
             <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">
               <li>Run OSPC Infrastructure Scanner to inventory VMs</li>
               <li>Scan networks, volumes, security groups, LBs</li>
-              <li>Define Business Systems with archetype templates</li>
+              <li>Define Business Systems with Business System Templates</li>
               <li>App Dependency &amp; Service Comparison analysis</li>
               <li>Performance baseline (CPU, RAM, IOPS, network)</li>
             </ul>
@@ -3715,115 +3825,104 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         </div>
         <div class="gov-status-badge status-pending" id="s2fullmig-status">Select a System</div>
       </div>
-      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
         <div class="gov-section"><h3>Business Systems</h3><div id="fsm-stat-sys" style="font-size:28px;font-weight:900;color:#7dd3fc;">0</div></div>
         <div class="gov-section"><h3>Total Components</h3><div id="fsm-stat-comp" style="font-size:28px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Linux / Windows</h3><div id="fsm-stat-vm" style="font-size:28px;font-weight:900;color:#60a5fa;">0</div></div>
+        <div class="gov-section"><h3>Databases</h3><div id="fsm-stat-db" style="font-size:28px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Volumes</h3><div id="fsm-stat-vol" style="font-size:28px;font-weight:900;color:#fbbf24;">0</div></div>
         <div class="gov-section"><h3>Migrated</h3><div id="fsm-stat-done" style="font-size:28px;font-weight:900;color:#86efac;">0</div></div>
         <div class="gov-section"><h3>Pending</h3><div id="fsm-stat-pending" style="font-size:28px;font-weight:900;color:#fcd34d;">0</div></div>
       </div>
       <div class="gov-section">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-          <h3 style="margin:0;">Business Systems &nbsp;<span id="fsm-sys-badge" style="background:#1e3a5f;color:#7dd3fc;border-radius:12px;padding:2px 10px;font-size:12px;">0</span></h3>
+          <h3 style="margin:0;">Business System Scope Engine &nbsp;<span id="fsm-sys-badge" style="background:#eaf2ff;color:#2563eb;border-radius:12px;padding:2px 10px;font-size:12px;">0</span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="gov-btn btn-example" onclick="uatS1OpenModal(null)">+ Add Business System</button>
             <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#1e3a5f;border:1px solid #7c3aed;color:#c4b5fd;" onclick="fsmLoadDemo()">🏦 Load Banking Demo</button>
-            <button class="gov-btn btn-save" onclick="fsmRefresh()">↻ Refresh</button>
+            <button class="gov-btn btn-save" onclick="fsmRefresh()">↻ Refresh Migration Matrix</button>
           </div>
         </div>
-        <div id="fsm-systems-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
-        <div id="fsm-empty" style="color:#64748b;font-style:italic;padding:24px 0;text-align:center;display:none;">
-          No business systems defined yet.
-          <a href="#" onclick="fsmGoToOntology();return false;" style="color:#7dd3fc;">Add in Stage 1 Business System Ontology</a>
-           or
-          <a href="#" onclick="fsmLoadDemo();return false;" style="color:#c4b5fd;">load the banking demo</a>.
-        </div>
+        <p style="color:#64748b;font-size:12px;margin:0 0 10px;">This is the same Add Business System engine used by the UAT stage: same cards, Business System Templates, component editor, modal, import/export controls, and localStorage model.</p>
+        <div id="fsm-uat-engine-host" style="background:#fff;border:1px solid #d6e3f3;border-radius:10px;padding:0;overflow:hidden;"></div>
       </div>
       <div id="fsm-plan-section" class="gov-section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
           <h3 style="margin:0;">
-            Component Migration Plan —
+            Selected Business System Source Infra Details —
             <span id="fsm-plan-name" style="color:#7dd3fc;"></span>
             <span id="fsm-plan-wave" style="background:#1e3a5f;color:#94a3b8;border-radius:12px;padding:2px 10px;font-size:12px;margin-left:6px;"></span>
           </h3>
-          <button class="gov-btn" style="padding:5px 10px;font-size:12px;background:#0f172a;border:1px solid #475569;color:#94a3b8;" onclick="fsmMarkAllMigrated()">✓ Mark All Migrated</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="gov-btn" style="padding:5px 10px;font-size:12px;background:#0f172a;border:1px solid #38bdf8;color:#e0f2fe;" onclick="fsmValidateEndpointMappings(true)">Validate Endpoint Mapping</button>
+            <button class="gov-btn" style="padding:5px 10px;font-size:12px;background:#0f172a;border:1px solid #475569;color:#94a3b8;" onclick="fsmMarkAllMigrated()">✓ Mark All Migrated</button>
+          </div>
         </div>
-        <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Each component maps to its Stage 2 migration tool. Track progress row by row.</p>
-        <div style="overflow:auto;"><table class="gov-table" style="min-width:860px;">
-          <thead><tr><th>Component</th><th>Kind</th><th>Migration Tool</th><th>Status</th><th>Set Status</th></tr></thead>
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Select a business system above to inspect every component source mapping: source infra, source IP, OS type, source flavor, target endpoint, health test, and the migration engine that will handle it.</p>
+        <div id="fsm-endpoint-warning" style="display:none;margin:0 0 12px;padding:10px 12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:8px;font-size:12px;font-weight:700;"></div>
+        <div style="overflow:auto;"><table class="gov-table" style="min-width:1800px;">
+          <thead><tr><th>Component</th><th>Workload</th><th>Source Infra</th><th>Source Name / ID</th><th>Source IP</th><th>OS / Engine</th><th>Source Flavor</th><th>Snapshot Name / ID</th><th>Volume Snapshot</th><th>Target</th><th>Migration Engine</th><th>Migration Status</th><th>Status</th></tr></thead>
           <tbody id="fsm-plan-body"></tbody>
         </table></div>
-        <div class="gov-actions" style="margin-top:14px;">
-          <button class="gov-btn btn-save" onclick="stage2BuildFullMigrationPlan()">🔄 Build CSV Plan</button>
-          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p1')">🛠 Infra Builder</button>
-          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2image')">📸 VM Snapshot</button>
-          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p2_1')">⚙️ App &amp; DB Replication</button>
-          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2flex2flex')">🌐 FLEX2FLEX</button>
-        </div>
-      </div>
-      <div class="gov-section">
-        <h3>CSV Reference — Terraform / Ansible Inputs</h3>
-        <div style="overflow:auto;"><table class="gov-table" style="min-width:980px;">
-          <thead><tr><th>CSV</th><th>Used For</th><th>Terraform Template</th><th>Ansible Template</th><th>Full Migration Role</th></tr></thead>
-          <tbody>
-            <tr><td><code>*_overview.csv</code></td><td>Source inventory: networks, subnets, security groups, LBs, VMs, volumes</td><td><code>networks</code>, <code>subnets</code>, <code>security_groups</code></td><td>Inventory seed when target IPs exist</td><td>Build infra scaffold before VM clone</td></tr>
-            <tr><td><code>*_flavormap.csv</code></td><td>Source VM → target FLEX VM name/flavor/image/boot/FIP plan</td><td><code>openstack_compute_instance_v2</code>, FIP resources</td><td><code>hosts.ini</code> source/target flavor vars</td><td>Main join key: <code>source_server_id</code>; target name: <code>target_server_name</code></td></tr>
-            <tr><td><code>*_blockmap.csv</code></td><td>Source volume → target volume + attach device</td><td><code>openstack_blockstorage_volume_v3</code>, volume attach</td><td><code>group_vars/all.yml</code> volume map</td><td>Attach cloned volumes after VM is ACTIVE</td></tr>
-            <tr><td><code>*_lbmap.csv</code></td><td>LB/listener/pool/member relationships</td><td><code>openstack_lb_*</code> templates</td><td>LB validation targets</td><td>Reattach LB members after VM private IP is known</td></tr>
-          </tbody>
-        </table></div>
-      </div>
-      <div class="gov-section">
-        <h3>Full Migration Execution Order</h3>
-        <div style="overflow:auto;"><table class="gov-table" style="min-width:1000px;">
-          <thead><tr><th>Stage</th><th>Name</th><th>Input CSV</th><th>Output</th><th>Notes</th></tr></thead>
-          <tbody id="s2fullmig-stages-body"><tr><td colspan="5" style="color:#64748b;font-style:italic;">No plan loaded yet.</td></tr></tbody>
-        </table></div>
-      </div>
-      <div class="gov-section">
-        <h3>Source VM → FLEX Clone Link Map</h3>
-        <div style="overflow:auto;max-height:420px;"><table class="gov-table" style="min-width:1700px;">
-          <thead><tr><th>#</th><th>Source VM</th><th>Source ID</th><th>Source Region</th><th>Target Region</th><th>Original Flavor</th><th>Target FLEX VM</th><th>Target Flavor</th><th>Target Image</th><th>Volumes</th><th>LBs</th><th>FIP</th><th>Status</th><th>Link Step</th><th>Blockers</th></tr></thead>
-          <tbody id="s2fullmig-links-body"><tr><td colspan="15" style="color:#64748b;font-style:italic;">No link map loaded yet.</td></tr></tbody>
-        </table></div>
-      </div>
-      <div class="gov-section">
-        <h3>Artifacts</h3>
-        <div class="artifact-list" id="s2fullmig-artifacts"><span style="color:#64748b;">No full migration plan generated yet.</span></div>
       </div>
       <!-- MIGRATION ENGINES — embedded iframes, lazy-loaded on tab click -->
       <div class="gov-section" id="fsm-engines-section">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
           <h3 style="margin:0;">🔧 Migration Engines</h3>
-          <span style="font-size:12px;color:#64748b;">Select the engine matching the component type you are migrating</span>
+          <span id="fsm-engine-active-label" style="font-size:12px;color:#64748b;">Linux Snapshot engine selected</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:end;margin-bottom:12px;padding:12px;border:1px solid #d6e3f3;border-radius:8px;background:#f8fbff;">
+          <div>
+            <label for="fsm-engine-slider" style="display:block;font-size:11px;font-weight:900;color:#0f172a;text-transform:uppercase;margin-bottom:6px;">Migration Engine Selector</label>
+            <input id="fsm-engine-slider" type="range" min="0" max="3" step="1" value="0" oninput="fsmSetEngineFromSlider(this.value)" style="width:100%;accent-color:#2563eb;">
+            <div style="display:flex;justify-content:space-between;color:#475569;font-size:10px;font-weight:800;margin-top:5px;">
+              <span>Linux</span><span>Windows</span><span>Volume</span><span>DB</span>
+            </div>
+          </div>
+          <div>
+            <label for="fsm-engine-height-slider" style="display:block;font-size:11px;font-weight:900;color:#0f172a;text-transform:uppercase;margin-bottom:6px;">Console Height <span id="fsm-engine-height-label" style="color:#2563eb;">1200px</span></label>
+            <input id="fsm-engine-height-slider" type="range" min="900" max="1800" step="100" value="1200" oninput="fsmSetEngineHeight(this.value)" style="width:100%;accent-color:#16a34a;">
+            <div style="display:flex;justify-content:space-between;color:#64748b;font-size:10px;margin-top:5px;">
+              <span>Compact</span><span>Full operator view</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;grid-column:1 / -1;">
+            <button class="gov-btn btn-example" style="padding:6px 12px;font-size:12px;" onclick="fsmSlideEngine(-1)">← Previous Engine</button>
+            <button class="gov-btn btn-save" style="padding:6px 12px;font-size:12px;" onclick="fsmSlideEngine(1)">Next Engine →</button>
+            <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#0f172a;border:1px solid #38bdf8;color:#e0f2fe;" onclick="fsmSetEngineHeight(1600)">Expand Console</button>
+            <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#0f172a;border:1px solid #94a3b8;color:#e2e8f0;" onclick="fsmSetEngineHeight(1200)">Reset Height</button>
+          </div>
+        </div>
+        <div id="fsm-endpoint-map-bar" style="display:none;margin:0 0 12px;padding:12px;border:1px solid #0ea5e9;border-radius:8px;background:#ecfeff;color:#0f172a;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:12px;font-weight:900;text-transform:uppercase;color:#0369a1;">Endpoint Selection Mode</div>
+            <div id="fsm-endpoint-map-label" style="font-size:13px;color:#0f172a;">Select one scanned row in the engine table, then update the business system.</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="gov-btn btn-save" style="padding:7px 12px;font-size:12px;" onclick="fsmCaptureSelectedEndpoint()">Add to Business Component</button>
+            <button class="gov-btn" style="padding:7px 12px;font-size:12px;background:#0f172a;border:1px solid #94a3b8;color:#e2e8f0;" onclick="fsmCancelEndpointSelection()">Cancel</button>
+          </div>
         </div>
         <!-- Engine selector tabs -->
         <div id="fsm-engine-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:0;border-bottom:2px solid #1e3a5f;padding-bottom:0;">
-          <button id="fsm-etab-vm"    class="fsm-etab fsm-etab-active" onclick="fsmShowEngine('vm')"   style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#1e3a5f;color:#7dd3fc;border-bottom:2px solid #7dd3fc;margin-bottom:-2px;">📸 Linux / Windows VM Snapshot</button>
+          <button id="fsm-etab-linux" class="fsm-etab fsm-etab-active" onclick="fsmShowEngine('linux')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#1e3a5f;color:#7dd3fc;border-bottom:2px solid #7dd3fc;margin-bottom:-2px;">🐧 Linux Snapshot</button>
+          <button id="fsm-etab-windows" class="fsm-etab"              onclick="fsmShowEngine('windows')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">🪟 Windows Snapshot</button>
           <button id="fsm-etab-vol"   class="fsm-etab"                 onclick="fsmShowEngine('vol')"  style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">💾 Volume Snapshot</button>
           <button id="fsm-etab-db"    class="fsm-etab"                 onclick="fsmShowEngine('db')"   style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">⚙️ App &amp; DB Replication</button>
-          <button id="fsm-etab-infra" class="fsm-etab"                 onclick="fsmShowEngine('infra')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">🛠 Infra Clone &amp; Adapt</button>
         </div>
         <!-- Engine frames -->
-        <div id="fsm-engine-vm"    style="height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
-          <iframe id="fsm-iframe-vm"    src=""                                          style="width:100%;height:100%;border:none;" title="VM Snapshot Migration"></iframe>
+        <div id="fsm-engine-linux" class="fsm-engine-frame" style="height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
+          <iframe id="fsm-iframe-linux" src=""                                          style="width:100%;height:100%;border:none;" title="Linux Snapshot Migration"></iframe>
         </div>
-        <div id="fsm-engine-vol"   style="display:none;height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
+        <div id="fsm-engine-windows" class="fsm-engine-frame" style="display:none;height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
+          <iframe id="fsm-iframe-windows" src=""                                       style="width:100%;height:100%;border:none;" title="Windows Snapshot Migration"></iframe>
+        </div>
+        <div id="fsm-engine-vol" class="fsm-engine-frame" style="display:none;height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
           <iframe id="fsm-iframe-vol"   src=""                                          style="width:100%;height:100%;border:none;" title="Volume Snapshot Migration"></iframe>
         </div>
-        <div id="fsm-engine-db"    style="display:none;height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
+        <div id="fsm-engine-db" class="fsm-engine-frame" style="display:none;height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
           <iframe id="fsm-iframe-db"    src=""                                          style="width:100%;height:100%;border:none;" title="DB Replication"></iframe>
         </div>
-        <div id="fsm-engine-infra" style="display:none;height:720px;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;background:#0f172a;">
-          <iframe id="fsm-iframe-infra" src=""                                          style="width:100%;height:100%;border:none;" title="Infra Clone"></iframe>
-        </div>
         <p style="color:#475569;font-size:11px;margin:8px 0 0;text-align:right;">Engines are loaded on first click. Each engine is an independent session.</p>
-      </div>
-
-      <div class="gov-actions">
-        <button class="gov-btn btn-save" onclick="stage2BuildFullMigrationPlan()">🔄 Build Full Migration Link Plan</button>
-        <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p1')">Open Infra Builder</button>
-        <button class="gov-btn btn-example" onclick="stage2OpenPath('s2image')">Open VM Snapshot Migration</button>
-        <button class="gov-btn btn-example" onclick="stage2OpenPath('s2flex2flex')">Open FLEX2FLEX Snapshot Migration</button>
       </div>
     </div>
 
@@ -3986,7 +4085,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
       </div>
     </div>
 
-    <iframe id="s2rehost_p1-pane" src="/designer/?source=ospc" title="Shared FLEX Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p1-pane" src="about:blank" data-src="/designer/?source=ospc" title="Shared FLEX Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2image-pane" src="/image_migrator/?v={{ cache_bust|default('') }}" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2flex2flex-pane" src="/image_migrator/?mode=flex2flex&v={{ cache_bust|default('') }}" title="R3 FLEX2FLEX-Region Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2flexanywhere-pane" src="/image_migrator/?mode=flexanywhere&v={{ cache_bust|default('') }}" title="R3 FLEX Anywhere Hyperscaler Bridge" style="display:none; width:100%; height:100%; border:none;"></iframe>
@@ -4786,16 +4885,25 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           </div>
           <div class="uat-s1-arch-selector">
             <div class="uat-s1-arch-head">
-              <div class="uat-s1-arch-title">Archetype Templates</div>
+              <div class="uat-s1-arch-title">Business System Templates</div>
               <span class="uat-s1-arch-badge">10 Templates</span>
             </div>
             <p class="uat-s1-arch-desc">Use templates to create a complete UAT scope in seconds. Operators can edit every component before saving.</p>
-            <div id="uatS1ArchList" class="uat-s1-arch-grid">
-              <!-- rendered by JS -->
+            <div class="uat-s1-template-tabs" role="tablist" aria-label="Business System Templates">
+              <button type="button" class="uat-s1-template-tab active" data-uat-template-tab="classic" onclick="uatS1SetTemplateTab('classic')">Current Templates</button>
+              <button type="button" class="uat-s1-template-tab" data-uat-template-tab="das" onclick="uatS1SetTemplateTab('das')">Business System Template Das</button>
             </div>
-            <div class="uat-s1-arch-footer">
-              <span class="uat-s1-arch-footer-text">Selected template pre-fills components, generated checks, and UAT scope. Operators can still edit every field.</span>
-              <button class="uat-s1-arch-use-btn" id="uatS1UseTemplateBtn" disabled>Use Selected Template</button>
+            <div class="uat-s1-template-pane active" data-uat-template-pane="classic">
+              <div id="uatS1ArchList" class="uat-s1-arch-grid">
+                <!-- rendered by JS -->
+              </div>
+              <div class="uat-s1-arch-footer">
+                <span class="uat-s1-arch-footer-text">Selected template pre-fills components, generated checks, and UAT scope. Operators can still edit every field.</span>
+                <button class="uat-s1-arch-use-btn" id="uatS1UseTemplateBtn" disabled>Use Selected Template</button>
+              </div>
+            </div>
+            <div class="uat-s1-template-pane" data-uat-template-pane="das">
+              <iframe class="uat-s1-template-das-frame" src="/business-system-template-das/" title="Business System Template Das"></iframe>
             </div>
           </div>
         </div>
@@ -4803,7 +4911,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     </div>
 
     <!-- Standalone Servers & Databases -->
-    <div class="uat-s1-card">
+    <div class="uat-s1-card" id="uatS1StandaloneSection">
       <div class="uat-s1-card-head">
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="width:32px;height:32px;border-radius:10px;background:#fff7df;color:#f59e0b;display:grid;place-items:center;font-weight:900;font-size:16px;">+</div>
@@ -14023,69 +14131,16 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   }
 
   function stage2OpenPath(substage) {
+    if (substage === 's2fullmig') {
+      const infraPane = document.getElementById('s2rehost_p1-pane');
+      if (infraPane) {
+        infraPane.style.display = 'none';
+        if (infraPane.getAttribute('src') !== 'about:blank') infraPane.setAttribute('src', 'about:blank');
+      }
+    }
     activateStage('s2');
     document.querySelectorAll('#subBar2 .sub-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === substage));
     activateSub(s2Panes, substage || 's2image');
-  }
-
-  async function stage2BuildFullMigrationPlan() {
-    const status = document.getElementById('s2fullmig-status');
-    const stagesBody = document.getElementById('s2fullmig-stages-body');
-    const linksBody = document.getElementById('s2fullmig-links-body');
-    const artifactsBox = document.getElementById('s2fullmig-artifacts');
-    if (status) {
-      status.textContent = 'Status: Building plan...';
-      status.className = 'gov-status-badge status-pending';
-    }
-    try {
-      const res = await fetch('/api/stage2/full-migration/plan', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Full migration plan failed');
-      appdepSetText('s2fullmig-card-vms', data.counts?.planned_vms || 0);
-      appdepSetText('s2fullmig-card-ready', data.counts?.ready_vms || 0);
-      appdepSetText('s2fullmig-card-map', data.counts?.needs_mapping || 0);
-      const best = document.getElementById('s2fullmig-best-link');
-      if (best) best.textContent = data.best_link_step || '';
-      if (stagesBody) {
-        stagesBody.innerHTML = (data.stages || []).map(s => '<tr>' +
-          appdepHtmlCell(escapeHtmlDr(s.stage || '')) +
-          appdepHtmlCell(escapeHtmlDr(s.name || '')) +
-          appdepHtmlCell('<code>' + escapeHtmlDr(s.input_csv || '') + '</code>') +
-          appdepHtmlCell(escapeHtmlDr(s.output || '')) +
-          appdepHtmlCell(escapeHtmlDr(s.notes || '')) +
-        '</tr>').join('') || appdepEmptyRow(5);
-      }
-      if (linksBody) {
-        linksBody.innerHTML = (data.links || []).map(r => '<tr>' +
-          appdepCell(r.order) +
-          appdepCell(r.source_vm) +
-          appdepCell(r.source_server_id) +
-          appdepCell(r.source_region) +
-          appdepCell(r.target_region) +
-          appdepCell(r.source_flavor) +
-          appdepCell(r.target_flex_vm) +
-          appdepCell(r.target_flex_flavor) +
-          appdepCell(r.target_image) +
-          appdepCell(r.volume_count) +
-          appdepCell(r.lb_member_count) +
-          appdepCell(r.floating_ip) +
-          appdepHtmlCell(migrationBadge(r.status || 'unknown')) +
-          appdepCell(r.link_step) +
-          appdepCell(r.blockers) +
-        '</tr>').join('') || appdepEmptyRow(15);
-      }
-      if (artifactsBox) artifactsBox.innerHTML = artifactLinks(data.artifacts || {});
-      if (status) {
-        status.textContent = 'Status: Plan ready';
-        status.className = 'gov-status-badge status-done';
-      }
-    } catch (err) {
-      if (status) {
-        status.textContent = 'Status: ' + (err.message || err);
-        status.className = 'gov-status-badge status-failed';
-      }
-      if (artifactsBox) artifactsBox.innerHTML = '<span style="color:#fca5a5;">' + escapeHtmlDr(err.message || err) + '</span>';
-    }
   }
 
   function migrationBadge(status) {
@@ -18084,11 +18139,24 @@ ${certContent}
   }
 
   function activateSub(paneIds, activeId) {
+    if (activeId === 's2fullmig') {
+      const infraPane = document.getElementById('s2rehost_p1-pane');
+      if (infraPane) {
+        infraPane.style.display = 'none';
+        if (infraPane.getAttribute('src') !== 'about:blank') infraPane.setAttribute('src', 'about:blank');
+      }
+      try { localStorage.removeItem('fsm_last_engine_substage'); } catch (_) {}
+    }
     paneIds.forEach(id => {
       const el = document.getElementById(id + '-pane');
       if (!el) return;
       el.style.display = id === activeId ? '' : 'none';
     });
+    const activeEl = document.getElementById(activeId + '-pane');
+    if (activeEl && activeEl.tagName === 'IFRAME' && activeEl.dataset && activeEl.dataset.src) {
+      const currentSrc = activeEl.getAttribute('src') || '';
+      if (!currentSrc || currentSrc === 'about:blank') activeEl.setAttribute('src', activeEl.dataset.src);
+    }
     requestAnimationFrame(syncVisibleIframeHeights);
   }
 
@@ -19485,6 +19553,13 @@ ${certContent}
   // Stage 2 sub-btn clicks
   document.querySelectorAll('#subBar2 .sub-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (btn.dataset.sub === 's2fullmig') {
+        const infraPane = document.getElementById('s2rehost_p1-pane');
+        if (infraPane) {
+          infraPane.style.display = 'none';
+          if (infraPane.getAttribute('src') !== 'about:blank') infraPane.setAttribute('src', 'about:blank');
+        }
+      }
       document.querySelectorAll('#subBar2 .sub-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       activateSub(s2Panes, btn.dataset.sub);
@@ -20971,17 +21046,83 @@ ${certContent}
     erp:'fa-industry', saas:'fa-cloud', api:'fa-bolt',
     reporting:'fa-chart-bar', batch:'fa-gear', data:'fa-database', custom:'fa-wand-magic-sparkles'
   };
+  var _archGlyphs = {
+    banking:'🏦', ecommerce:'🛒', crm:'👥', erp:'🏭', saas:'☁️',
+    api:'⚡', reporting:'📊', batch:'⚙️', data:'🗄️', custom:'✨'
+  };
   var _selectedArch = null;
+
+  function _systemKey(sys) {
+    return String((sys && sys.name) || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '');
+  }
+  function _mergeComponents(oldList, newList) {
+    var out = [];
+    var seen = {};
+    function addList(list) {
+      (list || []).forEach(function(comp) {
+        var name = String((comp && comp.name) || '').trim();
+        if (!name) return;
+        var key = name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        if (seen[key] === undefined) {
+          seen[key] = out.length;
+          out.push(comp);
+        } else {
+          out[seen[key]] = Object.assign({}, out[seen[key]], comp);
+        }
+      });
+    }
+    addList(oldList);
+    addList(newList);
+    return out;
+  }
+  function _dedupeSystems(list) {
+    var out = [];
+    var seen = {};
+    (list || []).forEach(function(sys) {
+      if (!sys) return;
+      var key = _systemKey(sys) || String(sys.id || '');
+      if (!key) return;
+      if (seen[key] === undefined) {
+        seen[key] = out.length;
+        out.push(sys);
+      } else {
+        var idx = seen[key];
+        var existing = out[idx];
+        out[idx] = Object.assign({}, existing, sys, {
+          id: existing.id || sys.id,
+          components: _mergeComponents(existing.components, sys.components)
+        });
+      }
+    });
+    return out;
+  }
+  window.osflexDedupeBusinessSystems = _dedupeSystems;
 
   var _state = { systems: [], standalones: [], saType: 'server', editId: null, editSaId: null };
   try { var _d = localStorage.getItem('uatS1_systems'); if (_d) _state.systems = JSON.parse(_d) || []; } catch(e) {}
   try { var _e = localStorage.getItem('uatS1_standalones'); if (_e) _state.standalones = JSON.parse(_e) || []; } catch(e) {}
+  _state.systems = _dedupeSystems(_state.systems);
+  try { localStorage.setItem('uatS1_systems', JSON.stringify(_state.systems)); } catch(e) {}
 
   function _save() {
+    _state.systems = _dedupeSystems(_state.systems);
     try { localStorage.setItem('uatS1_systems', JSON.stringify(_state.systems)); } catch(e) {}
     try { localStorage.setItem('uatS1_standalones', JSON.stringify(_state.standalones)); } catch(e) {}
     if (window.UAT) { window.UAT.businessSystems = _state.systems; window.UAT.standaloneItems = _state.standalones; }
   }
+  window.uatS1ReloadFromStorage = function() {
+    try { var d = localStorage.getItem('uatS1_systems'); _state.systems = d ? (JSON.parse(d) || []) : []; } catch(e) { _state.systems = []; }
+    _state.systems = _dedupeSystems(_state.systems);
+    try { localStorage.setItem('uatS1_systems', JSON.stringify(_state.systems)); } catch(e3) {}
+    try { var e = localStorage.getItem('uatS1_standalones'); _state.standalones = e ? (JSON.parse(e) || []) : []; } catch(e2) { _state.standalones = []; }
+    _render();
+    _renderSa();
+    _renderKpis();
+    _populateSaMapTo();
+  };
   function _id() { return 'bs-' + Date.now() + '-' + Math.floor(Math.random()*9999); }
 
   /* ── view toggle ── */
@@ -21172,8 +21313,13 @@ ${certContent}
     }) : _activeComps.map(function(n){
       return { name:n, type:_sType(n), src:_sSrc(n), tgt:_sTgt(n), path:_sPath(n) };
     });
+    var existingByName = null;
+    if (!_state.editId) {
+      var newKey = String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+      existingByName = _state.systems.find(function(s) { return _systemKey(s) === newKey; }) || null;
+    }
     var sys = {
-      id:          _state.editId || _id(),
+      id:          _state.editId || (existingByName && existingByName.id) || _id(),
       name:        name,
       archetype:   arch,
       criticality: _gv('uatS1Crit')||'Critical',
@@ -21187,9 +21333,12 @@ ${certContent}
       components:  comps,
       createdAt:   new Date().toLocaleString()
     };
-    if (_state.editId) {
+    if (_state.editId || existingByName) {
+      var targetId = _state.editId || existingByName.id;
       var idx = _state.systems.findIndex(function(s){ return s.id===_state.editId; });
-      if (idx >= 0) _state.systems[idx] = sys; else _state.systems.push(sys);
+      if (idx < 0 && existingByName) idx = _state.systems.findIndex(function(s){ return s.id===targetId; });
+      if (idx >= 0) _state.systems[idx] = Object.assign({}, _state.systems[idx], sys, { components: _mergeComponents((_state.systems[idx] || {}).components, sys.components) });
+      else _state.systems.push(sys);
     } else {
       _state.systems.push(sys);
     }
@@ -21206,6 +21355,7 @@ ${certContent}
     var el = document.getElementById('uatS1Cards');
     var empty = document.getElementById('uatS1Empty');
     if (!el) return;
+    _state.systems = _dedupeSystems(_state.systems);
     el.querySelectorAll('[data-bz-card]').forEach(function(c){ c.remove(); });
     if (!_state.systems.length) { if(empty) empty.style.display=''; _renderKpis(); return; }
     if (empty) empty.style.display = 'none';
@@ -21244,6 +21394,9 @@ ${certContent}
       el.appendChild(div);
     });
     _renderKpis();
+    if (typeof window.fsmEnhanceMountedBusinessCards === 'function') {
+      try { window.fsmEnhanceMountedBusinessCards(); } catch(e) {}
+    }
   }
 
   /* ── render archetype grid ── */
@@ -21252,7 +21405,7 @@ ${certContent}
     if (!el) return;
     el.innerHTML = Object.keys(_arch).map(function(key) {
       return '<div class="uat-s1-arch-card tmpl-'+key+'" data-arch-key="'+key+'">'
-        +'<div class="uat-s1-arch-card-icon"><i class="fas '+(_archIcons[key]||'fa-cube')+'"></i></div>'
+        +'<div class="uat-s1-arch-card-icon" aria-hidden="true">'+(_archGlyphs[key]||'◆')+'</div>'
         +'<div class="uat-s1-arch-card-name">'+(_archLabels[key]||key)+'</div>'
         +'<div class="uat-s1-arch-card-sub">'+(_archSub[key]||'')+'</div>'
         +'</div>';
@@ -21272,6 +21425,16 @@ ${certContent}
       if (_selectedArch) uatS1OpenModal(null, _selectedArch);
     });
   }
+
+  window.uatS1SetTemplateTab = function(tab) {
+    tab = tab || 'classic';
+    document.querySelectorAll('[data-uat-template-tab]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-uat-template-tab') === tab);
+    });
+    document.querySelectorAll('[data-uat-template-pane]').forEach(function(pane) {
+      pane.classList.toggle('active', pane.getAttribute('data-uat-template-pane') === tab);
+    });
+  };
 
   /* ── KPIs ── */
   function _renderKpis() {
@@ -21551,6 +21714,7 @@ ${certContent}
   //  Full Business System Migration (FSM)
   // ============================================================
   var _fsmSelId = null;
+  var _fsmEndpointContext = null;
 
   var FSM_DEMO_DATA = [
     {
@@ -21567,45 +21731,692 @@ ${certContent}
       status: 'Active',
       createdAt: '2026-06-30T00:00:00.000Z',
       components: [
-        { name: 'Web Frontend',          type: 'Component Type: Application' },
-        { name: 'REST API Gateway',       type: 'Component Type: Gateway'     },
-        { name: 'Backend Services',       type: 'Component Type: Application' },
-        { name: 'Core Banking Database',  type: 'Component Type: Database'    },
-        { name: 'Transaction Database',   type: 'Component Type: Database'    },
-        { name: 'Auth Service',           type: 'Component Type: Application' },
-        { name: 'Message Queue',          type: 'Component Type: Queue'       },
-        { name: 'Cache Layer',            type: 'Component Type: Cache'       },
-        { name: 'Reporting Service',      type: 'Component Type: Application' },
-        { name: 'Network Load Balancer',  type: 'Component Type: Gateway'     }
-      ]
+	        { name: 'Web Frontend Linux VM',          type: 'Component Type: Linux VM',      src: 'http://104.130.26.116:80',      tgt: 'http://50.56.158.21:80',       path: '/health', os: 'Ubuntu 24.04', flavor: 'gp.0.4' },
+	        { name: 'REST API Gateway Linux VM',       type: 'Component Type: Linux VM',      src: 'http://23.253.159.193:8080',    tgt: 'http://50.56.158.22:8080',     path: '/health,/ready', os: 'Ubuntu 24.04', flavor: 'gp.1.4' },
+	        { name: 'Core Banking Windows VM',         type: 'Component Type: Windows VM',    src: 'rdp://104.130.13.28:3389',      tgt: 'rdp://50.56.158.23:3389',      path: 'RDP service', os: 'Windows Server 2019', flavor: 'gp.1.8' },
+	        { name: 'Backend Services Linux VM',       type: 'Component Type: Linux VM',      src: 'http://104.130.26.118:8080',    tgt: 'http://50.56.158.24:8080',     path: '/health', os: 'Ubuntu 24.04', flavor: 'gp.1.4' },
+	        { name: 'Core Banking Database',           type: 'Component Type: Database',      src: 'postgresql://104.130.26.81:5432/corebank', tgt: 'postgresql://50.56.158.30:5432/corebank', path: 'SELECT 1', os: 'PostgreSQL 16 on Ubuntu 24.04', flavor: 'db.2.8' },
+	        { name: 'Transaction Database',            type: 'Component Type: Database',      src: 'mysql://104.130.26.82:3306/txn', tgt: 'mysql://50.56.158.31:3306/txn', path: 'SELECT 1', os: 'MySQL 8 on Ubuntu 24.04', flavor: 'db.2.8' },
+	        { name: 'Auth Service Linux VM',           type: 'Component Type: Linux VM',      src: 'http://104.130.26.119:8101',    tgt: 'http://50.56.158.25:8101',     path: '/health', os: 'Ubuntu 24.04', flavor: 'gp.0.4' },
+	        { name: 'Message Queue Volume Snapshot',   type: 'Component Type: Volume',        src: 'cinder://104.130.26.120/vol-mq-01', tgt: 'cinder://50.56.158.26/vol-mq-01', path: 'volume attach check', os: 'Cinder block volume', flavor: '500 GB volume' },
+	        { name: 'Cache Layer Linux VM',            type: 'Component Type: Linux VM',      src: 'redis://104.130.26.121:6379',   tgt: 'redis://50.56.158.27:6379',    path: 'PING', os: 'Ubuntu 24.04 + Redis', flavor: 'gp.0.4' },
+	        { name: 'Network Load Balancer',           type: 'Component Type: Gateway',       src: 'http://104.130.26.122:443',     tgt: 'http://50.56.158.28:443',      path: '/health', os: 'Octavia LB / HAProxy', flavor: 'load_balancer' }
+	      ]
     }
   ];
 
-  function fsmCompTool(compName) {
-    var n = (compName || '').toLowerCase();
-    if (n.indexOf('database') >= 0 || n === 'db' || n.indexOf(' db') >= 0 ||
-        n.indexOf('mysql') >= 0 || n.indexOf('postgres') >= 0 ||
-        n.indexOf('mongo') >= 0 || n.indexOf('oracle') >= 0 || n.indexOf('mssql') >= 0)
-      return { label: 'App & DB Replication',  sub: 's2rehost_p2_1', badge: 'DB',    color: '#16a34a' };
-    if (n.indexOf('kubernetes') >= 0 || n.indexOf('k8s') >= 0 ||
-        n.indexOf('container') >= 0 || n.indexOf('docker') >= 0)
-      return { label: 'K8s Modernization',     sub: 's2rehost_p2_2', badge: 'K8S',   color: '#7c3aed' };
-    if (n.indexOf('load balancer') >= 0 || n.indexOf('network load') >= 0 ||
-        n.indexOf('gateway') >= 0 || n.indexOf('network infra') >= 0)
-      return { label: 'Infra Clone & Adapt',   sub: 's2rehost_p1',   badge: 'INFRA', color: '#0891b2' };
-    if (n.indexOf('storage') >= 0 || n.indexOf('volume') >= 0 ||
-        n.indexOf('nfs') >= 0 || n.indexOf('san') >= 0)
-      return { label: 'Volume Snapshot',       sub: 's2image',        badge: 'VOL',   color: '#d97706' };
-    return   { label: 'VM Snapshot',           sub: 's2image',        badge: 'VM',    color: '#2563eb' };
+  function fsmText(v) { return (v === undefined || v === null) ? '' : String(v); }
+  function fsmSafe(v) {
+    if (typeof escapeHtmlDr === 'function') return escapeHtmlDr(fsmText(v));
+    return fsmText(v).replace(/[&<>"']/g, function(ch) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]; });
+  }
+  function fsmExtractHost(v) {
+    var s = fsmText(v).trim();
+    if (!s) return '';
+    try {
+      var normalized = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'scheme://' + s;
+      var u = new URL(normalized);
+      return u.hostname || s;
+    } catch(e) {
+      return s.replace(/^[a-z]+:\/\//i, '').split(/[/:?#]/)[0];
+    }
+  }
+  function fsmExtractPort(v) {
+    var s = fsmText(v).trim();
+    if (!s) return '';
+    try {
+      var normalized = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'scheme://' + s;
+      var u = new URL(normalized);
+      if (u.port) return u.port;
+      if (u.protocol === 'https:') return '443';
+      if (u.protocol === 'http:') return '80';
+      if (u.protocol === 'rdp:') return '3389';
+      if (u.protocol === 'mysql:') return '3306';
+      if (u.protocol === 'postgresql:' || u.protocol === 'postgres:') return '5432';
+      if (u.protocol === 'redis:') return '6379';
+    } catch(e) {}
+    var m = s.match(/:(\d{2,5})(?:\/|$)/);
+    return m ? m[1] : '';
+  }
+  function fsmInferOs(comp) {
+    var explicit = comp && (comp.os || comp.osType || comp.sourceOs || comp.source_os || comp.engine);
+    if (explicit) return explicit;
+    var all = [fsmText(comp && comp.name), fsmText(comp && comp.type), fsmText(comp && comp.src)].join(' ').toLowerCase();
+    if (/postgres|postgresql/.test(all)) return 'PostgreSQL on Linux';
+    if (/mysql|mariadb/.test(all)) return 'MySQL / MariaDB on Linux';
+    if (/redis/.test(all)) return 'Linux + Redis';
+    if (/api gateway|rest api gateway|mobile api|api entry|edge api|gateway service/.test(all)) return 'Linux VM';
+    if (/windows|win201|win202|rdp/.test(all)) return 'Windows Server';
+    if (/volume|cinder|block/.test(all)) return 'Block volume';
+    if (/load balancer|haproxy|octavia|network gateway|firewall|router/.test(all)) return 'Network service / LB';
+    if (/ubuntu/.test(all)) return 'Ubuntu Linux';
+    if (/rhel|red hat/.test(all)) return 'RHEL Linux';
+    if (/debian/.test(all)) return 'Debian Linux';
+    if (/rocky|alma|centos/.test(all)) return 'Enterprise Linux';
+    return 'Linux VM';
+  }
+  function fsmInferFlavor(comp, tool) {
+    var explicit = comp && (comp.flavor || comp.sourceFlavor || comp.source_flavor || comp.vmFlavor || comp.size);
+    if (explicit) return explicit;
+    if (tool && tool.badge === 'DB') return 'db.2.8';
+    if (tool && tool.badge === 'WIN') return 'gp.1.8';
+    if (tool && tool.badge === 'VOL') return 'volume snapshot';
+    if (tool && tool.badge === 'INFRA') return 'infra service';
+    return 'gp.0.4';
+  }
+  function fsmComponentKey(name) {
+    return fsmText(name).replace(/[^a-z0-9]+/gi, '_');
+  }
+  var FSM_ENDPOINT_CACHE_KEY = 'fsm_endpoint_cache_v1';
+  var FSM_ENDPOINT_CACHE_FIELDS = [
+    'endpointSelected','endpointEngine','endpointName','endpointId','endpointAssetType',
+    'sourceName','sourceId','sourceIp','sourceInfra','src',
+    'snapshotName','snapshotId','volumeSnapshotName','volumeSnapshotId',
+    'targetName','targetIp','tgt','os','flavor'
+  ];
+  function fsmSystemCacheKeys(sys) {
+    var keys = [];
+    var id = fsmText(sys && sys.id).trim();
+    var nameKey = fsmText(sys && sys.name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (id) keys.push('id:' + id);
+    if (nameKey) keys.push('name:' + nameKey);
+    return keys;
+  }
+  function fsmLoadEndpointCache() {
+    try {
+      var raw = localStorage.getItem(FSM_ENDPOINT_CACHE_KEY);
+      var cache = raw ? JSON.parse(raw) : null;
+      if (cache && cache.systems) return cache;
+    } catch(e) {}
+    return { version: 1, systems: {} };
+  }
+  function fsmSaveEndpointCache(cache) {
+    try { localStorage.setItem(FSM_ENDPOINT_CACHE_KEY, JSON.stringify(cache || { version: 1, systems: {} })); } catch(e) {}
+  }
+  function fsmEndpointCachePayload(comp) {
+    var out = {};
+    for (var i = 0; i < FSM_ENDPOINT_CACHE_FIELDS.length; i++) {
+      var k = FSM_ENDPOINT_CACHE_FIELDS[i];
+      if (comp && comp[k] !== undefined && comp[k] !== null && comp[k] !== '') out[k] = comp[k];
+    }
+    if (out.endpointSelected || out.endpointId || out.snapshotId || out.volumeSnapshotId || out.sourceId || out.sourceName) {
+      out.endpointSelected = !!(out.endpointSelected || out.endpointId || out.snapshotId || out.volumeSnapshotId || out.sourceId || out.sourceName);
+      out.cachedAt = new Date().toISOString();
+      return out;
+    }
+    return null;
+  }
+  function fsmCacheEndpointSelection(sys, compName, compOrPatch) {
+    var payload = fsmEndpointCachePayload(compOrPatch);
+    if (!payload) return;
+    var keys = fsmSystemCacheKeys(sys);
+    var compKey = fsmComponentKey(compName);
+    if (!keys.length || !compKey) return;
+    var cache = fsmLoadEndpointCache();
+    for (var i = 0; i < keys.length; i++) {
+      if (!cache.systems[keys[i]]) cache.systems[keys[i]] = {};
+      cache.systems[keys[i]][compKey] = payload;
+    }
+    fsmSaveEndpointCache(cache);
+  }
+  function fsmMergeEndpointCache(systems) {
+    var cache = fsmLoadEndpointCache();
+    (systems || []).forEach(function(sys) {
+      var keys = fsmSystemCacheKeys(sys);
+      (sys.components || []).forEach(function(comp) {
+        var compKey = fsmComponentKey(comp && comp.name);
+        if (!compKey) return;
+        var cached = null;
+        for (var i = 0; i < keys.length; i++) {
+          var entry = cache.systems[keys[i]] && cache.systems[keys[i]][compKey];
+          if (!entry) continue;
+          if (!cached || fsmText(entry.cachedAt) > fsmText(cached.cachedAt)) cached = entry;
+        }
+        if (cached) {
+          for (var k in cached) {
+            if (k !== 'cachedAt') comp[k] = cached[k];
+          }
+        }
+      });
+    });
+    return systems || [];
+  }
+  function fsmFindSystem(systems, sysId) {
+    for (var i = 0; i < systems.length; i++) if (systems[i].id === sysId) return systems[i];
+    return null;
+  }
+  function fsmDedupeSystems(systems) {
+    if (typeof window.osflexDedupeBusinessSystems === 'function') {
+      try { return window.osflexDedupeBusinessSystems(systems || []); } catch(e) {}
+    }
+    return systems || [];
+  }
+  function fsmLoadSystems() {
+    try {
+      var d = localStorage.getItem('uatS1_systems');
+      var systems = d ? (JSON.parse(d) || []) : [];
+      return fsmMergeEndpointCache(fsmDedupeSystems(systems));
+    } catch(e) {
+      return [];
+    }
+  }
+  function fsmSaveSystems(systems) {
+    systems = fsmMergeEndpointCache(fsmDedupeSystems(systems || []));
+    try { localStorage.setItem('uatS1_systems', JSON.stringify(systems)); } catch(e) {}
+    if (typeof window.uatS1ReloadFromStorage === 'function') {
+      try { window.uatS1ReloadFromStorage(); } catch(e2) {}
+    }
+  }
+  function fsmUpdateComponent(sysId, compName, patch) {
+    var systems = fsmLoadSystems();
+    var sys = fsmFindSystem(systems, sysId);
+    if (!sys) return false;
+    var comps = sys.components || [];
+    for (var i = 0; i < comps.length; i++) {
+      if (comps[i].name === compName) {
+        for (var k in patch) comps[i][k] = patch[k];
+        fsmCacheEndpointSelection(sys, compName, comps[i]);
+        fsmSaveSystems(systems);
+        fsmRefresh();
+        fsmRenderPlan(sysId);
+        return true;
+      }
+    }
+    return false;
+  }
+  function fsmEndpointKey(comp) {
+    return fsmText(comp.endpointId || comp.snapshotId || comp.sourceId || comp.volumeSnapshotId || '').trim();
+  }
+  function fsmShowEndpointWarning(messages, pop) {
+    var box = document.getElementById('fsm-endpoint-warning');
+    var list = messages || [];
+    if (box) {
+      if (list.length) {
+        box.style.display = '';
+        box.className = 'fsm-terminal-output';
+        box.textContent = list.map(function(m) { return '[WARN] ' + m; }).join('\n');
+      } else {
+        box.style.display = 'none';
+        box.className = '';
+        box.textContent = '';
+      }
+    }
+    if (pop && list.length) alert(list.join('\n'));
+  }
+  function fsmInferInfra(v) {
+    var s = fsmText(v).toLowerCase();
+    if (s.indexOf('flex') >= 0) return 'FLEX';
+    if (s.indexOf('aws') >= 0) return 'AWS';
+    if (s.indexOf('azure') >= 0) return 'Azure';
+    if (s.indexOf('gcp') >= 0) return 'GCP';
+    return 'OSPC';
+  }
+  function fsmCompTool(comp) {
+    var name = fsmText(comp && comp.name ? comp.name : comp).toLowerCase();
+    var type = fsmText(comp && comp.type).toLowerCase();
+    var src  = fsmText(comp && comp.src).toLowerCase();
+    var tgt  = fsmText(comp && comp.tgt).toLowerCase();
+    var all  = [name, type, src, tgt].join(' ');
+    if (/api gateway|rest api gateway|mobile api|api entry|edge api|gateway service/.test(all))
+      return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'LINUX', workload: 'Linux VM', color: '#2563eb', snapshot: 'Match API gateway VM/image snapshot by source IP' };
+    if (/database|\bdb\b|mysql|mariadb|postgres|mongo|oracle|mssql|sql server/.test(all))
+      return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'DB', workload: 'Database', color: '#16a34a', snapshot: 'Match database VM/image snapshot by source IP or DB name' };
+    if (/volume|block|cinder|storage|nfs|san|attached disk/.test(all))
+      return { label: 'Volume Snapshot Migration', sub: 's2image', engine: 'vol', badge: 'VOL', workload: 'Volume', color: '#d97706', snapshot: 'Match by source volume snapshot / attachment' };
+    if (/windows|win201|win202|mssql|rdp/.test(all))
+      return { label: 'Windows Snapshot Migration', sub: 's2image', engine: 'windows', badge: 'WIN', workload: 'Windows VM', color: '#7c3aed', snapshot: 'Match Windows image/snapshot by source IP' };
+    if (/linux|ubuntu|debian|rhel|red hat|rocky|alma|centos|suse/.test(all))
+      return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'LINUX', workload: 'Linux VM', color: '#2563eb', snapshot: 'Match Linux image/snapshot by source IP' };
+    if (/kubernetes|k8s|container|docker/.test(all))
+      return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'K8S', workload: 'Kubernetes / Container', color: '#9333ea', snapshot: 'Match source endpoint in scanned VM/snapshot table' };
+    if (/load balancer|network load|network infra|firewall|router/.test(all))
+      return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'INFRA', workload: 'Network / Gateway', color: '#0891b2', snapshot: 'Match source endpoint in scanned VM/snapshot table' };
+    return { label: 'Linux Snapshot Migration', sub: 's2image', engine: 'linux', badge: 'LINUX', workload: 'Linux VM', color: '#2563eb', snapshot: 'Default VM snapshot route; confirm OS if Windows' };
+  }
+  function fsmOpenComponentEngine(engine, sub) {
+    fsmShowEngine(engine || 'linux');
+    if (sub && typeof stage2OpenPath === 'function') {
+      try { localStorage.setItem('fsm_last_engine_substage', sub); } catch(e) {}
+    }
+  }
+  function fsmSetEndpointContext(ctx) {
+    _fsmEndpointContext = ctx || null;
+    try {
+      if (ctx) sessionStorage.setItem('fsm_endpoint_context', JSON.stringify(ctx));
+      else sessionStorage.removeItem('fsm_endpoint_context');
+    } catch(e) {}
+  }
+  function fsmRestoreEndpointContext() {
+    if (_fsmEndpointContext) return _fsmEndpointContext;
+    try {
+      var raw = sessionStorage.getItem('fsm_endpoint_context');
+      var ctx = raw ? JSON.parse(raw) : null;
+      if (ctx && ctx.sysId && ctx.compName && ctx.engine) {
+        _fsmEndpointContext = ctx;
+        return ctx;
+      }
+    } catch(e) {}
+    return null;
+  }
+  function fsmClearEndpointEngineBars() {
+    for (var i = 0; i < _fsmEngineOrder.length; i++) {
+      var iframe = document.getElementById('fsm-iframe-' + _fsmEngineOrder[i]);
+      try {
+        var bar = iframe && iframe.contentDocument ? iframe.contentDocument.getElementById('fsm-business-update-bar') : null;
+        if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      } catch(e) {}
+    }
+  }
+  function fsmEndpointTableTarget(doc, engine) {
+    if (!doc) return null;
+    if (engine === 'db') {
+      var dbBody = doc.getElementById('node-pair-tbody');
+      if (dbBody) return dbBody.closest ? dbBody.closest('table') : dbBody;
+      return doc.getElementById('node-pair-table')
+        || doc.getElementById('migration-form')
+        || doc.querySelector('.container')
+        || doc.body;
+    }
+    return doc.getElementById('ospc-image-table')
+      || doc.getElementById('ospcImageContainer')
+      || doc.getElementById('imageScannerPanel')
+      || doc.querySelector('.adv-panel')
+      || doc.body;
+  }
+  function fsmEndpointBarAnchor(doc, engine) {
+    if (!doc) return null;
+    if (engine === 'db') {
+      var dbBody = doc.getElementById('node-pair-tbody');
+      var dbTable = dbBody && dbBody.closest ? dbBody.closest('table') : doc.getElementById('node-pair-table');
+      if (dbTable && dbTable.parentNode) return { parent: dbTable.parentNode, before: dbTable };
+      var manualTitle = Array.from(doc.querySelectorAll('.section-title-wrapper')).filter(function(el) {
+        return /Manual addition of OSPC2Flex Servers DBaaS/i.test(el.textContent || '');
+      })[0];
+      var manualPanel = manualTitle && manualTitle.closest ? manualTitle.closest('.panel') : null;
+      if (manualPanel) return { parent: manualPanel, before: manualPanel.firstChild };
+      var form = doc.getElementById('migration-form');
+      if (form) return { parent: form, before: form.firstChild };
+      return doc.body ? { parent: doc.body, before: doc.body.firstChild } : null;
+    }
+    var scannerPanel = doc.getElementById('imageScannerPanel');
+    var imageContainer = doc.getElementById('ospcImageContainer');
+    if (scannerPanel && imageContainer && imageContainer.parentNode === scannerPanel) {
+      return { parent: scannerPanel, before: imageContainer };
+    }
+    if (scannerPanel) return { parent: scannerPanel, before: scannerPanel.firstChild };
+    if (imageContainer && imageContainer.parentNode) return { parent: imageContainer.parentNode, before: imageContainer };
+    var table = doc.getElementById('ospc-image-table');
+    if (table && table.parentNode) return { parent: table.parentNode, before: table };
+    return doc.body ? { parent: doc.body, before: doc.body.firstChild } : null;
+  }
+  function fsmClearEngineSelections(engine) {
+    var iframe = document.getElementById('fsm-iframe-' + (engine || 'linux'));
+    if (!iframe || !iframe.contentDocument) return;
+    try {
+      var boxes = iframe.contentDocument.querySelectorAll([
+        '.ospc-image-cb:checked',
+        '.vm-checkbox:checked',
+        '.vm-select-cb:checked',
+        'input[data-vm-checkbox]:checked',
+        '.batch-vm-checkbox:checked',
+        '.vsp-approve-cb:checked',
+        '.agent1-endpoint-cb:checked',
+        '#node-pair-tbody input[type="checkbox"]:checked'
+      ].join(','));
+      Array.from(boxes).forEach(function(cb) {
+        if (cb.id === 'ospc-select-all-cb' || cb.id === 'ospc-fresh-all-cb') return;
+        cb.checked = false;
+        try { cb.dispatchEvent(new Event('change', { bubbles: true })); } catch(e) {}
+      });
+    } catch(e) {}
+  }
+  function fsmDecorateEndpointEngine(engine) {
+    var ctx = fsmRestoreEndpointContext();
+    if (!ctx || ctx.engine !== engine) return;
+    var iframe = document.getElementById('fsm-iframe-' + (engine || 'linux'));
+    if (!iframe || !iframe.contentDocument) return;
+    var doc = iframe.contentDocument;
+    var target = fsmEndpointTableTarget(doc, engine);
+    if (!target) {
+      var tries = parseInt(iframe.getAttribute('data-fsm-decorate-tries') || '0', 10);
+      if (tries < 20) {
+        iframe.setAttribute('data-fsm-decorate-tries', String(tries + 1));
+        setTimeout(function() { fsmDecorateEndpointEngine(engine); }, 250);
+      }
+      return;
+    }
+    iframe.setAttribute('data-fsm-decorate-tries', '0');
+    var bar = doc.getElementById('fsm-business-update-bar');
+    if (!bar) {
+      bar = doc.createElement('div');
+      bar.id = 'fsm-business-update-bar';
+      bar.style.cssText = 'position:sticky;top:0;z-index:9999;margin:8px 0 12px;padding:10px 12px;border:1px solid #38bdf8;border-radius:8px;background:#ecfeff;color:#0f172a;box-shadow:0 8px 22px rgba(15,23,42,.18);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;';
+      var anchor = fsmEndpointBarAnchor(doc, engine);
+      if (anchor && anchor.parent) anchor.parent.insertBefore(bar, anchor.before || null);
+    }
+    bar.innerHTML = ''
+      + '<div><div style="font-size:11px;font-weight:900;color:#0369a1;text-transform:uppercase;">Business System Endpoint Selection</div>'
+      + '<div style="font-size:12px;color:#0f172a;">Mapping <strong>' + fsmSafe(ctx.compName) + '</strong>. Select exactly one scanned row below, then add it to the business component.</div></div>';
+    var updateBtn = doc.createElement('button');
+    updateBtn.type = 'button';
+    updateBtn.textContent = 'Add to Business Component';
+    updateBtn.style.cssText = 'background:#a63b3b;border:1px solid #7f1d1d;color:white;border-radius:5px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;';
+    updateBtn.onclick = function() { fsmCaptureSelectedEndpoint(ctx); };
+    bar.appendChild(updateBtn);
+  }
+  function fsmScheduleEndpointDecoration(engine) {
+    engine = engine || 'linux';
+    var iframe = document.getElementById('fsm-iframe-' + engine);
+    if (!iframe || iframe._fsmDecorateScheduleActive) return;
+    iframe._fsmDecorateScheduleActive = true;
+    var attempts = 0;
+    function tick() {
+      var ctx = fsmRestoreEndpointContext();
+      if (!ctx || ctx.engine !== engine) {
+        iframe._fsmDecorateScheduleActive = false;
+        return;
+      }
+      try { fsmDecorateEndpointEngine(engine); } catch(e) {}
+      attempts++;
+      if (attempts < 28) setTimeout(tick, 250);
+      else iframe._fsmDecorateScheduleActive = false;
+    }
+    tick();
+  }
+  function fsmJumpToEndpointTable(engine) {
+    var iframe = document.getElementById('fsm-iframe-' + (engine || 'linux'));
+    if (!iframe) return;
+    var run = function() {
+      try {
+        fsmDecorateEndpointEngine(engine || 'linux');
+        fsmScheduleEndpointDecoration(engine || 'linux');
+        if (iframe.scrollIntoView) iframe.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var doc = iframe.contentDocument;
+        var target = fsmEndpointTableTarget(doc, engine || 'linux');
+        var bar = doc ? doc.getElementById('fsm-business-update-bar') : null;
+        if (bar && bar.scrollIntoView) bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch(e) {}
+    };
+    if (iframe.contentDocument && iframe.contentDocument.readyState !== 'loading') {
+      setTimeout(run, 120);
+    } else {
+      iframe.addEventListener('load', function once() { setTimeout(run, 200); }, { once: true });
+    }
+  }
+  function fsmBeginEndpointSelection(sysId, compName, engine, sub) {
+    fsmSetEndpointContext({ sysId: sysId, compName: compName, engine: engine || 'linux' });
+    fsmOpenComponentEngine(engine || 'linux', sub);
+    setTimeout(function() { fsmClearEngineSelections(engine || 'linux'); }, 180);
+    fsmUpdateEndpointMapBar();
+    fsmScheduleEndpointDecoration(engine || 'linux');
+    fsmJumpToEndpointTable(engine || 'linux');
+  }
+  function fsmCancelEndpointSelection() {
+    fsmSetEndpointContext(null);
+    fsmClearEndpointEngineBars();
+    fsmUpdateEndpointMapBar();
+  }
+  function fsmSyncFloatingEndpointButton(ctx) {
+    var btn = document.getElementById('fsm-floating-add-component-btn');
+    if (!ctx) {
+      if (btn) btn.style.display = 'none';
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'fsm-floating-add-component-btn';
+      btn.type = 'button';
+      btn.textContent = 'Add to Business Component';
+      btn.onclick = function() { fsmCaptureSelectedEndpoint(); };
+      btn.style.cssText = 'position:fixed;right:24px;top:104px;z-index:2147483000;background:#166534;border:2px solid #22c55e;color:#fff;border-radius:8px;padding:11px 16px;font-size:13px;font-weight:900;box-shadow:0 10px 28px rgba(20,83,45,.35);cursor:pointer;';
+      document.body.appendChild(btn);
+    }
+    btn.style.display = '';
+    btn.title = 'Mapping "' + ctx.compName + '". Select one scanned row in the active engine, then click this.';
+  }
+  function fsmUpdateEndpointMapBar() {
+    var bar = document.getElementById('fsm-endpoint-map-bar');
+    var label = document.getElementById('fsm-endpoint-map-label');
+    if (!bar) return;
+    var ctx = fsmRestoreEndpointContext();
+    if (!ctx) {
+      bar.style.display = 'none';
+      fsmClearEndpointEngineBars();
+      fsmSyncFloatingEndpointButton(null);
+      return;
+    }
+    bar.style.display = 'flex';
+    fsmSyncFloatingEndpointButton(ctx);
+    if (label) {
+      label.textContent = 'Mapping "' + ctx.compName + '". Select exactly one scanned row in the ' + (_fsmEngineLabels[ctx.engine] || 'migration engine') + ' table, then click Add to Business Component.';
+    }
+    fsmDecorateEndpointEngine(ctx.engine);
+  }
+  function fsmShowEndpointUpdateSuccess(ctx, ep) {
+    var box = document.getElementById('fsm-endpoint-warning');
+    if (!box || !ctx) return;
+    box.style.display = '';
+    box.className = 'fsm-terminal-output';
+    box.textContent = '[OK] Updated ' + ctx.compName + ' from ' + (ep.sourceName || ep.snapshotName || ep.endpointId || 'selected endpoint')
+      + '\n[NEXT] Select the next business component and map its matching scanned row.';
+    var sec = document.getElementById('fsm-plan-section');
+    if (sec) { try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {} }
+  }
+  function fsmRowCellText(row, idx) {
+    if (!row || !row.cells || !row.cells[idx]) return '';
+    return (row.cells[idx].innerText || row.cells[idx].textContent || '').trim();
+  }
+  function fsmCheckedEndpointFromImageRow(win, cb) {
+    var idx = cb.getAttribute('data-idx');
+    var rowData = null;
+    if (idx !== null && win && win.imageScanState && Array.isArray(win.imageScanState.rows)) {
+      rowData = win.imageScanState.rows[parseInt(idx, 10)] || null;
+    }
+    var tr = cb.closest ? cb.closest('tr') : null;
+    var isVolume = !!(rowData && rowData.asset_type === 'volume_snapshot');
+    var snapId = rowData ? fsmText(rowData.snapshot_id || rowData.image_id) : fsmRowCellText(tr, 7);
+    var replacement = tr ? tr.querySelector('.replacement-ip-input') : null;
+    var flavorSel = tr ? tr.querySelector('.target-flavor-select') : null;
+    var volTargetVm = tr ? tr.querySelector('.volsnap-target-vm-id') : null;
+    var volTargetIp = tr ? tr.querySelector('.volsnap-target-ip') : null;
+    return {
+      sourceName: fsmText((rowData && (isVolume ? (rowData.attached_to || rowData.source_vm_name || rowData.snapshot_name) : (rowData.source_vm_name || rowData.snapshot_name || rowData.image_name))) || fsmRowCellText(tr, isVolume ? 1 : 4)),
+      sourceId: fsmText((rowData && (isVolume ? (rowData.volume_id || rowData.source_volume_id || rowData.source_server_id) : (rowData.source_server_id || rowData.volume_id || rowData.image_id))) || ''),
+      sourceIp: fsmText((replacement && replacement.value) || (rowData && (rowData.attached_vm_ip || rowData.source_ip || rowData.replacement_ip || rowData.replacement_floating_ip)) || ''),
+      snapshotName: fsmText((rowData && (rowData.snapshot_name || rowData.image_name)) || fsmRowCellText(tr, 4)),
+      snapshotId: snapId,
+      endpointId: snapId,
+      os: fsmText((rowData && (rowData.os_distro || rowData.os_type)) || ''),
+      flavor: fsmText((flavorSel && flavorSel.value) || (rowData && (rowData.target_flavor || rowData.flavor)) || ''),
+      targetName: fsmText((volTargetVm && volTargetVm.value) || (rowData && (rowData.flex_target_vm || rowData.target_flex_vm || rowData.target_flex)) || ''),
+      targetIp: fsmText((volTargetIp && volTargetIp.value) || (rowData && (rowData.flex_target_ip || rowData.target_flex_vm_ip)) || ''),
+      assetType: fsmText((rowData && rowData.asset_type) || '')
+    };
+  }
+  function fsmCheckedEndpointFromDataset(cb) {
+    var tr = cb.closest ? cb.closest('tr') : null;
+    var isDbPair = !!(cb.dataset.ospcName || cb.dataset.ospcIp || cb.dataset.flexIp);
+    var snapName = cb.dataset.snapshotName || (isDbPair ? '' : fsmRowCellText(tr, 4));
+    var snapId = cb.dataset.snapshotId || (isDbPair ? '' : cb.dataset.sourceId || '');
+    return {
+      sourceName: cb.dataset.sourceName || cb.dataset.ospcName || fsmRowCellText(tr, 1),
+      sourceId: cb.dataset.sourceId || cb.dataset.ospcId || cb.dataset.ospcName || fsmRowCellText(tr, 2),
+      sourceIp: cb.dataset.sourceIp || cb.dataset.ospcIp || fsmRowCellText(tr, 2),
+      snapshotName: snapName,
+      snapshotId: snapId,
+      endpointId: cb.dataset.sourceId || cb.dataset.snapshotId || cb.dataset.ospcIp || cb.dataset.tableCacheKey || '',
+      os: cb.dataset.osType || cb.dataset.osFamily || cb.dataset.os || '',
+      flavor: cb.dataset.flavor || cb.dataset.sourceFlavor || '',
+      targetName: cb.dataset.targetName || cb.dataset.flexName || fsmRowCellText(tr, 5),
+      targetIp: cb.dataset.flexIp || '',
+      assetType: cb.dataset.assetType || (isDbPair ? 'database' : '')
+    };
+  }
+  function fsmCollectSelectedEndpoints(engine) {
+    var iframe = document.getElementById('fsm-iframe-' + (engine || 'linux'));
+    if (!iframe || !iframe.contentDocument) return [];
+    var doc = iframe.contentDocument;
+    var win = iframe.contentWindow;
+    var selector = [
+      '.ospc-image-cb:checked',
+      '.vm-checkbox:checked',
+      '.vm-select-cb:checked',
+      'input[data-vm-checkbox]:checked',
+      '.batch-vm-checkbox:checked',
+      '.vsp-approve-cb:checked',
+      '.agent1-endpoint-cb:checked',
+      '#node-pair-tbody input[type="checkbox"]:checked'
+    ].join(',');
+    var boxes = Array.from(doc.querySelectorAll(selector)).filter(function(cb) {
+      return cb.id !== 'ospc-select-all-cb' && cb.id !== 'ospc-fresh-all-cb';
+    });
+    return boxes.map(function(cb) {
+      if (cb.classList && cb.classList.contains('ospc-image-cb')) return fsmCheckedEndpointFromImageRow(win, cb);
+      if (cb.classList && cb.classList.contains('vsp-approve-cb')) {
+        var sid = cb.getAttribute('data-snap-id') || '';
+        var pair = win && win._volsnapPairingMap ? win._volsnapPairingMap[sid] : null;
+        return {
+          sourceName: fsmText((pair && (pair.ospc_server_name || pair.snapshot_name)) || sid),
+          sourceId: fsmText((pair && (pair.ospc_server_id || pair.volume_id)) || ''),
+          snapshotName: fsmText((pair && pair.snapshot_name) || sid),
+          snapshotId: sid,
+          endpointId: sid,
+          assetType: 'volume'
+        };
+      }
+      return fsmCheckedEndpointFromDataset(cb);
+    }).filter(function(ep) {
+      return fsmText(ep.endpointId || ep.snapshotId || ep.sourceId || ep.sourceName).trim();
+    });
+  }
+  function fsmCaptureSelectedEndpoint(contextOverride) {
+    var ctx = contextOverride || fsmRestoreEndpointContext();
+    if (contextOverride) fsmSetEndpointContext(contextOverride);
+    if (!ctx) {
+      alert('Select a business component first.');
+      return;
+    }
+    var selected = fsmCollectSelectedEndpoints(ctx.engine);
+    if (!selected.length) {
+      alert('No endpoint selected. Select exactly one source VM, volume snapshot, or DB row in the active migration engine table.');
+      return;
+    }
+    if (selected.length > 1) {
+      alert('Duplicate endpoint selection detected. Select exactly one source endpoint for this business component.');
+      return;
+    }
+    var ep = selected[0];
+    var patch = {
+      endpointSelected: true,
+      endpointEngine: ctx.engine,
+      endpointName: ep.sourceName || ep.snapshotName || '',
+      endpointId: ep.endpointId || ep.snapshotId || ep.sourceId || '',
+      sourceName: ep.sourceName || '',
+      sourceId: ep.sourceId || '',
+      snapshotName: ep.snapshotName || '',
+      snapshotId: ep.snapshotId || '',
+      endpointAssetType: ep.assetType || ''
+    };
+    if (ep.sourceIp) patch.sourceIp = ep.sourceIp;
+    if (ep.sourceIp) patch.src = ep.sourceIp;
+    if (ep.targetIp) patch.tgt = ep.targetIp;
+    if (ep.targetName) patch.targetName = ep.targetName;
+    if (ep.os) patch.os = ep.os;
+    if (ep.flavor) patch.flavor = ep.flavor;
+    if (ctx.engine === 'vol' || /volume/i.test(ep.assetType || '')) {
+      patch.volumeSnapshotName = ep.snapshotName || ep.sourceName || '';
+      patch.volumeSnapshotId = ep.snapshotId || ep.endpointId || '';
+    }
+    fsmUpdateComponent(ctx.sysId, ctx.compName, patch);
+    fsmClearEngineSelections(ctx.engine);
+    fsmSetEndpointContext(null);
+    fsmClearEndpointEngineBars();
+    fsmUpdateEndpointMapBar();
+    fsmValidateEndpointMappings(false);
+    fsmShowEndpointUpdateSuccess(ctx, ep);
+  }
+  function fsmImportFromUAT() {
+    if (typeof window.uatS1ReloadFromStorage === 'function') window.uatS1ReloadFromStorage();
+    fsmRefresh();
+    if (_fsmSelId) fsmRenderPlan(_fsmSelId);
+    var badge = document.getElementById('s2fullmig-status');
+    if (badge) { badge.textContent = 'Business Systems Refreshed'; badge.className = 'gov-status-badge status-done'; }
+  }
+  function fsmMountBusinessSystemEngine() {
+    var host = document.getElementById('fsm-uat-engine-host');
+    var engine = document.getElementById('uatS1SystemsView');
+    if (!host || !engine) return;
+    if (!window._fsmUatEnginePlaceholder) {
+      window._fsmUatEnginePlaceholder = document.createComment('uatS1SystemsView original position');
+      if (engine.parentNode) engine.parentNode.insertBefore(window._fsmUatEnginePlaceholder, engine);
+    }
+    if (engine.parentNode !== host) host.appendChild(engine);
+    engine.style.display = '';
+    if (typeof window.uatS1ReloadFromStorage === 'function') window.uatS1ReloadFromStorage();
+    fsmSetStandaloneVisible(false);
+    fsmEnhanceMountedBusinessCards();
+  }
+  function fsmRestoreBusinessSystemEngine() {
+    var engine = document.getElementById('uatS1SystemsView');
+    var ph = window._fsmUatEnginePlaceholder;
+    fsmSetStandaloneVisible(true);
+    if (engine && ph && ph.parentNode && engine.parentNode !== ph.parentNode) {
+      ph.parentNode.insertBefore(engine, ph.nextSibling);
+    }
+  }
+  function fsmSetStandaloneVisible(visible) {
+    var standalone = document.getElementById('uatS1StandaloneSection');
+    if (standalone) standalone.style.display = visible ? '' : 'none';
+  }
+  function fsmEnhanceMountedBusinessCards() {
+    var host = document.getElementById('fsm-uat-engine-host');
+    if (!host) return;
+    fsmSetStandaloneVisible(false);
+    var cards = host.querySelectorAll('[data-bz-card]');
+    for (var i = 0; i < cards.length; i++) {
+      (function(card) {
+        var id = card.getAttribute('data-bz-card');
+        var selected = id && id === _fsmSelId;
+        card.style.cursor = 'pointer';
+        card.style.borderColor = selected ? '#2563eb' : '#dbe4f0';
+        card.style.boxShadow = selected ? '0 0 0 3px rgba(37,99,235,.18)' : '';
+        card.style.background = selected ? '#eff6ff' : '#fff';
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        card.title = 'Select this business system to inspect source infrastructure details';
+        card.onclick = function(e) {
+          if (e && e.target && e.target.closest && e.target.closest('button')) return;
+          fsmSelectSystem(id);
+        };
+        card.onkeydown = function(e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fsmSelectSystem(id);
+          }
+        };
+      })(cards[i]);
+    }
   }
 
   function fsmStatusKey(sysId, compName) {
     return 'fsm_s_' + sysId + '_' + compName.replace(/\s+/g, '_');
   }
   function fsmGetStatus(sysId, compName) {
-    try { return localStorage.getItem(fsmStatusKey(sysId, compName)) || 'Pending'; } catch(e) { return 'Pending'; }
+    try {
+      var status = localStorage.getItem(fsmStatusKey(sysId, compName)) || 'Pending Migration';
+      return status === 'Migrated' ? 'Migrated' : 'Pending Migration';
+    } catch(e) { return 'Pending Migration'; }
   }
   function fsmSetStatus(sysId, compName, status) {
+    if (status === 'Migrated') {
+      var warnings = fsmValidateEndpointMappings(false, compName);
+      if (warnings.length) {
+        alert(warnings.join('\n'));
+        return;
+      }
+    }
     try { localStorage.setItem(fsmStatusKey(sysId, compName), status); } catch(e) {}
     fsmRenderPlan(_fsmSelId);
     fsmUpdateStats();
@@ -21616,14 +22427,48 @@ ${certContent}
     }
   }
 
+  function fsmVolumeStatusKey(sysId, compName) {
+    return 'fsm_vs_' + sysId + '_' + compName.replace(/\s+/g, '_');
+  }
+  function fsmGetVolumeStatus(sysId, compName) {
+    try {
+      var status = localStorage.getItem(fsmVolumeStatusKey(sysId, compName)) || 'Pending Migration';
+      return status === 'Migrated and Attached' ? 'Migrated and Attached' : 'Pending Migration';
+    } catch(e) { return 'Pending Migration'; }
+  }
+  function fsmSetVolumeStatus(sysId, compName, status) {
+    if (status === 'Migrated and Attached') {
+      var systems = fsmLoadSystems();
+      var sys = fsmFindSystem(systems, sysId);
+      var comp = null;
+      if (sys) {
+        var comps = sys.components || [];
+        for (var i = 0; i < comps.length; i++) {
+          if (comps[i].name === compName) { comp = comps[i]; break; }
+        }
+      }
+      if (!comp || !(comp.volumeSnapshotId || comp.volumeSnapshotName)) {
+        alert('Select a volume snapshot for "' + compName + '" before marking it Migrated and Attached.');
+        return;
+      }
+    }
+    try { localStorage.setItem(fsmVolumeStatusKey(sysId, compName), status); } catch(e) {}
+    fsmRenderPlan(_fsmSelId);
+    fsmUpdateStats();
+  }
+
   function fsmLoadDemo() {
     try {
       var existing = [];
       try { var d = localStorage.getItem('uatS1_systems'); if (d) existing = JSON.parse(d) || []; } catch(e2) {}
-      var hasDemo = false;
-      for (var i = 0; i < existing.length; i++) { if (existing[i].id === 'demo-bank-001') { hasDemo = true; break; } }
-      if (!hasDemo) existing = FSM_DEMO_DATA.concat(existing);
-      localStorage.setItem('uatS1_systems', JSON.stringify(existing));
+	      var replaced = false;
+	      existing = existing.map(function(item) {
+	        var sameDemo = item && (item.id === 'demo-bank-001' || fsmText(item.name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '') === 'bankingcoreplatform');
+	        if (sameDemo) { replaced = true; return Object.assign({}, item, FSM_DEMO_DATA[0], { id: FSM_DEMO_DATA[0].id, components: (FSM_DEMO_DATA[0].components || []) }); }
+	        return item;
+	      });
+	      if (!replaced) existing = FSM_DEMO_DATA.concat(existing);
+      localStorage.setItem('uatS1_systems', JSON.stringify(fsmDedupeSystems(existing)));
     } catch(e) {}
     fsmRefresh();
     setTimeout(function() { fsmSelectSystem('demo-bank-001'); }, 80);
@@ -21641,8 +22486,9 @@ ${certContent}
 
   function fsmMarkAllMigrated() {
     if (!_fsmSelId) return;
-    var systems = [];
-    try { var d = localStorage.getItem('uatS1_systems'); if (d) systems = JSON.parse(d) || []; } catch(e) {}
+    var warnings = fsmValidateEndpointMappings(true);
+    if (warnings.length) return;
+    var systems = fsmLoadSystems();
     for (var i = 0; i < systems.length; i++) {
       if (systems[i].id === _fsmSelId) {
         var comps = systems[i].components || [];
@@ -21655,6 +22501,49 @@ ${certContent}
     fsmRenderPlan(_fsmSelId);
     fsmUpdateStats();
   }
+  function fsmSaveSnapshotFields(sysId, compName) {
+    var key = fsmComponentKey(compName);
+    function v(field) {
+      var el = document.querySelector('[data-fsm-comp-key="' + key + '"][data-fsm-snap-field="' + field + '"]');
+      return el ? el.value.trim() : '';
+    }
+    var patch = {
+      snapshotName: v('snapshotName'),
+      snapshotId: v('snapshotId'),
+      volumeSnapshotName: v('volumeSnapshotName'),
+      volumeSnapshotId: v('volumeSnapshotId')
+    };
+    if (patch.snapshotId || patch.volumeSnapshotId) {
+      patch.endpointSelected = true;
+      patch.endpointId = patch.snapshotId || patch.volumeSnapshotId;
+    }
+    fsmUpdateComponent(sysId, compName, patch);
+    fsmValidateEndpointMappings(false);
+  }
+  function fsmValidateEndpointMappings(pop, onlyCompName) {
+    var systems = fsmLoadSystems();
+    var sys = fsmFindSystem(systems, _fsmSelId);
+    var warnings = [];
+    if (!sys) return warnings;
+    var seen = {};
+    (sys.components || []).forEach(function(c) {
+      if (onlyCompName && c.name !== onlyCompName) return;
+      var key = fsmEndpointKey(c);
+      var manualKey = fsmText(c.snapshotId || c.volumeSnapshotId).trim();
+      var selected = !!(c.endpointSelected || key || manualKey);
+      if (!selected) warnings.push('Missing endpoint selection for component "' + c.name + '".');
+      var uniqueKey = key || manualKey;
+      if (uniqueKey) {
+        if (seen[uniqueKey]) warnings.push('Duplicate endpoint/snapshot "' + uniqueKey + '" used by "' + seen[uniqueKey] + '" and "' + c.name + '".');
+        else seen[uniqueKey] = c.name;
+      }
+      if (c.endpointSelections && c.endpointSelections.length > 1) {
+        warnings.push('Component "' + c.name + '" has multiple endpoint entries. Keep exactly one selected endpoint.');
+      }
+    });
+    fsmShowEndpointWarning(warnings, !!pop);
+    return warnings;
+  }
 
   function fsmMakeCell(text, style) {
     var td = document.createElement('td');
@@ -21663,15 +22552,16 @@ ${certContent}
     return td;
   }
 
-  function fsmRefresh() {
-    var systems = [];
-    try { var d = localStorage.getItem('uatS1_systems'); if (d) systems = JSON.parse(d) || []; } catch(e) {}
-    var grid  = document.getElementById('fsm-systems-grid');
-    var empty = document.getElementById('fsm-empty');
-    var badge = document.getElementById('fsm-sys-badge');
-    if (!grid) return;
-    if (badge) badge.textContent = systems.length;
-    grid.innerHTML = '';
+	  function fsmRefresh() {
+	    fsmMountBusinessSystemEngine();
+	    var systems = fsmLoadSystems();
+	    fsmSaveSystems(systems);
+	    var grid  = document.getElementById('fsm-systems-grid');
+	    var empty = document.getElementById('fsm-empty');
+	    var badge = document.getElementById('fsm-sys-badge');
+	    if (badge) badge.textContent = systems.length;
+	    if (!grid) { fsmUpdateStats(systems); return; }
+	    grid.innerHTML = '';
 
     if (!systems.length) {
       if (empty) empty.style.display = '';
@@ -21694,7 +22584,7 @@ ${certContent}
         // Build tool counts
         var toolCounts = {}, toolColors = {};
         for (var ti = 0; ti < comps.length; ti++) {
-          var t = fsmCompTool(comps[ti].name);
+          var t = fsmCompTool(comps[ti]);
           toolCounts[t.badge] = (toolCounts[t.badge] || 0) + 1;
           toolColors[t.badge] = t.color;
         }
@@ -21766,27 +22656,35 @@ ${certContent}
 
   function fsmUpdateStats(systems) {
     if (!systems) {
-      try { var d = localStorage.getItem('uatS1_systems'); systems = d ? JSON.parse(d) : []; } catch(e) { systems = []; }
+      systems = fsmLoadSystems();
     }
-    var totalComp = 0, done = 0;
-    for (var i = 0; i < systems.length; i++) {
-      var comps = systems[i].components || [];
-      totalComp += comps.length;
-      for (var j = 0; j < comps.length; j++) {
-        if (fsmGetStatus(systems[i].id, comps[j].name) === 'Migrated') done++;
-      }
-    }
+	    var totalComp = 0, done = 0, vm = 0, db = 0, vol = 0;
+	    for (var i = 0; i < systems.length; i++) {
+	      var comps = systems[i].components || [];
+	      totalComp += comps.length;
+	      for (var j = 0; j < comps.length; j++) {
+	        var tool = fsmCompTool(comps[j]);
+	        if (tool.badge === 'DB') db++;
+	        else if (tool.badge === 'VOL') vol++;
+	        else if (tool.badge === 'LINUX' || tool.badge === 'WIN') vm++;
+	        if (fsmGetStatus(systems[i].id, comps[j].name) === 'Migrated') done++;
+	      }
+	    }
     function st(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
-    st('fsm-stat-sys',     systems.length);
-    st('fsm-stat-comp',    totalComp);
-    st('fsm-stat-done',    done);
-    st('fsm-stat-pending', totalComp - done);
-  }
+	    st('fsm-stat-sys',     systems.length);
+	    st('fsm-stat-comp',    totalComp);
+	    st('fsm-stat-vm',      vm);
+	    st('fsm-stat-db',      db);
+	    st('fsm-stat-vol',     vol);
+	    st('fsm-stat-done',    done);
+	    st('fsm-stat-pending', totalComp - done);
+	  }
 
   function fsmSelectSystem(sysId) {
     _fsmSelId = sysId;
     fsmRefresh();
     fsmRenderPlan(sysId);
+    fsmValidateEndpointMappings(false);
     var badge = document.getElementById('s2fullmig-status');
     if (badge) { badge.textContent = 'System Selected'; badge.className = 'gov-status-badge status-done'; }
     var sec = document.getElementById('fsm-plan-section');
@@ -21794,8 +22692,7 @@ ${certContent}
   }
 
   function fsmRenderPlan(sysId) {
-    var systems = [];
-    try { var d = localStorage.getItem('uatS1_systems'); if (d) systems = JSON.parse(d) || []; } catch(e) {}
+    var systems = fsmLoadSystems();
     var sys = null;
     for (var i = 0; i < systems.length; i++) { if (systems[i].id === sysId) { sys = systems[i]; break; } }
     var section = document.getElementById('fsm-plan-section');
@@ -21814,7 +22711,7 @@ ${certContent}
     if (!comps.length) {
       var emptyRow = document.createElement('tr');
       var emptyTd  = document.createElement('td');
-      emptyTd.setAttribute('colspan', '5');
+	      emptyTd.setAttribute('colspan', '13');
       emptyTd.style.cssText = 'color:#64748b;font-style:italic;';
       emptyTd.textContent = 'No components. Edit this system in Stage 1 Business System Ontology.';
       emptyRow.appendChild(emptyTd);
@@ -21822,15 +22719,34 @@ ${certContent}
       return;
     }
 
-    var sColors = { Migrated: '#86efac', 'In Progress': '#fcd34d', Failed: '#fca5a5', Pending: '#94a3b8' };
+    var sColors = { Migrated: '#86efac', 'Pending Migration': '#fcd34d', Pending: '#fcd34d' };
 
     for (var ci = 0; ci < comps.length; ci++) {
       (function(c) {
-        var tool   = fsmCompTool(c.name);
-        var status = fsmGetStatus(sysId, c.name);
-        var sCol   = sColors[status] || '#94a3b8';
+	        var tool   = fsmCompTool(c);
+	        var status = fsmGetStatus(sysId, c.name);
+	        var sCol   = sColors[status] || '#94a3b8';
+	        var srcRaw = c.src || c.source || c.source_ip || '';
+	        var tgtRaw = c.tgt || c.target || c.target_ip || '';
+	        var srcHost = fsmExtractHost(srcRaw);
+	        var tgtHost = fsmExtractHost(tgtRaw);
+	        var srcPort = fsmExtractPort(srcRaw);
+	        var osType = fsmInferOs(c);
+	        var flavor = fsmInferFlavor(c, tool);
+	        var srcInfra = c.sourceInfra || c.source_infra || fsmInferInfra(srcRaw);
+	        var sourceName = c.sourceName || c.endpointName || '';
+	        var sourceId = c.sourceId || c.endpointId || '';
+	        var snapshotName = c.snapshotName || '';
+	        var snapshotId = c.snapshotId || '';
+	        var volumeSnapshotName = c.volumeSnapshotName || '';
+	        var volumeSnapshotId = c.volumeSnapshotId || '';
+	        var compKey = fsmComponentKey(c.name);
+	        var endpointSelected = !!c.endpointSelected;
+	        var volumeSelected = !!(volumeSnapshotName || volumeSnapshotId);
+	        var volumeStatus = fsmGetVolumeStatus(sysId, c.name);
 
-        var tr = document.createElement('tr');
+	        var tr = document.createElement('tr');
+	        tr.className = 'fsm-component-row ' + (endpointSelected ? 'fsm-component-row-selected' : 'fsm-component-row-pending');
 
         // Name cell
         var tdName = document.createElement('td');
@@ -21839,23 +22755,59 @@ ${certContent}
         tdName.appendChild(strong);
         tr.appendChild(tdName);
 
-        // Kind badge cell
-        var tdKind = document.createElement('td');
-        var kindSpan = document.createElement('span');
-        kindSpan.style.cssText = 'font-size:11px;background:' + tool.color + '22;color:' + tool.color + ';border-radius:4px;padding:2px 7px;';
-        kindSpan.textContent = tool.badge;
-        tdKind.appendChild(kindSpan);
-        tr.appendChild(tdKind);
+	        // Workload badge cell
+	        var tdKind = document.createElement('td');
+	        var kindSpan = document.createElement('span');
+	        kindSpan.style.cssText = 'font-size:11px;background:' + tool.color + '22;color:' + tool.color + ';border-radius:4px;padding:2px 7px;';
+	        kindSpan.textContent = tool.workload;
+	        tdKind.appendChild(kindSpan);
+	        tr.appendChild(tdKind);
 
-        // Tool link cell
-        var tdTool = document.createElement('td');
-        var toolLink = document.createElement('a');
-        toolLink.href = '#';
-        toolLink.style.color = '#7dd3fc';
-        toolLink.textContent = tool.label;
-        (function(sub) { toolLink.onclick = function() { stage2OpenPath(sub); return false; }; })(tool.sub);
-        tdTool.appendChild(toolLink);
-        tr.appendChild(tdTool);
+	        var tdInfra = document.createElement('td');
+	        tdInfra.innerHTML = '<span style="font-size:11px;background:#0f172a;color:#93c5fd;border:1px solid #1e3a5f;border-radius:999px;padding:2px 8px;">' + fsmSafe(srcInfra) + '</span>';
+	        tr.appendChild(tdInfra);
+
+	        var tdSourceName = document.createElement('td');
+	        tdSourceName.innerHTML = '<div style="font-weight:700;color:#0f172a;font-size:11px;">' + fsmSafe(sourceName || c.name) + '</div><div style="font-family:monospace;color:#64748b;font-size:10px;">id: ' + fsmSafe(sourceId || 'not selected') + '</div>';
+	        tr.appendChild(tdSourceName);
+
+	        var tdSource = document.createElement('td');
+	        tdSource.innerHTML = '<div style="font-family:monospace;color:#cbd5e1;font-size:11px;">' + fsmSafe(srcHost || '—') + '</div><div style="color:#64748b;font-size:10px;">' + fsmSafe(srcRaw || 'source pending') + '</div>';
+	        tr.appendChild(tdSource);
+
+	        var tdOs = document.createElement('td');
+	        tdOs.innerHTML = '<div style="font-weight:700;color:#0f172a;font-size:11px;">' + fsmSafe(osType) + '</div><div style="color:#64748b;font-size:10px;">inferred from component/source</div>';
+	        tr.appendChild(tdOs);
+
+	        var tdFlavor = document.createElement('td');
+	        tdFlavor.innerHTML = '<code style="font-size:11px;color:#0f172a;">' + fsmSafe(flavor) + '</code>';
+	        tr.appendChild(tdFlavor);
+
+	        var tdPort = document.createElement('td');
+	        tdPort.innerHTML = '<div style="font-family:monospace;color:#0f172a;font-size:11px;">' + fsmSafe(srcPort || '—') + '</div><div style="color:#64748b;font-size:10px;">' + fsmSafe(c.path || c.health || c.healthPath || 'health check pending') + '</div>';
+	        tr.appendChild(tdPort);
+
+	        var tdSnapshot = document.createElement('td');
+	        tdSnapshot.innerHTML = '<div style="font-weight:700;color:#0f172a;font-size:11px;">' + fsmSafe(snapshotName || 'not selected') + '</div><div style="font-family:monospace;color:#64748b;font-size:10px;">id: ' + fsmSafe(snapshotId || 'not selected') + '</div>';
+	        tr.appendChild(tdSnapshot);
+
+	        var tdVolSnapshot = document.createElement('td');
+	        tdVolSnapshot.innerHTML = '<div style="font-weight:700;color:#0f172a;font-size:11px;">' + fsmSafe(volumeSnapshotName || 'not selected') + '</div><div style="font-family:monospace;color:#64748b;font-size:10px;">id: ' + fsmSafe(volumeSnapshotId || 'not selected') + '</div>';
+	        tr.appendChild(tdVolSnapshot);
+
+	        var tdTarget = document.createElement('td');
+	        tdTarget.innerHTML = '<div style="font-family:monospace;color:#bbf7d0;font-size:11px;">' + fsmSafe(tgtRaw || '—') + '</div><div style="color:#64748b;font-size:10px;">destination: ' + fsmSafe(tgtHost || 'pending') + '</div>';
+	        tr.appendChild(tdTarget);
+
+	        // Tool link cell
+	        var tdTool = document.createElement('td');
+	        var toolLink = document.createElement('a');
+	        toolLink.href = '#';
+	        toolLink.style.color = '#7dd3fc';
+	        toolLink.textContent = tool.label;
+	        (function(engine, sub) { toolLink.onclick = function() { fsmOpenComponentEngine(engine, sub); return false; }; })(tool.engine, tool.sub);
+	        tdTool.appendChild(toolLink);
+	        tr.appendChild(tdTool);
 
         // Status cell
         var tdStatus = document.createElement('td');
@@ -21866,36 +22818,94 @@ ${certContent}
         tr.appendChild(tdStatus);
 
         // Action buttons cell — pure DOM, no onclick string escaping needed
-        var tdActions = document.createElement('td');
-        tdActions.style.cssText = 'display:flex;gap:3px;flex-wrap:wrap;';
-        var statuses = ['Pending', 'In Progress', 'Migrated', 'Failed'];
+	        var tdActions = document.createElement('td');
+        tdActions.style.cssText = 'white-space:nowrap;';
+        var actionWrap = document.createElement('div');
+        actionWrap.style.cssText = 'display:flex;gap:3px;flex-wrap:wrap;align-items:center;';
+	        var openBtn = document.createElement('button');
+	        openBtn.className = 'gov-btn fsm-endpoint-btn' + (endpointSelected ? ' fsm-endpoint-btn-selected' : '');
+	        var endpointSelectLabel = tool.badge === 'DB' ? 'Select Database' : 'Select Endpoint';
+	        openBtn.textContent = endpointSelected ? 'Endpoint Selected' : endpointSelectLabel;
+	        openBtn.title = endpointSelected ? 'Endpoint is mapped. Click to remap this component.' : (tool.badge === 'DB' ? 'Select the source database for this component.' : 'Select the source endpoint for this component.');
+	        (function(sid, cn, engine, sub) { openBtn.onclick = function() { fsmBeginEndpointSelection(sid, cn, engine, sub); }; })(sysId, c.name, tool.engine, tool.sub);
+	        actionWrap.appendChild(openBtn);
+	        var statuses = ['Pending Migration', 'Migrated'];
         for (var si = 0; si < statuses.length; si++) {
           (function(s) {
             var active = status === s;
             var btn = document.createElement('button');
-            btn.className = 'gov-btn';
+            btn.className = 'gov-btn fsm-migration-status-btn' + (active ? (s === 'Migrated' ? ' fsm-migration-status-btn-active-migrated' : ' fsm-migration-status-btn-active-pending') : '');
             btn.style.cssText = 'padding:3px 7px;font-size:10px;background:' + (active ? '#1e3a5f' : 'transparent') + ';border:1px solid ' + (active ? '#7dd3fc' : '#334155') + ';color:' + (active ? '#e2e8f0' : '#64748b') + ';border-radius:4px;';
             btn.textContent = s;
             (function(sid, cn, st) { btn.onclick = function() { fsmSetStatus(sid, cn, st); }; })(sysId, c.name, s);
-            tdActions.appendChild(btn);
+            actionWrap.appendChild(btn);
           })(statuses[si]);
         }
+        tdActions.appendChild(actionWrap);
         tr.appendChild(tdActions);
         tbody.appendChild(tr);
+
+        var subRow = document.createElement('tr');
+        subRow.className = 'fsm-snapshot-row';
+        var subTd = document.createElement('td');
+        subTd.setAttribute('colspan', '13');
+        subTd.innerHTML = ''
+          + '<div style="display:flex;width:100%;min-width:1760px;gap:8px;align-items:end;padding:8px 10px;border-left:3px solid #38bdf8;box-sizing:border-box;">'
+          + '<div style="display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:8px;align-items:end;flex:1;min-width:960px;">'
+          + '<label style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:#0369a1;font-weight:800;text-transform:uppercase;">Snapshot Name'
+          + '<input data-fsm-comp-key="' + fsmSafe(compKey) + '" data-fsm-snap-field="snapshotName" value="' + fsmSafe(snapshotName) + '" placeholder="source VM/image snapshot name" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;"></label>'
+          + '<label style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:#0369a1;font-weight:800;text-transform:uppercase;">Snapshot ID'
+          + '<input data-fsm-comp-key="' + fsmSafe(compKey) + '" data-fsm-snap-field="snapshotId" value="' + fsmSafe(snapshotId) + '" placeholder="snapshot/image ID" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;"></label>'
+          + '<label style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:#0369a1;font-weight:800;text-transform:uppercase;">Volume Snapshot Name'
+          + '<input data-fsm-comp-key="' + fsmSafe(compKey) + '" data-fsm-snap-field="volumeSnapshotName" value="' + fsmSafe(volumeSnapshotName) + '" placeholder="volume snapshot name" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;"></label>'
+          + '<label style="display:flex;flex-direction:column;gap:3px;font-size:10px;color:#0369a1;font-weight:800;text-transform:uppercase;">Volume Snapshot ID'
+          + '<input data-fsm-comp-key="' + fsmSafe(compKey) + '" data-fsm-snap-field="volumeSnapshotId" value="' + fsmSafe(volumeSnapshotId) + '" placeholder="volume snapshot ID" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:11px;"></label>'
+          + '</div>'
+          + '<div style="display:flex;gap:8px;flex-wrap:nowrap;align-items:center;justify-content:flex-end;align-self:end;margin-left:auto;white-space:nowrap;min-width:620px;">'
+          + '<button class="gov-btn btn-save" style="padding:7px 10px;font-size:11px;width:max-content;white-space:nowrap;" data-fsm-save-snap="' + fsmSafe(compKey) + '">Save Snapshot Fields</button>'
+          + '<button class="gov-btn fsm-volume-snapshot-btn' + (volumeSelected ? ' fsm-volume-snapshot-btn-selected' : '') + '" style="padding:7px 10px;font-size:10px;width:max-content;white-space:nowrap;" data-fsm-select-vol="' + fsmSafe(compKey) + '">Select Volume Snapshot</button>'
+          + '<button class="gov-btn fsm-volume-status-btn' + (volumeStatus === 'Pending Migration' ? ' fsm-volume-status-btn-active-pending' : '') + '" style="padding:7px 10px;font-size:10px;background:' + (volumeStatus === 'Pending Migration' ? '#1e3a5f' : 'transparent') + ';border:1px solid ' + (volumeStatus === 'Pending Migration' ? '#7dd3fc' : '#334155') + ';color:' + (volumeStatus === 'Pending Migration' ? '#e2e8f0' : '#64748b') + ';border-radius:4px;white-space:nowrap;" data-fsm-volume-status="' + fsmSafe(compKey) + '" data-fsm-volume-status-value="Pending Migration">Pending Migration</button>'
+          + '<button class="gov-btn fsm-volume-status-btn' + (volumeStatus === 'Migrated and Attached' ? ' fsm-volume-status-btn-active-migrated' : '') + '" style="padding:7px 10px;font-size:10px;background:' + (volumeStatus === 'Migrated and Attached' ? '#166534' : 'transparent') + ';border:1px solid ' + (volumeStatus === 'Migrated and Attached' ? '#14532d' : '#334155') + ';color:' + (volumeStatus === 'Migrated and Attached' ? '#ffffff' : '#64748b') + ';border-radius:4px;white-space:nowrap;" data-fsm-volume-status="' + fsmSafe(compKey) + '" data-fsm-volume-status-value="Migrated and Attached">Migrated and Attached</button>'
+          + '</div>'
+          + '</div>';
+        subRow.appendChild(subTd);
+        tbody.appendChild(subRow);
+        var saveSnapBtn = subRow.querySelector('[data-fsm-save-snap]');
+        if (saveSnapBtn) {
+          (function(sid, cn) { saveSnapBtn.onclick = function() { fsmSaveSnapshotFields(sid, cn); }; })(sysId, c.name);
+        }
+        var selectVolBtn = subRow.querySelector('[data-fsm-select-vol]');
+        if (selectVolBtn) {
+          (function(sid, cn) { selectVolBtn.onclick = function() { fsmBeginEndpointSelection(sid, cn, 'vol', 's2image'); }; })(sysId, c.name);
+        }
+        var volumeStatusBtns = subRow.querySelectorAll('[data-fsm-volume-status]');
+        for (var vbi = 0; vbi < volumeStatusBtns.length; vbi++) {
+          (function(btn, sid, cn) {
+            btn.onclick = function() { fsmSetVolumeStatus(sid, cn, btn.getAttribute('data-fsm-volume-status-value') || 'Pending Migration'); };
+          })(volumeStatusBtns[vbi], sysId, c.name);
+        }
       })(comps[ci]);
     }
   }
 
 
   var _fsmEngineLoaded = {};
+  var _fsmEngineOrder = ['linux', 'windows', 'vol', 'db'];
+  var _fsmEngineLabels = {
+    linux: 'Linux Snapshot engine selected',
+    windows: 'Windows Snapshot engine selected',
+    vol: 'Volume Snapshot engine selected',
+    db: 'App & DB Replication engine selected'
+  };
   var _fsmEngineUrls = {
-    vm:    '/image_migrator/',
+    linux: '/image_migrator/?mode=linux',
+    windows: '/image_migrator/?mode=windows',
     vol:   '/image_migrator/?mode=volume',
-    db:    '/agent1/',
-    infra: '/designer/?source=ospc'
+    db:    '/agent1/'
   };
 
   function fsmShowEngine(engine) {
+    if (_fsmEngineOrder.indexOf(engine) < 0) engine = 'linux';
     // Switch tab highlight
     var tabs = document.querySelectorAll('.fsm-etab');
     for (var i = 0; i < tabs.length; i++) {
@@ -21906,53 +22916,124 @@ ${certContent}
       tabs[i].style.borderBottom  = isActive ? '2px solid #7dd3fc' : '2px solid transparent';
     }
     // Show/hide engine panels
-    var panels = ['vm', 'vol', 'db', 'infra'];
+    var panels = _fsmEngineOrder;
     for (var pi = 0; pi < panels.length; pi++) {
       var panel = document.getElementById('fsm-engine-' + panels[pi]);
       if (panel) panel.style.display = panels[pi] === engine ? '' : 'none';
     }
+    var slider = document.getElementById('fsm-engine-slider');
+    if (slider) slider.value = _fsmEngineOrder.indexOf(engine);
+    var label = document.getElementById('fsm-engine-active-label');
+    if (label) label.textContent = _fsmEngineLabels[engine] || 'Migration engine selected';
+    fsmUpdateEndpointMapBar();
     // Lazy-load iframe on first open
     if (!_fsmEngineLoaded[engine]) {
       var iframe = document.getElementById('fsm-iframe-' + engine);
       if (iframe && _fsmEngineUrls[engine]) {
+        if (!iframe._fsmEndpointBridgeInstalled) {
+          iframe.addEventListener('load', function() {
+            fsmDecorateEndpointEngine(engine);
+            if (_fsmEndpointContext && _fsmEndpointContext.engine === engine) fsmJumpToEndpointTable(engine);
+          });
+          iframe._fsmEndpointBridgeInstalled = true;
+        }
         iframe.src = _fsmEngineUrls[engine];
         _fsmEngineLoaded[engine] = true;
       }
+    } else {
+      fsmDecorateEndpointEngine(engine);
     }
     // Scroll engine section into view
     var sec = document.getElementById('fsm-engines-section');
     if (sec) { try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {} }
   }
 
-  // Load VM engine immediately when FSM pane activates (first touch)
-  function fsmInitEngines() {
-    if (!_fsmEngineLoaded['vm']) {
-      var iframe = document.getElementById('fsm-iframe-vm');
-      if (iframe) { iframe.src = _fsmEngineUrls['vm']; _fsmEngineLoaded['vm'] = true; }
+  function fsmSetEngineFromSlider(idx) {
+    var i = Math.max(0, Math.min(_fsmEngineOrder.length - 1, parseInt(idx, 10) || 0));
+    fsmShowEngine(_fsmEngineOrder[i]);
+  }
+
+  function fsmSlideEngine(delta) {
+    var slider = document.getElementById('fsm-engine-slider');
+    var current = slider ? parseInt(slider.value, 10) || 0 : 0;
+    var next = Math.max(0, Math.min(_fsmEngineOrder.length - 1, current + delta));
+    fsmSetEngineFromSlider(next);
+  }
+
+  function fsmSetEngineHeight(px) {
+    var h = Math.max(900, Math.min(1800, parseInt(px, 10) || 1200));
+    var frames = document.querySelectorAll('.fsm-engine-frame');
+    for (var i = 0; i < frames.length; i++) frames[i].style.height = h + 'px';
+    var slider = document.getElementById('fsm-engine-height-slider');
+    if (slider) slider.value = h;
+    var label = document.getElementById('fsm-engine-height-label');
+    if (label) label.textContent = h + 'px';
+    try { localStorage.setItem('fsm_engine_height', String(h)); } catch(e) {}
+    if (typeof syncVisibleIframeHeights === 'function') {
+      try { requestAnimationFrame(syncVisibleIframeHeights); } catch(e2) {}
     }
   }
 
-  function fsmGoToOntology() {
-    if (typeof activateStage === 'function') activateStage('s1');
-    var btns = document.querySelectorAll('#subBar1 .sub-btn');
+  // Load Linux snapshot engine immediately when FSM pane activates (first touch)
+  function fsmInitEngines() {
+    try {
+      var savedHeight = localStorage.getItem('fsm_engine_height');
+      if (savedHeight) fsmSetEngineHeight(savedHeight);
+    } catch(e) {}
+    if (!_fsmEngineLoaded['linux']) {
+      var iframe = document.getElementById('fsm-iframe-linux');
+      if (iframe) { iframe.src = _fsmEngineUrls['linux']; _fsmEngineLoaded['linux'] = true; }
+    }
+  }
+
+	  function fsmGoToOntology() {
+	    if (typeof activateStage === 'function') activateStage('s1');
+	    var btns = document.querySelectorAll('#subBar1 .sub-btn');
     for (var i = 0; i < btns.length; i++) {
       btns[i].classList.toggle('active', btns[i].getAttribute('data-sub') === 's1business_ontology');
     }
     if (typeof activateSub === 'function' && typeof s1Panes !== 'undefined') {
-      activateSub(s1Panes, 's1business_ontology');
-    }
-  }
+	      activateSub(s1Panes, 's1business_ontology');
+	    }
+	  }
 
-  // Auto-seed demo + refresh when FSM pane activates
-  (function() {
-    var _orig = window.activateSub;
-    if (typeof _orig === 'function') {
-      window.activateSub = function(panes, id) {
-        _orig(panes, id);
-        if (id === 's2fullmig') setTimeout(fsmSeedIfEmpty, 80);
-      };
-    }
-  })();
+	  window.fsmLoadDemo = fsmLoadDemo;
+	  window.fsmRefresh = fsmRefresh;
+	  window.fsmMarkAllMigrated = fsmMarkAllMigrated;
+	  window.fsmShowEngine = fsmShowEngine;
+  window.fsmSetEngineFromSlider = fsmSetEngineFromSlider;
+  window.fsmSlideEngine = fsmSlideEngine;
+  window.fsmSetEngineHeight = fsmSetEngineHeight;
+  window.fsmEnhanceMountedBusinessCards = fsmEnhanceMountedBusinessCards;
+  window.fsmBeginEndpointSelection = fsmBeginEndpointSelection;
+  window.fsmCancelEndpointSelection = fsmCancelEndpointSelection;
+  window.fsmCaptureSelectedEndpoint = fsmCaptureSelectedEndpoint;
+  window.fsmRestoreEndpointContext = fsmRestoreEndpointContext;
+  window.fsmJumpToEndpointTable = fsmJumpToEndpointTable;
+  window.fsmValidateEndpointMappings = fsmValidateEndpointMappings;
+  window.fsmSaveSnapshotFields = fsmSaveSnapshotFields;
+  window.fsmSetVolumeStatus = fsmSetVolumeStatus;
+	  window.fsmGoToOntology = fsmGoToOntology;
+	  window.fsmImportFromUAT = fsmImportFromUAT;
+	  window.fsmOpenComponentEngine = fsmOpenComponentEngine;
+
+	  // Auto-seed demo + refresh when FSM pane activates
+	  (function() {
+	    var _orig = window.activateSub;
+	    if (typeof _orig === 'function') {
+	      window.activateSub = function(panes, id) {
+	        _orig(panes, id);
+	        if (id === 's2fullmig') setTimeout(fsmSeedIfEmpty, 80);
+	      };
+	    }
+	    var _origStage = window.activateStage;
+	    if (typeof _origStage === 'function') {
+	      window.activateStage = function(stage) {
+	        if (stage === 's4') fsmRestoreBusinessSystemEngine();
+	        return _origStage.apply(this, arguments);
+	      };
+	    }
+	  })();
 
   function s03dInit() {
     if (_s03d_inited) return;

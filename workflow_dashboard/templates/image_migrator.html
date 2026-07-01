@@ -11,8 +11,35 @@
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script>
+      function toggleEngineSection(sectionId, button) {
+        var body = document.getElementById(sectionId);
+        if (!body) return;
+        var collapsed = body.classList.toggle('collapsed');
+        if (button) {
+          button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          button.textContent = collapsed ? 'Show' : 'Hide';
+        }
+      }
+    </script>
     <style>
       .collapsed { display: none !important; }
+      .engine-collapse-btn {
+          border: 1px solid rgba(59,130,246,.55);
+          background: rgba(15,23,42,.86);
+          color: #bfdbfe;
+          border-radius: 999px;
+          padding: 6px 13px;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+          text-transform: uppercase;
+          letter-spacing: .04em;
+      }
+      .engine-collapse-btn:hover {
+          background: rgba(37,99,235,.24);
+          color: #e0f2fe;
+      }
       @keyframes neonPulse {
           0%   { color: #ff5e00; text-shadow: 0 0 10px #ff5e00, 0 0 20px #ff5e00, 0 0 30px #ff5e00; }
           33%  { color: #00e5ff; text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff, 0 0 30px #00e5ff; }
@@ -597,7 +624,9 @@
                 <div class="config-group">
                     <div class="group-header">
                         <h3><span style="width:4px;height:22px;background:linear-gradient(180deg,#818cf8,#6366f1);border-radius:2px;display:inline-block;margin-right:10px;"></span> Cloud Credentials</h3>
+                        <button type="button" class="engine-collapse-btn" aria-expanded="false" onclick="toggleEngineSection('cloud-credentials-fields', this)">Show</button>
                     </div>
+                    <div id="cloud-credentials-fields" class="collapsed">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
 
         <!-- OSPC — exact same field IDs as agent1.html (ospc_cloud_user/key/account) -->
@@ -800,6 +829,7 @@
       <p style="margin:14px 0 0;font-size:.75rem;color:#64748b;font-style:italic;">
         ✦ OSPC credentials are saved automatically and used by the scanner below. FLEX credentials are used by Validation (Step 3) and Deploy Generation (Step 4).
       </p>
+                    </div>
                 </div>
 
                 <script>
@@ -1105,13 +1135,10 @@
                 <div class="config-group" style="margin-top: 16px;">
                     <div class="group-header">
                         <h3>🖥 Jumphost Connection <span style="font-size:11px;color:#64748b;font-weight:400;margin-left:8px;">SSH target for NBD / Windows migration</span></h3>
-                        <label class="toggle-switch accent-blue">
-                            <input type="checkbox" checked onchange="document.getElementById('jumphost-fields').classList.toggle('collapsed')">
-                            <span class="slider"></span>
-                        </label>
+                        <button type="button" class="engine-collapse-btn" aria-expanded="false" onclick="toggleEngineSection('jumphost-fields', this)">Show</button>
                     </div>
 
-                    <div id="jumphost-fields" class="collapsable">
+                    <div id="jumphost-fields" class="collapsable collapsed">
                         <div style="margin-bottom:12px;padding:6px 10px;background:rgba(251,146,60,0.1);border-left:3px solid #f97316;border-radius:0 4px 4px 0;font-size:0.8rem;color:#fdba74;">
                             <strong style="color:#fed7aa;">⚡ Tip:</strong> Deploy your jumphost in the <strong>same OSPC region</strong> as the source VMs/snapshots for maximum transfer speed.
                         </div>
@@ -1532,6 +1559,13 @@
 
 
                 <section class="adv-panel" id="imageScannerPanel" style="margin-top: 16px;">
+                        <div id="fsm-native-image-add-bar" style="display:none;position:sticky;top:0;z-index:9999;margin:0 0 14px;padding:10px 12px;border:1px solid #38bdf8;border-radius:8px;background:#ecfeff;color:#0f172a;box-shadow:0 8px 22px rgba(15,23,42,.18);align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                            <div>
+                                <div style="font-size:11px;font-weight:900;color:#0369a1;text-transform:uppercase;">Business System Endpoint Selection</div>
+                                <div id="fsm-native-image-add-label" style="font-size:12px;color:#0f172a;">Select exactly one scanned row below, then add it to the business component.</div>
+                            </div>
+                            <button type="button" id="fsm-native-image-add-btn" style="background:#166534;border:1px solid #14532d;color:#fff;border-radius:5px;padding:8px 12px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 2px 8px rgba(20,83,45,.22);">Add to Business Component</button>
+                        </div>
                         <!-- ── Private OSPC Snapshot Scanner ── -->
                         <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
                             <div style="font-size:0.82rem;font-weight:700;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">
@@ -1562,13 +1596,13 @@
                                 </button>
                                 <span style="color:#64748b;font-size:11px;">Scans private tenant snapshots only · region sets <code style="font-size:10px;">OS_REGION_NAME</code></span>
                             </div>
-                            <div id="image-scan-console-wrap" style="display:none;margin-top:12px;">
+                            <div id="image-scan-console-wrap" style="display:none;margin-top:12px;background:#f8fafc;border:1px solid #d7e3f2;border-radius:10px;padding:10px 12px;box-shadow:0 8px 20px rgba(15,23,42,0.06);">
                                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                                    <span style="color:#6ee7b7;font-size:11px;font-weight:600;">Live Image Scan Console <span id="image-scan-spinner">⚙</span></span>
+                                    <span style="color:#047857;font-size:11px;font-weight:800;">Live Image Scan Console <span id="image-scan-spinner">⚙</span></span>
                                     <button type="button" onclick="document.getElementById('image-scan-console-wrap').style.display='none'"
-                                        style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;">✕</button>
+                                        style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;color:#991b1b;cursor:pointer;font-size:13px;font-weight:900;line-height:1;padding:5px 8px;">✕</button>
                                 </div>
-                                <pre id="image-scan-log" style="background:#060a10;border:1px solid #065f46;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#94a3b8;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;">Waiting to start…</pre>
+                                <pre id="image-scan-log" style="background:#07110d;border:1px solid #34d399;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#39ff14;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;box-shadow:inset 0 1px 2px rgba(15,23,42,0.18),0 0 10px rgba(57,255,20,0.12);">Waiting to start…</pre>
                             </div>
                             </div>
                         </div>
@@ -13816,6 +13850,54 @@ function val(id) {
   } else {
     installFieldCache();
   }
+})();
+</script>
+
+<script>
+(function installBusinessComponentAddBar(){
+  function getParentContext() {
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.fsmRestoreEndpointContext === 'function') {
+        return window.parent.fsmRestoreEndpointContext();
+      }
+    } catch (_) {}
+    return null;
+  }
+  function syncBar() {
+    const bar = document.getElementById('fsm-native-image-add-bar');
+    const label = document.getElementById('fsm-native-image-add-label');
+    if (!bar) return;
+    const ctx = getParentContext();
+    let mapperAvailable = false;
+    try {
+      mapperAvailable = !!(window.parent && window.parent !== window && typeof window.parent.fsmCaptureSelectedEndpoint === 'function');
+    } catch (_) {}
+    bar.style.display = 'flex';
+    if (ctx && ['linux', 'windows', 'vol'].includes(ctx.engine) && label) {
+      label.innerHTML = 'Mapping <strong>' + String(ctx.compName || 'business component').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])) + '</strong>. Select exactly one scanned row below, then add it to the business component.';
+    } else if (label) {
+      label.textContent = 'Select a business component first, then select exactly one scanned row below and add it to the business component.';
+    }
+  }
+  function install() {
+    const btn = document.getElementById('fsm-native-image-add-btn');
+    if (btn && !btn._fsmAddBound) {
+      btn._fsmAddBound = true;
+      btn.addEventListener('click', function(){
+        try {
+          if (window.parent && window.parent !== window && typeof window.parent.fsmCaptureSelectedEndpoint === 'function') {
+            window.parent.fsmCaptureSelectedEndpoint();
+            return;
+          }
+        } catch (_) {}
+        alert('Business component mapper is not available. Open this engine from Full Business System Migration first.');
+      });
+    }
+    syncBar();
+    setInterval(syncBar, 500);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+  else install();
 })();
 </script>
 

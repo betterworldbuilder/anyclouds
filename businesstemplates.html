@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Deck - Business System Templates</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: #06080d;
+            min-height: 100vh;
+            padding: 40px;
+            color: #c0c8d8;
+            overflow-x: hidden;
+        }
+
+        .cockpit-ambient {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: 
+                radial-gradient(ellipse at 50% 30%, rgba(0, 255, 128, 0.03) 0%, transparent 60%);
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .header::before, .header::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 30%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 128, 0.15), transparent);
+        }
+
+        .header::before { left: 0; }
+        .header::after { right: 0; }
+
+        .header h1 {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 400;
+            letter-spacing: 8px;
+            color: #00ff80;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-shadow: 0 0 20px rgba(0, 255, 128, 0.4), 0 0 40px rgba(0, 255, 128, 0.1);
+        }
+
+        .header .subtitle {
+            font-family: 'Share Tech Mono', monospace;
+            color: #3a6a50;
+            font-size: 0.75rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .header-line {
+            width: 120px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00ff80, transparent);
+            margin: 15px auto;
+            opacity: 0.3;
+        }
+
+        .panel-frame {
+            background: linear-gradient(145deg, #0a0d12 0%, #07090c 100%);
+            border: 1px solid #1a2a20;
+            border-radius: 4px;
+            padding: 30px;
+            position: relative;
+            box-shadow: 
+                inset 0 1px 0 rgba(0, 255, 128, 0.03),
+                0 20px 60px rgba(0, 0, 0, 0.6),
+                0 0 30px rgba(0, 255, 128, 0.03);
+        }
+
+        .panel-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 20px;
+            right: 20px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 128, 0.15), transparent);
+        }
+
+        .panel-label {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #06080d;
+            padding: 0 20px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            color: #2a6a45;
+            text-transform: uppercase;
+        }
+
+        .templates-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        /* DEFAULT STATE - Original colors with transparency */
+        .template-btn {
+            position: relative;
+            background: rgba(15, 20, 30, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            padding: 22px 24px;
+            cursor: pointer;
+            transition: all 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            outline: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
+        }
+
+        .template-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: var(--default-accent);
+            opacity: 0.4;
+            transition: all 0.3s ease;
+        }
+
+        .template-btn .btn-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--default-accent);
+            opacity: 0.6;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .template-btn .btn-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .template-btn .btn-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 0.5px;
+            transition: color 0.3s ease;
+            margin-bottom: 4px;
+        }
+
+        .template-btn .btn-desc {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.25);
+            letter-spacing: 0.5px;
+            transition: color 0.3s ease;
+        }
+
+        .template-btn .btn-meta {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .template-btn .meta-tag {
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .template-btn .status-led {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--default-accent);
+            opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+
+        /* Hover state */
+        .template-btn:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(20, 25, 35, 0.7);
+        }
+
+        .template-btn:hover .btn-icon {
+            opacity: 0.8;
+        }
+
+        .template-btn:hover .btn-title {
+            color: rgba(255, 255, 255, 0.65);
+        }
+
+        /* SELECTED STATE - Plain bright colors */
+        .template-btn.selected {
+            background: var(--bg-solid);
+            border-color: var(--accent-color);
+            box-shadow: 
+                0 0 20px var(--glow-outer),
+                0 0 40px var(--glow-inner),
+                inset 0 1px 0 rgba(255,255,255,0.1);
+            transform: scale(1.02);
+        }
+
+        .template-btn.selected::before {
+            background: var(--accent-color);
+            opacity: 1;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        .template-btn.selected .btn-icon {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            opacity: 1;
+            box-shadow: 0 0 15px var(--glow-inner);
+        }
+
+        .template-btn.selected .btn-title {
+            color: #fff;
+            text-shadow: 0 0 10px var(--glow-inner);
+        }
+
+        .template-btn.selected .btn-desc {
+            color: var(--accent-dim);
+        }
+
+        .template-btn.selected .meta-tag {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent-color);
+            color: var(--accent-dim);
+        }
+
+        .template-btn.selected .status-led {
+            background: var(--accent-color);
+            opacity: 1;
+            box-shadow: 0 0 8px var(--accent-color), 0 0 16px var(--accent-color);
+            animation: led-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes led-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Color definitions */
+        .btn-banking {
+            --default-accent: #00d4a0;
+            --accent-color: #00d4a0;
+            --accent-dim: #4ae0b0;
+            --bg-solid: #0a1f18;
+            --glow-inner: rgba(0, 212, 160, 0.3);
+            --glow-outer: rgba(0, 212, 160, 0.1);
+        }
+
+        .btn-ecommerce {
+            --default-accent: #ff4757;
+            --accent-color: #ff4757;
+            --accent-dim: #ff6b7a;
+            --bg-solid: #1f0a0c;
+            --glow-inner: rgba(255, 71, 87, 0.3);
+            --glow-outer: rgba(255, 71, 87, 0.1);
+        }
+
+        .btn-crm {
+            --default-accent: #00d2d3;
+            --accent-color: #00d2d3;
+            --accent-dim: #4ae0e0;
+            --bg-solid: #0a1f1f;
+            --glow-inner: rgba(0, 210, 211, 0.3);
+            --glow-outer: rgba(0, 210, 211, 0.1);
+        }
+
+        .btn-erp {
+            --default-accent: #a29bfe;
+            --accent-color: #a29bfe;
+            --accent-dim: #b8b3fe;
+            --bg-solid: #1a1828;
+            --glow-inner: rgba(162, 155, 254, 0.3);
+            --glow-outer: rgba(162, 155, 254, 0.1);
+        }
+
+        .btn-saas {
+            --default-accent: #54a0ff;
+            --accent-color: #54a0ff;
+            --accent-dim: #7ab8ff;
+            --bg-solid: #0a1a2f;
+            --glow-inner: rgba(84, 160, 255, 0.3);
+            --glow-outer: rgba(84, 160, 255, 0.1);
+        }
+
+        .btn-api {
+            --default-accent: #feca57;
+            --accent-color: #feca57;
+            --accent-dim: #fed876;
+            --bg-solid: #2a2208;
+            --glow-inner: rgba(254, 202, 87, 0.3);
+            --glow-outer: rgba(254, 202, 87, 0.1);
+        }
+
+        .btn-reporting {
+            --default-accent: #ff9ff3;
+            --accent-color: #ff9ff3;
+            --accent-dim: #ffb8f0;
+            --bg-solid: #2a0a24;
+            --glow-inner: rgba(255, 159, 243, 0.3);
+            --glow-outer: rgba(255, 159, 243, 0.1);
+        }
+
+        .btn-batch {
+            --default-accent: #1dd1a1;
+            --accent-color: #1dd1a1;
+            --accent-dim: #4ee0b8;
+            --bg-solid: #0a1f18;
+            --glow-inner: rgba(29, 209, 161, 0.3);
+            --glow-outer: rgba(29, 209, 161, 0.1);
+        }
+
+        .btn-data {
+            --default-accent: #5f27cd;
+            --accent-color: #5f27cd;
+            --accent-dim: #8a5fd8;
+            --bg-solid: #1a0f2f;
+            --glow-inner: rgba(95, 39, 205, 0.3);
+            --glow-outer: rgba(95, 39, 205, 0.1);
+        }
+
+        .btn-custom {
+            --default-accent: #ff9f43;
+            --accent-color: #ff9f43;
+            --accent-dim: #ffb370;
+            --bg-solid: #2a1a0a;
+            --glow-inner: rgba(255, 159, 67, 0.3);
+            --glow-outer: rgba(255, 159, 67, 0.1);
+        }
+
+        /* Info panel */
+        .info-panel {
+            margin-top: 30px;
+            background: rgba(12, 14, 18, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .info-panel .info-led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .info-panel .info-led.active {
+            background: #00ff80;
+            box-shadow: 0 0 10px #00ff80, 0 0 20px rgba(0, 255, 128, 0.3);
+            animation: led-pulse 1.5s ease-in-out infinite;
+        }
+
+        .info-panel .info-text {
+            flex: 1;
+        }
+
+        .info-panel .info-value {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Sound toggle */
+        .sound-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(12, 14, 18, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.3);
+            transition: all 0.2s ease;
+            z-index: 100;
+        }
+
+        .sound-toggle:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .sound-toggle i {
+            font-size: 0.9rem;
+        }
+
+        .sound-toggle.muted {
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .templates-grid {
+                grid-template-columns: 1fr;
+            }
+            body {
+                padding: 20px;
+            }
+            .header h1 {
+                font-size: 1.3rem;
+                letter-spacing: 4px;
+            }
+        }
+
+        .noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.02;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            z-index: 2;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 255, 128, 0.01) 2px,
+                rgba(0, 255, 128, 0.01) 4px
+            );
+            z-index: 3;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="cockpit-ambient"></div>
+    <div class="noise"></div>
+    <div class="scanline"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>BUSINESS SYSTEM TEMPLATES</h1>
+            <div class="header-line"></div>
+            <p class="subtitle">Flight Deck Configuration System v2.4</p>
+        </div>
+
+        <div class="panel-frame">
+            <div class="panel-label">Primary Systems</div>
+            
+            <div class="templates-grid">
+                <button class="template-btn btn-banking" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-university"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">BANKING</div>
+                        <div class="btn-desc">Web + API + DB + Queue</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Critical</span>
+                            <span class="meta-tag">Financial</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-ecommerce" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-shopping-cart"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">E-COMMERCE</div>
+                        <div class="btn-desc">Catalog + Cart + Payment</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Retail</span>
+                            <span class="meta-tag">High-Traffic</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-crm" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-users"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">CRM</div>
+                        <div class="btn-desc">Customer + Reports + Files</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Sales</span>
+                            <span class="meta-tag">Analytics</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-erp" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-building"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">ERP</div>
+                        <div class="btn-desc">Workflow + Batch + DB</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Enterprise</span>
+                            <span class="meta-tag">Integrated</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-saas" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-cloud"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">SAAS</div>
+                        <div class="btn-desc">Web + API + DB</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Cloud</span>
+                            <span class="meta-tag">Multi-Tenant</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-api" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-bolt"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">API PLATFORM</div>
+                        <div class="btn-desc">Gateway + API + Auth</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Integration</span>
+                            <span class="meta-tag">Secure</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-reporting" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-chart-bar"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">REPORTING / BI</div>
+                        <div class="btn-desc">App + DB + Reports</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Analytics</span>
+                            <span class="meta-tag">Visualization</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-batch" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-cogs"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">BATCH / WORKER</div>
+                        <div class="btn-desc">Worker + Queue + DB</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Background</span>
+                            <span class="meta-tag">Processing</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-data" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-database"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">DATA PLATFORM</div>
+                        <div class="btn-desc">Ingest + DB + Storage</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Pipeline</span>
+                            <span class="meta-tag">Big Data</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+
+                <button class="template-btn btn-custom" data-sound="click">
+                    <div class="btn-icon"><i class="fas fa-magic"></i></div>
+                    <div class="btn-content">
+                        <div class="btn-title">CUSTOM</div>
+                        <div class="btn-desc">Build manually</div>
+                        <div class="btn-meta">
+                            <span class="meta-tag">Flexible</span>
+                            <span class="meta-tag">Bespoke</span>
+                        </div>
+                    </div>
+                    <div class="status-led"></div>
+                </button>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-led" id="systemLed"></div>
+            <div class="info-text">SYSTEM STATUS</div>
+            <div class="info-value" id="systemStatus">STANDBY - SELECT A MODULE</div>
+        </div>
+    </div>
+
+    <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">
+        <i class="fas fa-volume-up" id="soundIcon"></i>
+        <span>AUDIO: ON</span>
+    </button>
+
+    <script>
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // NASA-style beep/bip sound
+        function playNasaBip() {
+            if (!soundEnabled || !audioCtx) return;
+            
+            const now = audioCtx.currentTime;
+            
+            // Clean NASA-style beep - sine wave
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.setValueAtTime(1200, now + 0.08);
+            
+            // Sharp attack, quick decay
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.2, now + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(now);
+            osc.stop(now + 0.15);
+            
+            // Subtle harmonic for richness
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(2400, now);
+            
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.05, now + 0.005);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            
+            osc2.start(now);
+            osc2.stop(now + 0.1);
+        }
+
+        // Power-on NASA sound
+        function playPowerOnSound() {
+            if (!soundEnabled || !audioCtx) return;
+            
+            const now = audioCtx.currentTime;
+            
+            // Two-tone NASA power-up
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(880, now + 0.1);
+            osc.frequency.setValueAtTime(1320, now + 0.1);
+            osc.frequency.setValueAtTime(1320, now + 0.25);
+            
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+            gain.gain.setValueAtTime(0.15, now + 0.1);
+            gain.gain.linearRampToValueAtTime(0.15, now + 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(now);
+            osc.stop(now + 0.4);
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const toggle = document.getElementById('soundToggle');
+            const icon = document.getElementById('soundIcon');
+            const text = toggle.querySelector('span');
+            
+            if (soundEnabled) {
+                toggle.classList.remove('muted');
+                icon.className = 'fas fa-volume-up';
+                text.textContent = 'AUDIO: ON';
+                initAudio();
+                playNasaBip();
+            } else {
+                toggle.classList.add('muted');
+                icon.className = 'fas fa-volume-mute';
+                text.textContent = 'AUDIO: OFF';
+            }
+        }
+
+        const buttons = document.querySelectorAll('.template-btn');
+        const systemLed = document.getElementById('systemLed');
+        const systemStatus = document.getElementById('systemStatus');
+
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                initAudio();
+                playNasaBip();
+                
+                buttons.forEach(b => b.classList.remove('selected'));
+                this.classList.add('selected');
+                
+                systemLed.classList.add('active');
+                const title = this.querySelector('.btn-title').textContent;
+                const accentColor = getComputedStyle(this).getPropertyValue('--accent-color').trim();
+                systemStatus.textContent = `ACTIVE: ${title} - SYSTEM ENGAGED`;
+                systemStatus.style.color = accentColor;
+            });
+        });
+
+        document.addEventListener('click', function initOnFirstClick() {
+            initAudio();
+            playPowerOnSound();
+            document.removeEventListener('click', initOnFirstClick);
+        }, { once: true });
+    </script>
+</body>
+</html>

@@ -393,6 +393,27 @@
                 </table>
             </div>
 
+            <!-- Business system endpoint picker used by Full Business System Migration -->
+            <div id="agent1-endpoint-inventory" style="margin-top:22px;border:1px solid rgba(99,102,241,.28);border-radius:12px;overflow:hidden;background:rgba(15,23,42,.04);">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--border);">
+                    <div>
+                        <h4 style="margin:0;color:#a5b4fc;font-size:1rem;">Business System Endpoint Inventory</h4>
+                        <p style="margin:3px 0 0;color:var(--text-muted);font-size:.82rem;">Selectable VM, snapshot, database backup, and DB load balancer rows for business component mapping.</p>
+                    </div>
+                    <span id="agent1-endpoint-count" style="font-size:.78rem;font-weight:800;color:#6ee7b7;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.35);border-radius:999px;padding:4px 10px;">0 discovered</span>
+                </div>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--border);">
+                    <button type="button" class="agent1-endpoint-tab active" data-agent-endpoint-tab="agent1-tab-vms" onclick="switchAgentEndpointTab(this)" style="padding:7px 13px;font-size:.8rem;background:rgba(99,102,241,.16);border:1px solid rgba(99,102,241,.35);border-radius:8px;color:#a5b4fc;box-shadow:none;">Servers VM</button>
+                    <button type="button" class="agent1-endpoint-tab" data-agent-endpoint-tab="agent1-tab-server-snaps" onclick="switchAgentEndpointTab(this)" style="padding:7px 13px;font-size:.8rem;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);box-shadow:none;">Server Snapshots</button>
+                    <button type="button" class="agent1-endpoint-tab" data-agent-endpoint-tab="agent1-tab-db-snaps" onclick="switchAgentEndpointTab(this)" style="padding:7px 13px;font-size:.8rem;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);box-shadow:none;">DB Snapshots</button>
+                    <button type="button" class="agent1-endpoint-tab" data-agent-endpoint-tab="agent1-tab-db-lbs" onclick="switchAgentEndpointTab(this)" style="padding:7px 13px;font-size:.8rem;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);box-shadow:none;">DB Load Balancers</button>
+                </div>
+                <div class="agent1-endpoint-content" id="agent1-tab-vms" style="overflow-x:auto;"></div>
+                <div class="agent1-endpoint-content" id="agent1-tab-server-snaps" style="display:none;overflow-x:auto;"></div>
+                <div class="agent1-endpoint-content" id="agent1-tab-db-snaps" style="display:none;overflow-x:auto;"></div>
+                <div class="agent1-endpoint-content" id="agent1-tab-db-lbs" style="display:none;overflow-x:auto;"></div>
+            </div>
+
             <!-- ═══ FLEX ENVIRONMENT DISCOVERY ═══ -->
             <div style="margin-top: 30px; border-top: 2px solid rgba(16,185,129,0.3); padding-top: 20px;">
                 <div style="display: flex; gap: 15px; margin-bottom: 5px; align-items: center;">
@@ -5708,6 +5729,97 @@ echo "[MOCK] Done — ${p.name} simulation complete"`;
         if (target) target.style.display = 'block';
     };
 
+    window.switchAgentEndpointTab = function(btn) {
+        document.querySelectorAll('.agent1-endpoint-tab').forEach(t => {
+            t.classList.remove('active');
+            t.style.background = 'transparent';
+            t.style.color = 'var(--text-muted)';
+            t.style.borderColor = 'var(--border)';
+        });
+        btn.classList.add('active');
+        btn.style.background = 'rgba(99,102,241,.16)';
+        btn.style.color = '#a5b4fc';
+        btn.style.borderColor = 'rgba(99,102,241,.35)';
+        document.querySelectorAll('.agent1-endpoint-content').forEach(c => c.style.display = 'none');
+        const target = document.getElementById(btn.dataset.agentEndpointTab);
+        if (target) target.style.display = 'block';
+    };
+
+    function agent1Esc(v) {
+        return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    function agent1EndpointTable(targetId, headings, rows, emptyText) {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        if (!rows.length) {
+            target.innerHTML = `<div style="padding:18px;color:var(--text-muted);text-align:center;font-style:italic;">${agent1Esc(emptyText)}</div>`;
+            return;
+        }
+        target.innerHTML = `<table class="grid-table" style="width:100%;border-collapse:collapse;text-align:left;font-size:.84rem;">
+            <thead><tr style="border-bottom:1px solid var(--border);background:rgba(99,102,241,.06);">
+                <th style="padding:9px 8px;color:var(--text-muted);width:48px;">Select</th>
+                ${headings.map(h => `<th style="padding:9px 8px;color:var(--text-muted);">${agent1Esc(h)}</th>`).join('')}
+            </tr></thead>
+            <tbody>${rows.join('')}</tbody>
+        </table>`;
+    }
+
+    function endpointCb(attrs) {
+        const safe = {};
+        Object.keys(attrs || {}).forEach(k => { safe[k] = agent1Esc(attrs[k]); });
+        return `<input type="checkbox" class="agent1-endpoint-cb" data-source-name="${safe.sourceName || ''}" data-source-id="${safe.sourceId || ''}" data-source-ip="${safe.sourceIp || ''}" data-ospc-name="${safe.ospcName || safe.sourceName || ''}" data-ospc-id="${safe.ospcId || safe.sourceId || ''}" data-ospc-ip="${safe.ospcIp || safe.sourceIp || ''}" data-snapshot-name="${safe.snapshotName || ''}" data-snapshot-id="${safe.snapshotId || ''}" data-os="${safe.os || ''}" data-flavor="${safe.flavor || ''}" data-target-name="${safe.targetName || ''}" data-flex-ip="${safe.targetIp || ''}" data-asset-type="${safe.assetType || ''}" style="accent-color:#6366f1;width:15px;height:15px;cursor:pointer;">`;
+    }
+
+    function populateAgentEndpointInventory(topData) {
+        topData = topData || {};
+        const nodes = Array.isArray(topData.nodes) ? topData.nodes : [];
+        const vms = nodes.filter(n => n.group !== 'load_balancer');
+        const serverSnaps = Array.isArray(topData.image_snapshots) ? topData.image_snapshots : [];
+        const dbSnaps = Array.isArray(topData.db_snapshots) ? topData.db_snapshots : (Array.isArray(topData.backups) ? topData.backups : []);
+        const dbLbs = []
+            .concat(Array.isArray(topData.load_balancers) ? topData.load_balancers : [])
+            .concat(nodes.filter(n => n.group === 'load_balancer'));
+        const rowStyle = 'border-bottom:1px solid rgba(255,255,255,.06);';
+        const td = v => `<td style="padding:9px 8px;">${v}</td>`;
+        const mono = v => `<span style="font-family:Fira Code,monospace;color:#79c0ff;">${agent1Esc(v || '—')}</span>`;
+
+        const vmRows = vms.map(n => {
+            const ip = (n.ips && n.ips.length) ? n.ips[0] : (n.external_ip || n.internal_ip || '');
+            return `<tr style="${rowStyle}">
+                ${td(endpointCb({ sourceName:n.id, sourceId:n.id, sourceIp:ip, ospcName:n.id, ospcIp:ip, os:n.os, flavor:n.flavor, assetType:'server_vm' }))}
+                ${td(agent1Esc(n.id || '—'))}${td(mono(ip))}${td(agent1Esc(n.os || 'Unknown'))}${td(agent1Esc(n.flavor || '—'))}${td(agent1Esc(n.status || 'ACTIVE'))}
+            </tr>`;
+        });
+
+        const snapRows = serverSnaps.map(s => `<tr style="${rowStyle}">
+            ${td(endpointCb({ sourceName:s.name, sourceId:s.server_id || s.id, snapshotName:s.name, snapshotId:s.id, os:s.os, assetType:'server_snapshot' }))}
+            ${td(agent1Esc(s.name || '—'))}${td(mono(s.id))}${td(agent1Esc(s.server_id || '—'))}${td(agent1Esc(s.os || s.os_label || '—'))}${td(agent1Esc(s.status || 'UNKNOWN'))}${td(agent1Esc(s.created || '—'))}
+        </tr>`);
+
+        const dbSnapRows = dbSnaps.map(s => `<tr style="${rowStyle}">
+            ${td(endpointCb({ sourceName:s.parent || s.name, sourceId:s.parent_id || s.id, snapshotName:s.name, snapshotId:s.id, os:s.engine || 'Database', assetType:'database_snapshot' }))}
+            ${td(agent1Esc(s.name || '—'))}${td(mono(s.id))}${td(agent1Esc(s.parent || '—'))}${td(agent1Esc(s.engine || 'DB'))}${td(agent1Esc(s.status || 'UNKNOWN'))}${td(agent1Esc(s.created || '—'))}
+        </tr>`);
+
+        const lbRows = dbLbs.map(lb => {
+            const vip = lb.vip || ((lb.ips && lb.ips.length) ? lb.ips[0] : '');
+            return `<tr style="${rowStyle}">
+                ${td(endpointCb({ sourceName:lb.name || lb.id, sourceId:lb.id, sourceIp:vip, ospcName:lb.name || lb.id, ospcIp:vip, os:'Load Balancer', assetType:'db_load_balancer' }))}
+                ${td(agent1Esc(lb.name || lb.id || '—'))}${td(mono(vip))}${td(agent1Esc(lb.protocol || 'TCP'))}${td(agent1Esc(lb.port || '—'))}${td(agent1Esc(lb.members || '—'))}${td(agent1Esc(lb.status || 'ACTIVE'))}
+            </tr>`;
+        });
+
+        agent1EndpointTable('agent1-tab-vms', ['Name', 'IP Address', 'OS', 'Flavor', 'Status'], vmRows, 'No server VMs discovered for this region.');
+        agent1EndpointTable('agent1-tab-server-snaps', ['Snapshot Name', 'Snapshot ID', 'Source Server ID', 'OS', 'Status', 'Created'], snapRows, 'No server image snapshots discovered for this region.');
+        agent1EndpointTable('agent1-tab-db-snaps', ['DB Snapshot', 'Snapshot ID', 'Parent DB', 'Engine', 'Status', 'Created'], dbSnapRows, 'No DB snapshots/backups discovered for this region.');
+        agent1EndpointTable('agent1-tab-db-lbs', ['Load Balancer', 'VIP', 'Protocol', 'Port', 'Members', 'Status'], lbRows, 'No DB load balancers discovered for this region.');
+        const countEl = document.getElementById('agent1-endpoint-count');
+        if (countEl) countEl.textContent = `${vms.length + serverSnaps.length + dbSnaps.length + dbLbs.length} discovered`;
+    }
+
     // ══════ POPULATE ALL RESOURCE TABS FROM TOPOLOGY ══════
     function populateResourceTabs(topData) {
         const row = (cols) => `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">${cols.map(c => `<td style="padding: 10px 5px;${c.style||''}">${c.v}</td>`).join('')}</tr>`;
@@ -5873,6 +5985,7 @@ echo "[MOCK] Done — ${p.name} simulation complete"`;
                 backupsBody.innerHTML = '<tr><td colspan="5" style="padding:15px; color:var(--text-muted); text-align:center;">No instance backups found.</td></tr>';
             }
         }
+        populateAgentEndpointInventory(topData);
     }
 
     // ═══════ FLEX TAB SWITCHING ═══════

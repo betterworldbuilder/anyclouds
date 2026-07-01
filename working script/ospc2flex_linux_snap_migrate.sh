@@ -42,7 +42,12 @@ USE_CLOUD_FILES_EXPORT="${OSPC2FLEX_USE_CLOUD_FILES_EXPORT:-1}"
 CINDER_VOLUME_EXPORT_ON_LICENSED="${OSPC2FLEX_CINDER_VOLUME_EXPORT_ON_LICENSED:-1}"
 CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-75}"
 CINDER_CREATE_TIMEOUT="${OSPC2FLEX_CINDER_CREATE_TIMEOUT:-7200}"
+CINDER_CREATE_ATTEMPTS="${OSPC2FLEX_CINDER_CREATE_ATTEMPTS:-3}"
+CINDER_CREATE_RETRY_WAIT="${OSPC2FLEX_CINDER_CREATE_RETRY_WAIT:-45}"
 PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-0}"
+LIVE_ORIGIN_FALLBACK="${OSPC2FLEX_LIVE_ORIGIN_FALLBACK:-1}"
+LIVE_ORIGIN_EXPORT_FIRST="${OSPC2FLEX_LIVE_ORIGIN_EXPORT_FIRST:-0}"
+ORIGIN_SSH_USER="${OSPC2FLEX_ORIGIN_SSH_USER:-ubuntu}"
 DOWNLOAD_ONLY=0
 DRY_RUN=0
 START_FRESH=0
@@ -169,6 +174,73 @@ log_download_wait_status() {
   log "[DOWNLOAD_STATUS] phase=$phase downloaded_mb=0 total_mb=0 pct=$pct status=$status elapsed_s=$elapsed_s timeout_s=$total_s${extra:+ $extra}"
   log "[DOWNLOAD_BAR] phase=$phase [$bar] ${pct}% elapsed=${elapsed_s}/${total_s}s status=${status}${extra:+ $extra}"
 }
+upload_progress_bar() {
+  local phase="$1" uploaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" eta_min="${5:-}" pct="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$uploaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  local filled empty bar
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[UPLOAD_BAR] phase=$phase [$bar] ${pct}% ${uploaded_mb}/${total_mb}MB status=${status}${eta_min:+ eta_min=$eta_min}${extra:+ $extra}"
+}
+log_upload_status() {
+  local phase="$1" uploaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" pct="${5:-}" eta_min="${6:-}" extra="${7:-}"
+  if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
+    pct="$(awk -v d="$uploaded_mb" -v t="$total_mb" 'BEGIN{if(t>0) printf "%.1f", (d/t)*100; else printf "0.0"}')"
+  fi
+  log "[UPLOAD_STATUS] phase=$phase uploaded_mb=$uploaded_mb total_mb=$total_mb pct=$pct${eta_min:+ eta_min=$eta_min} status=$status${extra:+ $extra}"
+  upload_progress_bar "$phase" "$uploaded_mb" "$total_mb" "$status" "$eta_min" "$pct" "$extra"
+}
+log_upload_wait_status() {
+  local phase="$1" elapsed_s="${2:-0}" total_s="${3:-0}" status="${4:-waiting}" extra="${5:-}" pct filled empty bar
+  pct="$(awk -v e="$elapsed_s" -v t="$total_s" 'BEGIN{if(t>0) printf "%.1f", (e/t)*100; else printf "0.0"}')"
+  filled="$(awk -v p="$pct" 'BEGIN{n=int(p/5); if(n<0)n=0; if(n>20)n=20; print n}')"
+  empty=$((20 - filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  log "[UPLOAD_STATUS] phase=$phase uploaded_mb=0 total_mb=0 pct=$pct status=$status elapsed_s=$elapsed_s timeout_s=$total_s${extra:+ $extra}"
+  log "[UPLOAD_BAR] phase=$phase [$bar] ${pct}% elapsed=${elapsed_s}/${total_s}s status=${status}${extra:+ $extra}"
+}
+proc_io_bytes() {
+  local pid="$1"
+  awk '
+    /^read_bytes:/ { rb=$2 }
+    /^rchar:/ { rc=$2 }
+    END {
+      if (rb > 0) print rb;
+      else if (rc > 0) print rc;
+      else print 0;
+    }
+  ' "/proc/$pid/io" 2>/dev/null || printf '0\n'
+}
+run_qemu_convert_with_progress() {
+  local phase="$1" src="$2" fmt="$3" out="$4" qlog="$5"
+  local src_bytes src_mb out_bytes out_mb pct pid rc
+  src_bytes="$(stat -c%s "$src" 2>/dev/null || echo 0)"
+  src_mb="$(mb_from_bytes "$src_bytes")"
+  : >"$qlog"
+  set +e
+  qemu-img convert -f "$fmt" -O qcow2 -c "$src" "$out" >>"$qlog" 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    out_bytes="$(stat -c%s "$out" 2>/dev/null || echo 0)"
+    out_mb="$(mb_from_bytes "$out_bytes")"
+    pct="$(awk -v d="$out_bytes" -v t="$src_bytes" 'BEGIN{if(t>0){p=(d/t)*100; if(p>99)p=99; printf "%.1f", p}else printf "0.0"}')"
+    log_download_status "$phase" "$out_mb" "$src_mb" "converting" "$pct" "" "output=$out"
+    sleep 30
+  done
+  wait "$pid"; rc=$?
+  set -e
+  out_bytes="$(stat -c%s "$out" 2>/dev/null || echo 0)"
+  out_mb="$(mb_from_bytes "$out_bytes")"
+  if [ "$rc" -eq 0 ]; then
+    log_download_status "$phase" "$out_mb" "$src_mb" "complete" "100.0" "" "output=$out"
+  else
+    log "[${phase}] qemu-img convert failed rc=$rc; detail_log=$qlog"
+  fi
+  return "$rc"
+}
 kv() { log "  $(printf '%-18s' "$1") : ${*:2}"; }
 stage() {
   CURRENT_STAGE="$1"
@@ -246,15 +318,19 @@ cleanup_stale_jumphost_images() {
     log "[LS0A] no stale image files found; label cleanup root not found: $cleanup_root"
     return 0
   }
-  case "$(readlink -f "$cleanup_root")" in
-    /mnt/migration|/mnt/migration/*) ;;
+  local resolved_cleanup_root resolved_migration_root resolved_label_root
+  resolved_cleanup_root="$(readlink -f "$cleanup_root" 2>/dev/null || true)"
+  resolved_migration_root="$(readlink -f /mnt/migration 2>/dev/null || printf '%s' /mnt/migration)"
+  resolved_label_root="$(readlink -f "$BASE_DIR/runs/$LABEL_SAFE" 2>/dev/null || true)"
+  case "$resolved_cleanup_root" in
+    "$resolved_migration_root"|"$resolved_migration_root"/*) ;;
     *)
-      log "[LS0A] refusing cleanup outside /mnt/migration: $cleanup_root"
+      log "[LS0A] refusing cleanup outside /mnt/migration: $cleanup_root resolved=$resolved_cleanup_root migration_root=$resolved_migration_root"
       return 0
       ;;
   esac
-  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-0}" != "1" ] && [ "$(readlink -f "$cleanup_root")" != "$(readlink -f "$BASE_DIR/runs/$LABEL_SAFE" 2>/dev/null || true)" ]; then
-    log "[LS0A] refusing cleanup outside current label root: $cleanup_root"
+  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-0}" != "1" ] && [ "$resolved_cleanup_root" != "$resolved_label_root" ]; then
+    log "[LS0A] refusing cleanup outside current label root: $cleanup_root resolved=$resolved_cleanup_root label_root=$resolved_label_root"
     return 0
   fi
 
@@ -702,6 +778,39 @@ rackspace_volume_status() {
   resp="$(curl -sS "$base/volumes/$vol_id" -H "X-Auth-Token: $token" 2>/dev/null || true)"
   printf '%s' "$resp" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("status","unknown"))' 2>/dev/null || echo unknown
 }
+rackspace_volume_error_summary() {
+  local vol_id="$1" token base resp
+  token="$(refresh_ospc_token || true)"; base="$(rackspace_blockstorage_base)"
+  [ -n "$token" ] && [ -n "$base" ] || return 1
+  resp="$(curl -sS "$base/volumes/$vol_id" -H "X-Auth-Token: $token" 2>>"$JOB_LOG/cinder.log" || true)"
+  printf '\n[CINDER volume detail %s]\n%s\n' "$vol_id" "$resp" >>"$JOB_LOG/cinder.log" 2>/dev/null || true
+  VOLUME_JSON="$resp" python3 - <<'PY' 2>/dev/null || true
+import json, os
+try:
+    doc = json.loads(os.environ.get("VOLUME_JSON") or "{}")
+except Exception:
+    raise SystemExit
+v = doc.get("volume") if isinstance(doc, dict) else {}
+if not isinstance(v, dict):
+    v = {}
+parts = []
+for key in ("status", "display_name", "id", "size", "bootable", "availability_zone", "migration_status"):
+    val = v.get(key)
+    if val not in (None, ""):
+        parts.append(f"{key}={val}")
+for key in ("error", "error_message", "message", "fault"):
+    val = v.get(key)
+    if val:
+        parts.append(f"{key}={val}")
+meta = v.get("metadata")
+if isinstance(meta, dict):
+    for key in ("readonly", "attached_mode", "image_id", "image_name"):
+        val = meta.get(key)
+        if val not in (None, ""):
+            parts.append(f"metadata.{key}={val}")
+print(" ".join(str(p).replace("\n", " ") for p in parts[:12]))
+PY
+}
 cinder_wait_volume_status() {
   local vol_id="$1" want="$2" timeout="${3:-1800}" phase="${4:-cinder_wait}" total_mb="${5:-0}" downloaded_mb="${6:-0}" waited=0 status poll_rc
   while [ "$waited" -lt "$timeout" ]; do
@@ -711,21 +820,25 @@ cinder_wait_volume_status() {
     set -e
     [ -n "$status" ] || status="unknown"
     if [ "$status" = "$want" ]; then
-      log_download_status "$phase" "$downloaded_mb" "$total_mb" "$status" "" "" "waited=${waited}s"
+      log_download_wait_status "$phase" "$waited" "$timeout" "$status" "target=$want volume=$vol_id"
       return 0
     fi
     if [ "$status" = "error" ]; then
-      log_download_status "$phase" "$downloaded_mb" "$total_mb" "error" "" "" "waited=${waited}s"
+      log_download_wait_status "$phase" "$waited" "$timeout" "error" "target=$want volume=$vol_id"
       log "[CINDER] vol=$vol_id status=error target=$want waited=${waited}s poll_rc=$poll_rc"
+      local err_summary; err_summary="$(rackspace_volume_error_summary "$vol_id" || true)"
+      [ -n "$err_summary" ] && log "[CINDER] error detail: $err_summary"
       return 1
     fi
     if [ $((waited % 60)) -eq 0 ]; then
       log "[CINDER] vol=$vol_id status=$status target=$want waited=${waited}s poll_rc=$poll_rc"
-      log_download_status "$phase" "$downloaded_mb" "$total_mb" "$status" "" "" "waited=${waited}s"
+      log_download_wait_status "$phase" "$waited" "$timeout" "$status" "target=$want volume=$vol_id"
     fi
     sleep 10; waited=$((waited + 10))
   done
-  log_download_status "$phase" "$downloaded_mb" "$total_mb" "timeout" "" "" "waited=${timeout}s"
+  log_download_wait_status "$phase" "$timeout" "$timeout" "timeout" "target=$want volume=$vol_id"
+  local err_summary; err_summary="$(rackspace_volume_error_summary "$vol_id" || true)"
+  [ -n "$err_summary" ] && log "[CINDER] timeout detail: $err_summary"
   return 1
 }
 local_block_disks() {
@@ -826,6 +939,39 @@ rackspace_delete_volume() {
   [ -n "$vol_id" ] && [ -n "$token" ] && [ -n "$base" ] || return 0
   curl -sS -X DELETE "$base/volumes/$vol_id" -H "X-Auth-Token: $token" -o /dev/null >>"$JOB_LOG/cinder.log" 2>&1 || true
 }
+cinder_create_available_volume_from_image() {
+  local image_id="$1" size_gb="$2" name_prefix="$3" source_mb="${4:-0}" phase="${5:-cinder_volume_create}"
+  local attempts wait_s attempt volume_name volume_id status
+  CINDER_AVAILABLE_VOLUME_ID=""
+  attempts="${CINDER_CREATE_ATTEMPTS:-3}"
+  wait_s="${CINDER_CREATE_RETRY_WAIT:-45}"
+  [ "$attempts" -ge 1 ] 2>/dev/null || attempts=1
+  attempt=1
+  while [ "$attempt" -le "$attempts" ]; do
+    volume_name="${name_prefix}-a${attempt}"
+    log "[CINDER] create image-volume attempt $attempt/$attempts: name=$volume_name size=${size_gb}GB"
+    volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name" | tr -d '\r' | tail -1)" || volume_id=""
+    if [ -z "$volume_id" ]; then
+      log "[CINDER] WARN image-volume create request returned no volume id on attempt $attempt/$attempts"
+    else
+      log "[CINDER] volume=$volume_id — waiting available (attempt $attempt/$attempts)"
+      if cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "$phase" "$source_mb" "0"; then
+        CINDER_AVAILABLE_VOLUME_ID="$volume_id"
+        return 0
+      fi
+      status="$(rackspace_volume_status "$volume_id" 2>/dev/null || echo unknown)"
+      log "[CINDER] WARN image-volume attempt $attempt/$attempts did not become available: volume=$volume_id status=$status"
+      log "[CINDER] cleanup: requesting delete for failed temp volume=$volume_id"
+      rackspace_delete_volume "$volume_id" || true
+    fi
+    if [ "$attempt" -lt "$attempts" ]; then
+      log "[CINDER] retrying image-volume create after ${wait_s}s with a fresh temp volume"
+      sleep "$wait_s"
+    fi
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
 discover_ospc_helper_server_id() {
   local ips_json server_json meta_id
   if [ -n "${OSPC2FLEX_OSPC_HELPER_SERVER_ID:-${OSPC2FLEX_CINDER_HELPER_SERVER_ID:-}}" ]; then
@@ -902,15 +1048,11 @@ remote_ospc_helper_volume_export() {
   ssh_key_file="${SSH_KEY_PATH/#\~/$HOME}"
   log "[CINDER] Remote OSPC helper fallback: helper=$helper_id ip=$helper_ip size=${size_gb}GB"
 
-  volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || return 1
-  volume_id="$(printf '%s' "$volume_id" | tr -d '\r' | tail -1)"
-  [ -n "$volume_id" ] || return 1
-  log "[CINDER] volume=$volume_id — waiting available"
-  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "cinder_volume_create" "$source_mb" "0" || {
-    log "[CINDER] FAILED remote helper volume create timeout"
-    rackspace_delete_volume "$volume_id" || true
+  cinder_create_available_volume_from_image "$image_id" "$size_gb" "$volume_name" "$source_mb" "cinder_volume_create" || {
+    log "[CINDER] FAILED remote helper volume create after ${CINDER_CREATE_ATTEMPTS:-3} attempt(s)"
     return 1
   }
+  volume_id="$CINDER_AVAILABLE_VOLUME_ID"
 
   rackspace_attach_volume "$helper_id" "$volume_id" || { rackspace_delete_volume "$volume_id" || true; return 1; }
   cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || {
@@ -974,6 +1116,118 @@ gb = max(1, min_disk, math.ceil(size/(1024**3)), math.ceil(virtual/(1024**3)) if
 print(gb)
 PY
 }
+image_origin_instance_uuid() {
+  local image_id="$1" meta="$JOB_TMP/origin_img_meta.json"
+  openstack image show "$image_id" -f json >"$meta" 2>/dev/null || return 1
+  python3 - "$meta" <<'PY'
+import json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    print("")
+    raise SystemExit
+props = data.get("properties") or {}
+if not isinstance(props, dict):
+    props = {}
+print(props.get("instance_uuid") or data.get("instance_uuid") or "")
+PY
+}
+server_public_ipv4() {
+  local server_id="$1" meta="$JOB_TMP/origin_server_meta.json"
+  openstack server show "$server_id" -f json >"$meta" 2>/dev/null || return 1
+  python3 - "$meta" <<'PY'
+import ipaddress, json, sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    raise SystemExit
+def public_v4(value):
+    try:
+        ip = ipaddress.ip_address(str(value))
+    except Exception:
+        return ""
+    if ip.version == 4 and not ip.is_private:
+        return str(ip)
+    return ""
+for key in ("accessIPv4", "public_v4", "publicIPv4"):
+    out = public_v4(data.get(key))
+    if out:
+        print(out)
+        raise SystemExit
+addresses = data.get("addresses") or {}
+if isinstance(addresses, dict):
+    for rows in addresses.values():
+        if not isinstance(rows, list):
+            rows = [rows]
+        for row in rows:
+            if isinstance(row, dict):
+                candidates = [row.get("addr"), row.get("ip")]
+            else:
+                candidates = [row]
+            for item in candidates:
+                out = public_v4(item)
+                if out:
+                    print(out)
+                    raise SystemExit
+print("")
+PY
+}
+server_status_value() {
+  local server_id="$1"
+  openstack server show "$server_id" -f value -c status 2>/dev/null | tr -d '[:space:]'
+}
+origin_vm_raw_export() {
+  local image_id="$1" dest="$2" min_bytes="${3:-1073741824}"
+  local origin_id status origin_ip ssh_key_file disk dev_size dev_mb export_log export_pid start_s copied copied_mb pct elapsed_s eta_min rc final_bytes final_mb
+  [ "$LIVE_ORIGIN_FALLBACK" = "1" ] || return 1
+  origin_id="${OSPC2FLEX_ORIGIN_SERVER_ID:-$(image_origin_instance_uuid "$image_id" | tr -d '[:space:]' || true)}"
+  [ -n "$origin_id" ] || { log "[ORIGIN] No source server id found in snapshot metadata"; return 1; }
+  status="$(server_status_value "$origin_id" | tr '[:lower:]' '[:upper:]')"
+  [ "$status" = "ACTIVE" ] || { log "[ORIGIN] Source server $origin_id is not ACTIVE (status=${status:-unknown})"; return 1; }
+  origin_ip="${OSPC2FLEX_ORIGIN_SERVER_IP:-$(server_public_ipv4 "$origin_id" | head -1 | tr -d '[:space:]' || true)}"
+  [ -n "$origin_ip" ] || { log "[ORIGIN] No public IPv4 found for source server $origin_id"; return 1; }
+  ssh_key_file="${SSH_KEY_PATH/#\~/$HOME}"
+  [ -f "$ssh_key_file" ] || { log "[ORIGIN] SSH key not found: $ssh_key_file"; return 1; }
+  log "[ORIGIN] Live source VM export fallback: server=$origin_id ip=$origin_ip user=$ORIGIN_SSH_USER"
+  disk="$(ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes "$ORIGIN_SSH_USER@$origin_ip" 'for d in /dev/vda /dev/xvda /dev/sda; do [ -b "$d" ] && printf "%s\n" "$d" && exit 0; done; exit 1' 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+  [ -n "$disk" ] || { log "[ORIGIN] Could not detect root disk on source VM"; return 1; }
+  dev_size="$(ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes "$ORIGIN_SSH_USER@$origin_ip" "sudo blockdev --getsize64 '$disk'" 2>/dev/null | tr -dc '0-9' || true)"
+  [ "${dev_size:-0}" -ge "$min_bytes" ] 2>/dev/null || { log "[ORIGIN] Source disk size invalid: disk=$disk bytes=${dev_size:-0}"; return 1; }
+  dev_mb="$(mb_from_bytes "$dev_size")"
+  export_log="$JOB_LOG/origin_vm_export.log"
+  rm -f "$dest" "$export_log"
+  log "[ORIGIN] Streaming source disk $disk ($(fmt_bytes "$dev_size")) to $dest"
+  log_download_status "origin_vm_raw_export" "0" "$dev_mb" "starting" "0.0" "unknown" "server=$origin_id disk=$disk"
+  set +e
+  ssh -i "$ssh_key_file" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o IdentitiesOnly=yes "$ORIGIN_SSH_USER@$origin_ip" \
+    "sudo dd if='$disk' bs=16M status=none" >"$dest" 2>"$export_log" &
+  export_pid=$!
+  start_s="$(date +%s)"
+  while kill -0 "$export_pid" 2>/dev/null; do
+    sleep 30
+    if kill -0 "$export_pid" 2>/dev/null; then
+      copied="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+      copied_mb="$(mb_from_bytes "$copied")"
+      pct="$(awk -v c="$copied" -v t="$dev_size" 'BEGIN{if(t>0) printf "%.1f", (c/t)*100; else printf "0.0"}')"
+      elapsed_s=$(( $(date +%s) - start_s ))
+      eta_min="$(awk -v c="$copied" -v t="$dev_size" -v e="$elapsed_s" 'BEGIN{if(c>0 && e>0 && t>c) printf "%.0f", ((t-c)/(c/e))/60; else if(t>0 && c>=t) printf "0"; else printf "unknown"}')"
+      log_download_status "origin_vm_raw_export" "$copied_mb" "$dev_mb" "streaming" "$pct" "$eta_min" "server=$origin_id disk=$disk"
+    fi
+  done
+  wait "$export_pid"; rc=$?
+  set -e
+  final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
+  if [ "$rc" -eq 0 ] && [ "$final_bytes" -ge "$min_bytes" ]; then
+    final_mb="$(mb_from_bytes "$final_bytes")"
+    log_download_status "origin_vm_raw_export" "$final_mb" "$dev_mb" "complete" "100.0" "0" "server=$origin_id disk=$disk"
+    log "[ORIGIN] HIT live source raw artifact: $dest (${final_bytes} bytes)"
+    return 0
+  fi
+  log "[ORIGIN] WARN live source export failed rc=$rc size=${final_bytes}B log=$export_log"
+  log_file_excerpt "[ORIGIN] export-error:" "$export_log"
+  rm -f "$dest"
+  return 1
+}
 image_is_cinder_preferred_snapshot() {
   local image_id="$1" meta="$JOB_TMP/img_meta_export.json"
   openstack image show "$image_id" -f json >"$meta" 2>/dev/null || return 1
@@ -995,7 +1249,8 @@ rackspace_managed = any(str(props.get(k, "")).strip() for k in (
     "com.rackspace__1__build_config_options",
 ))
 # flag=4 is the classic licensed/export-blocked case.  Rackspace-managed snapshots
-# can also fail Cloud Files export with a generic error; prefer Cinder for those.
+# may still use Cinder, but the safer default is Cloud Files first because image-to-volume
+# can sit in creating for a long time before failing in Rackspace Cinder.
 print("1" if flag == "4" or (image_type == "snapshot" and rackspace_managed) else "0")
 PY
 }
@@ -1035,26 +1290,24 @@ PYSIZE
   log "[CINDER] Licensed image — Cinder attach fallback: helper=$helper_id size=${size_gb}GB"
   log_download_status "cinder_volume_create" "0" "$source_mb" "starting" "" "" "volume_mb=$volume_mb"
   local_block_disks >"$before_file"
-  volume_id="$(rackspace_create_volume_from_image "$image_id" "$size_gb" "$volume_name")" || {
-    log "[CINDER] FAILED volume create request; cannot use Cinder fallback"
+  cinder_create_available_volume_from_image "$image_id" "$size_gb" "$volume_name" "$source_mb" "cinder_volume_create" || {
+    log "[CINDER] FAILED volume create after ${CINDER_CREATE_ATTEMPTS:-3} attempt(s)"
+    log "[CINDER] ICF Issue=volume stuck creating/error Cause=Rackspace Cinder backend did not finish image-to-volume create Fix=retry later or use START FRESH after failed temp volumes are deleted"
     return 1
   }
-  volume_id="$(printf '%s' "$volume_id" | tr -d '\r' | tail -1)"
-  [ -n "$volume_id" ] || {
-    log "[CINDER] FAILED volume create request returned no volume id"
-    return 1
-  }
-  log "[CINDER] volume=$volume_id — waiting available"
-  cinder_wait_volume_status "$volume_id" "available" "$CINDER_CREATE_TIMEOUT" "cinder_volume_create" "$source_mb" "0" || {
-    log "[CINDER] FAILED volume create timeout: volume=$volume_id waited=${CINDER_CREATE_TIMEOUT}s status=$(rackspace_volume_status "$volume_id" 2>/dev/null || echo unknown)"
-    log "[CINDER] ICF Issue=volume stuck creating Cause=Rackspace Cinder backend did not finish image-to-volume create Fix=retry later or use START FRESH after volume leaves creating/error"
-    log "[CINDER] cleanup: requesting delete for failed temp volume=$volume_id"
+  volume_id="$CINDER_AVAILABLE_VOLUME_ID"
+  log_download_status "cinder_attach" "0" "$source_mb" "starting"
+  rackspace_attach_volume "$helper_id" "$volume_id" || {
+    log "[CINDER] FAILED attach temp volume=$volume_id to helper=$helper_id"
     rackspace_delete_volume "$volume_id" || true
     return 1
   }
-  log_download_status "cinder_attach" "0" "$source_mb" "starting"
-  rackspace_attach_volume "$helper_id" "$volume_id" || return 1
-  cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || return 1
+  cinder_wait_volume_status "$volume_id" "in-use" 900 "cinder_attach" "$source_mb" "0" || {
+    log "[CINDER] FAILED temp volume attach wait: volume=$volume_id"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   dev=""
   for _i in $(seq 1 60); do
     sleep 3
@@ -1068,14 +1321,25 @@ PYSIZE
       dev="$(find_new_block_disk "$before_file" "$after_file" || true)"
     else
       log "[CINDER] ERROR could not map volume=$volume_id to an attached block device; refusing unsafe parallel disk guess"
+      rackspace_detach_volume "$helper_id" "$volume_id" || true
+      rackspace_delete_volume "$volume_id" || true
       return 1
     fi
   fi
-  [ -n "$dev" ] || return 1
+  [ -n "$dev" ] || {
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   dev_size="$(sudo blockdev --getsize64 "$dev" 2>/dev/null || echo 0)"
   dev_mb="$(mb_from_bytes "$dev_size")"
   log "[CINDER] attached block device for volume=$volume_id: $dev bytes=$dev_size"
-  [ "$dev_size" -gt 1073741824 ] || return 1
+  [ "$dev_size" -gt 1073741824 ] || {
+    log "[CINDER] FAILED attached device too small/invalid: volume=$volume_id dev=$dev bytes=$dev_size"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   rm -f "$dest"
   log "[CINDER] raw-copying $dev → $dest"
   copy_start_ts="$(date +%s)"
@@ -1095,7 +1359,12 @@ PYSIZE
   done
   wait "$dd_pid"; dd_rc=$?
   set -e
-  [ "$dd_rc" -eq 0 ] || return 1
+  [ "$dd_rc" -eq 0 ] || {
+    log "[CINDER] FAILED raw copy from temp volume=$volume_id rc=$dd_rc"
+    rackspace_detach_volume "$helper_id" "$volume_id" || true
+    rackspace_delete_volume "$volume_id" || true
+    return 1
+  }
   sudo chown "$(id -u):$(id -g)" "$dest" 2>/dev/null || true
   final_bytes="$(stat -c%s "$dest" 2>/dev/null || echo 0)"
   final_mb="$(mb_from_bytes "$final_bytes")"
@@ -1110,11 +1379,17 @@ PYSIZE
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
   log "[ZS3] Download waterfall for image=$image_id"
+  if [ "$LIVE_ORIGIN_EXPORT_FIRST" = "1" ]; then
+    log "[ZS3] Live-origin export requested first"
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
+    log "[ZS3] Live-origin export-first failed — continuing waterfall"
+  fi
   if [ "$CINDER_VOLUME_EXPORT_ON_LICENSED" = "1" ] && [ "$PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT" = "1" ] && [ "$(image_is_cinder_preferred_snapshot "$image_id" || echo 0)" = "1" ]; then
     log "[ZS3] Rackspace-managed snapshot — using Cinder fallback first; set OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 to try Cloud Files first"
     OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1
     cinder_volume_raw_export "$image_id" "$dest" && return 0
     log "[ZS3] Cinder-first export failed. Not retrying the same Cinder path in this run."
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
     if [ "$USE_CLOUD_FILES_EXPORT" != "1" ]; then
       log "[ZS3] Enabling Cloud Files export automatically because Cinder image-to-volume did not become available"
       USE_CLOUD_FILES_EXPORT=1
@@ -1185,9 +1460,11 @@ download_existing_ospc_snapshot() {
   fi
   if [ "${OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED:-0}" = "1" ]; then
     log "[ZS3] Cinder fallback already failed once in this run; stopping to avoid duplicate stuck temp volumes."
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
     return 1
   fi
   OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1 cinder_volume_raw_export "$image_id" "$dest" && return 0
+  origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
   return 1
 }
 
@@ -1321,7 +1598,8 @@ else
   FMT="$(qemu-img info --output=json "$SOURCE_RAW" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("format","raw"))' 2>/dev/null || echo raw)"
   log "[LS4] Converting $SOURCE_RAW (format=$FMT) → $QCOW"
   rm -f "$QCOW"
-  qemu-img convert -p -f "$FMT" -O qcow2 -c "$SOURCE_RAW" "$QCOW" 2>&1 | tee -a "$BACKGROUND_LOG" || fail_exit "LS4_NORMALIZE_QCOW2" "qemu-img convert failed — check disk space"
+  run_qemu_convert_with_progress "qcow2_normalize" "$SOURCE_RAW" "$FMT" "$QCOW" "$JOB_LOG/qemu_convert.log" \
+    || fail_exit "LS4_NORMALIZE_QCOW2" "qemu-img convert failed — check disk space; see $JOB_LOG/qemu_convert.log"
   sz="$(stat -c%s "$QCOW" 2>/dev/null || echo 0)"
   log "[LS4] HIT qcow2: $QCOW ($sz bytes)"
 fi
@@ -1443,10 +1721,46 @@ IMAGE_CREATE_ARGS=(
 
 NEW_ID=""
 for _up_try in 1 2 3; do
+  UPLOAD_OUT="$JOB_TMP/flex_glance_upload_${_up_try}.out"
+  UPLOAD_ERR="$JOB_TMP/flex_glance_upload_${_up_try}.err"
+  : >"$UPLOAD_OUT"
+  : >"$UPLOAD_ERR"
   log "  [UPLOAD $_up_try/3] starting..."
-  NEW_ID="$(openstack image create --format value -c id "${IMAGE_CREATE_ARGS[@]}" "$IMG_NAME" 2>>"$BACKGROUND_LOG" || true)"
-  [ -n "$NEW_ID" ] && { log "  [UPLOAD $_up_try/3] image id: $NEW_ID"; break; }
-  log "  [WARN] upload attempt $_up_try failed"
+  log_upload_status "flex_glance_upload" "0" "$QCOW_MIB" "starting" "0.0" "unknown" "attempt=$_up_try image=$IMG_NAME"
+  set +e
+  openstack image create --format value -c id "${IMAGE_CREATE_ARGS[@]}" "$IMG_NAME" >"$UPLOAD_OUT" 2>"$UPLOAD_ERR" &
+  UPLOAD_PID="$!"
+  UPLOAD_START="$(date +%s)"
+  while kill -0 "$UPLOAD_PID" 2>/dev/null; do
+    sleep 15
+    kill -0 "$UPLOAD_PID" 2>/dev/null || break
+    UPLOAD_BYTES="$(proc_io_bytes "$UPLOAD_PID")"
+    [ "${UPLOAD_BYTES:-0}" -gt "$QCOW_BYTES" ] 2>/dev/null && UPLOAD_BYTES="$QCOW_BYTES"
+    UPLOAD_MB="$(mb_from_bytes "$UPLOAD_BYTES")"
+    UPLOAD_PCT="$(awk -v d="${UPLOAD_BYTES:-0}" -v t="$QCOW_BYTES" 'BEGIN{if(t>0){p=(d/t)*100; if(p>99)p=99; printf "%.1f", p}else printf "0.0"}')"
+    UPLOAD_ELAPSED="$(( $(date +%s) - UPLOAD_START ))"
+    UPLOAD_ETA="$(awk -v d="${UPLOAD_BYTES:-0}" -v t="$QCOW_BYTES" -v e="$UPLOAD_ELAPSED" 'BEGIN{if(d>0 && e>0 && t>d){eta=((t-d)/(d/e))/60; printf "%.0f", eta}else printf "unknown"}')"
+    log_upload_status "flex_glance_upload" "$UPLOAD_MB" "$QCOW_MIB" "uploading" "$UPLOAD_PCT" "$UPLOAD_ETA" "attempt=$_up_try pid=$UPLOAD_PID image=$IMG_NAME"
+  done
+  wait "$UPLOAD_PID"
+  UPLOAD_RC="$?"
+  set -e
+  [ -s "$UPLOAD_ERR" ] && cat "$UPLOAD_ERR" >>"$BACKGROUND_LOG" 2>/dev/null || true
+  NEW_ID="$(awk 'NF{print $1; exit}' "$UPLOAD_OUT" 2>/dev/null | tr -d '\r')"
+  if [ "$UPLOAD_RC" -ne 0 ]; then
+    log_upload_status "flex_glance_upload" "$(mb_from_bytes "$QCOW_BYTES")" "$QCOW_MIB" "failed" "100.0" "0" "attempt=$_up_try rc=$UPLOAD_RC image=$IMG_NAME"
+    log "  [WARN] upload attempt $_up_try failed rc=$UPLOAD_RC"
+    [ -s "$UPLOAD_ERR" ] && tail -n 12 "$UPLOAD_ERR" | while IFS= read -r _upload_err_line; do log "  [UPLOAD_ERR] $_upload_err_line"; done
+    [ "$_up_try" -lt 3 ] && sleep 20
+    continue
+  fi
+  if [ -n "$NEW_ID" ]; then
+    log_upload_status "flex_glance_upload" "$QCOW_MIB" "$QCOW_MIB" "submitted" "100.0" "0" "attempt=$_up_try image_id=$NEW_ID image=$IMG_NAME"
+    log "  [UPLOAD $_up_try/3] image id: $NEW_ID"
+    break
+  fi
+  log_upload_status "flex_glance_upload" "$(mb_from_bytes "$QCOW_BYTES")" "$QCOW_MIB" "failed" "100.0" "0" "attempt=$_up_try rc=0 reason=no_image_id image=$IMG_NAME"
+  log "  [WARN] upload attempt $_up_try failed: no image id returned"
   [ "$_up_try" -lt 3 ] && sleep 20
 done
 [ -n "$NEW_ID" ] || fail_exit "LS6_UPLOAD_FLEX" "Upload failed after 3 attempts"
@@ -1454,9 +1768,11 @@ for _poll in $(seq 1 60); do
   ST="$(openstack image show "$NEW_ID" -f value -c status 2>/dev/null || echo "")"
   [ "$ST" = "active" ] && break
   [ "$ST" = "killed" ] && fail_exit "LS6_UPLOAD_FLEX" "Image $NEW_ID killed by Glance"
+  log_upload_wait_status "flex_glance_activate" "$((_poll * 20))" "1200" "${ST:-unknown}" "poll=$_poll/60 image_id=$NEW_ID"
   log "  [UPLOAD_POLL $_poll/60] status=${ST:-unknown}"; sleep 20
 done
 [ "$ST" = "active" ] || fail_exit "LS6_UPLOAD_FLEX" "Image $NEW_ID never reached active (status=$ST)"
+log_upload_wait_status "flex_glance_activate" "1200" "1200" "active" "image_id=$NEW_ID"
 log "[LS6] HIT image active: $NEW_ID"
 
 # ── LS6A: Volume-snapshot only — fix Glance virtual_size + create FLEX Cinder volume ──

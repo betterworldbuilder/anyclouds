@@ -44,7 +44,7 @@ CINDER_MIN_VOLUME_SIZE_GB="${OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB:-75}"
 CINDER_CREATE_TIMEOUT="${OSPC2FLEX_CINDER_CREATE_TIMEOUT:-7200}"
 CINDER_CREATE_ATTEMPTS="${OSPC2FLEX_CINDER_CREATE_ATTEMPTS:-3}"
 CINDER_CREATE_RETRY_WAIT="${OSPC2FLEX_CINDER_CREATE_RETRY_WAIT:-45}"
-PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-1}"
+PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT:-0}"
 LIVE_ORIGIN_FALLBACK="${OSPC2FLEX_LIVE_ORIGIN_FALLBACK:-1}"
 LIVE_ORIGIN_EXPORT_FIRST="${OSPC2FLEX_LIVE_ORIGIN_EXPORT_FIRST:-0}"
 ORIGIN_SSH_USER="${OSPC2FLEX_ORIGIN_SSH_USER:-ubuntu}"
@@ -778,6 +778,39 @@ rackspace_volume_status() {
   resp="$(curl -sS "$base/volumes/$vol_id" -H "X-Auth-Token: $token" 2>/dev/null || true)"
   printf '%s' "$resp" | python3 -c 'import json,sys; print((json.load(sys.stdin).get("volume") or {}).get("status","unknown"))' 2>/dev/null || echo unknown
 }
+rackspace_volume_error_summary() {
+  local vol_id="$1" token base resp
+  token="$(refresh_ospc_token || true)"; base="$(rackspace_blockstorage_base)"
+  [ -n "$token" ] && [ -n "$base" ] || return 1
+  resp="$(curl -sS "$base/volumes/$vol_id" -H "X-Auth-Token: $token" 2>>"$JOB_LOG/cinder.log" || true)"
+  printf '\n[CINDER volume detail %s]\n%s\n' "$vol_id" "$resp" >>"$JOB_LOG/cinder.log" 2>/dev/null || true
+  VOLUME_JSON="$resp" python3 - <<'PY' 2>/dev/null || true
+import json, os
+try:
+    doc = json.loads(os.environ.get("VOLUME_JSON") or "{}")
+except Exception:
+    raise SystemExit
+v = doc.get("volume") if isinstance(doc, dict) else {}
+if not isinstance(v, dict):
+    v = {}
+parts = []
+for key in ("status", "display_name", "id", "size", "bootable", "availability_zone", "migration_status"):
+    val = v.get(key)
+    if val not in (None, ""):
+        parts.append(f"{key}={val}")
+for key in ("error", "error_message", "message", "fault"):
+    val = v.get(key)
+    if val:
+        parts.append(f"{key}={val}")
+meta = v.get("metadata")
+if isinstance(meta, dict):
+    for key in ("readonly", "attached_mode", "image_id", "image_name"):
+        val = meta.get(key)
+        if val not in (None, ""):
+            parts.append(f"metadata.{key}={val}")
+print(" ".join(str(p).replace("\n", " ") for p in parts[:12]))
+PY
+}
 cinder_wait_volume_status() {
   local vol_id="$1" want="$2" timeout="${3:-1800}" phase="${4:-cinder_wait}" total_mb="${5:-0}" downloaded_mb="${6:-0}" waited=0 status poll_rc
   while [ "$waited" -lt "$timeout" ]; do
@@ -787,21 +820,25 @@ cinder_wait_volume_status() {
     set -e
     [ -n "$status" ] || status="unknown"
     if [ "$status" = "$want" ]; then
-      log_download_status "$phase" "$downloaded_mb" "$total_mb" "$status" "" "" "waited=${waited}s"
+      log_download_wait_status "$phase" "$waited" "$timeout" "$status" "target=$want volume=$vol_id"
       return 0
     fi
     if [ "$status" = "error" ]; then
-      log_download_status "$phase" "$downloaded_mb" "$total_mb" "error" "" "" "waited=${waited}s"
+      log_download_wait_status "$phase" "$waited" "$timeout" "error" "target=$want volume=$vol_id"
       log "[CINDER] vol=$vol_id status=error target=$want waited=${waited}s poll_rc=$poll_rc"
+      local err_summary; err_summary="$(rackspace_volume_error_summary "$vol_id" || true)"
+      [ -n "$err_summary" ] && log "[CINDER] error detail: $err_summary"
       return 1
     fi
     if [ $((waited % 60)) -eq 0 ]; then
       log "[CINDER] vol=$vol_id status=$status target=$want waited=${waited}s poll_rc=$poll_rc"
-      log_download_status "$phase" "$downloaded_mb" "$total_mb" "$status" "" "" "waited=${waited}s"
+      log_download_wait_status "$phase" "$waited" "$timeout" "$status" "target=$want volume=$vol_id"
     fi
     sleep 10; waited=$((waited + 10))
   done
-  log_download_status "$phase" "$downloaded_mb" "$total_mb" "timeout" "" "" "waited=${timeout}s"
+  log_download_wait_status "$phase" "$timeout" "$timeout" "timeout" "target=$want volume=$vol_id"
+  local err_summary; err_summary="$(rackspace_volume_error_summary "$vol_id" || true)"
+  [ -n "$err_summary" ] && log "[CINDER] timeout detail: $err_summary"
   return 1
 }
 local_block_disks() {
@@ -1212,7 +1249,8 @@ rackspace_managed = any(str(props.get(k, "")).strip() for k in (
     "com.rackspace__1__build_config_options",
 ))
 # flag=4 is the classic licensed/export-blocked case.  Rackspace-managed snapshots
-# can also fail Cloud Files export with a generic error; prefer Cinder for those.
+# may still use Cinder, but the safer default is Cloud Files first because image-to-volume
+# can sit in creating for a long time before failing in Rackspace Cinder.
 print("1" if flag == "4" or (image_type == "snapshot" and rackspace_managed) else "0")
 PY
 }
