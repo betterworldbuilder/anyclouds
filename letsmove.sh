@@ -23,6 +23,10 @@ echo " Starting OSPC to FLEX Migration Dashboard "
 echo "================================================"
 
 echo "-> Cleaning up previous background instances..."
+systemctl --user stop osflex-dashboard >/dev/null 2>&1 || true
+pkill -f "$SCRIPT_DIR/workflow_dashboard/run_dashboard.sh" >/dev/null 2>&1 || true
+rm -f /tmp/osflex-dashboard.pid
+fuser -k 5001/tcp >/dev/null 2>&1 || true
 fuser -k 5005/tcp >/dev/null 2>&1 || true
 sleep 1
 
