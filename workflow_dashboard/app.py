@@ -3606,6 +3606,9 @@ def uat_mobile_preview():
             return Response(html, status=200, mimetype="text/html")
     text = raw.decode("utf-8", errors="replace")
     if "text/html" in content_type.lower() or "<html" in text[:500].lower():
+        local_piggybank_ui = BASE_DIR / "banking_poc" / "banking_app_live.html"
+        if local_piggybank_ui.exists() and ("PIGGYBANK" in text or "bankvault_api_adapter" in text):
+            text = local_piggybank_ui.read_text(encoding="utf-8", errors="replace")
         encoded_origin = urllib.parse.quote(origin, safe="")
         base_tag = f'<base href="{origin}/">'
         preview_css = """
@@ -3649,6 +3652,58 @@ def uat_mobile_preview():
     el.textContent = msg || '';
     el.className = 'bankvault-status' + (mode ? ' ' + mode : '');
   }
+  function userLabel(username){
+    var u = String(username || '').trim();
+    if (!u) return '';
+    if (u.toLowerCase() === 'alex') return 'Alex Morgan (alex)';
+    if (u.toLowerCase() === 'alice') return 'Alice Chen (alice)';
+    return u.charAt(0).toUpperCase() + u.slice(1) + ' (' + u + ')';
+  }
+  function addOption(select, value, label){
+    if (!select || !value) return;
+    var exists = Array.prototype.some.call(select.options, function(opt){ return opt.value === value; });
+    if (exists) return;
+    var opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label || value;
+    select.appendChild(opt);
+  }
+  function currentUsername(){
+    var login = $('#bankvaultLoginUsername');
+    return (login && login.value ? login.value : 'alex').trim();
+  }
+  function ensureTransferOptions(){
+    var from = $('#bankvaultFromAccount');
+    if (from) {
+      addOption(from, 'acct-checking', 'Everyday Checking - $24,426.80');
+      addOption(from, 'acct-savings', 'Savings - $136.00');
+      if (!from.value && from.options.length) from.value = from.options[0].value;
+    }
+    var to = $('#bankvaultToUsername');
+    if (to) {
+      $all('[data-switch-user]').forEach(function(btn){
+        var username = btn.getAttribute('data-switch-user');
+        addOption(to, username, userLabel(username));
+      });
+      addOption(to, 'alice', 'Alice Chen (alice)');
+      addOption(to, 'alex', 'Alex Morgan (alex)');
+      var current = currentUsername().toLowerCase();
+      var firstOther = Array.prototype.find.call(to.options, function(opt){ return opt.value.toLowerCase() !== current; });
+      if (firstOther && (!to.value || to.value.toLowerCase() === current)) to.value = firstOther.value;
+    }
+  }
+  function refreshModernPanel(){
+    $all('#bankvault-live-panel,#bankvaultTransferForm,#bankvaultFeatureView').forEach(function(el){
+      el.style.setProperty('display', '');
+      el.style.setProperty('visibility', 'visible');
+    });
+    var login = $('#bankvaultLoginForm');
+    var register = $('#bankvaultRegisterForm');
+    if (login && register && !login.classList.contains('active') && !register.classList.contains('active')) {
+      login.classList.add('active');
+    }
+    ensureTransferOptions();
+  }
   function setTab(name){
     $all('.bankvault-tab').forEach(function(tab){
       tab.classList.toggle('active', tab.getAttribute('data-bankvault-tab') === name);
@@ -3666,6 +3721,7 @@ def uat_mobile_preview():
     if (feature) feature.classList.remove('active');
     var transfer = $('#bankvaultTransferForm');
     if (transfer) {
+      ensureTransferOptions();
       transfer.classList.add('active');
       transfer.scrollIntoView({behavior:'smooth', block:'center'});
     }
@@ -3717,6 +3773,7 @@ def uat_mobile_preview():
         el.style.setProperty('pointer-events', 'auto', 'important');
       });
     });
+    refreshModernPanel();
   }
   function wire(){
     if (document.documentElement.dataset.uatPiggyPreviewWired === 'true') return;
@@ -3733,6 +3790,7 @@ def uat_mobile_preview():
         if (pass) pass.value = switchUser.getAttribute('data-switch-pass') || pass.value || 'demo';
         setTab('login');
         setStatus('Selected ' + (switchUser.getAttribute('data-switch-user') || 'user') + '.', 'ok');
+        ensureTransferOptions();
         return;
       }
       var action = event.target.closest('[data-bank-action]');
@@ -3793,15 +3851,19 @@ def uat_mobile_preview():
         }
         var login = $('#bankvaultLoginUsername');
         if (login) login.value = username;
+        addOption($('#bankvaultToUsername'), username, userLabel(username));
         setStatus('Created preview user ' + username + '. Login ready.', 'ok');
         setTab('login');
       }
       if (event.target && event.target.id === 'bankvaultTransferForm') {
         event.preventDefault();
-        setStatus('Transfer submitted in preview.', 'ok');
+        ensureTransferOptions();
+        var recipient = ($('#bankvaultToUsername') || {}).value || 'recipient';
+        var amount = ($('#bankvaultAmount') || {}).value || '25.00';
+        setStatus('Transfer submitted in preview: $' + amount + ' to ' + recipient + '.', 'ok');
       }
     });
-    setInterval(ensureLayer, 1000);
+    setInterval(function(){ ensureLayer(); ensureTransferOptions(); }, 1000);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
@@ -3877,6 +3939,12 @@ def uat_mobile_asset_proxy():
     parsed = urllib.parse.urlparse(origin)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc or not asset_path.startswith("/"):
         return Response("Invalid mobile asset proxy request.", status=400, mimetype="text/plain")
+    if asset_path.rstrip("/").endswith("/bankvault_api_adapter.js"):
+        local_adapter = BASE_DIR / "banking_poc" / "frontend" / "bankvault_api_adapter.js"
+        if local_adapter.exists():
+            out = Response(local_adapter.read_text(encoding="utf-8", errors="replace"), status=200, mimetype="application/javascript")
+            out.headers["Cache-Control"] = "no-store"
+            return out
     target = origin + asset_path
     try:
         req = urllib.request.Request(target, headers={
@@ -11614,8 +11682,11 @@ def run_image_migrator():
                 remote_env = (
                     f"OSPC2FLEX_JUMPHOST_IP={_shlex.quote(process_ip)} "
                     "OSPC2FLEX_LINUX_SNAP_SKIP_REPAIRED=0 "
-                    "OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 "
-                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 "
+                    # Cloud Files export is broken for this tenant (server-side "Unknown error" after
+                    # ~7 min), so skip it and go straight to Cinder. Origin VM export stays as the
+                    # last-resort fallback if Cinder can't create the volume.
+                    "OSPC2FLEX_USE_CLOUD_FILES_EXPORT=0 "
+                    "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=1 "
                     "OSPC2FLEX_RETRY_FAILED_CF_EXPORT=0 "
                     "OSPC2FLEX_CINDER_CREATE_TIMEOUT=3600 "
                     "OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB=75 "
