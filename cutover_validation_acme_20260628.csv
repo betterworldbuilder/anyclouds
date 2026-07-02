@@ -1,0 +1,15 @@
+CUTOVER VALIDATION CERTIFICATE
+"Customer","acme"
+"Operator","dzoan"
+"Date","28/06/2026"
+"Time","17:06"
+
+"Step","Status"
+"Pre-checks","pass"
+"Configure HAProxy","pass"
+"Validate App","pass"
+"Validate DB","skipped"
+"Monitor","pass"
+"Cut over PASS","pass"
+
+"Cut over done by Operator dzoan for customer acme on 28/06/2026"

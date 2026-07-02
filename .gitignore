@@ -77,6 +77,30 @@ uploads/migration_output_bundles/
 workflow_dashboard/cache/
 *.log
 
+# Local generated dashboards, screenshots, downloads, and migration artifacts
+/*.zip
+/*.crdownload
+/Unconfirmed*.crdownload
+/*.png
+/screenshot*.py
+/Archetype Templates.html
+/Live Image Scan Console*.txt
+/businesstemplatesBlue*.html
+/businesstemplatesgreen.html
+/cloud_jumper_flex.html
+/cutover_dashboard-advanced.html
+/cutover_report*.html
+/dawn_migration*.html
+/migration_strategy*.html
+/newuatinput.html
+/rainbows.html
+/rocket.html
+/uat_validation_section.html
+/uatbusinesssystem.html
+/workflow_dashboard/ospc-discovery/outputs/
+/workflow_dashboard/workflow_dashboard/static/discovery_log.txt
+/uploads/*.xlsx
+
 # Local migration disk artifacts
 *.img
 *.raw

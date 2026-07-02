@@ -8,7 +8,7 @@ SUBNET_CIDR='10.60.0.0/24'
 ROUTER_NAME='tenant-router'
 SECURITY_GROUP='default'
 VOLUME_TYPE='Performance'
-KEY_NAME='latopras'
+KEY_NAME='laptopubuntu24'
 SSH_PUB_KEY=''
 FAIL_FAST=0
 RESULTS_CSV='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/1342314_tenant_deploy_results.csv'
@@ -297,7 +297,7 @@ echo "PHASE 4: Compute - executing deployment steps..."
 
 run_step 'step-0001' 'compute' 'server' 'Server-27' 'create_server_local_boot' 'image=AlmaLinux 9,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Server-27"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Server-27'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Server-27'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -319,7 +319,7 @@ STEP_EOF
 
 run_step 'step-0003' 'compute' 'server' 'haproxyopsc' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server haproxyopsc"
-openstack server create -f value -c id --flavor 'gp.5.4.4' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'haproxyopsc'
+openstack server create -f value -c id --flavor 'gp.0.4.4' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'haproxyopsc'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -341,7 +341,7 @@ STEP_EOF
 
 run_step 'step-0005' 'compute' 'server' 'u24clean' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server u24clean"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24clean'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24clean'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -363,7 +363,7 @@ STEP_EOF
 
 run_step 'step-0007' 'compute' 'server' 'debian12' 'create_server_local_boot' 'image=Debian 12,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server debian12"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Debian 12' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian12'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Debian 12' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian12'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -385,7 +385,7 @@ STEP_EOF
 
 run_step 'step-0009' 'compute' 'server' 'u24 green server' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server u24 green server"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24 green server'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u24 green server'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -407,7 +407,7 @@ STEP_EOF
 
 run_step 'step-0011' 'compute' 'server' 'u-22' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server u-22"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u-22'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u-22'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -429,7 +429,7 @@ STEP_EOF
 
 run_step 'step-0013' 'compute' 'server' 'Server-21' 'create_server_local_boot' 'image=AlmaLinux 9,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Server-21"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Server-21'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Server-21'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -451,7 +451,7 @@ STEP_EOF
 
 run_step 'step-0015' 'compute' 'server' 'musicradio' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server musicradio"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'musicradio'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'musicradio'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -473,7 +473,7 @@ STEP_EOF
 
 run_step 'step-0017' 'compute' 'server' 'postgresqlU24' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server postgresqlU24"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'postgresqlU24'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'postgresqlU24'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -495,7 +495,7 @@ STEP_EOF
 
 run_step 'step-0019' 'compute' 'server' 'mongo db u24' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server mongo db u24"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'mongo db u24'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'mongo db u24'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -520,7 +520,7 @@ echo "Creating boot volume for ospcwin2019"
 openstack volume create --size 80 --type "$VOLUME_TYPE" --image 'Windows Server 2019' 'boot-ospcwin2019'
 wait_for_volume_available 'boot-ospcwin2019'
 BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-ospcwin2019')
-openstack server create -f value -c id --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'wUVPVr8cxY2tIf' 'ospcwin2019'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'xUM0zFO6Dp6zz5' 'ospcwin2019'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -542,7 +542,7 @@ STEP_EOF
 
 run_step 'step-0023' 'compute' 'server' 'opscwin2016' 'create_server_local_boot' 'image=Windows Server 2016,auth_mode=windows_password' <<'STEP_EOF'
 echo "Creating server opscwin2016"
-openstack server create -f value -c id --flavor 'gp.5.2.4' --image 'Windows Server 2016' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'Wfas1Yed9ctrIC' 'opscwin2016'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --image 'Windows Server 2016' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'DLIarOpvSBa24D' 'opscwin2016'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -564,7 +564,7 @@ STEP_EOF
 
 run_step 'step-0025' 'compute' 'server' 'bigjumpwindowsiad' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server bigjumpwindowsiad"
-openstack server create -f value -c id --flavor 'gp.5.16.64' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'bigjumpwindowsiad'
+openstack server create -f value -c id --flavor 'gp.0.16.64' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'bigjumpwindowsiad'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -586,7 +586,7 @@ STEP_EOF
 
 run_step 'step-0027' 'compute' 'server' 'Bigjim-iad' 'create_server_local_boot' 'image=Ubuntu 24.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Bigjim-iad"
-openstack server create -f value -c id --flavor 'gp.5.16.64' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Bigjim-iad'
+openstack server create -f value -c id --flavor 'gp.0.16.64' --image 'Ubuntu 24.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Bigjim-iad'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -608,7 +608,7 @@ STEP_EOF
 
 run_step 'step-0029' 'compute' 'server' 'jenkins' 'create_server_local_boot' 'image=Rocky Linux 8,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server jenkins"
-openstack server create -f value -c id --flavor 'gp.5.4.4' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'jenkins'
+openstack server create -f value -c id --flavor 'gp.0.4.4' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'jenkins'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -633,7 +633,7 @@ echo "Creating boot volume for centos7"
 openstack volume create --size 80 --type "$VOLUME_TYPE" --image 'Rocky Linux 8' 'boot-centos7'
 wait_for_volume_available 'boot-centos7'
 BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-centos7')
-openstack server create -f value -c id --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'centos7'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'centos7'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -658,7 +658,7 @@ echo "Creating boot volume for win2019"
 openstack volume create --size 80 --type "$VOLUME_TYPE" --image 'Windows Server 2019' 'boot-win2019'
 wait_for_volume_available 'boot-win2019'
 BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-win2019')
-openstack server create -f value -c id --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password '5eT19U0kB8sHRs' 'win2019'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'XRx3W8RvwsKfw8' 'win2019'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -680,7 +680,7 @@ STEP_EOF
 
 run_step 'step-0035' 'compute' 'server' 'windows2016' 'create_server_local_boot' 'image=Windows Server 2016,auth_mode=windows_password' <<'STEP_EOF'
 echo "Creating server windows2016"
-openstack server create -f value -c id --flavor 'gp.5.2.4' --image 'Windows Server 2016' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'gzxrv87PJ5g3Vy' 'windows2016'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --image 'Windows Server 2016' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" --password 'ehbyFEYsyATwq5' 'windows2016'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -702,7 +702,7 @@ STEP_EOF
 
 run_step 'step-0037' 'compute' 'server' 'debian11new' 'create_server_local_boot' 'image=Debian 11,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server debian11new"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian11new'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'debian11new'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -724,7 +724,7 @@ STEP_EOF
 
 run_step 'step-0039' 'compute' 'server' 'dbian10new' 'create_server_local_boot' 'image=Debian 11,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server dbian10new"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian10new'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Debian 11' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian10new'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -746,7 +746,7 @@ STEP_EOF
 
 run_step 'step-0041' 'compute' 'server' 'u20' 'create_server_local_boot' 'image=Ubuntu 20.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server u20"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 20.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u20'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 20.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'u20'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -768,7 +768,7 @@ STEP_EOF
 
 run_step 'step-0043' 'compute' 'server' 'rocky9' 'create_server_local_boot' 'image=Rocky Linux 9,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server rocky9"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Rocky Linux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'rocky9'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Rocky Linux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'rocky9'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -793,7 +793,7 @@ echo "Creating boot volume for alma8"
 openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'AlmaLinux 8' 'boot-alma8'
 wait_for_volume_available 'boot-alma8'
 BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-alma8')
-openstack server create -f value -c id --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'alma8'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'alma8'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -818,7 +818,7 @@ echo "Creating boot volume for dbian12"
 openstack volume create --size 50 --type "$VOLUME_TYPE" --image 'Debian 12' 'boot-dbian12'
 wait_for_volume_available 'boot-dbian12'
 BOOT_VOL_ID=$(openstack volume show -f value -c id 'boot-dbian12')
-openstack server create -f value -c id --flavor 'gp.5.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian12'
+openstack server create -f value -c id --flavor 'gp.0.2.4' --volume "$BOOT_VOL_ID" --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbian12'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -840,7 +840,7 @@ STEP_EOF
 
 run_step 'step-0049' 'compute' 'server' 'Alma9' 'create_server_local_boot' 'image=AlmaLinux 9,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Alma9"
-openstack server create -f value -c id --flavor 'gp.5.4.8' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Alma9'
+openstack server create -f value -c id --flavor 'gp.0.4.8' --image 'AlmaLinux 9' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Alma9'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -862,7 +862,7 @@ STEP_EOF
 
 run_step 'step-0051' 'compute' 'server' 'rocky8' 'create_server_local_boot' 'image=Rocky Linux 8,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server rocky8"
-openstack server create -f value -c id --flavor 'gp.5.4.8' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'rocky8'
+openstack server create -f value -c id --flavor 'gp.0.4.8' --image 'Rocky Linux 8' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'rocky8'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -884,7 +884,7 @@ STEP_EOF
 
 run_step 'step-0053' 'compute' 'server' 'HA percona 8-02' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HA percona 8-02"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-02'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-02'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -906,7 +906,7 @@ STEP_EOF
 
 run_step 'step-0055' 'compute' 'server' 'drupal' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server drupal"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'drupal'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'drupal'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -928,7 +928,7 @@ STEP_EOF
 
 run_step 'step-0057' 'compute' 'server' 'dbaasmariadb' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server dbaasmariadb"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbaasmariadb'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'dbaasmariadb'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -950,7 +950,7 @@ STEP_EOF
 
 run_step 'step-0059' 'compute' 'server' 'HA-Mysql8-01' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HA-Mysql8-01"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-Mysql8-01'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-Mysql8-01'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -972,7 +972,7 @@ STEP_EOF
 
 run_step 'step-0061' 'compute' 'server' 'HA-mariaDB-02' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HA-mariaDB-02"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-02'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-02'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -994,7 +994,7 @@ STEP_EOF
 
 run_step 'step-0063' 'compute' 'server' 'drupalphp_Database' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server drupalphp_Database"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'drupalphp_Database'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'drupalphp_Database'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1016,7 +1016,7 @@ STEP_EOF
 
 run_step 'step-0065' 'compute' 'server' 'HA percona 8-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HA percona 8-03"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-03'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA percona 8-03'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1038,7 +1038,7 @@ STEP_EOF
 
 run_step 'step-0067' 'compute' 'server' 'HA-mariaDB-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HA-mariaDB-03"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-03'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HA-mariaDB-03'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1060,7 +1060,7 @@ STEP_EOF
 
 run_step 'step-0069' 'compute' 'server' 'lamp_Database' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server lamp_Database"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'lamp_Database'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'lamp_Database'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1082,7 +1082,7 @@ STEP_EOF
 
 run_step 'step-0071' 'compute' 'server' 'HAdbaasSql-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HAdbaasSql-03"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HAdbaasSql-03'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HAdbaasSql-03'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1104,7 +1104,7 @@ STEP_EOF
 
 run_step 'step-0073' 'compute' 'server' 'Stack-05_Database' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Stack-05_Database"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Stack-05_Database'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Stack-05_Database'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1126,7 +1126,7 @@ STEP_EOF
 
 run_step 'step-0075' 'compute' 'server' 'HAmysql-01' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server HAmysql-01"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HAmysql-01'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'HAmysql-01'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1148,7 +1148,7 @@ STEP_EOF
 
 run_step 'step-0077' 'compute' 'server' 'mariad1' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server mariad1"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'mariad1'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'mariad1'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1170,7 +1170,7 @@ STEP_EOF
 
 run_step 'step-0079' 'compute' 'server' 'hadbaas-vip-03' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server hadbaas-vip-03"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'hadbaas-vip-03'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'hadbaas-vip-03'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1192,7 +1192,7 @@ STEP_EOF
 
 run_step 'step-0081' 'compute' 'server' 'Instance-21' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Instance-21"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Instance-21'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Instance-21'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1214,7 +1214,7 @@ STEP_EOF
 
 run_step 'step-0083' 'compute' 'server' 'mysql8instance' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server mysql8instance"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'mysql8instance'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'mysql8instance'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1236,7 +1236,7 @@ STEP_EOF
 
 run_step 'step-0085' 'compute' 'server' 'sql' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server sql"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'sql'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'sql'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1258,7 +1258,7 @@ STEP_EOF
 
 run_step 'step-0087' 'compute' 'server' 'Mariadb' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Mariadb"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Mariadb'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Mariadb'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1280,7 +1280,7 @@ STEP_EOF
 
 run_step 'step-0089' 'compute' 'server' 'hadbaas-vip-01' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server hadbaas-vip-01"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'hadbaas-vip-01'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'hadbaas-vip-01'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -1302,7 +1302,7 @@ STEP_EOF
 
 run_step 'step-0091' 'compute' 'server' 'Instance-20' 'create_server_local_boot' 'image=Ubuntu 22.04,auth_mode=ssh_key' <<'STEP_EOF'
 echo "Creating server Instance-20"
-openstack server create -f value -c id --flavor 'gp.5.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Instance-20'
+openstack server create -f value -c id --flavor 'gp.0.2.2' --image 'Ubuntu 22.04' --network "$PRIVATE_NETWORK" --security-group "$SECURITY_GROUP" ${KEY_NAME:+--key-name "$KEY_NAME"} 'Instance-20'
 STEP_EOF
 
 # Map OSPC server → FLEX server
@@ -2238,97 +2238,97 @@ printf "| %-34s | %-24s | %-34s | %-18s | %-8s |\n" "---------------------------
 _SUMMARY_VM_OK=0
 _SUMMARY_VM_FAIL=0
 if openstack server show 'Server-27' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Server-27' '1 GB General Purpose v1' 'Server-27' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Server-27' '1 GB General Purpose v1' 'Server-27' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'haproxyopsc' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'haproxyopsc' '4 GB General Purpose v1' 'haproxyopsc' 'gp.5.4.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'haproxyopsc' '4 GB General Purpose v1' 'haproxyopsc' 'gp.0.4.4' "$_VM_STATUS"
 if openstack server show 'u24clean' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u24clean' '2 GB General Purpose v1' 'u24clean' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u24clean' '2 GB General Purpose v1' 'u24clean' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'debian12' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'debian12' '2 GB General Purpose v1' 'debian12' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'debian12' '2 GB General Purpose v1' 'debian12' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'u24 green server' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u24 green server' '2 GB General Purpose v1' 'u24 green server' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u24 green server' '2 GB General Purpose v1' 'u24 green server' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'u-22' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u-22' '2 GB General Purpose v1' 'u-22' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u-22' '2 GB General Purpose v1' 'u-22' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'Server-21' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Server-21' '2 GB General Purpose v1' 'Server-21' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Server-21' '2 GB General Purpose v1' 'Server-21' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'musicradio' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'musicradio' '2 GB General Purpose v1' 'musicradio' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'musicradio' '2 GB General Purpose v1' 'musicradio' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'postgresqlU24' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'postgresqlU24' '1 GB General Purpose v1' 'postgresqlU24' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'postgresqlU24' '1 GB General Purpose v1' 'postgresqlU24' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'mongo db u24' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'mongo db u24' '1 GB General Purpose v1' 'mongo db u24' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'mongo db u24' '1 GB General Purpose v1' 'mongo db u24' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'ospcwin2019' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'ospcwin2019' '1 GB General Purpose v1' 'ospcwin2019' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'ospcwin2019' '1 GB General Purpose v1' 'ospcwin2019' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'opscwin2016' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'opscwin2016' '2 GB General Purpose v1' 'opscwin2016' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'opscwin2016' '2 GB General Purpose v1' 'opscwin2016' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'bigjumpwindowsiad' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'bigjumpwindowsiad' '30 GB Compute v1' 'bigjumpwindowsiad' 'gp.5.16.64' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'bigjumpwindowsiad' '30 GB Compute v1' 'bigjumpwindowsiad' 'gp.0.16.64' "$_VM_STATUS"
 if openstack server show 'Bigjim-iad' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Bigjim-iad' '30 GB Compute v1' 'Bigjim-iad' 'gp.5.16.64' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Bigjim-iad' '30 GB Compute v1' 'Bigjim-iad' 'gp.0.16.64' "$_VM_STATUS"
 if openstack server show 'jenkins' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'jenkins' '4 GB General Purpose v1' 'jenkins' 'gp.5.4.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'jenkins' '4 GB General Purpose v1' 'jenkins' 'gp.0.4.4' "$_VM_STATUS"
 if openstack server show 'centos7' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'centos7' '3.75 GB Compute v1' 'centos7' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'centos7' '3.75 GB Compute v1' 'centos7' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'win2019' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'win2019' '3.75 GB Compute v1' 'win2019' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'win2019' '3.75 GB Compute v1' 'win2019' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'windows2016' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'windows2016' '2 GB General Purpose v1' 'windows2016' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'windows2016' '2 GB General Purpose v1' 'windows2016' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'debian11new' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'debian11new' '2 GB General Purpose v1' 'debian11new' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'debian11new' '2 GB General Purpose v1' 'debian11new' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'dbian10new' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'dbian10new' '2 GB General Purpose v1' 'dbian10new' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'dbian10new' '2 GB General Purpose v1' 'dbian10new' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'u20' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u20' '1 GB General Purpose v1' 'u20' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'u20' '1 GB General Purpose v1' 'u20' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'rocky9' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'rocky9' '1 GB General Purpose v1' 'rocky9' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'rocky9' '1 GB General Purpose v1' 'rocky9' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'alma8' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'alma8' '3.75 GB Compute v1' 'alma8' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'alma8' '3.75 GB Compute v1' 'alma8' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'dbian12' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'dbian12' '3.75 GB Compute v1' 'dbian12' 'gp.5.2.4' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'dbian12' '3.75 GB Compute v1' 'dbian12' 'gp.0.2.4' "$_VM_STATUS"
 if openstack server show 'Alma9' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Alma9' '7.5 GB Compute v1' 'Alma9' 'gp.5.4.8' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Alma9' '7.5 GB Compute v1' 'Alma9' 'gp.0.4.8' "$_VM_STATUS"
 if openstack server show 'rocky8' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'rocky8' '7.5 GB Compute v1' 'rocky8' 'gp.5.4.8' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'rocky8' '7.5 GB Compute v1' 'rocky8' 'gp.0.4.8' "$_VM_STATUS"
 if openstack server show 'HA percona 8-02' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA percona 8-02' '-' 'HA percona 8-02' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA percona 8-02' '-' 'HA percona 8-02' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'drupal' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'drupal' '-' 'drupal' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'drupal' '-' 'drupal' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'dbaasmariadb' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'dbaasmariadb' '-' 'dbaasmariadb' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'dbaasmariadb' '-' 'dbaasmariadb' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'HA-Mysql8-01' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA-Mysql8-01' '-' 'HA-Mysql8-01' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA-Mysql8-01' '-' 'HA-Mysql8-01' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'HA-mariaDB-02' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA-mariaDB-02' '-' 'HA-mariaDB-02' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA-mariaDB-02' '-' 'HA-mariaDB-02' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'drupalphp_Database' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'drupalphp_Database' '-' 'drupalphp_Database' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'drupalphp_Database' '-' 'drupalphp_Database' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'HA percona 8-03' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA percona 8-03' '-' 'HA percona 8-03' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA percona 8-03' '-' 'HA percona 8-03' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'HA-mariaDB-03' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA-mariaDB-03' '-' 'HA-mariaDB-03' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HA-mariaDB-03' '-' 'HA-mariaDB-03' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'lamp_Database' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'lamp_Database' '-' 'lamp_Database' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'lamp_Database' '-' 'lamp_Database' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'HAdbaasSql-03' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HAdbaasSql-03' '-' 'HAdbaasSql-03' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HAdbaasSql-03' '-' 'HAdbaasSql-03' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'Stack-05_Database' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Stack-05_Database' '-' 'Stack-05_Database' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Stack-05_Database' '-' 'Stack-05_Database' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'HAmysql-01' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HAmysql-01' '-' 'HAmysql-01' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'HAmysql-01' '-' 'HAmysql-01' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'mariad1' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'mariad1' '-' 'mariad1' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'mariad1' '-' 'mariad1' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'hadbaas-vip-03' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'hadbaas-vip-03' '-' 'hadbaas-vip-03' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'hadbaas-vip-03' '-' 'hadbaas-vip-03' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'Instance-21' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Instance-21' '-' 'Instance-21' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Instance-21' '-' 'Instance-21' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'mysql8instance' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'mysql8instance' '-' 'mysql8instance' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'mysql8instance' '-' 'mysql8instance' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'sql' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'sql' '-' 'sql' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'sql' '-' 'sql' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'Mariadb' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Mariadb' '-' 'Mariadb' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Mariadb' '-' 'Mariadb' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'hadbaas-vip-01' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'hadbaas-vip-01' '-' 'hadbaas-vip-01' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'hadbaas-vip-01' '-' 'hadbaas-vip-01' 'gp.0.2.2' "$_VM_STATUS"
 if openstack server show 'Instance-20' >/dev/null 2>&1; then _VM_STATUS='created'; _SUMMARY_VM_OK=$((_SUMMARY_VM_OK + 1)); else _VM_STATUS='failed'; _SUMMARY_VM_FAIL=$((_SUMMARY_VM_FAIL + 1)); fi
-printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Instance-20' '-' 'Instance-20' 'gp.5.2.2' "$_VM_STATUS"
+printf "| %-34.34s | %-24.24s | %-34.34s | %-18.18s | %-8s |\n" 'Instance-20' '-' 'Instance-20' 'gp.0.2.2' "$_VM_STATUS"
 echo "Target FLEX VM count: $_SUMMARY_VM_OK created/reused, $_SUMMARY_VM_FAIL failed, total planned: 46"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Deployment script finished."
