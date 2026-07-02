@@ -17,6 +17,8 @@ import tempfile
 import threading
 import time
 import urllib.request
+import urllib.error
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -3487,7 +3489,409 @@ def index():
 
 @app.get("/business-system-template-das/")
 def business_system_template_das():
-    return send_from_directory(str(BASE_DIR), "businesstemplates.html")
+    resp = send_from_directory(str(BASE_DIR), "businesstemplates.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.post("/api/uat/test-proxy")
+def uat_test_proxy():
+    """Server-side UAT probe so browser CORS does not block source/target checks."""
+    data = request.get_json(silent=True) or {}
+    url = str(data.get("url") or "").strip()
+    method = str(data.get("method") or "GET").strip().upper()
+    body = data.get("body")
+    headers = data.get("headers") if isinstance(data.get("headers"), dict) else {}
+    timeout = data.get("timeout", 8)
+    try:
+        timeout = max(1, min(int(timeout), 20))
+    except Exception:
+        timeout = 8
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return jsonify({"ok": False, "error": "Only absolute http/https URLs are allowed.", "url": url}), 400
+    if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+        return jsonify({"ok": False, "error": "Unsupported method.", "method": method}), 400
+    payload = None
+    req_headers = {"User-Agent": "OSPC2FLEX-UAT-Probe/1.0", "Accept": "application/json,text/plain,*/*"}
+    for key, value in headers.items():
+        if str(key).lower() in {"host", "content-length"}:
+            continue
+        req_headers[str(key)] = str(value)
+    if body is not None and method != "GET":
+        if isinstance(body, (dict, list)):
+            payload = json.dumps(body).encode("utf-8")
+            req_headers.setdefault("Content-Type", "application/json")
+        else:
+            payload = str(body).encode("utf-8")
+    started = time.time()
+    try:
+        req = urllib.request.Request(url, data=payload, headers=req_headers, method=method)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read(200000)
+            text = raw.decode("utf-8", errors="replace")
+            return jsonify({
+                "ok": 200 <= int(resp.status) < 400,
+                "status": int(resp.status),
+                "reason": getattr(resp, "reason", ""),
+                "headers": dict(resp.headers.items()),
+                "body": text,
+                "elapsed_ms": int((time.time() - started) * 1000),
+                "url": url,
+                "method": method,
+            })
+    except urllib.error.HTTPError as e:
+        raw = e.read(200000)
+        return jsonify({
+            "ok": False,
+            "status": int(e.code),
+            "reason": getattr(e, "reason", ""),
+            "body": raw.decode("utf-8", errors="replace"),
+            "elapsed_ms": int((time.time() - started) * 1000),
+            "url": url,
+            "method": method,
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+            "elapsed_ms": int((time.time() - started) * 1000),
+            "url": url,
+            "method": method,
+        }), 200
+
+
+@app.get("/api/uat/mobile-preview")
+def uat_mobile_preview():
+    """Same-origin mobile preview for UAT/Cutover iframes.
+
+    The POC mobile app is often served from a source/target VM. Loading it
+    through this dashboard route keeps the preview stable and rewrites
+    root-relative assets such as /bankvault_api_adapter.js to the VM host.
+    """
+    url = str(request.args.get("url") or "").strip()
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return Response("Invalid preview URL. Use an absolute http/https URL.", status=400, mimetype="text/plain")
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    started = time.time()
+    try:
+        curl = subprocess.run(
+            ["curl", "-L", "--max-time", "8", "-sS", url],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=12,
+            check=False,
+        )
+        if curl.returncode != 0 or not curl.stdout:
+            raise RuntimeError((curl.stderr or b"curl returned no content").decode("utf-8", errors="replace"))
+        raw = curl.stdout[:1500000]
+        content_type = "text/html"
+    except Exception as e:
+        fallback = BASE_DIR / "banking_poc" / "banking_app_live.html"
+        if fallback.exists():
+            raw = fallback.read_bytes()[:1500000]
+            content_type = "text/html"
+        else:
+            html = (
+                "<!doctype html><html><head><meta charset='utf-8'>"
+                "<style>body{margin:0;background:#101a2d;color:#00ff66;font:13px Consolas,monospace;"
+                "display:grid;place-items:center;height:100vh;padding:22px;box-sizing:border-box;}"
+                ".box{border:1px solid #334155;border-radius:14px;padding:18px;background:#020617;max-width:360px;}"
+                "</style></head><body><div class='box'>"
+                f"[preview-error] Could not load {url}<br><br>{str(e)}"
+                "</div></body></html>"
+            )
+            return Response(html, status=200, mimetype="text/html")
+    text = raw.decode("utf-8", errors="replace")
+    if "text/html" in content_type.lower() or "<html" in text[:500].lower():
+        encoded_origin = urllib.parse.quote(origin, safe="")
+        base_tag = f'<base href="{origin}/">'
+        preview_css = """
+<style id="uat-piggybank-preview-style">
+.bankvault-live-panel,.bankvault-feature-view{margin:18px 0;padding:16px;border-radius:22px;background:rgba(255,255,255,.97);box-shadow:0 18px 38px rgba(31,38,135,.18);border:1px solid rgba(102,126,234,.18);color:#172033}
+.bankvault-live-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.bankvault-live-head h3{margin:0;font-size:18px;line-height:1.2;color:#172033}.bankvault-live-user{font-size:11px;color:#64748b;font-weight:800}
+.bankvault-shortcuts{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}.bankvault-shortcuts button{border:1px solid #d8e2f0;border-radius:999px;background:#fff;color:#3451b2;padding:8px 11px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,.08)}
+.bankvault-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.bankvault-tab,.bankvault-action{border:0;border-radius:13px;padding:11px 12px;background:#edf2ff;color:#3451b2;font-size:13px;font-weight:900;cursor:pointer}.bankvault-tab.active,.bankvault-action.primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;box-shadow:0 8px 18px rgba(102,126,234,.28)}
+.bankvault-form{display:none;gap:9px}.bankvault-form.active,.bankvault-transfer-card.active,.bankvault-dev-view.active,.bankvault-feature-view.active{display:grid}.bankvault-transfer-card,.bankvault-dev-view,.bankvault-feature-view{display:none}.bankvault-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.bankvault-field{display:grid;gap:5px}.bankvault-field label{color:#64748b;font-size:10px;font-weight:900;letter-spacing:.03em;text-transform:uppercase}.bankvault-field input,.bankvault-field select{width:100%;border:1px solid #d8e2f0;border-radius:13px;padding:11px 12px;background:#f8fafc;color:#172033;font-size:14px;outline:none}.bankvault-field input:focus,.bankvault-field select:focus{border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.14)}
+.bankvault-status{min-height:18px;margin-top:8px;font-size:12px;color:#64748b;font-weight:800}.bankvault-status.ok{color:#059669}.bankvault-status.err{color:#dc2626}.bankvault-close{border:0;border-radius:999px;background:#fee2e2;color:#991b1b;padding:8px 11px;font-size:12px;font-weight:900;cursor:pointer}
+.bankvault-dev-view.bankvault-external-dev{display:none!important;visibility:hidden!important;pointer-events:none!important}
+.phone-frame,.phone-screen,.app-content,.bankvault-live-panel,.bankvault-transfer-card,.bankvault-feature-view,.quick-actions,.bottom-nav{position:relative;z-index:50;pointer-events:auto!important}
+.test-btn,.sound-toggle{z-index:60!important}
+</style>
+"""
+        fetch_bridge = (
+            "<script>(function(){"
+            f"var origin={json.dumps(origin)};"
+            "var relay='/api/uat/mobile-api-proxy/';"
+            "var nativeFetch=window.fetch.bind(window);"
+            "window.fetch=function(input,init){"
+            "var url=(typeof input==='string')?input:(input&&input.url?input.url:String(input||''));"
+            "if(url.indexOf('/api/')===0){return nativeFetch(relay+url.slice(1)+'?origin='+encodeURIComponent(origin),init);}"
+            "try{var u=new URL(url, window.location.href);"
+            "if(u.origin===window.location.origin && u.pathname.indexOf('/api/')===0){"
+            "return nativeFetch(relay+u.pathname.slice(1)+u.search+(u.search?'&':'?')+'origin='+encodeURIComponent(origin),init);"
+            "}}catch(e){}"
+            "return nativeFetch(input,init);"
+            "};"
+            "})();</script>"
+        )
+        preview_controller = """
+<script id="uat-piggybank-preview-controller">
+(function(){
+  function $(sel){ return document.querySelector(sel); }
+  function $all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function setStatus(msg, mode){
+    var el = $('#bankvaultStatus');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.className = 'bankvault-status' + (mode ? ' ' + mode : '');
+  }
+  function setTab(name){
+    $all('.bankvault-tab').forEach(function(tab){
+      tab.classList.toggle('active', tab.getAttribute('data-bankvault-tab') === name);
+    });
+    var login = $('#bankvaultLoginForm');
+    var register = $('#bankvaultRegisterForm');
+    if (login) login.classList.toggle('active', name === 'login');
+    if (register) register.classList.toggle('active', name === 'register');
+    var transfer = $('#bankvaultTransferForm');
+    if (transfer && (name === 'login' || name === 'register')) transfer.classList.remove('active');
+    setStatus(name === 'register' ? 'Register a new PIGGYBANK user.' : 'Login ready.', 'ok');
+  }
+  function showTransfer(){
+    var feature = $('#bankvaultFeatureView');
+    if (feature) feature.classList.remove('active');
+    var transfer = $('#bankvaultTransferForm');
+    if (transfer) {
+      transfer.classList.add('active');
+      transfer.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+    setStatus('Transfer form ready. Choose recipient and amount.', 'ok');
+  }
+  function hideTransfer(){
+    var transfer = $('#bankvaultTransferForm');
+    if (transfer) transfer.classList.remove('active');
+  }
+  function showHome(){
+    hideTransfer();
+    var feature = $('#bankvaultFeatureView');
+    if (feature) {
+      feature.classList.remove('active');
+      feature.innerHTML = '';
+    }
+    $('.app-header')?.scrollIntoView({behavior:'smooth', block:'start'});
+    setStatus('Home dashboard active.', 'ok');
+  }
+  function showFeature(name){
+    hideTransfer();
+    var view = $('#bankvaultFeatureView');
+    if (!view) return;
+    var title = {receive:'Receive Money', pay:'Utilities Payment', analytics:'Income & Spending', cards:'Cards', invest:'S&P 500 Watchlist', settings:'Settings'}[name] || 'PIGGYBANK';
+    var body = {
+      receive: '<div class="bankvault-mini-card"><div class="bankvault-card-row"><span>ACH / Wire Routing</span><strong>021000021</strong></div></div><div class="bankvault-mini-card"><div class="bankvault-card-row"><span>Payment link</span><strong>piggybank.me/customer</strong></div></div>',
+      pay: '<div class="bankvault-utility-grid"><button class="bankvault-action" type="button" data-preview-pay="Rent">🏠 Rent</button><button class="bankvault-action" type="button" data-preview-pay="Electricity">⚡ Electricity</button><button class="bankvault-action" type="button" data-preview-pay="Mobile">📱 Mobile</button><button class="bankvault-action" type="button" data-preview-pay="Internet">🌐 Internet</button><button class="bankvault-action" type="button" data-preview-pay="Car">🚗 Car</button></div><div class="bankvault-mini-card"><div class="bankvault-card-row"><span>Selected bill</span><strong id="bankvaultMockBill">Choose a utility</strong></div></div>',
+      analytics: '<div class="bankvault-grid-2"><div class="bankvault-mini-card"><div class="bankvault-card-row"><span>Income</span><strong style="color:#059669">$7,850</strong></div></div><div class="bankvault-mini-card"><div class="bankvault-card-row"><span>Spending</span><strong style="color:#dc2626">$3,240</strong></div></div></div>',
+      cards: '<div class="bankvault-mini-card" style="background:linear-gradient(135deg,#172033,#667eea);color:white"><div class="bankvault-card-row"><span>PIGGYBANK Platinum</span><strong>**** 4582</strong></div></div><button class="bankvault-action primary" type="button" data-preview-add-card>Add Card</button><div id="bankvaultAddedCards"></div>',
+      invest: '<div class="bankvault-mini-card"><div class="bankvault-card-row"><span><strong>SPY</strong> S&P 500 ETF</span><strong style="color:#059669">+0.42%</strong></div></div><div class="bankvault-mini-card"><div class="bankvault-card-row"><span><strong>AAPL</strong> Apple</span><strong style="color:#059669">+1.12%</strong></div></div><div class="bankvault-mini-card"><div class="bankvault-card-row"><span><strong>JPM</strong> JPMorgan Chase</span><strong style="color:#dc2626">-0.18%</strong></div></div>',
+      settings: '<div class="bankvault-mini-card"><div class="bankvault-card-row"><span>Theme</span><button class="bankvault-action" type="button" data-preview-theme>Toggle Light/Dark</button></div></div><div class="bankvault-mini-card"><div class="bankvault-card-row"><span>Transfer alerts</span><strong>Push + Email</strong></div></div>'
+    }[name] || '';
+    view.innerHTML = '<div class="bankvault-feature-head"><h3>' + title + '</h3><button class="bankvault-close" type="button" data-preview-home>Close</button></div>' + body;
+    view.classList.add('active');
+    view.scrollIntoView({behavior:'smooth', block:'center'});
+    setStatus(title + ' opened.', 'ok');
+  }
+  function ensureLayer(){
+    var dev = $('.bankvault-dev-view.bankvault-external-dev');
+    if (dev) {
+      dev.style.setProperty('display', 'none', 'important');
+      dev.style.setProperty('visibility', 'hidden', 'important');
+      dev.style.setProperty('pointer-events', 'none', 'important');
+    }
+    ['.phone-frame','.phone-screen','.app-content','.bankvault-live-panel','.bankvault-transfer-card','.bankvault-feature-view','.quick-actions','.bottom-nav'].forEach(function(sel){
+      $all(sel).forEach(function(el){
+        el.style.setProperty('position', 'relative');
+        el.style.setProperty('z-index', '50');
+        el.style.setProperty('pointer-events', 'auto', 'important');
+      });
+    });
+  }
+  function wire(){
+    if (document.documentElement.dataset.uatPiggyPreviewWired === 'true') return;
+    document.documentElement.dataset.uatPiggyPreviewWired = 'true';
+    ensureLayer();
+    document.addEventListener('click', function(event){
+      var tab = event.target.closest('[data-bankvault-tab]');
+      if (tab) { event.preventDefault(); event.stopPropagation(); setTab(tab.getAttribute('data-bankvault-tab')); return; }
+      var switchUser = event.target.closest('[data-switch-user]');
+      if (switchUser) {
+        var user = $('#bankvaultLoginUsername');
+        var pass = $('#bankvaultLoginPassword');
+        if (user) user.value = switchUser.getAttribute('data-switch-user') || '';
+        if (pass) pass.value = switchUser.getAttribute('data-switch-pass') || pass.value || 'demo';
+        setTab('login');
+        setStatus('Selected ' + (switchUser.getAttribute('data-switch-user') || 'user') + '.', 'ok');
+        return;
+      }
+      var action = event.target.closest('[data-bank-action]');
+      if (action) {
+        var name = action.getAttribute('data-bank-action');
+        if (name === 'send') { event.preventDefault(); showTransfer(); return; }
+        event.preventDefault(); showFeature(name); return;
+      }
+      if (event.target.closest('[data-bank-close-transfer]')) { event.preventDefault(); hideTransfer(); return; }
+      if (event.target.closest('[data-preview-home]')) { event.preventDefault(); showHome(); return; }
+      var pay = event.target.closest('[data-preview-pay]');
+      if (pay) {
+        event.preventDefault();
+        var bill = $('#bankvaultMockBill');
+        if (bill) bill.textContent = pay.getAttribute('data-preview-pay') + ' scheduled';
+        setStatus(pay.getAttribute('data-preview-pay') + ' mock payment scheduled.', 'ok');
+        return;
+      }
+      if (event.target.closest('[data-preview-add-card]')) {
+        event.preventDefault();
+        var cards = $('#bankvaultAddedCards');
+        if (cards) cards.insertAdjacentHTML('afterbegin', '<div class="bankvault-mini-card"><div class="bankvault-card-row"><span>New Virtual Card</span><strong>**** ' + Math.floor(1000 + Math.random() * 8999) + '</strong></div></div>');
+        return;
+      }
+      if (event.target.closest('[data-preview-theme]')) {
+        event.preventDefault();
+        document.body.classList.toggle('bankvault-light-theme');
+        return;
+      }
+      var nav = event.target.closest('.bottom-nav .nav-item');
+      if (nav) {
+        event.preventDefault();
+        var items = $all('.bottom-nav .nav-item');
+        var idx = items.indexOf(nav);
+        if (idx === 0) showHome();
+        if (idx === 1) showFeature('cards');
+        if (idx === 2) showFeature('invest');
+        if (idx === 3) showFeature('settings');
+        return;
+      }
+    }, true);
+    document.addEventListener('submit', function(event){
+      if (event.defaultPrevented) return;
+      if (event.target && event.target.id === 'bankvaultLoginForm') {
+        event.preventDefault();
+        var name = ($('#bankvaultLoginUsername') || {}).value || 'user';
+        var current = $('#bankvaultCurrentUser');
+        if (current) current.textContent = 'Signed in as ' + name;
+        setStatus('Login submitted for ' + name + '.', 'ok');
+        showTransfer();
+      }
+      if (event.target && event.target.id === 'bankvaultRegisterForm') {
+        event.preventDefault();
+        var username = ($('#bankvaultRegUsername') || {}).value || 'new.user';
+        var shortcuts = $('.bankvault-shortcuts');
+        if (shortcuts && !shortcuts.querySelector('[data-switch-user="' + CSS.escape(username) + '"]')) {
+          shortcuts.insertAdjacentHTML('afterbegin', '<button type="button" data-switch-user="' + username.replace(/"/g, '&quot;') + '" data-switch-pass="demo">' + username + '</button>');
+        }
+        var login = $('#bankvaultLoginUsername');
+        if (login) login.value = username;
+        setStatus('Created preview user ' + username + '. Login ready.', 'ok');
+        setTab('login');
+      }
+      if (event.target && event.target.id === 'bankvaultTransferForm') {
+        event.preventDefault();
+        setStatus('Transfer submitted in preview.', 'ok');
+      }
+    });
+    setInterval(ensureLayer, 1000);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+  setTimeout(wire, 700);
+  setTimeout(wire, 2000);
+})();
+</script>
+"""
+        if "<head" in text.lower():
+            text = re.sub(r"(<head\b[^>]*>)", r"\1" + base_tag + preview_css + fetch_bridge + preview_controller, text, count=1, flags=re.I)
+        else:
+            text = base_tag + preview_css + fetch_bridge + preview_controller + text
+        # Root-relative assets would otherwise resolve to the dashboard host.
+        # Keep scripts/styles same-origin so HTTPS/mixed-content and CORS do not
+        # break the embedded mobile app.
+        def _asset_attr(match):
+            encoded_path = urllib.parse.quote("/" + match.group(2), safe="")
+            return f'{match.group(1)}/api/uat/mobile-asset?origin={encoded_origin}&path={encoded_path}'
+        text = re.sub(r'((?:src|href)=["\'])/(?!/)([^"\']+)', _asset_attr, text, flags=re.I)
+        text = re.sub(r'(action=["\'])/(?!/)', r'\1' + origin + '/', text, flags=re.I)
+        text = re.sub(r'(url\(["\']?)/(?!/)', r'\1' + origin + '/', text, flags=re.I)
+        text += f"\n<!-- mobile-preview loaded in {int((time.time() - started) * 1000)} ms from {origin} -->\n"
+        resp = Response(text, status=200, mimetype="text/html")
+    else:
+        resp = Response(raw, status=200, content_type=content_type)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.route("/api/uat/mobile-api-proxy/<path:api_path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+def uat_mobile_api_proxy(api_path: str):
+    origin = str(request.args.get("origin") or "").strip().rstrip("/")
+    parsed = urllib.parse.urlparse(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return jsonify({"error": "Invalid mobile API proxy origin"}), 400
+    if not api_path.startswith("api/"):
+        return jsonify({"error": "Only /api/* paths are proxied"}), 400
+    query_pairs = [(k, v) for k, vals in request.args.lists() for v in vals if k != "origin"]
+    query = urllib.parse.urlencode(query_pairs)
+    target = f"{origin}/{api_path}" + (f"?{query}" if query else "")
+    headers = {
+        "User-Agent": "OSPC2FLEX-UAT-MobileApiProxy/1.0",
+        "Accept": request.headers.get("Accept", "application/json,*/*"),
+    }
+    if request.headers.get("Content-Type"):
+        headers["Content-Type"] = request.headers.get("Content-Type")
+    if request.headers.get("Authorization"):
+        headers["Authorization"] = request.headers.get("Authorization")
+    try:
+        req = urllib.request.Request(
+            target,
+            data=request.get_data() if request.method not in {"GET", "OPTIONS"} else None,
+            headers=headers,
+            method=request.method if request.method != "OPTIONS" else "GET",
+        )
+        with urllib.request.urlopen(req, timeout=35) as resp:
+            body = resp.read(300000)
+            out = Response(body, status=int(resp.status), content_type=resp.headers.get("Content-Type") or "application/json")
+    except urllib.error.HTTPError as e:
+        out = Response(e.read(300000), status=int(e.code), content_type=e.headers.get("Content-Type") or "application/json")
+    except Exception as e:
+        out = jsonify({"error": str(e), "target": target})
+        out.status_code = 502
+    out.headers["Cache-Control"] = "no-store"
+    return out
+
+
+@app.get("/api/uat/mobile-asset")
+def uat_mobile_asset_proxy():
+    origin = str(request.args.get("origin") or "").strip().rstrip("/")
+    asset_path = str(request.args.get("path") or "").strip()
+    parsed = urllib.parse.urlparse(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not asset_path.startswith("/"):
+        return Response("Invalid mobile asset proxy request.", status=400, mimetype="text/plain")
+    target = origin + asset_path
+    try:
+        req = urllib.request.Request(target, headers={
+            "User-Agent": "OSPC2FLEX-UAT-MobileAssetProxy/1.0",
+            "Accept": request.headers.get("Accept", "*/*"),
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read(1000000)
+            out = Response(body, status=int(resp.status), content_type=resp.headers.get("Content-Type") or "application/octet-stream")
+    except urllib.error.HTTPError as e:
+        out = Response(e.read(300000), status=int(e.code), content_type=e.headers.get("Content-Type") or "text/plain")
+    except Exception as e:
+        out = Response(str(e), status=502, mimetype="text/plain")
+    out.headers["Cache-Control"] = "no-store"
+    return out
 
 
 @app.get("/run/")
@@ -10369,6 +10773,58 @@ def _get_volsnap_staging_lock(key: str) -> threading.Lock:
             VOLSNAP_STAGING_LOCKS[key] = lock
         return lock
 
+# Per-(migration-type, jumphost) staging coordinator. Serializes the script-upload phase so that
+# within one migration type (linux / windows / volume) only the FIRST job uploads the shared script
+# to a given jumphost; same-type jobs wait, then proceed (and skip the re-upload since it's already
+# current). The heavy migration work runs in parallel after staging.
+#
+# This is holder-tracked with a heartbeat, NOT a bare mutex: the holder must "touch" the slot while
+# it stages. If the holder goes silent for longer than MIGRATION_STAGING_STALE_SECS (crashed stream,
+# client disconnect, wedged SSH), a waiter reclaims the slot instead of waiting forever. This avoids
+# the deadlock where a dead holder blocks every subsequent job — including the first.
+MIGRATION_STAGING_STATE = {}          # key -> {"holder": token, "ts": monotonic_seconds}
+MIGRATION_STAGING_MU = threading.Lock()
+MIGRATION_STAGING_STALE_SECS = 45     # reclaim a slot whose holder hasn't heart-beat within this window
+
+# Parallel staging: same-type jobs stage/upload concurrently (this is how it worked well before, and
+# skip-if-current already prevents redundant transfers; the jumphost's raised MaxStartups handles the
+# concurrent connections). Set to False to re-enable per-jumphost serialization (only needed if a
+# jumphost is sick/overloaded and can't take many parallel SSH connections).
+MIGRATION_PARALLEL_STAGING = True
+
+def _staging_acquire(key: str):
+    """Claim the staging slot for `key`. Returns a holder token on success (also reclaims a stale
+    slot whose holder stopped heart-beating), or None if a live holder currently owns it.
+    When MIGRATION_PARALLEL_STAGING is on, always grants immediately (no serialization)."""
+    now = time.monotonic()
+    token = f"{threading.get_ident()}-{now:.6f}"
+    if MIGRATION_PARALLEL_STAGING:
+        return token
+    with MIGRATION_STAGING_MU:
+        st = MIGRATION_STAGING_STATE.get(key)
+        if st is None or (now - st["ts"]) > MIGRATION_STAGING_STALE_SECS:
+            MIGRATION_STAGING_STATE[key] = {"holder": token, "ts": now}
+            return token
+        return None
+
+def _staging_touch(key: str, token) -> None:
+    """Heartbeat: keep ownership of the slot alive while actively staging."""
+    if not token:
+        return
+    with MIGRATION_STAGING_MU:
+        st = MIGRATION_STAGING_STATE.get(key)
+        if st is not None and st["holder"] == token:
+            st["ts"] = time.monotonic()
+
+def _staging_release(key: str, token) -> None:
+    """Release the slot (only if we still own it)."""
+    if not token:
+        return
+    with MIGRATION_STAGING_MU:
+        st = MIGRATION_STAGING_STATE.get(key)
+        if st is not None and st["holder"] == token:
+            del MIGRATION_STAGING_STATE[key]
+
 def _stop_tracked_migrator_processes(match_terms: Optional[List[str]] = None) -> List[int]:
     """Terminate dashboard-launched migration subprocesses, including their child process groups."""
     killed = []
@@ -10983,9 +11439,11 @@ def run_image_migrator():
         import re as _re
         label_raw = str(req.get('snapshot_name') or req.get('server_name') or _snapshot_id_for_linux).strip()
         label_safe = _re.sub(r'[^A-Za-z0-9._-]+', '_', label_raw).strip('_') or "linux-snapshot"
-        local_script = str(BASE_DIR / "working script" / "ospc2flex_linux_snap_migrate.sh")
-        local_repair_script = str(BASE_DIR / "working script" / "ospc2flex_offline_repair.sh")
-        local_centos_bridge = str(BASE_DIR / "working script" / "ospc2flex_centos_repair.py")
+        # Single source of truth for all uploaded migration scripts: ospc2Flex-Image-migtool/.
+        # (Previously linux-snap uploaded from "working script/", which drifted from this dir.)
+        local_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_linux_snap_migrate.sh")
+        local_repair_script = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_offline_repair.sh")
+        local_centos_bridge = str(BASE_DIR / "ospc2Flex-Image-migtool" / "ospc2flex_centos_repair.py")
         local_centos_module = str(BASE_DIR / "migration" / "os_repair" / "centos_repair.py")
         if not os.path.isfile(local_script):
             return jsonify({"error": f"ospc2flex_linux_snap_migrate.sh not found at {local_script}"}), 500
@@ -11038,6 +11496,19 @@ def run_image_migrator():
         import time as _linsnap_time
         _ts = int(_linsnap_time.time())
         _job_id = str(req.get('job_id') or _ts)
+        # SSH connection multiplexing (ControlMaster): this job opens ONE master connection and
+        # reuses it for every mkdir/chmod/verify/upload/launch call, so only the first pays the
+        # slow jumphost handshake — the rest are instant. Per-job control socket keeps jobs
+        # independent (no shared single point of failure). ControlPersist keeps it warm between calls.
+        _ssh_mux_path = f"/tmp/ospc2f-mux-{_job_id}"
+        _ssh_mux_opts = [
+            "-o", "ControlMaster=auto",
+            "-o", f"ControlPath={_ssh_mux_path}",
+            "-o", "ControlPersist=600",
+        ]
+        # ssh: options must precede the trailing "user@host"; scp: no trailing host, so append.
+        ssh_base = ssh_base[:-1] + _ssh_mux_opts + [ssh_base[-1]]
+        scp_base = scp_base + _ssh_mux_opts
         remote_script = "/tmp/ospc2flex_linux_snap_migrate.sh"
         remote_job_script = f"/tmp/ospc2flex_linux_snap_migrate.sh.{label_safe}.{_job_id}"
         remote_ospc = f"/tmp/linsnap_{label_safe}_{_ts}_ospc.sh"
@@ -11088,7 +11559,23 @@ def run_image_migrator():
                     f"test -s {_shlex.quote(remote_path)} && "
                     f"sha256sum {_shlex.quote(remote_path)} | awk '{{print $1}}'"
                 )
-                proc = _run(label, ssh_base + [remote_cmd], timeout=60)
+                # Retry the verify: with parallel Linux-snap jobs enabled, the jumphost can be
+                # saturated (concurrent downloads/qemu-img/cinder), so a single SSH round-trip may
+                # exceed the timeout. A single slow verify must not abort an otherwise-good launch.
+                attempts = 4
+                proc = None
+                for attempt in range(1, attempts + 1):
+                    try:
+                        proc = _run(label, ssh_base + [remote_cmd], timeout=90)
+                        break
+                    except Exception as exc:
+                        if attempt >= attempts:
+                            raise RuntimeError(
+                                f"{label} failed after {attempts} attempts — jumphost SSH not responding "
+                                f"(likely overloaded by parallel jobs): {exc}"
+                            )
+                        yield f"data: [LINSNAP] {label} attempt {attempt}/{attempts} slow/failed: {exc}; retrying in 10s\n\n"
+                        _linsnap_time.sleep(10)
                 remote_hash = (proc.stdout or "").strip().splitlines()[-1:] or [""]
                 remote_hash = remote_hash[0].strip()
                 if remote_hash != local_hash:
@@ -11129,13 +11616,25 @@ def run_image_migrator():
                     "OSPC2FLEX_LINUX_SNAP_SKIP_REPAIRED=0 "
                     "OSPC2FLEX_USE_CLOUD_FILES_EXPORT=1 "
                     "OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT=0 "
-                    "OSPC2FLEX_RETRY_FAILED_CF_EXPORT=1 "
-                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=1800 "
+                    "OSPC2FLEX_RETRY_FAILED_CF_EXPORT=0 "
+                    "OSPC2FLEX_CINDER_CREATE_TIMEOUT=3600 "
                     "OSPC2FLEX_CINDER_MIN_VOLUME_SIZE_GB=75 "
-                    "OSPC2FLEX_CINDER_CREATE_ATTEMPTS=1 "
+                    "OSPC2FLEX_CINDER_CREATE_ATTEMPTS=3 "
                     "OSPC2FLEX_CINDER_CREATE_RETRY_WAIT=45 "
                     "OSPC2FLEX_LIVE_ORIGIN_FALLBACK=1"
                 )
+                # "No image resume" (per-row) → recreate a fresh source snapshot before the
+                # CF/Cinder upload, bypassing a stale/broken existing snapshot.
+                _no_image_resume = bool(
+                    req.get('no_image_resume') if 'no_image_resume' in req else req.get('start_fresh')
+                )
+                if _no_image_resume:
+                    remote_env += " OSPC2FLEX_RECREATE_IMAGE_ON_NO_RESUME=1"
+                    _src_server_id = str(
+                        req.get('source_server_id') or req.get('attached_vm_id') or req.get('server_id') or ''
+                    ).strip()
+                    if _src_server_id:
+                        remote_env += f" OSPC2FLEX_SOURCE_SERVER_ID={_shlex.quote(_src_server_id)}"
                 if req.get('dry_run'):
                     remote_cmd = f"{remote_env} {' '.join(_shlex.quote(x) for x in lcmd)}"
                     remote_run = (
@@ -11190,12 +11689,17 @@ def run_image_migrator():
                         "if [ -n \"$pids\" ]; then echo \"$pids\" | xargs -r kill -TERM 2>/dev/null || true; sleep 2; "
                         "echo \"$pids\" | xargs -r kill -KILL 2>/dev/null || true; echo \"$pids\"; fi"
                     )
-                    killed = subprocess.run(
-                        ssh_base + [kill_cmd],
-                        check=False, timeout=45, capture_output=True, text=True,
-                    )
-                    killed_pids = " ".join((killed.stdout or "").split())
-                    yield f"data: [LINSNAP] START FRESH: killed existing Linux snapshot job pid(s): {killed_pids or 'none'}\n\n"
+                    # Best-effort cleanup: a slow/timed-out SSH here must NOT abort the launch — the
+                    # active-job check loop below re-verifies and handles any genuinely-running prior job.
+                    try:
+                        killed = subprocess.run(
+                            ssh_base + [kill_cmd],
+                            check=False, timeout=45, capture_output=True, text=True,
+                        )
+                        killed_pids = " ".join((killed.stdout or "").split())
+                        yield f"data: [LINSNAP] START FRESH: killed existing Linux snapshot job pid(s): {killed_pids or 'none'}\n\n"
+                    except subprocess.TimeoutExpired:
+                        yield "data: [LINSNAP] START FRESH: kill check timed out over SSH (jumphost slow); continuing — active-job check will re-verify.\n\n"
 
                 active_check = (
                     "pgrep -af ospc2flex_linux_snap_migrate.sh | "
@@ -11242,31 +11746,80 @@ def run_image_migrator():
 
                 yield f"data: [LINSNAP] Queue job {_job_id}: no active prior Linux snapshot job for {label_safe}; starting.\n\n"
 
-                yield "data: [LINSNAP] Uploading Linux snapshot scripts to jumphost.\n\n"
-                yield from _run_retry("script upload", scp_base + [local_script, f"{ssh_usr}@{process_ip}:{remote_script}"], timeout=300, attempts=4, wait=8)
-                yield from _run_retry("repair script upload", scp_base + [local_repair_script, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_offline_repair.sh"], timeout=300, attempts=4, wait=8)
-                yield from _run_retry("centos repair bridge upload", scp_base + [local_centos_bridge, f"{ssh_usr}@{process_ip}:/tmp/ospc2flex_centos_repair.py"], timeout=120, attempts=4, wait=8)
-                _run("centos repair mkdir", ssh_base + ["mkdir -p /tmp/migration/os_repair"], timeout=60)
-                yield from _run_retry("centos repair module upload", scp_base + [local_centos_module, f"{ssh_usr}@{process_ip}:/tmp/migration/os_repair/centos_repair.py"], timeout=120, attempts=4, wait=8)
+                # Serialize the upload phase across all Linux-snapshot jobs on this jumphost:
+                # the first job uploads the shared scripts, same-type jobs wait, then proceed and
+                # skip the re-upload (scripts are already current). Heavy work runs in parallel after.
+                _staging_key = f"linsnap:{process_ip}"
+                _staging_token = None
+                _staging_wait_polls = 0
+                while True:
+                    _staging_token = _staging_acquire(_staging_key)
+                    if _staging_token:
+                        break
+                    if _staging_wait_polls % 6 == 0:
+                        yield (
+                            f"data: [LINSNAP] Waiting for jumphost staging slot on {process_ip}: "
+                            "another Linux snapshot job is uploading scripts; will start automatically; next_check=5s\n\n"
+                        )
+                    _staging_wait_polls += 1
+                    _linsnap_time.sleep(5)
+                try:
+                    # Upload a shared file only if the jumphost copy is missing or out of date.
+                    def _stage_shared(label, local_path, remote_path, timeout=300):
+                        _staging_touch(_staging_key, _staging_token)  # heartbeat: keep the slot alive
+                        local_hash = _file_sha256(local_path)
+                        remote_hash = ""
+                        try:
+                            chk = _run(
+                                f"{label} precheck",
+                                ssh_base + [f"sha256sum {_shlex.quote(remote_path)} 2>/dev/null | awk '{{print $1}}'"],
+                                timeout=45,
+                            )
+                            remote_hash = ((chk.stdout or "").strip().splitlines()[-1:] or [""])[0].strip()
+                        except Exception:
+                            remote_hash = ""
+                        if remote_hash == local_hash:
+                            yield f"data: [LINSNAP] {label}: jumphost copy already current (sha256={local_hash[:12]}); skipping upload.\n\n"
+                            return
+                        yield from _run_retry(
+                            f"{label} upload",
+                            scp_base + [local_path, f"{ssh_usr}@{process_ip}:{remote_path}"],
+                            timeout=timeout, attempts=4, wait=8,
+                        )
 
-                yield from _run_retry("OSPC OpenRC upload", scp_base + [ospc_path, f"{ssh_usr}@{process_ip}:{remote_ospc}"], timeout=120, attempts=4, wait=8)
-                yield from _run_retry("FLEX OpenRC upload", scp_base + [flex_path, f"{ssh_usr}@{process_ip}:{remote_flex}"], timeout=120, attempts=4, wait=8)
-                _run(
-                    "chmod",
-                    ssh_base + [
-                        f"cp -f {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)}; "
-                        f"chmod 600 {_shlex.quote(remote_ospc)} {_shlex.quote(remote_flex)}; "
-                        f"chmod +x {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)} "
-                        "/tmp/ospc2flex_offline_repair.sh /tmp/ospc2flex_centos_repair.py"
-                    ],
-                    timeout=60,
-                )
-                yield from _verify_remote_sha256("linux snapshot script verify", local_script, remote_script)
-                yield from _verify_remote_sha256("linux snapshot job script verify", local_script, remote_job_script)
-                yield from _verify_remote_sha256("offline repair script verify", local_repair_script, "/tmp/ospc2flex_offline_repair.sh")
-                yield from _verify_remote_sha256("centos repair bridge verify", local_centos_bridge, "/tmp/ospc2flex_centos_repair.py")
-                yield from _verify_remote_sha256("centos repair module verify", local_centos_module, "/tmp/migration/os_repair/centos_repair.py")
-                yield "data: [LINSNAP] Scripts and OpenRC files staged on jumphost.\n\n"
+                    yield "data: [LINSNAP] Staging Linux snapshot scripts on jumphost (upload only if changed).\n\n"
+                    # These OS-repair helpers are staged for every Linux job and only run if the guest
+                    # is detected as RHEL/CentOS at the repair stage; they are inert for Ubuntu/Debian.
+                    yield from _stage_shared("main script", local_script, remote_script, timeout=300)
+                    yield from _stage_shared("offline repair script", local_repair_script, "/tmp/ospc2flex_offline_repair.sh", timeout=300)
+                    yield from _stage_shared("OS repair bridge", local_centos_bridge, "/tmp/ospc2flex_centos_repair.py", timeout=120)
+                    yield from _run_retry("OS repair mkdir", ssh_base + ["mkdir -p /tmp/migration/os_repair"], timeout=90, attempts=4, wait=8)
+                    yield from _stage_shared("OS repair module", local_centos_module, "/tmp/migration/os_repair/centos_repair.py", timeout=120)
+
+                    # OpenRC creds are per-job/per-region and tiny — always refresh them.
+                    _staging_touch(_staging_key, _staging_token)
+                    yield from _run_retry("OSPC OpenRC upload", scp_base + [ospc_path, f"{ssh_usr}@{process_ip}:{remote_ospc}"], timeout=120, attempts=4, wait=8)
+                    yield from _run_retry("FLEX OpenRC upload", scp_base + [flex_path, f"{ssh_usr}@{process_ip}:{remote_flex}"], timeout=120, attempts=4, wait=8)
+                    _staging_touch(_staging_key, _staging_token)
+                    yield from _run_retry(
+                        "chmod",
+                        ssh_base + [
+                            f"cp -f {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)}; "
+                            f"chmod 600 {_shlex.quote(remote_ospc)} {_shlex.quote(remote_flex)}; "
+                            f"chmod +x {_shlex.quote(remote_script)} {_shlex.quote(remote_job_script)} "
+                            "/tmp/ospc2flex_offline_repair.sh /tmp/ospc2flex_centos_repair.py"
+                        ],
+                        timeout=90, attempts=4, wait=8,
+                    )
+                    _staging_touch(_staging_key, _staging_token)
+                    yield from _verify_remote_sha256("linux snapshot script verify", local_script, remote_script)
+                    yield from _verify_remote_sha256("linux snapshot job script verify", local_script, remote_job_script)
+                    yield from _verify_remote_sha256("offline repair script verify", local_repair_script, "/tmp/ospc2flex_offline_repair.sh")
+                    yield from _verify_remote_sha256("OS repair bridge verify", local_centos_bridge, "/tmp/ospc2flex_centos_repair.py")
+                    yield from _verify_remote_sha256("OS repair module verify", local_centos_module, "/tmp/migration/os_repair/centos_repair.py")
+                    yield "data: [LINSNAP] Scripts and OpenRC files staged on jumphost.\n\n"
+                finally:
+                    _staging_release(_staging_key, _staging_token)
 
                 remote_cmd = f"{remote_env} {' '.join(_shlex.quote(x) for x in lcmd)}"
                 remote_run = (
@@ -11373,29 +11926,42 @@ def run_image_migrator():
                     if tail_excerpt:
                         yield f"data: [LINSNAP] Remote job finished without a clear success marker; latest remote text:\n{tail_excerpt}\n\n"
                     return 1
-                process = subprocess.Popen(
-                    ssh_base + [remote_run],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    start_new_session=True,
-                )
-                ACTIVE_MIGRATOR_PROCESSES.add(process)
-                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[label_safe] = process
-                with ACTIVE_MIGRATOR_LAUNCH_LOCK:
-                    ACTIVE_MIGRATOR_LAUNCHING_LABELS.discard(label_safe)
-                streamed_remote_lines = 0
-                for line in iter(process.stdout.readline, ''):
-                    if not line:
+                # The launch SSH connection can be reset by the jumphost sshd during key exchange when
+                # many jobs connect at once ("kex_exchange_identification: Connection reset by peer",
+                # rc=255). That reset happens BEFORE the remote nohup runs, so the job never starts —
+                # safe to retry. We only retry when the post-exit probe confirms no remote log exists
+                # (if it had actually started, the probe returns RUNNING and we re-attach instead).
+                launch_attempts = 3
+                effective_rc = 255
+                for _launch_attempt in range(1, launch_attempts + 1):
+                    process = subprocess.Popen(
+                        ssh_base + [remote_run],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1,
+                        start_new_session=True,
+                    )
+                    ACTIVE_MIGRATOR_PROCESSES.add(process)
+                    ACTIVE_MIGRATOR_PROCESSES_BY_SERVER[label_safe] = process
+                    with ACTIVE_MIGRATOR_LAUNCH_LOCK:
+                        ACTIVE_MIGRATOR_LAUNCHING_LABELS.discard(label_safe)
+                    streamed_remote_lines = 0
+                    _launch_tail = []
+                    for line in iter(process.stdout.readline, ''):
+                        if not line:
+                            break
+                        streamed_remote_lines += 1
+                        _clean = line.rstrip()
+                        if len(_launch_tail) < 8:
+                            _launch_tail.append(_clean)
+                        yield f"data: {_clean}\n\n"
+                    process.wait()
+                    ACTIVE_MIGRATOR_PROCESSES.discard(process)
+                    ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(label_safe, None)
+                    effective_rc = process.returncode
+                    if process.returncode == 0:
                         break
-                    streamed_remote_lines += 1
-                    yield f"data: {line.rstrip()}\n\n"
-                process.wait()
-                ACTIVE_MIGRATOR_PROCESSES.discard(process)
-                ACTIVE_MIGRATOR_PROCESSES_BY_SERVER.pop(label_safe, None)
-                effective_rc = process.returncode
-                if process.returncode != 0:
                     remote_state, remote_text = _remote_linsnap_after_stream_exit()
                     if remote_state == "running":
                         yield (
@@ -11403,15 +11969,35 @@ def run_image_migrator():
                             f"remote migration is still running on {ssh_usr}@{process_ip}; re-attaching to {remote_log}.\n\n"
                         )
                         effective_rc = yield from _follow_remote_linsnap_until_done(streamed_remote_lines + 1)
-                    elif remote_state == "success":
+                        break
+                    if remote_state == "success":
                         yield "data: [LINSNAP] Remote log confirms migration completed successfully after stream exit.\n\n"
                         effective_rc = 0
-                    elif remote_state == "failed":
+                        break
+                    if remote_state == "failed":
                         yield "data: [LINSNAP] Remote log confirms migration script failed; see latest remote log excerpt above.\n\n"
-                    else:
-                        tail_excerpt = "\n".join((remote_text or "").splitlines()[-20:])
-                        if tail_excerpt:
-                            yield f"data: [LINSNAP] Remote status after stream exit was inconclusive; latest remote text:\n{tail_excerpt}\n\n"
+                        break
+                    # Inconclusive: only retry a pure transport reset where the remote job never started.
+                    _joined = "\n".join(_launch_tail)
+                    _never_started = "__LINSNAP_NOLOG__" in (remote_text or "")
+                    _transport_reset = (
+                        process.returncode == 255
+                        or "kex_exchange_identification" in _joined
+                        or "Connection reset by peer" in _joined
+                        or "Connection refused" in _joined
+                        or "Connection timed out" in _joined
+                    )
+                    if _never_started and _transport_reset and _launch_attempt < launch_attempts:
+                        yield (
+                            f"data: [LINSNAP] Launch SSH connection reset by the jumphost (sshd overload); "
+                            f"remote job did not start — retrying launch {_launch_attempt}/{launch_attempts} in 20s.\n\n"
+                        )
+                        _linsnap_time.sleep(20)
+                        continue
+                    tail_excerpt = "\n".join((remote_text or "").splitlines()[-20:])
+                    if tail_excerpt:
+                        yield f"data: [LINSNAP] Remote status after stream exit was inconclusive; latest remote text:\n{tail_excerpt}\n\n"
+                    break
                 yield f"data: [PROCESS EXITED WITH CODE {effective_rc}]\n\n"
             except Exception as exc:
                 yield f"data: [LINSNAP ERROR] {exc}\n\n"
@@ -11419,6 +12005,14 @@ def run_image_migrator():
                 try:
                     with ACTIVE_MIGRATOR_LAUNCH_LOCK:
                         ACTIVE_MIGRATOR_LAUNCHING_LABELS.discard(label_safe)
+                except Exception:
+                    pass
+                # Close the shared SSH master connection for this job (best-effort).
+                try:
+                    subprocess.run(
+                        ["ssh", "-o", f"ControlPath={_ssh_mux_path}", "-O", "exit", f"{ssh_usr}@{process_ip}"],
+                        check=False, timeout=15, capture_output=True, text=True,
+                    )
                 except Exception:
                     pass
                 yield "data: [DONE]\n\n"
@@ -11508,6 +12102,8 @@ def run_image_migrator():
             yield "data: [METHOD_Z] Hard rule: no source snapshot creation, no SSH raw capture, no local KVM/virt-install/virsh.\n\n"
             yield f"data: [METHOD_Z] SNAPWIN selected jumphost: {ssh_usr_z}@{process_ip}\n\n"
             yield f"data: [METHOD_Z] Jumphost SSH key: {ssh_key_z}\n\n"
+            _z_stage_key = f"snapwin:{process_ip}"
+            _z_stage_token = None
             try:
                 def _run_stage_cmd(stage_label, cmd, timeout, attempts=1, retry_wait=8, capture=True):
                     last = None
@@ -11596,6 +12192,21 @@ def run_image_migrator():
                     killed_pids = " ".join((killed.stdout or "").split())
                     yield f"data: [METHOD_Z] START FRESH: killed pid(s): {killed_pids or 'none'}\n\n"
 
+                # First SNAPWIN (Windows) job on this jumphost uploads the script; same-type jobs
+                # wait, then proceed and skip the re-upload (already current). A stale/dead holder's
+                # slot is auto-reclaimed so a crashed job can't block subsequent ones forever.
+                _z_stage_wait_polls = 0
+                while True:
+                    _z_stage_token = _staging_acquire(_z_stage_key)
+                    if _z_stage_token:
+                        break
+                    if _z_stage_wait_polls % 6 == 0:
+                        yield (
+                            f"data: [METHOD_Z] Waiting for jumphost staging slot on {process_ip}: "
+                            "another Windows SNAPWIN job is uploading the script; will start automatically; next_check=5s\n\n"
+                        )
+                    _z_stage_wait_polls += 1
+                    time.sleep(5)
                 import hashlib as _snapwin_hashlib
                 with open(method_z_script, "rb") as _fh:
                     local_method_z_md5 = _snapwin_hashlib.md5(_fh.read()).hexdigest()
@@ -11659,6 +12270,8 @@ def run_image_migrator():
                     retry_wait=15,
                 )
                 yield "data: [METHOD_Z] Scripts, scoped OpenRC files, and SNAPWIN workspace staged on jumphost.\n\n"
+                _staging_release(_z_stage_key, _z_stage_token)
+                _z_stage_token = None
 
                 flex_region_z = _read_openrc_export(flex_path, "OS_REGION_NAME") or str(req.get('flex_region') or 'DFW3')
                 z_cmd = [
@@ -11739,6 +12352,7 @@ def run_image_migrator():
                         yield "data: [METHOD_Z] Root cause hint: TCP/22 opened but sshd did not deliver its SSH banner in time (usually host overload or wedged sshd).\n\n"
                     yield f"data: [METHOD_Z] SSH target was {ssh_usr_z}@{process_ip}. If this repeats, reboot/recover the jumphost or kill any stuck qemu-img/dd jobs before retrying SNAPWIN.\n\n"
             finally:
+                _staging_release(_z_stage_key, _z_stage_token)
                 try:
                     subprocess.run(
                         ssh_base_z + [f"rm -f {shlex.quote(remote_ospc)} {shlex.quote(remote_flex)} 2>/dev/null || true"],
@@ -12138,9 +12752,23 @@ def run_volsnap_migrator():
             raise last_exc
 
         try:
-            stage_lock = None
-            stage_lock_acquired = False
-            yield "data: [VOLSNAP] Parallel staging enabled; not waiting for other selected jobs.\n\n"
+            # First volume-snapshot job on this jumphost uploads the script; same-type jobs wait,
+            # then proceed and skip the re-upload (already current). Heavy work runs in parallel after.
+            # A stale/dead holder's slot is auto-reclaimed so a crashed job can't block others forever.
+            _vs_stage_key = f"volsnap:{process_ip}"
+            _vs_stage_token = None
+            _vs_stage_wait_polls = 0
+            while True:
+                _vs_stage_token = _staging_acquire(_vs_stage_key)
+                if _vs_stage_token:
+                    break
+                if _vs_stage_wait_polls % 6 == 0:
+                    yield (
+                        f"data: [VOLSNAP] Waiting for jumphost staging slot on {process_ip}: "
+                        "another volume snapshot job is uploading the script; will start automatically; next_check=5s\n\n"
+                    )
+                _vs_stage_wait_polls += 1
+                time.sleep(5)
             try:
                 try:
                     _run("jumphost ssh preflight", ssh_base + ["true"], timeout=75)
@@ -12219,7 +12847,7 @@ def run_volsnap_migrator():
                 yield "data: [VOLSNAP] Credentials staged on jumphost.\n\n"
                 staged_ok = True
             finally:
-                pass
+                _staging_release(_vs_stage_key, _vs_stage_token)
 
             # Build remote command — pass FLEX helper args for direct Cinder path
             flex_helper_vm_id = str(req.get('flex_helper_vm_id') or '').strip()
@@ -15344,6 +15972,64 @@ def _nbd_jumphost_migtool_root() -> str:
     )
 
 
+def _jumphost_storage_preflight_cmd(work_dir: str = "/mnt/migration/ospc2flex_image") -> str:
+    """Remote shell guard: prune stale image artifacts, then hard-fail on low disk."""
+    return f"""set -e
+WORK_DIR={shlex.quote(work_dir)}
+MIN_GB="${{OSPC2FLEX_JUMPHOST_MIN_FREE_GB:-120}}"
+AGE_MIN="${{OSPC2FLEX_STALE_CLEAN_MIN_AGE_MIN:-60}}"
+case "$MIN_GB" in ''|*[!0-9]*) MIN_GB=120 ;; esac
+case "$AGE_MIN" in ''|*[!0-9]*) AGE_MIN=60 ;; esac
+mkdir -p "$WORK_DIR"
+before="$(df -hP "$WORK_DIR" 2>/dev/null | awk 'NR==2{{print $4 " free / " $2 " total (" $5 " used)"}}' || true)"
+echo "[JH-PREFLIGHT] disk before cleanup: ${{before:-unknown}}"
+tmp="$(mktemp /tmp/ospc2flex-stale-preflight.XXXXXX)"
+trap 'rm -f "$tmp" 2>/dev/null || true' EXIT
+: >"$tmp"
+for root in /mnt/migration/ospc2flex_image /mnt/migration/ospc2flex_linux_snap /mnt/migration/ospc2flex_method_z /mnt/migration/flex2flex /mnt/migration/images /mnt/migration/tmp; do
+  [ -d "$root" ] || continue
+  root_real="$(readlink -f "$root" 2>/dev/null || true)"
+  case "$root_real" in /mnt/migration|/mnt/migration/*) ;; *) echo "[JH-PREFLIGHT] skip unsafe cleanup root: $root"; continue ;; esac
+  find "$root" -xdev -type f -mmin +"$AGE_MIN" \\( \\
+    -iname "*.img" -o -iname "*.raw" -o -iname "*.vhd" -o -iname "*.vhdx" -o -iname "*.vmdk" -o -iname "*.vpc" \\
+    -o -iname "*.qcow2" -o -iname "*.part" -o -iname "*.partial*" -o -iname "*.tmp" -o -iname "*.invalid*" \\
+  \\) -printf '%s\\t%p\\n' 2>/dev/null >>"$tmp" || true
+done
+sort -nr -u -o "$tmp" "$tmp" 2>/dev/null || true
+count="$(wc -l <"$tmp" | tr -d '[:space:]')"
+bytes="$(awk -F '\\t' '{{s+=$1}} END{{printf "%.0f", s+0}}' "$tmp")"
+echo "[JH-PREFLIGHT] stale candidates older than ${{AGE_MIN}}m: count=${{count:-0}} bytes=${{bytes:-0}}"
+deleted=0
+freed=0
+while IFS="$(printf '\\t')" read -r sz path; do
+  [ -n "$path" ] || continue
+  active_root="$(printf '%s\\n' "$path" | sed -E 's#^(/mnt/migration/[^/]+/runs/[^/]+/[^/]+).*#\\1#; s#^(/mnt/migration/flex2flex/[^/]+).*#\\1#; s#^(/mnt/migration/ospc2flex_image/[^/]+).*#\\1#')"
+  if [ -n "$active_root" ] && ps -eo args= 2>/dev/null | grep -F -- "$active_root" | grep -vq grep; then
+    echo "[JH-PREFLIGHT] keep active artifact: $path"
+    continue
+  fi
+  case "$path" in
+    /mnt/migration/*)
+      rm -f -- "$path" 2>/dev/null || sudo rm -f -- "$path" 2>/dev/null || true
+      deleted=$((deleted + 1))
+      freed=$((freed + ${{sz:-0}}))
+      ;;
+    *) echo "[JH-PREFLIGHT] skip unsafe path: $path" ;;
+  esac
+done <"$tmp"
+after="$(df -hP "$WORK_DIR" 2>/dev/null | awk 'NR==2{{print $4 " free / " $2 " total (" $5 " used)"}}' || true)"
+echo "[JH-PREFLIGHT] cleanup complete: deleted=$deleted freed_bytes=$freed"
+echo "[JH-PREFLIGHT] disk after cleanup: ${{after:-unknown}}"
+avail="$(df -PB1 "$WORK_DIR" 2>/dev/null | awk 'NR==2{{print $4+0}}')"
+required="$(awk -v gb="$MIN_GB" 'BEGIN{{printf "%.0f", gb*1024*1024*1024}}')"
+if [ -z "$avail" ] || [ "$avail" -lt "$required" ]; then
+  echo "[JH-PREFLIGHT][ERROR] insufficient jumphost disk after cleanup: required=${{MIN_GB}}GiB available_bytes=${{avail:-unknown}} work_dir=$WORK_DIR"
+  exit 44
+fi
+echo "[JH-PREFLIGHT] disk gate passed: min=${{MIN_GB}}GiB work_dir=$WORK_DIR"
+"""
+
+
 # Single manifest: same order drives combined_hash and the tarball (plus embedded mig_worker_v4).
 # (path relative to ospc2Flex-Image-migtool/, remote basename under /tmp/)
 _NBD_JUMPHOST_BUNDLE_MEMBERS: Tuple[Tuple[str, str], ...] = (
@@ -16243,6 +16929,21 @@ def nbd_run_single():
                         _win_entry = '/tmp/ospc2flex_windows_v2_engine.sh'
                 _win_entry_name = os.path.basename(_win_entry)
                 _run_prefix = re.sub(r'[^a-zA-Z0-9._-]', '_', label)
+                yield "data: [JH-PREFLIGHT] Cleaning stale jumphost artifacts and checking free disk before Windows migration launch.\n\n"
+                _preflight = subprocess.run(
+                    ssh_base + [_jumphost_storage_preflight_cmd()],
+                    check=False,
+                    timeout=600,
+                    capture_output=True,
+                    text=True,
+                )
+                for _line in ((_preflight.stdout or "") + "\n" + (_preflight.stderr or "")).splitlines():
+                    if _line.strip():
+                        yield f"data: {_line.strip()}\n\n"
+                if _preflight.returncode != 0:
+                    yield f"data: [ERROR] Jumphost storage preflight failed before Windows migration launch (rc={_preflight.returncode}).\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
                 _private_script_setup = (
                     f"RUN_DIR=$(mktemp -d /tmp/ospc2flex_run_{shlex.quote(_run_prefix)}.XXXXXX); "
                     "mkdir -p \"$RUN_DIR/scripts\" \"$RUN_DIR/tmp\"; "
@@ -16344,6 +17045,21 @@ def nbd_run_single():
                     pass
 
                 _run_prefix = re.sub(r'[^a-zA-Z0-9._-]', '_', label)
+                yield "data: [JH-PREFLIGHT] Cleaning stale jumphost artifacts and checking free disk before worker launch.\n\n"
+                _preflight = subprocess.run(
+                    ssh_base + [_jumphost_storage_preflight_cmd()],
+                    check=False,
+                    timeout=600,
+                    capture_output=True,
+                    text=True,
+                )
+                for _line in ((_preflight.stdout or "") + "\n" + (_preflight.stderr or "")).splitlines():
+                    if _line.strip():
+                        yield f"data: {_line.strip()}\n\n"
+                if _preflight.returncode != 0:
+                    yield f"data: [ERROR] Jumphost storage preflight failed before worker launch (rc={_preflight.returncode}).\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
                 _private_worker_setup = (
                     f"RUN_DIR=$(mktemp -d /tmp/ospc2flex_run_{shlex.quote(_run_prefix)}.XXXXXX); "
                     "mkdir -p \"$RUN_DIR/scripts\" \"$RUN_DIR/tmp\"; "

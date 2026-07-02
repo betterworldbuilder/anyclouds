@@ -65,7 +65,7 @@
       .led-timer {
         font-family: 'Share Tech Mono', 'Courier New', monospace;
         color: #00ff41;
-        background: #000a00;
+        background: #000;
         border: 2px solid #003300;
         border-radius: 8px;
         padding: 4px 12px;
@@ -418,7 +418,7 @@
       body.flex-light-mode .terminal-shell-panel,
       body.flex-light-mode .terminal-shell-panel .crt-terminal,
       body.flex-light-mode .terminal-shell-panel .console-section {
-        background: #000a00 !important;
+        background: #000 !important;
         border-color: #00ff41 !important;
         color: #00ff41 !important;
         box-shadow: 0 0 30px rgba(0,255,65,0.18) !important;
@@ -433,17 +433,17 @@
       }
       body.flex-light-mode .terminal-shell-panel #vm-panels-container,
       body.flex-light-mode .terminal-shell-panel #console-output {
-        background: #000a00 !important;
+        background: #000 !important;
         color: #00ff41 !important;
         text-shadow: 0 0 5px rgba(0,255,65,0.7) !important;
       }
       body.flex-light-mode .terminal-shell-panel #image-panels-outer,
       body.flex-light-mode .terminal-shell-panel #image-panels-container {
-        background: #06030f !important;
+        background: #000 !important;
         border-color: rgba(167,139,250,0.28) !important;
       }
       body.flex-light-mode .terminal-shell-panel #operator-terminal-panel {
-        background: #020802 !important;
+        background: #000 !important;
         border-color: rgba(0,255,65,.28) !important;
       }
       body.flex-light-mode .terminal-shell-panel #operator-terminal-output,
@@ -453,7 +453,7 @@
         border-color: rgba(34,211,238,.35) !important;
       }
       body.flex-light-mode .terminal-shell-panel #operator-terminal-shell {
-        background: #06111f !important;
+        background: #000 !important;
         color: #e0f2fe !important;
         border-color: #22d3ee !important;
       }
@@ -487,6 +487,142 @@
         background: linear-gradient(135deg,#0891b2,#0e7490) !important;
         border-color: #22d3ee !important;
         color: #fff !important;
+      }
+      .terminal-shell-panel [id^="img-block-"],
+      .terminal-shell-panel [id^="vm-block-"],
+      .terminal-shell-panel .migration-log-terminal {
+        background: #000 !important;
+        border: 1px solid #1e293b !important;
+        color: #d1fae5 !important;
+        box-shadow: 0 14px 28px rgba(2,6,23,0.48) !important;
+      }
+      .terminal-shell-panel .migration-terminal-header {
+        background: #000 !important;
+        border: 1px solid #334155 !important;
+        color: #d1fae5 !important;
+      }
+      .terminal-shell-panel .migration-stage-panel,
+      .terminal-shell-panel [id^="img-stage-card-section-"] {
+        background: #000 !important;
+        border: 1px solid #223044 !important;
+        color: #d1fae5 !important;
+      }
+      .terminal-shell-panel .migration-stage-cards {
+        background: #000 !important;
+        border-top: 1px solid rgba(56,189,248,0.28) !important;
+        color: #d1fae5 !important;
+      }
+      .terminal-shell-panel .migration-stage-card {
+        background: #000 !important;
+        border-color: #334155 !important;
+        color: #cbd5e1 !important;
+        box-shadow: none !important;
+      }
+      .terminal-shell-panel .migration-stage-card.is-done {
+        background: rgba(20,83,45,0.68) !important;
+        border-color: #22c55e !important;
+      }
+      .terminal-shell-panel .migration-stage-card.is-active {
+        background: rgba(120,53,15,0.78) !important;
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 14px rgba(245,158,11,0.35) !important;
+      }
+      .terminal-shell-panel .migration-stage-card.is-failed {
+        background: rgba(127,29,29,0.78) !important;
+        border-color: #ef4444 !important;
+      }
+      .terminal-shell-panel .migration-stage-card.is-pending,
+      .terminal-shell-panel .migration-stage-card.is-skipped {
+        background: rgba(15,23,42,0.92) !important;
+        border-color: #334155 !important;
+      }
+      .terminal-shell-panel .migration-terminal-shell {
+        background: #000 !important;
+        border: 1px solid #1e293b !important;
+        box-shadow: inset 0 0 22px rgba(15,23,42,0.85) !important;
+      }
+      .terminal-shell-panel .migration-terminal-body,
+      .terminal-shell-panel .vm-terminal-body,
+      .terminal-shell-panel .nbd-terminal-body,
+      .terminal-shell-panel .image-terminal-body,
+      .terminal-shell-panel #vm-panels-container,
+      .terminal-shell-panel #image-panels-container {
+        background: #000 !important;
+        color: #39ff14 !important;
+        text-shadow: 0 0 4px rgba(57,255,20,0.36) !important;
+        scrollbar-color: #38bdf8 #020617 !important;
+      }
+      .terminal-shell-panel .migration-terminal-actions {
+        background: #000 !important;
+        border: 1px solid #223044 !important;
+        box-shadow: none !important;
+      }
+      body.flex-light-mode .terminal-shell-panel [id^="img-block-"],
+      body.flex-light-mode .terminal-shell-panel [id^="vm-block-"],
+      body.flex-light-mode .terminal-shell-panel .migration-log-terminal,
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-header,
+      body.flex-light-mode .terminal-shell-panel .migration-stage-panel,
+      body.flex-light-mode .terminal-shell-panel .migration-stage-cards,
+      body.flex-light-mode .terminal-shell-panel .migration-stage-card,
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-shell,
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-body,
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-actions {
+        color: inherit;
+      }
+      body.flex-light-mode .terminal-shell-panel [id^="img-block-"],
+      body.flex-light-mode .terminal-shell-panel [id^="vm-block-"],
+      body.flex-light-mode .terminal-shell-panel .migration-log-terminal {
+        background: #000 !important;
+        border-color: #1e293b !important;
+        color: #d1fae5 !important;
+        box-shadow: 0 14px 28px rgba(2,6,23,0.48) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-header {
+        background: #000 !important;
+        border-color: #334155 !important;
+        color: #d1fae5 !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-stage-panel,
+      body.flex-light-mode .terminal-shell-panel [id^="img-stage-card-section-"],
+      body.flex-light-mode .terminal-shell-panel .migration-stage-cards {
+        background: #000 !important;
+        border-color: #223044 !important;
+        color: #d1fae5 !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-stage-card {
+        background: #000 !important;
+        border-color: #334155 !important;
+        color: #cbd5e1 !important;
+        box-shadow: none !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-stage-card.is-done {
+        background: rgba(20,83,45,0.68) !important;
+        border-color: #22c55e !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-stage-card.is-active {
+        background: rgba(120,53,15,0.78) !important;
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 14px rgba(245,158,11,0.35) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-stage-card.is-failed {
+        background: rgba(127,29,29,0.78) !important;
+        border-color: #ef4444 !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-shell {
+        background: #000 !important;
+        border-color: #1e293b !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-body,
+      body.flex-light-mode .terminal-shell-panel .vm-terminal-body,
+      body.flex-light-mode .terminal-shell-panel .nbd-terminal-body,
+      body.flex-light-mode .terminal-shell-panel .image-terminal-body {
+        background: #000 !important;
+        color: #39ff14 !important;
+        text-shadow: 0 0 4px rgba(57,255,20,0.36) !important;
+      }
+      body.flex-light-mode .terminal-shell-panel .migration-terminal-actions {
+        background: #000 !important;
+        border-color: #223044 !important;
       }
     </style>
     <script>
@@ -537,7 +673,7 @@
             <div class="panel" style="border-color: #10b981;">
                 <h2 class="section-title" style="width:100%; display:block;">
                     <div class="neon-banner-wrapper" style="width:100%; box-sizing:border-box; background:#0f172a; border:3px solid #ec4899; box-shadow:0 0 15px #ec4899, inset 0 0 15px #ec4899; border-radius:16px; padding:6px; margin-bottom:15px; position:relative; overflow:hidden;">
-                        <div class="neon-banner-inner" style="width:100%; box-sizing:border-box; background:#020617; border:2px solid #06b6d4; box-shadow:0 0 15px #06b6d4, inset 0 0 15px #06b6d4; border-radius:10px; padding:16px 20px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; text-align:center;">
+                        <div class="neon-banner-inner" style="width:100%; box-sizing:border-box; background:#000; border:2px solid #06b6d4; box-shadow:0 0 15px #06b6d4, inset 0 0 15px #06b6d4; border-radius:10px; padding:16px 20px; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; text-align:center;">
 
                             <div style="display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap; width:100%;">
                                 <!-- Glowing Shield Icon -->
@@ -957,6 +1093,25 @@
       const regEl = document.getElementById('credFlexRegion');
       if (regEl) { regEl.value = 'DFW3'; localStorage.setItem('cred_flex_region', 'DFW3'); }
     }
+    // Two-way sync: the Target Region duplicate in the scanner banner (credFlexRegionBanner) mirrors
+    // the credentials Target Region (credFlexRegion). Migration code reads credFlexRegion, so a change
+    // on the banner is pushed onto credFlexRegion (with persistence + change event) and vice versa.
+    (function wireTargetRegionBannerSync() {
+      const main = document.getElementById('credFlexRegion');
+      const banner = document.getElementById('credFlexRegionBanner');
+      if (!main || !banner) return;
+      if (main.value) banner.value = main.value;            // mirror initial value onto the duplicate
+      main.addEventListener('change', () => {
+        if (banner.value !== main.value) banner.value = main.value;
+      });
+      banner.addEventListener('change', () => {
+        if (main.value !== banner.value) {
+          main.value = banner.value;
+          try { localStorage.setItem('cred_flex_region', main.value); } catch (e) {}
+          main.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    })();
     if (!localStorage.getItem('cred_flex_auth_type') && !document.getElementById('credFlexAuthType')?.value) {
       const authTypeEl = document.getElementById('credFlexAuthType');
       if (authTypeEl) authTypeEl.value = 'password';
@@ -1559,13 +1714,6 @@
 
 
                 <section class="adv-panel" id="imageScannerPanel" style="margin-top: 16px;">
-                        <div id="fsm-native-image-add-bar" style="display:none;position:sticky;top:0;z-index:9999;margin:0 0 14px;padding:10px 12px;border:1px solid #38bdf8;border-radius:8px;background:#ecfeff;color:#0f172a;box-shadow:0 8px 22px rgba(15,23,42,.18);align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                            <div>
-                                <div style="font-size:11px;font-weight:900;color:#0369a1;text-transform:uppercase;">Business System Endpoint Selection</div>
-                                <div id="fsm-native-image-add-label" style="font-size:12px;color:#0f172a;">Select exactly one scanned row below, then add it to the business component.</div>
-                            </div>
-                            <button type="button" id="fsm-native-image-add-btn" style="background:#166534;border:1px solid #14532d;color:#fff;border-radius:5px;padding:8px 12px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 2px 8px rgba(20,83,45,.22);">Add to Business Component</button>
-                        </div>
                         <!-- ── Private OSPC Snapshot Scanner ── -->
                         <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
                             <div style="font-size:0.82rem;font-weight:700;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">
@@ -1595,6 +1743,22 @@
                                     🔍 Start Private Snapshot Scan
                                 </button>
                                 <span style="color:#64748b;font-size:11px;">Scans private tenant snapshots only · region sets <code style="font-size:10px;">OS_REGION_NAME</code></span>
+                                <!-- Duplicate of Target Region (credFlexRegion); kept in two-way sync via JS. -->
+                                <label for="credFlexRegionBanner" style="display:flex;align-items:center;gap:6px;margin-left:auto;color:#94a3b8;font-size:11px;white-space:nowrap;">
+                                    <span style="color:#6ee7b7;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Target Region</span>
+                                    <span style="color:#64748b;">(FLEX Glance upload dest.)</span>
+                                    <select id="credFlexRegionBanner" title="FLEX Glance upload destination — synced with Target Region"
+                                        style="background:#0f172a;border:1px solid rgba(165,180,252,.4);border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;cursor:pointer;">
+                                        <option value="DFW">🇺🇸 DFW &mdash; Dallas/Fort Worth (US)</option>
+                                        <option value="DFW3">🇺🇸 DFW3 &mdash; Dallas/Fort Worth Legacy (US)</option>
+                                        <option value="SJC3">🇺🇸 SJC3 &mdash; San Jose (US)</option>
+                                        <option value="IAD">🇺🇸 IAD &mdash; Northern Virginia (US)</option>
+                                        <option value="ORD">🇺🇸 ORD &mdash; Chicago (US)</option>
+                                        <option value="SYD">🇦🇺 SYD &mdash; Sydney (AU)</option>
+                                        <option value="LON">🇬🇧 LON &mdash; London (UK)</option>
+                                        <option value="HKG">🇭🇰 HKG &mdash; Hong Kong (AS)</option>
+                                    </select>
+                                </label>
                             </div>
                             <div id="image-scan-console-wrap" style="display:none;margin-top:12px;background:#f8fafc;border:1px solid #d7e3f2;border-radius:10px;padding:10px 12px;box-shadow:0 8px 20px rgba(15,23,42,0.06);">
                                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -1602,7 +1766,7 @@
                                     <button type="button" onclick="document.getElementById('image-scan-console-wrap').style.display='none'"
                                         style="background:#fee2e2;border:1px solid #fecaca;border-radius:6px;color:#991b1b;cursor:pointer;font-size:13px;font-weight:900;line-height:1;padding:5px 8px;">✕</button>
                                 </div>
-                                <pre id="image-scan-log" style="background:#07110d;border:1px solid #34d399;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#39ff14;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;box-shadow:inset 0 1px 2px rgba(15,23,42,0.18),0 0 10px rgba(57,255,20,0.12);">Waiting to start…</pre>
+                                <pre id="image-scan-log" style="background:#000;border:1px solid #34d399;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#39ff14;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;box-shadow:inset 0 1px 2px rgba(15,23,42,0.18),0 0 10px rgba(57,255,20,0.12);">Waiting to start…</pre>
                             </div>
                             </div>
                         </div>
@@ -1646,6 +1810,14 @@
                                 <table class="adv-table" id="ospc-image-table"></table>
                             </div>
                             </div>
+                        </div>
+
+                        <div id="fsm-native-image-add-bar" style="display:none;position:sticky;top:0;z-index:9999;margin:14px 0 14px;padding:10px 12px;border:1px solid #38bdf8;border-radius:8px;background:#ecfeff;color:#0f172a;box-shadow:0 8px 22px rgba(15,23,42,.18);align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                            <div>
+                                <div style="font-size:11px;font-weight:900;color:#0369a1;text-transform:uppercase;">Business System Endpoint Selection</div>
+                                <div id="fsm-native-image-add-label" style="font-size:12px;color:#0f172a;">Select exactly one scanned row below, then add it to the business component.</div>
+                            </div>
+                            <button type="button" id="fsm-native-image-add-btn" style="background:#166534;border:1px solid #14532d;color:#fff;border-radius:5px;padding:8px 12px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 2px 8px rgba(20,83,45,.22);">Add to Business Component</button>
                         </div>
 
                         <!-- Method Z (SNAPWIN) Stage Reference -->
@@ -2383,7 +2555,7 @@
                                     <button onclick="document.getElementById('vm-scan-console-wrap').style.display='none'"
                                         style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;">✕</button>
                                 </div>
-                                <pre id="vm-scan-log" style="background:#060a10;border:1px solid #1e3a5f;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#94a3b8;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;">Waiting to start…</pre>
+                                <pre id="vm-scan-log" style="background:#000;border:1px solid #1e3a5f;border-radius:8px;padding:10px 14px;font-size:10.5px;color:#94a3b8;max-height:180px;overflow-y:auto;font-family:monospace;line-height:1.5;white-space:pre-wrap;">Waiting to start…</pre>
                             </div>
                         </div>
 
@@ -3940,14 +4112,14 @@
                             <div style="margin-top:10px; display:flex; gap:12px; flex-wrap:wrap;">
                                 <div style="flex:1; min-width:330px; background:rgba(15,23,42,0.7); border:1px solid rgba(51,65,85,0.55); border-radius:10px; padding:10px;">
                                     <div style="color:#e2e8f0; font-weight:800; font-size:12px; margin-bottom:8px;">1) RDP into target (copy/paste)</div>
-                                    <pre style="margin:0; white-space:pre-wrap; word-break:break-word; color:#a7f3d0; font-size:11px; background:#020617; border:1px solid rgba(20,184,166,0.25); border-radius:8px; padding:10px; overflow:auto;">xfreerdp /v:&lt;TARGET_PUBLIC_IP&gt; /u:Administrator /p:'&lt;TARGET_PASSWORD&gt;' /cert:ignore /sec:nla</pre>
+                                    <pre style="margin:0; white-space:pre-wrap; word-break:break-word; color:#a7f3d0; font-size:11px; background:#000; border:1px solid rgba(20,184,166,0.25); border-radius:8px; padding:10px; overflow:auto;">xfreerdp /v:&lt;TARGET_PUBLIC_IP&gt; /u:Administrator /p:'&lt;TARGET_PASSWORD&gt;' /cert:ignore /sec:nla</pre>
                                     <div style="margin-top:6px; color:#94a3b8; font-size:11px;">Replace placeholders with your target FLEX VM public IP and password.</div>
                                 </div>
 
                                 <div style="flex:2; min-width:420px; background:rgba(15,23,42,0.7); border:1px solid rgba(51,65,85,0.55); border-radius:10px; padding:10px;">
                                     <div style="color:#e2e8f0; font-weight:800; font-size:12px; margin-bottom:8px;">2) Enable WinRM (5985) + attempt OpenSSH (22)</div>
                                     <div style="color:#94a3b8; font-size:11px; margin-bottom:8px;">Open <strong>PowerShell as Administrator</strong> on the target VM and paste this exact block (single paste, no manual line breaks):</div>
-                                    <pre style="margin:0; white-space:pre; overflow:auto; color:#fbcfe8; font-size:11px; background:#020617; border:1px solid rgba(56,189,248,0.22); border-radius:8px; padding:10px;">$ErrorActionPreference = 'Continue'
+                                    <pre style="margin:0; white-space:pre; overflow:auto; color:#fbcfe8; font-size:11px; background:#000; border:1px solid rgba(56,189,248,0.22); border-radius:8px; padding:10px;">$ErrorActionPreference = 'Continue'
 
 # WinRM
 Set-Service WinRM -StartupType Automatic -ErrorAction SilentlyContinue
@@ -4085,24 +4257,24 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         </div>
                     </div>
                     <!-- Per-VM terminal panels (one per migrating VM) -->
-                    <div id="vm-panels-container" style="display:flex;flex-direction:column;gap:8px;padding:8px;background:#000a00;"></div>
+                    <div id="vm-panels-container" style="display:flex;flex-direction:column;gap:8px;padding:8px;background:#000;"></div>
                     <!-- Per-image Glance pipeline terminals (same UX as VM batch) -->
                     <div id="image-panels-outer" style="display:none;border-top:1px solid rgba(167,139,250,0.28);">
                         <div style="padding:8px 12px 4px;font-size:10px;font-weight:700;color:#c4b5fd;font-family:'Orbitron',sans-serif;letter-spacing:1px;">🖼 IMAGE PIPELINE · ONE TERMINAL PER IMAGE</div>
-                        <div id="image-panels-container" style="display:flex;flex-direction:column;gap:8px;padding:8px;padding-top:4px;background:#06030f;"></div>
+                        <div id="image-panels-container" style="display:flex;flex-direction:column;gap:8px;padding:8px;padding-top:4px;background:#000;"></div>
                     </div>
                     <!-- Fallback single console (used for non-batch output) -->
-                    <div class="console-body" id="console-output" style="padding: 26px; background: #000a00; color: #00ff41; font-family: 'VT323','Share Tech Mono','Courier New', monospace; font-size: 18px; font-weight: 400; height: 460px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; word-break: break-all; white-space: pre-wrap; display: flex; flex-direction: column; gap: 4px; min-width: 0; box-sizing: border-box; text-shadow: 0 0 5px rgba(0,255,65,0.7);">
+                    <div class="console-body" id="console-output" style="padding: 26px; background: #000; color: #00ff41; font-family: 'VT323','Share Tech Mono','Courier New', monospace; font-size: 18px; font-weight: 400; height: 460px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; word-break: break-all; white-space: pre-wrap; display: flex; flex-direction: column; gap: 4px; min-width: 0; box-sizing: border-box; text-shadow: 0 0 5px rgba(0,255,65,0.7);">
                         <div class="log-line system" style="color: #005500; font-style: italic;">Waiting for batch execution...</div>
                     </div>
-                    <div id="operator-terminal-panel" style="border-top:1px solid rgba(0,255,65,.28);background:#020802;padding:10px 12px 12px;">
+                    <div id="operator-terminal-panel" style="border-top:1px solid rgba(0,255,65,.28);background:#000;padding:10px 12px 12px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
                             <div style="display:flex;align-items:center;gap:8px;color:#67e8f9;font-family:'Share Tech Mono','Courier New',monospace;font-size:12px;font-weight:700;letter-spacing:.05em;">
                                 <span>LOCAL COMMAND CONSOLE</span>
                                 <span id="operator-terminal-status" style="color:#64748b;font-weight:500;">ready</span>
                             </div>
                             <div style="display:flex;align-items:center;gap:8px;">
-                                <select id="operator-terminal-shell" style="background:#06111f;border:1px solid #22d3ee;border-radius:6px;color:#e0f2fe;font-size:12px;padding:5px 8px;outline:none;">
+                                <select id="operator-terminal-shell" style="background:#000;border:1px solid #22d3ee;border-radius:6px;color:#e0f2fe;font-size:12px;padding:5px 8px;outline:none;">
                                     <option value="powershell">PowerShell</option>
                                     <option value="cmd">CMD</option>
                                     <option value="bash">Ubuntu Bash</option>
@@ -4115,7 +4287,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 </pre>
                         <div style="display:flex;gap:8px;align-items:flex-end;">
                             <textarea id="operator-terminal-input" rows="1" spellcheck="false" placeholder="Enter command, e.g. Get-Date or ls -la"
-                                style="flex:1;min-height:34px;max-height:120px;resize:vertical;background:#020617;border:1px solid #22d3ee;border-radius:7px;color:#e2e8f0;font-family:'Consolas','Cascadia Mono','Courier New',monospace;font-size:13px;padding:8px 10px;outline:none;"></textarea>
+                                style="flex:1;min-height:34px;max-height:120px;resize:vertical;background:#000;border:1px solid #22d3ee;border-radius:7px;color:#e2e8f0;font-family:'Consolas','Cascadia Mono','Courier New',monospace;font-size:13px;padding:8px 10px;outline:none;"></textarea>
                             <button type="button" id="operator-terminal-run" style="background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:7px;color:#fff;font-weight:700;padding:9px 16px;cursor:pointer;">Run</button>
                         </div>
                     </div>
@@ -5184,7 +5356,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         const barColor = progressPct >= 100 ? '#4ade80' : isRunning ? '#00a3ff' : '#ef4444';
 
                         html += `
-                            <div style="background:linear-gradient(135deg,#0d1117 0%,#0f1923 100%); border:1px solid #1e3a5f; border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6);">
+                            <div style="background:#000; border:1px solid #1e3a5f; border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6);">
 
                                 <!-- ── ROW 1: header ── -->
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -5201,7 +5373,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                                 </div>
 
                                 <!-- ── ROW 2: pipeline track ── -->
-                                <div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; padding:4px 6px; background:#080d12; border-radius:4px; border:1px solid #1e293b;">
+                                <div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; padding:4px 6px; background:#000; border-radius:4px; border:1px solid #1e293b;">
                                     ${pipeHtml}
                                     <div style="margin-left:auto; color:#475569; font-family:'Share Tech Mono'; font-size:9px;">STAGE ${stageIdx}/6</div>
                                 </div>
@@ -5219,22 +5391,22 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
                                 <!-- ── ROW 4: metrics ── -->
                                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px;">
-                                    <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">SOURCE</div>
                                         <div style="color:#f1f5f9; font-family:'Orbitron'; font-size:14px; font-weight:bold;">${srcSizeGb > 0 ? srcSizeGb.toFixed(1) : '--'}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">GB</div>
                                     </div>
-                                    <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">SPEED</div>
                                         <div style="color:${speedMbps>0?'#00a3ff':'#374151'}; font-family:'Orbitron'; font-size:14px; font-weight:bold;">${speedMbps > 0 ? speedMbps.toFixed(1) : '--'}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">MB/s</div>
                                     </div>
-                                    <div style="background:#080d12; border:1px solid ${landingStr==='LANDED'?'#166534':'#1e293b'}; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid ${landingStr==='LANDED'?'#166534':'#1e293b'}; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">FLEX ETA</div>
                                         <div style="color:${landingStr==='LANDED'?'#4ade80':etaStr!=='N/A'?'#fbbf24':'#374151'}; font-family:'Orbitron'; font-size:13px; font-weight:bold;">${etaFmt}</div>
                                         <div style="color:${landingStr==='LANDED'?'#4ade80':'#475569'}; font-family:'Share Tech Mono'; font-size:8px;">LANDS ${landingStr}</div>
                                     </div>
-                                    <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">XFER'D</div>
                                         <div style="color:#c084fc; font-family:'Orbitron'; font-size:14px; font-weight:bold;">${currGb > 0 ? currGb.toFixed(1) : '--'}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">GB</div>
@@ -5242,7 +5414,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                                 </div>
 
                                 <!-- ── ROW 5: sparkline + last log ── -->
-                                <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:5px 8px;">
+                                <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:5px 8px;">
                                     ${sparkHtml ? `<div style="font-size:13px;letter-spacing:0px;margin-bottom:3px;opacity:0.9;">${sparkHtml} <span style="color:#334155;font-family:'Share Tech Mono';font-size:8px;">${speedFun}</span></div>` : ''}
                                     ${lastLine.includes('=== NBD Worker:')
                                         ? `<div style="color:#eab308; text-shadow:0 0 10px rgba(217,119,6,0.9); font-weight:bold; font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
@@ -5394,7 +5566,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                                 </div>
 
                                 <!-- ROW 2: pipeline track -->
-                                <div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; padding:4px 6px; background:#080d12; border-radius:4px; border:1px solid #1e293b;">
+                                <div style="display:flex; align-items:center; gap:3px; flex-wrap:wrap; padding:4px 6px; background:#000; border-radius:4px; border:1px solid #1e293b;">
                                     ${imgPipeHtml}
                                     <div style="margin-left:auto; color:#475569; font-family:'Share Tech Mono'; font-size:9px;">STAGE ${Math.max(0,imgStageIdx)}/5</div>
                                 </div>
@@ -5412,22 +5584,22 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
                                 <!-- ROW 4: metrics -->
                                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px;">
-                                    <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">SIZE</div>
                                         <div style="color:#f1f5f9; font-family:'Orbitron'; font-size:14px; font-weight:bold;">${imgSizeGb > 0 ? imgSizeGb.toFixed(1) : '--'}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">GB</div>
                                     </div>
-                                    <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">STAGE</div>
                                         <div style="color:#c084fc; font-family:'Orbitron'; font-size:11px; font-weight:bold;">${String(job.stage||'--').replace(/<[^>]+>/g,'').substring(0,10).toUpperCase()}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">${Math.max(0,imgStageIdx)}/5</div>
                                     </div>
-                                    <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">ELAPSED</div>
                                         <div style="color:#fbbf24; font-family:'Orbitron'; font-size:11px; font-weight:bold;">${durationStr}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">T+</div>
                                     </div>
-                                    <div style="background:#080d12; border:1px solid ${isDone?'#166534':'#1e293b'}; border-radius:4px; padding:6px 8px; text-align:center;">
+                                    <div style="background:#000; border:1px solid ${isDone?'#166534':'#1e293b'}; border-radius:4px; padding:6px 8px; text-align:center;">
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px; letter-spacing:1px; margin-bottom:3px;">STATUS</div>
                                         <div style="color:${isRunning?'#c084fc':isDone?'#4ade80':'#ef4444'}; font-family:'Orbitron'; font-size:11px; font-weight:bold;">${isRunning?'RUN':isDone?'DONE':'FAIL'}</div>
                                         <div style="color:#475569; font-family:'Share Tech Mono'; font-size:8px;">IMAGE</div>
@@ -5435,7 +5607,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                                 </div>
 
                                 <!-- ROW 5: last log -->
-                                <div style="background:#080d12; border:1px solid #1e293b; border-radius:4px; padding:5px 8px;">
+                                <div style="background:#000; border:1px solid #1e293b; border-radius:4px; padding:5px 8px;">
                                     ${lastLine.includes('=== NBD Worker:')
                                         ? `<div style="color:#eab308; text-shadow:0 0 10px rgba(217,119,6,0.9); font-weight:bold; font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
                                         : `<div style="color:rgba(192,132,252,0.6); font-family:'Share Tech Mono'; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${lastLine.replace(/"/g,'')}">› ${lastLine}</div>`
@@ -5576,6 +5748,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
         ],
         linuxSnapStages: [
             { key: 'lsprep', code: 'PREP', label: 'Dashboard / Jumphost Prep', short: 'Prep', goal: 'Stage scripts, credentials, and workspace.' },
+            { key: 'lslock', code: 'LOCK', label: 'Waiting for Jumphost Lock', short: 'Lock Wait', goal: 'Queued — another migration holds the jumphost lock. Will start automatically.' },
             { key: 'ls0', code: 'LS0', label: 'Preflight', short: 'Preflight', goal: 'Confirm source image, target region, and run inputs.' },
             { key: 'ls0a', code: 'LS0A', label: 'Clean Stale Images', short: 'Cleanup', goal: 'Remove stale per-run artifacts for this selected image.' },
             { key: 'ls1', code: 'LS1', label: 'Load Credentials', short: 'Creds', goal: 'Load source and target FLEX credentials.' },
@@ -5820,6 +5993,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 if (/Floating IP|FIP/i.test(t)) return 'ls8';
                 if (/R3\.7_VALIDATE_PLAN|SSH Test|ssh.*verify|Validation plan:|R3 FLEX2FLEX-Region Cloning complete|DG5_COMPLETE|Reports written/i.test(t)) return 'ls9';
                 if (/EXECUTING LINUX SNAPSHOT MIGRATION|Linux snapshot migration|Job id:|Queue job|Uploading Linux snapshot scripts|Scripts and OpenRC files staged|Launching Linux snapshot script/i.test(t)) return 'lsprep';
+                if (/\[LOCK\]\s+Waiting for (jumphost|per-label) lock/i.test(t)) return 'lslock';
                 if (/METHOD_LINUX_SNAPSHOT_DRY_RUN_SUCCESS|METHOD_LINUX_SNAPSHOT_SUCCESS|Linux snapshot migration complete/i.test(t)) return 'ls9';
                 return null;
             }
@@ -5960,7 +6134,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const density = compact ? 'minmax(92px,1fr)' : 'minmax(118px,1fr)';
             const pad = compact ? '6px' : '8px';
             const titleSize = compact ? '10px' : '11px';
-            let html = `<div style="margin-top:10px;border-top:1px solid rgba(167,139,250,0.24);padding-top:10px;">`;
+            let html = `<div class="migration-stage-cards" style="margin-top:10px;border-top:1px solid rgba(167,139,250,0.24);padding-top:10px;">`;
             html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">`;
             html += `<div style="color:#e9d5ff;font-weight:800;font-size:${titleSize};letter-spacing:0.4px;text-transform:uppercase;">${this._escapeHtml(this._flowTitle(job))}</div>`;
             html += `<div style="color:#fde047;font-size:${titleSize};font-family:'Share Tech Mono',monospace;text-align:right;">${this._escapeHtml(stageTitle)}</div>`;
@@ -5983,7 +6157,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 };
                 const c = colors[status] || colors.pending;
                 const pulse = status === 'active' ? 'animation:migPulse 1s infinite;' : '';
-                html += `<div title="${this._escapeHtml((stage.label || '') + ': ' + (stage.goal || ''))}" style="border:1px solid ${c[1]};background:${c[0]};border-radius:7px;padding:${pad};min-height:${compact ? '58px' : '70px'};box-shadow:${status === 'active' ? `0 0 12px ${c[1]}55` : 'none'};${pulse}">`;
+                html += `<div class="migration-stage-card is-${this._escapeHtml(status)}" title="${this._escapeHtml((stage.label || '') + ': ' + (stage.goal || ''))}" style="border:1px solid ${c[1]};background:${c[0]};border-radius:7px;padding:${pad};min-height:${compact ? '58px' : '70px'};box-shadow:${status === 'active' ? `0 0 12px ${c[1]}55` : 'none'};${pulse}">`;
                 html += `<div style="color:${c[1]};font-weight:900;font-size:10px;font-family:'Share Tech Mono',monospace;">STAGE ${stage.code}</div>`;
                 html += `<div style="color:${c[2]};font-weight:900;font-size:${compact ? '10px' : '12px'};line-height:1.15;margin-top:2px;">${this._escapeHtml(stage.label)}</div>`;
                 html += `<div style="color:${c[2]};opacity:0.8;font-size:9px;line-height:1.15;margin-top:3px;">${this._escapeHtml(stage.goal || stage.short || '')}</div>`;
@@ -6100,6 +6274,14 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const volsnapMonitorWarning = /\[VOLSNAP WARN\]\s+SSH poll failed attempt|remote VOLSNAP may still be running/i.test(t);
             const linsnapMonitorOnly = job.windowsFlowKind === 'linsnap' && this._isLinuxSnapMonitorOnlyLine(t);
             const linsnapTerminalFailure = job.windowsFlowKind === 'linsnap' && this._isLinuxSnapTerminalFailureLine(t);
+            // Once the remote nohup job is confirmed launched, SSH stream drops are non-fatal (the
+            // remote job keeps running). But BEFORE launch — during dashboard/jumphost prep — a
+            // [LINSNAP ERROR]/SSH timeout is a real, fatal launch failure, not monitoring noise.
+            if (job.windowsFlowKind === 'linsnap' && /Remote job is nohup-protected|Launching Linux snapshot script/i.test(t)) {
+                job.linsnapRemoteLaunched = true;
+            }
+            const linsnapPrepFatal = linsnapMonitorOnly && !job.linsnapRemoteLaunched
+                && /\[LINSNAP ERROR\]|timed out after|Connection timed out|scp: Connection closed/i.test(t);
             const volsnapStreamProgress = /\[VS8\]\s+Streaming progress:/i.test(t);
             const flex2flexFallbackPending = /DG2B_JUMPHOST_FALLBACK_REQUIRED|fallback_required|Direct path requires fallback|PROCESS EXITED WITH CODE 86/i.test(t);
             if (flex2flexFallbackPending && job.status !== 'success') {
@@ -6119,7 +6301,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 this.render();
                 return;
             }
-            if (linsnapMonitorOnly && job.status !== 'success') {
+            if (linsnapMonitorOnly && !linsnapPrepFatal && job.status !== 'success') {
                 job.status = 'running';
                 if (job.windowsFailedStageKey) job.windowsFailedStageKey = '';
                 job.stage = job.stage && !/^❌/.test(job.stage) ? job.stage : 'LS3 Download Snapshot';
@@ -6157,7 +6339,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 	                this.renderImageStageCards(imageId);
 	            } else if (!volsnapMonitorWarning && !linsnapMonitorOnly && (t.includes('ERROR') || t.includes('FAIL') || t.includes('[FATAL]') || volsnapAttachFailed || linsnapTerminalFailure)) job.errors++;
             const imageTerminalFailure = job.windowsFlowKind === 'linsnap'
-                ? linsnapTerminalFailure
+                ? (linsnapTerminalFailure || linsnapPrepFatal)
                 : (volsnapAttachFailed || t.includes('[FATAL]') || t.includes('[VOLSNAP] FAILED') || t.includes('[VOLSNAP ERROR]') || t.includes('[R3-F2F ERROR]') || t.includes('[R3-F2F] FAILED') || t.includes('FAILED:') || (t.includes('[PROCESS EXITED WITH CODE') && !t.includes('CODE 0')));
             if (!volsnapComplete && imageTerminalFailure) {
 	                if (job.status !== 'failed' && typeof jarvisAnnounce === 'function') {
@@ -8223,7 +8405,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                 progress.total ? `total=${progress.total}` : '',
                 progress.target ? `target=${progress.target}` : ''
             ].filter(Boolean).join('  ');
-            return `<div title="${escapeLogHtml(progress.raw)}" style="margin:5px 0;padding:8px 10px;border:1px solid rgba(56,189,248,0.32);border-left:5px solid #38bdf8;border-radius:7px;background:rgba(2,6,23,0.72);line-height:1.3;white-space:normal;"><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><span style="color:#64748b;font-size:11px;">[${escapeLogHtml(ts)}]</span><span style="color:#67e8f9;font-weight:900;text-transform:uppercase;">${escapeLogHtml(progress.label)}</span>${pct ? `<span style="color:#e0f2fe;font-weight:900;">${escapeLogHtml(pct)}%</span>` : ''}${progress.bar ? `<span style="color:#93c5fd;font-family:'Share Tech Mono','Courier New',monospace;">${escapeLogHtml(progress.bar)}</span>` : ''}</div>${pct ? `<div style="height:6px;margin-top:7px;border-radius:999px;background:rgba(15,23,42,0.95);overflow:hidden;border:1px solid rgba(148,163,184,0.18);"><div style="height:100%;width:${escapeLogHtml(pct)}%;background:linear-gradient(90deg,#06b6d4,#22c55e);box-shadow:0 0 10px rgba(34,211,238,0.45);"></div></div>` : ''}${details ? `<div style="margin-top:5px;color:#cbd5e1;font-size:12px;font-family:'Share Tech Mono','Courier New',monospace;">${escapeLogHtml(details)}</div>` : ''}</div>`;
+            return `<div title="${escapeLogHtml(progress.raw)}" style="margin:5px 0;padding:8px 10px;border:1px solid rgba(56,189,248,0.32);border-left:5px solid #38bdf8;border-radius:7px;background:#000;line-height:1.3;white-space:normal;"><div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;"><span style="color:#64748b;font-size:11px;">[${escapeLogHtml(ts)}]</span><span style="color:#67e8f9;font-weight:900;text-transform:uppercase;">${escapeLogHtml(progress.label)}</span>${pct ? `<span style="color:#e0f2fe;font-weight:900;">${escapeLogHtml(pct)}%</span>` : ''}${progress.bar ? `<span style="color:#93c5fd;font-family:'Share Tech Mono','Courier New',monospace;">${escapeLogHtml(progress.bar)}</span>` : ''}</div>${pct ? `<div style="height:6px;margin-top:7px;border-radius:999px;background:#0b1220;overflow:hidden;border:1px solid rgba(148,163,184,0.18);"><div style="height:100%;width:${escapeLogHtml(pct)}%;background:linear-gradient(90deg,#06b6d4,#22c55e);box-shadow:0 0 10px rgba(34,211,238,0.45);"></div></div>` : ''}${details ? `<div style="margin-top:5px;color:#cbd5e1;font-size:12px;font-family:'Share Tech Mono','Courier New',monospace;">${escapeLogHtml(details)}</div>` : ''}</div>`;
         }
 
         function appendLog(text, type='info') {
@@ -8338,6 +8520,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 
             const block = document.createElement('div');
             block.id = 'img-block-' + safeId;
+            block.className = 'migration-log-terminal';
             block.dataset.imageId = id;
             block.dataset.titleLabel = String(titleLabel || id);
             if (jobServerName) block.dataset.serverName = String(jobServerName);
@@ -8355,7 +8538,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             const migMode = domMode ? (domMode.value === 'dryrun' ? 'DRY-RUN' : 'LIVE') : 'LIVE';
 
             block.innerHTML = `
-	                <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#0f172a; border:1px solid #2d1b69; border-radius:8px; gap:12px;">
+	                <div class="migration-terminal-header" style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#0f172a; border:1px solid #2d1b69; border-radius:8px; gap:12px;">
 	                    <div style="color:#39ff14; text-shadow:0 0 6px rgba(57,255,20,0.4); font-family:'Share Tech Mono',monospace; font-size:12px; font-weight:bold; letter-spacing:0.5px; flex:1; min-width:0; overflow:hidden;">
 	                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${display} &mdash; IP: <span style="color:#38bdf8;">N/A</span> &nbsp;|&nbsp; MODE: <span style="color:#4ade80;">${migMode}</span> &nbsp;//&nbsp; TYPE: <span id="img-type-label-${safeId}" style="color:#c084fc;">GLANCE EXPORT</span></div>
 	                        <div style="margin-top:3px;color:#67e8f9;font-size:10px;letter-spacing:0.35px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">JH: <span class="jh-terminal-ip">--</span> &nbsp;|&nbsp; FREE: <span class="jh-terminal-free">--</span></div>
@@ -8365,9 +8548,9 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         <span class="vm-timer" id="img-timer-${safeId}" data-start="${Date.now()}" style="font-size:20px; font-weight:bold; color:#4ade80; font-family:'Share Tech Mono',monospace; text-shadow:0 0 6px rgba(74,222,128,0.5);">00:00:00</span>
                     </div>
                 </div>
-                <div id="img-stage-card-section-${safeId}" style="display:none;background:rgba(15,23,42,0.58);border:1px solid rgba(148,163,184,0.28);border-radius:6px;padding:7px 9px;"></div>
-                <div style="display:flex;background:#0b1220;border:1px solid rgba(148,163,184,0.34);border-radius:7px;box-shadow:none;flex:1;min-height:240px;max-height:300px;">
-                    <div id="img-panel-${safeId}" class="vm-terminal-body" style="
+                <div id="img-stage-card-section-${safeId}" class="migration-stage-panel" style="display:none;background:rgba(15,23,42,0.58);border:1px solid rgba(148,163,184,0.28);border-radius:6px;padding:7px 9px;"></div>
+                <div class="migration-terminal-shell" style="display:flex;background:#000;border:1px solid rgba(148,163,184,0.34);border-radius:7px;box-shadow:none;flex:1;min-height:240px;max-height:300px;">
+                    <div id="img-panel-${safeId}" class="vm-terminal-body migration-terminal-body" style="
                         flex:1; overflow-y:auto; overflow-x:hidden;
                         color:#d1fae5; font-family:'Share Tech Mono','VT323',monospace;
                         font-size:14px; font-weight:normal; letter-spacing:0;
@@ -8375,7 +8558,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         word-break:break-word; white-space:pre-wrap; line-height:1.38; scrollbar-color:#38bdf8 #0b1220;
                     "></div>
                 </div>
-                <div id="img-panel-actions-${safeId}" style="display:flex; gap:12px; margin-top:8px; align-items:center; background:#18181b; padding:12px; border:2px solid #27272a; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,0.8);"></div>
+                <div id="img-panel-actions-${safeId}" class="migration-terminal-actions" style="display:flex; gap:12px; margin-top:8px; align-items:center; background:#18181b; padding:12px; border:2px solid #27272a; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,0.8);"></div>
 	            `;
 	            container.appendChild(block);
 	            if (typeof window.updateJumphostReadouts === 'function') window.updateJumphostReadouts();
@@ -8750,6 +8933,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
             // Outer block
             const block = document.createElement('div');
             block.id = 'vm-block-' + safeId;
+            block.className = 'migration-log-terminal';
             block.style.cssText = `
                 background:#111827;
                 border:1px solid rgba(148,163,184,0.35);
@@ -8761,7 +8945,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
 	            `;
 
             block.innerHTML = `
-	                <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#0f172a; border:1px solid #1e3a5f; border-radius:8px; gap:12px;">
+	                <div class="migration-terminal-header" style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#0f172a; border:1px solid #1e3a5f; border-radius:8px; gap:12px;">
 	                    <div style="color:#39ff14; text-shadow:0 0 6px rgba(57,255,20,0.4); font-family:'Share Tech Mono',monospace; font-size:12px; font-weight:bold; letter-spacing:0.5px; flex:1; min-width:0; overflow:hidden;">
 	                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${vmName} &mdash; IP: <span style="color:#38bdf8;">${ipHint || 'UNKNOWN'}</span> &nbsp;|&nbsp; MODE: <span style="color:#4ade80;">${migMode}</span> &nbsp;//&nbsp; TYPE: <span style="color:#c084fc;">${migMethod}</span></div>
 	                        <div style="margin-top:3px;color:#67e8f9;font-size:10px;letter-spacing:0.35px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">JH: <span class="jh-terminal-ip">--</span> &nbsp;|&nbsp; FREE: <span class="jh-terminal-free">--</span></div>
@@ -8771,8 +8955,8 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         <span class="vm-timer" id="vm-timer-${safeId}" data-start="${Date.now()}" style="font-size:20px; font-weight:bold; color:#4ade80; font-family:'Share Tech Mono',monospace; text-shadow:0 0 6px rgba(74,222,128,0.5);">00:00:00</span>
                     </div>
                 </div>
-                <div style="display:flex;background:#0b1220;border:1px solid rgba(148,163,184,0.34);border-radius:7px;box-shadow:none;flex:1;min-height:240px;max-height:300px;">
-                    <div id="vm-panel-${safeId}" class="vm-terminal-body" style="
+                <div class="migration-terminal-shell" style="display:flex;background:#000;border:1px solid rgba(148,163,184,0.34);border-radius:7px;box-shadow:none;flex:1;min-height:240px;max-height:300px;">
+                    <div id="vm-panel-${safeId}" class="vm-terminal-body migration-terminal-body" style="
                         flex:1; overflow-y:auto; overflow-x:hidden;
                         color:#d1fae5; font-family:'Share Tech Mono','VT323',monospace;
                         font-size:14px; font-weight:normal; letter-spacing:0;
@@ -8780,7 +8964,7 @@ Write-Host "[ospc2flex] WinRM(5985) configured; SSH(22) attempted."</pre>
                         word-break:break-word; white-space:pre-wrap; line-height:1.38; scrollbar-color:#38bdf8 #0b1220;
                     "></div>
                 </div>
-                <div id="vm-panel-actions-${safeId}" style="display:flex; gap:12px; margin-top:8px; align-items:center; background:#18181b; padding:12px; border:2px solid #27272a; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,0.8);"></div>
+                <div id="vm-panel-actions-${safeId}" class="migration-terminal-actions" style="display:flex; gap:12px; margin-top:8px; align-items:center; background:#18181b; padding:12px; border:2px solid #27272a; border-radius:8px; box-shadow:inset 0 2px 10px rgba(0,0,0,0.8);"></div>
 	            `;
 	            container.appendChild(block);
 	            if (typeof window.updateJumphostReadouts === 'function') window.updateJumphostReadouts();
@@ -9859,7 +10043,11 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         if (jobState.disconnectReason === 'closed' || jobState.disconnectReason === 'killed' || e.name === 'AbortError') {
                             return;
                         }
-                        if (isVmBatchRunning) { appendLog(`✖ NBD FAILED ${sName}: ${e.message}`, 'error'); setVmStatus(sName, 'error'); }
+                        if (isVmBatchRunning) {
+                            appendLog(`✖ NBD FAILED ${sName}: ${e.message}`, 'error');
+                            if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Network error. Review the execution log.');
+                            setVmStatus(sName, 'error');
+                        }
                         _jobConfirmedDone = true;
                     } finally {
                         if (_jobConfirmedDone && typeof _nbdRemoveJob === 'function') _nbdRemoveJob(sName);
@@ -10271,6 +10459,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                         const streamDrop = /network error|failed to fetch|load failed|connection|socket|terminated/i.test(detail);
                         if (streamDrop) {
                             appendImageLog(iid, `[WARN] VOLSNAP dashboard stream disconnected from ${window.location.origin}; the migration may still be running on the jumphost. Check the jumphost log before starting another run.`);
+                            if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Network error. Review the execution log.');
                         } else {
                             appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
                             jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);
@@ -10815,6 +11004,7 @@ ${_duplicates.length > 0 ? `<div style="color:#fbbf24;font-size:10px;margin-top:
                             const streamDrop = /network error|failed to fetch|load failed|connection|socket|terminated/i.test(detail);
                             if (streamDrop) {
                                 appendImageLog(iid, `[WARN] VOLSNAP dashboard stream disconnected from ${window.location.origin}; the migration may still be running on the jumphost. Check the jumphost log before starting another run.`);
+                                if (typeof jarvisAnnounce === 'function') jarvisAnnounce('Network error. Review the execution log.');
                             } else {
                                 appendImageLog(iid, `[ERROR] VOLSNAP fetch failed from ${window.location.origin}: ${detail}`);
                                 jarvisAnnounce(`Volume snapshot ${label.replace(/-/g, ' ')} migration failed. Operator intervention required.`);

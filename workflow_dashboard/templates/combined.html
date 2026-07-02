@@ -569,8 +569,8 @@
       font-size:10px; color:white;
     }
     .s0-dawn-title {
-      font-size:43px; font-weight:900; color:#1a2a4a; margin:0 0 20px;
-      line-height:1.2; text-shadow:0 2px 10px rgba(255,255,255,0.3);
+      font-size:43px; font-weight:900; color:#ffffff; margin:0 0 20px;
+      line-height:1.2; text-shadow:0 2px 12px rgba(0,0,0,0.30);
     }
     .s0-dawn-title-line {
       display:block;
@@ -579,41 +579,22 @@
       display:inline-block;
       margin-right:6px;
       font-size:1.2em;
-      animation-duration:6s;
+      color:#ffffff;
+      text-shadow:0 2px 12px rgba(0,0,0,0.30);
+      animation-name:s0-title-blue;
+      animation-duration:11s;
       animation-iteration-count:infinite;
       animation-timing-function:ease-in-out;
     }
-    .s0-title-why {
-      color:#ffffff;
-      animation-name:s0-title-glow-why;
-    }
-    .s0-title-who {
-      color:#facc15;
-      animation-name:s0-title-glow-who;
-    }
-    .s0-title-what {
-      color:#f87171;
-      animation-name:s0-title-glow-what;
-    }
-    .s0-title-when {
-      color:#22c55e;
-      animation-name:s0-title-glow-when;
-    }
-    @keyframes s0-title-glow-why {
-      0%, 13%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
-      18%, 78%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
-    }
-    @keyframes s0-title-glow-who {
-      0%, 18%, 38%, 78%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
-      23%, 33%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
-    }
-    @keyframes s0-title-glow-what {
-      0%, 38%, 58%, 78%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
-      43%, 53%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
-    }
-    @keyframes s0-title-glow-when {
-      0%, 58%, 100% { filter:brightness(0.82); text-shadow:0 2px 10px rgba(255,255,255,0.18); }
-      63%, 78%, 82%, 96% { filter:brightness(1.45); text-shadow:0 0 10px currentColor,0 0 22px currentColor,0 2px 10px rgba(255,255,255,0.35); }
+    /* Each word turns FLEX-contour blue in turn (words spaced ~2s apart),
+       then the whole FLEX block blinks at the end of the sweep. 11s loop. */
+    .s0-title-why  { animation-delay:0s; }
+    .s0-title-who  { animation-delay:2s; }
+    .s0-title-what { animation-delay:4s; }
+    .s0-title-when { animation-delay:6s; }
+    @keyframes s0-title-blue {
+      0%, 18%, 100% { color:#ffffff; text-shadow:0 2px 12px rgba(0,0,0,0.30); }
+      6%, 10% { color:#ffd600; text-shadow:0 0 14px rgba(255,214,0,0.95),0 0 26px rgba(255,193,7,0.6),0 2px 12px rgba(0,0,0,0.30); }
     }
     .s0-dawn-title-highlight {
       display:inline-block;
@@ -622,6 +603,13 @@
       color:#fff;
       background:linear-gradient(90deg,rgba(37,99,235,0.92),rgba(96,165,250,0.82));
       text-shadow:0 2px 8px rgba(0,0,0,0.18);
+      animation:s0-flex-block-blink 11s ease-in-out infinite;
+    }
+    /* After the Why/Who/What/When sweep, the whole FLEX block double-blinks (~78–88% of the 11s loop). */
+    @keyframes s0-flex-block-blink {
+      0%, 72%, 100% { filter:brightness(1); box-shadow:none; }
+      78%, 88% { filter:brightness(1.4); box-shadow:0 0 18px rgba(96,165,250,0.95),0 0 36px rgba(37,99,235,0.6); }
+      83%, 95% { filter:brightness(1); box-shadow:none; }
     }
     .s0-dawn-desc {
       font-size:15px; line-height:1.7; color:#2a3a5a;
@@ -1227,7 +1215,7 @@
       box-shadow: none !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
     }
-    body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown),
+body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown):not(.uat-s1-template-tab),
     body.flex-skyline-mode .gov-btn,
     body.flex-skyline-mode .uat-btn {
       background: #a33e3e !important;
@@ -1664,29 +1652,169 @@
 .uat-s1-arch-selector {
   background:#ffffff;
   border-radius:16px;padding:20px;
-  border:1.5px solid #dbe4f0;
-  box-shadow:0 2px 8px rgba(0,0,0,0.06);
+  border:1.5px solid #d8e2f0;
+  box-shadow:0 10px 28px rgba(15,23,42,0.08);
   position:relative;overflow:hidden;
 }
 .uat-s1-arch-head {
   display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;position:relative;z-index:1;
 }
-.uat-s1-arch-title { font-size:16px;font-weight:700;color:#0f172a; }
+.uat-s1-arch-title { font-size:16px;font-weight:800;color:#172033; }
 .uat-s1-template-tabs {
   display:flex;gap:6px;align-items:center;margin:10px 0 12px;position:relative;z-index:1;
-  background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:4px;
+  background:#f6f8fc;border:1px solid #d8e2f0;border-radius:10px;padding:4px;
 }
 .uat-s1-template-tab {
   flex:1;border:0;border-radius:8px;padding:7px 10px;background:transparent;color:#475569;
   font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;transition:all .18s;
 }
-.uat-s1-template-tab:hover { background:#eff6ff;color:#1d4ed8; }
-.uat-s1-template-tab.active { background:#1e3a8a;color:#fff;box-shadow:0 3px 8px rgba(30,58,138,.18); }
+.uat-s1-template-tab:hover { background:#ecfdf5;color:#047857; }
+.uat-s1-template-tab.active { background:#16a34a;color:#fff;box-shadow:0 6px 14px rgba(22,163,74,.22); }
+body.flex-skyline-mode .uat-s1-template-tab {
+  background:transparent !important;
+  border:0 !important;
+  color:#475569 !important;
+  border-radius:8px !important;
+  box-shadow:none !important;
+}
+body.flex-skyline-mode .uat-s1-template-tab:hover {
+  background:#ecfdf5 !important;
+  color:#047857 !important;
+}
+body.flex-skyline-mode .uat-s1-template-tab.active {
+  background:#16a34a !important;
+  color:#fff !important;
+  box-shadow:0 6px 14px rgba(22,163,74,.22) !important;
+}
 .uat-s1-template-pane { display:none;position:relative;z-index:1; }
 .uat-s1-template-pane.active { display:block; }
 .uat-s1-template-das-frame {
   width:100%;height:620px;border:1px solid #dbe4f0;border-radius:12px;background:#06080d;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);display:block;
+}
+.uat-s1-customer-template-list {
+  display:block;min-height:420px;background:#06080d;border:1px solid #101820;border-radius:4px;
+  padding:40px;position:relative;overflow:hidden;color:#c0c8d8;font-family:'Rajdhani','Segoe UI',sans-serif;
+}
+.uat-s1-customer-template-list::before {
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 30%, rgba(0,255,128,.03) 0%, transparent 60%);
+}
+.uat-s1-customer-template-flight-head {
+  text-align:center;margin-bottom:40px;position:relative;z-index:1;
+}
+.uat-s1-customer-template-flight-head::before,
+.uat-s1-customer-template-flight-head::after {
+  content:'';position:absolute;top:50%;width:30%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,255,128,.15),transparent);
+}
+.uat-s1-customer-template-flight-head::before { left:0; }
+.uat-s1-customer-template-flight-head::after { right:0; }
+.uat-s1-customer-template-flight-title {
+  font-family:'Share Tech Mono','Courier New',monospace;font-size:1.8rem;font-weight:400;letter-spacing:8px;
+  color:#00ff80;text-transform:uppercase;text-shadow:0 0 20px rgba(0,255,128,.4),0 0 40px rgba(0,255,128,.1);
+}
+.uat-s1-customer-template-flight-subtitle {
+  font-family:'Share Tech Mono','Courier New',monospace;color:#3a6a50;font-size:.75rem;letter-spacing:4px;text-transform:uppercase;margin-top:8px;
+}
+.uat-s1-customer-template-header-line {
+  width:120px;height:1px;background:linear-gradient(90deg,transparent,#00ff80,transparent);
+  margin:15px auto;opacity:.3;
+}
+.uat-s1-customer-template-panel-frame {
+  background:linear-gradient(145deg,#0a0d12 0%,#07090c 100%);
+  border:1px solid #1a2a20;border-radius:4px;padding:30px;position:relative;z-index:1;
+  box-shadow:inset 0 1px 0 rgba(0,255,128,.03),0 20px 60px rgba(0,0,0,.6),0 0 30px rgba(0,255,128,.03);
+}
+.uat-s1-customer-template-panel-frame::before {
+  content:'';position:absolute;top:0;left:20px;right:20px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,255,128,.15),transparent);
+}
+.uat-s1-customer-template-panel-label {
+  position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+  background:#06080d;padding:0 20px;font-family:'Share Tech Mono','Courier New',monospace;
+  font-size:.62rem;letter-spacing:3px;color:#2a6a45;text-transform:uppercase;z-index:2;
+}
+.uat-s1-customer-template-grid {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;position:relative;z-index:1;
+}
+.uat-s1-customer-template-card {
+  --cust-accent:#ff9f43;--cust-accent-dim:#ffb370;--cust-bg:#2a1a0a;--cust-glow-inner:rgba(255,159,67,.3);--cust-glow-outer:rgba(255,159,67,.1);
+  position:relative;background:rgba(15,20,30,.6);border:1px solid rgba(255,255,255,.08);border-radius:3px;
+  padding:22px 24px;min-height:118px;box-shadow:none;overflow:hidden;transition:all .3s ease-out;
+  display:flex;align-items:center;gap:18px;
+}
+.uat-s1-customer-template-card::before {
+  content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--cust-accent);opacity:.55;transition:all .22s ease;
+}
+.uat-s1-customer-template-card:hover {
+  background:rgba(20,25,35,.7);border-color:rgba(255,255,255,.15);transform:none;
+}
+.uat-s1-customer-template-card.selected {
+  background:var(--cust-bg);border-color:var(--cust-accent);
+  box-shadow:0 0 20px var(--cust-glow-outer),0 0 40px var(--cust-glow-inner),inset 0 1px 0 rgba(255,255,255,.1);
+  transform:scale(1.02);
+}
+.uat-s1-customer-template-card.selected::before {
+  background:var(--cust-accent);opacity:1;box-shadow:0 0 10px var(--cust-accent);
+}
+.uat-s1-customer-template-icon {
+  width:42px;height:42px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);color:var(--cust-accent);opacity:.72;transition:all .3s ease;flex-shrink:0;
+}
+.uat-s1-customer-template-card.selected .uat-s1-customer-template-icon {
+  background:rgba(255,255,255,.1);border-color:var(--cust-accent);color:var(--cust-accent);opacity:1;box-shadow:0 0 15px var(--cust-glow-inner);
+}
+.uat-s1-customer-template-content { flex:1;min-width:0; }
+.uat-s1-customer-template-title {
+  font-size:1rem;font-weight:600;color:rgba(255,255,255,.62);letter-spacing:.5px;margin-bottom:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;
+}
+.uat-s1-customer-template-card.selected .uat-s1-customer-template-title {
+  color:#fff;text-shadow:0 0 10px var(--cust-glow-inner);
+}
+.uat-s1-customer-template-desc {
+  font-family:'Share Tech Mono','Courier New',monospace;font-size:.7rem;color:rgba(255,255,255,.28);letter-spacing:.5px;line-height:1.35;
+}
+.uat-s1-customer-template-card.selected .uat-s1-customer-template-desc { color:var(--cust-accent-dim); }
+.uat-s1-customer-template-meta {
+  display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;
+}
+.uat-s1-customer-template-meta-tag {
+  font-size:.6rem;padding:2px 8px;border-radius:2px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);letter-spacing:.5px;text-transform:uppercase;
+  font-family:'Share Tech Mono','Courier New',monospace;
+}
+.uat-s1-customer-template-card.selected .uat-s1-customer-template-meta-tag {
+  background:rgba(255,255,255,.08);border-color:var(--cust-accent);color:var(--cust-accent-dim);
+}
+.uat-s1-customer-template-led {
+  position:absolute;top:12px;right:12px;width:6px;height:6px;border-radius:50%;
+  background:var(--cust-accent);opacity:.35;transition:all .3s ease;
+}
+.uat-s1-customer-template-card.selected .uat-s1-customer-template-led {
+  opacity:1;box-shadow:0 0 8px var(--cust-accent),0 0 16px var(--cust-accent);animation:uatS1CustLedPulse 1.5s ease-in-out infinite;
+}
+@keyframes uatS1CustLedPulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.5; }
+}
+.uat-s1-customer-template-actions { display:flex;gap:8px;justify-content:flex-start;margin-top:10px; }
+.uat-s1-customer-template-empty {
+  display:flex;align-items:center;justify-content:center;min-height:220px;text-align:center;grid-column:1/-1;
+  color:rgba(255,255,255,.42);font-size:13px;line-height:1.55;background:rgba(15,20,30,.6);
+  border:1px dashed rgba(0,255,128,.22);border-radius:4px;font-family:'Share Tech Mono','Courier New',monospace;
+}
+.uat-s1-customer-template-actions button {
+  background:rgba(255,255,255,.04) !important;border:1px solid rgba(255,159,67,.44) !important;
+  color:#ffb370 !important;border-radius:3px !important;font-family:'Share Tech Mono','Courier New',monospace !important;
+  box-shadow:none !important;text-transform:uppercase;letter-spacing:.3px;
+}
+@media (max-width: 900px) {
+  .uat-s1-customer-template-grid { grid-template-columns:1fr; }
+  .uat-s1-customer-template-flight-head::before,
+  .uat-s1-customer-template-flight-head::after { display:none; }
+  .uat-s1-customer-template-list { padding:24px; }
 }
 .uat-s1-arch-badge {
   padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
@@ -1694,44 +1822,49 @@
 }
 .uat-s1-arch-desc { font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.45;position:relative;z-index:1; }
 .uat-s1-arch-grid {
-  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;position:relative;z-index:1;
 }
 .uat-s1-arch-card {
-  border-radius:12px;padding:14px;cursor:pointer;transition:all 0.22s;
-  border:2px solid rgba(148,163,184,.28);position:relative;overflow:hidden;
+  border-radius:14px;padding:22px;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  border:1px solid rgba(255,255,255,.18);position:relative;overflow:hidden;
   background:var(--tmpl-bg,#f8fafc);color:var(--tmpl-fg,#334155);
+  box-shadow:0 10px 24px rgba(15,23,42,.12);
 }
-.uat-s1-arch-card:hover { transform:translateY(-2px);border-color:rgba(59,130,246,0.42);box-shadow:0 8px 22px rgba(15,23,42,0.12); }
-.uat-s1-arch-card.selected { border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.25); }
+.uat-s1-arch-card:hover { transform:translateY(-3px);box-shadow:0 16px 34px rgba(15,23,42,.22); }
+.uat-s1-arch-card.selected {
+  outline:3px solid #38bdf8;
+  border-color:rgba(255,255,255,.28);
+  box-shadow:0 0 0 6px rgba(56,189,248,.18), 0 18px 38px rgba(15,23,42,.25);
+}
 .uat-s1-arch-card-icon {
-  width:34px;height:34px;background:rgba(255,255,255,0.55);border-radius:9px;
+  width:36px;height:36px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.28);border-radius:10px;
   display:flex;align-items:center;justify-content:center;color:var(--tmpl-fg,#334155);font-size:18px;
   margin-bottom:9px;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);
+  box-shadow:none;
 }
 .uat-s1-arch-card-name { font-size:13px;font-weight:800;color:var(--tmpl-fg,#334155);margin-bottom:2px; }
 .uat-s1-arch-card-sub  { font-size:10px;color:var(--tmpl-fg,#334155);opacity:.78; }
-.uat-s1-arch-card.tmpl-banking   { --tmpl-bg:#E0F2FE; --tmpl-fg:#0369A1; }
-.uat-s1-arch-card.tmpl-ecommerce { --tmpl-bg:#FFEDD5; --tmpl-fg:#C2410C; }
-.uat-s1-arch-card.tmpl-crm       { --tmpl-bg:#D1FAE5; --tmpl-fg:#047857; }
-.uat-s1-arch-card.tmpl-erp       { --tmpl-bg:#EDE9FE; --tmpl-fg:#6D28D9; }
-.uat-s1-arch-card.tmpl-saas      { --tmpl-bg:#E0F2FE; --tmpl-fg:#0284C7; }
-.uat-s1-arch-card.tmpl-api       { --tmpl-bg:#E0E7FF; --tmpl-fg:#4338CA; }
-.uat-s1-arch-card.tmpl-reporting { --tmpl-bg:#FEF3C7; --tmpl-fg:#B45309; }
-.uat-s1-arch-card.tmpl-batch     { --tmpl-bg:#F1F5F9; --tmpl-fg:#334155; }
-.uat-s1-arch-card.tmpl-data      { --tmpl-bg:#CCFBF1; --tmpl-fg:#0F766E; }
-.uat-s1-arch-card.tmpl-custom    { --tmpl-bg:#FCE7F3; --tmpl-fg:#BE185D; }
+.uat-s1-arch-card.tmpl-banking   { --tmpl-bg:linear-gradient(135deg,#1d4ed8,#2563eb); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-ecommerce { --tmpl-bg:linear-gradient(135deg,#991b1b,#dc2626); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-crm       { --tmpl-bg:linear-gradient(135deg,#047857,#059669); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-erp       { --tmpl-bg:linear-gradient(135deg,#6d28d9,#9333ea); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-saas      { --tmpl-bg:linear-gradient(135deg,#0e7490,#0891b2); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-api       { --tmpl-bg:linear-gradient(135deg,#3730a3,#4f46e5); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-reporting { --tmpl-bg:linear-gradient(135deg,#c2410c,#f97316); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-batch     { --tmpl-bg:linear-gradient(135deg,#1e293b,#334155); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-data      { --tmpl-bg:linear-gradient(135deg,#115e59,#0f766e); --tmpl-fg:#ffffff; }
+.uat-s1-arch-card.tmpl-custom    { --tmpl-bg:linear-gradient(135deg,#be185d,#db2777); --tmpl-fg:#ffffff; }
 .uat-s1-arch-footer {
   display:flex;align-items:center;gap:12px;position:relative;z-index:1;
-  background:#f8fafc;border:1px solid #e2e8f0;
+  background:#f6f8fc;border:1px solid #d8e2f0;
   border-radius:10px;padding:12px 14px;
 }
 .uat-s1-arch-footer-text { font-size:11px;color:#64748b;flex:1;line-height:1.4; }
 .uat-s1-arch-use-btn {
-  padding:8px 16px;background:#3b82f6;color:#fff;border:none;border-radius:8px;
+  padding:8px 16px;background:#b23a3a;color:#fff;border:none;border-radius:8px;
   font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.2s;
 }
-.uat-s1-arch-use-btn:hover:not(:disabled) { background:#2563eb; }
+.uat-s1-arch-use-btn:hover:not(:disabled) { background:#8f2e2e; }
 .uat-s1-arch-use-btn:disabled { background:#334155;color:#64748b;cursor:not-allowed; }
 
 .uat-s1-sa-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
@@ -4859,6 +4992,121 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     </div>
   </div>
 
+  <!-- ── Source / Target live UAT workbench ───────────────────── -->
+  <div class="uat-live-compare-bench" id="uatLiveCompareBench">
+    <div class="uat-live-side uat-live-side--source" data-uat-live-side="source">
+      <div class="uat-live-head">
+        <div>
+          <div class="uat-live-kicker">Source OSPC</div>
+          <h3>Source Mobile UI</h3>
+          <p>Validate the current production/source frontend and service path.</p>
+        </div>
+        <span class="uat-live-badge">LEFT</span>
+      </div>
+      <div class="uat-live-controls">
+        <label>Type
+          <select id="uatLive-source-type" onchange="uatLiveTypeChanged('source')">
+            <option value="frontend">Frontend Mobile UI</option>
+            <option value="api">API Gateway</option>
+            <option value="backend">Backend Service</option>
+            <option value="db">Database API</option>
+          </select>
+        </label>
+        <label>IP / Host
+          <input id="uatLive-source-host" value="23.253.159.71" placeholder="23.253.159.71">
+        </label>
+        <label>Port
+          <input id="uatLive-source-port" value="8080" placeholder="8080">
+        </label>
+        <label>Path
+          <input id="uatLive-source-path" value="/#" placeholder="/#">
+        </label>
+      </div>
+      <div class="uat-live-actions">
+        <button type="button" onclick="uatLiveLoadMobile('source')">Load Mobile</button>
+        <button type="button" onclick="uatLiveRun('source','health')">Health</button>
+        <button type="button" onclick="uatLiveRun('source','ready')">Ready</button>
+        <button type="button" onclick="uatLiveRun('source','login')">Login</button>
+        <button type="button" onclick="uatLiveRun('source','summary')">Summary</button>
+        <button type="button" onclick="uatLiveRun('source','recipients')">Users</button>
+      </div>
+      <div class="uat-live-phone">
+        <div class="uat-live-notch"></div>
+        <iframe id="uatLive-source-frame" title="Source mobile frontend preview" src="http://23.253.159.71:8080/#"></iframe>
+      </div>
+      <div class="uat-live-dev">
+        <div class="uat-live-dev-head">
+          <strong>Dev View - Live Data Movement</strong>
+          <span id="uatLive-source-current">Step 1: frontend loaded</span>
+        </div>
+        <div class="uat-live-route" id="uatLive-source-route"></div>
+        <pre id="uatLive-source-log" class="uat-live-log"></pre>
+        <div class="uat-live-table-wrap">
+          <table>
+            <thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>
+            <tbody id="uatLive-source-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="uat-live-side uat-live-side--target" data-uat-live-side="target">
+      <div class="uat-live-head">
+        <div>
+          <div class="uat-live-kicker">Target FLEX</div>
+          <h3>Target Mobile UI</h3>
+          <p>Enter the cloned FLEX frontend or service endpoint and compare behavior.</p>
+        </div>
+        <span class="uat-live-badge">RIGHT</span>
+      </div>
+      <div class="uat-live-controls">
+        <label>Type
+          <select id="uatLive-target-type" onchange="uatLiveTypeChanged('target')">
+            <option value="frontend">Frontend Mobile UI</option>
+            <option value="api">API Gateway</option>
+            <option value="backend">Backend Service</option>
+            <option value="db">Database API</option>
+          </select>
+        </label>
+        <label>IP / Host
+          <input id="uatLive-target-host" value="" placeholder="FLEX frontend IP">
+        </label>
+        <label>Port
+          <input id="uatLive-target-port" value="8080" placeholder="8080">
+        </label>
+        <label>Path
+          <input id="uatLive-target-path" value="/#" placeholder="/#">
+        </label>
+      </div>
+      <div class="uat-live-actions">
+        <button type="button" onclick="uatLiveLoadMobile('target')">Load Mobile</button>
+        <button type="button" onclick="uatLiveRun('target','health')">Health</button>
+        <button type="button" onclick="uatLiveRun('target','ready')">Ready</button>
+        <button type="button" onclick="uatLiveRun('target','login')">Login</button>
+        <button type="button" onclick="uatLiveRun('target','summary')">Summary</button>
+        <button type="button" onclick="uatLiveRun('target','recipients')">Users</button>
+      </div>
+      <div class="uat-live-phone">
+        <div class="uat-live-notch"></div>
+        <iframe id="uatLive-target-frame" title="Target mobile frontend preview" src="about:blank"></iframe>
+      </div>
+      <div class="uat-live-dev">
+        <div class="uat-live-dev-head">
+          <strong>Dev View - Live Data Movement</strong>
+          <span id="uatLive-target-current">Waiting for FLEX endpoint</span>
+        </div>
+        <div class="uat-live-route" id="uatLive-target-route"></div>
+        <pre id="uatLive-target-log" class="uat-live-log"></pre>
+        <div class="uat-live-table-wrap">
+          <table>
+            <thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>
+            <tbody id="uatLive-target-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Business Systems view ─────────────────────────────── -->
   <div id="uatS1SystemsView">
     <div class="uat-s1-card">
@@ -4890,8 +5138,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
             </div>
             <p class="uat-s1-arch-desc">Use templates to create a complete UAT scope in seconds. Operators can edit every component before saving.</p>
             <div class="uat-s1-template-tabs" role="tablist" aria-label="Business System Templates">
-              <button type="button" class="uat-s1-template-tab active" data-uat-template-tab="classic" onclick="uatS1SetTemplateTab('classic')">Current Templates</button>
-              <button type="button" class="uat-s1-template-tab" data-uat-template-tab="das" onclick="uatS1SetTemplateTab('das')">Business System Template Das</button>
+              <button type="button" class="uat-s1-template-tab active" data-uat-template-tab="classic" onclick="uatS1SetTemplateTab('classic')">Business System Models</button>
+              <button type="button" class="uat-s1-template-tab" data-uat-template-tab="das" onclick="uatS1SetTemplateTab('das')">Customers Business Template</button>
             </div>
             <div class="uat-s1-template-pane active" data-uat-template-pane="classic">
               <div id="uatS1ArchList" class="uat-s1-arch-grid">
@@ -4903,7 +5151,13 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
               </div>
             </div>
             <div class="uat-s1-template-pane" data-uat-template-pane="das">
-              <iframe class="uat-s1-template-das-frame" src="/business-system-template-das/" title="Business System Template Das"></iframe>
+              <div id="uatS1CustomerTemplateList" class="uat-s1-customer-template-list">
+                <!-- rendered by JS: saved custom business system templates only -->
+              </div>
+              <div class="uat-s1-arch-footer" style="margin-top:12px;">
+                <span class="uat-s1-arch-footer-text">Only custom business systems created from the Custom model and saved by the operator appear here.</span>
+                <button class="uat-s1-arch-use-btn" onclick="uatS1OpenCustomerTemplate()">Create Custom Template</button>
+              </div>
             </div>
           </div>
         </div>
@@ -5733,6 +5987,292 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         /* ── Footer ── */
         .ud-footer { text-align: center; font-size: 11px; color: #9ca3af; padding: 10px 0; border-top: 1px solid #f3f4f6; }
 
+        /* ── Stage 3 source/target live UAT workbench ── */
+        .uat-live-compare-bench {
+          display: grid;
+          grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+          gap: 14px;
+          align-items: start;
+          margin: 14px 0;
+        }
+        .uat-live-side {
+          background: #ffffff;
+          border: 1.5px solid #d8e2f0;
+          border-radius: 12px;
+          padding: 14px;
+          box-shadow: 0 10px 24px rgba(15,23,42,.08);
+          min-width: 0;
+        }
+        .uat-live-side--source { border-left: 4px solid #2563eb; }
+        .uat-live-side--target { border-left: 4px solid #16a34a; }
+        .uat-live-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+          margin-bottom: 10px;
+        }
+        .uat-live-kicker {
+          color: #64748b;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: .12em;
+          text-transform: uppercase;
+        }
+        .uat-live-head h3 {
+          color: #172033;
+          font-size: 18px;
+          line-height: 1.15;
+          margin: 3px 0 4px;
+        }
+        .uat-live-head p {
+          color: #64748b;
+          font-size: 12px;
+          margin: 0;
+        }
+        .uat-live-badge {
+          border-radius: 999px;
+          background: #eff6ff;
+          color: #1d4ed8;
+          border: 1px solid #bfdbfe;
+          padding: 4px 9px;
+          font-size: 10px;
+          font-weight: 900;
+        }
+        .uat-live-side--target .uat-live-badge {
+          background: #ecfdf5;
+          color: #047857;
+          border-color: #bbf7d0;
+        }
+        .uat-live-controls {
+          display: grid;
+          grid-template-columns: 1.1fr 1.4fr .7fr 1fr;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .uat-live-controls label {
+          color: #334155;
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .uat-live-controls input,
+        .uat-live-controls select {
+          width: 100%;
+          min-width: 0;
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          color: #0f172a;
+          border-radius: 7px;
+          padding: 8px 9px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .uat-live-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .uat-live-actions button {
+          border: 0;
+          border-radius: 7px;
+          background: #b23a3a;
+          color: #fff;
+          padding: 7px 10px;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .uat-live-actions button:hover { background: #8f2e2e; }
+        .uat-live-phone {
+          position: relative;
+          width: min(100%, 410px);
+          height: 840px;
+          margin: 0 auto 12px;
+          background: #050505;
+          border: 12px solid #050505;
+          border-radius: 54px;
+          box-shadow:
+            0 0 0 2px #202633,
+            0 24px 52px rgba(15,23,42,.35),
+            inset 0 0 0 1px rgba(255,255,255,.08);
+          overflow: hidden;
+        }
+        .uat-live-phone::before {
+          content: "13:23";
+          position: absolute;
+          top: 12px;
+          left: 32px;
+          z-index: 3;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: .02em;
+          text-shadow: 0 1px 2px rgba(0,0,0,.45);
+          pointer-events: none;
+        }
+        .uat-live-phone::after {
+          content: "▮▮ 5G 🔋";
+          position: absolute;
+          top: 12px;
+          right: 28px;
+          z-index: 3;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: .02em;
+          text-shadow: 0 1px 2px rgba(0,0,0,.45);
+          pointer-events: none;
+        }
+        .uat-live-notch {
+          display: block;
+          position: absolute;
+          top: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 4;
+          width: 42%;
+          height: 34px;
+          background: #050505;
+          border-radius: 0 0 22px 22px;
+          pointer-events: none;
+        }
+        .uat-live-phone iframe {
+          width: 100%;
+          height: 100%;
+          border: 0;
+          background: #13233d;
+          border-radius: 38px;
+        }
+        .uat-live-bottom-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: 18px 0 10px;
+          padding: 12px 14px;
+          border: 1px solid #d8e2f0;
+          border-left: 4px solid #38bdf8;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #172033;
+          font-weight: 900;
+        }
+        .uat-live-bottom-title span {
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .uat-live-dev {
+          border: 1px solid #334155;
+          border-radius: 12px;
+          background: #020617;
+          color: #d1fae5;
+          overflow: hidden;
+        }
+        .uat-live-dev-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          background: #111827;
+          border-bottom: 1px solid #334155;
+          padding: 10px 12px;
+        }
+        .uat-live-dev-head strong {
+          color: #a7f3d0;
+          font-size: 12px;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+        }
+        .uat-live-dev-head span {
+          color: #00ff7f;
+          background: rgba(16,185,129,.12);
+          border: 1px solid rgba(16,185,129,.35);
+          border-radius: 999px;
+          padding: 5px 9px;
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .uat-live-route {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 7px;
+          align-items: center;
+          padding: 10px 12px 6px;
+          color: #22d3ee;
+          font-size: 11px;
+          font-weight: 800;
+        }
+        .uat-live-route span {
+          border: 1px solid #0891b2;
+          background: rgba(8,145,178,.16);
+          color: #cffafe;
+          border-radius: 999px;
+          padding: 5px 8px;
+        }
+        .uat-live-log {
+          min-height: 92px;
+          max-height: 170px;
+          margin: 0;
+          overflow: auto;
+          background: #030712;
+          border-top: 1px solid #1f2937;
+          border-bottom: 1px solid #1f2937;
+          color: #00ff66;
+          padding: 10px 12px;
+          font-family: "Consolas", "SFMono-Regular", monospace;
+          font-size: 11px;
+          line-height: 1.45;
+          white-space: pre-wrap;
+        }
+        .uat-live-table-wrap {
+          max-height: 250px;
+          overflow: auto;
+          background: #eef6ff;
+        }
+        .uat-live-table-wrap table {
+          width: 100%;
+          border-collapse: collapse;
+          color: #0f172a;
+          font-size: 11px;
+        }
+        .uat-live-table-wrap th {
+          position: sticky;
+          top: 0;
+          background: #f8fafc;
+          color: #334155;
+          text-align: left;
+          padding: 8px;
+          border-bottom: 1px solid #cbd5e1;
+          z-index: 1;
+        }
+        .uat-live-table-wrap td {
+          padding: 8px;
+          border-bottom: 1px solid #cbd5e1;
+          vertical-align: top;
+        }
+        .uat-live-table-wrap tr.uat-live-active td {
+          background: #dcfce7;
+          border-top: 1px solid #86efac;
+          border-bottom: 1px solid #86efac;
+        }
+        .uat-live-step-dot {
+          display: inline-grid;
+          place-items: center;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #dff6ff;
+          color: #0284c7;
+          font-weight: 900;
+        }
+
         /* ── Steps 1-4 inside the overlay: dark card style ── */
         #uat-content .uat-panel {
           background: #ffffff !important;
@@ -5755,6 +6295,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
         /* ── Responsive ── */
         @media(max-width:900px){
+          .uat-live-compare-bench { grid-template-columns: 1fr; }
+          .uat-live-controls { grid-template-columns: 1fr 1fr; }
           .ud-why-grid  { grid-template-columns: 1fr 1fr !important; }
           .ud-chart-card { grid-template-columns: 1fr !important; }
           .ud-bottom-row { grid-template-columns: 1fr !important; }
@@ -20929,8 +21471,7 @@ ${certContent}
       </div>
     </div>
     <div class="uat-s1-modal-foot">
-      <button class="uat-s1-btn-muted" onclick="uatS1SaveDraft()">Save Draft</button>
-      <button class="uat-s1-btn-soft"  onclick="uatS1AutoFill()">Auto-map from Server Targets</button>
+      <button class="uat-s1-btn-muted" id="uatS1SaveDraftBtn" onclick="uatS1SaveDraft()">Save Draft</button>
       <button class="uat-s1-btn-primary" onclick="uatS1SaveSystem()">Add Business System</button>
     </div>
   </div>
@@ -21101,29 +21642,89 @@ ${certContent}
   }
   window.osflexDedupeBusinessSystems = _dedupeSystems;
 
-  var _state = { systems: [], standalones: [], saType: 'server', editId: null, editSaId: null };
+  var _state = { systems: [], standalones: [], saType: 'server', editId: null, editSaId: null, templateMode: false, editTemplateId: null };
   try { var _d = localStorage.getItem('uatS1_systems'); if (_d) _state.systems = JSON.parse(_d) || []; } catch(e) {}
   try { var _e = localStorage.getItem('uatS1_standalones'); if (_e) _state.standalones = JSON.parse(_e) || []; } catch(e) {}
+  var _customerTemplates = [];
+  var _customerTemplateRaw = null;
+  try { _customerTemplateRaw = localStorage.getItem('uatS1_customer_templates'); if (_customerTemplateRaw) _customerTemplates = JSON.parse(_customerTemplateRaw) || []; } catch(e) { _customerTemplates = []; }
   _state.systems = _dedupeSystems(_state.systems);
   try { localStorage.setItem('uatS1_systems', JSON.stringify(_state.systems)); } catch(e) {}
+  if (!_customerTemplateRaw) {
+    _customerTemplates = (_state.systems || [])
+      .filter(function(sys){ return String((sys && sys.archetype) || '').toLowerCase() === 'custom'; })
+      .map(function(sys){
+        return Object.assign({}, sys, { id: 'ctpl-' + (sys.id || Date.now() + '-' + Math.floor(Math.random()*9999)), status: 'Template' });
+      });
+    try { localStorage.setItem('uatS1_customer_templates', JSON.stringify(_customerTemplates)); } catch(e) {}
+  }
+  function _saveCustomerTemplates() {
+    try { localStorage.setItem('uatS1_customer_templates', JSON.stringify(_customerTemplates || [])); } catch(e) {}
+  }
+  var _uatS1AudioCtx = null;
+  function _uatS1InitAudio() {
+    if (!_uatS1AudioCtx) {
+      try { _uatS1AudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { _uatS1AudioCtx = null; }
+    }
+  }
+  function _uatS1PlayBip(freq) {
+    _uatS1InitAudio();
+    if (!_uatS1AudioCtx) return;
+    var now = _uatS1AudioCtx.currentTime;
+    var osc = _uatS1AudioCtx.createOscillator();
+    var gain = _uatS1AudioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq || 1200, now);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.16, now + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    osc.connect(gain);
+    gain.connect(_uatS1AudioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.13);
+  }
+  function _uatS1PlayPowerOn() {
+    _uatS1InitAudio();
+    if (!_uatS1AudioCtx) return;
+    _uatS1PlayBip(880);
+    setTimeout(function(){ _uatS1PlayBip(1320); }, 90);
+  }
+  function _h(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+    });
+  }
 
   function _save() {
     _state.systems = _dedupeSystems(_state.systems);
     try { localStorage.setItem('uatS1_systems', JSON.stringify(_state.systems)); } catch(e) {}
     try { localStorage.setItem('uatS1_standalones', JSON.stringify(_state.standalones)); } catch(e) {}
     if (window.UAT) { window.UAT.businessSystems = _state.systems; window.UAT.standaloneItems = _state.standalones; }
+    _renderCustomerTemplates();
   }
   window.uatS1ReloadFromStorage = function() {
     try { var d = localStorage.getItem('uatS1_systems'); _state.systems = d ? (JSON.parse(d) || []) : []; } catch(e) { _state.systems = []; }
     _state.systems = _dedupeSystems(_state.systems);
     try { localStorage.setItem('uatS1_systems', JSON.stringify(_state.systems)); } catch(e3) {}
     try { var e = localStorage.getItem('uatS1_standalones'); _state.standalones = e ? (JSON.parse(e) || []) : []; } catch(e2) { _state.standalones = []; }
+    try { var t = localStorage.getItem('uatS1_customer_templates'); _customerTemplates = t ? (JSON.parse(t) || []) : []; } catch(e4) { _customerTemplates = []; }
     _render();
+    _renderCustomerTemplates();
     _renderSa();
     _renderKpis();
     _populateSaMapTo();
   };
   function _id() { return 'bs-' + Date.now() + '-' + Math.floor(Math.random()*9999); }
+  function _gv(id) {
+    var e = document.getElementById(id);
+    return e ? (e.value || e.textContent || '').trim() : '';
+  }
+  function _sv(id, value) {
+    var e = document.getElementById(id);
+    if (!e) return;
+    if ('value' in e) e.value = value == null ? '' : value;
+    else e.textContent = value == null ? '' : value;
+  }
 
   /* ── view toggle ── */
   window.uatS1SetView = function(v) {
@@ -21137,7 +21738,14 @@ ${certContent}
   };
 
   /* ── modal open/close ── */
+  function _setTemplateMode(on) {
+    _state.templateMode = !!on;
+    var draftBtn = document.getElementById('uatS1SaveDraftBtn');
+    if (draftBtn) draftBtn.textContent = on ? 'Save Customer Template' : 'Save Draft';
+  }
   window.uatS1OpenModal = function(editId, presetArch) {
+    _setTemplateMode(false);
+    _state.editTemplateId = null;
     var bd = document.getElementById('uatS1BzBackdrop');
     if (bd) bd.classList.add('open');
     _state.editId = editId || null;
@@ -21157,12 +21765,18 @@ ${certContent}
       }
     }
     _sv('uatS1Name',''); _sv('uatS1BOwner',''); _sv('uatS1TOwner',''); _sv('uatS1Desc','');
-    _sv('uatS1ArchSel', presetArch||'banking');
-    uatS1ApplyArchetype();
+    if (typeof window.uatS1SelectArchetype === 'function') {
+      window.uatS1SelectArchetype(presetArch || 'banking');
+    } else {
+      _sv('uatS1ArchSel', presetArch||'banking');
+      uatS1ApplyArchetype();
+    }
   };
   window.uatS1CloseModal = function() {
     var bd = document.getElementById('uatS1BzBackdrop');
     if (bd) bd.classList.remove('open');
+    _setTemplateMode(false);
+    _state.editTemplateId = null;
   };
 
   /* ── active component state + full library ── */
@@ -21254,6 +21868,14 @@ ${certContent}
     _rebuildEditor();
     _rebuildPreview();
   };
+  window.uatS1SelectArchetype = function(key) {
+    key = _arch.hasOwnProperty(key) ? key : 'banking';
+    _sv('uatS1ArchSel', key);
+    _activeComps = (_arch[key] || []).slice();
+    _rebuildEditor();
+    _rebuildPreview();
+    return key;
+  };
 
   /* Toggle a component in/out of scope, preserving existing input values */
   window.uatS1ToggleComp = function(name) {
@@ -21297,14 +21919,10 @@ ${certContent}
     return '/health';
   }
 
-  /* ── save system ── */
-  window.uatS1SaveSystem = function(draft) {
-    var name = (_gv('uatS1Name')||'').trim();
-    if (!name) { alert('Please enter a Business System Name.'); return; }
-    var arch  = _gv('uatS1ArchSel')||'banking';
+  function _collectModalComponents() {
     var _editor = document.getElementById('uatS1CompEditor');
     var _rows = _editor ? Array.from(_editor.querySelectorAll('.uat-s1-comp-row')) : [];
-    var comps = _rows.length ? _rows.map(function(row) {
+    return _rows.length ? _rows.map(function(row) {
       var n = (row.querySelector('strong')||{textContent:''}).textContent;
       return { name:n, type:_sType(n),
         src:  (row.querySelector('[data-field="src"]') ||{value:''}).value,
@@ -21313,6 +21931,60 @@ ${certContent}
     }) : _activeComps.map(function(n){
       return { name:n, type:_sType(n), src:_sSrc(n), tgt:_sTgt(n), path:_sPath(n) };
     });
+  }
+
+  window.uatS1OpenCustomerTemplate = function(templateId) {
+    var tpl = templateId ? (_customerTemplates || []).find(function(t){ return t.id === templateId; }) : null;
+    window.uatS1OpenModal(null, 'custom');
+    _setTemplateMode(true);
+    _state.editTemplateId = templateId || null;
+    _sv('uatS1ArchSel', 'custom');
+    if (tpl) {
+      _sv('uatS1Name', tpl.name || '');
+      _sv('uatS1Crit', tpl.criticality || 'Critical');
+      _sv('uatS1BOwner', tpl.bowner || '');
+      _sv('uatS1TOwner', tpl.towner || '');
+      _sv('uatS1Wave', tpl.wave || 'Wave 1');
+      _sv('uatS1Risk', tpl.risk || 'Medium');
+      _sv('uatS1Desc', tpl.desc || 'custom business system');
+      _activeComps = (tpl.components || []).map(function(c){ return c.name; }).filter(Boolean);
+      _rebuildEditor(tpl.components || []);
+      _rebuildPreview();
+    }
+  };
+
+  window.uatS1SaveCustomerTemplate = function() {
+    var name = (_gv('uatS1Name')||'').trim();
+    if (!name) { alert('Please enter a Business System Name.'); return; }
+    var tpl = {
+      id: _state.editTemplateId || ('ctpl-' + Date.now() + '-' + Math.floor(Math.random()*9999)),
+      name: name,
+      archetype: 'custom',
+      criticality: _gv('uatS1Crit')||'Critical',
+      bowner: _gv('uatS1BOwner')||'',
+      towner: _gv('uatS1TOwner')||'',
+      wave: _gv('uatS1Wave')||'Wave 1',
+      risk: _gv('uatS1Risk')||'Medium',
+      desc: _gv('uatS1Desc')||'custom business system',
+      env: _gv('uatS1Env')||'UAT',
+      status: 'Template',
+      components: _collectModalComponents(),
+      updatedAt: new Date().toLocaleString()
+    };
+    var idx = (_customerTemplates || []).findIndex(function(t){ return t.id === tpl.id; });
+    if (idx >= 0) _customerTemplates[idx] = tpl;
+    else _customerTemplates.push(tpl);
+    _saveCustomerTemplates();
+    uatS1CloseModal();
+    _renderCustomerTemplates();
+  };
+
+  /* ── save system ── */
+  window.uatS1SaveSystem = function(draft) {
+    var name = (_gv('uatS1Name')||'').trim();
+    if (!name) { alert('Please enter a Business System Name.'); return; }
+    var arch  = _gv('uatS1ArchSel')||'banking';
+    var comps = _collectModalComponents();
     var existingByName = null;
     if (!_state.editId) {
       var newKey = String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -21344,8 +22016,7 @@ ${certContent}
     }
     _save(); uatS1CloseModal(); _render();
   };
-  window.uatS1SaveDraft    = function(){ uatS1SaveSystem(true); };
-  window.uatS1AutoFill     = function(){ alert('Auto-map: switch to Raw Server Targets view and use the Auto-map button.'); };
+  window.uatS1SaveDraft    = function(){ if (_state.templateMode) uatS1SaveCustomerTemplate(); else uatS1SaveSystem(true); };
   window.uatS1ExportPackage= function(){ alert('Export UAT Package: coming soon.'); };
   window.uatS1ImportJSON   = function(){ alert('Import JSON: coming soon.'); };
   window.uatS1ExportSystems= function(){ alert('Export Systems: coming soon.'); };
@@ -21357,7 +22028,7 @@ ${certContent}
     if (!el) return;
     _state.systems = _dedupeSystems(_state.systems);
     el.querySelectorAll('[data-bz-card]').forEach(function(c){ c.remove(); });
-    if (!_state.systems.length) { if(empty) empty.style.display=''; _renderKpis(); return; }
+    if (!_state.systems.length) { if(empty) empty.style.display=''; _renderKpis(); _renderCustomerTemplates(); return; }
     if (empty) empty.style.display = 'none';
     _state.systems.forEach(function(sys) {
       var col = {Critical:'#dc2626',High:'#f59e0b',Medium:'#2563eb',Low:'#16a34a'}[sys.criticality]||'#64748b';
@@ -21394,6 +22065,7 @@ ${certContent}
       el.appendChild(div);
     });
     _renderKpis();
+    _renderCustomerTemplates();
     if (typeof window.fsmEnhanceMountedBusinessCards === 'function') {
       try { window.fsmEnhanceMountedBusinessCards(); } catch(e) {}
     }
@@ -21410,21 +22082,122 @@ ${certContent}
         +'<div class="uat-s1-arch-card-sub">'+(_archSub[key]||'')+'</div>'
         +'</div>';
     }).join('');
+    function selectArch(key) {
+      if (!_arch.hasOwnProperty(key)) return;
+      el.querySelectorAll('.uat-s1-arch-card').forEach(function(c){
+        c.classList.toggle('selected', c.getAttribute('data-arch-key') === key);
+      });
+      _selectedArch = key;
+      var btn = document.getElementById('uatS1UseTemplateBtn');
+      if (btn) btn.disabled = false;
+      uatS1OpenModal(null, key);
+      if (typeof window.uatS1SelectArchetype === 'function') {
+        window.uatS1SelectArchetype(key);
+      }
+    }
     el.addEventListener('click', function(e) {
       var card = e.target.closest('[data-arch-key]');
       if (!card) return;
-      el.querySelectorAll('.uat-s1-arch-card').forEach(function(c){ c.classList.remove('selected'); });
-      card.classList.add('selected');
-      _selectedArch = card.getAttribute('data-arch-key');
-      var btn = document.getElementById('uatS1UseTemplateBtn');
-      if (btn) btn.disabled = false;
-      uatS1OpenModal(null, _selectedArch);
+      selectArch(card.getAttribute('data-arch-key'));
     });
     var useBtn = document.getElementById('uatS1UseTemplateBtn');
     if (useBtn) useBtn.addEventListener('click', function() {
       if (_selectedArch) uatS1OpenModal(null, _selectedArch);
     });
+    window.uatS1SelectTemplateFromDas = selectArch;
   }
+
+  function _renderCustomerTemplates() {
+    var el = document.getElementById('uatS1CustomerTemplateList');
+    if (!el) return;
+    var custom = (_customerTemplates || []);
+    var head = '<div class="uat-s1-customer-template-flight-head">'
+      + '<div class="uat-s1-customer-template-flight-title">Customer Real Business Systems</div>'
+      + '<div class="uat-s1-customer-template-header-line"></div>'
+      + '<div class="uat-s1-customer-template-flight-subtitle">Flight Deck Configuration System v2.4</div>'
+      + '</div>';
+    if (!custom.length) {
+      el.innerHTML = head + '<div class="uat-s1-customer-template-panel-frame">'
+        + '<div class="uat-s1-customer-template-panel-label">Saved Custom Systems</div>'
+        + '<div class="uat-s1-customer-template-empty">'
+        + '<div><strong>No customer custom templates saved yet.</strong><br>'
+        + 'Create a business system from the Custom model, save it, and it will appear here.</div>'
+        + '</div></div>';
+      return;
+    }
+    el.innerHTML = head + '<div class="uat-s1-customer-template-panel-frame">'
+      + '<div class="uat-s1-customer-template-panel-label">Saved Custom Systems</div>'
+      + '<div class="uat-s1-customer-template-grid">' + custom.map(function(sys) {
+      var comps = (sys.components || []).map(function(c){ return c.name; }).filter(Boolean);
+      var sysName = sys.name || 'Unnamed Business System';
+      return '<div class="uat-s1-customer-template-card selected" data-customer-template-open="'+_h(sys.id)+'" data-sound="click" role="button" tabindex="0" title="Open '+_h(sysName)+' in edit mode">'
+        + '<div class="uat-s1-customer-template-icon"><i class="fas fa-magic"></i></div>'
+        + '<div class="uat-s1-customer-template-content">'
+        + '<div class="uat-s1-customer-template-title">'+_h(sysName)+'</div>'
+        + '<div class="uat-s1-customer-template-desc">'+_h(sys.desc || 'Custom customer business system')+'</div>'
+        + '<div class="uat-s1-customer-template-meta">'
+        + '<span class="uat-s1-customer-template-meta-tag">'+_h(sys.criticality || 'Critical')+'</span>'
+        + '<span class="uat-s1-customer-template-meta-tag">'+_h(sys.wave || 'Wave 1')+'</span>'
+        + '<span class="uat-s1-customer-template-meta-tag">'+comps.length+' Components</span>'
+        + comps.slice(0,3).map(function(n){ return '<span class="uat-s1-customer-template-meta-tag">'+_h(n)+'</span>'; }).join('')
+        + '</div>'
+        + '<div class="uat-s1-customer-template-actions">'
+        + '<button class="uat-s1-btn-muted" data-customer-template-remove="'+_h(sys.id)+'" style="font-size:11px;padding:6px 10px;color:#dc2626;">Remove</button>'
+        + '</div>'
+        + '</div>'
+        + '<div class="uat-s1-customer-template-led"></div>'
+        + '</div>';
+    }).join('') + '</div></div>';
+    el.querySelectorAll('[data-customer-template-open]').forEach(function(card) {
+      card.addEventListener('mouseenter', function() { _uatS1PlayBip(900); });
+      card.addEventListener('click', function(e) {
+        if (e.target && e.target.closest('[data-customer-template-remove]')) return;
+        _uatS1PlayBip(1200);
+        window.uatS1OpenCustomerTemplate(this.getAttribute('data-customer-template-open'));
+      });
+      card.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          _uatS1PlayBip(1200);
+          window.uatS1OpenCustomerTemplate(this.getAttribute('data-customer-template-open'));
+        }
+      });
+    });
+    el.querySelectorAll('[data-customer-template-remove]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = this.getAttribute('data-customer-template-remove');
+        if (!confirm('Remove this customer business template?')) return;
+        _uatS1PlayBip(520);
+        _customerTemplates = (_customerTemplates || []).filter(function(s){ return s.id !== id; });
+        _saveCustomerTemplates(); _renderCustomerTemplates();
+      });
+    });
+  }
+
+  window.uatS1UseCustomerTemplate = function(id) {
+    var sys = (_customerTemplates || []).find(function(s){ return s.id === id; });
+    if (!sys) return;
+    uatS1OpenModal(null, 'custom');
+    _sv('uatS1ArchSel', 'custom');
+    _sv('uatS1Name', (sys.name || 'Custom Business System') + ' Copy');
+    _sv('uatS1Crit', sys.criticality || 'Critical');
+    _sv('uatS1BOwner', sys.bowner || '');
+    _sv('uatS1TOwner', sys.towner || '');
+    _sv('uatS1Wave', sys.wave || 'Wave 1');
+    _sv('uatS1Risk', sys.risk || 'Medium');
+    _sv('uatS1Desc', sys.desc || 'custom business system');
+    _activeComps = (sys.components || []).map(function(c){ return c.name; }).filter(Boolean);
+    _rebuildEditor(sys.components || []);
+    _rebuildPreview();
+  };
+
+  window.addEventListener('message', function(ev) {
+    var data = ev && ev.data;
+    if (!data || data.type !== 'uatS1SelectTemplateFromDas') return;
+    if (typeof window.uatS1SelectTemplateFromDas === 'function') {
+      window.uatS1SelectTemplateFromDas(data.key);
+    }
+  });
 
   window.uatS1SetTemplateTab = function(tab) {
     tab = tab || 'classic';
@@ -21434,6 +22207,10 @@ ${certContent}
     document.querySelectorAll('[data-uat-template-pane]').forEach(function(pane) {
       pane.classList.toggle('active', pane.getAttribute('data-uat-template-pane') === tab);
     });
+    if (tab === 'das') {
+      _renderCustomerTemplates();
+      _uatS1PlayPowerOn();
+    }
   };
 
   /* ── KPIs ── */
@@ -21671,6 +22448,7 @@ ${certContent}
   function _init() {
     _renderArch();
     _render();
+    _renderCustomerTemplates();
     _renderSa();
     _renderKpis();
   }
@@ -21679,6 +22457,279 @@ ${certContent}
   } else {
     _init();
   }
+})();
+</script>
+
+
+<script>
+/* ── Stage 3 UAT: Source/Target Mobile + Dev View Test Bench ───────────── */
+(function() {
+  var WORKFLOW = [
+    ['1','Open mobile banking app','Frontend Web / Mobile App :8080','nginx serves banking_app.html and bankvault_api_adapter.js','No banking data created. App loads UI and API config.'],
+    ['2','Register new user','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Creates customer profile, username/password record, checking account, savings account, opening deposit transaction.'],
+    ['3','Log in','API Gateway :8100','Auth Service :8101 -> Database Service :8106','Reads user credentials. Creates signed login token returned to mobile app.'],
+    ['4','View account dashboard','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Reads customer profile, accounts, balances, recent transactions.'],
+    ['5','Search/validate recipient username','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Reads recipient customer and default checking account. No money moved yet.'],
+    ['6','Submit money transfer','API Gateway :8100','Ledger / Transfer Service :8103 -> Database Service :8106','Creates transfer transaction. Debits source account balance. Credits destination account balance.'],
+    ['7','Record compliance event','Ledger / Transfer Service :8103','Audit / Compliance Log :8104 -> Database Service :8106','Creates audit event for posted transfer.'],
+    ['8','Send transfer notification','Ledger / Transfer Service :8103','Notification Service :8105 -> Database Service :8106','Creates simulated mobile/SMS/email notification record.'],
+    ['9','Refresh account dashboard','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Reads updated balances and transaction history after transfer.'],
+    ['10','Readiness/session-style checks','API Gateway :8100','Cache Service :8107 -> Redis','Reads/writes lightweight cache health/session-style POC checks.']
+  ];
+  var TYPE_DEFAULTS = {
+    frontend: { port: '8080', path: '/#', label: 'Frontend Mobile UI' },
+    api:      { port: '8100', path: '/ready', label: 'API Gateway' },
+    backend:  { port: '8102', path: '/health', label: 'Backend Service' },
+    db:       { port: '8106', path: '/ready', label: 'Database API' }
+  };
+  var TESTS = {
+    health:     { method: 'GET', path: '/health', step: '10', label: 'Health check' },
+    ready:      { method: 'GET', path: '/ready', step: '10', label: 'Readiness check' },
+    version:    { method: 'GET', path: '/version', step: '10', label: 'Version check' },
+    login:      { method: 'POST', path: '/api/login', step: '3', label: 'POST /api/login', body: { username: 'alex', password: 'demo' } },
+    summary:    { method: 'GET', path: '/api/mobile/summary', step: '9', label: 'GET /api/mobile/summary', auth: true },
+    recipients: { method: 'GET', path: '/api/recipients/list', step: '5', label: 'GET /api/recipients/list', auth: true }
+  };
+  var tokens = { source: '', target: '' };
+
+  function el(id) { return document.getElementById(id); }
+  function val(id) { var n = el(id); return n ? String(n.value || '').trim() : ''; }
+  function setVal(id, value) { var n = el(id); if (n) n.value = value; }
+  function now() { return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+  function cleanPath(path) {
+    path = String(path || '/').trim();
+    if (!path) return '/';
+    return path.charAt(0) === '/' ? path : '/' + path;
+  }
+  function baseUrl(side) {
+    var host = val('uatLive-' + side + '-host');
+    var port = val('uatLive-' + side + '-port');
+    if (!host) return '';
+    if (/^https?:\/\//i.test(host)) {
+      try {
+        var u = new URL(host);
+        if (port) u.port = port;
+        return u.protocol + '//' + u.host;
+      } catch(e) {}
+    }
+    return 'http://' + host.replace(/^\/+|\/+$/g, '') + (port ? ':' + port : '');
+  }
+  function fullUrl(side, path) {
+    var b = baseUrl(side);
+    return b ? b + cleanPath(path) : '';
+  }
+  function previewUrl(url) {
+    return '/api/uat/mobile-preview?url=' + encodeURIComponent(url) + '&_=' + Date.now();
+  }
+  function cacheBustAppUrl(url) {
+    var hash = '';
+    var base = String(url || '');
+    var hashIdx = base.indexOf('#');
+    if (hashIdx >= 0) {
+      hash = base.slice(hashIdx);
+      base = base.slice(0, hashIdx);
+    }
+    base += (base.indexOf('?') >= 0 ? '&' : '?') + 'uat_preview=' + Date.now();
+    return base + hash;
+  }
+  function appendLog(side, text) {
+    var out = el('uatLive-' + side + '-log');
+    if (!out) return;
+    out.textContent += '[' + now() + '] ' + text + '\n';
+    out.scrollTop = out.scrollHeight;
+  }
+  function setCurrent(side, step, text) {
+    var c = el('uatLive-' + side + '-current');
+    if (c) c.textContent = 'Step ' + step + ': ' + text;
+    var route = el('uatLive-' + side + '-route');
+    if (route) route.innerHTML = [
+      '<span>Mobile App</span>',
+      '<b>→</b>',
+      '<span>API Gateway :8100</span>',
+      '<b>→</b>',
+      '<span>Core/Auth/Ledger</span>',
+      '<b>→</b>',
+      '<span>Database :8106</span>'
+    ].join('');
+    renderRows(side, step);
+  }
+  function renderRows(side, activeStep) {
+    var body = el('uatLive-' + side + '-rows');
+    if (!body) return;
+    body.innerHTML = WORKFLOW.map(function(row) {
+      return '<tr class="' + (row[0] === String(activeStep) ? 'uat-live-active' : '') + '">'
+        + '<td><span class="uat-live-step-dot">' + row[0] + '</span></td>'
+        + '<td>' + row[1] + '</td>'
+        + '<td>' + row[2] + '</td>'
+        + '<td>' + row[3] + '</td>'
+        + '<td>' + row[4] + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+  function shortBody(body) {
+    body = String(body || '').trim();
+    if (!body) return '';
+    try { return JSON.stringify(JSON.parse(body), null, 2).slice(0, 900); } catch(e) {}
+    return body.slice(0, 900);
+  }
+  async function proxy(side, request) {
+    var resp = await fetch('/api/uat/test-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    return await resp.json();
+  }
+  async function loginForToken(side) {
+    if (tokens[side]) return tokens[side];
+    var url = fullUrl(side, '/api/login');
+    if (!url) throw new Error('Enter an IP/host first.');
+    appendLog(side, '$ curl -X POST ' + url + ' -d {"username":"alex","password":"demo"}');
+    var res = await proxy(side, { method: 'POST', url: url, body: { username: 'alex', password: 'demo' } });
+    if (res && res.ok) {
+      try {
+        var parsed = JSON.parse(res.body || '{}');
+        tokens[side] = parsed.token || parsed.access_token || '';
+      } catch(e) {}
+    }
+    if (!tokens[side]) throw new Error('Login did not return a token. HTTP ' + (res.status || 'n/a') + ' ' + (res.error || ''));
+    appendLog(side, 'HTTP ' + res.status + ' token acquired in ' + res.elapsed_ms + ' ms');
+    return tokens[side];
+  }
+  window.uatLiveTypeChanged = function(side) {
+    var type = val('uatLive-' + side + '-type') || 'frontend';
+    var d = TYPE_DEFAULTS[type] || TYPE_DEFAULTS.frontend;
+    setVal('uatLive-' + side + '-port', d.port);
+    setVal('uatLive-' + side + '-path', d.path);
+    appendLog(side, '[mode] ' + d.label + ' selected. Default port ' + d.port + ', path ' + d.path);
+  };
+  window.uatLiveLoadMobile = function(side) {
+    var url = fullUrl(side, val('uatLive-' + side + '-path') || '/#');
+    var frame = el('uatLive-' + side + '-frame');
+    if (!url) {
+      appendLog(side, '[error] Enter an IP/host before loading the preview.');
+      return;
+    }
+    if (frame) {
+      frame.setAttribute('allow', 'clipboard-read; clipboard-write');
+      frame.removeAttribute('srcdoc');
+      frame.src = 'about:blank';
+      setTimeout(function() {
+        frame.src = previewUrl(cacheBustAppUrl(url));
+      }, 60);
+      appendLog(side, '[preview] same-origin interactive mobile preview enabled');
+    }
+    appendLog(side, '$ open ' + url);
+    setCurrent(side, '1', 'frontend loaded from ' + url);
+    try {
+      localStorage.setItem('uatLiveBench.' + side, JSON.stringify({
+        type: val('uatLive-' + side + '-type'),
+        host: val('uatLive-' + side + '-host'),
+        port: val('uatLive-' + side + '-port'),
+        path: val('uatLive-' + side + '-path')
+      }));
+    } catch(e) {}
+  };
+  window.uatLiveRun = async function(side, kind) {
+    var test = TESTS[kind] || TESTS.health;
+    try {
+      var headers = {};
+      if (test.auth) headers.Authorization = 'Bearer ' + await loginForToken(side);
+      var url = fullUrl(side, test.path);
+      if (!url) throw new Error('Enter an IP/host first.');
+      appendLog(side, '$ curl ' + (test.method !== 'GET' ? '-X ' + test.method + ' ' : '') + url);
+      var res = await proxy(side, { method: test.method, url: url, body: test.body, headers: headers });
+      appendLog(side, 'HTTP ' + (res.status || 'ERR') + ' in ' + (res.elapsed_ms || 0) + ' ms'
+        + (res.ok ? ' [OK]' : ' [FAILED]') + (res.error ? ' ' + res.error : ''));
+      var body = shortBody(res.body);
+      if (body) appendLog(side, body);
+      if (kind === 'login') {
+        try {
+          var parsed = JSON.parse(res.body || '{}');
+          tokens[side] = parsed.token || parsed.access_token || tokens[side] || '';
+        } catch(e) {}
+      }
+      setCurrent(side, test.step, test.label + ' -> ' + (res.ok ? 'OK' : 'check log'));
+    } catch(e) {
+      appendLog(side, '[error] ' + e.message);
+      setCurrent(side, test.step, test.label + ' failed');
+    }
+  };
+  function restoreSide(side) {
+    try {
+      var raw = localStorage.getItem('uatLiveBench.' + side);
+      var data = raw ? JSON.parse(raw) : null;
+      if (data) {
+        setVal('uatLive-' + side + '-type', data.type || 'frontend');
+        setVal('uatLive-' + side + '-host', data.host || (side === 'source' ? '23.253.159.71' : ''));
+        setVal('uatLive-' + side + '-port', data.port || '8080');
+        setVal('uatLive-' + side + '-path', data.path || '/#');
+      }
+    } catch(e) {}
+    renderRows(side, side === 'source' ? '1' : '');
+    if ((side === 'source' || side === 'cutover-source') && val('uatLive-' + side + '-host')) window.uatLiveLoadMobile(side);
+    else appendLog(side, '[ready] Enter endpoint, load mobile, or run a service test.');
+  }
+  function retargetCloneIds(root, fromSide, toSide) {
+    if (!root) return;
+    Array.from(root.querySelectorAll('*')).concat([root]).forEach(function(node) {
+      Array.from(node.attributes || []).forEach(function(attr) {
+        var v = attr.value;
+        if (!v) return;
+        v = v.replace(new RegExp('uatLive-' + fromSide, 'g'), 'uatLive-' + toSide)
+             .replace(new RegExp("'" + fromSide + "'", 'g'), "'" + toSide + "'")
+             .replace(new RegExp('"' + fromSide + '"', 'g'), '"' + toSide + '"')
+             .replace(new RegExp('data-uat-live-side="' + fromSide + '"', 'g'), 'data-uat-live-side="' + toSide + '"');
+        node.setAttribute(attr.name, v);
+      });
+    });
+  }
+  function installBenchPlacement() {
+    var bench = el('uatLiveCompareBench');
+    var uatContent = el('uat-content');
+    if (bench && uatContent && !el('uatLiveUatBottomTitle')) {
+      var title = document.createElement('div');
+      title.id = 'uatLiveUatBottomTitle';
+      title.className = 'uat-live-bottom-title';
+      title.innerHTML = '<div>Source vs Target Business System Live Test</div><span>UAT bottom validation bench</span>';
+      uatContent.appendChild(title);
+      uatContent.appendChild(bench);
+    }
+    var cutoverPanel = el('panel-s5');
+    var cutoverBody = cutoverPanel && cutoverPanel.querySelector('.info-panel');
+    if (bench && cutoverBody && !el('uatLiveCompareBenchCutover')) {
+      var cutTitle = document.createElement('div');
+      cutTitle.id = 'uatLiveCutoverBottomTitle';
+      cutTitle.className = 'uat-live-bottom-title';
+      cutTitle.innerHTML = '<div>Source vs Target Business System Live Test</div><span>Cutover bottom validation bench</span>';
+      var cutBench = bench.cloneNode(true);
+      cutBench.id = 'uatLiveCompareBenchCutover';
+      retargetCloneIds(cutBench, 'source', 'cutover-source');
+      retargetCloneIds(cutBench, 'target', 'cutover-target');
+      var sHead = cutBench.querySelector('.uat-live-side--source h3');
+      var tHead = cutBench.querySelector('.uat-live-side--target h3');
+      var sBadge = cutBench.querySelector('.uat-live-side--source .uat-live-badge');
+      var tBadge = cutBench.querySelector('.uat-live-side--target .uat-live-badge');
+      if (sHead) sHead.textContent = 'Cutover Source Mobile UI';
+      if (tHead) tHead.textContent = 'Cutover Target Mobile UI';
+      if (sBadge) sBadge.textContent = 'CUTOVER SOURCE';
+      if (tBadge) tBadge.textContent = 'CUTOVER TARGET';
+      cutoverBody.appendChild(cutTitle);
+      cutoverBody.appendChild(cutBench);
+    }
+  }
+  function init() {
+    if (!el('uatLiveCompareBench')) return;
+    installBenchPlacement();
+    restoreSide('source');
+    restoreSide('target');
+    if (el('uatLiveCompareBenchCutover')) {
+      restoreSide('cutover-source');
+      restoreSide('cutover-target');
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
 </script>
 
@@ -22041,7 +23092,7 @@ ${certContent}
     var scannerPanel = doc.getElementById('imageScannerPanel');
     var imageContainer = doc.getElementById('ospcImageContainer');
     if (scannerPanel && imageContainer && imageContainer.parentNode === scannerPanel) {
-      return { parent: scannerPanel, before: imageContainer };
+      return { parent: scannerPanel, before: imageContainer.nextSibling };
     }
     if (scannerPanel) return { parent: scannerPanel, before: scannerPanel.firstChild };
     if (imageContainer && imageContainer.parentNode) return { parent: imageContainer.parentNode, before: imageContainer };

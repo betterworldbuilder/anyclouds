@@ -48,6 +48,16 @@ PREFER_CINDER_FOR_RACKSPACE_SNAPSHOT="${OSPC2FLEX_PREFER_CINDER_FOR_RACKSPACE_SN
 LIVE_ORIGIN_FALLBACK="${OSPC2FLEX_LIVE_ORIGIN_FALLBACK:-1}"
 LIVE_ORIGIN_EXPORT_FIRST="${OSPC2FLEX_LIVE_ORIGIN_EXPORT_FIRST:-0}"
 ORIGIN_SSH_USER="${OSPC2FLEX_ORIGIN_SSH_USER:-ubuntu}"
+# NO IMAGE RESUME → recreate a fresh source snapshot before the CF/Cinder upload waterfall, so a
+# stale/broken existing snapshot is bypassed. Needs a source server id (from image metadata
+# instance_uuid, or OSPC2FLEX_SOURCE_SERVER_ID passed by the dashboard).
+RECREATE_IMAGE_ON_NO_RESUME="${OSPC2FLEX_RECREATE_IMAGE_ON_NO_RESUME:-0}"
+SOURCE_SERVER_ID="${OSPC2FLEX_SOURCE_SERVER_ID:-}"
+RECREATE_IMAGE_TIMEOUT="${OSPC2FLEX_RECREATE_IMAGE_TIMEOUT:-1800}"
+WORKSPACE_MIN_FREE_GB="${OSPC2FLEX_LINUX_SNAP_MIN_FREE_GB:-120}"
+WORKSPACE_CONVERT_BUFFER_GB="${OSPC2FLEX_LINUX_SNAP_CONVERT_BUFFER_GB:-10}"
+LOCK_TIMEOUT="${OSPC2FLEX_LINUX_SNAP_LOCK_TIMEOUT:-21600}"
+KEEP_RAW_AFTER_QCOW="${OSPC2FLEX_LINUX_SNAP_KEEP_RAW_AFTER_QCOW:-0}"
 DOWNLOAD_ONLY=0
 DRY_RUN=0
 START_FRESH=0
@@ -141,6 +151,47 @@ fmt_bytes() {
   else
     printf '%sB\n' "$n"
   fi
+}
+gib_to_bytes() {
+  awk -v gb="${1:-0}" 'BEGIN{printf "%.0f", gb*1024*1024*1024}'
+}
+bytes_to_gib() {
+  awk -v b="${1:-0}" 'BEGIN{printf "%.1f", b/1024/1024/1024}'
+}
+available_bytes_for_path() {
+  local p="$1"
+  df -PB1 "$p" 2>/dev/null | awk 'NR==2{print $4+0}'
+}
+require_workspace_free_bytes() {
+  local path="$1" required="$2" context="$3" avail
+  avail="$(available_bytes_for_path "$path")"
+  [ -n "$avail" ] || fail_exit "$CURRENT_STAGE" "Could not determine free space for $path"
+  log "[SPACE] $context: required=$(fmt_bytes "$required") available=$(fmt_bytes "$avail") path=$path"
+  if [ "$avail" -lt "$required" ]; then
+    fail_exit "$CURRENT_STAGE" "Insufficient jumphost workspace for $context: required $(bytes_to_gib "$required") GiB, available $(bytes_to_gib "$avail") GiB. Clean /mnt/migration artifacts or increase the jumphost volume before retry."
+  fi
+}
+require_workspace_min_free_gb() {
+  local path="$1" min_gb="$2" context="$3"
+  require_workspace_free_bytes "$path" "$(gib_to_bytes "$min_gb")" "$context"
+}
+acquire_linux_snap_lock() {
+  [ "${OSPC2FLEX_LINUX_SNAP_DISABLE_LOCK:-0}" = "1" ] && {
+    log "[LOCK] Linux snapshot job lock disabled by OSPC2FLEX_LINUX_SNAP_DISABLE_LOCK=1"
+    return 0
+  }
+  command -v flock >/dev/null 2>&1 || {
+    log "[LOCK] flock not available; continuing without serialized migration guard"
+    return 0
+  }
+  # Per-label lock: different images run in parallel; same image can't run twice simultaneously.
+  local lock_file="$BASE_DIR/.linux_snap_migration_${LABEL_SAFE}.lock"
+  exec 9>"$lock_file"
+  log "[LOCK] Waiting for per-label lock: $lock_file timeout=${LOCK_TIMEOUT}s"
+  if ! flock -w "$LOCK_TIMEOUT" 9; then
+    fail_exit "LS0_PREFLIGHT" "This image label ($LABEL_SAFE) is already running on this jumphost. Retry later or raise OSPC2FLEX_LINUX_SNAP_LOCK_TIMEOUT."
+  fi
+  log "[LOCK] Acquired per-label lock for $LABEL_SAFE"
 }
 mb_from_bytes() {
   local n="${1:-0}"
@@ -238,6 +289,15 @@ run_qemu_convert_with_progress() {
     log_download_status "$phase" "$out_mb" "$src_mb" "complete" "100.0" "" "output=$out"
   else
     log "[${phase}] qemu-img convert failed rc=$rc; detail_log=$qlog"
+    log "[${phase}] workspace free after failure: $(df -hP "$(dirname "$out")" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || echo unknown)"
+    if [ -s "$qlog" ]; then
+      log "[${phase}] qemu detail tail:"
+      tail -20 "$qlog" 2>/dev/null | while IFS= read -r qline; do
+        log "[${phase}][qemu] $qline"
+      done
+    else
+      log "[${phase}] qemu detail log is empty; check kernel/dmesg and storage health on the jumphost."
+    fi
   fi
   return "$rc"
 }
@@ -276,6 +336,8 @@ if [ "$DRY_RUN" = 1 ]; then
   exit 0
 fi
 
+acquire_linux_snap_lock
+
 # ── Tool check / install ──────────────────────────────────────────────────────
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail_exit "$CURRENT_STAGE" "missing_command: $1 — install it on the jumphost"
@@ -311,7 +373,7 @@ cleanup_stale_jumphost_images() {
 
   local cleanup_root="$BASE_DIR/runs/$LABEL_SAFE"
   local min_age_minutes="${OSPC2FLEX_LINUX_SNAP_CLEAN_MIN_AGE_MIN:-60}"
-  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-0}" = "1" ]; then
+  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-1}" = "1" ]; then
     cleanup_root="/mnt/migration"
   fi
   [ -d "$cleanup_root" ] || {
@@ -329,7 +391,7 @@ cleanup_stale_jumphost_images() {
       return 0
       ;;
   esac
-  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-0}" != "1" ] && [ "$resolved_cleanup_root" != "$resolved_label_root" ]; then
+  if [ "${OSPC2FLEX_LINUX_SNAP_GLOBAL_CLEANUP:-1}" != "1" ] && [ "$resolved_cleanup_root" != "$resolved_label_root" ]; then
     log "[LS0A] refusing cleanup outside current label root: $cleanup_root resolved=$resolved_cleanup_root label_root=$resolved_label_root"
     return 0
   fi
@@ -1376,8 +1438,56 @@ PYSIZE
   return 0
 }
 
+recreate_source_snapshot() {
+  # Create a brand-new Glance snapshot from the source VM and put its id in RECREATED_IMAGE_ID.
+  # Returns 0 on success; non-zero (with a clear reason logged) if recreation isn't possible.
+  RECREATED_IMAGE_ID=""
+  local orig_image_id="$1" src_id status new_name new_id waited
+  src_id="${SOURCE_SERVER_ID:-$(image_origin_instance_uuid "$orig_image_id" | tr -d '[:space:]' || true)}"
+  if [ -z "$src_id" ]; then
+    log "[RECREATE] Cannot recreate: no source server id (image metadata has no instance_uuid and OSPC2FLEX_SOURCE_SERVER_ID unset). Using existing image."
+    return 1
+  fi
+  status="$(server_status_value "$src_id" 2>/dev/null | tr '[:lower:]' '[:upper:]' || true)"
+  if [ "$status" != "ACTIVE" ]; then
+    log "[RECREATE] Cannot recreate: source server $src_id is not ACTIVE (status=${status:-unknown}). Using existing image."
+    return 1
+  fi
+  new_name="${LABEL_SAFE}-fresh-${RUN_ID}"
+  log "[RECREATE] NO IMAGE RESUME: creating a fresh snapshot from source server $src_id (name=$new_name)"
+  new_id="$(openstack server image create --name "$new_name" --wait -f value -c id "$src_id" 2>>"$JOB_LOG/recreate.log" | tr -d '[:space:]' || true)"
+  if [ -z "$new_id" ]; then
+    new_id="$(openstack image list --name "$new_name" -f value -c ID 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+  fi
+  if [ -z "$new_id" ]; then
+    log "[RECREATE] Failed to create a fresh snapshot from $src_id (see $JOB_LOG/recreate.log). Using existing image."
+    return 1
+  fi
+  waited=0
+  while :; do
+    status="$(openstack image show "$new_id" -f value -c status 2>/dev/null | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]' || true)"
+    [ "$status" = "active" ] && break
+    if [ "$waited" -ge "$RECREATE_IMAGE_TIMEOUT" ]; then
+      log "[RECREATE] New image $new_id did not reach ACTIVE within ${RECREATE_IMAGE_TIMEOUT}s (status=${status:-unknown}). Using existing image."
+      return 1
+    fi
+    sleep 15; waited=$((waited+15))
+    log "[RECREATE] Waiting for fresh image $new_id to become ACTIVE (status=${status:-queued} elapsed=${waited}s)"
+  done
+  RECREATED_IMAGE_ID="$new_id"
+  log "[RECREATE] Fresh snapshot ready: image=$new_id (from source server $src_id)"
+  return 0
+}
 download_existing_ospc_snapshot() {
   local image_id="$1" dest="$2" min_bytes=1073741824 tmp_log token attempt base host base_i direct_blocked=0
+  if [ "$RECREATE_IMAGE_ON_NO_RESUME" = "1" ]; then
+    if recreate_source_snapshot "$image_id"; then
+      log "[ZS3] Using freshly recreated image ${RECREATED_IMAGE_ID} in place of ${image_id}"
+      image_id="$RECREATED_IMAGE_ID"
+    else
+      log "[ZS3] Recreation not available — proceeding with existing image $image_id"
+    fi
+  fi
   log "[ZS3] Download waterfall for image=$image_id"
   if [ "$LIVE_ORIGIN_EXPORT_FIRST" = "1" ]; then
     log "[ZS3] Live-origin export requested first"
@@ -1463,7 +1573,19 @@ download_existing_ospc_snapshot() {
     origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
     return 1
   fi
+  local _cinder_fail_dir _cinder_fail_marker
+  _cinder_fail_dir="$BASE_DIR/cache/cinder_failures"
+  _cinder_fail_marker="$_cinder_fail_dir/${image_id}.failed"
+  if [ -s "$_cinder_fail_marker" ] && [ "${OSPC2FLEX_RETRY_FAILED_CINDER:-0}" != "1" ]; then
+    log "[ZS3] Skipping Cinder fallback — previous Cinder attempt failed for image=$image_id ($(head -1 "$_cinder_fail_marker" 2>/dev/null))"
+    log "[ZS3] Set OSPC2FLEX_RETRY_FAILED_CINDER=1 to force a new Cinder attempt. Falling through to origin VM export."
+    origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
+    return 1
+  fi
   OSPC2FLEX_CINDER_FALLBACK_ALREADY_TRIED=1 cinder_volume_raw_export "$image_id" "$dest" && return 0
+  mkdir -p "$_cinder_fail_dir" 2>/dev/null || true
+  printf 'cinder_failed image=%s ts=%s\n' "$image_id" "$(date -u +%Y%m%dT%H%M%SZ)" >"$_cinder_fail_marker" 2>/dev/null || true
+  log "[ZS3] Cinder failure cached for image=$image_id — next run will skip Cinder and go straight to origin VM export"
   origin_vm_raw_export "$image_id" "$dest" "$min_bytes" && return 0
   return 1
 }
@@ -1504,14 +1626,26 @@ infer_image_os_distro() {
 }
 normalize_int() { printf '%s' "${1:-}" | tr -cd '0-9'; }
 resolve_target_flavor() {
-  local req="$1"
-  [ -n "$req" ] && openstack flavor show "$req" >/dev/null 2>&1 && { echo "$req"; return 0; }
-  local rows _rows_fit _best _fallback _chosen _cid _cname _cram _cdisk _cvcpu
+  local req="$1" min_disk_gb="${2:-0}" req_disk
+  if [ -n "$req" ] && openstack flavor show "$req" >/dev/null 2>&1; then
+    req_disk="$(openstack flavor show "$req" -f json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(int(d.get("disk") or d.get("Disk") or 0))' 2>/dev/null || echo 0)"
+    if [ "${min_disk_gb:-0}" -le 0 ] || [ "${req_disk:-0}" -ge "$min_disk_gb" ]; then
+      echo "$req"
+      return 0
+    fi
+    echo "  Requested flavor $req rejected: root disk ${req_disk}GB is smaller than image virtual size ${min_disk_gb}GB" >&2
+  fi
+  local rows _rows_fit _fallback _chosen _cid _cname
   rows="$(openstack flavor list --long --format value -c ID -c Name -c RAM -c Disk -c VCPUs 2>/dev/null || true)"
   [ -z "$rows" ] && { echo "$req"; return 0; }
-  _rows_fit="$(printf '%s\n' "$rows" | awk 'NF>=5 && ($4+0) > 0')"
+  _rows_fit="$(printf '%s\n' "$rows" | awk -v min="${min_disk_gb:-0}" 'NF>=5 && ($4+0) > 0 && ($4+0) >= min')"
   [ -n "$_rows_fit" ] && rows="$_rows_fit"
-  _fallback="$(printf '%s\n' "$rows" | awk 'NF>=5{id=$1;name=$2;ram=$3+0;disk=$4+0;vcpu=$5+0;score=(vcpu*1000000000)+(ram*1000000)+disk;if(!seen||score<best){seen=1;best=score;out=id"|"name}}END{if(seen)print out}')"
+  if [ "${min_disk_gb:-0}" -gt 0 ] && [ -z "$_rows_fit" ]; then
+    echo "  No flavor with root disk >= ${min_disk_gb}GB found" >&2
+    echo ""
+    return 1
+  fi
+  _fallback="$(printf '%s\n' "$rows" | awk 'NF>=5{id=$1;name=$2;ram=$3+0;disk=$4+0;vcpu=$5+0;score=(disk*1000000000)+(vcpu*1000000)+ram;if(!seen||score<best){seen=1;best=score;out=id"|"name}}END{if(seen)print out}')"
   _chosen="${_fallback}"; _cid="$(echo "$_chosen" | cut -d'|' -f1)"; _cname="$(echo "$_chosen" | cut -d'|' -f2)"
   [ -n "$_cid" ] && { echo "  Flavor auto-pick: $_cid ($_cname)" >&2; echo "$_cid"; return 0; }
   echo "$req"
@@ -1543,11 +1677,12 @@ log "label=$LABEL_SAFE job_id=$JOB_ID run_id=$RUN_ID"
 log "ospc_openrc=$OSPC_OPENRC flex_openrc=$FLEX_OPENRC"
 log "os_type=${OS_TYPE:-auto} flex_user=$FLEX_USER"
 log "base_dir=$BASE_DIR"
-install_if_missing qemu-img qemu-nbd python3 openstack curl
 
 stage "LS0A_CLEAN_STALE_IMAGES"
 cleanup_stale_jumphost_images
 start_fresh_clear_label_resume
+require_workspace_min_free_gb "$BASE_DIR" "$WORKSPACE_MIN_FREE_GB" "linux snapshot migration preflight after stale cleanup"
+install_if_missing qemu-img qemu-nbd python3 openstack curl
 
 stage "LS1_LOAD_CREDENTIALS"
 source_ospc_openrc
@@ -1587,6 +1722,9 @@ else
   fi
   sz="$(stat -c%s "$SOURCE_RAW" 2>/dev/null || echo 0)"
   log "[LS3] HIT downloaded: $SOURCE_RAW ($sz bytes)"
+  if [ "${sz:-0}" -gt 0 ]; then
+    require_workspace_free_bytes "$BASE_DIR" "$((sz + $(gib_to_bytes "$WORKSPACE_CONVERT_BUFFER_GB")))" "qcow2 normalize workspace for downloaded source"
+  fi
 fi
 
 # ── LS4: Normalize to qcow2 ──────────────────────────────────────────────────
@@ -1602,6 +1740,10 @@ else
     || fail_exit "LS4_NORMALIZE_QCOW2" "qemu-img convert failed — check disk space; see $JOB_LOG/qemu_convert.log"
   sz="$(stat -c%s "$QCOW" 2>/dev/null || echo 0)"
   log "[LS4] HIT qcow2: $QCOW ($sz bytes)"
+  if [ "$KEEP_RAW_AFTER_QCOW" != "1" ] && [ -n "${SOURCE_RAW:-}" ] && [ "$SOURCE_RAW" != "$QCOW" ] && [ -f "$SOURCE_RAW" ]; then
+    log "[LS4] Removing raw source artifact after successful qcow2 normalize to preserve jumphost space: $SOURCE_RAW"
+    rm -f -- "$SOURCE_RAW"
+  fi
 fi
 [ -f "$QCOW" ] || fail_exit "LS4_NORMALIZE_QCOW2" "qcow2 not found after normalize step"
 
@@ -1829,7 +1971,8 @@ fi
 stage "LS7_BOOT_FLEX_VM"
 DATE="$(date +%Y%m%d-%H%M)"
 VMNAME="linsnap-${LABEL_SAFE}-${DATE}"
-FLAVOR="$(resolve_target_flavor "$FLAVOR")"
+FLAVOR="$(resolve_target_flavor "$FLAVOR" "${QCOW_VIRTUAL_GIB:-0}")"
+[ -n "$FLAVOR" ] || fail_exit "LS7_BOOT_FLEX_VM" "No FLEX flavor has enough root disk for image virtual size ${QCOW_VIRTUAL_GIB:-unknown}GB"
 NETWORK="$(resolve_target_network "$NETWORK")"
 KEYPAIR="$(resolve_target_keypair "$KEYPAIR")"
 kv "VM name"  "$VMNAME"
@@ -1864,7 +2007,10 @@ for _bp in $(seq 1 90); do
   VM_TASK="$(openstack server show "$VM_ID" -f value -c "OS-EXT-STS:task_state" 2>/dev/null || true)"
   log "  [BOOT $_bp/90] status=${VM_ST:-?} task=${VM_TASK:-none}"
   [ "$VM_ST" = "ACTIVE" ] && break
-  [ "$VM_ST" = "ERROR" ] && fail_exit "LS7_BOOT_FLEX_VM" "Server $VM_ID entered ERROR state"
+  if [ "$VM_ST" = "ERROR" ]; then
+    _fault="$(openstack server show "$VM_ID" -f json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("fault") or d.get("OS-EXT-SRV-ATTR:instance_name") or "")' 2>/dev/null | tr '\n' ' ' | cut -c1-500 || true)"
+    fail_exit "LS7_BOOT_FLEX_VM" "Server $VM_ID entered ERROR state${_fault:+; fault=$_fault}"
+  fi
   sleep 10
 done
 [ "$VM_ST" = "ACTIVE" ] || fail_exit "LS7_BOOT_FLEX_VM" "Server $VM_ID did not reach ACTIVE"
