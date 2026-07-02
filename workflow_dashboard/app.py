@@ -3939,7 +3939,8 @@ def uat_mobile_asset_proxy():
     parsed = urllib.parse.urlparse(origin)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc or not asset_path.startswith("/"):
         return Response("Invalid mobile asset proxy request.", status=400, mimetype="text/plain")
-    if asset_path.rstrip("/").endswith("/bankvault_api_adapter.js"):
+    parsed_asset_path = urllib.parse.urlparse(asset_path).path
+    if parsed_asset_path.rstrip("/").endswith("/bankvault_api_adapter.js"):
         local_adapter = BASE_DIR / "banking_poc" / "frontend" / "bankvault_api_adapter.js"
         if local_adapter.exists():
             out = Response(local_adapter.read_text(encoding="utf-8", errors="replace"), status=200, mimetype="application/javascript")

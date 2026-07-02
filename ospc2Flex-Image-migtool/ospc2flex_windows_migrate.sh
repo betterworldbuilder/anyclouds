@@ -33,6 +33,8 @@ FLAVOR="gp.0.4.4"
 NETWORK="tenant-net"
 KEYPAIR="laptopubuntu24"
 WORK="${WORK:-/mnt/migration/ospc2flex_image}"
+JUMPHOST_MIN_FREE_GB="${OSPC2FLEX_JUMPHOST_MIN_FREE_GB:-${OSPC2FLEX_WINDOWS_MIN_FREE_GB:-120}}"
+STALE_CLEAN_MIN_AGE_MIN="${OSPC2FLEX_STALE_CLEAN_MIN_AGE_MIN:-${OSPC2FLEX_WINDOWS_CLEAN_MIN_AGE_MIN:-60}}"
 OSPC_CREDS="/tmp/ospc2flex_ospc.sh"
 FLEX_CREDS="/tmp/ospc2flex_flex.sh"
 WIN_REPAIR="/tmp/ospc2flex_windows_repair.sh"
@@ -59,6 +61,99 @@ PASS() { echo "  ✅ $*" >&2; }
 FAIL() { echo "  ❌ $*" >&2; }
 WARN() { echo "  ⚠️  $*" >&2; }
 INFO() { echo "  ℹ️  $*" >&2; }
+
+gib_to_bytes() {
+  awk -v gb="${1:-0}" 'BEGIN{printf "%.0f", gb*1024*1024*1024}'
+}
+bytes_to_gib() {
+  awk -v b="${1:-0}" 'BEGIN{printf "%.1f", b/1024/1024/1024}'
+}
+available_bytes_for_path() {
+  local p="$1"
+  df -PB1 "$p" 2>/dev/null | awk 'NR==2{print $4+0}'
+}
+require_jumphost_min_free_gb() {
+  local path="$1" min_gb="$2" context="$3" required avail
+  required="$(gib_to_bytes "$min_gb")"
+  avail="$(available_bytes_for_path "$path")"
+  [ -n "$avail" ] || { FAIL "$context: could not determine free space for $path"; exit 1; }
+  INFO "[SPACE] $context: required=$(bytes_to_gib "$required") GiB available=$(bytes_to_gib "$avail") GiB path=$path"
+  if [ "$avail" -lt "$required" ]; then
+    FAIL "Insufficient jumphost workspace after stale cleanup for $context: required $(bytes_to_gib "$required") GiB, available $(bytes_to_gib "$avail") GiB. Clean /mnt/migration or increase the jumphost volume before retry."
+    exit 1
+  fi
+}
+cleanup_stale_jumphost_files() {
+  [ "${OSPC2FLEX_CLEAN_STALE_JUMPHOST_FILES:-1}" = "1" ] || {
+    INFO "[CLEANUP] stale jumphost cleanup disabled"
+    return 0
+  }
+  local min_age="$STALE_CLEAN_MIN_AGE_MIN"
+  case "$min_age" in ''|*[!0-9]*) min_age=60 ;; esac
+
+  mkdir -p "$WORK"
+  local before after
+  before="$(df -hP "$WORK" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+  INFO "[CLEANUP] jumphost disk before cleanup: ${before:-unknown}"
+
+  local roots=()
+  [ -d /mnt/migration/ospc2flex_image ] && roots+=("/mnt/migration/ospc2flex_image")
+  [ -d /mnt/migration/ospc2flex_linux_snap ] && roots+=("/mnt/migration/ospc2flex_linux_snap")
+  [ -d /mnt/migration/ospc2flex_method_z ] && roots+=("/mnt/migration/ospc2flex_method_z")
+  [ -d /mnt/migration/flex2flex ] && roots+=("/mnt/migration/flex2flex")
+  [ -d /mnt/migration/images ] && roots+=("/mnt/migration/images")
+  [ -d /mnt/migration/tmp ] && roots+=("/mnt/migration/tmp")
+
+  local delete_list
+  delete_list="$(mktemp /tmp/ospc2flex-stale-windows.XXXXXX)"
+  : >"$delete_list"
+  local root root_real
+  for root in "${roots[@]}"; do
+    root_real="$(readlink -f "$root" 2>/dev/null || true)"
+    case "$root_real" in
+      /mnt/migration|/mnt/migration/*) ;;
+      *) WARN "[CLEANUP] refusing stale cleanup outside /mnt/migration: $root"; continue ;;
+    esac
+    find "$root" -xdev -type f -mmin +"$min_age" \( \
+      -iname "*.img" -o -iname "*.raw" -o -iname "*.vhd" -o -iname "*.vhdx" -o -iname "*.vmdk" -o -iname "*.vpc" \
+      -o -iname "*.qcow2" -o -iname "*.part" -o -iname "*.partial*" -o -iname "*.tmp" -o -iname "*.invalid*" \
+    \) -printf '%s\t%p\n' 2>/dev/null >>"$delete_list" || true
+  done
+
+  sort -nr -u -o "$delete_list" "$delete_list" 2>/dev/null || true
+  local count bytes deleted=0 freed=0 sz path active_root
+  count="$(wc -l <"$delete_list" | tr -d '[:space:]')"
+  bytes="$(awk -F '\t' '{s+=$1} END{printf "%.0f", s+0}' "$delete_list")"
+  if [ "${count:-0}" -eq 0 ]; then
+    INFO "[CLEANUP] no stale jumphost image files found"
+  else
+    INFO "[CLEANUP] stale image candidates older than ${min_age}m: count=$count bytes=$bytes"
+    while IFS=$'\t' read -r sz path; do
+      [ -n "$path" ] || continue
+      active_root="$(printf '%s\n' "$path" | sed -E 's#^(/mnt/migration/[^/]+/runs/[^/]+/[^/]+).*#\1#; s#^(/mnt/migration/flex2flex/[^/]+).*#\1#; s#^(/mnt/migration/ospc2flex_image/[^/]+).*#\1#')"
+      if [ -n "$active_root" ] && ps -eo args= 2>/dev/null | grep -F -- "$active_root" | grep -vq grep; then
+        INFO "[CLEANUP] keep active run artifact: $path"
+        continue
+      fi
+      case "$path" in
+        /mnt/migration/*)
+          rm -f -- "$path" 2>/dev/null || sudo rm -f -- "$path" 2>/dev/null || true
+          deleted=$((deleted + 1))
+          freed=$((freed + ${sz:-0}))
+          ;;
+        *) WARN "[CLEANUP] skip unsafe stale path: $path" ;;
+      esac
+    done <"$delete_list"
+    INFO "[CLEANUP] stale cleanup complete: deleted=$deleted freed_bytes=$freed"
+  fi
+  rm -f "$delete_list" 2>/dev/null || true
+  after="$(df -hP "$WORK" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
+  INFO "[CLEANUP] jumphost disk after cleanup: ${after:-unknown}"
+}
+jumphost_storage_preflight() {
+  cleanup_stale_jumphost_files
+  require_jumphost_min_free_gb "$WORK" "$JUMPHOST_MIN_FREE_GB" "Windows image migration preflight"
+}
 
 # ── Step tracking (for aligned progress output) ────────────────────────────────
 _STEP_NUM=""
@@ -128,6 +223,7 @@ done
 #   CLOUD_LABEL  — Glance image + FLEX VM name; always BASE_LABEL-YYYYMMDD-HHMMSS when
 #                  LABEL equals BASE (resume), else same as LABEL.
 BASE_LABEL="$LABEL"
+jumphost_storage_preflight
 _ts=$(date +%Y%m%d-%H%M%S)
 _resume_qcow=""
 RESUME_MODE="${OSPC2FLEX_RESUME_MODE:-on}"

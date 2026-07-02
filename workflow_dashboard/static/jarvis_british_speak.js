@@ -43,6 +43,19 @@
 
   function speak(text) {
     if (!text) return;
+    text = String(text || '').trim();
+    if (!text) return;
+
+    window.__jarvisErrorReviewState = window.__jarvisErrorReviewState || { announced: false };
+    if (/\b(starting|started|initializing|initiated|launching)\b/i.test(text)) {
+      window.__jarvisErrorReviewState.announced = false;
+    }
+    if (/\b(error|failed|failure|fatal|exception|traceback|operator intervention|required|review the execution log|check the log|network error|process exited with code [1-9])\b/i.test(text)) {
+      if (window.__jarvisErrorReviewState.announced) return;
+      window.__jarvisErrorReviewState.announced = true;
+      text = 'Migration error detected. Review the execution log.';
+    }
+
     if (!voiceEnabled()) return;
     if (!('speechSynthesis' in window)) return;
 
@@ -68,4 +81,7 @@
 
   window.jarvisSpeakBritish = speak;
   window.jarvisAnnounce = speak;
+  window.jarvisResetErrorReviewAlert = function () {
+    window.__jarvisErrorReviewState = { announced: false };
+  };
 })();

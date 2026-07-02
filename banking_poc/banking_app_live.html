@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PIGGYBANK - Mobile Banking</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Mobile Phone Frame */
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: #000;
+            border-radius: 50px;
+            padding: 12px;
+            box-shadow: 
+                0 0 0 2px #333,
+                0 25px 50px -12px rgba(0,0,0,0.7),
+                0 0 100px rgba(0, 150, 255, 0.1);
+            position: relative;
+            animation: phoneFloat 6s ease-in-out infinite;
+        }
+
+        @keyframes phoneFloat {
+            0%, 100% { transform: translateY(0) rotateX(0deg); }
+            50% { transform: translateY(-10px) rotateX(2deg); }
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 30px;
+            background: #000;
+            border-radius: 0 0 20px 20px;
+            z-index: 100;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0a0e27 0%, #1a1a3e 100%);
+            border-radius: 40px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 25px;
+            padding-top: 12px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 50;
+        }
+
+        .status-time { font-variant-numeric: tabular-nums; }
+        .status-icons { display: flex; gap: 5px; align-items: center; }
+        .signal-bars { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+        .signal-bar { width: 3px; background: #fff; border-radius: 1px; }
+        .signal-bar:nth-child(1) { height: 4px; }
+        .signal-bar:nth-child(2) { height: 6px; }
+        .signal-bar:nth-child(3) { height: 8px; }
+        .signal-bar:nth-child(4) { height: 12px; }
+
+        /* App Content */
+        .app-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 0 20px 20px;
+            scrollbar-width: none;
+        }
+        .app-content::-webkit-scrollbar { display: none; }
+
+        /* Header */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-greeting h2 {
+            color: #fff;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .user-greeting p {
+            color: #8b9dc3;
+            font-size: 13px;
+        }
+
+        .profile-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .profile-avatar:hover { transform: scale(1.1); }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logout-btn {
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            padding: 8px 10px;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .piggybrand {
+            color: #f8b4d9;
+            letter-spacing: 0.5px;
+        }
+
+        /* Server Info Card */
+        .server-info-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .server-info-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 200, 255, 0.1) 0%, transparent 70%);
+            animation: pulseGlow 4s ease-in-out infinite;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .server-info-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        .server-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .server-info-header h3 {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .server-status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 200, 100, 0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #00ff88;
+            font-weight: 600;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .server-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .metric-item {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .metric-label {
+            color: #8b9dc3;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .metric-value {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+        }
+        .metric-value.ip { font-size: 13px; }
+        .metric-value.time { color: #00ff88; }
+        .metric-value.connections { color: #ffd700; }
+
+        /* Balance Card */
+        .balance-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px;
+            padding: 28px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 0.8s ease-out 0.4s both;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        }
+        .balance-card::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            right: -100px;
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .balance-card::after {
+            content: '';
+            position: absolute;
+            bottom: -50px;
+            left: -50px;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .balance-label {
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+        .balance-amount {
+            color: #fff;
+            font-size: 36px;
+            font-weight: 800;
+            position: relative;
+            z-index: 1;
+            letter-spacing: -0.5px;
+        }
+        .balance-change {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .balance-change span {
+            color: #00ff88;
+            font-size: 14px;
+            font-weight: 600;
+            background: rgba(0, 255, 136, 0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+        .card-number {
+            position: absolute;
+            bottom: 20px;
+            right: 28px;
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            z-index: 1;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+            animation: fadeInUp 0.8s ease-out 0.6s both;
+        }
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .action-btn:hover { transform: translateY(-5px); }
+        .action-btn:active { transform: scale(0.95); }
+        .action-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s;
+        }
+        .action-btn:hover .action-icon {
+            background: rgba(255,255,255,0.2);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+        .action-btn span {
+            color: #fff;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Transactions */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            animation: fadeInUp 0.8s ease-out 0.8s both;
+        }
+        .section-header h3 {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .section-header a {
+            color: #667eea;
+            font-size: 13px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .transaction-list {
+            animation: fadeInUp 0.8s ease-out 1s both;
+        }
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: all 0.3s;
+            animation: slideInLeft 0.5s ease-out both;
+        }
+        .transaction-item:nth-child(1) { animation-delay: 1.1s; }
+        .transaction-item:nth-child(2) { animation-delay: 1.2s; }
+        .transaction-item:nth-child(3) { animation-delay: 1.3s; }
+        .transaction-item:nth-child(4) { animation-delay: 1.4s; }
+        .transaction-item:hover {
+            background: rgba(255,255,255,0.03);
+            margin: 0 -20px;
+            padding-left: 20px;
+            padding-right: 20px;
+            border-radius: 12px;
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .tx-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .tx-icon.income { background: rgba(0, 255, 136, 0.15); }
+        .tx-icon.expense { background: rgba(255, 71, 87, 0.15); }
+        .tx-details { flex: 1; }
+        .tx-name {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+        .tx-date {
+            color: #8b9dc3;
+            font-size: 12px;
+        }
+        .tx-amount {
+            font-size: 15px;
+            font-weight: 700;
+            text-align: right;
+        }
+        .tx-amount.positive { color: #00ff88; }
+        .tx-amount.negative { color: #ff4757; }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            height: 80px;
+            background: rgba(10, 14, 39, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: 20px;
+            z-index: 50;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 8px 16px;
+            border-radius: 12px;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.05); }
+        .nav-item.active { color: #667eea; }
+        .nav-item.active .nav-icon { transform: scale(1.1); }
+        .nav-icon {
+            font-size: 22px;
+            transition: transform 0.3s;
+        }
+        .nav-item span {
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .nav-item { color: #8b9dc3; }
+        .nav-item.active span { color: #667eea; font-weight: 600; }
+
+        /* Home Indicator */
+        .home-indicator {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 134px;
+            height: 5px;
+            background: #fff;
+            border-radius: 3px;
+            z-index: 100;
+        }
+
+        /* Sound Toggle */
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            color: #fff;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .sound-toggle:hover { background: rgba(255,255,255,0.2); }
+        .sound-toggle.muted { opacity: 0.5; }
+
+        /* Connection Test Button */
+        .test-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 25px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .test-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6); }
+        .test-btn:active { transform: scale(0.95); }
+
+        /* Loading overlay for connection test */
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            border-radius: 40px;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Responsive */
+        @media (max-width: 420px) {
+            .phone-frame {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+                padding: 0;
+            }
+            .phone-notch { display: none; }
+            .phone-screen { border-radius: 0; }
+            .home-indicator { display: none; }
+        }
+
+        .bankvault-external-dev {
+            position: fixed;
+            left: 30px;
+            top: 92px;
+            width: min(665px, calc(50vw - 70px));
+            height: calc(100vh - 130px);
+            z-index: 20;
+        }
+
+        @media (max-width: 1180px) {
+            .bankvault-external-dev {
+                display: none;
+            }
+        }
+
+        /* PIGGYBANK live account controls - baked in so embedded previews never show raw browser controls. */
+        .bankvault-live-panel,
+        .bankvault-feature-view {
+            margin: 18px 0;
+            padding: 16px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.97);
+            box-shadow: 0 18px 38px rgba(31, 38, 135, 0.18);
+            border: 1px solid rgba(102, 126, 234, 0.18);
+            color: #172033;
+        }
+        .bankvault-live-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .bankvault-live-head h3 {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.2;
+            color: #172033;
+        }
+        .bankvault-live-user {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 800;
+        }
+        .bankvault-shortcuts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-bottom: 12px;
+        }
+        .bankvault-shortcuts button {
+            border: 1px solid #d8e2f0;
+            border-radius: 999px;
+            background: #fff;
+            color: #3451b2;
+            padding: 8px 11px;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+        }
+        .bankvault-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .bankvault-tab,
+        .bankvault-action {
+            border: 0;
+            border-radius: 13px;
+            padding: 11px 12px;
+            background: #edf2ff;
+            color: #3451b2;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .bankvault-tab.active,
+        .bankvault-action.primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            box-shadow: 0 8px 18px rgba(102, 126, 234, 0.28);
+        }
+        .bankvault-form {
+            display: none;
+            gap: 9px;
+        }
+        .bankvault-form.active,
+        .bankvault-transfer-card.active,
+        .bankvault-dev-view.active,
+        .bankvault-feature-view.active {
+            display: grid;
+        }
+        .bankvault-transfer-card,
+        .bankvault-dev-view,
+        .bankvault-feature-view {
+            display: none;
+        }
+        .bankvault-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 9px;
+        }
+        .bankvault-field {
+            display: grid;
+            gap: 5px;
+        }
+        .bankvault-field label {
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+        }
+        .bankvault-field input,
+        .bankvault-field select {
+            width: 100%;
+            border: 1px solid #d8e2f0;
+            border-radius: 13px;
+            padding: 11px 12px;
+            background: #f8fafc;
+            color: #172033;
+            font-size: 14px;
+            outline: none;
+        }
+        .bankvault-field input:focus,
+        .bankvault-field select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.14);
+        }
+        .bankvault-status {
+            min-height: 18px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 800;
+        }
+        .bankvault-status.ok { color: #059669; }
+        .bankvault-status.err { color: #dc2626; }
+        .bankvault-close {
+            border: 0;
+            border-radius: 999px;
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 8px 11px;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <button class="test-btn" onclick="testConnection()" id="testBtn">🔄 Test LB</button>
+    <button class="sound-toggle" onclick="toggleSound()" id="soundToggle">🔊</button>
+
+    <div class="bankvault-dev-view active bankvault-external-dev" id="bankvaultDevView">
+        <div class="bankvault-flow-card">
+            <div class="bankvault-flow-head">
+                <span>Dev View - Live Data Movement</span>
+                <span class="bankvault-flow-pill" id="bankvaultFlowStatus">Step 1 active</span>
+            </div>
+            <div class="bankvault-route-panel">
+                <div class="bankvault-route-title">Active Data Route</div>
+                <div class="bankvault-route-line" id="bankvaultFlowPath"></div>
+            </div>
+            <div class="bankvault-log" id="bankvaultFlowLog">
+                <div class="bankvault-log-line"><span class="bankvault-log-time">[ready]</span> waiting for mobile app action</div>
+            </div>
+            <div class="bankvault-flow-scroll">
+                <table class="bankvault-flow-table">
+                    <thead>
+                        <tr>
+                            <th>Step</th>
+                            <th>Mobile App Action</th>
+                            <th>Main Component Hit First</th>
+                            <th>Backend Components Used</th>
+                            <th>Data Created / Read / Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bankvaultFlowRows"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="bankvault-flow-note">Rows highlight as the mobile app calls each component path.</div>
+    </div>
+
+    <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="spinner"></div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <span class="status-time" id="statusTime">9:41</span>
+                <div class="status-icons">
+                    <div class="signal-bars">
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                    </div>
+                    <span>5G</span>
+                    <span>🔋</span>
+                </div>
+            </div>
+
+            <!-- App Content -->
+            <div class="app-content">
+                <!-- Header -->
+                <div class="app-header">
+                    <div class="user-greeting">
+                        <h2>Good Morning, Alex</h2>
+                        <p>Welcome back to <span class="piggybrand">PIGGYBANK</span></p>
+                    </div>
+                    <div class="header-actions">
+                        <button type="button" class="logout-btn" id="bankvaultLogoutBtn">Logout</button>
+                        <div class="profile-avatar" onclick="playSound('click')">A</div>
+                    </div>
+                </div>
+
+                <!-- Server Info Card -->
+                <div class="server-info-card">
+                    <div class="server-info-header">
+                        <div class="server-icon">🖥️</div>
+                        <h3>Server Metrics</h3>
+                        <div class="server-status">
+                            <div class="status-dot"></div>
+                            <span>ONLINE</span>
+                        </div>
+                    </div>
+                    <div class="server-metrics">
+                        <div class="metric-item">
+                            <div class="metric-label">Server IP</div>
+                            <div class="metric-value ip" id="serverIP">Loading...</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Response Time</div>
+                            <div class="metric-value time" id="responseTime">-- ms</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Connections</div>
+                            <div class="metric-value connections" id="connectionCount">--</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-label">Load Balancer</div>
+                            <div class="metric-value" id="lbStatus" style="color: #ffd700;">Checking...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Balance Card -->
+                <div class="balance-card" onclick="playSound('success')">
+                    <div class="balance-label">Total Balance</div>
+                    <div class="balance-amount" id="balanceAmount">$24,562.80</div>
+                    <div class="balance-change">
+                        <span>▲ +$1,240.50 this month</span>
+                    </div>
+                    <div class="card-number">**** 4582</div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <div class="action-btn" data-bank-action="send" onclick="playSound('click'); animateAction(this)">
+                        <div class="action-icon">📤</div>
+                        <span>Send</span>
+                    </div>
+                    <div class="action-btn" data-bank-action="receive" onclick="playSound('click'); animateAction(this)">
+                        <div class="action-icon">📥</div>
+                        <span>Receive</span>
+                    </div>
+                    <div class="action-btn" data-bank-action="pay" onclick="playSound('click'); animateAction(this)">
+                        <div class="action-icon">📱</div>
+                        <span>Pay</span>
+                    </div>
+                    <div class="action-btn" data-bank-action="analytics" onclick="playSound('click'); animateAction(this)">
+                        <div class="action-icon">📊</div>
+                        <span>Analytics</span>
+                    </div>
+                </div>
+
+                <div class="bankvault-live-panel" id="bankvault-live-panel">
+                    <div class="bankvault-live-head">
+                        <h3>PIGGYBANK Login</h3>
+                        <div class="bankvault-live-user" id="bankvaultCurrentUser">Signed in as alex</div>
+                    </div>
+                    <div class="bankvault-shortcuts">
+                        <button type="button" data-switch-user="alex" data-switch-pass="demo">Alex</button>
+                        <button type="button" data-switch-user="alice" data-switch-pass="demo">Alice</button>
+                        <button type="button" id="bankvaultRefreshBtn">Refresh</button>
+                    </div>
+                    <div class="bankvault-tabs">
+                        <button type="button" class="bankvault-tab active" data-bankvault-tab="login">Login</button>
+                        <button type="button" class="bankvault-tab" data-bankvault-tab="register">Register</button>
+                    </div>
+                    <form class="bankvault-form" id="bankvaultRegisterForm">
+                        <div class="bankvault-grid-2">
+                            <div class="bankvault-field">
+                                <label>Username</label>
+                                <input id="bankvaultRegUsername" placeholder="new.user">
+                            </div>
+                            <div class="bankvault-field">
+                                <label>Password</label>
+                                <input id="bankvaultRegPassword" type="password" value="demo">
+                            </div>
+                        </div>
+                        <div class="bankvault-field">
+                            <label>Full name</label>
+                            <input id="bankvaultRegName" placeholder="New Customer">
+                        </div>
+                        <div class="bankvault-grid-2">
+                            <div class="bankvault-field">
+                                <label>Email</label>
+                                <input id="bankvaultRegEmail" type="email" placeholder="new.customer@example.com">
+                            </div>
+                            <div class="bankvault-field">
+                                <label>Opening deposit</label>
+                                <input id="bankvaultRegDeposit" value="500.00" inputmode="decimal">
+                            </div>
+                        </div>
+                        <button type="submit" class="bankvault-action primary">Create Account</button>
+                    </form>
+                    <form class="bankvault-form active" id="bankvaultLoginForm">
+                        <div class="bankvault-grid-2">
+                            <div class="bankvault-field">
+                                <label>Username</label>
+                                <input id="bankvaultLoginUsername" value="alex">
+                            </div>
+                            <div class="bankvault-field">
+                                <label>Password</label>
+                                <input id="bankvaultLoginPassword" type="password" value="demo">
+                            </div>
+                        </div>
+                        <div class="bankvault-field">
+                            <label>Bank account number</label>
+                            <input id="bankvaultLoginAccount" value="acct-checking" readonly>
+                        </div>
+                        <button type="submit" class="bankvault-action primary">Log In</button>
+                    </form>
+                    <div class="bankvault-status" id="bankvaultStatus"></div>
+                </div>
+
+                <form class="bankvault-live-panel bankvault-transfer-card" id="bankvaultTransferForm">
+                    <div class="bankvault-live-head">
+                        <h3>Send Money</h3>
+                        <button type="button" class="bankvault-close" data-bank-close-transfer>Close</button>
+                    </div>
+                    <div class="bankvault-field">
+                        <label>From account</label>
+                        <select id="bankvaultFromAccount"></select>
+                    </div>
+                    <div class="bankvault-grid-2">
+                        <div class="bankvault-field">
+                            <label>Recipient</label>
+                            <select id="bankvaultToUsername"></select>
+                        </div>
+                        <div class="bankvault-field">
+                            <label>Amount</label>
+                            <input id="bankvaultAmount" value="25.00" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="bankvault-field">
+                        <label>Description</label>
+                        <input id="bankvaultDescription" value="Mobile transfer">
+                    </div>
+                    <button type="submit" class="bankvault-action primary">Send Money</button>
+                </form>
+
+                <div class="bankvault-feature-view" id="bankvaultFeatureView"></div>
+
+                <!-- Recent Transactions -->
+                <div class="section-header">
+                    <h3>Recent Transactions</h3>
+                    <a href="#" onclick="playSound('click')">See All</a>
+                </div>
+                <div class="transaction-list">
+                    <div class="transaction-item" onclick="playSound('click')">
+                        <div class="tx-icon expense">🛒</div>
+                        <div class="tx-details">
+                            <div class="tx-name">Amazon Purchase</div>
+                            <div class="tx-date">Today, 10:23 AM</div>
+                        </div>
+                        <div class="tx-amount negative">-$129.99</div>
+                    </div>
+                    <div class="transaction-item" onclick="playSound('click')">
+                        <div class="tx-icon income">💰</div>
+                        <div class="tx-details">
+                            <div class="tx-name">Salary Deposit</div>
+                            <div class="tx-date">Yesterday, 9:00 AM</div>
+                        </div>
+                        <div class="tx-amount positive">+$5,200.00</div>
+                    </div>
+                    <div class="transaction-item" onclick="playSound('click')">
+                        <div class="tx-icon expense">🍕</div>
+                        <div class="tx-details">
+                            <div class="tx-name">Uber Eats</div>
+                            <div class="tx-date">Jun 12, 8:45 PM</div>
+                        </div>
+                        <div class="tx-amount negative">-$34.50</div>
+                    </div>
+                    <div class="transaction-item" onclick="playSound('click')">
+                        <div class="tx-icon expense">⚡</div>
+                        <div class="tx-details">
+                            <div class="tx-name">Electric Bill</div>
+                            <div class="tx-date">Jun 10, 2:00 PM</div>
+                        </div>
+                        <div class="tx-amount negative">-$87.20</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation -->
+            <div class="bottom-nav">
+                <div class="nav-item active" onclick="playSound('click'); setActiveNav(this)">
+                    <div class="nav-icon">🏠</div>
+                    <span>Home</span>
+                </div>
+                <div class="nav-item" onclick="playSound('click'); setActiveNav(this)">
+                    <div class="nav-icon">💳</div>
+                    <span>Cards</span>
+                </div>
+                <div class="nav-item" onclick="playSound('click'); setActiveNav(this)">
+                    <div class="nav-icon">📈</div>
+                    <span>Invest</span>
+                </div>
+                <div class="nav-item" onclick="playSound('click'); setActiveNav(this)">
+                    <div class="nav-icon">⚙️</div>
+                    <span>Settings</span>
+                </div>
+            </div>
+
+            <div class="home-indicator"></div>
+        </div>
+    </div>
+
+    <script>
+        // ===== AUDIO ENGINE =====
+        let audioContext = null;
+        let soundEnabled = true;
+        let activeOscillators = [];
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+
+            const now = audioContext.currentTime;
+
+            switch(type) {
+                case 'click':
+                    playClickSound(now);
+                    break;
+                case 'success':
+                    playSuccessSound(now);
+                    break;
+                case 'error':
+                    playErrorSound(now);
+                    break;
+                case 'test':
+                    playTestSound(now);
+                    break;
+            }
+        }
+
+        function playClickSound(now) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05);
+
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+            osc.start(now);
+            osc.stop(now + 0.1);
+        }
+
+        function playSuccessSound(now) {
+            const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+            notes.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now + i * 0.1);
+
+                gain.gain.setValueAtTime(0, now + i * 0.1);
+                gain.gain.linearRampToValueAtTime(0.2, now + i * 0.1 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.3);
+
+                osc.start(now + i * 0.1);
+                osc.stop(now + i * 0.1 + 0.3);
+            });
+        }
+
+        function playErrorSound(now) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+
+        function playTestSound(now) {
+            const notes = [440, 554, 659, 880];
+            notes.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now + i * 0.15);
+
+                gain.gain.setValueAtTime(0, now + i * 0.15);
+                gain.gain.linearRampToValueAtTime(0.15, now + i * 0.15 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.4);
+
+                osc.start(now + i * 0.15);
+                osc.stop(now + i * 0.15 + 0.4);
+            });
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundToggle');
+            btn.textContent = soundEnabled ? '🔊' : '🔇';
+            btn.classList.toggle('muted', !soundEnabled);
+            if (soundEnabled) {
+                initAudio();
+                playSound('click');
+            }
+        }
+
+        // ===== SERVER METRICS =====
+        async function getServerIP() {
+            try {
+                // Try to get IP from various sources
+                const response = await fetch('https://api.ipify.org?format=json', { 
+                    mode: 'cors',
+                    cache: 'no-store'
+                }).catch(() => null);
+
+                if (response) {
+                    const data = await response.json();
+                    return data.ip;
+                }
+            } catch (e) {
+                console.log('External IP fetch failed, using local');
+            }
+
+            // Fallback to window location
+            return window.location.hostname || '127.0.0.1';
+        }
+
+        async function measureResponseTime() {
+            const start = performance.now();
+            try {
+                await fetch(window.location.href, { 
+                    method: 'HEAD', 
+                    cache: 'no-store',
+                    mode: 'no-cors'
+                });
+            } catch (e) {
+                // HEAD might fail, try GET with cache bust
+                try {
+                    await fetch(window.location.href + '?_t=' + Date.now(), { 
+                        cache: 'no-store',
+                        mode: 'no-cors'
+                    });
+                } catch (e2) {
+                    // Ignore errors for timing measurement
+                }
+            }
+            const end = performance.now();
+            return Math.round(end - start);
+        }
+
+        function getConnectionCount() {
+            // Simulated connection count based on navigator.connection
+            const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if (conn) {
+                return Math.floor(Math.random() * 50) + 10; // Simulated for demo
+            }
+            return Math.floor(Math.random() * 100) + 20;
+        }
+
+        async function updateServerMetrics() {
+            const ip = await getServerIP();
+            const responseTime = await measureResponseTime();
+            const connections = getConnectionCount();
+
+            document.getElementById('serverIP').textContent = ip;
+            document.getElementById('responseTime').textContent = responseTime + ' ms';
+            document.getElementById('connectionCount').textContent = connections;
+
+            // Determine LB status based on response time
+            const lbStatus = document.getElementById('lbStatus');
+            if (responseTime < 50) {
+                lbStatus.textContent = 'Optimal ✓';
+                lbStatus.style.color = '#00ff88';
+            } else if (responseTime < 150) {
+                lbStatus.textContent = 'Good ✓';
+                lbStatus.style.color = '#ffd700';
+            } else {
+                lbStatus.textContent = 'Slow ⚠';
+                lbStatus.style.color = '#ff4757';
+            }
+        }
+
+        async function testConnection() {
+            initAudio();
+            playSound('test');
+
+            const btn = document.getElementById('testBtn');
+            const overlay = document.getElementById('loadingOverlay');
+
+            btn.textContent = '⏳ Testing...';
+            btn.disabled = true;
+            overlay.classList.add('active');
+
+            // Run multiple tests
+            const tests = [];
+            for (let i = 0; i < 5; i++) {
+                tests.push(measureResponseTime());
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            const results = await Promise.all(tests);
+            const avg = Math.round(results.reduce((a, b) => a + b, 0) / results.length);
+            const min = Math.min(...results);
+            const max = Math.max(...results);
+
+            overlay.classList.remove('active');
+            btn.textContent = '🔄 Test LB';
+            btn.disabled = false;
+
+            // Update display with test results
+            document.getElementById('responseTime').textContent = avg + ' ms (avg)';
+            document.getElementById('connectionCount').textContent = results.length + ' tests';
+
+            const lbStatus = document.getElementById('lbStatus');
+            if (avg < 100 && max - min < 50) {
+                lbStatus.textContent = 'LB Working ✓';
+                lbStatus.style.color = '#00ff88';
+                playSound('success');
+            } else {
+                lbStatus.textContent = 'Check LB ⚠';
+                lbStatus.style.color = '#ff4757';
+                playSound('error');
+            }
+
+            // Show detailed results in console
+            console.log('Load Balancer Test Results:');
+            console.log('  Tests: ' + results.length);
+            console.log('  Average: ' + avg + 'ms');
+            console.log('  Min: ' + min + 'ms');
+            console.log('  Max: ' + max + 'ms');
+            console.log('  Variance: ' + (max - min) + 'ms');
+
+            // Auto refresh after 3 seconds
+            setTimeout(() => {
+                updateServerMetrics();
+            }, 3000);
+        }
+
+        // ===== UI INTERACTIONS =====
+        function animateAction(element) {
+            element.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                element.style.transform = '';
+            }, 150);
+        }
+
+        function setActiveNav(element) {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+                item.style.color = '#8b9dc3';
+            });
+            element.classList.add('active');
+            element.style.color = '#667eea';
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('statusTime').textContent = hours + ':' + minutes;
+        }
+
+        // ===== ANIMATE BALANCE =====
+        function animateBalance() {
+            const target = 24562.80;
+            const element = document.getElementById('balanceAmount');
+            let current = 0;
+            const increment = target / 60;
+            const timer = setInterval(() => {
+                current += increment;
+                if (current >= target) {
+                    current = target;
+                    clearInterval(timer);
+                }
+                element.textContent = '$' + current.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }, 16);
+        }
+
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTime();
+            setInterval(updateTime, 1000);
+
+            // Initialize audio on first user interaction
+            document.addEventListener('click', initAudio, { once: true });
+            document.addEventListener('touchstart', initAudio, { once: true });
+
+            // Load server metrics
+            updateServerMetrics();
+            setInterval(updateServerMetrics, 10000); // Refresh every 10 seconds
+
+            // Animate balance on load
+            setTimeout(animateBalance, 800);
+
+            // Add parallax effect to balance card
+            const balanceCard = document.querySelector('.balance-card');
+            balanceCard.addEventListener('mousemove', (e) => {
+                const rect = balanceCard.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = (y - centerY) / 20;
+                const rotateY = (centerX - x) / 20;
+                balanceCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`;
+            });
+            balanceCard.addEventListener('mouseleave', () => {
+                balanceCard.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)';
+            });
+        });
+    </script>
+<script src="/bankvault_config.js"></script>
+<script src="/bankvault_api_adapter.js?v=20260702-piggybank-live-v2"></script>
+</body>
+</html>

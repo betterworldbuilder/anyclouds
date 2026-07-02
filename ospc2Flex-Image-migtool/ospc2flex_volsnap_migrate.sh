@@ -62,6 +62,7 @@ POST_ATTACH_START_POSTGRESQL="true"
 POST_ATTACH_SCRIPT_PATH="/tmp/osflex_post_attach_pg_mount_validate.sh"
 BASE_DIR="${VOLSNAP_RUN_ROOT:-${OSPC2FLEX_VOLSNAP_BASE_DIR:-${OSPC2FLEX_LINUX_SNAP_BASE_DIR:-/mnt/migration/ospc2flex_linux_snap}}}"
 START_FRESH="${VOLSNAP_START_FRESH:-0}"
+JUMPHOST_MIN_FREE_GB="${OSPC2FLEX_JUMPHOST_MIN_FREE_GB:-${VOLSNAP_MIN_FREE_GB:-120}}"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -150,6 +151,26 @@ mb_from_bytes() {
   local n="${1:-0}"
   awk -v n="$n" 'BEGIN{if(n>0) printf "%.0f", n/1048576; else printf "0"}'
 }
+gib_to_bytes() {
+  awk -v gb="${1:-0}" 'BEGIN{printf "%.0f", gb*1024*1024*1024}'
+}
+bytes_to_gib() {
+  awk -v b="${1:-0}" 'BEGIN{printf "%.1f", b/1024/1024/1024}'
+}
+available_bytes_for_path() {
+  local p="$1"
+  df -PB1 "$p" 2>/dev/null | awk 'NR==2{print $4+0}'
+}
+require_jumphost_min_free_gb() {
+  local path="$1" min_gb="$2" context="$3" avail required
+  required="$(gib_to_bytes "$min_gb")"
+  avail="$(available_bytes_for_path "$path")"
+  [ -n "$avail" ] || fail_exit "$context: could not determine free space for $path"
+  log "[SPACE] $context: required=$(bytes_to_gib "$required") GiB available=$(bytes_to_gib "$avail") GiB path=$path"
+  if [ "$avail" -lt "$required" ]; then
+    fail_exit "Insufficient jumphost workspace after stale cleanup for $context: required $(bytes_to_gib "$required") GiB, available $(bytes_to_gib "$avail") GiB. Clean /mnt/migration or increase the jumphost volume before retry."
+  fi
+}
 download_progress_bar() {
   local phase="$1" downloaded_mb="${2:-0}" total_mb="${3:-0}" status="${4:-unknown}" eta_min="${5:-}" pct="${6:-}"
   if [ -z "$pct" ] || [ "$pct" = "unknown" ]; then
@@ -187,6 +208,7 @@ prep_disk_and_stale_image_cleanup() {
   [ -d /mnt/migration/flex2flex ] && roots+=("/mnt/migration/flex2flex")
   [ -d /mnt/migration/ospc2flex_method_z ] && roots+=("/mnt/migration/ospc2flex_method_z")
   [ -d /mnt/migration/ospc2flex_image ] && roots+=("/mnt/migration/ospc2flex_image")
+  [ -d /mnt/migration/ospc2flex_linux_snap ] && roots+=("/mnt/migration/ospc2flex_linux_snap")
 
   local delete_list="$JOB_TMP/stale_image_delete.tsv"
   : >"$delete_list"
@@ -215,6 +237,7 @@ prep_disk_and_stale_image_cleanup() {
     log "[VS0A] no stale image files found; keeping unrepaired qcow2 files"
     after="$(df -hP "$BASE_DIR" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
     log "[VS0A] run root disk after cleanup: ${after:-unknown}"
+    require_jumphost_min_free_gb "$BASE_DIR" "$JUMPHOST_MIN_FREE_GB" "volume snapshot migration preflight"
     return 0
   fi
 
@@ -246,6 +269,7 @@ prep_disk_and_stale_image_cleanup() {
   log "[VS0A] stale image cleanup complete; deleted=$deleted freed_bytes=$freed"
   after="$(df -hP "$BASE_DIR" 2>/dev/null | awk 'NR==2{print $4 " free / " $2 " total (" $5 " used)"}' || true)"
   log "[VS0A] run root disk after cleanup: ${after:-unknown}"
+  require_jumphost_min_free_gb "$BASE_DIR" "$JUMPHOST_MIN_FREE_GB" "volume snapshot migration preflight"
 }
 
 start_fresh_clear_label_resume() {
