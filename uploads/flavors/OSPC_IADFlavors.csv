@@ -1,0 +1,7 @@
+Region,ID,Name,Category,Disk (GiB),CPU,Memory,Internal Network Bandwidth (Gbps),Ephemeral Disk (GiB),Cost per Hour,Public,Monthly Cost,Sample Count,Pricing Source
+IAD,general1-1,1 GB General Purpose v1,General Purpose,20,1,1 GiB,,0,$0.096,Yes,$68.80,3,Inferred from TCO_Comparison_Report.csv aligned with uploads/tco_flavormap_1780381947_1342314_flavormap.csv
+IAD,general1-2,2 GB General Purpose v1,General Purpose,40,2,2 GiB,,0,$0.108,Yes,$77.62,4,Inferred from TCO_Comparison_Report.csv aligned with uploads/tco_flavormap_1780381947_1342314_flavormap.csv
+IAD,compute1-4,3.75 GB Compute v1,Compute Optimized,0,2,3.75 GiB,,0,$0.120,Yes,$86.44,5,Inferred from TCO_Comparison_Report.csv aligned with uploads/tco_flavormap_1780381947_1342314_flavormap.csv
+IAD,general1-4,4 GB General Purpose v1,General Purpose,80,4,4 GiB,,0,$0.211,Yes,$151.70,5,Inferred from TCO_Comparison_Report.csv aligned with uploads/tco_flavormap_1780381947_1342314_flavormap.csv
+IAD,compute1-8,7.5 GB Compute v1,Compute Optimized,0,4,7.5 GiB,,0,$0.260,Yes,$186.98,2,Inferred from TCO_Comparison_Report.csv aligned with uploads/tco_flavormap_1780381947_1342314_flavormap.csv
+IAD,compute1-30,30 GB Compute v1,Compute Optimized,0,16,30 GiB,,0,$0.278,Yes,$200.00,2,Inferred from TCO_Comparison_Report.csv aligned with uploads/tco_flavormap_1780381947_1342314_flavormap.csv
