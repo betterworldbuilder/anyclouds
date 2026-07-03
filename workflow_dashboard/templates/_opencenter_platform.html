@@ -1,0 +1,228 @@
+<!-- OpenCenter Platform — recreated from opencenter.cloud/features.
+     Shared partial: included by the dashboard (Stage 7 panel) and the standalone /opencenter route. -->
+<style>
+  #opencenter-platform .oc-card { text-align:left !important; background:#ffe5e5 !important; border:1px solid #fca5a5 !important; border-radius:16px !important; padding:20px 22px !important; cursor:pointer; transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease; font-family:inherit !important; width:100%; display:block !important; color:#1e293b !important; text-transform:none !important; box-shadow:none !important; letter-spacing:normal !important; }
+  #opencenter-platform button.oc-card:hover { transform:translateY(-3px); box-shadow:0 12px 26px rgba(239,68,68,.14) !important; border-color:#ef4444 !important; }
+  #opencenter-platform .oc-plain { background:#ffe5e5 !important; border:1px solid #fca5a5 !important; border-radius:16px; padding:20px 22px; }
+  #opencenter-platform .oc-phase { font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#64748b; margin:26px 0 14px; }
+  #opencenter-platform .oc-grid { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
+  #opencenter-platform .oc-phase-1 .oc-card,
+  #opencenter-platform .oc-phase-1 .oc-plain { background:#b23a3a !important; border-color:#8f2e2e !important; color:#fff !important; }
+  #opencenter-platform .oc-phase-2 .oc-card,
+  #opencenter-platform .oc-phase-2 .oc-plain { background:#d97706 !important; border-color:#b45309 !important; color:#fff !important; }
+  #opencenter-platform .oc-phase-3 .oc-card,
+  #opencenter-platform .oc-phase-3 .oc-plain { background:#15803d !important; border-color:#166534 !important; color:#fff !important; }
+  #opencenter-platform .oc-phase-1 button.oc-card:hover { background:#8f2e2e !important; border-color:#7f1d1d !important; }
+  #opencenter-platform .oc-phase-2 button.oc-card:hover { background:#b45309 !important; border-color:#92400e !important; }
+  #opencenter-platform .oc-phase-3 button.oc-card:hover { background:#166534 !important; border-color:#14532d !important; }
+  #opencenter-platform .oc-phase-1 .oc-card *,
+  #opencenter-platform .oc-phase-1 .oc-plain *,
+  #opencenter-platform .oc-phase-2 .oc-card *,
+  #opencenter-platform .oc-phase-2 .oc-plain *,
+  #opencenter-platform .oc-phase-3 .oc-card *,
+  #opencenter-platform .oc-phase-3 .oc-plain * { color:#fff !important; }
+  #opencenter-platform .oc-phase-1 .oc-ico,
+  #opencenter-platform .oc-phase-2 .oc-ico,
+  #opencenter-platform .oc-phase-3 .oc-ico { background:rgba(255,255,255,.18) !important; border-color:rgba(255,255,255,.45) !important; color:#fff !important; box-shadow:none !important; }
+  #opencenter-platform .oc-phase-1 .oc-pill,
+  #opencenter-platform .oc-phase-2 .oc-pill,
+  #opencenter-platform .oc-phase-3 .oc-pill { background:rgba(255,255,255,.14) !important; border-color:rgba(255,255,255,.55) !important; color:#fff !important; font-weight:800 !important; }
+  #opencenter-platform .oc-phase-1 li::before,
+  #opencenter-platform .oc-phase-2 li::before,
+  #opencenter-platform .oc-phase-3 li::before { background:#fff !important; }
+  #opencenter-platform .oc-head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  #opencenter-platform h4 { margin:0; font-size:16px; font-weight:800; color:#1e293b; line-height:1.2; }
+  #opencenter-platform .oc-sub { color:#64748b; font-size:13px; font-weight:500; margin:2px 0 0; }
+  #opencenter-platform ul { margin:0; padding:0; list-style:none; }
+  #opencenter-platform li { position:relative; padding-left:16px; color:#475569; font-size:13px; line-height:1.85; }
+  #opencenter-platform li::before { content:""; position:absolute; left:2px; top:9px; width:5px; height:5px; border-radius:50%; background:#f43f5e; }
+  #opencenter-platform .oc-pill { display:inline-block; background:#fff; border:1px solid #b23a3a; border-radius:999px; padding:4px 11px; font-size:12px; color:#b23a3a; margin:4px 5px 0 0; font-weight:700; }
+  #opencenter-platform .oc-ico { width:40px; height:40px; border-radius:11px; background:#b23a3a; border:1px solid #8f2e2e; display:inline-flex; align-items:center; justify-content:center; color:#fff; flex:none; box-shadow:0 4px 10px rgba(178,58,58,.22); }
+  #opencenter-platform .oc-ico svg { width:20px; height:20px; }
+  #opencenter-platform .oc-arrow { background:none !important; border:none !important; color:#94a3b8 !important; font-style:italic !important; font-size:12.5px !important; font-weight:400 !important; cursor:pointer; padding:2px 6px !important; display:inline-flex !important; flex-direction:column; align-items:center; gap:1px; font-family:inherit !important; box-shadow:none !important; text-transform:none !important; letter-spacing:normal !important; }
+  #opencenter-platform .oc-arrow:hover { color:#db2777 !important; text-decoration:underline; background:none !important; }
+  #opencenter-platform .oc-arrow svg { width:16px; height:16px; }
+</style>
+<div id="opencenter-platform" style="background:#fff; border:1px solid #d8e2f0; border-radius:16px; padding:26px 28px; color:#0f172a; box-shadow:0 10px 30px rgba(15,23,42,.08);">
+  <div style="text-align:center;">
+    <div style="font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#b23a3a;">OpenCenter Platform</div>
+    <h2 style="margin:6px 0 4px; font-size:24px; font-weight:900; color:#0f172a;">Configure → Generate → Reconcile → Run</h2>
+    <p style="margin:0 auto; max-width:720px; color:#64748b; font-size:14px; line-height:1.6;">One declarative YAML becomes a full, hardened production Kubernetes platform across OpenStack, VMware, AWS, and bare metal. Click any action below.</p>
+  </div>
+  <div id="opencenter-status" style="margin:16px auto 4px; max-width:920px; background:#fdf2f8; border:1px solid #fbcfe8; border-radius:10px; padding:10px 14px; font-size:13px; color:#9d174d; font-family:'Share Tech Mono',monospace;">Ready — click an action button (CLI · GitOps Repo · Air-Gap · Generates · FluxCD Reconciles).</div>
+
+  <!-- PHASE 1 — CONFIGURE & GENERATE -->
+  <div class="oc-phase">Phase 1 — Configure &amp; Generate</div>
+  <div class="oc-grid oc-phase-1">
+    <button type="button" class="oc-card" onclick="opencenterAction('cli')">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></span><div><h4>openCenter CLI</h4><div class="oc-sub">Single YAML → full cluster</div></div></div>
+      <ul>
+        <li>Declarative config for infra, K8s, services, secrets</li>
+        <li>Multi-provider: OpenStack, VMware, AWS, Kind</li>
+        <li>Schema validation and business-rule checks</li>
+        <li>SOPS Age encryption with key lifecycle</li>
+      </ul>
+    </button>
+    <button type="button" class="oc-card" onclick="opencenterAction('gitops')">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg></span><div><h4>GitOps Repository</h4><div class="oc-sub">Generated by CLI</div></div></div>
+      <ul>
+        <li>Infrastructure-as-Code (OpenTofu / Terraform)</li>
+        <li>Kubespray inventory with security hardening</li>
+        <li>FluxCD manifests with Kustomize overlays</li>
+        <li>Encrypted secrets safe for version control</li>
+      </ul>
+    </button>
+    <button type="button" class="oc-card" onclick="opencenterAction('airgap')">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg></span><div><h4>Air-Gap Packaging</h4><div class="oc-sub">openCenter AirGap</div></div></div>
+      <ul>
+        <li>All images, charts, binaries in one Zarf artifact</li>
+        <li>Cryptographic signing and SBOM generation</li>
+        <li>Three-zone model: Factory → Airlock → Field</li>
+        <li>Bastion serves local registry and package repos</li>
+      </ul>
+    </button>
+  </div>
+
+  <div style="text-align:center; margin:16px 0;">
+    <button type="button" class="oc-arrow" onclick="opencenterAction('generate')">generates &amp; provisions<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+  </div>
+
+  <!-- PHASE 2 — PLATFORM SERVICES (GITOPS BASE) -->
+  <div class="oc-phase">Phase 2 — Platform Services (GitOps Base)</div>
+  <div class="oc-grid oc-phase-2">
+    <div class="oc-plain">
+      <h4>20+ Pre-Hardened Services</h4>
+      <div style="margin-top:8px;">
+        <span class="oc-pill">cert-manager</span><span class="oc-pill">Kyverno</span><span class="oc-pill">Keycloak</span><span class="oc-pill">Harbor</span><span class="oc-pill">Velero</span><span class="oc-pill">MetalLB</span><span class="oc-pill">Longhorn</span><span class="oc-pill">Gateway API</span><span class="oc-pill">Calico</span><span class="oc-pill">Headlamp</span><span class="oc-pill">RBAC Manager</span><span class="oc-pill">Sealed Secrets</span><span class="oc-pill">PostgreSQL Operator</span><span class="oc-pill">vSphere CSI</span><span class="oc-pill">OpenStack CSI</span><span class="oc-pill">OLM</span>
+      </div>
+    </div>
+    <div class="oc-plain">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></span><div><h4>Observability</h4><div class="oc-sub">Full-stack telemetry</div></div></div>
+      <ul>
+        <li>Prometheus + Grafana + Alertmanager</li>
+        <li>Loki log aggregation</li>
+        <li>Tempo distributed tracing</li>
+        <li>OpenTelemetry collection</li>
+      </ul>
+    </div>
+    <div class="oc-plain">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg></span><div><h4>Security Layers</h4><div class="oc-sub">Defense in depth</div></div></div>
+      <ul>
+        <li>17 Kyverno ClusterPolicies</li>
+        <li>Pod Security Admission (baseline + restricted)</li>
+        <li>NetworkPolicies for platform services</li>
+        <li>RBAC via Keycloak OIDC groups</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="text-align:center; margin:16px 0;">
+    <button type="button" class="oc-arrow" onclick="opencenterAction('reconcile')">FluxCD reconciles<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+  </div>
+
+  <!-- PHASE 3 — PRODUCTION KUBERNETES CLUSTER -->
+  <div class="oc-phase">Phase 3 — Production Kubernetes Cluster</div>
+  <div class="oc-grid oc-phase-3">
+    <div class="oc-plain">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg></span><div><h4>Infrastructure</h4><div class="oc-sub">Multi-provider</div></div></div>
+      <ul>
+        <li>HA control plane (3 nodes)</li>
+        <li>Scalable worker pools</li>
+        <li>OpenStack / VMware / AWS / Bare Metal</li>
+      </ul>
+    </div>
+    <div class="oc-plain">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></span><div><h4>GitOps Lifecycle</h4><div class="oc-sub">FluxCD continuous reconciliation</div></div></div>
+      <ul>
+        <li>Drift detection and auto-remediation</li>
+        <li>Kustomize base + overlay composition</li>
+        <li>SOPS decryption at reconciliation time</li>
+      </ul>
+    </div>
+    <div class="oc-plain">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span><div><h4>Secrets Management</h4><div class="oc-sub">Dual encryption</div></div></div>
+      <ul>
+        <li>SOPS Age encryption in Git</li>
+        <li>Kubernetes encryption at rest</li>
+        <li>Zero-downtime key rotation</li>
+      </ul>
+    </div>
+    <div class="oc-plain">
+      <div class="oc-head"><span class="oc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span><div><h4>Day-2 Operations</h4><div class="oc-sub">Ongoing management</div></div></div>
+      <ul>
+        <li>Backup and disaster recovery (Velero)</li>
+        <li>Kubernetes version upgrades</li>
+        <li>Configuration drift detection</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- WHAT — what it solves, for whom, USP, closing -->
+  <div class="oc-phase">What OpenCenter Solves</div>
+
+  <!-- One-liner: what problem, for whom -->
+  <div style="background:linear-gradient(135deg,#eff6ff,#ecfdf5 55%,#fef2f2); border:1px solid #dbeafe; border-radius:14px; padding:16px 20px; margin-bottom:18px; color:#0f172a; font-size:15px; line-height:1.6;">
+    <span style="display:inline-block; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#db2777; margin-bottom:4px;">In one line</span><br>
+    For <strong>platform, DevOps &amp; cloud-operations teams</strong> running FLEX, OpenStack, regulated or sovereign clouds — OpenCenter turns a <em>migrated</em> cloud into a <strong>secure, GitOps-native, Day-2-ready platform</strong>, with no hyperscaler lock-in.
+  </div>
+
+  <!-- Pain points table -->
+  <div class="oc-plain" style="padding:0; overflow:hidden;">
+    <div style="padding:16px 20px 4px;"><h4>Pain points it solves</h4></div>
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead>
+        <tr style="text-align:left; color:#64748b;">
+          <th style="padding:8px 20px; border-bottom:1px solid #fbd5d5; font-weight:800;">Pain point</th>
+          <th style="padding:8px 20px; border-bottom:1px solid #fbd5d5; font-weight:800;">OpenCenter answer</th>
+        </tr>
+      </thead>
+      <tbody style="color:#334155;">
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">Kubernetes is hard to operate</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">Built-in Day-2 operations</td></tr>
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">Too many tools to integrate</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">Pre-packaged platform stack</td></tr>
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">Security added too late</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">Security-by-design</td></tr>
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">Environments drift</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">GitOps reconciliation</td></tr>
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">No clear audit trail</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">Git-based change control</td></tr>
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">Hyperscaler lock-in</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">Open, portable, private-cloud friendly</td></tr>
+        <tr><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea;">Sovereignty concerns</td><td style="padding:9px 20px; border-bottom:1px solid #f3e6ea; color:#0f172a; font-weight:600;">FLEX / OpenStack / bare metal / air-gap support</td></tr>
+        <tr><td style="padding:9px 20px;">Migration without modernization</td><td style="padding:9px 20px; color:#0f172a; font-weight:600;">Turns FLEX into a cloud-native platform</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- USP -->
+  <div style="background:#fdf2f8; border:1px solid #fbcfe8; border-left:4px solid #db2777; border-radius:14px; padding:16px 20px; margin-top:18px; color:#0f172a;">
+    <div style="font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#db2777; margin-bottom:6px;">The USP</div>
+    <p style="margin:0; font-size:14px; line-height:1.65; color:#334155;">OpenCenter's USP is <em>not</em> cluster creation. It's a <strong>complete, open, GitOps-native, Day-2-ready platform operating model</strong> for FLEX, OpenStack, regulated cloud, and sovereign AI workloads.</p>
+  </div>
+
+  <!-- Closing message -->
+  <div style="text-align:center; margin-top:18px; padding:16px 20px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:14px; color:#0f172a; font-size:14px; line-height:1.7;">
+    <strong>Move to FLEX</strong> to modernize the cloud foundation.<br>
+    <strong>Use OpenCenter</strong> to modernize the applications, operations, and AI platform on top of it.
+  </div>
+
+  <div style="text-align:center; margin-top:20px; padding-top:14px; border-top:1px solid #f1e3ea; color:#64748b; font-size:12px;">
+    <strong style="color:#0f172a;">Runs on:</strong>
+    &nbsp;OpenStack&nbsp; · &nbsp;VMware vSphere&nbsp; · &nbsp;AWS&nbsp; · &nbsp;Bare Metal&nbsp; · &nbsp;Air-Gapped Sites
+  </div>
+</div>
+<script>
+  window.opencenterAction = function(kind) {
+    var bar = document.getElementById('opencenter-status');
+    var MSG = {
+      cli:       'openCenter CLI → validating declarative YAML and rendering full-cluster manifests (infra + K8s + services + secrets)…',
+      gitops:    'GitOps Repository → opening the Git repo config below to commit IaC + FluxCD manifests…',
+      airgap:    'Air-Gap Packaging → building signed Zarf artifact (images, charts, binaries) with SBOM for Factory → Airlock → Field…',
+      generate:  'generates & provisions → openCenter CLI generating the GitOps base and platform services…',
+      reconcile: 'FluxCD reconciles → applying Kustomize overlays, decrypting SOPS, driving the cluster to desired state…'
+    };
+    if (bar) { bar.textContent = '● ' + (MSG[kind] || 'Working…'); bar.style.color = '#db2777'; }
+    if (kind === 'generate' && typeof fetchGitopsRegisterSnippets === 'function') {
+      try { fetchGitopsRegisterSnippets(); } catch (e) {}
+    }
+    if (kind === 'gitops') {
+      var inp = document.getElementById('s8-gitops-repo-url');
+      if (inp) { inp.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function(){ inp.focus(); }, 250); }
+    }
+  };
+</script>

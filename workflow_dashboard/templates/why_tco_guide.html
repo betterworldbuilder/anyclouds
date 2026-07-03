@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>How To get Best Performance and TCO Saving</title>
+  <style>
+    :root {
+      --navy: #172033;
+      --slate: #64748b;
+      --line: #d8e2f0;
+      --sky: #38bdf8;
+      --green: #16a34a;
+      --red: #b23a3a;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f6f8fc;
+      color: var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+    }
+    .hero {
+      position: relative;
+      min-height: 430px;
+      padding: 48px 24px 54px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #2f65a5 0%, #66b8e2 45%, #dff8ff 100%);
+      text-align: center;
+      border-bottom: 1px solid var(--line);
+    }
+    .cloud {
+      position: absolute;
+      background: rgba(255,255,255,.78);
+      border-radius: 999px;
+      filter: blur(.5px);
+      animation: drift linear infinite;
+    }
+    .cloud:before,
+    .cloud:after {
+      content: "";
+      position: absolute;
+      background: rgba(255,255,255,.78);
+      border-radius: 50%;
+    }
+    .c1 { width: 260px; height: 74px; top: 138px; left: 18%; animation-duration: 54s; }
+    .c1:before { width: 142px; height: 142px; left: 36px; top: -70px; }
+    .c1:after { width: 104px; height: 104px; left: 142px; top: -52px; }
+    .c2 { width: 180px; height: 52px; top: 84px; left: 64%; opacity: .62; animation-duration: 48s; }
+    .c2:before { width: 88px; height: 88px; left: 24px; top: -42px; }
+    .c2:after { width: 72px; height: 72px; left: 92px; top: -34px; }
+    .c3 { width: 330px; height: 26px; top: 42px; left: 42%; opacity: .45; transform: rotate(-7deg); animation-duration: 38s; }
+    @keyframes drift { from { transform: translateX(0); } to { transform: translateX(-80px); } }
+    .badge {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 32px;
+      padding: 0 18px;
+      border: 1px solid rgba(255,255,255,.8);
+      border-radius: 999px;
+      background: rgba(255,255,255,.28);
+      color: #fff;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      box-shadow: 0 8px 22px rgba(15,23,42,.12);
+    }
+    .title {
+      position: relative;
+      z-index: 2;
+      max-width: 980px;
+      margin: 26px auto 0;
+      font-size: 44px;
+      line-height: 1.08;
+      color: #07111f;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+    .title .word {
+      display: inline-block;
+      animation: wordPulse 5.6s infinite;
+      color: #07111f;
+    }
+    .title .who { animation-delay: .7s; }
+    .title .what { animation-delay: 1.4s; }
+    .title .when { animation-delay: 2.1s; }
+    @keyframes wordPulse {
+      0%, 18%, 100% { color: #07111f; text-shadow: none; }
+      8% { color: #fff; text-shadow: 0 0 14px rgba(255,255,255,.8); }
+    }
+    .title .highlight {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px 6px;
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(37,99,235,.22);
+    }
+    .desc {
+      position: relative;
+      z-index: 2;
+      max-width: 760px;
+      margin: 22px auto 0;
+      color: #0f2942;
+      line-height: 1.7;
+      font-size: 15px;
+    }
+    .stats {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 16px;
+      max-width: 760px;
+      margin: 34px auto 0;
+    }
+    .stat {
+      background: rgba(255,255,255,.36);
+      border: 1px solid rgba(255,255,255,.62);
+      border-radius: 12px;
+      padding: 18px 12px;
+      box-shadow: 0 10px 24px rgba(15,23,42,.10);
+    }
+    .stat strong {
+      display: block;
+      font-size: 28px;
+      color: #fff;
+      text-shadow: 0 1px 10px rgba(15,23,42,.18);
+    }
+    .stat span {
+      display: block;
+      margin-top: 6px;
+      color: #f8fafc;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .content {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 34px 24px 58px;
+      display: grid;
+      gap: 22px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 26px rgba(15,23,42,.07);
+      padding: 26px;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 24px; color: var(--navy); }
+    .card p { margin: 0; color: #334155; line-height: 1.7; }
+    .grid4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .mini {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      background: #f8fafc;
+    }
+    .mini .icon { font-size: 22px; margin-bottom: 8px; }
+    .mini strong { display:block; margin-bottom: 6px; color:#0f3b66; }
+    .savings {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .panel-head {
+      margin: -26px -26px 20px;
+      padding: 20px 26px;
+      border-radius: 14px 14px 0 0;
+      color: #fff;
+      font-weight: 900;
+    }
+    .tco .panel-head { background: linear-gradient(135deg,#047857,#059669); }
+    .perf .panel-head { background: linear-gradient(135deg,#1d4ed8,#2563eb); }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric {
+      border: 1px solid #86efac;
+      border-radius: 10px;
+      background: #ecfdf5;
+      padding: 14px;
+      text-align: center;
+    }
+    .metric label {
+      display:block;
+      color:#047857;
+      font-size:10px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.06em;
+    }
+    .metric strong { display:block; margin-top:6px; font-size:24px; color:#065f46; }
+    .bar-label {
+      display:flex;
+      justify-content:space-between;
+      color:#64748b;
+      font-size:12px;
+      margin:10px 0 4px;
+    }
+    .bar {
+      height: 14px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .bar.red span { background: #ef4444; width: 100%; }
+    .bar.green span { background: #22c55e; width: 42%; }
+    .bar span { display:block; height:100%; border-radius:999px; }
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .check {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #14532d;
+      font-weight: 700;
+    }
+    @media (max-width: 900px) {
+      .title { font-size: 32px; }
+      .stats, .grid4, .savings, .checklist { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="cloud c3"></div>
+    <div class="badge">Migration Strategy Guide</div>
+    <h1 class="title">
+      <span class="word why">Why</span><span class="word who">Who</span><span class="word what">What</span><span class="word when">When</span> <span style="font-size:.72em;">Move to</span><br>
+      <span class="highlight">FLEX <span style="font-size:.72em;">Your AI-Ready Open Cloud Hub</span></span>
+    </h1>
+    <p class="desc">Before any technical migration begins, customers need a clear business answer: <strong>who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
+    <div class="stats">
+      <div class="stat"><strong>4</strong><span>Why Reasons</span></div>
+      <div class="stat"><strong>5</strong><span>When Triggers</span></div>
+      <div class="stat"><strong>8</strong><span>Migration Triggers</span></div>
+      <div class="stat"><strong>0</strong><span>Vendor Lock-In</span></div>
+    </div>
+  </section>
+
+  <main class="content">
+    <section class="card" id="why" style="background:linear-gradient(160deg,#f0f9ff 0%,#e0f2fe 18%,#bae6fd 40%,#7dd3fc 65%,#38bdf8 85%,#0ea5e9 100%);border-top:4px solid #0284c7;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.32);border:1px solid rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128203;</div>
+        <div>
+          <h2 style="margin:0;color:#0c4a6e;">FLEX Migration Strategy Guide</h2>
+          <p style="margin:0;color:#0284c7;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">From Legacy OSPC to AI-Ready Open Cloud</p>
+        </div>
+      </div>
+      <p style="color:#0c4a6e;line-height:1.5;font-size:18px;font-weight:900;margin:0 0 12px;">Still on Legacy OSPC? Move to FLEX and Unlock Your AI-Ready Cloud Future.</p>
+      <p style="color:#0c4a6e;line-height:1.7;font-size:15px;margin:0 0 18px;">Before any migration starts, customers need one clear business answer: <strong>who should move, why it matters, and when to move.</strong> FLEX gives OSPC customers a modern open-cloud foundation with better <strong>performance</strong>, <strong>lower TCO</strong>, <strong>Kubernetes readiness</strong>, <strong>OpenCenter modernization</strong>, and makes your Business System ready for <strong>AI-Power Up</strong>.</p>
+      <div class="grid4">
+        <div class="mini" style="background:rgba(255,255,255,.72);border-color:rgba(255,255,255,.9);"><div class="icon">&#128161;</div><strong>Why move?</strong><p>Lower TCO, fewer VMware and hyperscaler surprises, stronger performance, and a safer path to growth.</p></div>
+        <div class="mini" style="background:rgba(255,255,255,.72);border-color:rgba(255,255,255,.9);"><div class="icon">&#127919;</div><strong>Who should move?</strong><p>Customers with critical OSPC, VMware, private cloud, or hyperscaler workloads needing control and cost clarity.</p></div>
+        <div class="mini" style="background:rgba(255,255,255,.72);border-color:rgba(255,255,255,.9);"><div class="icon">&#9889;</div><strong>What moves?</strong><p>VMs, apps, data, images, networks, security rules, sovereignty controls, and operations move into FLEX.</p></div>
+        <div class="mini" style="background:rgba(255,255,255,.72);border-color:rgba(255,255,255,.9);"><div class="icon">&#9200;</div><strong>When to move?</strong><p>When OSPC ages, VMware renewals hurt, hyperscaler spend grows, sovereignty matters, or disruption risk is too high.</p></div>
+      </div>
+    </section>
+
+    <section class="savings" id="savings">
+      <div class="card tco" id="tco">
+        <div class="panel-head">TCO Savings</div>
+        <div class="metric-grid">
+          <div class="metric"><label>Monthly Savings</label><strong>$3.5K</strong></div>
+          <div class="metric"><label>Savings %</label><strong>60%</strong></div>
+          <div class="metric"><label>5-Year Savings</label><strong>$194.7K</strong></div>
+        </div>
+        <div class="bar-label"><span>Current state</span><strong style="color:#ef4444;">$5.8K/mo</strong></div>
+        <div class="bar red"><span></span></div>
+        <div class="bar-label"><span>FLEX</span><strong style="color:#16a34a;">$2.3K/mo</strong></div>
+        <div class="bar green"><span></span></div>
+      </div>
+      <div class="card perf" id="readiness">
+        <div class="panel-head">Performance Gain</div>
+        <div class="metric-grid">
+          <div class="metric"><label>Traffic Ramp</label><strong>100%</strong></div>
+          <div class="metric"><label>Readiness</label><strong>78%</strong></div>
+          <div class="metric"><label>Checks</label><strong>14/18</strong></div>
+        </div>
+        <div class="checklist">
+          <div class="check">CPU efficiency improved</div>
+          <div class="check">Memory utilization improved</div>
+          <div class="check">Latency reduced</div>
+          <div class="check">Cutover risk reduced</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

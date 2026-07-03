@@ -1,0 +1,384 @@
+  <style>
+    #panel-sai {
+      background:#f6f8fc !important;
+      color:#172033 !important;
+    }
+    #panel-sai > div {
+      max-width:1460px !important;
+    }
+    #panel-sai h2,
+    #panel-sai h3,
+    #panel-sai strong,
+    #panel-sai [style*="color:#e2e8f0"],
+    #panel-sai [style*="color:#f0fdf4"] {
+      color:#172033 !important;
+      text-shadow:none !important;
+    }
+    #panel-sai p,
+    #panel-sai li,
+    #panel-sai td,
+    #panel-sai [style*="color:#94a3b8"],
+    #panel-sai [style*="color:#64748b"] {
+      color:#64748b !important;
+    }
+    #panel-sai [style*="background:rgba(15,23,42"],
+    #panel-sai [style*="background:rgba(0,0,0"],
+    #panel-sai [style*="background:linear-gradient(135deg,rgba(109,40,217"],
+    #panel-sai [style*="background:linear-gradient(135deg,rgba(16,185,129"],
+    #panel-sai [style*="background:linear-gradient(135deg,rgba(6,182,212"],
+    #panel-sai [style*="background:linear-gradient(135deg,rgba(245,158,11"],
+    #panel-sai [style*="background:linear-gradient(135deg,rgba(236,72,153"] {
+      background:#ffffff !important;
+      border-color:#d8e2f0 !important;
+      box-shadow:0 8px 24px rgba(15,23,42,.08) !important;
+    }
+    #panel-sai > div > div:first-child {
+      background:linear-gradient(135deg,#ffffff,#eff6ff 55%,#f0fdf4) !important;
+      border:1px solid #d8e2f0 !important;
+      box-shadow:0 12px 32px rgba(15,23,42,.10) !important;
+    }
+    #panel-sai > div > div:first-child h2 {
+      color:#172033 !important;
+    }
+    #panel-sai > div > div:first-child p {
+      color:#475569 !important;
+    }
+    #sai-counters > div,
+    #sai-systems-grid > div,
+    #sai-goals-grid > div,
+    #sai-data-grid > button,
+    #sai-sensitivity-btns > button,
+    #sai-checklist-grid > div {
+      background:#ffffff !important;
+      border:1px solid #d8e2f0 !important;
+      box-shadow:0 6px 18px rgba(15,23,42,.07) !important;
+      color:#172033 !important;
+    }
+    #sai-systems-grid > div:hover,
+    #sai-goals-grid > div:hover,
+    #sai-data-grid > button:hover,
+    #sai-sensitivity-btns > button:hover {
+      border-color:#38bdf8 !important;
+      box-shadow:0 10px 24px rgba(56,189,248,.16) !important;
+      transform:translateY(-1px);
+    }
+    #panel-sai select,
+    #panel-sai input,
+    #panel-sai textarea {
+      background:#ffffff !important;
+      border:1px solid #cbd5e1 !important;
+      color:#172033 !important;
+    }
+    #panel-sai table {
+      background:#ffffff !important;
+      border:1px solid #d8e2f0 !important;
+      border-radius:10px !important;
+      overflow:hidden !important;
+    }
+    #panel-sai th {
+      background:#f8fafc !important;
+      color:#1d4ed8 !important;
+      border-bottom:1px solid #d8e2f0 !important;
+    }
+    #panel-sai tr {
+      border-bottom:1px solid #e2e8f0 !important;
+    }
+    #sai-launchpad-output,
+    #panel-sai pre,
+    #panel-sai code {
+      background:#f8fafc !important;
+      border:1px solid #d8e2f0 !important;
+      color:#0f766e !important;
+    }
+    #panel-sai button[onclick*="exportAIPowerUpMarkdown"],
+    #panel-sai button[onclick*="copyAILaunchPadPlan"],
+    #panel-sai button[onclick*="exportAIPowerUpJSON"],
+    #panel-sai button[onclick*="exportAIPowerUpCSV"] {
+      background:#ffffff !important;
+      border:1px solid #b23a3a !important;
+      color:#b23a3a !important;
+    }
+  </style>
+  <div class="panel" id="panel-sai">
+    <div style="padding:20px 20px 40px;max-width:1400px;margin:0 auto;box-sizing:border-box;">
+
+      <!-- ── HERO ── -->
+      <div style="background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(6,182,212,.12),rgba(16,185,129,.08));border:1px solid rgba(139,92,246,.35);border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(139,92,246,.18),transparent 70%);border-radius:50%;pointer-events:none;"></div>
+        <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#a78bfa;font-weight:700;margin-bottom:8px;">Stage 9 — AI Power Up</div>
+        <h2 style="margin:0 0 10px;color:#f0fdf4;font-size:26px;font-weight:800;">Which FLEX Business System do you want to improve with AI?</h2>
+        <p style="margin:0 0 22px;color:#94a3b8;max-width:860px;font-size:14px;line-height:1.6;">Your workloads are migrated to FLEX. Now connect or clone them into an AI POC — and scale to production AI. Start by selecting a migrated business system, choose the AI output you want to improve, then get your recommended Rackspace AI path.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+          <button onclick="importMigratedSystemsForAI()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid #a78bfa;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📥 Import FLEX Business Systems</button>
+          <button onclick="runAIOpportunityScan()" style="background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🔍 Run AI Opportunity Scan</button>
+          <button onclick="generateAILaunchPadPlan()" style="background:linear-gradient(135deg,#059669,#047857);border:1px solid #34d399;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🚀 Generate AI LaunchPad Plan</button>
+          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(245,158,11,.15);border:1px solid rgba(251,191,36,.5);border-radius:8px;color:#fbbf24;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📄 Export AI Power Up Report</button>
+        </div>
+      </div>
+
+      <!-- ── OVERVIEW COUNTERS ── -->
+      <div id="sai-counters" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;">
+        <div style="background:rgba(109,40,217,.12);border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:18px;text-align:center;">
+          <div id="sai-cnt-imported" style="font-size:36px;font-weight:900;color:#a78bfa;">0</div>
+          <div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">FLEX Systems Imported</div>
+        </div>
+        <div style="background:rgba(6,182,212,.10);border:1px solid rgba(34,211,238,.3);border-radius:12px;padding:18px;text-align:center;">
+          <div id="sai-cnt-ready" style="font-size:36px;font-weight:900;color:#22d3ee;">0</div>
+          <div style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">AI-Ready Systems</div>
+        </div>
+        <div style="background:rgba(16,185,129,.10);border:1px solid rgba(52,211,153,.3);border-radius:12px;padding:18px;text-align:center;">
+          <div id="sai-cnt-quickwin" style="font-size:36px;font-weight:900;color:#34d399;">0</div>
+          <div style="font-size:11px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Quick-Win LaunchPad Candidates</div>
+        </div>
+        <div style="background:rgba(245,158,11,.10);border:1px solid rgba(251,191,36,.3);border-radius:12px;padding:18px;text-align:center;">
+          <div id="sai-cnt-upsell" style="font-size:36px;font-weight:900;color:#fbbf24;">$0</div>
+          <div style="font-size:11px;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Est. AI Upsell Potential</div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           STEP 1 — SELECT FLEX BUSINESS SYSTEM
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="background:#7c3aed;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">1</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">Select a migrated FLEX Business System</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Import your migration tracker data or use the demo systems below</div>
+          </div>
+        </div>
+        <div id="sai-import-msg" style="background:rgba(6,182,212,.08);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#67e8f9;margin-bottom:14px;display:none;"></div>
+        <div id="sai-systems-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           STEP 2 — CHOOSE AI OUTPUT GOAL
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="background:#0891b2;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">2</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">What AI output do you want to improve?</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Select one business goal — we'll map it to the right Rackspace AI service</div>
+          </div>
+        </div>
+        <div id="sai-goals-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;"></div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           STEP 3 — DATA SOURCES & SENSITIVITY
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(16,185,129,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="background:#059669;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">3</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">What data can AI safely use?</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Select all available data types and set the sensitivity level</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div>
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Data Sources Available</div>
+            <div id="sai-data-grid" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Data Sensitivity</div>
+            <div id="sai-sensitivity-btns" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+            <div style="margin-top:16px;">
+              <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Preferred Environment</div>
+              <select id="sai-env" style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:12px;width:100%;">
+                <option value="flex">FLEX (Rackspace OpenStack)</option>
+                <option value="private">Private Cloud / Colo / Customer DC</option>
+                <option value="hybrid">Hybrid Cloud</option>
+                <option value="sovereign">Sovereign / Regulated</option>
+                <option value="edge">Edge / Colo</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:20px;">
+          <button onclick="recommendAIPath()" style="background:linear-gradient(135deg,#7c3aed,#0891b2,#059669);border:none;border-radius:10px;color:#fff;padding:13px 32px;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.02em;box-shadow:0 4px 20px rgba(139,92,246,.35);">✨ Recommend My AI Path</button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           AI RECOMMENDATION OUTPUT
+      ═════════════════════════════════════════ -->
+      <div id="sai-recommendation" style="display:none;background:linear-gradient(135deg,rgba(109,40,217,.15),rgba(6,182,212,.10));border:2px solid rgba(139,92,246,.5);border-radius:16px;padding:26px;margin-bottom:24px;">
+        <div style="font-size:12px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">🎯 Your Rackspace AI Recommendation</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:4px;">FLEX Business System</div>
+            <div id="sai-rec-system" style="font-size:18px;font-weight:800;color:#e2e8f0;"></div>
+            <div style="font-size:11px;color:#64748b;margin-top:10px;margin-bottom:4px;">AI Output Goal</div>
+            <div id="sai-rec-goal" style="font-size:14px;font-weight:700;color:#a78bfa;"></div>
+            <div style="font-size:11px;color:#64748b;margin-top:10px;margin-bottom:4px;">FLEX Connection Method</div>
+            <div id="sai-rec-connect" style="font-size:12px;color:#22d3ee;"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Recommended Starting Service</div>
+            <div id="sai-rec-service" style="background:rgba(109,40,217,.2);border:1px solid rgba(139,92,246,.5);border-radius:8px;padding:12px;font-size:16px;font-weight:800;color:#a78bfa;"></div>
+            <div style="font-size:11px;color:#64748b;margin-top:10px;margin-bottom:6px;">Scale-Up Path</div>
+            <div id="sai-rec-scaleup" style="font-size:12px;color:#34d399;"></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px;">
+          <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:14px;">
+            <div style="font-size:10px;color:#fbbf24;font-weight:700;text-transform:uppercase;margin-bottom:6px;">📅 2-Week POC Plan</div>
+            <div id="sai-rec-poc" style="font-size:12px;color:#e2e8f0;line-height:1.6;"></div>
+          </div>
+          <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:14px;">
+            <div style="font-size:10px;color:#34d399;font-weight:700;text-transform:uppercase;margin-bottom:6px;">📈 Sales Next Step</div>
+            <div id="sai-rec-sales" style="font-size:12px;color:#e2e8f0;line-height:1.6;"></div>
+          </div>
+          <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:14px;">
+            <div style="font-size:10px;color:#22d3ee;font-weight:700;text-transform:uppercase;margin-bottom:6px;">⚙️ Technical Next Step</div>
+            <div id="sai-rec-tech" style="font-size:12px;color:#e2e8f0;line-height:1.6;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           POC TO PRODUCTION SCALE-UP PATH
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
+        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">🪜 POC to Production AI Scale-Up Path</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:18px;">Start with the lowest-friction entry point and scale when the business case is clear</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+          <div style="background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.10));border:2px solid rgba(52,211,153,.5);border-radius:10px;padding:14px;position:relative;">
+            <div style="position:absolute;top:-10px;left:12px;background:#059669;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;letter-spacing:.05em;">START HERE</div>
+            <div style="font-size:11px;color:#34d399;font-weight:700;margin-bottom:4px;">Level 1</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">AI LaunchPad</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Fast POC. RAG assistant, summarization, or chatbot on FLEX-hosted data. Lowest friction.</div>
+          </div>
+          <div style="background:linear-gradient(135deg,rgba(6,182,212,.15),rgba(14,116,144,.10));border:1px solid rgba(34,211,238,.3);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;color:#22d3ee;font-weight:700;margin-bottom:4px;">Level 2</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">FAIR Diagnostic / Ideate</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">AI readiness scoring. Identify highest-value use cases. Governance and feasibility review.</div>
+          </div>
+          <div style="background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(14,116,144,.08));border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;color:#22d3ee;font-weight:700;margin-bottom:4px;">Level 3</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">FAIR Incubate / Industrialize</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Build MVP. Validated use case to production. RAG, GenAI app, or workflow automation.</div>
+          </div>
+          <div style="background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(91,33,182,.10));border:1px solid rgba(167,139,250,.35);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:4px;">Level 4</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">Private Cloud AI / AI Anywhere</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Secure AI near your data. Regulated, sovereign, private, colo, or hybrid workloads.</div>
+          </div>
+          <div style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(217,119,6,.08));border:1px solid rgba(251,191,36,.35);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;color:#fbbf24;font-weight:700;margin-bottom:4px;">Level 5</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">AI Business / Inference</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Scalable inference, fine-tuning, domain model deployment. GPU/CPU platform sizing.</div>
+          </div>
+          <div style="background:linear-gradient(135deg,rgba(109,40,217,.22),rgba(6,182,212,.15));border:2px solid rgba(139,92,246,.4);border-radius:10px;padding:14px;position:relative;">
+            <div style="position:absolute;top:-10px;left:12px;background:linear-gradient(135deg,#7c3aed,#0891b2);color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;">SCALE WHEN READY</div>
+            <div style="font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:4px;">Level 6</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">Enterprise AI Cloud</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Governed full-stack AI. Infrastructure, inference, agents, security, operations, accountability.</div>
+          </div>
+          <div style="background:linear-gradient(135deg,rgba(236,72,153,.15),rgba(168,85,247,.10));border:1px solid rgba(244,114,182,.35);border-radius:10px;padding:14px;position:relative;">
+            <div style="position:absolute;top:-10px;left:12px;background:linear-gradient(135deg,#db2777,#7c3aed);color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;">STRATEGIC</div>
+            <div style="font-size:11px;color:#f472b6;font-weight:700;margin-bottom:4px;">Level 7</div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">FDE + Partner Accelerators</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Embedded engineers. Palantir, Uniphore, Dell, AMD, VMware, Rubrik. Fast production impact.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           BUSINESS SYSTEM AI OPPORTUNITY TABLE
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
+        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">📊 Business System AI Opportunity Table</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Each row is a migrated FLEX business system with its AI readiness score and recommended service</div>
+        <div style="overflow-x:auto;">
+          <table id="sai-opp-table" style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(139,92,246,.3);">
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;white-space:nowrap;">Business System</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Apps/VMs</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Data Type</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Sensitivity</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">AI Score</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Recommended Entry</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Est. Value</th>
+                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="sai-opp-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           AI LAUNCHPAD QUICK PLAN
+      ═════════════════════════════════════════ -->
+      <div style="background:linear-gradient(135deg,rgba(16,185,129,.10),rgba(5,150,105,.06));border:1px solid rgba(52,211,153,.3);border-radius:12px;padding:22px;margin-bottom:24px;">
+        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">🚀 AI LaunchPad Quick Plan</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Lowest-hanging AI opportunity — ready in 2 weeks</div>
+        <div id="sai-launchpad-output" style="background:rgba(0,0,0,.3);border-radius:8px;padding:16px;font-size:12px;color:#94a3b8;min-height:80px;font-family:'Share Tech Mono',monospace;white-space:pre-wrap;line-height:1.7;">Click "Generate AI LaunchPad Plan" after selecting a business system and AI goal above.</div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+          <button onclick="generateAILaunchPadPlan()" style="background:rgba(5,150,105,.85);border:1px solid #34d399;border-radius:6px;color:#fff;padding:8px 16px;font-size:11px;font-weight:700;cursor:pointer;">🚀 Generate Plan</button>
+          <button onclick="copyAILaunchPadPlan()" style="background:rgba(30,41,59,.8);border:1px solid #334155;border-radius:6px;color:#94a3b8;padding:8px 16px;font-size:11px;font-weight:700;cursor:pointer;">📋 Copy Plan</button>
+          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(30,41,59,.8);border:1px solid #334155;border-radius:6px;color:#94a3b8;padding:8px 16px;font-size:11px;font-weight:700;cursor:pointer;">⬇ Export Markdown</button>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           GOVERNANCE CHECKLIST
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <div>
+            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">✅ Governance &amp; Data Readiness Checklist</div>
+            <div style="font-size:11px;color:#64748b;">Complete before moving to production AI</div>
+          </div>
+          <div style="text-align:center;">
+            <div id="sai-gov-score" style="font-size:32px;font-weight:900;color:#a78bfa;">0%</div>
+            <div id="sai-gov-label" style="font-size:11px;color:#64748b;font-weight:700;">NOT READY</div>
+          </div>
+        </div>
+        <div id="sai-checklist-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;"></div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           COMMERCIAL UPSELL VIEW
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
+        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">💼 Commercial AI Upsell Tracker</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Track AI sales opportunities per migrated FLEX business system</div>
+        <div style="overflow-x:auto;">
+          <table id="sai-upsell-table" style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(245,158,11,.3);">
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Business System</th>
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">AI Entry Point</th>
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Scale-Up Path</th>
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Est. Value</th>
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Sales Motion</th>
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Status</th>
+                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Next Action</th>
+              </tr>
+            </thead>
+            <tbody id="sai-upsell-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════
+           EXPORT SECTION
+      ═════════════════════════════════════════ -->
+      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;">
+        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">⬇ Export AI Power Up Report</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:14px;">Export your AI plan, recommendations, and upsell tracker for executive review</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button onclick="exportAIPowerUpJSON()" style="background:rgba(109,40,217,.25);border:1px solid rgba(139,92,246,.5);border-radius:8px;color:#a78bfa;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;">📦 Export JSON</button>
+          <button onclick="exportAIPowerUpCSV()" style="background:rgba(6,182,212,.15);border:1px solid rgba(34,211,238,.4);border-radius:8px;color:#22d3ee;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;">📊 Export CSV</button>
+          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(16,185,129,.15);border:1px solid rgba(52,211,153,.4);border-radius:8px;color:#34d399;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;">📄 Export Markdown Report</button>
+        </div>
+      </div>
+
+    </div><!-- /padding wrapper -->
+  </div><!-- /panel-sai -->

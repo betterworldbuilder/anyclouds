@@ -3,12 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Rackspace Cloud | FLEX Region DR Creation</title>
   <style>
     :root {
-      --topbar: #1f232b;
+      --topbar: #ffffff;
       --sidebar: #ffffff;
-      --page: #f4f6f8;
+      --page: #f6f8fc;
       --panel: #ffffff;
       --line: #e6e9ee;
       --line-strong: #d6dbe3;
@@ -39,16 +42,17 @@
       display: flex;
       align-items: center;
       background: var(--topbar);
-      color: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      color: #1f2937;
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 3px rgba(15,23,42,.08);
     }
     .hamburger {
       width: 43px;
       height: 42px;
       display: grid;
       place-items: center;
-      background: #222936;
-      border-right: 1px solid rgba(255,255,255,.06);
+      background: #f8fafc;
+      border-right: 1px solid var(--line);
       font-size: 24px;
       line-height: 1;
     }
@@ -73,15 +77,15 @@
       gap: 14px;
       height: 100%;
       padding: 0 18px;
-      border-left: 1px solid rgba(255,255,255,.08);
-      color: #f7f7f8;
+      border-left: 1px solid var(--line);
+      color: #334155;
       white-space: nowrap;
     }
-    .grid-icon { color: #cfd4dc; font-size: 15px; }
+    .grid-icon { color: #64748b; font-size: 15px; }
     .domain {
       margin-left: 8px;
       padding-left: 22px;
-      border-left: 1px solid rgba(255,255,255,.25);
+      border-left: 1px solid var(--line-strong);
       font-weight: 600;
     }
     .profile {
@@ -90,7 +94,7 @@
       width: 31px;
       height: 31px;
       border-radius: 50%;
-      background: #fff;
+      background: #f1f5f9;
       color: #20242c;
       display: grid;
       place-items: center;
@@ -231,6 +235,110 @@
       font-family: Arial, Helvetica, sans-serif;
       fill: #0f172a;
       font-weight: 800;
+    }
+    .nav-dr-opencenter {
+      min-height: 88px;
+      padding: 12px 14px;
+      flex-direction: column;
+      gap: 4px;
+      background: linear-gradient(135deg, #eff6ff 0%, #ecfdf5 45%, #fef2f2 100%);
+      border: 1px solid #dbeafe;
+      color: #0f172a;
+      box-shadow: 0 10px 24px rgba(59,130,246,.14);
+    }
+    .nav-dr-opencenter:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 14px 30px rgba(34,197,94,.20);
+    }
+    .nav-dr-opencenter .oc-badge-sub { color: #2563eb; }
+    .oc-badge-mark {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #3b82f6 0%, #22c55e 50%, #ef4444 100%);
+      color: #ffffff;
+      font-size: 17px;
+      font-weight: 800;
+      box-shadow: 0 0 0 4px rgba(59,130,246,.12);
+    }
+    .oc-badge-title {
+      color: #0f172a;
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .oc-badge-sub {
+      color: #0e7490;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .nav-dr-flex2flex {
+      min-height: 88px;
+      padding: 12px 14px;
+      flex-direction: column;
+      gap: 4px;
+      background: linear-gradient(135deg, #eff6ff 0%, #ecfdf5 45%, #fef2f2 100%);
+      border: 1px solid #dbeafe;
+      color: #0f172a;
+      box-shadow: 0 10px 24px rgba(59,130,246,.14);
+    }
+    .nav-dr-flex2flex:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 14px 30px rgba(34,197,94,.20);
+    }
+    .nav-dr-flex2flex .oc-badge-sub { color: #2563eb; }
+    .f2f-mark {
+      background: linear-gradient(135deg, #3b82f6 0%, #22c55e 50%, #ef4444 100%);
+      color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(59,130,246,.12);
+    }
+    .nav-dr-hyperflex {
+      min-height: 88px;
+      padding: 12px 14px;
+      flex-direction: column;
+      gap: 4px;
+      background:
+        radial-gradient(circle at 88% 18%, rgba(255,153,0,.26), transparent 30%),
+        linear-gradient(135deg, #fff7ed 0%, #f8fafc 50%, #f1f5f9 100%);
+      border: 1px solid #fed7aa;
+      color: #0f172a;
+      box-shadow: 0 10px 24px rgba(255,153,0,.18);
+    }
+    .nav-dr-hyperflex:hover {
+      border-color: #ff9900;
+      box-shadow: 0 14px 30px rgba(255,153,0,.28);
+    }
+    .nav-dr-hyperflex .oc-badge-sub { color: #b45309; }
+    .hf-mark {
+      background: #232f3e;
+      color: #ff9900;
+      box-shadow: 0 0 0 4px rgba(255,153,0,.16);
+    }
+    .nav-dr-aipower {
+      min-height: 88px;
+      padding: 12px 14px;
+      flex-direction: column;
+      gap: 4px;
+      background:
+        radial-gradient(circle at 88% 18%, rgba(6,182,212,.24), transparent 30%),
+        linear-gradient(135deg, #faf5ff 0%, #f5f3ff 45%, #ecfeff 100%);
+      border: 1px solid #e9d5ff;
+      color: #0f172a;
+      box-shadow: 0 10px 24px rgba(124,58,237,.16);
+    }
+    .nav-dr-aipower:hover {
+      border-color: #a855f7;
+      box-shadow: 0 14px 30px rgba(124,58,237,.26);
+    }
+    .nav-dr-aipower .oc-badge-sub { color: #7c3aed; }
+    .ai-mark {
+      background: linear-gradient(135deg, #6d28d9 0%, #06b6d4 100%);
+      color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(139,92,246,.16);
     }
     .toolbar-cleanup { display: none !important; }
     .pulse {
@@ -440,14 +548,25 @@
     <a class="nav-item section" href="#"><span>▧ Container</span><span class="chev">⌄</span></a>
     <a class="nav-item section" href="#" onclick="toggleDrButtons(event)"><span>🌈 FLEX Migrations</span><span class="chev" id="flex-tools-chev">⌄</span></a>
     <div id="dr-buttons-container" style="display: none; padding-top: 6px;">
-    <button id="ospc2flex-dr-btn" class="btn btn-dr nav-dr nav-dr-primary" type="button" title="Open OSPC2FLEX migration workflow" aria-label="Open OSPC2FLEX migration workflow">
-      <img src="assets/ospc_to_flex.png" class="dr-logo" alt="OSPC to FLEX">
+    <button id="flex-region-dr-btn" class="btn btn-dr nav-dr nav-dr-flex2flex" type="button" title="Open Flex2Flex Region DR Cloning workflow" aria-label="Open Flex2Flex Region DR Cloning workflow">
+      <span class="oc-badge-mark f2f-mark">⇄</span>
+      <span class="oc-badge-title">Flex2Flex</span>
+      <span class="oc-badge-sub">Region DR Cloning</span>
     </button>
-    <button id="flex-region-dr-btn" class="btn btn-dr nav-dr" type="button" title="Open FLEX2FLEX region cloning workflow" aria-label="Open FLEX2FLEX region cloning workflow">
-      <img src="assets/flex2flex.png" class="dr-logo" alt="Flex2Flex">
+    <button id="flexanywhere-cross-cloud-btn" class="btn btn-dr nav-dr nav-dr-hyperflex" type="button" title="Open HyperFlex cross-cloud migration workflow" aria-label="Open HyperFlex cross-cloud migration workflow">
+      <span class="oc-badge-mark hf-mark">⇅</span>
+      <span class="oc-badge-title">HyperFlex</span>
+      <span class="oc-badge-sub">Cross Cloud Migration</span>
     </button>
-    <button id="flexanywhere-cross-cloud-btn" class="btn btn-dr nav-dr nav-dr-secondary" type="button" title="Open Flex Anywhere cross-cloud solutions workflow" aria-label="Open Flex Anywhere cross-cloud solutions workflow">
-      <img src="assets/hyperflex.png" class="dr-logo" alt="HYPERFLEX">
+    <button id="opencenter-dr-btn" class="btn btn-dr nav-dr nav-dr-opencenter" type="button" title="Open OpenCenter modernization workflow" aria-label="Open OpenCenter modernization workflow">
+      <span class="oc-badge-mark">⌘</span>
+      <span class="oc-badge-title">OpenCenter</span>
+      <span class="oc-badge-sub">GitOps Modernization</span>
+    </button>
+    <button id="aipower-dr-btn" class="btn btn-dr nav-dr nav-dr-aipower" type="button" title="Open AI Power Up workflow" aria-label="Open AI Power Up workflow">
+      <span class="oc-badge-mark ai-mark">✦</span>
+      <span class="oc-badge-title">AI Power Up</span>
+      <span class="oc-badge-sub">FLEX AI Modernization</span>
     </button>
     </div>
     <a class="nav-item" href="#"><span>□</span><span>Documentation</span></a>
@@ -468,17 +587,34 @@
 
   <script>
     (function () {
-      const flex2flexWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?mode=flex2flex&skin=flexlight';
-      const hyperFlexWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?mode=flexanywhere&skin=flexlight';
-      const ospcWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?skin=flexlight';
-      const frame = document.getElementById('dr-frame');
-      const ospcBtn = document.getElementById('ospc2flex-dr-btn');
-      const openBtn = document.getElementById('flex-region-dr-btn');
-      const crossCloudBtn = document.getElementById('flexanywhere-cross-cloud-btn');
+	      const flex2flexWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?mode=flex2flex&skin=flexlight';
+	      const hyperFlexWorkflowUrl = 'https://127.0.0.1:5002/image_migrator/?mode=flexanywhere&skin=flexlight';
+	      const opencenterWorkflowUrl = 'https://127.0.0.1:5002/opencenter';
+	      const aipowerWorkflowUrl = 'https://127.0.0.1:5002/ai-powerup';
+	      const frame = document.getElementById('dr-frame');
+	      const openBtn = document.getElementById('flex-region-dr-btn');
+	      const crossCloudBtn = document.getElementById('flexanywhere-cross-cloud-btn');
+	      const opencenterBtn = document.getElementById('opencenter-dr-btn');
+	      const aipowerBtn = document.getElementById('aipower-dr-btn');
 
-      function loadDr() {
-        if (frame) frame.src = flex2flexWorkflowUrl;
-      }
+	      try {
+	        localStorage.setItem('osflex_global_theme_v1', 'flex-skyline');
+	        localStorage.setItem('osflex_global_theme_v2', 'flex-skyline');
+	      } catch (_) {}
+
+	      function applyLightThemeToFrame() {
+	        if (!frame || !frame.contentWindow) return;
+	        try {
+	          frame.contentWindow.postMessage({ type: 'osflex-theme', theme: 'flex-skyline' }, 'https://127.0.0.1:5002');
+	          if (typeof frame.contentWindow.applyGlobalTheme === 'function') {
+	            frame.contentWindow.applyGlobalTheme('flex-skyline', false);
+	          }
+	        } catch (_) {}
+	      }
+
+	      function loadDr() {
+	        if (frame) frame.src = flex2flexWorkflowUrl;
+	      }
 
       function refreshFlex2FlexDr() {
         if (frame) frame.src = flex2flexWorkflowUrl + '&_=' + Date.now();
@@ -488,15 +624,21 @@
         if (frame) frame.src = hyperFlexWorkflowUrl + '&_=' + Date.now();
       }
 
-      function refreshOspcDr() {
-        if (frame) frame.src = ospcWorkflowUrl + (ospcWorkflowUrl.includes('?') ? '&' : '?') + '_=' + Date.now();
-      }
+	      function refreshOpenCenter() {
+	        if (frame) frame.src = opencenterWorkflowUrl + (opencenterWorkflowUrl.includes('?') ? '&' : '?') + '_=' + Date.now();
+	      }
 
-      loadDr();
-      if (ospcBtn) ospcBtn.addEventListener('click', refreshOspcDr);
-      if (openBtn) openBtn.addEventListener('click', refreshFlex2FlexDr);
-      if (crossCloudBtn) crossCloudBtn.addEventListener('click', refreshHyperFlexDr);
-    })();
+	      function refreshAIPower() {
+	        if (frame) frame.src = aipowerWorkflowUrl + (aipowerWorkflowUrl.includes('?') ? '&' : '?') + '_=' + Date.now();
+	      }
+
+	      loadDr();
+	      if (frame) frame.addEventListener('load', applyLightThemeToFrame);
+	      if (openBtn) openBtn.addEventListener('click', refreshFlex2FlexDr);
+	      if (crossCloudBtn) crossCloudBtn.addEventListener('click', refreshHyperFlexDr);
+	      if (opencenterBtn) opencenterBtn.addEventListener('click', refreshOpenCenter);
+	      if (aipowerBtn) aipowerBtn.addEventListener('click', refreshAIPower);
+	    })();
     function toggleDrButtons(e) {
       e.preventDefault();
       const container = document.getElementById('dr-buttons-container');

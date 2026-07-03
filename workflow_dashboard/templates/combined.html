@@ -470,6 +470,17 @@
     #panel-s_tour { width: 100%; max-width: 100%; }
     #panel-s2 { width: 100%; max-width: 100%; }
     #panel-s5, #panel-s5b { width: 100% !important; max-width: 100% !important; }
+    .r6-step-card {
+      background:#fff;
+      border:1px solid #d8e2f0;
+      border-left:4px solid #38bdf8;
+      border-radius:10px;
+      padding:12px;
+      box-shadow:0 2px 8px rgba(15,23,42,.06);
+    }
+    .r6-step-card strong { display:block;color:#0f172a;font-size:12px;margin-bottom:8px; }
+    .r6-step-card span { display:inline-block;background:#f1f5f9;color:#475569;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:900;margin-bottom:8px; }
+    .r6-step-card small { display:block;color:#64748b;line-height:1.35; }
     /* Skyline theme: white instead of grey everywhere */
     body.flex-skyline-mode .panel-area { background: #ffffff !important; }
     body.flex-skyline-mode .s0-feature-card { background: #ffffff !important; box-shadow: 0 2px 10px rgba(0,0,0,0.07) !important; }
@@ -552,7 +563,7 @@
       z-index:0;
     }
     .s0-dawn-content {
-      position:relative; z-index:2; text-align:center; max-width:900px;
+      position:relative; z-index:2; text-align:center; max-width:1320px; margin:0 auto; width:100%;
     }
     .s0-dawn-badge {
       display:inline-flex; align-items:center; gap:8px;
@@ -569,8 +580,8 @@
       font-size:10px; color:white;
     }
     .s0-dawn-title {
-      font-size:43px; font-weight:900; color:#ffffff; margin:0 0 20px;
-      line-height:1.2; text-shadow:0 2px 12px rgba(0,0,0,0.30);
+      font-size:clamp(32px,4.2vw,62px); font-weight:900; color:#ffffff; margin:0 0 20px;
+      line-height:1.25; text-shadow:0 2px 12px rgba(0,0,0,0.30); text-align:center;
     }
     .s0-dawn-title-line {
       display:block;
@@ -578,31 +589,34 @@
     .s0-dawn-title-word {
       display:inline-block;
       margin-right:6px;
-      font-size:1.2em;
-      color:#ffffff;
-      text-shadow:0 2px 12px rgba(0,0,0,0.30);
-      animation-name:s0-title-blue;
-      animation-duration:11s;
+      font-size:1em;
+      color:transparent;
+      animation-name:s0-title-lightup;
+      animation-duration:12s;
       animation-iteration-count:infinite;
       animation-timing-function:ease-in-out;
     }
-    /* Each word turns FLEX-contour blue in turn (words spaced ~2s apart),
-       then the whole FLEX block blinks at the end of the sweep. 11s loop. */
+    /* Words start invisible; each lights up white in turn and stays lit ~3s (round-robin), 12s loop. */
     .s0-title-why  { animation-delay:0s; }
-    .s0-title-who  { animation-delay:2s; }
-    .s0-title-what { animation-delay:4s; }
-    .s0-title-when { animation-delay:6s; }
-    @keyframes s0-title-blue {
-      0%, 18%, 100% { color:#ffffff; text-shadow:0 2px 12px rgba(0,0,0,0.30); }
-      6%, 10% { color:#ffd600; text-shadow:0 0 14px rgba(255,214,0,0.95),0 0 26px rgba(255,193,7,0.6),0 2px 12px rgba(0,0,0,0.30); }
+    .s0-title-who  { animation-delay:3s; }
+    .s0-title-what { animation-delay:6s; }
+    .s0-title-when { animation-delay:9s; }
+    @keyframes s0-title-lightup {
+      0% { color:transparent; text-shadow:none; }
+      2%, 23% { color:#ffffff; text-shadow:0 0 12px rgba(255,255,255,0.9),0 0 22px rgba(255,255,255,0.5),0 2px 12px rgba(0,0,0,0.30); }
+      25%, 100% { color:transparent; text-shadow:none; }
     }
     .s0-dawn-title-highlight {
       display:inline-block;
       margin-top:4px;
-      padding:1px 8px 4px;
+      padding:2px 14px 6px;
       color:#fff;
+      white-space:nowrap;
+      font-size:1em; /* same size as the Why/Who/What/When words */
+      border-radius:10px;
       background:linear-gradient(90deg,rgba(37,99,235,0.92),rgba(96,165,250,0.82));
       text-shadow:0 2px 8px rgba(0,0,0,0.18);
+      box-shadow:0 8px 26px rgba(37,99,235,0.35);
       animation:s0-flex-block-blink 11s ease-in-out infinite;
     }
     /* After the Why/Who/What/When sweep, the whole FLEX block double-blinks (~78–88% of the 11s loop). */
@@ -1215,7 +1229,7 @@
       box-shadow: none !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
     }
-body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown):not(.uat-s1-template-tab),
+body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):not(.sub-btn):not(.sub-btn-dropdown):not(.uat-s1-template-tab):not(.oc-card):not(.oc-arrow),
     body.flex-skyline-mode .gov-btn,
     body.flex-skyline-mode .uat-btn {
       background: #a33e3e !important;
@@ -1925,7 +1939,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 <script>
   (function() {
     try {
-      var theme = localStorage.getItem('osflex_global_theme_v2') || 'dark';
+    var theme = localStorage.getItem('osflex_global_theme_v2') || 'flex-skyline';
       if (theme === 'flex-skyline') document.body.classList.add('flex-skyline-mode');
     } catch (_) {}
   })();
@@ -1981,7 +1995,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   function restoreGlobalTheme() {
     let saved = '';
     try { saved = localStorage.getItem(GLOBAL_THEME_KEY) || ''; } catch (_) {}
-    applyGlobalTheme(saved || 'dark', false);
+    applyGlobalTheme(saved || 'flex-skyline', false);
   }
   document.addEventListener('click', function(e) {
     const dd = document.getElementById('top-theme-dropdown');
@@ -2110,7 +2124,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <button class="stage-btn stage-tour-btn" data-stage="s_tour">🎓 Quick Tour</button>
   <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Migration Log</button>
   <button class="stage-btn" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
-  <button class="stage-btn" data-stage="s2">Stage 2<br><small>Migrations</small></button>
+  <button class="stage-btn" data-stage="s2">Stage 2<br><small>Migration Strategies Hub</small></button>
   <button class="stage-btn" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
   <button class="stage-btn" data-stage="s7">Stage 3a<br><small>Cost Optimization</small></button>
   <button class="stage-btn" data-stage="s7a">Stage 3b<br><small>Performance Gain</small></button>
@@ -2118,7 +2132,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <button class="stage-btn" data-stage="s5b">Stage 4B<br><small>Business System Cutover</small></button>
   <button class="stage-btn" data-stage="s8">Stage 5<br><small>IaC Backup, DR &amp; Restore</small></button>
   <button class="stage-btn" data-stage="s6">Stage 6<br><small>Handover and Deliverable</small></button>
-  <button class="stage-btn" data-stage="s9">Stage 7<br><small>OPENCENTER Migration</small></button>
+  <button class="stage-btn" data-stage="s9" style="display:none;">Stage 7<br><small>OPENCENTER Migration</small></button>
   <button class="stage-btn" data-stage="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
   <button class="stage-btn" data-stage="sai" style="background:linear-gradient(135deg,rgba(109,40,217,.55),rgba(6,182,212,.35));border-color:rgba(139,92,246,.6);">Stage 9<br><small>AI Power Up</small></button>
 </div>
@@ -2171,12 +2185,14 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 
   <button class="sub-btn" data-sub="s2rehost_p1">🛠 Infrastructure Migration</button>
   <button class="sub-btn" data-sub="s2fullmig">🏢 Full Business System Rehost</button>
+  <button class="sub-btn" data-sub="s2vmware">💠 VMware to FLEX Migration</button>
   <button class="sub-btn active" data-sub="s2image">☁️ 🌈 ☁️ R3 : OSPC 2 FLEX VM Rehost</button>
   <button class="sub-btn" data-sub="s2flexanywhere">☁️ AWS · ☁️ GCP · ☁️ Azure 🌈 ☁️ FLEX — R3 HYPER FLEX</button>
   <button class="sub-btn" data-sub="s2flex2flex">🌐 R3 FLEX2FLEX-Region Cloning</button>
   <button class="sub-btn" data-sub="s2rehost_p2_1">⚙️ R5 Replatform — App & DB Replication</button>
   <!-- R5 Data Replatform / Full Manual Runbook removed — see Stage 2 migration tools -->
-  <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ R6 Refactor / Rearchitect — K8s Modernization</button>
+  <button class="sub-btn" data-sub="s2rehost_p2_2">☸️ R6 Refactor / Rearchitect APPs to Containerization</button>
+  <button class="sub-btn" data-sub="s2opencenter">🚀 OpenCenter Migration</button>
 
   <button class="sub-btn" data-sub="s2repurchase">🛒 R7 Repurchase — Replace with SaaS/Product</button>
 </div>
@@ -2239,7 +2255,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
             <span class="s0-dawn-badge-dot">&#9733;</span>
             MIGRATION STRATEGY GUIDE
           </div>
-          <h1 class="s0-dawn-title"><span class="s0-dawn-title-line"><span class="s0-dawn-title-word s0-title-why">Why</span><span class="s0-dawn-title-word s0-title-who">Who</span><span class="s0-dawn-title-word s0-title-what">What</span><span class="s0-dawn-title-word s0-title-when">When</span> to Move to</span><span class="s0-dawn-title-line"><span class="s0-dawn-title-highlight">FLEX, the Next Level Cloud?</span></span></h1>
+          <h1 class="s0-dawn-title"><span class="s0-dawn-title-line"><span class="s0-dawn-title-word s0-title-why">Why</span><span class="s0-dawn-title-word s0-title-who">Who</span><span class="s0-dawn-title-word s0-title-what">What</span><span class="s0-dawn-title-word s0-title-when">When</span> <span style="font-size:0.6em;">Move to</span></span><span class="s0-dawn-title-line"><span class="s0-dawn-title-highlight">FLEX <span style="font-size:0.6em;">Your AI-Ready Open Cloud Hub</span></span></span></h1>
           <p class="s0-dawn-desc">Before any technical migration begins, customers need a clear business answer: <strong>who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
           <div class="s0-dawn-stats">
             <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">4</div><div class="s0-dawn-stat-lbl">WHY REASONS</div></div>
@@ -2258,11 +2274,12 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
             <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,0.3);border:1px solid rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128203;</div>
             <div>
-              <h2 style="color:#0c4a6e;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">Strategic Message</h2>
-              <p style="color:#0284c7;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Executive Summary</p>
+              <h2 style="color:#0c4a6e;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">FLEX Migration Strategy Guide</h2>
+              <p style="color:#0284c7;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">From Legacy OSPC to AI-Ready Open Cloud</p>
             </div>
           </div>
-          <p style="color:#0c4a6e;line-height:1.7;font-size:15px;margin:0 0 18px;">Any cloud, VMware, OSPC, hyperscaler, or legacy infrastructure move to FLEX is not just a migration &mdash; it is a <strong>Business Modernization Journey</strong> that reduces cost pressure, protects data sovereignty, restores control, and delivers better <strong>Performance</strong>, <strong>Flexibility</strong>, <strong>Resiliency</strong>, and <strong>Services</strong> for your business and your customers.</p>
+          <p style="color:#0c4a6e;line-height:1.5;font-size:18px;font-weight:800;margin:0 0 12px;">Still on Legacy OSPC? Move to FLEX and Unlock Your AI-Ready Cloud Future.</p>
+          <p style="color:#0c4a6e;line-height:1.7;font-size:15px;margin:0 0 18px;">Before any migration starts, customers need one clear business answer: <strong>who should move, why it matters, and when to move.</strong> FLEX gives OSPC customers a modern open-cloud foundation with better <strong>performance</strong>, <strong>lower TCO</strong>, <strong>Kubernetes readiness</strong>, <strong>OpenCenter modernization</strong>, and makes your Business System ready for <strong>AI-Power Up</strong>.</p>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;">
             <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
               <div style="font-size:22px;margin-bottom:8px;">&#128161;</div>
@@ -2436,6 +2453,8 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
               let html = '<html><head><meta charset="utf-8"><style>table{border-collapse:collapse;margin-bottom:22px;min-width:980px;}th,td{border:1px solid #cbd5e1;padding:7px 9px;font-family:Arial;font-size:12px;}th{background:#e0f2fe;font-weight:700;color:#172033;}h2{font-family:Arial;color:#172033;}h3{font-family:Arial;color:#1e40af;margin-bottom:8px;}.save{background:#dcfce7;color:#166534;font-weight:700;}.cost{background:#fee2e2;color:#991b1b;font-weight:700;}.flex{background:#ecfdf5;color:#166534;font-weight:700;}</style></head><body>';
               html += '<h2>OSPC to FLEX Detailed Regional Flavor Price Comparison</h2>';
               if (tcoCards.length) {
+                const globalTcoTable = scope.querySelector('[data-global-tco-table]');
+                if (globalTcoTable) html += '<h3>Global TCO Summary</h3>' + globalTcoTable.outerHTML;
                 tcoCards.forEach(card => {
                   const region = card.getAttribute('data-region') || 'Region';
                   const table = card.querySelector('table');
@@ -2483,10 +2502,10 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
               const sign = n < 0 ? '-' : '';
               return sign + '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
             }
-            function s0UpdateFlavorBaseline(select) {
-              const opt = select && select.options ? select.options[select.selectedIndex] : null;
-              const card = select ? select.closest('[data-region-tco-card], [data-stage3a-region-tco-card]') : null;
-              if (!opt || !card) return;
+	            function s0UpdateFlavorBaseline(select) {
+	              const opt = select && select.options ? select.options[select.selectedIndex] : null;
+	              const card = select ? select.closest('[data-region-tco-card], [data-stage3a-region-tco-card]') : null;
+	              if (!opt || !card) return;
               const ospc = Number(opt.getAttribute('data-ospc-cost') || 0);
               const flex = Number(opt.getAttribute('data-flex-cost') || 0);
               const saving = ospc - flex;
@@ -2507,9 +2526,101 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
               setText('[data-selected-5y]', s0FlavorMoney(saving * 60));
               setText('[data-selected-saving]', s0FlavorMoney(saving) + '/mo saved (' + savePct.toFixed(1) + '%)');
               const flexBar = card.querySelector('[data-selected-flexbar]');
-              if (flexBar) flexBar.style.width = flexPct + '%';
-            }
-          </script>
+	              if (flexBar) flexBar.style.width = flexPct + '%';
+	            }
+	            function s0BuildGlobalTcoTable() {
+	              const flavors = [
+	                ['general1-1','2.2',68.80,28.08],
+	                ['general1-2','2.2',77.62,28.08],
+	                ['compute1-4','2.4',86.44,35.28],
+	                ['general1-4','4.4',151.70,61.92],
+	                ['compute1-8','4.8',186.98,76.32],
+	                ['compute1-30','16.64',200.00,398.16]
+	              ];
+	              const regions = [
+	                ['IAD','gp.0.'],
+	                ['DFW','gp.5.'],
+	                ['SJC','gp.0.']
+	              ];
+	              const money = n => {
+	                const sign = n < 0 ? '-' : '';
+	                return sign + '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+	              };
+	              const td = (value, align, bg, color) => `<td style="padding:9px 11px;border-bottom:1px solid #e2e8f0;text-align:${align || 'left'};background:${bg || '#fff'};color:${color || '#0f172a'};font-weight:900;white-space:nowrap;">${value}</td>`;
+	              const header = `
+	                <thead>
+	                  <tr style="background:#f8fafc;">
+	                    <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#0f172a;">Region</th>
+	                    <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#0f172a;">OSPC Flavor</th>
+	                    <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#0f172a;">FLEX Flavor</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#991b1b;">OSPC / Month</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">FLEX / Month</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Monthly Saving</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">1-Year Saving</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">3-Year Saving</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">5-Year Saving</th>
+	                    <th style="text-align:center;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#475569;">Matched</th>
+	                  </tr>
+	                </thead>`;
+	              let globalOspc = 0, globalFlex = 0, globalSaving = 0, globalMatched = 0;
+	              let body = '<tbody>';
+	              regions.forEach(([region, flexPrefix]) => {
+	                let regionOspc = 0, regionFlex = 0, regionSaving = 0;
+	                flavors.forEach(([ospcFlavor, flexSuffix, ospc, flex], idx) => {
+	                  const saving = ospc - flex;
+	                  regionOspc += ospc; regionFlex += flex; regionSaving += saving;
+	                  globalOspc += ospc; globalFlex += flex; globalSaving += saving; globalMatched += 1;
+	                  const saveBg = saving >= 0 ? '#dcfce7' : '#fee2e2';
+	                  const saveColor = saving >= 0 ? '#166534' : '#991b1b';
+	                  body += '<tr>' +
+	                    td(idx === 0 ? region : '', 'left', idx === 0 ? '#eff6ff' : '#fff', region === 'IAD' ? '#1e40af' : region === 'DFW' ? '#047857' : '#c2410c') +
+	                    td(ospcFlavor, 'left') +
+	                    td(flexPrefix + flexSuffix, 'left') +
+	                    td(money(ospc), 'right', '#fee2e2', '#991b1b') +
+	                    td(money(flex), 'right', '#ecfdf5', '#166534') +
+	                    td(money(saving), 'right', saveBg, saveColor) +
+	                    td(money(saving * 12), 'right', saveBg, saveColor) +
+	                    td(money(saving * 36), 'right', saveBg, saveColor) +
+	                    td(money(saving * 60), 'right', saveBg, saveColor) +
+	                    td('1', 'center') +
+	                  '</tr>';
+	                });
+	                body += '<tr style="background:#f8fafc;">' +
+	                  td(region + ' Total Matched Flavor Baseline', 'left', '#f8fafc', '#0f172a') +
+	                  td('', 'left', '#f8fafc') +
+	                  td('', 'left', '#f8fafc') +
+	                  td(money(regionOspc), 'right', '#fee2e2', '#991b1b') +
+	                  td(money(regionFlex), 'right', '#ecfdf5', '#166534') +
+	                  td(money(regionSaving), 'right', '#eff6ff', '#1e40af') +
+	                  td(money(regionSaving * 12), 'right', '#dcfce7', '#166534') +
+	                  td(money(regionSaving * 36), 'right', '#dcfce7', '#166534') +
+	                  td(money(regionSaving * 60), 'right', '#dcfce7', '#166534') +
+	                  td('6', 'center', '#f8fafc') +
+	                '</tr>';
+	              });
+	              body += '</tbody><tfoot><tr style="background:#f8fafc;">' +
+	                td('Global 3-Region Total', 'left', '#f8fafc', '#0f172a') +
+	                td('', 'left', '#f8fafc') +
+	                td('', 'left', '#f8fafc') +
+	                td(money(globalOspc), 'right', '#fee2e2', '#991b1b') +
+	                td(money(globalFlex), 'right', '#ecfdf5', '#166534') +
+	                td(money(globalSaving), 'right', '#eff6ff', '#1e40af') +
+	                td(money(globalSaving * 12), 'right', '#dcfce7', '#166534') +
+	                td(money(globalSaving * 36), 'right', '#dcfce7', '#166534') +
+	                td(money(globalSaving * 60), 'right', '#dcfce7', '#166534') +
+	                td(String(globalMatched), 'center', '#f8fafc') +
+	              '</tr></tfoot>';
+	              document.querySelectorAll('[data-global-tco-table]').forEach(table => {
+	                table.style.minWidth = '1320px';
+	                table.innerHTML = header + body;
+	              });
+	            }
+	            if (document.readyState === 'loading') {
+	              document.addEventListener('DOMContentLoaded', s0BuildGlobalTcoTable);
+	            } else {
+	              s0BuildGlobalTcoTable();
+	            }
+	          </script>
 
           <div data-price-comparison-section style="background:#fff;border:1px solid #d8e2f0;border-radius:14px;padding:18px 20px;margin:0 0 24px;box-shadow:0 8px 24px rgba(15,23,42,.08);width:calc(100vw - 48px);max-width:1780px;box-sizing:border-box;position:relative;left:50%;transform:translateX(-50%);">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
@@ -2520,6 +2631,41 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
               <div style="font-size:11px;color:#64748b;line-height:1.45;max-width:420px;text-align:right;">
                 <button type="button" onclick="s0ExportPriceComparisonXls(this)" style="border:none;border-radius:4px;background:#b23a3a;color:#fff;padding:8px 12px;font-size:10px;font-weight:900;cursor:pointer;margin-bottom:8px;box-shadow:0 2px 6px rgba(15,23,42,.16);">Export Full 3 Detailed Tables XLS</button><br>
                 OSPC prices are inferred from <strong>TCO_Comparison_Report.csv</strong> aligned with the TCO flavormap. FLEX prices come from <strong>uploads/flavors/*Flavors.csv</strong>.
+              </div>
+            </div>
+
+            <div data-global-tco-view style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 12px 28px rgba(15,23,42,.16);overflow:hidden;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px;">
+                <div>
+                  <div style="font-size:10px;font-weight:900;color:#93c5fd;text-transform:uppercase;letter-spacing:.14em;margin-bottom:5px;">Global TCO View</div>
+                  <h3 style="font-size:21px;font-weight:950;color:#fff;margin:0 0 4px;line-height:1.15;">All-region OSPC vs FLEX cost comparison</h3>
+                  <p style="font-size:12px;font-weight:700;color:#dbeafe;margin:0;">Monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings across IAD, DFW, and SJC.</p>
+                </div>
+                <button type="button" onclick="s0ExportPriceComparisonXls(this)" style="border:1px solid rgba(255,255,255,.28);border-radius:7px;background:#b23a3a;color:#fff;padding:9px 12px;font-size:10px;font-weight:950;cursor:pointer;box-shadow:0 5px 14px rgba(0,0,0,.22);white-space:nowrap;">Export Global XLS</button>
+              </div>
+              <div style="background:#fff;border-radius:12px;border:1px solid rgba(255,255,255,.3);overflow:auto;">
+                <table data-global-tco-table style="width:100%;min-width:1120px;border-collapse:collapse;font-size:11px;color:#0f172a;">
+                  <thead>
+                    <tr style="background:#eff6ff;">
+                      <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Region</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#991b1b;">OSPC / Month</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">FLEX / Month</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Monthly Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">1-Year Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">3-Year Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">5-Year Saving</th>
+                      <th style="text-align:center;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#475569;">Matched Flavors</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#1e40af;">IAD</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#047857;">DFW</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#c2410c;">SJC</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:#f8fafc;"><td style="padding:11px 12px;font-weight:950;color:#0f172a;">Global 3-Region Total</td><td style="padding:11px 12px;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$2,314.62</td><td style="padding:11px 12px;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$1,883.52</td><td style="padding:11px 12px;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$431.10</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$15,519.60</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$25,866.00</td><td style="padding:11px 12px;text-align:center;font-weight:950;">18</td></tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr;gap:16px;">
@@ -2700,45 +2846,45 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
               <div style="font-size:11px;color:#64748b;line-height:1.45;max-width:360px;text-align:right;">CPU, memory, and disk indexes compare matched FLEX capacity to source OSPC flavor capacity. FLEX bandwidth comes from the regional flavor catalogs.</div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;overflow:auto;">
-              <div data-export-card style="border:1px solid #bfdbfe;border-radius:10px;overflow:hidden;min-width:300px;">
+              <div data-export-card style="border:1px solid #bfdbfe;border-radius:10px;overflow:hidden;min-width:380px;">
                 <div style="background:#eff6ff;color:#1e40af;font-size:13px;font-weight:900;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;"><span>IAD Performance Comparison</span><button type="button" onclick="s0ExportNearestTable(this,'IAD_OSPC_FLEX_Performance_Comparison.csv')" style="border:1px solid #bfdbfe;border-radius:7px;background:#fff;color:#1e40af;padding:5px 8px;font-size:10px;font-weight:900;cursor:pointer;">Export CSV</button></div>
                 <table style="width:100%;border-collapse:collapse;font-size:11px;color:#334155;">
-                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC &rarr; FLEX</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
+                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Flavor</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Flavor</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
                   <tbody>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1<br><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2<br><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4<br><strong>gp.0.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4<br><strong>gp.0.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8<br><strong>gp.0.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
-                    <tr><td style="padding:7px 8px;">compute1-30<br><strong>gp.0.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
+                    <tr><td style="padding:7px 8px;">compute1-30</td><td style="padding:7px 8px;"><strong>gp.0.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
                   </tbody>
                 </table>
               </div>
-              <div data-export-card style="border:1px solid #bbf7d0;border-radius:10px;overflow:hidden;min-width:300px;">
+              <div data-export-card style="border:1px solid #bbf7d0;border-radius:10px;overflow:hidden;min-width:380px;">
                 <div style="background:#ecfdf5;color:#047857;font-size:13px;font-weight:900;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;"><span>DFW Performance Comparison</span><button type="button" onclick="s0ExportNearestTable(this,'DFW_OSPC_FLEX_Performance_Comparison.csv')" style="border:1px solid #bbf7d0;border-radius:7px;background:#fff;color:#047857;padding:5px 8px;font-size:10px;font-weight:900;cursor:pointer;">Export CSV</button></div>
                 <table style="width:100%;border-collapse:collapse;font-size:11px;color:#334155;">
-                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC &rarr; FLEX</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
+                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Flavor</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Flavor</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
                   <tbody>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1<br><strong>gp.5.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2<br><strong>gp.5.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4<br><strong>gp.5.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4<br><strong>gp.5.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8<br><strong>gp.5.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
-                    <tr><td style="padding:7px 8px;">compute1-30<br><strong>gp.5.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
+                    <tr><td style="padding:7px 8px;">compute1-30</td><td style="padding:7px 8px;"><strong>gp.5.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
                   </tbody>
                 </table>
               </div>
-              <div data-export-card style="border:1px solid #fed7aa;border-radius:10px;overflow:hidden;min-width:300px;">
+              <div data-export-card style="border:1px solid #fed7aa;border-radius:10px;overflow:hidden;min-width:380px;">
                 <div style="background:#fff7ed;color:#c2410c;font-size:13px;font-weight:900;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;"><span>SJC Performance Comparison</span><button type="button" onclick="s0ExportNearestTable(this,'SJC_OSPC_FLEX_Performance_Comparison.csv')" style="border:1px solid #fed7aa;border-radius:7px;background:#fff;color:#c2410c;padding:5px 8px;font-size:10px;font-weight:900;cursor:pointer;">Export CSV</button></div>
                 <table style="width:100%;border-collapse:collapse;font-size:11px;color:#334155;">
-                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC &rarr; FLEX</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
+                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Flavor</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Flavor</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
                   <tbody>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1<br><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2<br><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4<br><strong>gp.0.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4<br><strong>gp.0.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
-                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8<br><strong>gp.0.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
-                    <tr><td style="padding:7px 8px;">compute1-30<br><strong>gp.0.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
+                    <tr><td style="padding:7px 8px;">compute1-30</td><td style="padding:7px 8px;"><strong>gp.0.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -2961,6 +3107,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 
       </div>
     </div>
+  </div>
   </div>
 
   <!-- Customer Migration Tracker -->
@@ -3252,7 +3399,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
               <li>Linux/Windows VM Snapshot &amp; Volume Migration</li>
               <li>App &amp; Database Replication (MySQL, Postgres, MongoDB)</li>
               <li>Infra Clone: networks, subnets, security groups, LBs</li>
-              <li>K8s Modernization with architecture templates</li>
+              <li>APPs Containerization with architecture templates</li>
             </ul>
             <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#1e3a5f;border-radius:8px;">
               <div style="font-size:11px;color:#93c5fd;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIALS</div>
@@ -3596,7 +3743,6 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
       </div>
     </div>
 
-  </div>
   </div>
 
   <!-- Stage 1 — Discovery & Assessment -->
@@ -4442,16 +4588,23 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
     <iframe id="s2rehost_p1-pane" src="about:blank" data-src="/designer/?source=ospc" title="Shared FLEX Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2image-pane" src="/image_migrator/?v={{ cache_bust|default('') }}" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2vmware-pane" src="/image_migrator/?mode=vmware&v={{ cache_bust|default('') }}" title="VMware to FLEX Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2flex2flex-pane" src="/image_migrator/?mode=flex2flex&v={{ cache_bust|default('') }}" title="R3 FLEX2FLEX-Region Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2flexanywhere-pane" src="/image_migrator/?mode=flexanywhere&v={{ cache_bust|default('') }}" title="R3 FLEX Anywhere Hyperscaler Bridge" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
     <div id="s2rehost_p2_2-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
       <div class="gov-header">
         <div class="gov-title-area">
-          <h2>☸️ R6 Refactor / Rearchitect — K8s Modernization</h2>
-          <p>Select an architecture template for your business system. Each template pre-fills the component topology — Frontend, Cache/LB, API, Backend, Databases — ready for K8s deployment on FLEX.</p>
+          <h2>☸️ R6 Refactor / Rearchitect APPs to Containerization</h2>
+          <p>Transform selected customer business applications into container-ready, Kubernetes-packaged workloads that can be imported into the OpenCenter GitOps modernization stage.</p>
+          <p style="margin-top:8px;color:#475569;font-size:13px;line-height:1.55;"><strong>R6 is the bridge between VM migration and OpenCenter modernization.</strong> It converts selected business application components into container-ready, Kubernetes-packaged workloads that can be imported into OpenCenter for GitOps-based deployment, security, observability, backup, and lifecycle operations.</p>
         </div>
         <div class="gov-status-badge status-pending" id="r6-status">Select a Template</div>
+      </div>
+
+      <div class="gov-section" style="border-left:5px solid #0ea5e9;background:linear-gradient(135deg,#eff6ff,#f8fafc);">
+        <h3 style="margin-top:0;color:#0f172a;">OpenCenter handoff positioning</h3>
+        <p style="margin:0;color:#334155;line-height:1.6;">OpenCenter runs the production Kubernetes/GitOps platform. R6 prepares the business applications for OpenCenter by assessing, containerizing, externalizing state/config, generating CI/CD, and packaging Kubernetes manifests.</p>
       </div>
 
       <!-- Stats -->
@@ -4459,7 +4612,25 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         <div class="gov-section"><h3>Templates</h3><div style="font-size:26px;font-weight:900;color:#7dd3fc;">8</div></div>
         <div class="gov-section"><h3>Selected</h3><div id="r6-sel-count" style="font-size:26px;font-weight:900;color:#c4b5fd;">0</div></div>
         <div class="gov-section"><h3>Components</h3><div id="r6-comp-count" style="font-size:26px;font-weight:900;color:#86efac;">0</div></div>
-        <div class="gov-section"><h3>K8s Workloads</h3><div id="r6-k8s-count" style="font-size:26px;font-weight:900;color:#fcd34d;">0</div></div>
+        <div class="gov-section"><h3>Ready to Containerize</h3><div id="r6-ready-count" style="font-size:26px;font-weight:900;color:#16a34a;">0</div></div>
+        <div class="gov-section"><h3>Need Refactor</h3><div id="r6-refactor-count" style="font-size:26px;font-weight:900;color:#f97316;">0</div></div>
+        <div class="gov-section"><h3>Stay on VM</h3><div id="r6-vm-count" style="font-size:26px;font-weight:900;color:#60a5fa;">0</div></div>
+        <div class="gov-section"><h3>Blockers</h3><div id="r6-blocker-count" style="font-size:26px;font-weight:900;color:#ef4444;">0</div></div>
+        <div class="gov-section"><h3>Generated Artifacts</h3><div id="r6-artifact-count" style="font-size:26px;font-weight:900;color:#fcd34d;">0</div></div>
+        <div class="gov-section"><h3>OpenCenter Export</h3><div id="r6-export-status" style="font-size:18px;font-weight:900;color:#64748b;">Not Ready</div></div>
+      </div>
+
+      <div class="gov-section">
+        <h3 style="margin-top:0;">R6 Containerization Flow</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <div class="r6-step-card"><strong>A. Business App Selection</strong><span>Ready</span><small>Select business system or architecture template.</small></div>
+          <div class="r6-step-card"><strong>B. Readiness Assessment</strong><span id="r6-step-readiness">Not Started</span><small>Score statefulness, dependencies, runtime, and blockers.</small></div>
+          <div class="r6-step-card"><strong>C. Containerization Factory</strong><span id="r6-step-factory">Not Started</span><small>Dockerfile, image plan, ports, health checks.</small></div>
+          <div class="r6-step-card"><strong>D. State & Config</strong><span id="r6-step-state">Not Started</span><small>ConfigMaps, Secrets, PVCs, logs, sessions, uploads.</small></div>
+          <div class="r6-step-card"><strong>E. CI/CD Pipeline</strong><span id="r6-step-cicd">Not Started</span><small>Build, scan, push, SBOM, GitOps update.</small></div>
+          <div class="r6-step-card"><strong>F. K8s Packaging</strong><span id="r6-step-k8s">Not Started</span><small>Helm, Kustomize, Flux handoff files.</small></div>
+          <div class="r6-step-card"><strong>G. OpenCenter Export</strong><span id="r6-step-export">Not Started</span><small>Complete import bundle for OpenCenter.</small></div>
+        </div>
       </div>
 
       <!-- Architecture Template Cards -->
@@ -4480,7 +4651,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Each component maps to a K8s workload type. Review and adjust before generating manifests.</p>
         <div style="overflow:auto;">
           <table class="gov-table" style="min-width:820px;">
-            <thead><tr><th>Layer</th><th>Component</th><th>K8s Kind</th><th>Replicas</th><th>Image Placeholder</th><th>Resources</th></tr></thead>
+            <thead><tr><th>Layer</th><th>Component</th><th>K8s Kind</th><th>Readiness</th><th>Recommended Action</th><th>Replicas</th><th>Image Placeholder</th><th>Resources</th></tr></thead>
             <tbody id="r6-topo-body"></tbody>
           </table>
         </div>
@@ -4488,6 +4659,8 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           <button class="gov-btn btn-save" onclick="r6GenerateManifests()">⚡ Generate Helm / K8s Manifests</button>
           <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p2_1')">⚙️ Also Run DB Replication</button>
           <button class="gov-btn btn-export" onclick="r6ExportTopology()">📥 Export Topology JSON</button>
+          <button class="gov-btn btn-save" onclick="r6GenerateOpenCenterBundle()">📦 Generate OpenCenter Import Bundle</button>
+          <button class="gov-btn btn-export" onclick="r6SendToOpenCenter()">🚀 Send to OpenCenter Stage</button>
         </div>
       </div>
 
@@ -4497,8 +4670,63 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         <div style="display:flex;gap:8px;margin-bottom:10px;">
           <button class="gov-btn btn-save" onclick="r6CopyManifests()">📋 Copy All</button>
           <button class="gov-btn btn-export" onclick="r6DownloadManifests()">📥 Download YAML</button>
+          <button class="gov-btn btn-save" onclick="r6GenerateOpenCenterBundle()">📦 Generate OpenCenter Import Bundle</button>
+          <button class="gov-btn btn-export" onclick="r6SendToOpenCenter()">🚀 Send to OpenCenter Stage</button>
         </div>
         <pre id="r6-manifests-out" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:16px;color:#86efac;font-size:11px;overflow:auto;max-height:480px;white-space:pre-wrap;"></pre>
+      </div>
+
+      <div id="r6-bundle-section" class="gov-section" style="display:none;">
+        <h3>Export to OpenCenter</h3>
+        <p style="color:#64748b;margin-top:0;">The handoff bundle includes readiness, image plans, CI/CD metadata, Helm/Kustomize placeholders, Flux handoff, secrets placeholders, and README_OpenCenter_Import.md.</p>
+        <div id="r6-bundle-summary" style="background:#f8fafc;border:1px solid #dbeafe;border-radius:10px;padding:12px;color:#0f172a;font-size:13px;margin-bottom:10px;"></div>
+        <pre id="r6-bundle-out" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:16px;color:#86efac;font-size:11px;overflow:auto;max-height:360px;white-space:pre-wrap;"></pre>
+      </div>
+
+    </div>
+
+    <div id="s2opencenter-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🚀 OpenCenter Migration</h2>
+          <p>Stage 2 Migration Strategies Hub substage for importing R6 containerization outputs into the OpenCenter production Kubernetes/GitOps operating platform.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="s2opencenter-status">Awaiting R6 Bundle</div>
+      </div>
+      <div class="gov-section" style="border-left:5px solid #16a34a;background:linear-gradient(135deg,#f0fdf4,#ffffff);">
+        <h3 style="margin-top:0;">Import R6 Containerization Outputs</h3>
+        <p style="color:#334155;line-height:1.6;">R6 Containerization prepares the application workloads. OpenCenter deploys and operates them with GitOps, security, observability, backup, and lifecycle management.</p>
+        <p style="font-weight:900;color:#0f172a;">R6 Containerization Bundle → OpenCenter Import → GitOps Repository → Flux Reconcile → Production Kubernetes Platform</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
+          <button class="gov-btn btn-save" onclick="openCenterImportFromR6()">Import from R6 Containerization Stage</button>
+          <label class="gov-btn btn-example" style="cursor:pointer;">Upload OpenCenter Import Bundle <input id="oc-upload-input" type="file" accept=".json,.yaml,.yml,.md,.zip" multiple style="display:none" onchange="openCenterUploadBundle(event)"></label>
+          <button class="gov-btn btn-export" onclick="openCenterValidateImport()">Run Import Validation</button>
+          <button class="gov-btn btn-save" onclick="openCenterMockGenerate()">Proceed to OpenCenter Generate</button>
+        </div>
+        <div id="oc-import-status" style="background:#fff;border:1px solid #dbeafe;border-radius:10px;padding:12px;color:#0f172a;font-size:13px;">No R6 Containerization bundle found yet. Complete R6 first or upload an OpenCenter-ready bundle manually.</div>
+      </div>
+      <div class="gov-section">
+        <h3>Imported Application Workloads</h3>
+        <div style="overflow:auto;">
+          <table class="gov-table" style="min-width:1080px;">
+            <thead><tr><th>Component</th><th>Layer</th><th>Kubernetes Kind</th><th>Image</th><th>Replicas</th><th>Service</th><th>Ingress/Gateway</th><th>ConfigMap</th><th>Secret</th><th>PVC</th><th>Readiness</th><th>Action Required</th></tr></thead>
+            <tbody id="oc-workload-body"><tr><td colspan="12" style="color:#64748b;">Import an R6 bundle to populate OpenCenter workload metadata.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="gov-section">
+        <h3>OpenCenter Platform Actions</h3>
+        <div class="stage-fcard-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+          <div class="gov-section"><h3>OpenCenter CLI</h3><p>Uses imported topology and package metadata as generated YAML input.</p></div>
+          <div class="gov-section"><h3>GitOps Repository</h3><p>Uses imported Kustomize, Helm, Flux, image plans, and README handoff files.</p></div>
+          <div class="gov-section"><h3>Air-Gap Packaging</h3><p>Includes imported images, charts, YAML, SBOM placeholders, and registry plan.</p></div>
+          <div class="gov-section"><h3>Observability & Security</h3><p>Uses ServiceMonitor, OpenTelemetry, NetworkPolicy, Secret, RBAC, and policy requirements.</p></div>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>OpenCenter Platform UI</h3>
+        {% include "_opencenter_platform.html" %}
       </div>
 
       <script>
@@ -4628,6 +4856,32 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           Backend:'⚙️', Database:'📦', Cache:'⚡',
           Queue:'📨', Storage:'💾', Search:'🔍'
         };
+        function r6ReadinessFor(layer) {
+          if (!layer) return {status:'BLOCKED', action:'Manual review required', effort:'High', risk:'High'};
+          if (layer.layer === 'Database') return {status:'KEEP_ON_VM_FOR_NOW', action:'Keep database outside Kubernetes first', effort:'Medium', risk:'Medium'};
+          if (layer.layer === 'Queue') return {status:'READY_WITH_CHANGES', action:'StatefulSet with PVC, backup, and HA review', effort:'Medium', risk:'Medium'};
+          if (layer.layer === 'Cache' || layer.layer === 'Storage') return {status:'READY_WITH_CHANGES', action:'Externalize state or add PVC/object storage', effort:'Medium', risk:'Medium'};
+          if (layer.kind === 'Service/LB' || layer.kind === 'PVC/S3') return {status:'READY_WITH_CHANGES', action:'Map to Service, Ingress/Gateway, or storage class', effort:'Low', risk:'Low'};
+          return {status:'READY_TO_CONTAINERIZE', action:'Containerize with ConfigMap, Secret reference, Service, and route', effort:'Low', risk:'Low'};
+        }
+        function r6Badge(status) {
+          var colors = {
+            READY_TO_CONTAINERIZE:['#dcfce7','#166534'],
+            READY_WITH_CHANGES:['#fef3c7','#92400e'],
+            KEEP_ON_VM_FOR_NOW:['#dbeafe','#1e40af'],
+            REFACTOR_REQUIRED:['#ffedd5','#c2410c'],
+            BLOCKED:['#fee2e2','#991b1b']
+          };
+          var c = colors[status] || ['#f1f5f9','#475569'];
+          return '<span style="display:inline-block;border-radius:999px;padding:3px 8px;background:' + c[0] + ';color:' + c[1] + ';font-size:10px;font-weight:900;">' + status + '</span>';
+        }
+        function r6SetText(id, value) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = value;
+        }
+        function r6SelectedTemplate() {
+          return R6_TEMPLATES.find(function(t){ return t.id === _r6sel; });
+        }
 
         function r6RenderTemplates() {
           var grid = document.getElementById('r6-template-grid');
@@ -4668,12 +4922,17 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           });
 
           // Stats
-          var total = R6_TEMPLATES.reduce(function(a,t){ return a + t.layers.length; }, 0);
-          var k8s = R6_TEMPLATES.reduce(function(a,t){ return a + t.layers.filter(function(l){ return l.kind !== 'Service/LB' && l.kind !== 'PVC/S3'; }).length; }, 0);
           var el = function(id){ return document.getElementById(id); };
-          if(el('r6-sel-count')) el('r6-sel-count').textContent = _r6sel ? '1' : '0';
-          if(el('r6-comp-count')) el('r6-comp-count').textContent = _r6sel ? R6_TEMPLATES.find(function(t){return t.id===_r6sel;}).layers.length : 0;
-          if(el('r6-k8s-count')) el('r6-k8s-count').textContent = _r6sel ? R6_TEMPLATES.find(function(t){return t.id===_r6sel;}).layers.filter(function(l){return l.kind!=='Service/LB'&&l.kind!=='PVC/S3';}).length : 0;
+          var selected = r6SelectedTemplate();
+          var readiness = selected ? selected.layers.map(r6ReadinessFor) : [];
+          if(el('r6-sel-count')) el('r6-sel-count').textContent = selected ? '1' : '0';
+          if(el('r6-comp-count')) el('r6-comp-count').textContent = selected ? selected.layers.length : 0;
+          if(el('r6-ready-count')) el('r6-ready-count').textContent = readiness.filter(function(r){ return r.status === 'READY_TO_CONTAINERIZE'; }).length;
+          if(el('r6-refactor-count')) el('r6-refactor-count').textContent = readiness.filter(function(r){ return r.status === 'REFACTOR_REQUIRED'; }).length;
+          if(el('r6-vm-count')) el('r6-vm-count').textContent = readiness.filter(function(r){ return r.status === 'KEEP_ON_VM_FOR_NOW'; }).length;
+          if(el('r6-blocker-count')) el('r6-blocker-count').textContent = readiness.filter(function(r){ return r.status === 'BLOCKED'; }).length;
+          if(el('r6-artifact-count')) el('r6-artifact-count').textContent = selected ? selected.layers.length * 6 : 0;
+          if(el('r6-export-status')) el('r6-export-status').textContent = selected ? 'Ready to Generate' : 'Not Ready';
         }
 
         window.r6SelectTemplate = function(id) {
@@ -4693,15 +4952,20 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           tbody.innerHTML = tmpl.layers.map(function(l) {
             var c = LAYER_COLORS[l.layer] || '#64748b';
             var ki = l.kind === 'StatefulSet' ? '📦' : l.kind === 'DaemonSet' ? '\U0001f4e1' : l.kind === 'Service/LB' ? '🌐' : l.kind === 'PVC/S3' ? '💾' : '🖥';
+            var ready = r6ReadinessFor(l);
             return '<tr>'
               + '<td><span style="font-size:11px;background:' + c + '22;color:' + c + ';border-radius:4px;padding:2px 8px;font-weight:600;">' + l.layer + '</span></td>'
               + '<td><strong>' + l.name + '</strong></td>'
               + '<td><span style="font-size:11px;color:#94a3b8;">' + ki + ' ' + l.kind + '</span></td>'
+              + '<td>' + r6Badge(ready.status) + '</td>'
+              + '<td style="font-size:11px;color:#334155;">' + ready.action + '</td>'
               + '<td><input class="gov-input" type="number" value="' + l.replicas + '" min="1" max="20" style="width:56px;padding:3px 6px;font-size:12px;"></td>'
               + '<td><span style="font-family:monospace;font-size:11px;color:#86efac;">' + l.image + '</span></td>'
               + '<td style="font-size:11px;color:#94a3b8;">' + l.cpu + ' / ' + l.mem + '</td>'
               + '</tr>';
           }).join('');
+          ['readiness','factory','state','cicd','k8s'].forEach(function(k){ r6SetText('r6-step-' + k, 'Ready'); });
+          r6SetText('r6-step-export', 'Ready to Generate');
 
           setTimeout(function(){ try{ sec.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }, 80);
         };
@@ -4733,6 +4997,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           var sec = document.getElementById('r6-manifests-section');
           if(out) out.textContent = yaml;
           if(sec) { sec.style.display=''; try{sec.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){} }
+          r6SetText('r6-step-k8s', 'Ready');
         };
 
         window.r6CopyManifests = function() {
@@ -4746,6 +5011,145 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           if(!out||!out.textContent) return;
           var blob = new Blob([out.textContent], {type:'text/yaml'});
           var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='k8s-manifests.yaml'; a.click();
+        };
+
+        function r6BuildOpenCenterBundle() {
+          var tmpl = r6SelectedTemplate();
+          if (!tmpl) return null;
+          var workloads = tmpl.layers.map(function(l) {
+            var r = r6ReadinessFor(l);
+            var name = l.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+            return {
+              component: l.name,
+              layer: l.layer,
+              kubernetesKind: l.layer === 'Database' ? 'External DB / StatefulSet option' : l.kind,
+              image: l.image,
+              replicas: l.replicas,
+              service: l.kind !== 'PVC/S3',
+              ingressGateway: ['Frontend','API','Network'].indexOf(l.layer) >= 0,
+              configMap: true,
+              secret: 'Placeholder',
+              pvc: ['Database','Queue','Storage'].indexOf(l.layer) >= 0,
+              readiness: r.status,
+              actionRequired: r.action,
+              manifestName: name
+            };
+          });
+          var warnings = workloads.filter(function(w){ return w.readiness === 'KEEP_ON_VM_FOR_NOW' || w.readiness === 'READY_WITH_CHANGES'; }).map(function(w){ return w.component + ': ' + w.actionRequired; });
+          return {
+            id: 'r6-bundle-' + Date.now(),
+            source: 'r6_stage',
+            generatedAt: new Date().toISOString(),
+            customerName: 'Selected Customer',
+            businessSystemName: tmpl.name,
+            templateType: tmpl.id,
+            readinessScore: Math.max(50, Math.round((workloads.length - warnings.length * 0.5) / workloads.length * 100)),
+            importStatus: warnings.length ? 'WARNING' : 'PASS',
+            blockers: [],
+            warnings: warnings,
+            artifacts: [
+              'opencenter_import_manifest.json',
+              'business_system_topology.json',
+              'container_readiness_assessment.json',
+              'container_inventory.json',
+              'image_build_plan.yaml',
+              'state_config_externalization.json',
+              'ci_cd_pipeline.yaml',
+              'registry_push_plan.json',
+              'helm_chart/',
+              'kustomize_bundle/',
+              'flux_kustomization.yaml',
+              'README_OpenCenter_Import.md'
+            ],
+            workloads: workloads,
+            helmStatus: 'Skeleton generated',
+            kustomizeStatus: 'Bundle generated',
+            fluxStatus: 'flux_kustomization.yaml generated',
+            secretsStatus: 'Placeholders only',
+            nextActions: ['Review stateful workload warnings', 'Replace secret placeholders', 'Connect registry credentials', 'Import into OpenCenter']
+          };
+        }
+        window.r6GenerateOpenCenterBundle = function() {
+          var bundle = r6BuildOpenCenterBundle();
+          if (!bundle) { alert('Select an R6 architecture template first.'); return; }
+          localStorage.setItem('r6OpenCenterHandoffBundle', JSON.stringify(bundle));
+          localStorage.setItem('openCenterImportState', JSON.stringify(bundle));
+          var sec = document.getElementById('r6-bundle-section');
+          var sum = document.getElementById('r6-bundle-summary');
+          var out = document.getElementById('r6-bundle-out');
+          if (sum) sum.innerHTML = '<strong>Status:</strong> ' + bundle.importStatus + ' · <strong>Workloads:</strong> ' + bundle.workloads.length + ' · <strong>Readiness:</strong> ' + bundle.readinessScore + '% · <strong>Warnings:</strong> ' + bundle.warnings.length;
+          if (out) out.textContent = JSON.stringify(bundle, null, 2) + '\\n\\n# README_OpenCenter_Import.md\\nThis bundle was generated by R6 Refactor / Rearchitect APPs to Containerization. It prepares the selected business application for import into the OpenCenter GitOps modernization stage.\\n';
+          if (sec) sec.style.display = '';
+          r6SetText('r6-step-export', 'Ready');
+          r6SetText('r6-export-status', 'Generated');
+          var stat = document.getElementById('r6-status');
+          if (stat) { stat.textContent = 'OpenCenter Bundle Ready'; stat.className = 'gov-status-badge status-done'; }
+          return bundle;
+        };
+        window.r6SendToOpenCenter = function() {
+          var bundle = r6GenerateOpenCenterBundle();
+          if (!bundle) return;
+          stage2OpenPath('s2opencenter');
+          setTimeout(function(){ openCenterImportFromR6(); }, 120);
+        };
+        window.openCenterRenderImportState = function(state) {
+          var box = document.getElementById('oc-import-status');
+          var badge = document.getElementById('s2opencenter-status');
+          if (!state) {
+            if (box) box.textContent = 'No R6 Containerization bundle found. Complete R6 first or upload an OpenCenter-ready bundle manually.';
+            if (badge) { badge.textContent = 'Awaiting R6 Bundle'; badge.className = 'gov-status-badge status-pending'; }
+            return;
+          }
+          var statusColor = state.importStatus === 'PASS' ? '#16a34a' : state.importStatus === 'FAIL' ? '#dc2626' : '#f59e0b';
+          if (box) box.innerHTML = '<strong style="color:' + statusColor + ';">' + state.importStatus + '</strong> · ' + state.businessSystemName + ' · readiness ' + state.readinessScore + '% · workloads ' + state.workloads.length + ' · warnings ' + (state.warnings||[]).length + ' · blockers ' + (state.blockers||[]).length + '<br><span style="color:#64748b;">OpenCenter does not refactor the application. It runs the production Kubernetes/GitOps platform. Import the R6 bundle to deploy the containerized application architecture into OpenCenter.</span>';
+          if (badge) { badge.textContent = state.importStatus; badge.className = 'gov-status-badge ' + (state.importStatus === 'PASS' ? 'status-done' : state.importStatus === 'FAIL' ? 'status-failed' : 'status-pending'); }
+          var tbody = document.getElementById('oc-workload-body');
+          if (tbody) {
+            tbody.innerHTML = state.workloads.map(function(w) {
+              return '<tr><td><strong>' + w.component + '</strong></td><td>' + w.layer + '</td><td>' + w.kubernetesKind + '</td><td><code>' + w.image + '</code></td><td>' + w.replicas + '</td><td>' + (w.service?'Yes':'No') + '</td><td>' + (w.ingressGateway?'Yes':'No') + '</td><td>Yes</td><td>' + w.secret + '</td><td>' + (w.pvc?'Yes':'No') + '</td><td>' + r6Badge(w.readiness) + '</td><td>' + w.actionRequired + '</td></tr>';
+            }).join('');
+          }
+        };
+        window.openCenterImportFromR6 = function() {
+          var raw = localStorage.getItem('r6OpenCenterHandoffBundle') || localStorage.getItem('openCenterImportState');
+          if (!raw) { openCenterRenderImportState(null); return; }
+          try {
+            var state = JSON.parse(raw);
+            state.source = 'r6_stage';
+            state.importedAt = new Date().toISOString();
+            localStorage.setItem('openCenterImportState', JSON.stringify(state));
+            openCenterRenderImportState(state);
+          } catch(e) {
+            openCenterRenderImportState({importStatus:'FAIL', businessSystemName:'Invalid bundle', readinessScore:0, workloads:[], warnings:[], blockers:['Invalid JSON']});
+          }
+        };
+        window.openCenterValidateImport = function() {
+          var raw = localStorage.getItem('openCenterImportState');
+          if (!raw) { openCenterRenderImportState(null); return; }
+          try { openCenterRenderImportState(JSON.parse(raw)); } catch(e) { alert('Invalid OpenCenter import state'); }
+        };
+        window.openCenterUploadBundle = function(ev) {
+          var files = ev && ev.target ? Array.from(ev.target.files || []) : [];
+          var state = {
+            source:'manual_upload',
+            importedAt:new Date().toISOString(),
+            businessSystemName:'Manual OpenCenter Bundle',
+            importStatus: files.some(function(f){return f.name === 'opencenter_import_manifest.json';}) ? 'WARNING' : 'FAIL',
+            readinessScore: files.length ? 65 : 0,
+            warnings:['Manual upload parsed as file list only; validate content before production use.'],
+            blockers: files.length ? [] : ['No files uploaded'],
+            workloads: [],
+            importedArtifacts: files.map(function(f){ return f.name; })
+          };
+          localStorage.setItem('openCenterImportState', JSON.stringify(state));
+          openCenterRenderImportState(state);
+        };
+        window.openCenterMockGenerate = function() {
+          var raw = localStorage.getItem('openCenterImportState');
+          if (!raw) { alert('Import an R6 or manual bundle first.'); return; }
+          var state = JSON.parse(raw);
+          if (state.importStatus === 'FAIL') { alert('OpenCenter generation blocked: fix FAIL validation first.'); return; }
+          alert('OpenCenter platform YAML and GitOps repo structure generated from imported bundle.');
         };
 
       
@@ -12225,6 +12629,41 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 OSPC prices are inferred from <strong>TCO_Comparison_Report.csv</strong> aligned with the TCO flavormap. FLEX prices come from <strong>uploads/flavors/*Flavors.csv</strong>.
               </div>
             </div>
+
+            <div data-global-tco-view style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 12px 28px rgba(15,23,42,.16);overflow:hidden;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px;">
+                <div>
+                  <div style="font-size:10px;font-weight:900;color:#93c5fd;text-transform:uppercase;letter-spacing:.14em;margin-bottom:5px;">Global TCO View</div>
+                  <h3 style="font-size:21px;font-weight:950;color:#fff;margin:0 0 4px;line-height:1.15;">All-region OSPC vs FLEX cost comparison</h3>
+                  <p style="font-size:12px;font-weight:700;color:#dbeafe;margin:0;">Monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings across IAD, DFW, and SJC.</p>
+                </div>
+                <button type="button" onclick="s0ExportPriceComparisonXls(this)" style="border:1px solid rgba(255,255,255,.28);border-radius:7px;background:#b23a3a;color:#fff;padding:9px 12px;font-size:10px;font-weight:950;cursor:pointer;box-shadow:0 5px 14px rgba(0,0,0,.22);white-space:nowrap;">Export Global XLS</button>
+              </div>
+              <div style="background:#fff;border-radius:12px;border:1px solid rgba(255,255,255,.3);overflow:auto;">
+                <table data-global-tco-table style="width:100%;min-width:1120px;border-collapse:collapse;font-size:11px;color:#0f172a;">
+                  <thead>
+                    <tr style="background:#eff6ff;">
+                      <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Region</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#991b1b;">OSPC / Month</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">FLEX / Month</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Monthly Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">1-Year Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">3-Year Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">5-Year Saving</th>
+                      <th style="text-align:center;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#475569;">Matched Flavors</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#1e40af;">IAD</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#047857;">DFW</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#c2410c;">SJC</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:#f8fafc;"><td style="padding:11px 12px;font-weight:950;color:#0f172a;">Global 3-Region Total</td><td style="padding:11px 12px;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$2,314.62</td><td style="padding:11px 12px;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$1,883.52</td><td style="padding:11px 12px;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$431.10</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$15,519.60</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$25,866.00</td><td style="padding:11px 12px;text-align:center;font-weight:950;">18</td></tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
             <div style="display:grid;grid-template-columns:1fr;gap:16px;">
             <div data-export-card data-stage3a-region-tco-card data-region="IAD" style="background:#fff;border:1px solid #bfdbfe;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.08);">
               <div style="padding:18px 20px;overflow:auto;">
@@ -13239,6 +13678,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         <p style="color:#94a3b8; margin:0; max-width:940px;">Consume the Stage 7 recovery pack: publish backup/restore artifacts, create restore stubs, and drive repeatable redeploy pipelines in another FLEX region or OpenStack cloud.</p>
       </div>
 
+      <div class="stage-chain-box" style="background:#fff; border:1px solid #bbf7d0; border-left:6px solid #16a34a; border-radius:12px; padding:18px 20px; box-shadow:0 8px 22px rgba(15,23,42,.06);">
+        <div style="font-size:11px;font-weight:900;color:#16a34a;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Import R6 Containerization Outputs</div>
+        <h3 style="margin:0 0 8px;color:#0f172a;">R6 Containerization Bundle → OpenCenter Import → GitOps Repository → Flux Reconcile → Production Kubernetes Platform</h3>
+        <p style="margin:0 0 12px;color:#334155;line-height:1.6;">Import containerized application artifacts, Helm/Kustomize packaging, image plans, CI/CD metadata, and GitOps handoff files generated by R6 before deploying into OpenCenter. OpenCenter does not refactor the application. It runs the production Kubernetes/GitOps platform.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="gov-btn btn-save" onclick="activateStage('s2'); setTimeout(function(){ stage2OpenPath('s2opencenter'); openCenterImportFromR6(); }, 100);">Import from R6 Containerization Stage</button>
+          <button type="button" class="gov-btn btn-example" onclick="activateStage('s2'); setTimeout(function(){ stage2OpenPath('s2opencenter'); }, 100);">Upload OpenCenter Import Bundle</button>
+          <button type="button" class="gov-btn btn-export" onclick="activateStage('s2'); setTimeout(function(){ stage2OpenPath('s2opencenter'); openCenterValidateImport(); }, 100);">Run Import Validation</button>
+        </div>
+      </div>
+
       <div class="stage-chain-box" style="background:#e0f2fe; border:1px solid rgba(56,189,248,.4); border-radius:12px; padding:18px 20px;">
         <div style="color:#7dd3fc; font-size:12px; letter-spacing:2px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Enable GitOps on your repo</div>
         <p style="margin:10px 0 12px; color:#94a3b8; font-size:13px; line-height:1.6;">After <code style="color:#7dd3fc;">push-backup</code>, each bundle includes <code style="color:#7dd3fc;">gitops-flux-stub/kustomization.yaml</code> (empty Kustomize root) so Flux or Argo can use <code style="color:#7dd3fc;">path:</code> immediately. Generate YAML below, apply to the cluster, then extend the stub directory in Git with real resources.</p>
@@ -13318,289 +13768,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
        STAGE 9 — AI POWER UP  |  panel-sai
        Turn successfully migrated FLEX business systems into AI business value.
        ══════════════════════════════════════════════════════════════════════════ -->
-  <div class="panel" id="panel-sai">
-    <div style="padding:20px 20px 40px;max-width:1400px;margin:0 auto;box-sizing:border-box;">
-
-      <!-- ── HERO ── -->
-      <div style="background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(6,182,212,.12),rgba(16,185,129,.08));border:1px solid rgba(139,92,246,.35);border-radius:16px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(139,92,246,.18),transparent 70%);border-radius:50%;pointer-events:none;"></div>
-        <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#a78bfa;font-weight:700;margin-bottom:8px;">Stage 9 — AI Power Up</div>
-        <h2 style="margin:0 0 10px;color:#f0fdf4;font-size:26px;font-weight:800;">Which FLEX Business System do you want to improve with AI?</h2>
-        <p style="margin:0 0 22px;color:#94a3b8;max-width:860px;font-size:14px;line-height:1.6;">Your workloads are migrated to FLEX. Now connect or clone them into an AI POC — and scale to production AI. Start by selecting a migrated business system, choose the AI output you want to improve, then get your recommended Rackspace AI path.</p>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;">
-          <button onclick="importMigratedSystemsForAI()" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);border:1px solid #a78bfa;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📥 Import FLEX Business Systems</button>
-          <button onclick="runAIOpportunityScan()" style="background:linear-gradient(135deg,#0891b2,#0e7490);border:1px solid #22d3ee;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🔍 Run AI Opportunity Scan</button>
-          <button onclick="generateAILaunchPadPlan()" style="background:linear-gradient(135deg,#059669,#047857);border:1px solid #34d399;border-radius:8px;color:#fff;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">🚀 Generate AI LaunchPad Plan</button>
-          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(245,158,11,.15);border:1px solid rgba(251,191,36,.5);border-radius:8px;color:#fbbf24;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">📄 Export AI Power Up Report</button>
-        </div>
-      </div>
-
-      <!-- ── OVERVIEW COUNTERS ── -->
-      <div id="sai-counters" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;">
-        <div style="background:rgba(109,40,217,.12);border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:18px;text-align:center;">
-          <div id="sai-cnt-imported" style="font-size:36px;font-weight:900;color:#a78bfa;">0</div>
-          <div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">FLEX Systems Imported</div>
-        </div>
-        <div style="background:rgba(6,182,212,.10);border:1px solid rgba(34,211,238,.3);border-radius:12px;padding:18px;text-align:center;">
-          <div id="sai-cnt-ready" style="font-size:36px;font-weight:900;color:#22d3ee;">0</div>
-          <div style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">AI-Ready Systems</div>
-        </div>
-        <div style="background:rgba(16,185,129,.10);border:1px solid rgba(52,211,153,.3);border-radius:12px;padding:18px;text-align:center;">
-          <div id="sai-cnt-quickwin" style="font-size:36px;font-weight:900;color:#34d399;">0</div>
-          <div style="font-size:11px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Quick-Win LaunchPad Candidates</div>
-        </div>
-        <div style="background:rgba(245,158,11,.10);border:1px solid rgba(251,191,36,.3);border-radius:12px;padding:18px;text-align:center;">
-          <div id="sai-cnt-upsell" style="font-size:36px;font-weight:900;color:#fbbf24;">$0</div>
-          <div style="font-size:11px;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;">Est. AI Upsell Potential</div>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           STEP 1 — SELECT FLEX BUSINESS SYSTEM
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-          <div style="background:#7c3aed;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">1</div>
-          <div>
-            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">Select a migrated FLEX Business System</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">Import your migration tracker data or use the demo systems below</div>
-          </div>
-        </div>
-        <div id="sai-import-msg" style="background:rgba(6,182,212,.08);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:10px 14px;font-size:12px;color:#67e8f9;margin-bottom:14px;display:none;"></div>
-        <div id="sai-systems-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           STEP 2 — CHOOSE AI OUTPUT GOAL
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(6,182,212,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-          <div style="background:#0891b2;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">2</div>
-          <div>
-            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">What AI output do you want to improve?</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">Select one business goal — we'll map it to the right Rackspace AI service</div>
-          </div>
-        </div>
-        <div id="sai-goals-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;"></div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           STEP 3 — DATA SOURCES & SENSITIVITY
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(16,185,129,.2);border-radius:12px;padding:22px;margin-bottom:20px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-          <div style="background:#059669;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;">3</div>
-          <div>
-            <div style="font-size:15px;font-weight:800;color:#e2e8f0;">What data can AI safely use?</div>
-            <div style="font-size:11px;color:#64748b;margin-top:2px;">Select all available data types and set the sensitivity level</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-          <div>
-            <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Data Sources Available</div>
-            <div id="sai-data-grid" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Data Sensitivity</div>
-            <div id="sai-sensitivity-btns" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-            <div style="margin-top:16px;">
-              <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Preferred Environment</div>
-              <select id="sai-env" style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:8px 12px;color:#e2e8f0;font-size:12px;width:100%;">
-                <option value="flex">FLEX (Rackspace OpenStack)</option>
-                <option value="private">Private Cloud / Colo / Customer DC</option>
-                <option value="hybrid">Hybrid Cloud</option>
-                <option value="sovereign">Sovereign / Regulated</option>
-                <option value="edge">Edge / Colo</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div style="text-align:center;margin-top:20px;">
-          <button onclick="recommendAIPath()" style="background:linear-gradient(135deg,#7c3aed,#0891b2,#059669);border:none;border-radius:10px;color:#fff;padding:13px 32px;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.02em;box-shadow:0 4px 20px rgba(139,92,246,.35);">✨ Recommend My AI Path</button>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           AI RECOMMENDATION OUTPUT
-      ═════════════════════════════════════════ -->
-      <div id="sai-recommendation" style="display:none;background:linear-gradient(135deg,rgba(109,40,217,.15),rgba(6,182,212,.10));border:2px solid rgba(139,92,246,.5);border-radius:16px;padding:26px;margin-bottom:24px;">
-        <div style="font-size:12px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">🎯 Your Rackspace AI Recommendation</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-          <div>
-            <div style="font-size:11px;color:#64748b;margin-bottom:4px;">FLEX Business System</div>
-            <div id="sai-rec-system" style="font-size:18px;font-weight:800;color:#e2e8f0;"></div>
-            <div style="font-size:11px;color:#64748b;margin-top:10px;margin-bottom:4px;">AI Output Goal</div>
-            <div id="sai-rec-goal" style="font-size:14px;font-weight:700;color:#a78bfa;"></div>
-            <div style="font-size:11px;color:#64748b;margin-top:10px;margin-bottom:4px;">FLEX Connection Method</div>
-            <div id="sai-rec-connect" style="font-size:12px;color:#22d3ee;"></div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:#64748b;margin-bottom:6px;">Recommended Starting Service</div>
-            <div id="sai-rec-service" style="background:rgba(109,40,217,.2);border:1px solid rgba(139,92,246,.5);border-radius:8px;padding:12px;font-size:16px;font-weight:800;color:#a78bfa;"></div>
-            <div style="font-size:11px;color:#64748b;margin-top:10px;margin-bottom:6px;">Scale-Up Path</div>
-            <div id="sai-rec-scaleup" style="font-size:12px;color:#34d399;"></div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px;">
-          <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:14px;">
-            <div style="font-size:10px;color:#fbbf24;font-weight:700;text-transform:uppercase;margin-bottom:6px;">📅 2-Week POC Plan</div>
-            <div id="sai-rec-poc" style="font-size:12px;color:#e2e8f0;line-height:1.6;"></div>
-          </div>
-          <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:14px;">
-            <div style="font-size:10px;color:#34d399;font-weight:700;text-transform:uppercase;margin-bottom:6px;">📈 Sales Next Step</div>
-            <div id="sai-rec-sales" style="font-size:12px;color:#e2e8f0;line-height:1.6;"></div>
-          </div>
-          <div style="background:rgba(0,0,0,.25);border-radius:8px;padding:14px;">
-            <div style="font-size:10px;color:#22d3ee;font-weight:700;text-transform:uppercase;margin-bottom:6px;">⚙️ Technical Next Step</div>
-            <div id="sai-rec-tech" style="font-size:12px;color:#e2e8f0;line-height:1.6;"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           POC TO PRODUCTION SCALE-UP PATH
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
-        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">🪜 POC to Production AI Scale-Up Path</div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:18px;">Start with the lowest-friction entry point and scale when the business case is clear</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
-          <div style="background:linear-gradient(135deg,rgba(16,185,129,.18),rgba(5,150,105,.10));border:2px solid rgba(52,211,153,.5);border-radius:10px;padding:14px;position:relative;">
-            <div style="position:absolute;top:-10px;left:12px;background:#059669;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;letter-spacing:.05em;">START HERE</div>
-            <div style="font-size:11px;color:#34d399;font-weight:700;margin-bottom:4px;">Level 1</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">AI LaunchPad</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Fast POC. RAG assistant, summarization, or chatbot on FLEX-hosted data. Lowest friction.</div>
-          </div>
-          <div style="background:linear-gradient(135deg,rgba(6,182,212,.15),rgba(14,116,144,.10));border:1px solid rgba(34,211,238,.3);border-radius:10px;padding:14px;">
-            <div style="font-size:11px;color:#22d3ee;font-weight:700;margin-bottom:4px;">Level 2</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">FAIR Diagnostic / Ideate</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">AI readiness scoring. Identify highest-value use cases. Governance and feasibility review.</div>
-          </div>
-          <div style="background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(14,116,144,.08));border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:14px;">
-            <div style="font-size:11px;color:#22d3ee;font-weight:700;margin-bottom:4px;">Level 3</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">FAIR Incubate / Industrialize</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Build MVP. Validated use case to production. RAG, GenAI app, or workflow automation.</div>
-          </div>
-          <div style="background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(91,33,182,.10));border:1px solid rgba(167,139,250,.35);border-radius:10px;padding:14px;">
-            <div style="font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:4px;">Level 4</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">Private Cloud AI / AI Anywhere</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Secure AI near your data. Regulated, sovereign, private, colo, or hybrid workloads.</div>
-          </div>
-          <div style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(217,119,6,.08));border:1px solid rgba(251,191,36,.35);border-radius:10px;padding:14px;">
-            <div style="font-size:11px;color:#fbbf24;font-weight:700;margin-bottom:4px;">Level 5</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">AI Business / Inference</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Scalable inference, fine-tuning, domain model deployment. GPU/CPU platform sizing.</div>
-          </div>
-          <div style="background:linear-gradient(135deg,rgba(109,40,217,.22),rgba(6,182,212,.15));border:2px solid rgba(139,92,246,.4);border-radius:10px;padding:14px;position:relative;">
-            <div style="position:absolute;top:-10px;left:12px;background:linear-gradient(135deg,#7c3aed,#0891b2);color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;">SCALE WHEN READY</div>
-            <div style="font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:4px;">Level 6</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">Enterprise AI Cloud</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Governed full-stack AI. Infrastructure, inference, agents, security, operations, accountability.</div>
-          </div>
-          <div style="background:linear-gradient(135deg,rgba(236,72,153,.15),rgba(168,85,247,.10));border:1px solid rgba(244,114,182,.35);border-radius:10px;padding:14px;position:relative;">
-            <div style="position:absolute;top:-10px;left:12px;background:linear-gradient(135deg,#db2777,#7c3aed);color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:10px;">STRATEGIC</div>
-            <div style="font-size:11px;color:#f472b6;font-weight:700;margin-bottom:4px;">Level 7</div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:6px;">FDE + Partner Accelerators</div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.5;">Embedded engineers. Palantir, Uniphore, Dell, AMD, VMware, Rubrik. Fast production impact.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           BUSINESS SYSTEM AI OPPORTUNITY TABLE
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
-        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">📊 Business System AI Opportunity Table</div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Each row is a migrated FLEX business system with its AI readiness score and recommended service</div>
-        <div style="overflow-x:auto;">
-          <table id="sai-opp-table" style="width:100%;border-collapse:collapse;font-size:11px;">
-            <thead>
-              <tr style="border-bottom:1px solid rgba(139,92,246,.3);">
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;white-space:nowrap;">Business System</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Apps/VMs</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Data Type</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Sensitivity</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">AI Score</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Recommended Entry</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Est. Value</th>
-                <th style="padding:8px 10px;text-align:left;color:#7c3aed;font-weight:700;">Action</th>
-              </tr>
-            </thead>
-            <tbody id="sai-opp-tbody">
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           AI LAUNCHPAD QUICK PLAN
-      ═════════════════════════════════════════ -->
-      <div style="background:linear-gradient(135deg,rgba(16,185,129,.10),rgba(5,150,105,.06));border:1px solid rgba(52,211,153,.3);border-radius:12px;padding:22px;margin-bottom:24px;">
-        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">🚀 AI LaunchPad Quick Plan</div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Lowest-hanging AI opportunity — ready in 2 weeks</div>
-        <div id="sai-launchpad-output" style="background:rgba(0,0,0,.3);border-radius:8px;padding:16px;font-size:12px;color:#94a3b8;min-height:80px;font-family:'Share Tech Mono',monospace;white-space:pre-wrap;line-height:1.7;">Click "Generate AI LaunchPad Plan" after selecting a business system and AI goal above.</div>
-        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-          <button onclick="generateAILaunchPadPlan()" style="background:rgba(5,150,105,.85);border:1px solid #34d399;border-radius:6px;color:#fff;padding:8px 16px;font-size:11px;font-weight:700;cursor:pointer;">🚀 Generate Plan</button>
-          <button onclick="copyAILaunchPadPlan()" style="background:rgba(30,41,59,.8);border:1px solid #334155;border-radius:6px;color:#94a3b8;padding:8px 16px;font-size:11px;font-weight:700;cursor:pointer;">📋 Copy Plan</button>
-          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(30,41,59,.8);border:1px solid #334155;border-radius:6px;color:#94a3b8;padding:8px 16px;font-size:11px;font-weight:700;cursor:pointer;">⬇ Export Markdown</button>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           GOVERNANCE CHECKLIST
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
-          <div>
-            <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">✅ Governance &amp; Data Readiness Checklist</div>
-            <div style="font-size:11px;color:#64748b;">Complete before moving to production AI</div>
-          </div>
-          <div style="text-align:center;">
-            <div id="sai-gov-score" style="font-size:32px;font-weight:900;color:#a78bfa;">0%</div>
-            <div id="sai-gov-label" style="font-size:11px;color:#64748b;font-weight:700;">NOT READY</div>
-          </div>
-        </div>
-        <div id="sai-checklist-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;"></div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           COMMERCIAL UPSELL VIEW
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:22px;margin-bottom:24px;">
-        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">💼 Commercial AI Upsell Tracker</div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Track AI sales opportunities per migrated FLEX business system</div>
-        <div style="overflow-x:auto;">
-          <table id="sai-upsell-table" style="width:100%;border-collapse:collapse;font-size:11px;">
-            <thead>
-              <tr style="border-bottom:1px solid rgba(245,158,11,.3);">
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Business System</th>
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">AI Entry Point</th>
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Scale-Up Path</th>
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Est. Value</th>
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Sales Motion</th>
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Status</th>
-                <th style="padding:8px 10px;text-align:left;color:#d97706;font-weight:700;">Next Action</th>
-              </tr>
-            </thead>
-            <tbody id="sai-upsell-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ════════════════════════════════════════
-           EXPORT SECTION
-      ═════════════════════════════════════════ -->
-      <div style="background:rgba(15,23,42,.6);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;">
-        <div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">⬇ Export AI Power Up Report</div>
-        <div style="font-size:11px;color:#64748b;margin-bottom:14px;">Export your AI plan, recommendations, and upsell tracker for executive review</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button onclick="exportAIPowerUpJSON()" style="background:rgba(109,40,217,.25);border:1px solid rgba(139,92,246,.5);border-radius:8px;color:#a78bfa;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;">📦 Export JSON</button>
-          <button onclick="exportAIPowerUpCSV()" style="background:rgba(6,182,212,.15);border:1px solid rgba(34,211,238,.4);border-radius:8px;color:#22d3ee;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;">📊 Export CSV</button>
-          <button onclick="exportAIPowerUpMarkdown()" style="background:rgba(16,185,129,.15);border:1px solid rgba(52,211,153,.4);border-radius:8px;color:#34d399;padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;">📄 Export Markdown Report</button>
-        </div>
-      </div>
-
-    </div><!-- /padding wrapper -->
-  </div><!-- /panel-sai -->
+  {% include "_ai_powerup.html" %}
 
 </div><!-- /panel-area -->
 
@@ -13610,7 +13778,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1flex2flex_infra','s1flex2flex_mapper','s1hyper_aws','s1hyper_aws_mapper','s1hyper_aws_flavors','s1hyper_gcp','s1hyper_gcp_mapper','s1hyper_gcp_flavors','s1hyper_azure','s1hyper_azure_mapper','s1hyper_azure_flavors','s1analyze','s1flavors','s1flex2flex_flavors','s1tco','s1appdep','s1business_ontology','s1system_ontology_handoff','s1readiness','s1preflight','s1k8s'];
-  const s2Panes = ['s2retain','s2retire','s2rehost_p1','s2fullmig','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2rehost_manual','s2repurchase'];
+  const s2Panes = ['s2retain','s2retire','s2rehost_p1','s2fullmig','s2vmware','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2opencenter','s2rehost_manual','s2repurchase'];
 
   function addWorkloadRow(bodyId) {
     const body = document.getElementById(bodyId);
@@ -19106,6 +19274,13 @@ ${certContent}
   }
 
   function activateStage(stageId) {
+    if (!window.__activatingStageFromUrl) {
+      requestAnimationFrame(function() {
+        try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_) { window.scrollTo(0, 0); }
+        var area = document.querySelector('.panel-area');
+        if (area && area.scrollIntoView) area.scrollIntoView({ block: 'start', behavior: 'auto' });
+      });
+    }
     // Restore theme dropdown and body class when leaving UAT stage (s4)
     if (stageId !== 's4') {
       document.body.classList.remove('uat-dashboard-active');
@@ -19180,8 +19355,61 @@ ${certContent}
       }
     }
     requestAnimationFrame(syncVisibleIframeHeights);
-    if (stageId === 's7a') { try { s7aRefreshAll(); } catch(e) {} }
+  if (stageId === 's7a') { try { s7aRefreshAll(); } catch(e) {} }
   }
+
+  // "only=<token>" focus mode: keep only the requested panel visible (chrome + other panels hidden),
+  // e.g. only=aipower shows just Stage 9 AI Power Up. Walks up hiding siblings; keeps the panel's JS
+  // alive (unlike a static extract) so its interactive buttons still work.
+  function applyOnlyFocus() {
+    var params = new URLSearchParams(window.location.search || '');
+    var only = (params.get('only') || '').toLowerCase();
+    if (!only) return;
+    var targetId = only === 'aipower' ? 'panel-sai' : (only === 'opencenter' ? 'panel-s9' : null);
+    var target = targetId ? document.getElementById(targetId) : null;
+    if (!target) return;
+    var node = target;
+    while (node && node !== document.body) {
+      var parent = node.parentElement;
+      if (!parent) break;
+      Array.prototype.forEach.call(parent.children, function(sib) {
+        if (sib !== node && sib.tagName !== 'STYLE' && sib.tagName !== 'SCRIPT') sib.style.display = 'none';
+      });
+      node.style.display = 'block';
+      if (node.classList) node.classList.add('active');
+      node = parent;
+    }
+    document.body.style.overflow = 'auto';
+    document.body.style.background = '#fff';
+    document.documentElement.style.background = '#fff';
+  }
+  function activateStageFromUrl() {
+    var params = new URLSearchParams(window.location.search || '');
+    var requested = (params.get('stage') || '').replace(/^panel-/, '');
+    var hash = (window.location.hash || '').replace(/^#/, '').toLowerCase();
+    if (!requested && (hash === 'opencenter' || hash === 's9' || hash === 'stage7')) requested = 's9';
+    var onlyParam = (params.get('only') || '').toLowerCase();
+    if (!requested) { if (onlyParam) setTimeout(applyOnlyFocus, 80); return; }
+    var btn = document.querySelector('.stage-btn[data-stage="' + requested + '"]');
+    if (!btn) return;
+    window.__activatingStageFromUrl = true;
+    activateStage(requested);
+    window.__activatingStageFromUrl = false;
+    if (onlyParam) setTimeout(applyOnlyFocus, 80);
+    if (hash === 'opencenter' || requested === 's9') {
+      setTimeout(function() {
+        var oc = document.getElementById('opencenter-platform') || document.getElementById('panel-s9');
+        if (oc && oc.scrollIntoView) oc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', activateStageFromUrl);
+  } else {
+    setTimeout(activateStageFromUrl, 0);
+  }
+  window.addEventListener('hashchange', activateStageFromUrl);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Stage 7 — Performance Gain  (import-based, no hardcoded values)
@@ -21813,6 +22041,17 @@ ${certContent}
 
     .flex-skyline-mode #site-footer { color: #1e293b !important; border-top-color: rgba(0,0,0,0.12) !important; }
   .flex-skyline-mode #site-footer .footer-accent { color: #1d4ed8 !important; }
+
+  /* FIX: Quick Tour is dark-themed by design; in skyline (light) mode its light text was invisible
+     on the light background. Force all tour content readable — dark text, white cards. */
+  body.flex-skyline-mode #panel-s_tour *:not(svg):not(path) { color:#1e293b !important; text-shadow:none !important; }
+  body.flex-skyline-mode #panel-s_tour .tour-section,
+  body.flex-skyline-mode #panel-s_tour [style*="background:#0f172a"],
+  body.flex-skyline-mode #panel-s_tour [style*="background:#1e293b"],
+  body.flex-skyline-mode #panel-s_tour [style*="background:#111827"],
+  body.flex-skyline-mode #panel-s_tour [style*="background: #0f172a"] {
+    background:#ffffff !important; border:1px solid #d1d9e6 !important;
+  }
 </style>
 
 
@@ -24686,538 +24925,7 @@ ${certContent}
 })();
 </script>
 
-<script>
-/* ══════════════════════════════════════════════════════════════════════════════
-   STAGE 9 — AI POWER UP  (stage key: sai)
-   localStorage key: ospcFlex_stage9_aiPowerUp
-══════════════════════════════════════════════════════════════════════════════ */
-
-window.rackspaceAIConnectors = {
-  aiLaunchPad:      { enabled: false, endpoint: '', status: 'stub' },
-  fairDiagnostic:   { enabled: false, endpoint: '', status: 'stub' },
-  privateCloudAI:   { enabled: false, endpoint: '', status: 'stub' },
-  aiAnywhere:       { enabled: false, endpoint: '', status: 'stub' },
-  enterpriseAICloud:{ enabled: false, endpoint: '', status: 'stub' },
-  fde:              { enabled: false, endpoint: '', status: 'stub' },
-  palantir:         { enabled: false, endpoint: '', status: 'stub' },
-  uniphore:         { enabled: false, endpoint: '', status: 'stub' },
-  dell:             { enabled: false, endpoint: '', status: 'stub' },
-  vmware:           { enabled: false, endpoint: '', status: 'stub' },
-  rubrik:           { enabled: false, endpoint: '', status: 'stub' },
-  amd:              { enabled: false, endpoint: '', status: 'stub' }
-};
-
-var SAI_KEY = 'ospcFlex_stage9_aiPowerUp';
-
-var SAI_DEMO_SYSTEMS = [
-  { name:'Customer Portal',        vms:4,  data:'documents,tickets,emails',      sensitivity:'medium', migStatus:'Migrated' },
-  { name:'Billing Platform',       vms:6,  data:'database,logs,APIs',            sensitivity:'high',   migStatus:'Migrated' },
-  { name:'Support Knowledge Base', vms:2,  data:'documents,tickets',             sensitivity:'low',    migStatus:'Migrated' },
-  { name:'Claims / Ticketing',     vms:5,  data:'tickets,documents,images',      sensitivity:'high',   migStatus:'Migrated' },
-  { name:'Data Warehouse',         vms:8,  data:'database,logs',                 sensitivity:'medium', migStatus:'Migrated' },
-  { name:'ERP / Finance System',   vms:10, data:'database,APIs,emails',          sensitivity:'regulated', migStatus:'Migrated' }
-];
-
-var SAI_GOALS = [
-  { id:'support',    icon:'💬', label:'Faster Customer Support',     hint:'Ticket triage, suggested resolution, auto-summary' },
-  { id:'rag',        icon:'🔍', label:'Knowledge Search / RAG',      hint:'AI chatbot over documents, KB, tickets' },
-  { id:'summarize',  icon:'📄', label:'Document Summarization',      hint:'Summarize contracts, cases, reports' },
-  { id:'automate',   icon:'⚙️', label:'Ticket / Case Automation',   hint:'Auto-route, auto-resolve, auto-classify' },
-  { id:'ops',        icon:'🔧', label:'Operations Automation',       hint:'AIOps, incident summary, root-cause' },
-  { id:'revenue',    icon:'💰', label:'Revenue Growth',              hint:'Next-best offer, churn prediction, upsell AI' },
-  { id:'risk',       icon:'🛡', label:'Risk / Compliance',           hint:'Compliance checks, audit trail, risk alerts' },
-  { id:'exec',       icon:'📊', label:'Executive Insights',          hint:'NL reporting, dashboards, trend alerts' },
-  { id:'agents',     icon:'🤖', label:'AI Agents',                   hint:'Workflow automation, approvals, CRM/ERP bots' },
-  { id:'inference',  icon:'⚡', label:'Production Inference',         hint:'Model serving, fine-tuning, high-volume inference' }
-];
-
-var SAI_DATA_TYPES = ['documents','tickets','logs','database','images','call transcripts','emails','APIs','object storage','event streams'];
-var SAI_SENSITIVITIES = [
-  { v:'low',       label:'Low',       col:'#34d399' },
-  { v:'medium',    label:'Medium',    col:'#fbbf24' },
-  { v:'high',      label:'High',      col:'#f87171' },
-  { v:'regulated', label:'Regulated', col:'#c084fc' }
-];
-
-var SAI_GOV_ITEMS = [
-  'Business owner identified','Data owner identified','Data location known',
-  'Data classification complete','PII / sensitive data reviewed',
-  'Access model defined','API / database connectivity confirmed',
-  'RAG / vector store need assessed','Model / inference environment selected',
-  'Compliance requirements captured','Success metrics defined','Production owner assigned'
-];
-
-var saiState = {
-  systems: [], selectedSystem: null, selectedGoal: null,
-  selectedData: [], selectedSensitivity: 'low', selectedEnv: 'flex',
-  recommendation: null, launchPadPlan: null, govChecks: {}
-};
-
-/* ─── INIT ───────────────────────────────────────────────────────────── */
-window.initStage9 = function() {
-  loadStage9State();
-  renderAIGoals();
-  renderDataTypes();
-  renderSensitivityBtns();
-  renderChecklist();
-  if (saiState.systems.length === 0) importMigratedSystemsForAI();
-  else renderSystemsGrid();
-};
-
-/* ─── IMPORT SYSTEMS ──────────────────────────────────────────────────── */
-window.importMigratedSystemsForAI = function() {
-  var msg = document.getElementById('sai-import-msg');
-  var fromTracker = [];
-  try {
-    var raw = localStorage.getItem('osflex_migration_tracker');
-    if (raw) {
-      var parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) fromTracker = parsed.filter(function(r){ return r.status === 'Migrated' || r.migStatus === 'Migrated'; });
-    }
-  } catch(e) {}
-
-  if (fromTracker.length > 0) {
-    saiState.systems = fromTracker.map(function(r) {
-      return { name: r.name || r.customer || 'Unknown', vms: r.vms || 1, data: 'documents,tickets', sensitivity: 'medium', migStatus: 'Migrated' };
-    });
-    if (msg) { msg.style.display='block'; msg.textContent = '✔ Loaded ' + saiState.systems.length + ' migrated systems from your Migration Tracker.'; }
-  } else {
-    saiState.systems = SAI_DEMO_SYSTEMS.slice();
-    if (msg) { msg.style.display='block'; msg.textContent = 'ℹ No migrated systems found yet. Demo AI opportunities loaded. Complete Stage 1–Stage 4 first.'; }
-  }
-  renderSystemsGrid();
-  renderOpportunityTable();
-  renderUpsellTable();
-  updateCounters();
-  saveStage9State();
-};
-
-/* ─── RENDER SYSTEMS GRID ─────────────────────────────────────────────── */
-function renderSystemsGrid() {
-  var el = document.getElementById('sai-systems-grid');
-  if (!el) return;
-  el.innerHTML = '';
-  saiState.systems.forEach(function(sys) {
-    var isSelected = saiState.selectedSystem && saiState.selectedSystem.name === sys.name;
-    var card = document.createElement('div');
-    card.style.cssText = 'background:' + (isSelected ? 'rgba(109,40,217,.25)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? '#a78bfa' : 'rgba(255,255,255,.08)') + ';border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s;';
-    card.innerHTML = '<div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">' + sys.name + '</div>'
-      + '<div style="font-size:10px;color:#64748b;">' + sys.vms + ' VMs &bull; ' + (sys.migStatus||'Migrated') + '</div>'
-      + '<div style="margin-top:6px;"><span style="background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:4px;padding:2px 6px;font-size:9px;color:#34d399;font-weight:700;">MIGRATED</span></div>';
-    card.onclick = function() { selectAISystem(sys); };
-    el.appendChild(card);
-  });
-}
-
-/* ─── SELECT SYSTEM ───────────────────────────────────────────────────── */
-window.selectAISystem = function(sys) {
-  saiState.selectedSystem = sys;
-  renderSystemsGrid();
-};
-
-/* ─── RENDER GOAL CARDS ───────────────────────────────────────────────── */
-function renderAIGoals() {
-  var el = document.getElementById('sai-goals-grid');
-  if (!el) return;
-  el.innerHTML = '';
-  SAI_GOALS.forEach(function(g) {
-    var isSelected = saiState.selectedGoal === g.id;
-    var card = document.createElement('div');
-    card.style.cssText = 'background:' + (isSelected ? 'rgba(6,182,212,.2)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? '#22d3ee' : 'rgba(255,255,255,.08)') + ';border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s;';
-    card.innerHTML = '<div style="font-size:20px;margin-bottom:6px;">' + g.icon + '</div>'
-      + '<div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">' + g.label + '</div>'
-      + '<div style="font-size:10px;color:#64748b;line-height:1.4;">' + g.hint + '</div>';
-    card.onclick = function() { saiState.selectedGoal = g.id; renderAIGoals(); };
-    el.appendChild(card);
-  });
-}
-
-/* ─── RENDER DATA TYPES ───────────────────────────────────────────────── */
-function renderDataTypes() {
-  var el = document.getElementById('sai-data-grid');
-  if (!el) return;
-  el.innerHTML = '';
-  SAI_DATA_TYPES.forEach(function(dt) {
-    var isSelected = saiState.selectedData.indexOf(dt) >= 0;
-    var btn = document.createElement('button');
-    btn.style.cssText = 'background:' + (isSelected ? 'rgba(109,40,217,.25)' : 'rgba(30,41,59,.6)') + ';border:1px solid ' + (isSelected ? '#a78bfa' : 'rgba(255,255,255,.1)') + ';border-radius:6px;color:' + (isSelected ? '#a78bfa' : '#94a3b8') + ';padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;';
-    btn.textContent = dt;
-    btn.onclick = function() {
-      var idx = saiState.selectedData.indexOf(dt);
-      if (idx >= 0) saiState.selectedData.splice(idx,1); else saiState.selectedData.push(dt);
-      renderDataTypes();
-    };
-    el.appendChild(btn);
-  });
-}
-
-/* ─── RENDER SENSITIVITY BUTTONS ─────────────────────────────────────── */
-function renderSensitivityBtns() {
-  var el = document.getElementById('sai-sensitivity-btns');
-  if (!el) return;
-  el.innerHTML = '';
-  SAI_SENSITIVITIES.forEach(function(s) {
-    var isSelected = saiState.selectedSensitivity === s.v;
-    var btn = document.createElement('button');
-    btn.style.cssText = 'background:' + (isSelected ? 'rgba(0,0,0,.3)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? s.col : 'rgba(255,255,255,.1)') + ';border-radius:6px;color:' + (isSelected ? s.col : '#64748b') + ';padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;';
-    btn.textContent = s.label;
-    btn.onclick = function() { saiState.selectedSensitivity = s.v; renderSensitivityBtns(); };
-    el.appendChild(btn);
-  });
-}
-
-/* ─── RECOMMEND AI PATH ───────────────────────────────────────────────── */
-window.recommendAIPath = function() {
-  var rec = recommendRackspaceAIService({
-    system: saiState.selectedSystem,
-    goal: saiState.selectedGoal,
-    data: saiState.selectedData,
-    sensitivity: saiState.selectedSensitivity,
-    env: (document.getElementById('sai-env')||{}).value || 'flex'
-  });
-  saiState.recommendation = rec;
-
-  var div = document.getElementById('sai-recommendation');
-  if (!div) return;
-  div.style.display = 'block';
-  setText('sai-rec-system',  rec.system);
-  setText('sai-rec-goal',    rec.goalLabel);
-  setText('sai-rec-connect', rec.connectMethod);
-  setText('sai-rec-service', rec.service);
-  setText('sai-rec-scaleup', rec.scaleUp);
-  setText('sai-rec-poc',     rec.poc2wk);
-  setText('sai-rec-sales',   rec.salesNext);
-  setText('sai-rec-tech',    rec.techNext);
-  div.scrollIntoView({ behavior:'smooth', block:'nearest' });
-  saveStage9State();
-};
-
-function setText(id, val) {
-  var el = document.getElementById(id);
-  if (el) el.textContent = val || '';
-}
-
-/* ─── RECOMMENDATION LOGIC ────────────────────────────────────────────── */
-window.recommendRackspaceAIService = function(params) {
-  var goal = params.goal || 'rag';
-  var sens = params.sensitivity || 'low';
-  var env  = params.env || 'flex';
-  var sysName = (params.system && params.system.name) ? params.system.name : 'Your FLEX Business System';
-  var goalObj = SAI_GOALS.filter(function(g){ return g.id === goal; })[0] || { label:'AI Improvement' };
-
-  var service, scaleUp, connectMethod, poc2wk, salesNext, techNext;
-
-  // Connect vs Clone guidance
-  var cloneRecommended = (sens === 'regulated' || sens === 'high');
-  var connectMode = cloneRecommended ? 'Clone (masked dataset / DB copy / VM snapshot)' : 'Connect (read-only API / DB replica / document ingestion)';
-
-  if (sens === 'regulated' || sens === 'high' || env === 'private' || env === 'sovereign') {
-    service = 'Private Cloud AI / AI Anywhere';
-    scaleUp = 'AI Anywhere → Enterprise AI Cloud → FDE';
-    connectMethod = 'Private network + masked DB clone + secure data pipeline';
-    poc2wk = 'Wk 1: Data sensitivity review + private AI infra sizing.\nWk 2: Secure data pipeline + private AI LaunchPad POC on isolated clone.';
-    salesNext = 'Schedule Private AI architecture session. Position data sovereignty and compliance.';
-    techNext = 'Size private AI infra. Define masked clone pipeline. Confirm security model.';
-  } else if (goal === 'agents' || goal === 'automate') {
-    service = 'AI LaunchPad → Uniphore + FDE';
-    scaleUp = 'Uniphore → Enterprise AI Cloud';
-    connectMethod = 'App API + ticketing system connector + CRM/ERP integration';
-    poc2wk = 'Wk 1: Map workflow automation use case + API connectivity.\nWk 2: POC agentic workflow with Uniphore + Rackspace FDE.';
-    salesNext = 'FDE discovery call. Position Uniphore agentic platform over FLEX workloads.';
-    techNext = 'Map API endpoints. Define agent trigger/action graph. Confirm integration layer.';
-  } else if (goal === 'inference') {
-    service = 'AI Business / Inference Platform (Dell + AMD path)';
-    scaleUp = 'Enterprise AI Cloud';
-    connectMethod = 'App API to inference endpoint + feature data batch export';
-    poc2wk = 'Wk 1: Inventory VM / CPU / GPU sizing from FLEX migration data.\nWk 2: Define inference architecture + select model serving platform.';
-    salesNext = 'Dell/AMD infrastructure session. Present GPU/CPU sizing from FLEX discovery.';
-    techNext = 'Export FLEX VM sizing data. Size inference cluster. Select model serving stack.';
-  } else if (goal === 'risk' && (sens === 'regulated' || sens === 'high')) {
-    service = 'FAIR Diagnostic + Private Cloud AI';
-    scaleUp = 'Private Cloud AI → Enterprise AI Cloud';
-    connectMethod = 'Compliance document ingestion + audit log pipeline + secure DB replica';
-    poc2wk = 'Wk 1: FAIR AI readiness assessment + compliance gap review.\nWk 2: Risk AI POC on isolated dataset — flag, classify, alert.';
-    salesNext = 'FAIR Diagnostic workshop. Lead with compliance ROI and risk reduction.';
-    techNext = 'Ingest compliance docs. Build risk-scoring model. Define alert thresholds.';
-  } else if (goal === 'exec' || goal === 'revenue') {
-    service = 'FAIR Diagnostic / Ideate';
-    scaleUp = 'AI LaunchPad → Enterprise AI Cloud';
-    connectMethod = 'Database read replica + API connectors + data warehouse export';
-    poc2wk = 'Wk 1: FAIR AI use case ideation workshop. Map executive KPIs to AI outputs.\nWk 2: POC NL reporting or revenue prediction on FLEX data.';
-    salesNext = 'Schedule FAIR Ideate workshop. Lead with executive insight and revenue AI story.';
-    techNext = 'Connect DB replica. Build NL query layer or prediction model. Define KPI dashboard.';
-  } else {
-    // Default: AI LaunchPad for RAG/support/summarize/ops
-    service = 'AI LaunchPad';
-    scaleUp = 'FAIR Incubate → Private Cloud AI → Enterprise AI Cloud';
-    connectMethod = 'Read-only API + document ingestion + RAG / vector database pipeline';
-    poc2wk = 'Wk 1: Connect FLEX system data (documents / tickets / KB) to RAG pipeline.\nWk 2: Deploy AI LaunchPad chatbot / summarizer POC on FLEX-hosted data.';
-    salesNext = 'AI LaunchPad intro call. Show quick POC on their migrated FLEX data.';
-    techNext = 'Stand up vector database. Ingest FLEX-hosted documents / tickets. Deploy RAG endpoint.';
-  }
-
-  return {
-    system: sysName,
-    goalLabel: goalObj.label || goal,
-    service: service,
-    scaleUp: scaleUp,
-    connectMode: connectMode,
-    connectMethod: connectMethod,
-    poc2wk: poc2wk,
-    salesNext: salesNext,
-    techNext: techNext
-  };
-};
-
-/* ─── OPPORTUNITY TABLE ───────────────────────────────────────────────── */
-window.runAIOpportunityScan = function() {
-  renderOpportunityTable();
-  updateCounters();
-};
-
-function renderOpportunityTable() {
-  var tbody = document.getElementById('sai-opp-tbody');
-  if (!tbody) return;
-  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
-  tbody.innerHTML = '';
-  systems.forEach(function(sys) {
-    var score = calculateAIReadiness(sys);
-    var rec = recommendRackspaceAIService({ system: sys, goal: 'rag', sensitivity: sys.sensitivity, env: 'flex' });
-    var scoreCol = score >= 70 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171';
-    var sensCol = { low:'#34d399', medium:'#fbbf24', high:'#f87171', regulated:'#c084fc' }[sys.sensitivity] || '#94a3b8';
-    var tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid rgba(255,255,255,.04)';
-    tr.innerHTML = '<td style="padding:10px;color:#e2e8f0;font-weight:700;">' + sys.name + '</td>'
-      + '<td style="padding:10px;color:#94a3b8;">' + sys.vms + '</td>'
-      + '<td style="padding:10px;color:#94a3b8;max-width:160px;">' + (sys.data||'').replace(/,/g,', ') + '</td>'
-      + '<td style="padding:10px;"><span style="color:' + sensCol + ';font-weight:700;font-size:10px;">' + (sys.sensitivity||'low').toUpperCase() + '</span></td>'
-      + '<td style="padding:10px;"><span style="color:' + scoreCol + ';font-weight:800;font-size:14px;">' + score + '%</span></td>'
-      + '<td style="padding:10px;color:#a78bfa;font-size:10px;font-weight:700;">' + rec.service + '</td>'
-      + '<td style="padding:10px;color:#fbbf24;font-weight:700;">$' + (sys.vms * 18) + 'K/yr</td>'
-      + '<td style="padding:10px;">'
-        + '<button onclick="selectAISystem(' + JSON.stringify(sys).replace(/"/g,'&quot;') + ');recommendAIPath();" style="background:rgba(109,40,217,.3);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;padding:3px 8px;font-size:9px;font-weight:700;cursor:pointer;margin-right:3px;">Assess</button>'
-        + '<button onclick="selectAISystem(' + JSON.stringify(sys).replace(/"/g,'&quot;') + ');generateAILaunchPadPlan();" style="background:rgba(5,150,105,.3);border:1px solid rgba(52,211,153,.4);border-radius:4px;color:#34d399;padding:3px 8px;font-size:9px;font-weight:700;cursor:pointer;">LaunchPad</button>'
-      + '</td>';
-    tbody.appendChild(tr);
-  });
-}
-
-window.calculateAIReadiness = function(sys) {
-  var base = 40;
-  if (sys.data && sys.data.indexOf('documents') >= 0) base += 15;
-  if (sys.data && sys.data.indexOf('database') >= 0) base += 10;
-  if (sys.data && sys.data.indexOf('tickets') >= 0) base += 10;
-  if (sys.data && sys.data.indexOf('APIs') >= 0) base += 10;
-  if (sys.sensitivity === 'low') base += 10;
-  if (sys.sensitivity === 'medium') base += 5;
-  if (sys.migStatus === 'Migrated') base += 5;
-  return Math.min(base, 100);
-};
-
-/* ─── UPSELL TABLE ────────────────────────────────────────────────────── */
-function renderUpsellTable() {
-  var tbody = document.getElementById('sai-upsell-tbody');
-  if (!tbody) return;
-  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
-  tbody.innerHTML = '';
-  var motions = ['AI LaunchPad intro','FAIR Diagnostic workshop','Private AI architecture session','FDE discovery call'];
-  var statuses = ['Identified','Qualified','Workshop Scheduled'];
-  systems.forEach(function(sys, i) {
-    var rec = recommendRackspaceAIService({ system: sys, goal: 'rag', sensitivity: sys.sensitivity, env: 'flex' });
-    var motion = motions[i % motions.length];
-    var status = statuses[i % statuses.length];
-    var statusCol = { 'Identified':'#64748b','Qualified':'#22d3ee','Workshop Scheduled':'#a78bfa','POC Running':'#fbbf24','Won':'#34d399','Not Now':'#f87171' }[status] || '#64748b';
-    var tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid rgba(255,255,255,.04)';
-    tr.innerHTML = '<td style="padding:9px 10px;color:#e2e8f0;font-weight:700;">' + sys.name + '</td>'
-      + '<td style="padding:9px 10px;color:#a78bfa;font-size:10px;">' + rec.service + '</td>'
-      + '<td style="padding:9px 10px;color:#22d3ee;font-size:10px;">' + rec.scaleUp + '</td>'
-      + '<td style="padding:9px 10px;color:#fbbf24;font-weight:700;">$' + (sys.vms * 18) + 'K</td>'
-      + '<td style="padding:9px 10px;color:#94a3b8;font-size:10px;">' + motion + '</td>'
-      + '<td style="padding:9px 10px;"><span style="color:' + statusCol + ';font-weight:700;font-size:10px;">' + status + '</span></td>'
-      + '<td style="padding:9px 10px;color:#94a3b8;font-size:10px;">Schedule intro call</td>';
-    tbody.appendChild(tr);
-  });
-}
-
-/* ─── GOVERNANCE CHECKLIST ────────────────────────────────────────────── */
-function renderChecklist() {
-  var el = document.getElementById('sai-checklist-grid');
-  if (!el) return;
-  el.innerHTML = '';
-  SAI_GOV_ITEMS.forEach(function(item) {
-    var checked = !!saiState.govChecks[item];
-    var div = document.createElement('div');
-    div.style.cssText = 'background:rgba(30,41,59,.6);border:1px solid ' + (checked ? 'rgba(52,211,153,.4)' : 'rgba(255,255,255,.06)') + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s;';
-    div.innerHTML = '<div style="width:18px;height:18px;border-radius:4px;border:2px solid ' + (checked ? '#34d399' : '#334155') + ';background:' + (checked ? '#059669' : 'transparent') + ';flex-shrink:0;display:flex;align-items:center;justify-content:center;">'
-      + (checked ? '<span style="color:#fff;font-size:11px;font-weight:900;">✓</span>' : '') + '</div>'
-      + '<span style="font-size:11px;color:' + (checked ? '#e2e8f0' : '#64748b') + ';font-weight:' + (checked ? '700' : '400') + ';">' + item + '</span>';
-    div.onclick = function() {
-      saiState.govChecks[item] = !saiState.govChecks[item];
-      renderChecklist();
-      updateGovernanceScore();
-      saveStage9State();
-    };
-    el.appendChild(div);
-  });
-  updateGovernanceScore();
-}
-
-window.updateGovernanceScore = function() {
-  var total = SAI_GOV_ITEMS.length;
-  var done = Object.keys(saiState.govChecks).filter(function(k){ return saiState.govChecks[k]; }).length;
-  var pct = Math.round((done / total) * 100);
-  var scoreEl = document.getElementById('sai-gov-score');
-  var labelEl = document.getElementById('sai-gov-label');
-  if (scoreEl) scoreEl.textContent = pct + '%';
-  var label, col;
-  if (pct >= 85)      { label = 'ENTERPRISE AI READY'; col = '#a78bfa'; }
-  else if (pct >= 70) { label = 'AI READY';            col = '#34d399'; }
-  else if (pct >= 40) { label = 'LAUNCHPAD CANDIDATE'; col = '#fbbf24'; }
-  else                { label = 'NOT READY';            col = '#f87171'; }
-  if (scoreEl) scoreEl.style.color = col;
-  if (labelEl) { labelEl.textContent = label; labelEl.style.color = col; }
-};
-
-/* ─── COUNTERS ────────────────────────────────────────────────────────── */
-function updateCounters() {
-  var systems = saiState.systems;
-  var cnt = document.getElementById('sai-cnt-imported'); if (cnt) cnt.textContent = systems.length;
-  var ready = systems.filter(function(s){ return calculateAIReadiness(s) >= 70; });
-  var cr = document.getElementById('sai-cnt-ready'); if (cr) cr.textContent = ready.length;
-  var qw = systems.filter(function(s){ return s.sensitivity === 'low' || s.sensitivity === 'medium'; });
-  var cq = document.getElementById('sai-cnt-quickwin'); if (cq) cq.textContent = qw.length;
-  var totalVal = systems.reduce(function(a,s){ return a + s.vms * 18; }, 0);
-  var cu = document.getElementById('sai-cnt-upsell'); if (cu) cu.textContent = '$' + totalVal + 'K';
-}
-
-/* ─── AI LAUNCHPAD PLAN ───────────────────────────────────────────────── */
-window.generateAILaunchPadPlan = function() {
-  var sys = saiState.selectedSystem || SAI_DEMO_SYSTEMS[0];
-  var goalId = saiState.selectedGoal || 'rag';
-  var goalObj = SAI_GOALS.filter(function(g){ return g.id === goalId; })[0] || { label:'Knowledge Search / RAG', hint:'AI chatbot over documents' };
-
-  var plan = '=== AI LaunchPad Plan ===\n'
-    + 'Business System : ' + sys.name + '\n'
-    + 'AI Output Goal  : ' + goalObj.label + '\n'
-    + 'Data Sources    : ' + (saiState.selectedData.length ? saiState.selectedData.join(', ') : sys.data) + '\n'
-    + 'Sensitivity     : ' + (saiState.selectedSensitivity || sys.sensitivity) + '\n\n'
-    + 'USE CASE\n'
-    + 'Problem: Improve "' + goalObj.hint + '" using AI on ' + sys.name + ' data migrated to FLEX.\n\n'
-    + 'WEEK 1 ACTIONS\n'
-    + '✔ Identify data owner and confirm data access method (API / DB replica / file export)\n'
-    + '✔ Extract a sample dataset (500–1000 records / documents)\n'
-    + '✔ Set up RAG pipeline or AI LaunchPad environment\n'
-    + '✔ Define success metric (e.g. answer accuracy, resolution time, cost saved)\n\n'
-    + 'WEEK 2 ACTIONS\n'
-    + '✔ Index data into vector store\n'
-    + '✔ Deploy AI LaunchPad chatbot / summarizer / classifier POC\n'
-    + '✔ Run internal demo with business owner\n'
-    + '✔ Capture feedback and define production decision criteria\n\n'
-    + '30-DAY PRODUCTION DECISION\n'
-    + 'If POC accuracy ≥ 80% and user adoption confirmed → proceed to FAIR Incubate.\n'
-    + 'If data sensitivity flags raised → pivot to Private Cloud AI.\n'
-    + 'If business value unclear → run FAIR Diagnostic workshop.\n\n'
-    + 'CONNECT OR CLONE?\n'
-    + (saiState.selectedSensitivity === 'regulated' || saiState.selectedSensitivity === 'high'
-       ? 'CLONE: Masked dataset recommended. Create DB copy + anonymize PII before AI ingestion.'
-       : 'CONNECT: Read-only API or DB replica. No production data movement required for POC.') + '\n\n'
-    + 'SCALE-UP PATH\n'
-    + 'AI LaunchPad → FAIR Incubate → Private Cloud AI / AI Anywhere → Enterprise AI Cloud → FDE + Partners';
-
-  saiState.launchPadPlan = plan;
-  var el = document.getElementById('sai-launchpad-output');
-  if (el) el.textContent = plan;
-  saveStage9State();
-};
-
-window.copyAILaunchPadPlan = function() {
-  if (!saiState.launchPadPlan) return;
-  try { navigator.clipboard.writeText(saiState.launchPadPlan); } catch(e) {}
-};
-
-/* ─── EXPORTS ─────────────────────────────────────────────────────────── */
-window.exportAIPowerUpJSON = function() {
-  var data = { generated: new Date().toISOString(), systems: saiState.systems, recommendation: saiState.recommendation, launchPadPlan: saiState.launchPadPlan, governance: saiState.govChecks };
-  var blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_powerup_plan.json'; a.click();
-};
-
-window.exportAIPowerUpCSV = function() {
-  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
-  var rows = ['Business System,VMs,Data Type,Sensitivity,AI Score,Recommended Service,Est Value,Scale-Up Path'];
-  systems.forEach(function(s) {
-    var rec = recommendRackspaceAIService({ system:s, goal:'rag', sensitivity:s.sensitivity, env:'flex' });
-    rows.push([s.name, s.vms, s.data, s.sensitivity, calculateAIReadiness(s)+'%', rec.service, '$'+(s.vms*18)+'K', rec.scaleUp].map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','));
-  });
-  var blob = new Blob([rows.join('\n')], { type:'text/csv' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_service_mapping.csv'; a.click();
-};
-
-window.exportAIPowerUpMarkdown = function() {
-  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
-  var rec = saiState.recommendation || {};
-  var govDone = Object.keys(saiState.govChecks).filter(function(k){ return saiState.govChecks[k]; }).length;
-  var govPct  = Math.round((govDone / SAI_GOV_ITEMS.length) * 100);
-
-  var md = '# AI Power Up — Executive Report\n\n'
-    + '> Generated: ' + new Date().toLocaleDateString() + '\n\n'
-    + '## Summary\n\n'
-    + '- **FLEX Business Systems Imported:** ' + systems.length + '\n'
-    + '- **AI-Ready Systems:** ' + systems.filter(function(s){ return calculateAIReadiness(s)>=70; }).length + '\n'
-    + '- **Quick-Win Candidates:** ' + systems.filter(function(s){ return s.sensitivity!=='regulated'&&s.sensitivity!=='high'; }).length + '\n'
-    + '- **Governance Readiness:** ' + govPct + '%\n\n'
-    + '## Recommended AI Starting Service\n\n'
-    + (rec.service ? '**' + rec.service + '**\n\nScale-Up: ' + rec.scaleUp + '\n\n' : '_Run AI Opportunity Scan to generate recommendation._\n\n')
-    + '## Business System AI Readiness\n\n'
-    + '| System | VMs | Sensitivity | AI Score | Entry Point |\n'
-    + '|--------|-----|-------------|----------|-------------|\n'
-    + systems.map(function(s){
-        var rec2 = recommendRackspaceAIService({system:s,goal:'rag',sensitivity:s.sensitivity,env:'flex'});
-        return '| '+s.name+' | '+s.vms+' | '+s.sensitivity+' | '+calculateAIReadiness(s)+'% | '+rec2.service+' |';
-      }).join('\n') + '\n\n'
-    + '## AI LaunchPad Plan\n\n'
-    + (saiState.launchPadPlan ? '~~~\n' + saiState.launchPadPlan + '\n~~~\n\n' : '_Generate plan above._\n\n')
-    + '## Sales Next Actions\n\n'
-    + systems.map(function(s){ return '- **' + s.name + '**: Schedule AI LaunchPad intro call'; }).join('\n') + '\n\n'
-    + '## Scale-Up Path\n\n'
-    + 'AI LaunchPad → FAIR Incubate → Private Cloud AI → Enterprise AI Cloud → FDE + Partners\n\n'
-    + '_Generated by OSPC→FLEX Migration Dashboard — Stage 9 AI Power Up_\n';
-
-  var blob = new Blob([md], { type:'text/markdown' });
-  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_powerup_executive_report.md'; a.click();
-};
-
-/* ─── PERSISTENCE ─────────────────────────────────────────────────────── */
-window.saveStage9State = function() {
-  try { localStorage.setItem(SAI_KEY, JSON.stringify({ systems: saiState.systems, selectedGoal: saiState.selectedGoal, selectedData: saiState.selectedData, selectedSensitivity: saiState.selectedSensitivity, govChecks: saiState.govChecks, launchPadPlan: saiState.launchPadPlan })); } catch(e) {}
-};
-
-window.loadStage9State = function() {
-  try {
-    var raw = localStorage.getItem(SAI_KEY);
-    if (!raw) return;
-    var saved = JSON.parse(raw);
-    if (saved.systems)            saiState.systems = saved.systems;
-    if (saved.selectedGoal)       saiState.selectedGoal = saved.selectedGoal;
-    if (saved.selectedData)       saiState.selectedData = saved.selectedData;
-    if (saved.selectedSensitivity) saiState.selectedSensitivity = saved.selectedSensitivity;
-    if (saved.govChecks)          saiState.govChecks = saved.govChecks;
-    if (saved.launchPadPlan)      saiState.launchPadPlan = saved.launchPadPlan;
-  } catch(e) {}
-};
-
-/* ─── HOOK INTO activateStage ────────────────────────────────────────── */
-(function() {
-  var _orig = window.activateStage;
-  window.activateStage = function(stageId) {
-    if (typeof _orig === 'function') _orig.call(this, stageId);
-    if (stageId === 'sai') {
-      setTimeout(function() { if (typeof initStage9 === 'function') initStage9(); }, 80);
-    }
-  };
-})();
-</script>
+{% include "_ai_powerup_js.html" %}
 
 </body>
 </html>

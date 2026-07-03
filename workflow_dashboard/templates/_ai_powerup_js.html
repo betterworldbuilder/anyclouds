@@ -1,0 +1,532 @@
+<script>
+/* ══════════════════════════════════════════════════════════════════════════════
+   STAGE 9 — AI POWER UP  (stage key: sai)
+   localStorage key: ospcFlex_stage9_aiPowerUp
+══════════════════════════════════════════════════════════════════════════════ */
+
+window.rackspaceAIConnectors = {
+  aiLaunchPad:      { enabled: false, endpoint: '', status: 'stub' },
+  fairDiagnostic:   { enabled: false, endpoint: '', status: 'stub' },
+  privateCloudAI:   { enabled: false, endpoint: '', status: 'stub' },
+  aiAnywhere:       { enabled: false, endpoint: '', status: 'stub' },
+  enterpriseAICloud:{ enabled: false, endpoint: '', status: 'stub' },
+  fde:              { enabled: false, endpoint: '', status: 'stub' },
+  palantir:         { enabled: false, endpoint: '', status: 'stub' },
+  uniphore:         { enabled: false, endpoint: '', status: 'stub' },
+  dell:             { enabled: false, endpoint: '', status: 'stub' },
+  vmware:           { enabled: false, endpoint: '', status: 'stub' },
+  rubrik:           { enabled: false, endpoint: '', status: 'stub' },
+  amd:              { enabled: false, endpoint: '', status: 'stub' }
+};
+
+var SAI_KEY = 'ospcFlex_stage9_aiPowerUp';
+
+var SAI_DEMO_SYSTEMS = [
+  { name:'Customer Portal',        vms:4,  data:'documents,tickets,emails',      sensitivity:'medium', migStatus:'Migrated' },
+  { name:'Billing Platform',       vms:6,  data:'database,logs,APIs',            sensitivity:'high',   migStatus:'Migrated' },
+  { name:'Support Knowledge Base', vms:2,  data:'documents,tickets',             sensitivity:'low',    migStatus:'Migrated' },
+  { name:'Claims / Ticketing',     vms:5,  data:'tickets,documents,images',      sensitivity:'high',   migStatus:'Migrated' },
+  { name:'Data Warehouse',         vms:8,  data:'database,logs',                 sensitivity:'medium', migStatus:'Migrated' },
+  { name:'ERP / Finance System',   vms:10, data:'database,APIs,emails',          sensitivity:'regulated', migStatus:'Migrated' }
+];
+
+var SAI_GOALS = [
+  { id:'support',    icon:'💬', label:'Faster Customer Support',     hint:'Ticket triage, suggested resolution, auto-summary' },
+  { id:'rag',        icon:'🔍', label:'Knowledge Search / RAG',      hint:'AI chatbot over documents, KB, tickets' },
+  { id:'summarize',  icon:'📄', label:'Document Summarization',      hint:'Summarize contracts, cases, reports' },
+  { id:'automate',   icon:'⚙️', label:'Ticket / Case Automation',   hint:'Auto-route, auto-resolve, auto-classify' },
+  { id:'ops',        icon:'🔧', label:'Operations Automation',       hint:'AIOps, incident summary, root-cause' },
+  { id:'revenue',    icon:'💰', label:'Revenue Growth',              hint:'Next-best offer, churn prediction, upsell AI' },
+  { id:'risk',       icon:'🛡', label:'Risk / Compliance',           hint:'Compliance checks, audit trail, risk alerts' },
+  { id:'exec',       icon:'📊', label:'Executive Insights',          hint:'NL reporting, dashboards, trend alerts' },
+  { id:'agents',     icon:'🤖', label:'AI Agents',                   hint:'Workflow automation, approvals, CRM/ERP bots' },
+  { id:'inference',  icon:'⚡', label:'Production Inference',         hint:'Model serving, fine-tuning, high-volume inference' }
+];
+
+var SAI_DATA_TYPES = ['documents','tickets','logs','database','images','call transcripts','emails','APIs','object storage','event streams'];
+var SAI_SENSITIVITIES = [
+  { v:'low',       label:'Low',       col:'#34d399' },
+  { v:'medium',    label:'Medium',    col:'#fbbf24' },
+  { v:'high',      label:'High',      col:'#f87171' },
+  { v:'regulated', label:'Regulated', col:'#c084fc' }
+];
+
+var SAI_GOV_ITEMS = [
+  'Business owner identified','Data owner identified','Data location known',
+  'Data classification complete','PII / sensitive data reviewed',
+  'Access model defined','API / database connectivity confirmed',
+  'RAG / vector store need assessed','Model / inference environment selected',
+  'Compliance requirements captured','Success metrics defined','Production owner assigned'
+];
+
+var saiState = {
+  systems: [], selectedSystem: null, selectedGoal: null,
+  selectedData: [], selectedSensitivity: 'low', selectedEnv: 'flex',
+  recommendation: null, launchPadPlan: null, govChecks: {}
+};
+
+/* ─── INIT ───────────────────────────────────────────────────────────── */
+window.initStage9 = function() {
+  loadStage9State();
+  renderAIGoals();
+  renderDataTypes();
+  renderSensitivityBtns();
+  renderChecklist();
+  if (saiState.systems.length === 0) importMigratedSystemsForAI();
+  else renderSystemsGrid();
+};
+
+/* ─── IMPORT SYSTEMS ──────────────────────────────────────────────────── */
+window.importMigratedSystemsForAI = function() {
+  var msg = document.getElementById('sai-import-msg');
+  var fromTracker = [];
+  try {
+    var raw = localStorage.getItem('osflex_migration_tracker');
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) fromTracker = parsed.filter(function(r){ return r.status === 'Migrated' || r.migStatus === 'Migrated'; });
+    }
+  } catch(e) {}
+
+  if (fromTracker.length > 0) {
+    saiState.systems = fromTracker.map(function(r) {
+      return { name: r.name || r.customer || 'Unknown', vms: r.vms || 1, data: 'documents,tickets', sensitivity: 'medium', migStatus: 'Migrated' };
+    });
+    if (msg) { msg.style.display='block'; msg.textContent = '✔ Loaded ' + saiState.systems.length + ' migrated systems from your Migration Tracker.'; }
+  } else {
+    saiState.systems = SAI_DEMO_SYSTEMS.slice();
+    if (msg) { msg.style.display='block'; msg.textContent = 'ℹ No migrated systems found yet. Demo AI opportunities loaded. Complete Stage 1–Stage 4 first.'; }
+  }
+  renderSystemsGrid();
+  renderOpportunityTable();
+  renderUpsellTable();
+  updateCounters();
+  saveStage9State();
+};
+
+/* ─── RENDER SYSTEMS GRID ─────────────────────────────────────────────── */
+function renderSystemsGrid() {
+  var el = document.getElementById('sai-systems-grid');
+  if (!el) return;
+  el.innerHTML = '';
+  saiState.systems.forEach(function(sys) {
+    var isSelected = saiState.selectedSystem && saiState.selectedSystem.name === sys.name;
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (isSelected ? 'rgba(109,40,217,.25)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? '#a78bfa' : 'rgba(255,255,255,.08)') + ';border-radius:10px;padding:14px;cursor:pointer;transition:border-color .15s;';
+    card.innerHTML = '<div style="font-size:14px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">' + sys.name + '</div>'
+      + '<div style="font-size:10px;color:#64748b;">' + sys.vms + ' VMs &bull; ' + (sys.migStatus||'Migrated') + '</div>'
+      + '<div style="margin-top:6px;"><span style="background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);border-radius:4px;padding:2px 6px;font-size:9px;color:#34d399;font-weight:700;">MIGRATED</span></div>';
+    card.onclick = function() { selectAISystem(sys); };
+    el.appendChild(card);
+  });
+}
+
+/* ─── SELECT SYSTEM ───────────────────────────────────────────────────── */
+window.selectAISystem = function(sys) {
+  saiState.selectedSystem = sys;
+  renderSystemsGrid();
+};
+
+/* ─── RENDER GOAL CARDS ───────────────────────────────────────────────── */
+function renderAIGoals() {
+  var el = document.getElementById('sai-goals-grid');
+  if (!el) return;
+  el.innerHTML = '';
+  SAI_GOALS.forEach(function(g) {
+    var isSelected = saiState.selectedGoal === g.id;
+    var card = document.createElement('div');
+    card.style.cssText = 'background:' + (isSelected ? 'rgba(6,182,212,.2)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? '#22d3ee' : 'rgba(255,255,255,.08)') + ';border-radius:10px;padding:12px;cursor:pointer;transition:border-color .15s;';
+    card.innerHTML = '<div style="font-size:20px;margin-bottom:6px;">' + g.icon + '</div>'
+      + '<div style="font-size:12px;font-weight:800;color:#e2e8f0;margin-bottom:4px;">' + g.label + '</div>'
+      + '<div style="font-size:10px;color:#64748b;line-height:1.4;">' + g.hint + '</div>';
+    card.onclick = function() { saiState.selectedGoal = g.id; renderAIGoals(); };
+    el.appendChild(card);
+  });
+}
+
+/* ─── RENDER DATA TYPES ───────────────────────────────────────────────── */
+function renderDataTypes() {
+  var el = document.getElementById('sai-data-grid');
+  if (!el) return;
+  el.innerHTML = '';
+  SAI_DATA_TYPES.forEach(function(dt) {
+    var isSelected = saiState.selectedData.indexOf(dt) >= 0;
+    var btn = document.createElement('button');
+    btn.style.cssText = 'background:' + (isSelected ? 'rgba(109,40,217,.25)' : 'rgba(30,41,59,.6)') + ';border:1px solid ' + (isSelected ? '#a78bfa' : 'rgba(255,255,255,.1)') + ';border-radius:6px;color:' + (isSelected ? '#a78bfa' : '#94a3b8') + ';padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;';
+    btn.textContent = dt;
+    btn.onclick = function() {
+      var idx = saiState.selectedData.indexOf(dt);
+      if (idx >= 0) saiState.selectedData.splice(idx,1); else saiState.selectedData.push(dt);
+      renderDataTypes();
+    };
+    el.appendChild(btn);
+  });
+}
+
+/* ─── RENDER SENSITIVITY BUTTONS ─────────────────────────────────────── */
+function renderSensitivityBtns() {
+  var el = document.getElementById('sai-sensitivity-btns');
+  if (!el) return;
+  el.innerHTML = '';
+  SAI_SENSITIVITIES.forEach(function(s) {
+    var isSelected = saiState.selectedSensitivity === s.v;
+    var btn = document.createElement('button');
+    btn.style.cssText = 'background:' + (isSelected ? 'rgba(0,0,0,.3)' : 'rgba(30,41,59,.6)') + ';border:2px solid ' + (isSelected ? s.col : 'rgba(255,255,255,.1)') + ';border-radius:6px;color:' + (isSelected ? s.col : '#64748b') + ';padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;';
+    btn.textContent = s.label;
+    btn.onclick = function() { saiState.selectedSensitivity = s.v; renderSensitivityBtns(); };
+    el.appendChild(btn);
+  });
+}
+
+/* ─── RECOMMEND AI PATH ───────────────────────────────────────────────── */
+window.recommendAIPath = function() {
+  var rec = recommendRackspaceAIService({
+    system: saiState.selectedSystem,
+    goal: saiState.selectedGoal,
+    data: saiState.selectedData,
+    sensitivity: saiState.selectedSensitivity,
+    env: (document.getElementById('sai-env')||{}).value || 'flex'
+  });
+  saiState.recommendation = rec;
+
+  var div = document.getElementById('sai-recommendation');
+  if (!div) return;
+  div.style.display = 'block';
+  setText('sai-rec-system',  rec.system);
+  setText('sai-rec-goal',    rec.goalLabel);
+  setText('sai-rec-connect', rec.connectMethod);
+  setText('sai-rec-service', rec.service);
+  setText('sai-rec-scaleup', rec.scaleUp);
+  setText('sai-rec-poc',     rec.poc2wk);
+  setText('sai-rec-sales',   rec.salesNext);
+  setText('sai-rec-tech',    rec.techNext);
+  div.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  saveStage9State();
+};
+
+function setText(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = val || '';
+}
+
+/* ─── RECOMMENDATION LOGIC ────────────────────────────────────────────── */
+window.recommendRackspaceAIService = function(params) {
+  var goal = params.goal || 'rag';
+  var sens = params.sensitivity || 'low';
+  var env  = params.env || 'flex';
+  var sysName = (params.system && params.system.name) ? params.system.name : 'Your FLEX Business System';
+  var goalObj = SAI_GOALS.filter(function(g){ return g.id === goal; })[0] || { label:'AI Improvement' };
+
+  var service, scaleUp, connectMethod, poc2wk, salesNext, techNext;
+
+  // Connect vs Clone guidance
+  var cloneRecommended = (sens === 'regulated' || sens === 'high');
+  var connectMode = cloneRecommended ? 'Clone (masked dataset / DB copy / VM snapshot)' : 'Connect (read-only API / DB replica / document ingestion)';
+
+  if (sens === 'regulated' || sens === 'high' || env === 'private' || env === 'sovereign') {
+    service = 'Private Cloud AI / AI Anywhere';
+    scaleUp = 'AI Anywhere → Enterprise AI Cloud → FDE';
+    connectMethod = 'Private network + masked DB clone + secure data pipeline';
+    poc2wk = 'Wk 1: Data sensitivity review + private AI infra sizing.\nWk 2: Secure data pipeline + private AI LaunchPad POC on isolated clone.';
+    salesNext = 'Schedule Private AI architecture session. Position data sovereignty and compliance.';
+    techNext = 'Size private AI infra. Define masked clone pipeline. Confirm security model.';
+  } else if (goal === 'agents' || goal === 'automate') {
+    service = 'AI LaunchPad → Uniphore + FDE';
+    scaleUp = 'Uniphore → Enterprise AI Cloud';
+    connectMethod = 'App API + ticketing system connector + CRM/ERP integration';
+    poc2wk = 'Wk 1: Map workflow automation use case + API connectivity.\nWk 2: POC agentic workflow with Uniphore + Rackspace FDE.';
+    salesNext = 'FDE discovery call. Position Uniphore agentic platform over FLEX workloads.';
+    techNext = 'Map API endpoints. Define agent trigger/action graph. Confirm integration layer.';
+  } else if (goal === 'inference') {
+    service = 'AI Business / Inference Platform (Dell + AMD path)';
+    scaleUp = 'Enterprise AI Cloud';
+    connectMethod = 'App API to inference endpoint + feature data batch export';
+    poc2wk = 'Wk 1: Inventory VM / CPU / GPU sizing from FLEX migration data.\nWk 2: Define inference architecture + select model serving platform.';
+    salesNext = 'Dell/AMD infrastructure session. Present GPU/CPU sizing from FLEX discovery.';
+    techNext = 'Export FLEX VM sizing data. Size inference cluster. Select model serving stack.';
+  } else if (goal === 'risk' && (sens === 'regulated' || sens === 'high')) {
+    service = 'FAIR Diagnostic + Private Cloud AI';
+    scaleUp = 'Private Cloud AI → Enterprise AI Cloud';
+    connectMethod = 'Compliance document ingestion + audit log pipeline + secure DB replica';
+    poc2wk = 'Wk 1: FAIR AI readiness assessment + compliance gap review.\nWk 2: Risk AI POC on isolated dataset — flag, classify, alert.';
+    salesNext = 'FAIR Diagnostic workshop. Lead with compliance ROI and risk reduction.';
+    techNext = 'Ingest compliance docs. Build risk-scoring model. Define alert thresholds.';
+  } else if (goal === 'exec' || goal === 'revenue') {
+    service = 'FAIR Diagnostic / Ideate';
+    scaleUp = 'AI LaunchPad → Enterprise AI Cloud';
+    connectMethod = 'Database read replica + API connectors + data warehouse export';
+    poc2wk = 'Wk 1: FAIR AI use case ideation workshop. Map executive KPIs to AI outputs.\nWk 2: POC NL reporting or revenue prediction on FLEX data.';
+    salesNext = 'Schedule FAIR Ideate workshop. Lead with executive insight and revenue AI story.';
+    techNext = 'Connect DB replica. Build NL query layer or prediction model. Define KPI dashboard.';
+  } else {
+    // Default: AI LaunchPad for RAG/support/summarize/ops
+    service = 'AI LaunchPad';
+    scaleUp = 'FAIR Incubate → Private Cloud AI → Enterprise AI Cloud';
+    connectMethod = 'Read-only API + document ingestion + RAG / vector database pipeline';
+    poc2wk = 'Wk 1: Connect FLEX system data (documents / tickets / KB) to RAG pipeline.\nWk 2: Deploy AI LaunchPad chatbot / summarizer POC on FLEX-hosted data.';
+    salesNext = 'AI LaunchPad intro call. Show quick POC on their migrated FLEX data.';
+    techNext = 'Stand up vector database. Ingest FLEX-hosted documents / tickets. Deploy RAG endpoint.';
+  }
+
+  return {
+    system: sysName,
+    goalLabel: goalObj.label || goal,
+    service: service,
+    scaleUp: scaleUp,
+    connectMode: connectMode,
+    connectMethod: connectMethod,
+    poc2wk: poc2wk,
+    salesNext: salesNext,
+    techNext: techNext
+  };
+};
+
+/* ─── OPPORTUNITY TABLE ───────────────────────────────────────────────── */
+window.runAIOpportunityScan = function() {
+  renderOpportunityTable();
+  updateCounters();
+};
+
+function renderOpportunityTable() {
+  var tbody = document.getElementById('sai-opp-tbody');
+  if (!tbody) return;
+  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
+  tbody.innerHTML = '';
+  systems.forEach(function(sys) {
+    var score = calculateAIReadiness(sys);
+    var rec = recommendRackspaceAIService({ system: sys, goal: 'rag', sensitivity: sys.sensitivity, env: 'flex' });
+    var scoreCol = score >= 70 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171';
+    var sensCol = { low:'#34d399', medium:'#fbbf24', high:'#f87171', regulated:'#c084fc' }[sys.sensitivity] || '#94a3b8';
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(255,255,255,.04)';
+    tr.innerHTML = '<td style="padding:10px;color:#e2e8f0;font-weight:700;">' + sys.name + '</td>'
+      + '<td style="padding:10px;color:#94a3b8;">' + sys.vms + '</td>'
+      + '<td style="padding:10px;color:#94a3b8;max-width:160px;">' + (sys.data||'').replace(/,/g,', ') + '</td>'
+      + '<td style="padding:10px;"><span style="color:' + sensCol + ';font-weight:700;font-size:10px;">' + (sys.sensitivity||'low').toUpperCase() + '</span></td>'
+      + '<td style="padding:10px;"><span style="color:' + scoreCol + ';font-weight:800;font-size:14px;">' + score + '%</span></td>'
+      + '<td style="padding:10px;color:#a78bfa;font-size:10px;font-weight:700;">' + rec.service + '</td>'
+      + '<td style="padding:10px;color:#fbbf24;font-weight:700;">$' + (sys.vms * 18) + 'K/yr</td>'
+      + '<td style="padding:10px;">'
+        + '<button onclick="selectAISystem(' + JSON.stringify(sys).replace(/"/g,'&quot;') + ');recommendAIPath();" style="background:rgba(109,40,217,.3);border:1px solid rgba(139,92,246,.5);border-radius:4px;color:#a78bfa;padding:3px 8px;font-size:9px;font-weight:700;cursor:pointer;margin-right:3px;">Assess</button>'
+        + '<button onclick="selectAISystem(' + JSON.stringify(sys).replace(/"/g,'&quot;') + ');generateAILaunchPadPlan();" style="background:rgba(5,150,105,.3);border:1px solid rgba(52,211,153,.4);border-radius:4px;color:#34d399;padding:3px 8px;font-size:9px;font-weight:700;cursor:pointer;">LaunchPad</button>'
+      + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+window.calculateAIReadiness = function(sys) {
+  var base = 40;
+  if (sys.data && sys.data.indexOf('documents') >= 0) base += 15;
+  if (sys.data && sys.data.indexOf('database') >= 0) base += 10;
+  if (sys.data && sys.data.indexOf('tickets') >= 0) base += 10;
+  if (sys.data && sys.data.indexOf('APIs') >= 0) base += 10;
+  if (sys.sensitivity === 'low') base += 10;
+  if (sys.sensitivity === 'medium') base += 5;
+  if (sys.migStatus === 'Migrated') base += 5;
+  return Math.min(base, 100);
+};
+
+/* ─── UPSELL TABLE ────────────────────────────────────────────────────── */
+function renderUpsellTable() {
+  var tbody = document.getElementById('sai-upsell-tbody');
+  if (!tbody) return;
+  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
+  tbody.innerHTML = '';
+  var motions = ['AI LaunchPad intro','FAIR Diagnostic workshop','Private AI architecture session','FDE discovery call'];
+  var statuses = ['Identified','Qualified','Workshop Scheduled'];
+  systems.forEach(function(sys, i) {
+    var rec = recommendRackspaceAIService({ system: sys, goal: 'rag', sensitivity: sys.sensitivity, env: 'flex' });
+    var motion = motions[i % motions.length];
+    var status = statuses[i % statuses.length];
+    var statusCol = { 'Identified':'#64748b','Qualified':'#22d3ee','Workshop Scheduled':'#a78bfa','POC Running':'#fbbf24','Won':'#34d399','Not Now':'#f87171' }[status] || '#64748b';
+    var tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(255,255,255,.04)';
+    tr.innerHTML = '<td style="padding:9px 10px;color:#e2e8f0;font-weight:700;">' + sys.name + '</td>'
+      + '<td style="padding:9px 10px;color:#a78bfa;font-size:10px;">' + rec.service + '</td>'
+      + '<td style="padding:9px 10px;color:#22d3ee;font-size:10px;">' + rec.scaleUp + '</td>'
+      + '<td style="padding:9px 10px;color:#fbbf24;font-weight:700;">$' + (sys.vms * 18) + 'K</td>'
+      + '<td style="padding:9px 10px;color:#94a3b8;font-size:10px;">' + motion + '</td>'
+      + '<td style="padding:9px 10px;"><span style="color:' + statusCol + ';font-weight:700;font-size:10px;">' + status + '</span></td>'
+      + '<td style="padding:9px 10px;color:#94a3b8;font-size:10px;">Schedule intro call</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+/* ─── GOVERNANCE CHECKLIST ────────────────────────────────────────────── */
+function renderChecklist() {
+  var el = document.getElementById('sai-checklist-grid');
+  if (!el) return;
+  el.innerHTML = '';
+  SAI_GOV_ITEMS.forEach(function(item) {
+    var checked = !!saiState.govChecks[item];
+    var div = document.createElement('div');
+    div.style.cssText = 'background:rgba(30,41,59,.6);border:1px solid ' + (checked ? 'rgba(52,211,153,.4)' : 'rgba(255,255,255,.06)') + ';border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s;';
+    div.innerHTML = '<div style="width:18px;height:18px;border-radius:4px;border:2px solid ' + (checked ? '#34d399' : '#334155') + ';background:' + (checked ? '#059669' : 'transparent') + ';flex-shrink:0;display:flex;align-items:center;justify-content:center;">'
+      + (checked ? '<span style="color:#fff;font-size:11px;font-weight:900;">✓</span>' : '') + '</div>'
+      + '<span style="font-size:11px;color:' + (checked ? '#e2e8f0' : '#64748b') + ';font-weight:' + (checked ? '700' : '400') + ';">' + item + '</span>';
+    div.onclick = function() {
+      saiState.govChecks[item] = !saiState.govChecks[item];
+      renderChecklist();
+      updateGovernanceScore();
+      saveStage9State();
+    };
+    el.appendChild(div);
+  });
+  updateGovernanceScore();
+}
+
+window.updateGovernanceScore = function() {
+  var total = SAI_GOV_ITEMS.length;
+  var done = Object.keys(saiState.govChecks).filter(function(k){ return saiState.govChecks[k]; }).length;
+  var pct = Math.round((done / total) * 100);
+  var scoreEl = document.getElementById('sai-gov-score');
+  var labelEl = document.getElementById('sai-gov-label');
+  if (scoreEl) scoreEl.textContent = pct + '%';
+  var label, col;
+  if (pct >= 85)      { label = 'ENTERPRISE AI READY'; col = '#a78bfa'; }
+  else if (pct >= 70) { label = 'AI READY';            col = '#34d399'; }
+  else if (pct >= 40) { label = 'LAUNCHPAD CANDIDATE'; col = '#fbbf24'; }
+  else                { label = 'NOT READY';            col = '#f87171'; }
+  if (scoreEl) scoreEl.style.color = col;
+  if (labelEl) { labelEl.textContent = label; labelEl.style.color = col; }
+};
+
+/* ─── COUNTERS ────────────────────────────────────────────────────────── */
+function updateCounters() {
+  var systems = saiState.systems;
+  var cnt = document.getElementById('sai-cnt-imported'); if (cnt) cnt.textContent = systems.length;
+  var ready = systems.filter(function(s){ return calculateAIReadiness(s) >= 70; });
+  var cr = document.getElementById('sai-cnt-ready'); if (cr) cr.textContent = ready.length;
+  var qw = systems.filter(function(s){ return s.sensitivity === 'low' || s.sensitivity === 'medium'; });
+  var cq = document.getElementById('sai-cnt-quickwin'); if (cq) cq.textContent = qw.length;
+  var totalVal = systems.reduce(function(a,s){ return a + s.vms * 18; }, 0);
+  var cu = document.getElementById('sai-cnt-upsell'); if (cu) cu.textContent = '$' + totalVal + 'K';
+}
+
+/* ─── AI LAUNCHPAD PLAN ───────────────────────────────────────────────── */
+window.generateAILaunchPadPlan = function() {
+  var sys = saiState.selectedSystem || SAI_DEMO_SYSTEMS[0];
+  var goalId = saiState.selectedGoal || 'rag';
+  var goalObj = SAI_GOALS.filter(function(g){ return g.id === goalId; })[0] || { label:'Knowledge Search / RAG', hint:'AI chatbot over documents' };
+
+  var plan = '=== AI LaunchPad Plan ===\n'
+    + 'Business System : ' + sys.name + '\n'
+    + 'AI Output Goal  : ' + goalObj.label + '\n'
+    + 'Data Sources    : ' + (saiState.selectedData.length ? saiState.selectedData.join(', ') : sys.data) + '\n'
+    + 'Sensitivity     : ' + (saiState.selectedSensitivity || sys.sensitivity) + '\n\n'
+    + 'USE CASE\n'
+    + 'Problem: Improve "' + goalObj.hint + '" using AI on ' + sys.name + ' data migrated to FLEX.\n\n'
+    + 'WEEK 1 ACTIONS\n'
+    + '✔ Identify data owner and confirm data access method (API / DB replica / file export)\n'
+    + '✔ Extract a sample dataset (500–1000 records / documents)\n'
+    + '✔ Set up RAG pipeline or AI LaunchPad environment\n'
+    + '✔ Define success metric (e.g. answer accuracy, resolution time, cost saved)\n\n'
+    + 'WEEK 2 ACTIONS\n'
+    + '✔ Index data into vector store\n'
+    + '✔ Deploy AI LaunchPad chatbot / summarizer / classifier POC\n'
+    + '✔ Run internal demo with business owner\n'
+    + '✔ Capture feedback and define production decision criteria\n\n'
+    + '30-DAY PRODUCTION DECISION\n'
+    + 'If POC accuracy ≥ 80% and user adoption confirmed → proceed to FAIR Incubate.\n'
+    + 'If data sensitivity flags raised → pivot to Private Cloud AI.\n'
+    + 'If business value unclear → run FAIR Diagnostic workshop.\n\n'
+    + 'CONNECT OR CLONE?\n'
+    + (saiState.selectedSensitivity === 'regulated' || saiState.selectedSensitivity === 'high'
+       ? 'CLONE: Masked dataset recommended. Create DB copy + anonymize PII before AI ingestion.'
+       : 'CONNECT: Read-only API or DB replica. No production data movement required for POC.') + '\n\n'
+    + 'SCALE-UP PATH\n'
+    + 'AI LaunchPad → FAIR Incubate → Private Cloud AI / AI Anywhere → Enterprise AI Cloud → FDE + Partners';
+
+  saiState.launchPadPlan = plan;
+  var el = document.getElementById('sai-launchpad-output');
+  if (el) el.textContent = plan;
+  saveStage9State();
+};
+
+window.copyAILaunchPadPlan = function() {
+  if (!saiState.launchPadPlan) return;
+  try { navigator.clipboard.writeText(saiState.launchPadPlan); } catch(e) {}
+};
+
+/* ─── EXPORTS ─────────────────────────────────────────────────────────── */
+window.exportAIPowerUpJSON = function() {
+  var data = { generated: new Date().toISOString(), systems: saiState.systems, recommendation: saiState.recommendation, launchPadPlan: saiState.launchPadPlan, governance: saiState.govChecks };
+  var blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_powerup_plan.json'; a.click();
+};
+
+window.exportAIPowerUpCSV = function() {
+  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
+  var rows = ['Business System,VMs,Data Type,Sensitivity,AI Score,Recommended Service,Est Value,Scale-Up Path'];
+  systems.forEach(function(s) {
+    var rec = recommendRackspaceAIService({ system:s, goal:'rag', sensitivity:s.sensitivity, env:'flex' });
+    rows.push([s.name, s.vms, s.data, s.sensitivity, calculateAIReadiness(s)+'%', rec.service, '$'+(s.vms*18)+'K', rec.scaleUp].map(function(v){ return '"'+(v||'').toString().replace(/"/g,'""')+'"'; }).join(','));
+  });
+  var blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_service_mapping.csv'; a.click();
+};
+
+window.exportAIPowerUpMarkdown = function() {
+  var systems = saiState.systems.length ? saiState.systems : SAI_DEMO_SYSTEMS;
+  var rec = saiState.recommendation || {};
+  var govDone = Object.keys(saiState.govChecks).filter(function(k){ return saiState.govChecks[k]; }).length;
+  var govPct  = Math.round((govDone / SAI_GOV_ITEMS.length) * 100);
+
+  var md = '# AI Power Up — Executive Report\n\n'
+    + '> Generated: ' + new Date().toLocaleDateString() + '\n\n'
+    + '## Summary\n\n'
+    + '- **FLEX Business Systems Imported:** ' + systems.length + '\n'
+    + '- **AI-Ready Systems:** ' + systems.filter(function(s){ return calculateAIReadiness(s)>=70; }).length + '\n'
+    + '- **Quick-Win Candidates:** ' + systems.filter(function(s){ return s.sensitivity!=='regulated'&&s.sensitivity!=='high'; }).length + '\n'
+    + '- **Governance Readiness:** ' + govPct + '%\n\n'
+    + '## Recommended AI Starting Service\n\n'
+    + (rec.service ? '**' + rec.service + '**\n\nScale-Up: ' + rec.scaleUp + '\n\n' : '_Run AI Opportunity Scan to generate recommendation._\n\n')
+    + '## Business System AI Readiness\n\n'
+    + '| System | VMs | Sensitivity | AI Score | Entry Point |\n'
+    + '|--------|-----|-------------|----------|-------------|\n'
+    + systems.map(function(s){
+        var rec2 = recommendRackspaceAIService({system:s,goal:'rag',sensitivity:s.sensitivity,env:'flex'});
+        return '| '+s.name+' | '+s.vms+' | '+s.sensitivity+' | '+calculateAIReadiness(s)+'% | '+rec2.service+' |';
+      }).join('\n') + '\n\n'
+    + '## AI LaunchPad Plan\n\n'
+    + (saiState.launchPadPlan ? '~~~\n' + saiState.launchPadPlan + '\n~~~\n\n' : '_Generate plan above._\n\n')
+    + '## Sales Next Actions\n\n'
+    + systems.map(function(s){ return '- **' + s.name + '**: Schedule AI LaunchPad intro call'; }).join('\n') + '\n\n'
+    + '## Scale-Up Path\n\n'
+    + 'AI LaunchPad → FAIR Incubate → Private Cloud AI → Enterprise AI Cloud → FDE + Partners\n\n'
+    + '_Generated by OSPC→FLEX Migration Dashboard — Stage 9 AI Power Up_\n';
+
+  var blob = new Blob([md], { type:'text/markdown' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai_powerup_executive_report.md'; a.click();
+};
+
+/* ─── PERSISTENCE ─────────────────────────────────────────────────────── */
+window.saveStage9State = function() {
+  try { localStorage.setItem(SAI_KEY, JSON.stringify({ systems: saiState.systems, selectedGoal: saiState.selectedGoal, selectedData: saiState.selectedData, selectedSensitivity: saiState.selectedSensitivity, govChecks: saiState.govChecks, launchPadPlan: saiState.launchPadPlan })); } catch(e) {}
+};
+
+window.loadStage9State = function() {
+  try {
+    var raw = localStorage.getItem(SAI_KEY);
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    if (saved.systems)            saiState.systems = saved.systems;
+    if (saved.selectedGoal)       saiState.selectedGoal = saved.selectedGoal;
+    if (saved.selectedData)       saiState.selectedData = saved.selectedData;
+    if (saved.selectedSensitivity) saiState.selectedSensitivity = saved.selectedSensitivity;
+    if (saved.govChecks)          saiState.govChecks = saved.govChecks;
+    if (saved.launchPadPlan)      saiState.launchPadPlan = saved.launchPadPlan;
+  } catch(e) {}
+};
+
+/* ─── HOOK INTO activateStage ────────────────────────────────────────── */
+(function() {
+  var _orig = window.activateStage;
+  window.activateStage = function(stageId) {
+    if (typeof _orig === 'function') _orig.call(this, stageId);
+    if (stageId === 'sai') {
+      setTimeout(function() { if (typeof initStage9 === 'function') initStage9(); }, 80);
+    }
+  };
+})();
+</script>

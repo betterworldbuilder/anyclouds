@@ -3487,6 +3487,20 @@ def index():
     return render_template("combined.html", cache_bust=_CACHE_BUST)
 
 
+@app.get("/opencenter")
+def opencenter_ui():
+    # Standalone focused OpenCenter page (loads instantly, no dashboard chrome) —
+    # same pattern as /image_migrator/. Shares the _opencenter_platform.html partial with Stage 7.
+    return render_template("opencenter.html", cache_bust=_CACHE_BUST)
+
+
+@app.get("/ai-powerup")
+def ai_powerup_ui():
+    # Standalone focused AI Power Up page — loads ONLY the AI UI (no dashboard chrome).
+    # Shares the _ai_powerup.html + _ai_powerup_js.html partials with Stage 9 (panel-sai).
+    return render_template("ai_powerup.html", cache_bust=_CACHE_BUST)
+
+
 @app.get("/business-system-template-das/")
 def business_system_template_das():
     resp = send_from_directory(str(BASE_DIR), "businesstemplates.html")
@@ -4065,6 +4079,7 @@ def image_migrator_ui():
         default_jh_key=os.environ.get('NBD_JUMPHOST_KEY', '') or _jh['ssh_key'],
         flex2flex_mode=(mode == "flex2flex"),
         flexanywhere_mode=(mode == "flexanywhere"),
+        vmware_mode=(mode == "vmware"),
         flex_light_mode=((request.args.get("skin") or "").strip().lower() == "flexlight"),
     ))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -4077,6 +4092,36 @@ def image_migrator_ui():
 def flex_region_dr_ui():
     from flask import make_response
     resp = make_response(render_template("flex_region_dr.html", cache_bust=_CACHE_BUST))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+@app.get("/ospc_cloud_mockup/")
+def ospc_cloud_mockup_ui():
+    from flask import make_response
+    resp = make_response(render_template("ospc_cloud_mockup.html", cache_bust=_CACHE_BUST))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+@app.get("/why_tco_guide/")
+def why_tco_guide_ui():
+    from flask import make_response
+    resp = make_response(render_template("why_tco_guide.html", cache_bust=_CACHE_BUST))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+
+@app.get("/tco_savings_flex/")
+def tco_savings_flex_ui():
+    from flask import make_response
+    resp = make_response(render_template("tco_savings_flex.html", cache_bust=_CACHE_BUST))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"

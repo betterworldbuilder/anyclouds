@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Direct Shift and Lift of VM OSPC 2 FLEX</title>
+    <title>{% if vmware_mode %}VMware to FLEX Migration{% else %}Direct Shift and Lift of VM OSPC 2 FLEX{% endif %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -276,8 +276,9 @@
         left: 0;
         right: 0;
         height: 52px;
-        background: #1e232b;
-        box-shadow: 0 1px 0 rgba(0,0,0,.45), 0 6px 22px rgba(15,23,42,.12);
+        background: #ffffff;
+        border-bottom: 1px solid #d8e2f0;
+        box-shadow: 0 1px 3px rgba(15,23,42,.08);
         z-index: 11950;
         pointer-events: none;
       }
@@ -332,9 +333,9 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
       }
       body.flex-light-mode .mission-control {
-        animation: neonPulse 4s infinite linear !important;
-        color: inherit !important;
-        text-shadow: inherit !important;
+        animation: none !important;
+        color: #172033 !important;
+        text-shadow: none !important;
         letter-spacing: 2px !important;
       }
       body.flex-light-mode .section-title::before {
@@ -400,12 +401,54 @@
         border-color: #d6dbe3 !important;
       }
       body.flex-light-mode .neon-banner-wrapper {
-        background: #0f172a !important;
-        border-color: #ec4899 !important;
+        background: #ffffff !important;
+        border-color: #bae6fd !important;
+        box-shadow: 0 12px 30px rgba(15,23,42,.10) !important;
       }
       body.flex-light-mode .neon-banner-inner {
-        background: #020617 !important;
-        border-color: #06b6d4 !important;
+        background: linear-gradient(135deg,#f8fafc,#e0f2fe) !important;
+        border-color: #38bdf8 !important;
+      }
+      body.flex-light-mode .neon-banner-inner span,
+      body.flex-light-mode .neon-banner-inner div {
+        color: #172033 !important;
+        text-shadow: none !important;
+      }
+      body.flex-light-mode #flex2flex-head-card {
+        background: #ffffff !important;
+        border-color: #bae6fd !important;
+        box-shadow: 0 12px 30px rgba(15,23,42,.08) !important;
+        color: #172033 !important;
+      }
+      body.flex-light-mode #flex2flex-head-card > div > div {
+        background: #f8fafc !important;
+        border-color: #d8e2f0 !important;
+        color: #334155 !important;
+      }
+      body.flex-light-mode #flex2flex-head-card [style*="color:#cbd5e1"],
+      body.flex-light-mode #flex2flex-head-card [style*="color: #cbd5e1"],
+      body.flex-light-mode #flex2flex-head-card [style*="color:#e2e8f0"],
+      body.flex-light-mode #flex2flex-head-card [style*="color: #e2e8f0"] {
+        color: #334155 !important;
+      }
+      body.flex-light-mode #flex2flex-head-card [style*="color:#6ee7b7"],
+      body.flex-light-mode #flex2flex-head-card [style*="color: #6ee7b7"] {
+        color: #047857 !important;
+      }
+      body.flex-light-mode #flex2flex-head-card [style*="color:#a855f7"],
+      body.flex-light-mode #flex2flex-head-card [style*="color: #a855f7"] {
+        color: #4f46e5 !important;
+      }
+      body.flex-light-mode #flex2flex-head-card [style*="color:#fdba74"],
+      body.flex-light-mode #flex2flex-head-card [style*="color: #fdba74"] {
+        color: #c2410c !important;
+      }
+      body.flex-light-mode #flex2flex-head-card table,
+      body.flex-light-mode #flex2flex-head-card th,
+      body.flex-light-mode #flex2flex-head-card td {
+        background: #ffffff !important;
+        color: #172033 !important;
+        border-color: #d8e2f0 !important;
       }
       body.flex-light-mode [style*="color:#94a3b8"],
       body.flex-light-mode [style*="color: #94a3b8"],
@@ -639,7 +682,14 @@
           document.documentElement.classList.add('embedded-frame');
         }
         try {
+          var _skinParam = (new URLSearchParams(window.location.search).get('skin') || '').toLowerCase();
           var theme = localStorage.getItem('osflex_global_theme_v1') || 'flex-skyline';
+          // A skin= URL param (used when embedded, e.g. ?skin=flexlight) forces the light Flex Skyline
+          // theme and overrides any stale saved 'dark' theme in this frame's own localStorage.
+          if (_skinParam === 'flexlight' || _skinParam === 'flex-light' || _skinParam === 'light' || _skinParam === 'flex-skyline') {
+            theme = 'flex-skyline';
+            try { localStorage.setItem('osflex_global_theme_v1', 'flex-skyline'); localStorage.setItem('osflex_global_theme_v2', 'flex-skyline'); } catch (_) {}
+          }
           if (theme === 'apollo') document.body.classList.add('theme-apollo');
           else if (theme === 'flex-skyline' || theme === 'flex-light' || theme === 'light') document.body.classList.add('flex-light-mode');
         } catch (_) {
@@ -650,6 +700,7 @@
     <script>
       window.FLEXANYWHERE_UI = {{ 'true' if flexanywhere_mode else 'false' }};
       window.FLEX2FLEX_UI = {{ 'true' if flex2flex_mode or flexanywhere_mode else 'false' }};
+      window.VMWARE_UI = {{ 'true' if vmware_mode else 'false' }};
     </script>
     <div id="top-theme-dropdown" aria-label="Global theme selector">
         <button id="top-theme-trigger" type="button" onclick="toggleGlobalThemeMenu()" aria-haspopup="true" aria-expanded="false">
@@ -688,7 +739,8 @@
                             (function() {
                                 const isFlexAnywhere = {{ 'true' if flexanywhere_mode else 'false' }};
                                 const isFlex2Flex = {{ 'true' if flex2flex_mode else 'false' }};
-                                const isOspc2Flex = !isFlexAnywhere && !isFlex2Flex;
+                                const isVmware = {{ 'true' if vmware_mode else 'false' }};
+                                const isOspc2Flex = !isFlexAnywhere && !isFlex2Flex && !isVmware;
 
                                 const neon1 = document.getElementById('neon-banner-title-1');
                                 const neon2 = document.getElementById('neon-banner-title-2');
@@ -698,6 +750,9 @@
                                     neon2.innerText = 'Migration';
                                   } else if (isFlex2Flex) {
                                     neon1.innerText = 'FLEX2FLEX Region';
+                                    neon2.innerText = 'Migration';
+                                  } else if (isVmware) {
+                                    neon1.innerText = 'VMware to FLEX';
                                     neon2.innerText = 'Migration';
                                   } else if (isOspc2Flex) {
                                     neon1.innerText = 'OSPC 2 Flex';
@@ -724,7 +779,7 @@
                             How this tool works
                         </summary>
                         <div style="margin-top: 15px; font-size: 0.9rem; color: #cbd5e1; line-height: 1.6;">
-                            <p>This VM migration tool allows us to move live OSPC VMs or static OSPC VM images entirely from OpenStack to Flex. The pipeline ensures all original VM content, users, and disks are carried over intact across the datacenter.</p>
+                            <p>{% if vmware_mode %}This VM migration tool allows us to plan and execute VMware vSphere VM migration to FLEX using the same operator workflow as OSPC to FLEX: source discovery, target mapping, jumphost execution, image conversion, validation, and cutover readiness tracking.{% else %}This VM migration tool allows us to move live OSPC VMs or static OSPC VM images entirely from OpenStack to Flex. The pipeline ensures all original VM content, users, and disks are carried over intact across the datacenter.{% endif %}</p>
 
 
 
@@ -765,13 +820,24 @@
                     <div id="cloud-credentials-fields" class="collapsed">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;">
 
-        <!-- OSPC — exact same field IDs as agent1.html (ospc_cloud_user/key/account) -->
+        <!-- Source side — exact same field IDs as agent1.html (ospc_cloud_user/key/account) for shared JS compatibility -->
         <div>
-          <h2 class="section-title" style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h2>
+          <h2 class="section-title" style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">{% if vmware_mode %}VMware vCenter Credentials{% else %}OSPC Cloud Credentials{% endif %}</h2>
           <div style="display:flex;flex-direction:column;gap:10px;">
-            <div class="form-group"><label>Username</label><input type="text" id="ospc_cloud_user" placeholder="e.g. dzng.8294" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
-            <div class="form-group"><label>API Key / Password</label><input type="text" id="ospc_cloud_key" autocomplete="off" placeholder="Enter API Key" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
-            <div class="form-group"><label>Account / Project ID</label><input type="text" id="ospc_cloud_account" placeholder="e.g. 1342314" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;font-family:monospace;width:100%;"></div>
+            <div class="form-group"><label>{% if vmware_mode %}vCenter Username{% else %}Username{% endif %}</label><input type="text" id="ospc_cloud_user" placeholder="{% if vmware_mode %}administrator@vsphere.local{% else %}e.g. dzng.8294{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+            <div class="form-group"><label>{% if vmware_mode %}vCenter Password{% else %}API Key / Password{% endif %}</label><input type="text" id="ospc_cloud_key" autocomplete="off" placeholder="{% if vmware_mode %}vCenter password{% else %}Enter API Key{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+            <div class="form-group"><label>{% if vmware_mode %}vCenter URL / FQDN{% else %}Account / Project ID{% endif %}</label><input type="text" id="ospc_cloud_account" placeholder="{% if vmware_mode %}https://vcenter.example.com{% else %}e.g. 1342314{% endif %}" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;font-family:monospace;width:100%;"></div>
+            {% if vmware_mode %}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="form-group"><label>Datacenter</label><input type="text" id="vmware_datacenter" placeholder="DC01" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+              <div class="form-group"><label>Cluster</label><input type="text" id="vmware_cluster" placeholder="Production-Cluster" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+              <div class="form-group"><label>Datastore</label><input type="text" id="vmware_datastore" placeholder="Datastore01" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+              <div class="form-group"><label>VM Folder</label><input type="text" id="vmware_folder" placeholder="/Production/Apps" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;width:100%;"></div>
+            </div>
+            <div style="font-size:.75rem;color:#93c5fd;line-height:1.45;padding:8px 10px;border:1px solid rgba(59,130,246,.24);border-radius:6px;background:rgba(15,23,42,.35);">
+              VMware mode reuses the OSPC migration workflow design while staging vCenter inventory, VM snapshot/export, conversion, FLEX image upload, and target boot validation inputs.
+            </div>
+            {% endif %}
           </div>
         </div>
 
@@ -1717,11 +1783,11 @@
                         <!-- ── Private OSPC Snapshot Scanner ── -->
                         <div style="background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);border-radius:12px;padding:16px 18px;margin-bottom:14px;">
                             <div style="font-size:0.82rem;font-weight:700;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">
-                                <span>🖼 Private OSPC Snapshot Discovery Tool</span>
+                                <span>{% if vmware_mode %}💠 VMware VM Snapshot / OVA Discovery Tool{% else %}🖼 Private OSPC Snapshot Discovery Tool{% endif %}</span>
                             </div>
                             <div id="privateSnapshotBody">
                             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                                <label for="image_scan_region" style="color:#94a3b8;font-size:11px;white-space:nowrap;">Region</label>
+                                <label for="image_scan_region" style="color:#94a3b8;font-size:11px;white-space:nowrap;">{% if vmware_mode %}vCenter Site / Region{% else %}Region{% endif %}</label>
                                 <select id="image_scan_region" name="image_scan_region" title="OpenStack region for image list (same options as VM scanner)"
                                     style="background:#0f172a;border:1px solid rgba(16,185,129,0.4);border-radius:7px;color:#e2e8f0;font-size:12px;padding:7px 10px;cursor:pointer;">
                                     <option value="ALL">ALL Regions</option>
@@ -1735,14 +1801,14 @@
                                 </select>
                                 <button type="button" id="image-scan-sync-region-btn"
                                     style="background:#0f172a;border:1px solid #334155;border-radius:7px;color:#94a3b8;font-size:11px;padding:7px 10px;cursor:pointer;white-space:nowrap;"
-                                    title="Copy region from OSPC Server Scanner">
-                                    ⇄ Match VM scanner region
+                                    title="{% if vmware_mode %}Copy source site from VMware scanner{% else %}Copy region from OSPC Server Scanner{% endif %}">
+                                    {% if vmware_mode %}⇄ Match VMware scanner site{% else %}⇄ Match VM scanner region{% endif %}
                                 </button>
                                 <button id="image-scan-btn" type="button"
                                     style="background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;padding:8px 16px;cursor:pointer;white-space:nowrap;">
-                                    🔍 Start Private Snapshot Scan
+                                    {% if vmware_mode %}🔍 Start VMware VM Discovery{% else %}🔍 Start Private Snapshot Scan{% endif %}
                                 </button>
-                                <span style="color:#64748b;font-size:11px;">Scans private tenant snapshots only · region sets <code style="font-size:10px;">OS_REGION_NAME</code></span>
+                                <span style="color:#64748b;font-size:11px;">{% if vmware_mode %}Scans vCenter VM inventory, snapshots, templates, and source placement metadata{% else %}Scans private tenant snapshots only · region sets <code style="font-size:10px;">OS_REGION_NAME</code>{% endif %}</span>
                                 <!-- Duplicate of Target Region (credFlexRegion); kept in two-way sync via JS. -->
                                 <label for="credFlexRegionBanner" style="display:flex;align-items:center;gap:6px;margin-left:auto;color:#94a3b8;font-size:11px;white-space:nowrap;">
                                     <span style="color:#6ee7b7;font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Target Region</span>
@@ -1773,7 +1839,7 @@
 
                         <div id="ospcImageContainer" style="display:none;margin-top:10px;">
                             <div class="table-header">
-                                <h2>Private Server Volume Snapshot Migration Table</h2>
+                                <h2>{% if vmware_mode %}VMware VM / Snapshot Migration Table{% else %}Private Server Volume Snapshot Migration Table{% endif %}</h2>
                                 <span id="imageRowCount" class="pill">0 rows</span>
                             </div>
                             <div id="privateSnapshotListBody">
@@ -13606,7 +13672,7 @@ function val(id) {
         neon2.innerText = 'Migration';
       } else if (isFlex2Flex) {
         neon1.innerText = 'FLEX2FLEX Region';
-        neon2.innerText = 'Migration';
+        neon2.innerText = 'DR';
       } else if (isOspc2Flex) {
         neon1.innerText = 'OSPC 2 Flex';
         neon2.innerText = 'Migration';

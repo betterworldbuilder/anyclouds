@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>TCO Saving with FLEX</title>
+  <style>
+    :root {
+      --navy: #172033;
+      --line: #d8e2f0;
+      --red: #b23a3a;
+      --blue: #1e40af;
+      --deep: #10224f;
+      --green: #166534;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f6f8fc;
+      color: var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+    }
+    .wrap {
+      width: calc(100vw - 48px);
+      max-width: 1780px;
+      margin: 26px auto;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(15,23,42,.08);
+      padding: 18px 20px;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .eyebrow {
+      color: #0369a1;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      color: #0f172a;
+    }
+    .note {
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.45;
+      text-align: right;
+      max-width: 460px;
+    }
+    .btn {
+      border: 0;
+      border-radius: 5px;
+      background: var(--red);
+      color: #fff;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 9px 12px;
+      box-shadow: 0 3px 10px rgba(178,58,58,.18);
+      white-space: nowrap;
+    }
+    .global {
+      background: linear-gradient(135deg, #0f172a, #1e3a8a);
+      border: 1px solid #bfdbfe;
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 12px 28px rgba(15,23,42,.16);
+    }
+    .global-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 14px;
+    }
+    .global h2 {
+      margin: 0 0 4px;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 950;
+    }
+    .global p {
+      margin: 0;
+      color: #dbeafe;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .table-shell {
+      background: #fff;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 12px;
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      min-width: 1320px;
+      border-collapse: collapse;
+      color: #0f172a;
+      font-size: 11px;
+    }
+    th {
+      background: #f8fafc;
+      color: #0f172a;
+      border-bottom: 1px solid #cbd5e1;
+      padding: 10px 12px;
+      text-align: right;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    th:first-child,
+    th:nth-child(2),
+    th:nth-child(3) {
+      text-align: left;
+    }
+    td {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 9px 12px;
+      text-align: right;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    td:first-child,
+    td:nth-child(2),
+    td:nth-child(3) {
+      text-align: left;
+    }
+    tr.region-start td:first-child {
+      color: var(--blue);
+      font-weight: 950;
+    }
+    .ospc { background: #fee2e2; color: #991b1b; }
+    .flex { background: #ecfdf5; color: var(--green); }
+    .save { background: #dcfce7; color: var(--green); }
+    .loss { background: #fee2e2; color: #b91c1c; }
+    .monthly { background: #eff6ff; color: var(--blue); }
+    tfoot td,
+    tr.total td {
+      background: #f8fafc;
+      font-weight: 950;
+    }
+    @media (max-width: 900px) {
+      .top, .global-head { flex-direction: column; }
+      .note { text-align: left; }
+      .wrap { width: calc(100vw - 20px); padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="top">
+      <div>
+        <div class="eyebrow">OSPC &rarr; FLEX Regional Price Comparison</div>
+        <h1>Detailed flavor-level cost and savings comparison</h1>
+      </div>
+      <div class="note">
+        <button class="btn" type="button" onclick="exportTcoXls()">Export Full 3 Detailed Tables XLS</button><br>
+        OSPC prices are inferred from <strong>TCO_Comparison_Report.csv</strong> aligned with the TCO flavormap.
+        FLEX prices come from <strong>uploads/flavors/*Flavors.csv</strong>.
+      </div>
+    </div>
+
+    <section class="global">
+      <div class="global-head">
+        <div>
+          <div class="eyebrow" style="color:#93c5fd;">Global TCO View</div>
+          <h2>All-region OSPC vs FLEX cost comparison</h2>
+          <p>Monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings across IAD, DFW, and SJC.</p>
+        </div>
+        <button class="btn" type="button" onclick="exportTcoXls()">Export Global XLS</button>
+      </div>
+      <div class="table-shell">
+        <table id="global-tco-table">
+          <thead>
+            <tr>
+              <th>Region</th>
+              <th>OSPC Flavor</th>
+              <th>FLEX Flavor</th>
+              <th>OSPC / Month</th>
+              <th>FLEX / Month</th>
+              <th>Monthly Saving</th>
+              <th>1-Year Saving</th>
+              <th>3-Year Saving</th>
+              <th>5-Year Saving</th>
+              <th>Matched</th>
+            </tr>
+          </thead>
+          <tbody id="global-tco-body"></tbody>
+          <tfoot id="global-tco-foot"></tfoot>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const flavorRows = [
+      ['general1-1', 'gp.0.2.2', 68.80, 28.08],
+      ['general1-2', 'gp.0.2.2', 77.62, 28.08],
+      ['compute1-4', 'gp.0.2.4', 86.44, 35.28],
+      ['general1-4', 'gp.0.4.4', 151.70, 61.92],
+      ['compute1-8', 'gp.0.4.8', 186.98, 76.32],
+      ['compute1-30', 'gp.0.16.64', 200.00, 398.16]
+    ];
+    const regions = ['IAD', 'DFW', 'SJC'];
+
+    function money(value) {
+      const sign = value < 0 ? '-' : '';
+      return sign + '$' + Math.abs(value).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function cell(value, cls) {
+      return '<td class="' + (cls || '') + '">' + value + '</td>';
+    }
+
+    function renderTco() {
+      let body = '';
+      let globalOspc = 0;
+      let globalFlex = 0;
+      let globalMatched = 0;
+
+      regions.forEach(region => {
+        let regionOspc = 0;
+        let regionFlex = 0;
+        flavorRows.forEach((row, index) => {
+          const [ospcFlavor, flexFlavor, ospc, flex] = row;
+          const saving = ospc - flex;
+          regionOspc += ospc;
+          regionFlex += flex;
+          body += '<tr class="' + (index === 0 ? 'region-start' : '') + '">' +
+            cell(index === 0 ? region : '') +
+            cell(ospcFlavor) +
+            cell(flexFlavor) +
+            cell(money(ospc), 'ospc') +
+            cell(money(flex), 'flex') +
+            cell(money(saving), saving >= 0 ? 'monthly' : 'loss') +
+            cell(money(saving * 12), saving >= 0 ? 'save' : 'loss') +
+            cell(money(saving * 36), saving >= 0 ? 'save' : 'loss') +
+            cell(money(saving * 60), saving >= 0 ? 'save' : 'loss') +
+            cell('1') +
+          '</tr>';
+        });
+        const regionSaving = regionOspc - regionFlex;
+        globalOspc += regionOspc;
+        globalFlex += regionFlex;
+        globalMatched += flavorRows.length;
+        body += '<tr class="total">' +
+          cell(region + ' Total Matched Flavor Baseline') +
+          cell('') +
+          cell('') +
+          cell(money(regionOspc), 'ospc') +
+          cell(money(regionFlex), 'flex') +
+          cell(money(regionSaving), 'monthly') +
+          cell(money(regionSaving * 12), 'save') +
+          cell(money(regionSaving * 36), 'save') +
+          cell(money(regionSaving * 60), 'save') +
+          cell(String(flavorRows.length)) +
+        '</tr>';
+      });
+
+      const globalSaving = globalOspc - globalFlex;
+      document.getElementById('global-tco-body').innerHTML = body;
+      document.getElementById('global-tco-foot').innerHTML =
+        '<tr>' +
+          cell('Global 3-Region Total') +
+          cell('') +
+          cell('') +
+          cell(money(globalOspc), 'ospc') +
+          cell(money(globalFlex), 'flex') +
+          cell(money(globalSaving), 'monthly') +
+          cell(money(globalSaving * 12), 'save') +
+          cell(money(globalSaving * 36), 'save') +
+          cell(money(globalSaving * 60), 'save') +
+          cell(String(globalMatched)) +
+        '</tr>';
+    }
+
+    function exportTcoXls() {
+      const html = '<html><head><meta charset="utf-8"></head><body>' +
+        document.getElementById('global-tco-table').outerHTML +
+        '</body></html>';
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'OSPC_FLEX_All_Regions_TCO_Savings.xls';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 500);
+    }
+
+    renderTco();
+  </script>
+</body>
+</html>

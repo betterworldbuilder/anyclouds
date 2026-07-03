@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rackspace Cloud | OSPC Migration to FLEX</title>
+  <style>
+    :root {
+      --rack-red: #c4002f;
+      --rack-blue: #2563eb;
+      --line: #e5e7eb;
+      --muted: #6b7280;
+      --text: #111827;
+      --page: #f6f7f9;
+      --green: #00a36c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--page);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+    }
+    button, input, select { font: inherit; }
+    .top-line {
+      height: 4px;
+      background: linear-gradient(90deg, var(--rack-red), #ec4899, #7c3aed, #2563eb);
+    }
+    .topbar {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .logo {
+      width: 154px;
+      padding-left: 10px;
+      font-size: 27px;
+      line-height: .8;
+      font-style: italic;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #050505;
+    }
+    .logo small {
+      display: block;
+      margin-left: 55px;
+      margin-top: -2px;
+      font-size: 11px;
+      font-style: italic;
+      font-weight: 700;
+      letter-spacing: -.3px;
+    }
+    .product-select {
+      height: 54px;
+      min-width: 160px;
+      padding: 0 20px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 2px solid #b000ff;
+      font-size: 18px;
+      color: #1f2937;
+    }
+    .top-actions {
+      margin-left: auto;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      border-left: 1px solid var(--line);
+    }
+    .top-actions a,
+    .account {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      border-right: 1px solid var(--line);
+      color: #1f2937;
+      text-decoration: none;
+      font-size: 17px;
+      white-space: nowrap;
+    }
+    .nav {
+      height: 64px;
+      display: flex;
+      align-items: stretch;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding-left: 0;
+    }
+    .nav button {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      padding: 0 38px;
+      color: #111827;
+      cursor: pointer;
+      font-size: 17px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 3px solid transparent;
+    }
+    .nav button:hover { background: #fafafa; }
+    .nav button.active {
+      border-bottom-color: var(--rack-red);
+      font-weight: 700;
+    }
+    .nav .journey-tab {
+      position: relative;
+      min-width: 146px;
+      max-width: 190px;
+      padding: 0 14px;
+      justify-content: center;
+      text-align: center;
+      color: #0f172a;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.15;
+      white-space: normal;
+      border-left: 1px solid rgba(37,99,235,.16);
+      border-right: 1px solid rgba(37,99,235,.12);
+      overflow: hidden;
+    }
+    .nav .journey-start { margin-left: auto; }
+    .nav .journey-tab:before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: var(--tab-accent, #38bdf8);
+      opacity: .85;
+    }
+    .nav .journey-tab:hover {
+      transform: translateY(-1px);
+      box-shadow: inset 0 -3px 0 var(--tab-accent, #38bdf8), 0 10px 20px rgba(15,23,42,.08);
+    }
+    .nav .journey-tab.active {
+      color: #052e16;
+      border-bottom-color: #16a34a;
+      background: linear-gradient(135deg, #dcfce7, #ecfeff) !important;
+      box-shadow: inset 0 -4px 0 #16a34a, 0 0 18px rgba(34,197,94,.22);
+    }
+    .nav .journey-dropdown {
+      position: relative;
+      display: flex;
+      align-items: stretch;
+    }
+    .nav .journey-dropdown.journey-start { margin-left: auto; }
+    .nav .journey-dropdown-toggle { min-width: 198px; }
+    .nav .journey-dropdown-toggle span { font-size: 13px; }
+    .nav .journey-menu {
+      position: absolute;
+      top: calc(100% + 1px);
+      right: 0;
+      z-index: 20;
+      display: none;
+      min-width: 260px;
+      padding: 8px;
+      background: #fff;
+      border: 1px solid #d8e2f0;
+      border-radius: 0 0 10px 10px;
+      box-shadow: 0 16px 32px rgba(15,23,42,.16);
+    }
+    .nav .journey-dropdown:hover .journey-menu,
+    .nav .journey-dropdown.open .journey-menu,
+    .nav .journey-dropdown:focus-within .journey-menu {
+      display: block;
+    }
+    .nav .journey-menu button {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 8px;
+      background: #ecfdf5;
+      color: #065f46;
+      font-size: 13px;
+      font-weight: 900;
+      justify-content: flex-start;
+      border-bottom: 0;
+    }
+    .nav .journey-menu button:hover {
+      background: #dcfce7;
+      box-shadow: inset 4px 0 0 #16a34a;
+    }
+    .nav .journey-cost { --tab-accent: #f97316; background: linear-gradient(135deg, #fff7ed, #ffedd5); }
+    .nav .journey-save { --tab-accent: #22c55e; background: linear-gradient(135deg, #ecfdf5, #dcfce7); }
+    .nav .journey-why { --tab-accent: #f43f5e; background: linear-gradient(135deg, #fff1f2, #ffe4e6); }
+    .nav .journey-request { --tab-accent: #38bdf8; background: linear-gradient(135deg, #eff6ff, #e0f2fe); }
+    .nav .journey-service { --tab-accent: #8b5cf6; background: linear-gradient(135deg, #f5f3ff, #ede9fe); }
+    .nav .journey-risk { --tab-accent: #eab308; background: linear-gradient(135deg, #fefce8, #fef3c7); }
+    .migration-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 20px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .04em;
+      background: linear-gradient(135deg, #dc2626, #f97316, #22c55e, #2563eb);
+      box-shadow: 0 0 12px rgba(37,99,235,.28);
+    }
+    .layout {
+      max-width: 1180px;
+      margin: 32px auto 0;
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      gap: 28px;
+      padding: 0 16px;
+    }
+    .filters h1 {
+      margin: 0 0 22px;
+      font-size: 34px;
+      font-weight: 300;
+      color: #111827;
+    }
+    .region-select {
+      width: 218px;
+      height: 34px;
+      border: 1px solid #2563eb;
+      background: #fff;
+      color: #2563eb;
+      font-weight: 700;
+      padding: 0 16px;
+      margin-bottom: 22px;
+    }
+    .filter-title {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 18px;
+    }
+    .filter-group {
+      margin-bottom: 26px;
+    }
+    .filter-group h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      color: #4b5563;
+    }
+    .server-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 8px 22px rgba(15,23,42,.18);
+      padding: 30px 30px;
+      min-height: 560px;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .primary {
+      background: #2f75d6;
+      color: #fff;
+      border: 1px solid #2f75d6;
+      font-weight: 800;
+      height: 32px;
+      padding: 0 16px;
+      cursor: pointer;
+    }
+    .outline {
+      background: #fff;
+      color: #2563eb;
+      border: 1px solid #2563eb;
+      font-weight: 800;
+      height: 32px;
+      padding: 0 16px;
+      cursor: pointer;
+    }
+    .disabled {
+      color: #b5b9c3;
+      font-weight: 700;
+      margin-left: 0;
+    }
+    .search {
+      margin-left: auto;
+      width: 248px;
+      height: 32px;
+      border: 1px solid #bfc5cf;
+      padding: 0 12px;
+      color: #6b7280;
+      font-size: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th {
+      color: #9aa1ae;
+      font-weight: 400;
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid #d7dbe2;
+    }
+    td {
+      height: 41px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #d7dbe2;
+      color: #1f2937;
+      vertical-align: middle;
+    }
+    tr td:first-child {
+      width: 10px;
+      padding: 0;
+      background: var(--green);
+      border-bottom-color: var(--green);
+    }
+    .server-name {
+      color: #005ecb;
+      text-decoration: none;
+      max-width: 230px;
+      display: inline-block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gear { color: #9ca3af; font-size: 18px; }
+    .guide-view,
+    .migration-view {
+      display: none;
+      min-height: calc(100vh - 122px);
+      background: #eef1f5;
+      border-top: 1px solid var(--line);
+    }
+    .guide-frame,
+    .migration-frame {
+      display: block;
+      width: 100%;
+      height: calc(100vh - 122px);
+      min-height: 760px;
+      border: 0;
+      background: #f8fafc;
+    }
+    body.show-migration .layout { display: none; }
+    body.show-guide .layout { display: none; }
+    body.show-guide .guide-view { display: block; }
+    body.show-migration .migration-view { display: block; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .filters { display: none; }
+      .top-actions a { display: none; }
+      .nav { overflow-x: auto; }
+      .nav button { padding: 0 18px; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-line"></div>
+  <header class="topbar">
+    <div class="logo">rackspace<small>technology</small></div>
+    <div class="product-select">Rackspace Cloud <span>⌄</span></div>
+    <nav class="top-actions" aria-label="Account links">
+      <a href="#">Tickets</a>
+      <a href="#">Support</a>
+      <a href="#">Billing</a>
+      <a href="#">Account</a>
+      <div class="account">dzng.8294 <span style="margin-left:10px;">⌄</span></div>
+    </nav>
+  </header>
+
+  <nav class="nav" aria-label="OSPC navigation">
+    <button type="button">Dashboard</button>
+    <button type="button" class="active" id="servers-tab" onclick="showServers()">Servers <span>⌄</span></button>
+    <button type="button">Orchestration <span>⌄</span></button>
+    <button type="button">Networking <span>⌄</span></button>
+    <button type="button">Storage <span>⌄</span></button>
+    <button type="button">Databases <span>⌄</span></button>
+    <button type="button">Backups <span>⌄</span></button>
+    <div class="journey-dropdown journey-start" id="more-tco-dropdown">
+      <button type="button" class="journey-tab journey-save journey-dropdown-toggle" data-journey-tab id="more-tco-tab" onclick="toggleTcoMenu(event)">
+        GET MORE TCO SAVINGS <span>⌄</span>
+      </button>
+      <div class="journey-menu" aria-label="TCO savings menu">
+        <button type="button" onclick="showTcoSavings('more-tco-tab')">TCO Saving with FLEX</button>
+      </div>
+    </div>
+    <button type="button" class="journey-tab journey-cost" data-journey-tab id="cost-tab" onclick="showGuide('cost-tab', '#tco')">
+      Current TCO
+    </button>
+    <button type="button" class="journey-tab journey-save" data-journey-tab id="savings-tab" onclick="showGuide('savings-tab', '#savings')">
+      TCO Saving with FLEX
+    </button>
+    <button type="button" class="journey-tab journey-why" data-journey-tab id="why-tab" onclick="showGuide('why-tab', '')">
+      Why Move to FLEX
+    </button>
+    <button type="button" class="journey-tab journey-request" data-journey-tab id="request-tab" onclick="showMigration('request-tab')">
+      <span class="migration-pill">FLEX</span>
+      Migration Request
+    </button>
+    <button type="button" class="journey-tab journey-service" data-journey-tab id="service-tab" onclick="showMigration('service-tab')">
+      Let Rackspace Do It For Me
+    </button>
+    <button type="button" class="journey-tab journey-risk" data-journey-tab id="readiness-tab" onclick="showGuide('readiness-tab', '#readiness')">
+      Can I Move Without Risk?
+    </button>
+  </nav>
+
+  <main class="layout" id="servers-view">
+    <aside class="filters">
+      <h1>Cloud Servers</h1>
+      <select class="region-select">
+        <option>Northern Virginia (IAD)</option>
+        <option>Dallas / Fort Worth (DFW)</option>
+        <option>San Jose (SJC)</option>
+      </select>
+      <div class="filter-title">Filter Servers</div>
+      <section class="filter-group">
+        <h3>Status</h3>
+        <label class="filter-item"><input type="checkbox" checked> Active (11)</label>
+      </section>
+      <section class="filter-group">
+        <h3>Image</h3>
+        <div class="filter-item">Ubuntu 24.04 LTS (7)</div>
+        <div class="filter-item">Booted From Volume (3)</div>
+        <div class="filter-item">Windows Server 2016 (1)</div>
+      </section>
+      <section class="filter-group">
+        <h3>Flavor</h3>
+        <div class="filter-item">2 GB General Purpose (4)</div>
+        <div class="filter-item">4 GB General Purpose (4)</div>
+        <div class="filter-item">1 GB General Purpose (1)</div>
+        <div class="filter-item">3.75 GB Compute v1 (1)</div>
+        <div class="filter-item">30 GB Compute v1 (1)</div>
+      </section>
+    </aside>
+
+    <section class="server-card">
+      <div class="toolbar">
+        <button class="primary" type="button">Create Server</button>
+        <button class="outline" type="button">Create Stack</button>
+        <button class="outline" type="button">⌄</button>
+        <span class="disabled">Delete Server</span>
+        <input class="search" value="" placeholder="Search 11 servers...">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th style="width:32px;"><input type="checkbox"></th>
+            <th>Name ▲</th>
+            <th>Tags</th>
+            <th>IP Address</th>
+            <th>Monitoring</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">3Auth / Identity Service...</a></td><td></td><td>23.253.159.193</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">API Gateway / Mobile AP</a></td><td></td><td>104.130.26.180</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">Bank-Database Service...</a></td><td></td><td>104.130.26.116</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">bankappfrontend</a></td><td></td><td>23.253.159.71</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">bigjumpwindowsiad</a></td><td></td><td>104.130.29.126</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">centos7</a></td><td></td><td>104.130.29.156</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">haproxyopsc</a></td><td></td><td>23.253.159.45</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">Ledger / Transfer Servi...</a></td><td></td><td>104.130.13.28</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">ospcwin2019</a></td><td></td><td>23.253.159.176</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">u24 green server</a></td><td></td><td>23.253.159.251</td><td></td></tr>
+          <tr><td></td><td><input type="checkbox"></td><td><span class="gear">⚙</span> <a class="server-name" href="#">windows2016</a></td><td></td><td>104.130.26.194</td><td></td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <section class="guide-view" aria-label="Performance and TCO guide">
+    <iframe id="guide-frame" class="guide-frame" title="How To get Best Performance and TCO Saving"></iframe>
+  </section>
+
+  <section class="migration-view" aria-label="Migration to FLEX workflow">
+    <iframe id="migration-frame" class="migration-frame" title="OSPC to FLEX Migration"></iframe>
+  </section>
+
+  <script>
+    const guideUrl = '/why_tco_guide/';
+    const tcoSavingsUrl = '/tco_savings_flex/';
+    const migrationUrl = '/image_migrator/?skin=flexlight';
+    const guideFrame = document.getElementById('guide-frame');
+    const migrationFrame = document.getElementById('migration-frame');
+    const serversTab = document.getElementById('servers-tab');
+    const journeyTabs = Array.from(document.querySelectorAll('[data-journey-tab]'));
+
+    function clearViews() {
+      document.body.classList.remove('show-guide', 'show-migration');
+      journeyTabs.forEach(tab => tab.classList.remove('active'));
+      serversTab.classList.remove('active');
+    }
+
+    function setActiveJourney(tabId) {
+      const tab = document.getElementById(tabId);
+      if (tab) tab.classList.add('active');
+    }
+
+    function showGuide(tabId, anchor) {
+      clearViews();
+      document.body.classList.add('show-guide');
+      setActiveJourney(tabId || 'why-tab');
+      guideFrame.src = guideUrl + (anchor || '');
+    }
+
+    function toggleTcoMenu(event) {
+      if (event) event.stopPropagation();
+      const menu = document.getElementById('more-tco-dropdown');
+      if (menu) menu.classList.toggle('open');
+    }
+
+    function showTcoSavings(tabId) {
+      clearViews();
+      document.body.classList.add('show-guide');
+      setActiveJourney(tabId || 'more-tco-tab');
+      guideFrame.src = tcoSavingsUrl;
+      const menu = document.getElementById('more-tco-dropdown');
+      if (menu) menu.classList.remove('open');
+    }
+
+    function showMigration(tabId) {
+      clearViews();
+      document.body.classList.add('show-migration');
+      setActiveJourney(tabId || 'request-tab');
+      if (!migrationFrame.src || migrationFrame.src === 'about:blank') {
+        migrationFrame.src = migrationUrl;
+      }
+    }
+
+    function showServers() {
+      clearViews();
+      serversTab.classList.add('active');
+    }
+
+    document.addEventListener('click', () => {
+      const menu = document.getElementById('more-tco-dropdown');
+      if (menu) menu.classList.remove('open');
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('guide') === '1' || params.get('performance') === '1') {
+      showGuide('savings-tab', '#savings');
+    } else if (params.get('migration') === '1') {
+      showMigration('request-tab');
+    }
+  </script>
+</body>
+</html>
