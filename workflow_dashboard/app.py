@@ -3487,6 +3487,16 @@ def index():
     return render_template("combined.html", cache_bust=_CACHE_BUST)
 
 
+@app.get("/why-flex/")
+def why_flex_ui():
+    return render_template("why_flex.html")
+
+
+@app.get("/migration-strategy/")
+def migration_strategy_ui():
+    return render_template("migration_strategy.html")
+
+
 @app.get("/opencenter")
 def opencenter_ui():
     # Standalone focused OpenCenter page (loads instantly, no dashboard chrome) —

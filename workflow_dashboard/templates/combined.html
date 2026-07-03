@@ -2144,7 +2144,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
     <button class="sub-btn-dropdown">🚀 OSPC Infrastructure Scanner ▼</button>
     <div class="ospc-dropdown-content">
       <button class="sub-btn" data-sub="s1ospc">⚙️ OSPC infra Scanner and Flex infra Deployment</button>
-      <button class="sub-btn" data-sub="s1analyze">📄 OSPC Inventory and Flex Mapper</button>
+      <button class="sub-btn" data-sub="s1analyze">📄 OSPC and TCO</button>
       <button class="sub-btn" data-sub="s1flavors">🖼 OSPC Flavors &amp; Images</button>
     </div>
   </div>
@@ -2152,7 +2152,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
     <button class="sub-btn-dropdown">🌐 FLEX2FLEX infra Scanner ▼</button>
     <div class="ospc-dropdown-content">
       <button class="sub-btn" data-sub="s1flex2flex_infra">⚙️ FLEX2FLEX Scanner and Deployment Script Generator</button>
-      <button class="sub-btn" data-sub="s1flex2flex_mapper">📄 FLEX2FLEX Inventory and FLEX Mapper</button>
+      <button class="sub-btn" data-sub="s1flex2flex_mapper">📄 FLEX2FLEX and TCO</button>
       <button class="sub-btn" data-sub="s1flex2flex_flavors">🖼 FLEX2FLEX Flavors &amp; Images</button>
     </div>
   </div>
@@ -2160,13 +2160,13 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
     <button class="sub-btn-dropdown">☁️ HYPERSCALER infra Scanner ▼</button>
     <div class="ospc-dropdown-content">
       <button class="sub-btn" data-sub="s1hyper_aws">⚙️ AWS Scanner and FLEX Deployment Script Generator</button>
-      <button class="sub-btn" data-sub="s1hyper_aws_mapper">📄 AWS Inventory and FLEX Mapper</button>
+      <button class="sub-btn" data-sub="s1hyper_aws_mapper">📄 AWS and TCO</button>
       <button class="sub-btn" data-sub="s1hyper_aws_flavors">🖼 AWS Flavors &amp; Images</button>
       <button class="sub-btn" data-sub="s1hyper_gcp">⚙️ GCP Scanner and FLEX Deployment Script Generator</button>
-      <button class="sub-btn" data-sub="s1hyper_gcp_mapper">📄 GCP Inventory and FLEX Mapper</button>
+      <button class="sub-btn" data-sub="s1hyper_gcp_mapper">📄 GCP and TCO</button>
       <button class="sub-btn" data-sub="s1hyper_gcp_flavors">🖼 GCP Flavors &amp; Images</button>
       <button class="sub-btn" data-sub="s1hyper_azure">⚙️ Azure Scanner and FLEX Deployment Script Generator</button>
-      <button class="sub-btn" data-sub="s1hyper_azure_mapper">📄 Azure Inventory and FLEX Mapper</button>
+      <button class="sub-btn" data-sub="s1hyper_azure_mapper">📄 Azure and TCO</button>
       <button class="sub-btn" data-sub="s1hyper_azure_flavors">🖼 Azure Flavors &amp; Images</button>
     </div>
   </div>
@@ -2180,6 +2180,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 
 <!-- ── Sub-tabs for Stage 2 ─────────────────────────── -->
 <div class="sub-bar" id="subBar2">
+  <button class="sub-btn" data-sub="s2migstrategy">🗺 Migration Strategy</button>
   <button class="sub-btn" data-sub="s2retain">⏸ R1 Retain — Keep on OSPC</button>
   <button class="sub-btn" data-sub="s2retire">🗑 R2 Retire — Decommission</button>
 
@@ -3545,6 +3546,32 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 
   <div class="panel" id="panel-s0">
     <div style="padding:20px 16px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%; background:#f8fafc;">
+      <!-- Migration Waiting List (populated from ospc_cloud_mockup.html requests) -->
+      <div id="mig-waiting-list-banner" style="display:none;background:linear-gradient(135deg,#eff6ff,#e0f2fe);border:1px solid #bae6fd;border-radius:12px;padding:16px 20px;margin-bottom:22px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:900;color:#0369a1;text-transform:uppercase;letter-spacing:.07em;">📋 Migration Waiting List</div>
+          <button onclick="document.getElementById('mig-waiting-list-banner').style.display='none'" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;">✕</button>
+        </div>
+        <div id="mig-waiting-list-rows"></div>
+      </div>
+
+      <!-- Waiting List Details Panel -->
+      <div id="wl-details-panel" style="display:none;background:#fff;border:1px solid #bae6fd;border-radius:12px;padding:0;margin-bottom:22px;overflow:hidden;box-shadow:0 8px 32px rgba(2,132,199,0.14);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0c4a6e,#1e40af);color:#fff;">
+          <div>
+            <div id="wld-title" style="font-size:15px;font-weight:900;letter-spacing:.04em;">📋 Migration Request Details</div>
+            <div id="wld-meta" style="font-size:11px;color:#bae6fd;margin-top:2px;"></div>
+          </div>
+          <button onclick="document.getElementById('wl-details-panel').style.display='none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:13px;font-weight:700;">✕ Close</button>
+        </div>
+        <!-- Customer info bar -->
+        <div id="wld-customer-bar" style="display:flex;flex-wrap:wrap;gap:16px;padding:12px 20px;background:#f0f9ff;border-bottom:1px solid #bae6fd;font-size:12px;"></div>
+        <!-- Strategy + notes -->
+        <div id="wld-strategy-bar" style="display:flex;align-items:center;gap:10px;padding:10px 20px;background:#fafafa;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;font-size:12px;"></div>
+        <!-- Business systems cards -->
+        <div id="wld-systems" style="padding:16px 20px;display:grid;grid-template-columns:1fr;gap:12px;"></div>
+        <div id="wld-empty" style="display:none;padding:30px;text-align:center;color:#94a3b8;font-size:13px;">No business systems recorded in this request. Use 🔄 Sync Business Systems to add systems from the UAT stage.</div>
+      </div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <div>
           <h1 style="color:#0f172a; margin:0; font-size:28px;">Customer Migration Tracker</h1>
@@ -3563,6 +3590,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
         </div>
         <div style="display:flex; gap:10px;">
           <button id="btnAddNewRow" style="padding:10px 15px; background:#17a2b8; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">➕ Add Row</button>
+          <button id="btnSyncBizSystems" onclick="syncBizSystemsToTracker()" style="padding:10px 15px; background:linear-gradient(135deg,#0284c7,#4f46e5); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">🔄 Sync Business Systems</button>
           <button id="btnSaveEdits" style="padding:10px 15px; background:#2ecc71; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; display:none; box-shadow:0 0 10px #2ecc71;">💾 Save Edits</button>
           <button id="btnExportCsv" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">Li Export Report (CSV)</button>
           <button id="btnToggleUploadAppend" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">+ Append Missing</button>
@@ -3767,7 +3795,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
           <li><strong>Capacity plan</strong> – Assessment of resource requirements to ensure Flex can support migrated workloads.</li>
           <li><strong>Migration risk assessment</strong> – Identification of potential risks, limitations, or unsupported features impacting migration.</li>
         </ul>
-        <div class="notice">ℹ️ Use the sub-tabs above to run discovery tools: OSPC Scanner and Deployment Script Generator · OSPC Inventory and Flex Mapper · OSPC Flavors &amp; Images</div>
+        <div class="notice">ℹ️ Use the sub-tabs above to run discovery tools: OSPC Scanner and Deployment Script Generator · OSPC and TCO · OSPC Flavors &amp; Images</div>
       </div>
     </div>
 
@@ -3783,15 +3811,15 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
     <iframe id="s1hyper_azure-pane" src="/hyperflex-scanner/?provider=azure" title="Azure Scanner and FLEX Deployment Script Generator" style="display:none;"></iframe>
 
     <!-- 1c: Analyze OSPC CSV -->
-    <iframe id="s1analyze-pane" src="/dashboard/" title="Analyze OSPC CSV" style="display:none;"></iframe>
+    <iframe id="s1analyze-pane" src="/dashboard/" title="OSPC and TCO" style="display:none;"></iframe>
 
     <!-- 1d: OSPC Flavors & Images -->
     <iframe id="s1flavors-pane" src="/references/" title="OSPC Flavors &amp; Images" style="display:none;"></iframe>
-    <iframe id="s1flex2flex_mapper-pane" src="/dashboard/?source=flex2flex" title="FLEX2FLEX Inventory and FLEX Mapper" style="display:none;"></iframe>
+    <iframe id="s1flex2flex_mapper-pane" src="/dashboard/?source=flex2flex" title="FLEX2FLEX and TCO" style="display:none;"></iframe>
     <iframe id="s1flex2flex_flavors-pane" src="/references/?source=flex2flex" title="FLEX2FLEX Flavors &amp; Images" style="display:none;"></iframe>
-    <iframe id="s1hyper_aws_mapper-pane" src="/dashboard/?source=aws" title="AWS Inventory and FLEX Mapper" style="display:none;"></iframe>
-    <iframe id="s1hyper_gcp_mapper-pane" src="/dashboard/?source=gcp" title="GCP Inventory and FLEX Mapper" style="display:none;"></iframe>
-    <iframe id="s1hyper_azure_mapper-pane" src="/dashboard/?source=azure" title="Azure Inventory and FLEX Mapper" style="display:none;"></iframe>
+    <iframe id="s1hyper_aws_mapper-pane" src="/dashboard/?source=aws" title="AWS and TCO" style="display:none;"></iframe>
+    <iframe id="s1hyper_gcp_mapper-pane" src="/dashboard/?source=gcp" title="GCP and TCO" style="display:none;"></iframe>
+    <iframe id="s1hyper_azure_mapper-pane" src="/dashboard/?source=azure" title="Azure and TCO" style="display:none;"></iframe>
     <iframe id="s1hyper_aws_flavors-pane" src="/references/?source=aws" title="AWS Flavors &amp; Images" style="display:none;"></iframe>
     <iframe id="s1hyper_gcp_flavors-pane" src="/references/?source=gcp" title="GCP Flavors &amp; Images" style="display:none;"></iframe>
     <iframe id="s1hyper_azure_flavors-pane" src="/references/?source=azure" title="Azure Flavors &amp; Images" style="display:none;"></iframe>
@@ -4425,6 +4453,11 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         </div>
         <p style="color:#475569;font-size:11px;margin:8px 0 0;text-align:right;">Engines are loaded on first click. Each engine is an independent session.</p>
       </div>
+    </div>
+
+    <!-- Migration Strategy -->
+    <div id="s2migstrategy-pane" class="gov-page" style="display:none;padding:0;overflow:hidden;">
+      <iframe src="/migration-strategy/" style="width:100%;height:100%;min-height:calc(100vh - 160px);border:0;display:block;" title="Migration Strategy"></iframe>
     </div>
 
     <!-- R1 Retain -->
@@ -13778,7 +13811,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
   const subBar1 = document.getElementById('subBar1');
   const subBar2 = document.getElementById('subBar2');
   const s1Panes = ['s1info','s1ospc','s1flex2flex_infra','s1flex2flex_mapper','s1hyper_aws','s1hyper_aws_mapper','s1hyper_aws_flavors','s1hyper_gcp','s1hyper_gcp_mapper','s1hyper_gcp_flavors','s1hyper_azure','s1hyper_azure_mapper','s1hyper_azure_flavors','s1analyze','s1flavors','s1flex2flex_flavors','s1tco','s1appdep','s1business_ontology','s1system_ontology_handoff','s1readiness','s1preflight','s1k8s'];
-  const s2Panes = ['s2retain','s2retire','s2rehost_p1','s2fullmig','s2vmware','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2opencenter','s2rehost_manual','s2repurchase'];
+  const s2Panes = ['s2migstrategy','s2retain','s2retire','s2rehost_p1','s2fullmig','s2vmware','s2image','s2flex2flex','s2flexanywhere','s2rehost_p2_1','s2rehost_p2_2','s2opencenter','s2rehost_manual','s2repurchase'];
 
   function addWorkloadRow(bodyId) {
     const body = document.getElementById(bodyId);
@@ -19273,7 +19306,406 @@ ${certContent}
     requestAnimationFrame(syncVisibleIframeHeights);
   }
 
+  function loadMigWaitingList() {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      var banner = document.getElementById('mig-waiting-list-banner');
+      var rows = document.getElementById('mig-waiting-list-rows');
+      if (!banner || !rows) return;
+      if (!items.length) { banner.style.display = 'none'; return; }
+      banner.style.display = '';
+      rows.innerHTML = items.map(function(r, i) {
+        var sysCnt = (Array.isArray(r.systems) ? r.systems.length : 0);
+        return '<div style="display:flex;align-items:center;gap:12px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #bae6fd;margin-bottom:6px;flex-wrap:wrap;">'
+          + '<span style="background:#0284c7;color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900;">#' + (i+1) + '</span>'
+          + '<span style="font-weight:800;color:#0f172a;font-size:13px;">' + (r.company||'') + '</span>'
+          + '<span style="color:#64748b;font-size:12px;">' + (r.contact||'') + ' · ' + (r.email||'') + '</span>'
+          + '<span style="color:#0369a1;font-size:11px;font-weight:700;">' + (r.strategy||'') + '</span>'
+          + '<span style="color:#64748b;font-size:11px;">' + (r.region||'') + '</span>'
+          + '<span style="color:#94a3b8;font-size:10px;">Submitted: ' + new Date(r.submittedAt).toLocaleDateString() + '</span>'
+          + (r.startDate ? '<span style="background:#f0fdf4;color:#15803d;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;">▶ ' + r.startDate + '</span>' : '')
+          + (r.completionDate ? '<span style="background:#fef2f2;color:#dc2626;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;">🏁 ' + r.completionDate + '</span>' : '')
+          + (sysCnt ? '<span style="background:#dcfce7;color:#15803d;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:800;">' + sysCnt + ' systems</span>' : '')
+          + '<div style="margin-left:auto;display:flex;gap:8px;">'
+          + '<button onclick="showWLDetails(' + i + ')" style="background:#f0f9ff;color:#0284c7;border:1px solid #bae6fd;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">🔍 Show Details</button>'
+          + '<button onclick="addWLToTracker(' + i + ')" style="background:linear-gradient(135deg,#0284c7,#4f46e5);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap;">➕ Add to Migration Log</button>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    } catch(e) {}
+  }
+
+  // Save a single component field edit back to the waiting list localStorage
+  function wldSaveComp(itemIdx, sysIdx, compIdx, field, value) {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      if (!items[itemIdx]) return;
+      var systems = Array.isArray(items[itemIdx].systems) && items[itemIdx].systems.length
+        ? items[itemIdx].systems
+        : JSON.parse(localStorage.getItem('uatS1_systems') || '[]');
+      if (!systems[sysIdx] || !systems[sysIdx].components[compIdx]) return;
+      systems[sysIdx].components[compIdx][field] = value;
+      // Write back to uatS1_systems too so UAT stage stays in sync
+      try { localStorage.setItem('uatS1_systems', JSON.stringify(systems)); } catch(e) {}
+      // If the item has its own systems array, update it
+      if (Array.isArray(items[itemIdx].systems) && items[itemIdx].systems.length) {
+        items[itemIdx].systems = systems;
+        localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
+      }
+    } catch(e) {}
+  }
+
+  // Toggle In Scope for a component in the details panel
+  function wldToggleScope(itemIdx, sysIdx, compIdx, btn) {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      if (!items[itemIdx]) return;
+      var systems = Array.isArray(items[itemIdx].systems) && items[itemIdx].systems.length
+        ? items[itemIdx].systems
+        : JSON.parse(localStorage.getItem('uatS1_systems') || '[]');
+      if (!systems[sysIdx] || !systems[sysIdx].components) return;
+      var comp = systems[sysIdx].components[compIdx];
+      if (!comp) return;
+      var nowInScope = comp.inScope === false ? true : false;
+      comp.inScope = nowInScope;
+      btn.textContent = nowInScope ? 'In Scope' : 'Out of Scope';
+      btn.style.background = nowInScope ? '#16a34a' : '#e2e8f0';
+      btn.style.color = nowInScope ? '#fff' : '#64748b';
+      try { localStorage.setItem('uatS1_systems', JSON.stringify(systems)); } catch(e) {}
+      if (Array.isArray(items[itemIdx].systems) && items[itemIdx].systems.length) {
+        items[itemIdx].systems = systems;
+        localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
+      }
+    } catch(e) {}
+  }
+
+  function _buildTrackerRow(fieldMap, accentColor) {
+    var allKeys = [];
+    var trHead = document.querySelector('#trackerTable thead tr');
+    if (trHead) {
+      Array.from(trHead.cells).slice(1, -1).forEach(function(th) {
+        allKeys.push(th.innerText.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, ''));
+      });
+    }
+    if (!allKeys.length) allKeys = ['customer_name','status','region','migration_method','flex_readiness','reference_architecture'];
+    var color = accentColor || '#00d2ff';
+    var html = '<tr class="tracker-row" style="background-color:rgba(2,132,199,0.10);transition:background 0.2s;" onmouseover="this.style.backgroundColor=\'rgba(30,40,60,0.95)\'" onmouseout="this.style.backgroundColor=\'rgba(2,132,199,0.06)\'">'
+      + '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">'
+      + '<button style="background:rgba(0,210,255,0.15);border:1px solid ' + color + ';color:' + color + ';padding:6px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;">Start</button>'
+      + '</td>';
+    allKeys.forEach(function(col) {
+      var val = fieldMap[col] !== undefined ? fieldMap[col] : '';
+      var isStatus = col === 'status';
+      html += '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);'
+        + (isStatus ? 'color:' + color + ';text-shadow:0 0 5px ' + color + ';font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:1px;' : 'color:#e2e8f0;font-size:13px;font-weight:500;')
+        + 'border:1px dashed rgba(126,207,255,0.25);" contenteditable="true" oninput="markEdits()" data-key="' + col + '">' + val + '</td>';
+    });
+    html += '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">'
+      + '<button onclick="deleteRow(this)" style="background:transparent;border:none;cursor:pointer;font-size:16px;filter:grayscale(100%) opacity(50%);" onmouseover="this.style.filter=\'grayscale(0%) opacity(100%)\'" onmouseout="this.style.filter=\'grayscale(100%) opacity(50%)\'">❌</button>'
+      + '</td></tr>';
+    return html;
+  }
+
+  function showWLDetails(idx) {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      var item = items[idx];
+      if (!item) return;
+
+      var panel = document.getElementById('wl-details-panel');
+      var title = document.getElementById('wld-title');
+      var meta  = document.getElementById('wld-meta');
+      var cBar  = document.getElementById('wld-customer-bar');
+      var sBar  = document.getElementById('wld-strategy-bar');
+      var sysCt = document.getElementById('wld-systems');
+      var empty = document.getElementById('wld-empty');
+      if (!panel) return;
+
+      // Header
+      title.textContent = '📋 ' + (item.company||'Migration') + ' — Request Details';
+      meta.textContent  = 'Submitted ' + new Date(item.submittedAt).toLocaleString() + (item.id ? ' · ' + item.id : '');
+
+      // Customer info bar
+      var infoFields = [
+        ['Contact', item.contact], ['Email', item.email], ['Phone', item.phone],
+        ['Tenant ID', item.tenant], ['Region', item.region],
+        ['Start Date', item.startDate], ['Completion Date', item.completionDate]
+      ].filter(function(f){ return f[1]; });
+      cBar.innerHTML = infoFields.map(function(f){
+        return '<span><strong style="color:#0369a1;">' + f[0] + ':</strong> ' + f[1] + '</span>';
+      }).join('<span style="color:#cbd5e1">|</span>');
+
+      // Strategy + notes bar
+      sBar.innerHTML = (item.strategy ? '<span style="background:#ede9fe;color:#4f46e5;border-radius:5px;padding:3px 10px;font-weight:800;">' + item.strategy + '</span>' : '')
+        + (item.notes ? '<span style="color:#64748b;">📝 ' + item.notes + '</span>' : '');
+
+      // Business systems — use item.systems if present, else fall back to uatS1_systems
+      var systems = Array.isArray(item.systems) && item.systems.length ? item.systems : [];
+      if (!systems.length) {
+        try { systems = JSON.parse(localStorage.getItem('uatS1_systems') || '[]'); } catch(e) {}
+      }
+
+      if (!systems.length) {
+        sysCt.innerHTML = '';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+        // Store current item idx for save callbacks
+        panel.setAttribute('data-wl-idx', idx);
+
+        sysCt.innerHTML = systems.map(function(sys, si) {
+          var comps = sys.components || [];
+          var critColor = {Critical:'#dc2626',High:'#f59e0b',Medium:'#2563eb',Low:'#16a34a'}[sys.criticality] || '#64748b';
+          var statusColor = sys.status === 'Active' ? '#16a34a' : '#9ca3af';
+          var inScopeCnt = comps.filter(function(c){ return c.inScope !== false; }).length;
+          var typeCount = {};
+          comps.forEach(function(c){ var t=(c.type||'').toLowerCase(); typeCount[t]=(typeCount[t]||0)+1; });
+          var refArch = Object.keys(typeCount).map(function(t){ return typeCount[t]+' '+t; }).join(', ') || comps.map(function(c){ return c.name||c.type; }).join(', ');
+
+          // Component rows — full editable config matching the UAT modal right panel
+          var compRows = comps.map(function(c, ci) {
+            var inScope = c.inScope !== false;
+            var scopeBg = inScope ? '#16a34a' : '#e2e8f0';
+            var scopeColor = inScope ? '#fff' : '#64748b';
+            var scopeLabel = inScope ? 'In Scope' : 'Out of Scope';
+            return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
+              // Component header
+              + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+              + '<div>'
+              + '<div style="font-weight:800;font-size:13px;color:#0f172a;">' + (c.name||c.type||'Component') + '</div>'
+              + '<div style="font-size:10px;color:#94a3b8;">Component Type: ' + (c.type||'') + '</div>'
+              + '</div>'
+              + '<div style="display:flex;gap:6px;align-items:center;">'
+              + '<button onclick="wldToggleScope(' + idx + ',' + si + ',' + ci + ',this)" style="background:' + scopeBg + ';color:' + scopeColor + ';border:none;border-radius:5px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer;">' + scopeLabel + '</button>'
+              + '</div></div>'
+              // 3-column inputs
+              + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'
+              + '<div>'
+              + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">OSPC Source IP / URL</div>'
+              + '<input type="text" value="' + (c.ospcUrl||'').replace(/"/g,'&quot;') + '" oninput="wldSaveComp(' + idx + ',' + si + ',' + ci + ',\'ospcUrl\',this.value)" placeholder="http://OSPC-IP:80" style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:11px;color:#0f172a;background:#fff;box-sizing:border-box;">'
+              + '</div>'
+              + '<div>'
+              + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">FLEX Target IP / URL</div>'
+              + '<input type="text" value="' + (c.flexUrl||'').replace(/"/g,'&quot;') + '" oninput="wldSaveComp(' + idx + ',' + si + ',' + ci + ',\'flexUrl\',this.value)" placeholder="http://FLEX-IP:80" style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:11px;color:#0f172a;background:#fff;box-sizing:border-box;">'
+              + '</div>'
+              + '<div>'
+              + '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Health / Test Path</div>'
+              + '<input type="text" value="' + (c.healthPath||'').replace(/"/g,'&quot;') + '" oninput="wldSaveComp(' + idx + ',' + si + ',' + ci + ',\'healthPath\',this.value)" placeholder="/health" style="width:100%;border:1px solid #d1d5db;border-radius:5px;padding:5px 8px;font-size:11px;color:#0f172a;background:#fff;box-sizing:border-box;">'
+              + '</div>'
+              + '</div>'
+              + '</div>';
+          }).join('');
+
+          return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:4px;">'
+            // System header
+            + '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#f8fafc,#f0f9ff);border-bottom:1px solid #e2e8f0;">'
+            + '<div style="display:flex;align-items:center;gap:10px;">'
+            + '<div style="width:40px;height:40px;border-radius:8px;background:' + critColor + ';color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;">' + (sys.name||'').slice(0,2).toUpperCase() + '</div>'
+            + '<div>'
+            + '<div style="font-weight:900;font-size:15px;color:#0f172a;">' + (sys.name||'') + '</div>'
+            + '<div style="font-size:11px;color:#64748b;">' + [sys.archetype, sys.criticality, sys.towner, sys.wave, sys.env].filter(Boolean).join(' • ') + '</div>'
+            + '</div></div>'
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;">✅ ' + inScopeCnt + '/' + comps.length + ' In Scope</span>'
+            + '<span style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;">🏗 ' + refArch + '</span>'
+            + '<span style="border:1px solid ' + statusColor + ';color:' + statusColor + ';border-radius:5px;padding:2px 9px;font-size:11px;font-weight:800;">' + (sys.status||'') + '</span>'
+            + '<button onclick="(function(){ try { uatS1OpenModal(\'' + (sys.id||'') + '\'); } catch(e){} })()" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:5px;padding:5px 14px;font-size:11px;font-weight:800;cursor:pointer;">✏ Edit in UAT</button>'
+            + '</div></div>'
+            // Component Configuration section
+            + '<div style="padding:12px 16px;">'
+            + '<div style="font-size:11px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Component Configuration</div>'
+            + (compRows || '<div style="color:#94a3b8;font-size:12px;padding:10px 0;">No components configured.</div>')
+            + '</div>'
+            + '</div>';
+        }).join('');
+      }
+
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch(e) { console.error('showWLDetails', e); }
+  }
+
+  function addWLToTracker(idx) {
+    try {
+      var items = JSON.parse(localStorage.getItem('flex_migration_waiting_list') || '[]');
+      var item = items[idx];
+      if (!item) return;
+
+      var tbody = document.getElementById('trackerBody');
+      if (!tbody) return;
+
+      // If the waiting list item has business systems, add one row per system
+      var systems = Array.isArray(item.systems) ? item.systems : [];
+      if (!systems.length) {
+        // fallback: try reading current uatS1_systems
+        try { systems = JSON.parse(localStorage.getItem('uatS1_systems') || '[]'); } catch(e) {}
+      }
+
+      if (systems.length) {
+        systems.forEach(function(sys, i) {
+          var comps = sys.components || [];
+          var compNames = comps.map(function(c){ return c.name || c.type || ''; }).filter(Boolean);
+          var inScope = comps.filter(function(c){ return c.inScope !== false; });
+          var typeCount = {};
+          comps.forEach(function(c){ var t=(c.type||'').toLowerCase(); typeCount[t]=(typeCount[t]||0)+1; });
+          var refArch = Object.keys(typeCount).map(function(t){ return typeCount[t]+' '+t; }).join(', ') || compNames.join(', ');
+
+          var fieldMap = {
+            priority_rank: String(i+1),
+            wave: sys.wave || '',
+            flex_readiness_score: sys.status==='Active'?'95':'70',
+            customer_name: item.company + ' — ' + (sys.name||''),
+            industry: sys.archetype || '',
+            customer_id: item.tenant || ('WL-'+(i+1)),
+            region: item.region || '',
+            flex_readiness: sys.status==='Active'?'FLEX Ready':'Partially FLEX Ready',
+            ospc_infra_size: comps.length<=3?'Small':comps.length<=6?'Medium':'Large',
+            business_blast_radius: {Critical:'Core',High:'Important',Medium:'Secondary',Low:'Secondary'}[sys.criticality]||'Secondary',
+            stack_category: sys.archetype || '',
+            migration_method: item.strategy || 'Rehost',
+            ospc_vm_count: String(comps.length),
+            size_rank: comps.length<=3?'1':comps.length<=6?'2':'3',
+            status: sys.status==='Active'?'WAITING LIST':'DRAFT',
+            current_stage: '',
+            reference_architecture: refArch,
+            components: compNames.join(' | '),
+            in_scope_count: String(inScope.length),
+            criticality: sys.criticality||'',
+            business_owner: sys.bowner||'',
+            technical_owner: sys.towner||'',
+            start_date: item.startDate||'',
+            completion_date: item.completionDate||''
+          };
+          tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(fieldMap, '#0284c7'));
+        });
+      } else {
+        // No systems: add one customer-level row
+        var fieldMap = {
+          customer_name: item.company || '',
+          customer_id: item.tenant || ('WL-' + Date.now()),
+          region: item.region || '',
+          migration_method: item.strategy || '',
+          status: 'WAITING LIST',
+          flex_readiness: 'FLEX Ready',
+          reference_architecture: item.notes || ''
+        };
+        tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(fieldMap, '#f39c12'));
+      }
+
+      if (typeof markEdits === 'function') markEdits();
+      items.splice(idx, 1);
+      localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
+      loadMigWaitingList();
+    } catch(e) { console.error('addWLToTracker', e); }
+  }
+
+  function syncBizSystemsToTracker() {
+    try {
+      var systems = JSON.parse(localStorage.getItem('uatS1_systems') || '[]');
+      if (!systems.length) { alert('No Business Systems found. Add business systems in the UAT Stage first.'); return; }
+
+      // Read live column keys from thead
+      var allKeys = [];
+      var trHead = document.querySelector('#trackerTable thead tr');
+      if (trHead) {
+        Array.from(trHead.cells).slice(1, -1).forEach(function(th) {
+          allKeys.push(th.innerText.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, ''));
+        });
+      }
+      if (!allKeys.length) allKeys = ['customer_name','stack_category','wave','criticality','migration_method','ospc_vm_count','status','reference_architecture'];
+
+      // Helper: map criticality to blast_radius vocabulary
+      function toBlastRadius(crit) {
+        return {Critical:'Core', High:'Important', Medium:'Secondary', Low:'Secondary'}[crit] || crit;
+      }
+      // Helper: infer infra size from component count
+      function toInfraSize(count) {
+        if (count <= 3) return 'Small';
+        if (count <= 6) return 'Medium';
+        if (count <= 12) return 'Large';
+        return 'Very Large / Highly Interconnected';
+      }
+
+      var tbody = document.getElementById('trackerBody');
+      if (!tbody) return;
+
+      var inserted = 0;
+      systems.forEach(function(sys, i) {
+        var comps = sys.components || [];
+        var compNames = comps.map(function(c){ return c.name || c.type || ''; }).filter(Boolean);
+        var inScopeComps = comps.filter(function(c){ return c.inScope !== false; });
+        var inScopeNames = inScopeComps.map(function(c){ return c.name || c.type || ''; }).filter(Boolean);
+
+        // Reference architecture: typed breakdown
+        var typeCount = {};
+        comps.forEach(function(c){
+          var t = (c.type||'').toLowerCase();
+          typeCount[t] = (typeCount[t]||0) + 1;
+        });
+        var refArch = Object.keys(typeCount).map(function(t){ return typeCount[t] + ' ' + t; }).join(', ');
+        if (!refArch && compNames.length) refArch = compNames.join(', ');
+
+        var fieldMap = {
+          priority_rank:          String(i + 1),
+          wave:                   sys.wave || 'Wave 1',
+          flex_readiness_score:   sys.status === 'Active' ? '95' : '70',
+          customer_name:          sys.name || '',
+          industry:               sys.archetype || '',
+          customer_id:            (sys.id || '').slice(0, 8).toUpperCase() || ('BS-' + (i+1)),
+          region:                 '',
+          flex_readiness:         sys.status === 'Active' ? 'FLEX Ready' : 'Partially FLEX Ready',
+          ospc_infra_size:        toInfraSize(comps.length),
+          business_blast_radius:  toBlastRadius(sys.criticality || 'Medium'),
+          stack_category:         sys.archetype || '',
+          migration_method:       sys.risk === 'Low' ? 'Rehost' : (sys.risk === 'High' ? 'Replatform' : 'Relocate'),
+          ospc_vm_count:          String(comps.length),
+          size_rank:              comps.length <= 3 ? '1' : (comps.length <= 6 ? '2' : '3'),
+          status:                 sys.status === 'Active' ? 'READY FOR MIGRATION' : 'DRAFT',
+          current_stage:          sys.status || '',
+          reference_architecture: refArch,
+          // extended business system fields
+          business_system_name:   sys.name || '',
+          components:             compNames.join(' | '),
+          in_scope_components:    inScopeNames.join(' | '),
+          component_count:        String(comps.length),
+          in_scope_count:         String(inScopeComps.length),
+          criticality:            sys.criticality || '',
+          business_owner:         sys.bowner || '',
+          technical_owner:        sys.towner || '',
+          environment:            sys.env || '',
+          description:            sys.desc || '',
+          created_at:             sys.createdAt || ''
+        };
+
+        var neonColor = sys.status === 'Active' ? '#00d2ff' : '#f39c12';
+        var html = '<tr class="tracker-row" style="background-color:rgba(4,120,87,0.10);transition:background 0.2s;" onmouseover="this.style.backgroundColor=\'rgba(30,40,60,0.95)\'" onmouseout="this.style.backgroundColor=\'rgba(4,120,87,0.08)\'">'
+          + '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">'
+          + '<button style="background:rgba(0,210,255,0.15);border:1px solid ' + neonColor + ';color:' + neonColor + ';padding:6px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;">Start</button>'
+          + '</td>';
+        allKeys.forEach(function(col) {
+          var val = fieldMap[col] !== undefined ? fieldMap[col] : '';
+          var isStatus = col === 'status';
+          html += '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);'
+            + (isStatus ? 'color:' + neonColor + ';text-shadow:0 0 5px ' + neonColor + ';font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:1px;' : 'color:#e2e8f0;font-size:13px;font-weight:500;')
+            + 'border:1px dashed rgba(34,197,94,0.25);" contenteditable="true" oninput="markEdits()" data-key="' + col + '">' + val + '</td>';
+        });
+        html += '<td style="padding:14px 15px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:center;">'
+          + '<button onclick="deleteRow(this)" style="background:transparent;border:none;cursor:pointer;font-size:16px;filter:grayscale(100%) opacity(50%);" onmouseover="this.style.filter=\'grayscale(0%) opacity(100%)\'" onmouseout="this.style.filter=\'grayscale(100%) opacity(50%)\'">❌</button>'
+          + '</td></tr>';
+
+        tbody.insertAdjacentHTML('afterbegin', html);
+        inserted++;
+      });
+
+      if (typeof markEdits === 'function') markEdits();
+      // Flash the sync button
+      var btn = document.getElementById('btnSyncBizSystems');
+      if (btn) { btn.textContent = '✅ ' + inserted + ' systems synced — Save Edits!'; setTimeout(function(){ btn.textContent = '🔄 Sync Business Systems'; }, 3000); }
+    } catch(e) { console.error('syncBizSystemsToTracker', e); alert('Sync failed: ' + e.message); }
+  }
+
   function activateStage(stageId) {
+    if (stageId === 's0') loadMigWaitingList();
     if (!window.__activatingStageFromUrl) {
       requestAnimationFrame(function() {
         try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_) { window.scrollTo(0, 0); }
@@ -19365,7 +19797,7 @@ ${certContent}
     var params = new URLSearchParams(window.location.search || '');
     var only = (params.get('only') || '').toLowerCase();
     if (!only) return;
-    var targetId = only === 'aipower' ? 'panel-sai' : (only === 'opencenter' ? 'panel-s9' : null);
+    var targetId = only === 'aipower' ? 'panel-sai' : (only === 'opencenter' ? 'panel-s9' : (only === 's_why' ? 'panel-s_why' : (only === 'biz_systems' ? 'panel-s4' : (only === 'biz_cards' ? 'uatS1SystemsView' : null))));
     var target = targetId ? document.getElementById(targetId) : null;
     if (!target) return;
     var node = target;
@@ -19373,7 +19805,12 @@ ${certContent}
       var parent = node.parentElement;
       if (!parent) break;
       Array.prototype.forEach.call(parent.children, function(sib) {
-        if (sib !== node && sib.tagName !== 'STYLE' && sib.tagName !== 'SCRIPT') sib.style.display = 'none';
+        if (sib === node) return;
+        if (sib.tagName === 'STYLE' || sib.tagName === 'SCRIPT') return;
+        // Never hide fixed/absolute overlays (modals, backdrops) — they self-manage visibility
+        var pos = window.getComputedStyle(sib).position;
+        if (pos === 'fixed' || pos === 'absolute') return;
+        sib.style.display = 'none';
       });
       node.style.display = 'block';
       if (node.classList) node.classList.add('active');
@@ -19382,6 +19819,18 @@ ${certContent}
     document.body.style.overflow = 'auto';
     document.body.style.background = '#fff';
     document.documentElement.style.background = '#fff';
+    // biz_systems / biz_cards: switch to systems sub-view and hide UAT chrome
+    if (only === 'biz_systems' || only === 'biz_cards') {
+      setTimeout(function() {
+        if (typeof uatS1SetView === 'function') uatS1SetView('systems');
+        var hero = document.querySelector('.uat-hero');
+        if (hero) hero.style.display = 'none';
+        var tabRow = document.querySelector('.uat-s1-tabs-row');
+        if (tabRow) tabRow.style.display = 'none';
+        var sv = document.getElementById('uatS1SystemsView');
+        if (sv) { sv.style.display = 'block'; sv.style.padding = '0'; }
+      }, 120);
+    }
   }
   function activateStageFromUrl() {
     var params = new URLSearchParams(window.location.search || '');
