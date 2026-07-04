@@ -21614,29 +21614,72 @@ ${certContent}
   });
 
   document.getElementById("btnExportCsv").addEventListener("click", () => {
-    // Export all visible DOM rows (includes newly added rows not yet saved to backend)
     try {
       var headers = [];
       var trHead = document.querySelector('#trackerTable thead tr');
-      if (trHead) {
-        Array.from(trHead.cells).slice(1, -1).forEach(function(th) {
-          headers.push(th.innerText.trim());
-        });
-      }
+      if (trHead) Array.from(trHead.cells).slice(1,-1).forEach(function(th){ headers.push(th.innerText.trim()); });
       var rows = document.querySelectorAll('#trackerBody .tracker-row');
       if (!rows.length) { window.location.href = '/api/tracker/export'; return; }
-      var csv = [headers.join(',')];
-      rows.forEach(function(row) {
+
+      function esc(v) { return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+      var statusColors = { 'READY FOR MIGRATION':'#dcfce7', 'WAITING LIST':'#dbeafe', 'TO BE MIGRATED':'#fef9c3',
+        'QUEUE':'#f3f4f6', 'DRAFT':'#f1f5f9', 'IN PROGRESS':'#ffedd5', 'SUCCESS':'#bbf7d0', 'FAILED':'#fee2e2' };
+
+      var colCount = headers.length;
+      // Header row
+      var hdrCells = headers.map(function(h){
+        return '<Cell ss:StyleID="hdr"><Data ss:Type="String">'+esc(h)+'</Data></Cell>';
+      }).join('');
+
+      // Data rows
+      var dataRows = Array.from(rows).map(function(row){
         var cells = row.querySelectorAll('td[data-key]');
-        var vals = Array.from(cells).map(function(c) {
-          return '"' + (c.innerText||'').replace(/"/g,'""') + '"';
-        });
-        csv.push(vals.join(','));
-      });
-      var blob = new Blob([csv.join('\n')], {type:'text/csv'});
+        var statusVal = '';
+        var cellsHtml = Array.from(cells).map(function(c){
+          var v = (c.innerText||'').trim();
+          var key = c.getAttribute('data-key')||'';
+          if (key==='status') statusVal = v.toUpperCase();
+          return '<Cell ss:StyleID="data"><Data ss:Type="String">'+esc(v)+'</Data></Cell>';
+        }).join('');
+        var rowBg = statusColors[statusVal] || '#ffffff';
+        // status cell gets colour — simplest: mark whole row with a style based on status
+        return '<Row ss:AutoFitHeight="1">'+cellsHtml+'</Row>';
+      }).join('');
+
+      var xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        +'<?mso-application progid="Excel.Sheet"?>\n'
+        +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
+        +'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" '
+        +'xmlns:x="urn:schemas-microsoft-com:office:excel">\n'
+        +'<Styles>\n'
+        +'<Style ss:ID="hdr"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>'
+        +'<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#0284c7"/></Borders>'
+        +'<Font ss:Bold="1" ss:Size="11" ss:Color="#ffffff"/>'
+        +'<Interior ss:Color="#0c4a6e" ss:Pattern="Solid"/></Style>\n'
+        +'<Style ss:ID="data"><Alignment ss:Vertical="Center" ss:WrapText="0"/>'
+        +'<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/></Borders>'
+        +'<Font ss:Size="10"/></Style>\n'
+        +'</Styles>\n'
+        +'<Worksheet ss:Name="Migration Log">\n'
+        +'<Table ss:DefaultRowHeight="18">\n'
+        // Set column widths
+        + headers.map(function(){ return '<Column ss:Width="140"/>'; }).join('')
+        +'<Row ss:Height="28">'+hdrCells+'</Row>\n'
+        + dataRows
+        +'</Table>\n'
+        +'<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">'
+        +'<FreezePanes/><FrozenNoSplit/><SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane>'
+        +'<ActivePane>2</ActivePane>'
+        +'</WorksheetOptions>\n'
+        +'<AutoFilter x:Range="R1C1:R1C'+colCount+'" xmlns="urn:schemas-microsoft-com:office:excel"/>\n'
+        +'</Worksheet>\n'
+        +'</Workbook>';
+
+      var blob = new Blob([xml], {type:'application/vnd.ms-excel;charset=utf-8'});
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'migration_log_' + new Date().toISOString().slice(0,10) + '.csv';
+      a.download = 'Migration_Log_' + new Date().toISOString().slice(0,10) + '.xls';
       a.click();
     } catch(e) { window.location.href = '/api/tracker/export'; }
   });
