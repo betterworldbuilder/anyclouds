@@ -4894,8 +4894,10 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
               st.textContent = '✗ No OpenRC fields found — check file format';
             }
           }
-          if (typeof ocqsUpdate === 'function') ocqsUpdate();
-          if (typeof ocqsReqCheck === 'function') ocqsReqCheck();
+          setTimeout(function(){
+            if (typeof ocqsUpdate === 'function') ocqsUpdate();
+            if (typeof ocqsReqCheck === 'function') ocqsReqCheck();
+          }, 50);
         };
         reader.readAsText(file);
       };
@@ -5460,6 +5462,269 @@ opencenter cluster --help</div>
       <div id="ocqs-val-status" style="font-size:12px;color:#64748b;line-height:1.8;">Enter credentials above to see validation hints.</div>
     </div>
     </div><!-- end ocqs-body -->
+
+    <script>
+    (function(){
+      var _qs = {
+        services: { keycloak:false, loki:false, tempo:false, velero:true, monitoring:true },
+        steps: {}
+      };
+
+      function g(id){ return document.getElementById(id); }
+      function v(id){ var el=g(id); return el?el.value.trim():''; }
+      function mask(s){ return s ? '••••••••••••' : ''; }
+
+      function ocqsGetState(){
+        return {
+          org:    v('ocqs-org') || 'my-org',
+          cluster:v('ocqs-cluster') || 'my-cluster',
+          env:    v('ocqs-env') || 'dev',
+          provider: v('ocqs-provider') || 'openstack',
+          authUrl:v('ocqs-authurl') || 'https://identity.api.rackspacecloud.com/v3',
+          region: v('ocqs-region') || 'dfw3',
+          credId: v('ocqs-credid'),
+          credSec:v('ocqs-credsec'),
+          gitRepo:v('ocqs-gitrepo'),
+          gitBranch:v('ocqs-gitbranch')||'main',
+          tokFile:v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
+          tokVal: v('ocqs-tokval'),
+          svc: _qs.services
+        };
+      }
+
+      window.ocqsToggle = function(svc){
+        _qs.services[svc] = !_qs.services[svc];
+        var el=g('tog-'+svc);
+        if(el) el.classList.toggle('on', _qs.services[svc]);
+        ocqsUpdate();
+      };
+
+      window.ocqsUpdate = function(){
+        var s = ocqsGetState();
+        var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
+        var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
+        var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
+
+        // Paths
+        var cp=g('ocqs-configpath'); if(cp) cp.textContent=configPath;
+        var gp=g('ocqs-gitopspath'); if(gp) gp.textContent=gitopsPath;
+        var lp=g('ocqs-logpath');    if(lp) lp.textContent=logPath;
+        var gp2=g('ocqs-gitopspath2'); if(gp2) gp2.textContent=gitopsPath;
+
+        // Quick ref
+        var qc=g('ocqs-qr-config');  if(qc) qc.textContent=configPath;
+        var qg=g('ocqs-qr-gitops');  if(qg) qg.textContent=gitopsPath;
+        var ql=g('ocqs-qr-logs');    if(ql) ql.textContent=logPath;
+        var qr=g('ocqs-qr-repo');    if(qr) qr.textContent=s.gitRepo||'(not set)';
+
+        // Services status
+        var ss=g('ocqs-svc-status');
+        if(ss){
+          var svcs=['keycloak','loki','tempo','velero','monitoring'];
+          ss.innerHTML=svcs.map(function(sv){
+            var on=_qs.services[sv];
+            return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin:2px;background:'+(on?'#dcfce7':'#f1f5f9')+';color:'+(on?'#15803d':'#94a3b8')+';border:1px solid '+(on?'#86efac':'#e2e8f0')+'">'+(on?'✓':'✗')+' '+sv+'</span>';
+          }).join('');
+        }
+
+        // Step 2
+        var c2=g('ocqs-cmd-2');
+        if(c2) c2.textContent='opencenter cluster init '+s.cluster+' --org '+s.org;
+        var c2b=g('ocqs-cmd-2b');
+        if(c2b) c2b.textContent='CONFIG="'+configPath+'"\nnano "$CONFIG"';
+
+        // Step 3
+        var y3=g('ocqs-yaml-3');
+        if(y3) y3.textContent='opencenter:\n  infrastructure:\n    provider: '+s.provider+'\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"';
+        var c3e=g('ocqs-cmd-3env');
+        if(c3e) c3e.textContent='export OPENSTACK_APP_CRED_ID="'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\nexport OPENSTACK_APP_CRED_SECRET="'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"';
+
+        // Step 4
+        var c4=g('ocqs-cmd-4');
+        if(c4) c4.textContent='mkdir -p /home/dzoan/.config/opencenter/tokens\n# Write your token:\necho "'+( s.tokVal?'••••••••••••':'YOUR_GIT_TOKEN' )+'" > '+s.tokFile+'\nchmod 600 '+s.tokFile;
+        var y4=g('ocqs-yaml-4');
+        if(y4) y4.textContent='opencenter:\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"';
+
+        // Step 5
+        var c5=g('ocqs-cmd-5');
+        if(c5) c5.textContent='grep -nE "keycloak|loki|tempo|enabled|CHANGEME" "'+configPath+'"';
+        var y5=g('ocqs-yaml-5');
+        if(y5) y5.textContent='services:\n  keycloak:\n    enabled: '+(_qs.services.keycloak?'true':'false')+'\n  loki:\n    enabled: '+(_qs.services.loki?'true':'false')+'\n  tempo:\n    enabled: '+(_qs.services.tempo?'true':'false')+'\n  velero:\n    enabled: '+(_qs.services.velero?'true':'false')+'\n  kube-prometheus-stack:\n    enabled: '+(_qs.services.monitoring?'true':'false');
+
+        // Step 6
+        var c6=g('ocqs-cmd-6');
+        if(c6) c6.textContent='opencenter cluster validate '+s.cluster;
+
+        // Step 7
+        var c7=g('ocqs-cmd-7');
+        if(c7) c7.textContent='opencenter secrets sync '+s.cluster+'\nopencenter cluster validate '+s.cluster+'\nopencenter cluster generate '+s.cluster;
+        var c7b=g('ocqs-cmd-7b');
+        if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
+
+        // Step 8
+        var c8=g('ocqs-cmd-8');
+        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote add origin '+(s.gitRepo||'YOUR_GIT_REPO_URL')+' 2>/dev/null || git remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL')+'\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+
+        // Step 9
+        var c9=g('ocqs-cmd-9');
+        if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy '+s.cluster;
+        var c9l=g('ocqs-cmd-9logs');
+        if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
+
+        // YAML preview
+        var yp=g('ocqs-yaml-preview');
+        if(yp) yp.textContent=
+          'opencenter:\n  cluster:\n    cluster_name: "'+s.cluster+'"\n    organization: "'+s.org+'"\n\n  infrastructure:\n    provider: "'+s.provider+'"\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"\n\n  gitops:\n    repository:\n      url: "'+(s.gitRepo||'YOUR_GITOPS_REPO_URL')+'"\n    auth:\n      token:\n        token_file: "'+s.tokFile+'"\n\nservices:\n  keycloak:\n    enabled: '+(_qs.services.keycloak)+'\n  loki:\n    enabled: '+(_qs.services.loki)+'\n  tempo:\n    enabled: '+(_qs.services.tempo)+'\n  velero:\n    enabled: '+(_qs.services.velero)+'\n  kube-prometheus-stack:\n    enabled: '+(_qs.services.monitoring);
+
+        // Full flow
+        var ff=g('ocqs-full-flow');
+        if(ff) ff.textContent=
+          '# 1. Check CLI\nopencenter version\n\n'+
+          '# 2. Init config\nopencenter cluster init '+s.cluster+' --org '+s.org+'\n\n'+
+          '# 3. Edit config\nCONFIG="'+configPath+'"\nnano "$CONFIG"\n\n'+
+          '# 4. Validate\nopencenter cluster validate '+s.cluster+'\n\n'+
+          '# 5. Sync secrets\nopencenter secrets sync '+s.cluster+'\n\n'+
+          '# 6. Validate again\nopencenter cluster validate '+s.cluster+'\n\n'+
+          '# 7. Generate GitOps repo\nopencenter cluster generate '+s.cluster+'\n\n'+
+          '# 8. Check CHANGEME\ngrep -R "CHANGEME" '+gitopsPath+' || true\n\n'+
+          '# 9. Commit GitOps\ncd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit push\n\n'+
+          '# 10. Deploy\nopencenter cluster deploy '+s.cluster;
+
+        // Validation hints
+        var vs=g('ocqs-val-status');
+        if(vs){
+          var hints=[];
+          if(!s.credId) hints.push('<span style="color:#dc2626;font-weight:700;">✗ application_credential_id missing</span>');
+          else hints.push('<span style="color:#15803d;font-weight:700;">✓ credential ID set</span>');
+          if(!s.credSec) hints.push('<span style="color:#dc2626;font-weight:700;">✗ application_credential_secret missing</span>');
+          else hints.push('<span style="color:#15803d;font-weight:700;">✓ credential secret set</span>');
+          if(!s.gitRepo) hints.push('<span style="color:#dc2626;font-weight:700;">✗ GitOps repository URL missing</span>');
+          else hints.push('<span style="color:#15803d;font-weight:700;">✓ GitOps repo set</span>');
+          if(!s.tokVal) hints.push('<span style="color:#d97706;font-weight:700;">⚠ Git token not entered</span>');
+          else hints.push('<span style="color:#15803d;font-weight:700;">✓ Git token entered</span>');
+          if(!s.region) hints.push('<span style="color:#dc2626;font-weight:700;">✗ Region missing</span>');
+          else hints.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+s.region+'</span>');
+          vs.innerHTML=hints.join('<br>');
+        }
+
+        // Persist state
+        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authUrl:s.authUrl,region:s.region,credId:s.credId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,services:_qs.services})); }catch(e){}
+      };
+
+      window.ocqsReqCheck = function(){
+        var s=ocqsGetState();
+        var set=function(id,ok){ var el=g(id); if(el){el.className=ok?'ocqs-badge-ready':'ocqs-badge-missing'; el.textContent=ok?'Ready':'Missing';} };
+        set('ocqs-req-credid', !!s.credId);
+        set('ocqs-req-credsec', !!s.credSec);
+        set('ocqs-req-repo', !!s.gitRepo);
+        set('ocqs-req-token', !!s.tokVal);
+        set('ocqs-req-region', !!s.region);
+      };
+
+      window.ocqsCopyCmd = function(id,statusId){
+        var el=g(id); if(!el) return;
+        navigator.clipboard.writeText(el.textContent||el.innerText).then(function(){
+          var term=g('ocqs-terminal');
+          if(term){ term.innerHTML+='<span class="t-cmd">$ '+((el.textContent||el.innerText).split('\n')[0])+'</span>\n<span style="color:#64748b;">↑ Copied to clipboard. Paste into your WSL/Linux terminal.</span>\n\n'; term.scrollTop=term.scrollHeight; }
+          if(statusId){ var st=g(statusId); if(st&&st.classList.contains('ocqs-s-idle')){ st.className='ocqs-status ocqs-s-warn'; st.textContent='Copied'; } }
+        });
+      };
+
+      window.ocqsCopyEl = function(id,statusId){
+        var el=g(id); if(!el) return;
+        navigator.clipboard.writeText(el.textContent||el.innerText).then(function(){
+          if(statusId){ var st=g(statusId); if(st){ st.className='ocqs-status ocqs-s-warn'; st.textContent='Copied'; } }
+        });
+      };
+
+      window.ocqsCopyYaml = function(){ ocqsCopyEl('ocqs-yaml-preview'); };
+
+      window.ocqsDownloadYaml = function(){
+        var s=ocqsGetState();
+        var el=g('ocqs-yaml-preview'); if(!el) return;
+        var blob=new Blob([el.textContent],{type:'text/yaml'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download=s.cluster+'-config.yaml'; a.click();
+      };
+
+      window.ocqsDownloadScript = function(){
+        var s=ocqsGetState();
+        var el=g('ocqs-full-flow'); if(!el) return;
+        var blob=new Blob(['#!/bin/bash\nset -e\n\n'+el.textContent],{type:'text/x-sh'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='opencenter-bootstrap-'+s.cluster+'.sh'; a.click();
+      };
+
+      window.ocqsDownloadLog = function(){
+        var el=g('ocqs-terminal'); if(!el) return;
+        var blob=new Blob([el.innerText],{type:'text/plain'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='opencenter-tutorial-log.txt'; a.click();
+      };
+
+      window.ocqsDeploy = function(){
+        var el=g('ocqs-cmd-9'); if(!el) return;
+        navigator.clipboard.writeText(el.textContent||el.innerText).then(function(){
+          var term=g('ocqs-terminal');
+          if(term){ term.innerHTML+='<span class="t-warn">⚠ Deploy command copied. Ensure validate passes and no CHANGEME remain before running!</span>\n<span class="t-cmd">$ opencenter cluster deploy ...</span>\n\n'; term.scrollTop=term.scrollHeight; }
+        });
+      };
+
+      window.ocqsChecklistUpdate = function(){
+        var total=13, checked=0;
+        for(var i=1;i<=13;i++){ var cb=g('chk-'+i); if(cb&&cb.checked) checked++; }
+        var pct=Math.round(checked/total*100);
+        var statusEl=g('ocqs-checklist-status');
+        var deployBtn=g('ocqs-deploy-btn2');
+        if(statusEl){
+          if(checked===total){
+            statusEl.style.color='#4ade80';
+            statusEl.textContent=total+' / '+total+' ✓ Ready to deploy';
+          } else {
+            statusEl.style.color='#f87171';
+            statusEl.textContent=checked+' / '+total+' items checked — deploy blocked';
+          }
+        }
+        if(deployBtn){
+          if(checked===total){
+            deployBtn.disabled=false; deployBtn.style.opacity='1'; deployBtn.style.cursor='pointer';
+            deployBtn.textContent='🚀 Deploy Cluster';
+          } else {
+            deployBtn.disabled=true; deployBtn.style.opacity='.5'; deployBtn.style.cursor='not-allowed';
+            deployBtn.textContent='🚀 Deploy Cluster (Blocked — '+checked+'/'+total+')';
+          }
+        }
+      };
+
+      // Restore state from localStorage
+      (function(){
+        try{
+          var saved=JSON.parse(localStorage.getItem('ocqs_state')||'null');
+          if(saved){
+            if(saved.org)      { var el=g('ocqs-org');      if(el) el.value=saved.org; }
+            if(saved.cluster)  { var el=g('ocqs-cluster');  if(el) el.value=saved.cluster; }
+            if(saved.env)      { var el=g('ocqs-env');      if(el) el.value=saved.env; }
+            if(saved.provider) { var el=g('ocqs-provider'); if(el) el.value=saved.provider; }
+            if(saved.authUrl)  { var el=g('ocqs-authurl');  if(el) el.value=saved.authUrl; }
+            if(saved.region)   { var el=g('ocqs-region');   if(el) el.value=saved.region; }
+            if(saved.credId)   { var el=g('ocqs-credid');   if(el) el.value=saved.credId; }
+            if(saved.gitRepo)  { var el=g('ocqs-gitrepo');  if(el) el.value=saved.gitRepo; }
+            if(saved.gitBranch){ var el=g('ocqs-gitbranch');if(el) el.value=saved.gitBranch; }
+            if(saved.tokFile)  { var el=g('ocqs-tokfile');  if(el) el.value=saved.tokFile; }
+            if(saved.services) {
+              _qs.services=Object.assign(_qs.services,saved.services);
+              ['keycloak','loki','tempo','velero','monitoring'].forEach(function(sv){
+                var tel=g('tog-'+sv); if(tel) tel.classList.toggle('on',!!_qs.services[sv]);
+              });
+            }
+          }
+        }catch(e){}
+        ocqsUpdate();
+        ocqsReqCheck();
+      })();
+
+    })();
+    </script>
 
         </div><!-- end inline body -->
       </div><!-- end quick start collapsed -->
