@@ -13899,6 +13899,51 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             <div style="font-size:11px;color:#fcd34d;">vs. lift-and-shift only</div>
           </div>
         </div>
+        <!-- Embedded Current OSPC TCO Baseline -->
+        <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+          <div style="font-size:10px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">📊 Your Current OSPC Baseline — Live from UAT Scan</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px;">
+            <div style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OSPC / Day</div>
+              <div id="tco3x-infra-day" style="font-size:16px;font-weight:900;color:#fca5a5;">—</div>
+            </div>
+            <div style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OSPC / Month</div>
+              <div id="tco3x-infra-month" style="font-size:16px;font-weight:900;color:#93c5fd;">—</div>
+            </div>
+            <div style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OSPC / Year</div>
+              <div id="tco3x-infra-year" style="font-size:16px;font-weight:900;color:#93c5fd;">—</div>
+            </div>
+            <div style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Compute + DB</div>
+              <div id="tco3x-infra-compute" style="font-size:16px;font-weight:900;color:#c4b5fd;">—</div>
+            </div>
+            <div style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#86efac;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Storage</div>
+              <div id="tco3x-infra-storage" style="font-size:16px;font-weight:900;color:#86efac;">—</div>
+            </div>
+            <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#fde68a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Network / LB</div>
+              <div id="tco3x-infra-network" style="font-size:16px;font-weight:900;color:#fde68a;">—</div>
+            </div>
+          </div>
+          <!-- TCO Comparison mini table -->
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;min-width:480px;">
+              <thead><tr style="background:rgba(255,255,255,.05);">
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:left;border-bottom:1px solid rgba(255,255,255,.1);">Environment</th>
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:right;border-bottom:1px solid rgba(255,255,255,.1);">Daily</th>
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:right;border-bottom:1px solid rgba(255,255,255,.1);">Monthly</th>
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:right;border-bottom:1px solid rgba(255,255,255,.1);">Annual</th>
+              </tr></thead>
+              <tbody id="tco3x-comparison-tbody">
+                <tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;font-size:11px;font-style:italic;">Load from UAT to see comparison.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- 3 columns of saving levers -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
           <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
@@ -14191,6 +14236,12 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           _set('tco-infra-compute', _fmt(compute));
           _set('tco-infra-storage', _fmt(storage));
           _set('tco-infra-network', _fmt(network));
+          _set('tco3x-infra-day',     '$' + ospcDay.toFixed(2));
+          _set('tco3x-infra-month',   _fmt(s.srcMonthly));
+          _set('tco3x-infra-year',    _fmt(ospcYear));
+          _set('tco3x-infra-compute', _fmt(compute));
+          _set('tco3x-infra-storage', _fmt(storage));
+          _set('tco3x-infra-network', _fmt(network));
 
           var infraTbody = document.getElementById('tco-infra-tbody');
           if (infraTbody && s.srcMonthly) {
@@ -14258,6 +14309,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
               +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.round(Math.abs(s.savings)).toLocaleString()+'/mo</td>'
               +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.round(Math.abs(savYear)).toLocaleString()+'/yr</td>'
               +'</tr>';
+            var tco3xComp = document.getElementById('tco3x-comparison-tbody');
+            if (tco3xComp) tco3xComp.innerHTML = compTbody.innerHTML;
           }
 
           // --- Component-Level OSPC → FLEX TCO ---
