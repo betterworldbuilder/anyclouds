@@ -4854,10 +4854,51 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
 
     <script>
-    // ── ocil stubs (replaced by full ocqs functions embedded in inline section) ──
+    // ── OpenRC parser + ocil stubs ──
     (function(){
       function gi(id){ return document.getElementById(id); }
       function gv(id){ var el=gi(id); return el?el.value.trim():''; }
+      function sv(id,val){ var el=gi(id); if(el){ el.value=val; el.dispatchEvent(new Event('input')); } }
+
+      window.ocqsParseOpenRC = function(input){
+        var file = input.files[0];
+        if (!file) return;
+        var fn = gi('ocqs-openrc-filename');
+        var st = gi('ocqs-openrc-status');
+        if (fn) fn.textContent = file.name;
+        var reader = new FileReader();
+        reader.onload = function(e){
+          var text = e.target.result;
+          var found = {};
+          // Parse export KEY="VALUE" or export KEY=VALUE lines
+          var lines = text.split('\n');
+          lines.forEach(function(line){
+            var m = line.match(/^\s*export\s+(\w+)\s*=\s*["']?([^"'\r\n]*)["']?/);
+            if (!m) return;
+            var k = m[1], v = m[2].trim();
+            if (k === 'OS_AUTH_URL')                          { sv('ocqs-authurl', v); found.authUrl = true; }
+            if (k === 'OS_REGION_NAME')                       { sv('ocqs-region', v);  found.region = true; }
+            if (k === 'OS_APPLICATION_CREDENTIAL_ID')         { sv('ocqs-credid', v);  found.credId = true; }
+            if (k === 'OS_APPLICATION_CREDENTIAL_SECRET')     { sv('ocqs-credsec', v); found.credSec = true; }
+            // fallback: username/password style
+            if (k === 'OS_USERNAME' && !found.credId)         { sv('ocqs-credid', v);  found.credId = true; }
+            if (k === 'OS_PASSWORD' && !found.credSec)        { sv('ocqs-credsec', v); found.credSec = true; }
+          });
+          var count = Object.keys(found).length;
+          if (st) {
+            if (count > 0) {
+              st.style.color = '#15803d'; st.style.fontWeight = '700';
+              st.textContent = '✓ ' + count + ' field' + (count > 1 ? 's' : '') + ' imported';
+            } else {
+              st.style.color = '#dc2626'; st.style.fontWeight = '700';
+              st.textContent = '✗ No OpenRC fields found — check file format';
+            }
+          }
+          if (typeof ocqsUpdate === 'function') ocqsUpdate();
+          if (typeof ocqsReqCheck === 'function') ocqsReqCheck();
+        };
+        reader.readAsText(file);
+      };
 
       window.ocilUpdate = function(){
         var org     = gv('ocil-org')     || 'my-org';
@@ -5030,6 +5071,18 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 
         <div class="ocqs-card">
           <h3>🔑 OpenStack / FLEX Credentials</h3>
+          <!-- OpenRC file upload -->
+          <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">⬆ Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills fields below)</span></div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label style="background:#0369a1;color:#fff;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                📂 Choose OpenRC File
+                <input type="file" id="ocqs-openrc-input" accept=".sh,.env,.rc,text/plain" style="display:none" onchange="ocqsParseOpenRC(this)">
+              </label>
+              <span id="ocqs-openrc-filename" style="font-size:12px;color:#64748b;font-style:italic;">No file chosen</span>
+              <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
+            </div>
+          </div>
           <label class="ocqs-label">Auth URL</label>
           <input class="ocqs-input" id="ocqs-authurl" value="https://identity.api.rackspacecloud.com/v3" oninput="ocqsUpdate()">
           <label class="ocqs-label">Region</label>
