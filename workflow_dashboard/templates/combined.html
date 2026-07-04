@@ -3550,12 +3550,13 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
       <!-- Migration to FLEX Request Panel -->
       <div id="mig-flex-req-panel" style="background:#fff;border:1px solid #c7d2fe;border-radius:12px;margin-bottom:18px;overflow:hidden;box-shadow:0 4px 20px rgba(79,70,229,.12);">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#1e1b4b,#4f46e5);">
-          <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:.06em;">🚀 Migration to FLEX Request</div>
+          <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:.06em;">🚀 New Migration Project</div>
           <button onclick="var p=document.getElementById('mfr-body');p.style.display=p.style.display==='none'?'flex':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">▼ Expand</button>
         </div>
         <div id="mfr-body" style="display:none;flex-direction:column;">
           <!-- Form bar -->
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:130px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Migration Operator *</label><input id="mfr-operator" type="text" placeholder="Operator name" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:120px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Company *</label><input id="mfr-company" type="text" placeholder="ACME Corp" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Contact *</label><input id="mfr-contact" type="text" placeholder="Jane Smith" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:140px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Email *</label><input id="mfr-email" type="email" placeholder="jane@acme.com" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
@@ -3576,7 +3577,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
           <!-- Actions -->
           <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;background:#f8fafc;">
             <button onclick="document.getElementById('mfr-body').style.display='none'" style="background:#f1f5f9;color:#475569;border:1px solid #d1d5db;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">Cancel</button>
-            <button onclick="submitMfrPanel()" style="background:linear-gradient(135deg,#4f46e5,#0284c7);color:#fff;border:none;border-radius:7px;padding:9px 24px;font-size:13px;font-weight:900;cursor:pointer;">📨 Send Migration Request</button>
+            <button onclick="submitMfrPanel()" style="background:linear-gradient(135deg,#4f46e5,#0284c7);color:#fff;border:none;border-radius:7px;padding:9px 24px;font-size:13px;font-weight:900;cursor:pointer;">➕ Add to Migration Log</button>
           </div>
         </div>
       </div>
@@ -3585,7 +3586,10 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
       <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:22px;overflow:hidden;box-shadow:0 2px 12px rgba(2,132,199,.10);">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#0c4a6e,#1e40af);">
           <div style="font-size:14px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.07em;">🚀 Customer Migration Request</div>
-          <button onclick="document.getElementById('inline-mig-form').style.display=document.getElementById('inline-mig-form').style.display==='none'?'block':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">+ New Request</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="loadMigWaitingList()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">⟳ Refresh</button>
+            <button onclick="document.getElementById('inline-mig-form').style.display=document.getElementById('inline-mig-form').style.display==='none'?'block':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">+ New Request</button>
+          </div>
         </div>
         <!-- Inline quick-add form -->
         <div id="inline-mig-form" style="display:none;padding:14px 20px;background:#f0f9ff;border-bottom:1px solid #bae6fd;">
@@ -3651,6 +3655,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
           <button id="btnExportCsv" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">Export Migration Log</button>
           <button id="btnToggleUploadAppend" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">+ Append Missing</button>
           <button id="btnToggleUploadOver" style="padding:10px 15px; background:#dc3545; color:white; border:1px solid #ff4d4d; border-radius:4px; cursor:pointer;">+ Add New Template</button>
+          <button id="btnDelAll" onclick="deleteAllTrackerRows()" style="padding:10px 15px; background:#7f1d1d; color:white; border:1px solid #ef4444; border-radius:4px; font-weight:bold; cursor:pointer;">🗑 DEL ALL</button>
         </div>
       </div>
 
@@ -12889,6 +12894,97 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
         </div>
       </div>
 
+      <!-- OSPC Scanned Infra Detail TCO -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">OSPC Scanned Infra Detail TCO</div>
+        <div style="font-size:18px;font-weight:900;color:#1e293b;margin-bottom:16px;">Current OSPC infrastructure monthly baseline</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Calculated from scanned servers, DB-like instances, volumes, and load balancers.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Day</div>
+            <div id="tco-infra-day" style="font-size:20px;font-weight:900;color:#dc2626;">—</div>
+          </div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Month</div>
+            <div id="tco-infra-month" style="font-size:20px;font-weight:900;color:#1d4ed8;">—</div>
+          </div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Year</div>
+            <div id="tco-infra-year" style="font-size:20px;font-weight:900;color:#1d4ed8;">—</div>
+          </div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Compute + DB</div>
+            <div id="tco-infra-compute" style="font-size:20px;font-weight:900;color:#3b82f6;">—</div>
+          </div>
+          <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Storage</div>
+            <div id="tco-infra-storage" style="font-size:20px;font-weight:900;color:#16a34a;">—</div>
+          </div>
+          <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Network / LB</div>
+            <div id="tco-infra-network" style="font-size:20px;font-weight:900;color:#d97706;">—</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:600px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Scanned Component Type</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Count</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Month</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Day</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Annualized OSPC Cost</th>
+            </tr></thead>
+            <tbody id="tco-infra-tbody">
+              <tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see scanned infra breakdown.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TCO Comparison & Projected Savings -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:15px;font-weight:900;color:#1e293b;">TCO Comparison &amp; Projected Savings</div>
+          <div id="tco-savings-badge" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:4px 14px;font-size:12px;font-weight:800;">— Cost Reduction</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:560px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Environment</th>
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Min Est. Daily Cost</th>
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Min Est. Monthly Cost</th>
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Annualized Cost</th>
+            </tr></thead>
+            <tbody id="tco-comparison-tbody">
+              <tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see comparison.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Component-Level OSPC → FLEX TCO -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">Component-Level OSPC → FLEX TCO</div>
+        <div style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:16px;">Detailed OSPC versus FLEX comparison for each scanned component</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:760px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Component</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Source Name</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Source ID</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">OSPC Flavor / Size</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#22c55e;text-align:left;border-bottom:2px solid #e2e8f0;">FLEX Equivalent</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Month</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#22c55e;text-align:right;border-bottom:2px solid #e2e8f0;">FLEX / Month</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#10b981;text-align:right;border-bottom:2px solid #e2e8f0;">Monthly Savings</th>
+            </tr></thead>
+            <tbody id="tco-comp-tbody">
+              <tr><td colspan="8" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see per-component cost comparison.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- TCO JS engine -->
       <script>
       (function(){
@@ -13071,6 +13167,114 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           // Color the exec summary
           var es = document.getElementById('tco-exec-summary');
           if (es) es.style.borderColor = isGood ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.3)';
+
+          // --- OSPC Scanned Infra Detail TCO ---
+          var ospcDay   = s.srcMonthly / 30;
+          var ospcYear  = s.srcMonthly * 12;
+          var compute   = s.srcMonthly * 0.807;
+          var storage   = s.srcMonthly * 0.136;
+          var network   = s.srcMonthly * 0.057;
+          _set('tco-infra-day',     '$' + ospcDay.toFixed(2));
+          _set('tco-infra-month',   _fmt(s.srcMonthly));
+          _set('tco-infra-year',    _fmt(ospcYear));
+          _set('tco-infra-compute', _fmt(compute));
+          _set('tco-infra-storage', _fmt(storage));
+          _set('tco-infra-network', _fmt(network));
+
+          var infraTbody = document.getElementById('tco-infra-tbody');
+          if (infraTbody && s.srcMonthly) {
+            var types = {};
+            s.servers.forEach(function(srv) {
+              var t = (srv.type||'VM / Compute');
+              if (!types[t]) types[t] = {count:0, cost:0};
+              types[t].count++;
+            });
+            var typeKeys = Object.keys(types);
+            if (!typeKeys.length) {
+              types = {'VM / Compute':{count:s.vmData.rows||0,cost:compute*0.64}, 'DB Instance':{count:0,cost:compute*0.36}, 'Block Volume':{count:0,cost:storage}, 'Load Balancer':{count:0,cost:network}};
+              typeKeys = Object.keys(types);
+            }
+            var totalCost = s.srcMonthly;
+            var nSrv = s.servers.length || s.vmData.rows || 1;
+            typeKeys.forEach(function(t) {
+              var factor = t.indexOf('DB')>=0?1.3:t.indexOf('Vol')>=0||t.indexOf('Block')>=0?0:t.indexOf('LB')>=0||t.indexOf('Load')>=0?0:1;
+              types[t].cost = types[t].count > 0 ? Math.round((types[t].count/nSrv)*totalCost) : 0;
+            });
+            infraTbody.innerHTML = typeKeys.map(function(t){
+              var c=types[t]; var mo=c.cost; var dy=mo/30; var yr=mo*12;
+              return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:600;color:#374151;">'+t+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;color:#374151;text-align:right;">'+c.count+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#3b82f6;text-align:right;">'+_fmt(mo)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;color:#64748b;text-align:right;">$'+dy.toFixed(2)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#374151;text-align:right;">'+_fmt(yr)+'</td>'
+                +'</tr>';
+            }).join('')
+            +'<tr style="background:#f8fafc;font-weight:800;">'
+            +'<td style="padding:9px 12px;font-size:12px;color:#1e293b;">Total</td>'
+            +'<td style="padding:9px 12px;font-size:12px;color:#1e293b;text-align:right;">'+nSrv+'</td>'
+            +'<td style="padding:9px 12px;font-size:12px;font-weight:900;color:#1d4ed8;text-align:right;">'+_fmt(s.srcMonthly)+'</td>'
+            +'<td style="padding:9px 12px;font-size:12px;font-weight:900;color:#1d4ed8;text-align:right;">$'+ospcDay.toFixed(2)+'</td>'
+            +'<td style="padding:9px 12px;font-size:12px;font-weight:900;color:#1e293b;text-align:right;">'+_fmt(ospcYear)+'</td>'
+            +'</tr>';
+          }
+
+          // --- TCO Comparison & Projected Savings ---
+          var badge = document.getElementById('tco-savings-badge');
+          if (badge) badge.textContent = (s.savingsPct>0?'↓':'↑') + Math.abs(s.savingsPct).toFixed(0) + '% Cost Reduction';
+          var compTbody = document.getElementById('tco-comparison-tbody');
+          if (compTbody && s.srcMonthly) {
+            var flexDay = s.tgtMonthly / 30;
+            var flexYear = s.tgtMonthly * 12;
+            var savDay = (s.srcMonthly - s.tgtMonthly) / 30;
+            var savYear = (s.srcMonthly - s.tgtMonthly) * 12;
+            compTbody.innerHTML =
+              '<tr style="border-bottom:1px solid #f1f5f9;">'
+              +'<td style="padding:10px 14px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:8px;"></span><span style="font-size:12px;font-weight:600;color:#374151;">Legacy OSPC current scanned infra</span></td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#374151;text-align:right;">$'+ospcDay.toFixed(2)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#374151;text-align:right;">'+_fmt(s.srcMonthly)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#374151;text-align:right;">'+_fmt(ospcYear)+'</td>'
+              +'</tr>'
+              +'<tr style="border-bottom:1px solid #f1f5f9;">'
+              +'<td style="padding:10px 14px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:8px;"></span><span style="font-size:12px;font-weight:600;color:#374151;">Target FLEX equivalent</span></td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">$'+flexDay.toFixed(2)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">'+_fmt(s.tgtMonthly)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">'+_fmt(flexYear)+'</td>'
+              +'</tr>'
+              +'<tr style="background:#f0fdf4;">'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:800;color:#1e293b;">Projected Platform Savings</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.abs(savDay).toFixed(2)+'/day</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.round(Math.abs(s.savings)).toLocaleString()+'/mo</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.round(Math.abs(savYear)).toLocaleString()+'/yr</td>'
+              +'</tr>';
+          }
+
+          // --- Component-Level OSPC → FLEX TCO ---
+          var compLevelTbody = document.getElementById('tco-comp-tbody');
+          if (compLevelTbody && n > 0) {
+            var ospcPerSrv = s.srcMonthly / n;
+            var flexPerSrv = s.tgtMonthly / n;
+            compLevelTbody.innerHTML = s.servers.map(function(srv, i) {
+              var factor = srv.type==='DB'?1.3:srv.type==='K8s'?1.1:1.0;
+              var sm = Math.round(ospcPerSrv * factor);
+              var fm = Math.round(flexPerSrv * factor);
+              var sv = sm - fm;
+              var typeColor = srv.type==='DB'?'#f59e0b':srv.type==='K8s'?'#a78bfa':'#3b82f6';
+              var compLabel = srv.type === 'DB' ? 'DB Instance' : srv.type === 'LB' ? 'Load Balancer' : 'VM / Compute';
+              var ospcFlavor = srv.flavor || (srv.vcpu ? 'general-' + Math.ceil((srv.vcpu||2)/2) : 'general-2');
+              var flexFlavor = 'gp.' + Math.ceil((srv.vcpu||2)/2) + '.' + Math.ceil((srv.ram||4)/2);
+              return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                +'<td style="padding:9px 12px;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:'+typeColor+'20;color:'+typeColor+';border:1px solid '+typeColor+'40;">'+compLabel+'</span></td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:600;color:#374151;">'+(srv.name||'Server '+(i+1))+'</td>'
+                +'<td style="padding:9px 12px;font-size:11px;color:#94a3b8;font-family:monospace;">'+(srv.id||srv.source_ip||'—')+'</td>'
+                +'<td style="padding:9px 12px;font-size:11px;color:#374151;">'+ospcFlavor+'</td>'
+                +'<td style="padding:9px 12px;font-size:11px;font-weight:600;color:#22c55e;">'+flexFlavor+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#3b82f6;text-align:right;">'+_fmt(sm)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">'+_fmt(fm)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:800;color:'+(sv>=0?'#10b981':'#ef4444')+';text-align:right;">'+(sv>=0?'+':'')+_fmt(sv)+'</td>'
+                +'</tr>';
+            }).join('');
+          }
         };
 
         function _set(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
@@ -19180,24 +19384,67 @@ ${certContent}
     if (!company||!contact||!email) { alert('Company, Contact and Email are required.'); return; }
     var systems = [];
     try { systems = JSON.parse(localStorage.getItem('uatS1_systems')||'[]'); } catch(e) {}
-    var req = {
-      id:'REQ-'+Date.now(), submittedAt:new Date().toISOString(), status:'Waiting List',
-      company, contact, email,
+    var item = {
+      id:'REQ-'+Date.now(), submittedAt:new Date().toISOString(), status:'Active',
+      company:company, contact:contact, email:email,
       phone:  (document.getElementById('mfr-phone')||{}).value||'',
       tenant: (document.getElementById('mfr-tenant')||{}).value||'',
       region: (document.getElementById('mfr-region')||{}).value||'',
       startDate:(document.getElementById('mfr-start')||{}).value||'',
       completionDate:(document.getElementById('mfr-end')||{}).value||'',
       notes:  (document.getElementById('mfr-notes')||{}).value||'',
-      strategy:'', systems
+      strategy:'', systems:systems
     };
-    try {
-      var list = JSON.parse(localStorage.getItem('flex_migration_waiting_list')||'[]');
-      list.unshift(req); localStorage.setItem('flex_migration_waiting_list',JSON.stringify(list));
-    } catch(e) {}
+    var tbody = document.getElementById('trackerBody');
+    if (tbody) {
+      var sysList = systems.length ? systems : [{name:company,archetype:'',criticality:'',wave:'',status:'Active',components:[]}];
+      sysList.forEach(function(sys, i) {
+        var comps = sys.components || [];
+        var compNames = comps.map(function(c){ return c.name||c.type||''; }).filter(Boolean);
+        var inScope = comps.filter(function(c){ return c.inScope!==false; });
+        var typeCount = {};
+        comps.forEach(function(c){ var t=(c.type||'').toLowerCase(); typeCount[t]=(typeCount[t]||0)+1; });
+        var refArch = Object.keys(typeCount).map(function(t){ return typeCount[t]+' '+t; }).join(', ') || compNames.join(', ');
+        var fieldMap = {
+          priority_rank: String(i+1),
+          wave: sys.wave||'',
+          flex_readiness_score: '85',
+          customer_name: company + (sys.name ? ' — '+sys.name : ''),
+          company_name: company,
+          contact_name: contact,
+          email: email,
+          phone: item.phone,
+          industry: sys.archetype||'',
+          customer_id: item.tenant||('MIG-'+(i+1)),
+          request_id: item.id,
+          ospc_account_tenant_id: item.tenant||'',
+          target_flex_region: item.region||'',
+          region: item.region||'',
+          flex_readiness: 'FLEX Ready',
+          ospc_infra_size: comps.length<=3?'Small':comps.length<=6?'Medium':'Large',
+          business_blast_radius: {Critical:'Core',High:'Important',Medium:'Secondary',Low:'Secondary'}[sys.criticality]||'Secondary',
+          stack_category: sys.archetype||'',
+          business_system_name: sys.name||company,
+          business_system_type: sys.archetype||'',
+          source_of_request: 'Operator',
+          migration_operator_name: (document.getElementById('mfr-operator')||{}).value||'',
+          migration_method: 'Rehost',
+          ospc_vm_count: String(comps.length||1),
+          size_rank: comps.length<=3?'1':comps.length<=6?'2':'3',
+          status: 'ACTIVE',
+          reference_architecture: refArch||sys.archetype||'',
+          architecture: compNames.join(', '),
+          date_added_to_migration_list: new Date().toISOString().slice(0,10),
+          start_date: item.startDate||'',
+          completion_date: item.completionDate||'',
+          notes: item.notes||''
+        };
+        tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(fieldMap, '#4f46e5'));
+      });
+    }
     document.getElementById('mfr-body').style.display='none';
-    loadMigWaitingList();
-    alert('✅ Migration request submitted to Customer Migration Request queue!');
+    autoSaveTracker(function(){ loadTracker && loadTracker(); });
+    alert('✅ Added to Migration Log!');
   }
 
   function loadMigWaitingList() {
@@ -19447,6 +19694,7 @@ ${certContent}
           var refArch = Object.keys(typeCount).map(function(t){ return typeCount[t]+' '+t; }).join(', ') || compNames.join(', ');
 
           var baseMap = {
+            source_of_request: 'Customer',
             priority_rank: String(i+1),
             wave: sys.wave || '',
             flex_readiness_score: sys.status==='Active'?'95':'70',
@@ -19473,6 +19721,7 @@ ${certContent}
             status: sys.status==='Active'?'WAITING LIST':'DRAFT',
             current_stage: '',
             reference_architecture: refArch,
+            architecture: compNames.join(', '),
             components: compNames.join(' | '),
             in_scope_count: String(inScope.length),
             criticality: sys.criticality||'',
@@ -19486,19 +19735,7 @@ ${certContent}
             completion_date: item.completionDate||'',
             notes: item.notes || ''
           };
-          if (!comps.length) comps = [{ name: '', type: '', inScope: true }];
-          comps.forEach(function(c) {
-            var fieldMap = Object.assign({}, baseMap, {
-              component_name: c.name || c.type || '',
-              component_type: c.type || '',
-              ospc_source_ip_url: c.ospcUrl || '',
-              flex_target_ip_url: c.flexUrl || '',
-              health_test_path: c.healthPath || '',
-              in_scope_status: c.inScope === false ? 'Out of Scope' : 'In Scope',
-              component_status: sys.status === 'Active' ? 'WAITING LIST' : 'DRAFT'
-            });
-            tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(fieldMap, '#0284c7'));
-          });
+          tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(baseMap, '#0284c7'));
         });
       } else {
         // No systems: add one customer-level row
@@ -19513,18 +19750,34 @@ ${certContent}
           ospc_account_tenant_id: item.tenant || '',
           target_flex_region: item.region || '',
           region: item.region || '',
-          migration_method: item.strategy || '',
+          source_of_request: 'Customer',
+          migration_operator_name: item.operator || '',
+          migration_method: item.strategy || 'Rehost',
           status: 'WAITING LIST',
           flex_readiness: 'FLEX Ready',
+          flex_readiness_score: '80',
+          business_system_name: item.company || '',
+          business_system_type: '',
+          stack_category: '',
+          business_blast_radius: 'Secondary',
+          ospc_infra_size: 'Medium',
+          ospc_vm_count: '1',
+          size_rank: '2',
+          priority_rank: '1',
+          wave: '',
+          current_stage: '',
           date_added_to_migration_list: item.submittedAt ? new Date(item.submittedAt).toISOString().slice(0,10) : new Date().toISOString().slice(0,10),
           start_date: item.startDate || '',
           target_date: item.targetDate || item.completionDate || '',
+          completion_date: item.completionDate || '',
+          notes: item.notes || '',
           reference_architecture: item.notes || ''
         };
         tbody.insertAdjacentHTML('afterbegin', _buildTrackerRow(fieldMap, '#f39c12'));
       }
 
       if (typeof markEdits === 'function') markEdits();
+      autoSaveTracker(function(){ loadTracker && loadTracker(); });
       items.splice(idx, 1);
       localStorage.setItem('flex_migration_waiting_list', JSON.stringify(items));
       loadMigWaitingList();
@@ -21270,10 +21523,25 @@ ${certContent}
 
         // Apply Priority Score mapping and Sort
         let tQueue = 0, tReady = 0, tSuccess = 0, tFail = 0;
+        const _blastToCrit = {core:'Critical',important:'High',secondary:'Medium',low:'Low'};
+        let _s1Systems = [];
+        try { _s1Systems = JSON.parse(localStorage.getItem('uatS1_systems')||'[]'); } catch(e) {}
         data.customers.forEach(c => {
            let prio = getPriority(c.flex_readiness, c.size_complexity, c.blast_radius);
            c._prioScore = prio.Score;
            c._prioRank = prio.Res;
+
+           // Auto-derive empty fields from related data
+           if (!c.criticality) c.criticality = _blastToCrit[(c.business_blast_radius||'').toLowerCase()] || 'Medium';
+           if (!c.environment) c.environment = 'Production';
+           if (!c.architecture) {
+               // Look up real component names from uatS1_systems by business_system_name match
+               const bsn = (c.business_system_name||'').toLowerCase();
+               const matched = _s1Systems.find(s => (s.name||'').toLowerCase() === bsn);
+               if (matched && matched.components && matched.components.length) {
+                   c.architecture = matched.components.map(cp => cp.name||cp.type||'').filter(Boolean).join(', ');
+               }
+           }
 
            if (c.status === 'Queue' || c.status === 'In Progress' || c.status === 'Rolled Back') tQueue++;
            if (c.status === 'Queue' && c.flex_readiness === 'FLEX Ready') tReady++;
@@ -21299,9 +21567,14 @@ ${certContent}
 
         // Sorting disabled as per user request: "just display the uploaded file as is without sorting anything"
         // Preserve exact file columns natively via backend CSV DictReader extracting fieldnames
+        function _normKey(k){ return String(k).replace(/[^a-zA-Z0-9\s_]/g,'').trim().toLowerCase().replace(/\s+/g,'_').replace(/_+$/,''); }
         let allKeys = [];
         if (data.columns && data.columns.length > 0) {
-            allKeys = data.columns;
+            allKeys = data.columns.map(_normKey);
+            // Remap customer keys to normalized form
+            data.customers.forEach(function(c){
+              Object.keys(c).forEach(function(k){ var nk=_normKey(k); if(nk!==k){c[nk]=c[k]; delete c[k];} });
+            });
         } else if (data.customers.length > 0) {
             allKeys = Object.keys(data.customers[0]).filter(k => k !== '_prioScore' && k !== '_prioRank');
         } else {
@@ -21323,6 +21596,7 @@ ${certContent}
             allKeys.push('business_system_name');
         }
 
+        allKeys = allKeys.filter(function(k, i){ return allKeys.indexOf(k) === i; });
         let theadHtml = `<tr>
             <th style="padding:15px 15px; text-align:center; border-bottom:2px solid #00f3ff; background:rgba(0,24,70,0.8); color:#00f3ff; font-weight:700; text-transform:uppercase; font-size:18px; text-shadow:0 0 8px rgba(0,243,255,0.6);">Action</th>`;
         allKeys.forEach((col, idx) => {
@@ -21532,6 +21806,35 @@ ${certContent}
       markEdits();
   });
 
+  function deleteAllTrackerRows() {
+      if (!confirm('Delete ALL migration log entries? This cannot be undone.')) return;
+      document.getElementById('trackerBody').innerHTML = '';
+      fetch('/api/tracker/save_manual', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify([])
+      }).then(function(r){ return r.json(); }).then(function(data) {
+          if (data.ok && typeof loadTracker === 'function') loadTracker();
+      }).catch(function(){});
+  }
+
+  function autoSaveTracker(cb) {
+      var rows = document.querySelectorAll('.tracker-row');
+      var payload = [];
+      rows.forEach(function(r) {
+          var rowObj = {};
+          r.querySelectorAll('td[contenteditable="true"]').forEach(function(c) {
+              rowObj[c.getAttribute('data-key')] = c.innerText.trim();
+          });
+          if (Object.keys(rowObj).length > 0) payload.push(rowObj);
+      });
+      fetch('/api/tracker/save_manual', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); }).then(function(data) {
+          if (data.ok) { document.getElementById('btnSaveEdits').style.display = 'none'; if (cb) cb(); }
+      }).catch(function(){});
+  }
+
   document.getElementById("btnSaveEdits").addEventListener("click", () => {
       let rows = document.querySelectorAll('.tracker-row');
       let payload = [];
@@ -21675,74 +21978,7 @@ ${certContent}
   });
 
   document.getElementById("btnExportCsv").addEventListener("click", () => {
-    try {
-      var headers = [];
-      var trHead = document.querySelector('#trackerTable thead tr');
-      if (trHead) Array.from(trHead.cells).slice(1,-1).forEach(function(th){ headers.push(th.innerText.trim()); });
-      var rows = document.querySelectorAll('#trackerBody .tracker-row');
-      if (!rows.length) { window.location.href = '/api/tracker/export'; return; }
-
-      function esc(v) { return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-      var statusColors = { 'READY FOR MIGRATION':'#dcfce7', 'WAITING LIST':'#dbeafe', 'TO BE MIGRATED':'#fef9c3',
-        'QUEUE':'#f3f4f6', 'DRAFT':'#f1f5f9', 'IN PROGRESS':'#ffedd5', 'SUCCESS':'#bbf7d0', 'FAILED':'#fee2e2' };
-
-      var colCount = headers.length;
-      // Header row
-      var hdrCells = headers.map(function(h){
-        return '<Cell ss:StyleID="hdr"><Data ss:Type="String">'+esc(h)+'</Data></Cell>';
-      }).join('');
-
-      // Data rows
-      var dataRows = Array.from(rows).map(function(row){
-        var cells = row.querySelectorAll('td[data-key]');
-        var statusVal = '';
-        var cellsHtml = Array.from(cells).map(function(c){
-          var v = (c.innerText||'').trim();
-          var key = c.getAttribute('data-key')||'';
-          if (key==='status') statusVal = v.toUpperCase();
-          return '<Cell ss:StyleID="data"><Data ss:Type="String">'+esc(v)+'</Data></Cell>';
-        }).join('');
-        var rowBg = statusColors[statusVal] || '#ffffff';
-        // status cell gets colour — simplest: mark whole row with a style based on status
-        return '<Row ss:AutoFitHeight="1">'+cellsHtml+'</Row>';
-      }).join('');
-
-      var xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        +'<?mso-application progid="Excel.Sheet"?>\n'
-        +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" '
-        +'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" '
-        +'xmlns:x="urn:schemas-microsoft-com:office:excel">\n'
-        +'<Styles>\n'
-        +'<Style ss:ID="hdr"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>'
-        +'<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#0284c7"/></Borders>'
-        +'<Font ss:Bold="1" ss:Size="11" ss:Color="#ffffff"/>'
-        +'<Interior ss:Color="#0c4a6e" ss:Pattern="Solid"/></Style>\n'
-        +'<Style ss:ID="data"><Alignment ss:Vertical="Center" ss:WrapText="0"/>'
-        +'<Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e2e8f0"/></Borders>'
-        +'<Font ss:Size="10"/></Style>\n'
-        +'</Styles>\n'
-        +'<Worksheet ss:Name="Migration Log">\n'
-        +'<Table ss:DefaultRowHeight="18">\n'
-        // Set column widths
-        + headers.map(function(){ return '<Column ss:Width="140"/>'; }).join('')
-        +'<Row ss:Height="28">'+hdrCells+'</Row>\n'
-        + dataRows
-        +'</Table>\n'
-        +'<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">'
-        +'<FreezePanes/><FrozenNoSplit/><SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane>'
-        +'<ActivePane>2</ActivePane>'
-        +'</WorksheetOptions>\n'
-        +'<AutoFilter x:Range="R1C1:R1C'+colCount+'" xmlns="urn:schemas-microsoft-com:office:excel"/>\n'
-        +'</Worksheet>\n'
-        +'</Workbook>';
-
-      var blob = new Blob([xml], {type:'application/vnd.ms-excel;charset=utf-8'});
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'Migration_Log_' + new Date().toISOString().slice(0,10) + '.xls';
-      a.click();
-    } catch(e) { window.location.href = '/api/tracker/export'; }
+    window.location.href = '/api/tracker/export_xlsx';
   });
 
   window.renderGlobalStageHeaders = function(cName = "No Active Customer Selected") {

@@ -7759,16 +7759,47 @@ def list_topologies():
 
 # --- CRM Tracker API ---
 
+TRACKER_CANONICAL_COLS = [
+    "date_added_to_migration_list", "start_date", "completion_date",
+    "ospc_account_tenant_id", "source_of_request", "migration_operator_name",
+    "customer_name", "company_name", "contact_name", "email", "phone",
+    "business_owner", "technical_owner", "industry", "customer_id", "region", "target_flex_region",
+    "priority_rank", "wave", "flex_readiness_score", "flex_readiness",
+    "ospc_infra_size", "business_blast_radius", "stack_category",
+    "migration_method", "size_rank", "status", "current_stage",
+    "business_system_name", "business_system_type", "criticality", "environment",
+    "ospc_vm_count", "architecture",
+]
+
 @app.get("/api/tracker/list")
 def tracker_list():
+    import re as _re
+    def _norm(k): return _re.sub(r'[^a-z0-9]+','_',_re.sub(r'[^a-zA-Z0-9\s_]','',k).strip().lower()).rstrip('_')
+    def _stripped(k): return k.replace('_','')
+
     customers = []
-    columns = []
+    csv_cols = []
     if TRACKER_DB.exists():
         with open(TRACKER_DB, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            columns = list(reader.fieldnames) if reader.fieldnames else []
+            csv_cols = list(reader.fieldnames) if reader.fieldnames else []
             for row in reader:
-                customers.append(row)
+                customers.append(dict(row))
+
+    # Normalize all row keys
+    seen_s = {}
+    for row in customers:
+        for k in list(row.keys()):
+            nk = _norm(k); s = _stripped(nk)
+            if nk != k:
+                if s not in seen_s: seen_s[s] = nk; row[nk] = row.pop(k)
+                else: row.pop(k)
+        row.setdefault("date_added_to_migration_list",
+            row.get("created_at") or row.get("submitted_at") or "")
+
+    # Use exactly the template canonical columns — no extras appended
+    columns = list(TRACKER_CANONICAL_COLS)
+
     return jsonify({"customers": customers, "active": ACTIVE_CUSTOMER_ID, "columns": columns})
 
 @app.post("/api/tracker/upload")
@@ -7852,6 +7883,8 @@ def tracker_upload():
 
 @app.post("/api/tracker/save_manual")
 def tracker_save_manual():
+    import re as _re2
+    def _nk(k): return _re2.sub(r'_+$','',_re2.sub(r'[^a-z0-9]+','_',_re2.sub(r'[^a-zA-Z0-9\s_]','',k).strip().lower()))
     data = request.json or []
     if not isinstance(data, list):
         return jsonify({"ok": False, "error": "Invalid format"}), 400
@@ -7861,9 +7894,22 @@ def tracker_save_manual():
             f.write("")
         return jsonify({"ok": True, "saved": 0})
 
-    # Preserving exact columns from the first object
-    fields = list(data[0].keys())
-    # Ensure customer_id exists for backend logic
+    # Normalize all keys (strips arrows, spaces→underscore, dedup by stripped form)
+    def norm_row(row):
+        out = {}; seen = {}
+        for k, v in row.items():
+            nk = _nk(k); s = nk.replace('_','')
+            if s not in seen: seen[s] = nk; out[nk] = v
+        return out
+
+    data = [norm_row(r) for r in data]
+
+    # Build deduped field list (prefer underscore versions)
+    seen_s = {}; fields = []
+    for k in data[0].keys():
+        s = k.replace('_','')
+        if s not in seen_s: seen_s[s] = True; fields.append(k)
+
     if "customer_id" not in fields:
         fields.insert(0, "customer_id")
 
@@ -8003,31 +8049,263 @@ def tracker_stage1_update():
 
 @app.get("/api/tracker/export")
 def tracker_export():
-    import io
     if not TRACKER_DB.exists():
         return "No data", 404
 
     rows = read_csv_rows(TRACKER_DB)
-    t_queue = sum(1 for r in rows if r.get("status", "") in ["Queue", "In Progress", "Rolled Back"])
-    t_ready = sum(1 for r in rows if r.get("status", "") == "Queue" and r.get("flex_readiness", "") == "FLEX Ready")
-    t_success = sum(1 for r in rows if r.get("status", "") == "Success")
-    t_fail = sum(1 for r in rows if r.get("status", "") == "Failed")
-
     output = io.StringIO()
-    output.write("MIGRATION LOG METRICS\n")
-    output.write("Customers to be Migrated,Customers Ready,Successfully Migrated,Failed Migrations\n")
-    output.write(f"{t_queue},{t_ready},{t_success},{t_fail}\n\n")
-    output.write("CUSTOMER MIGRATION LOG DETAILS\n")
-    output.write(TRACKER_DB.read_text(encoding="utf-8"))
+    now = datetime.utcnow().strftime("%Y-%m-%d")
+
+    export_fields = [
+        "date_added_to_migration_list",
+        "start_date",
+        "target_date",
+        "request_id",
+        "completion_date",
+        "customer_id",
+        "customer_name",
+        "company_name",
+        "contact_name",
+        "email",
+        "phone",
+        "ospc_account_tenant_id",
+        "target_flex_region",
+        "region",
+        "status",
+        "current_stage",
+        "migration_method",
+        "business_system_name",
+        "business_system_type",
+        "stack_category",
+        "criticality",
+        "environment",
+        "wave",
+        "business_owner",
+        "technical_owner",
+        "component_count",
+        "in_scope_count",
+        "component_name",
+        "component_type",
+        "ospc_source_ip_url",
+        "flex_target_ip_url",
+        "health_test_path",
+        "in_scope_status",
+        "component_status",
+        "components",
+        "in_scope_components",
+        "reference_architecture",
+        "flex_readiness",
+        "flex_readiness_score",
+        "ospc_infra_size",
+        "ospc_vm_count",
+        "ospc_volumes_count",
+        "ospc_db_count",
+        "business_blast_radius",
+        "description",
+        "notes",
+    ]
+
+    aliases = {
+        "date_added_to_migration_list": ["date_added_to_migration_list", "date_added", "submitted_at", "submittedAt", "created_at", "createdAt"],
+        "target_date": ["target_date", "completion_date", "completionDate"],
+        "request_id": ["request_id", "req_id", "id"],
+        "completion_date": ["completion_date", "completionDate"],
+        "company_name": ["company_name", "company"],
+        "contact_name": ["contact_name", "contact"],
+        "ospc_account_tenant_id": ["ospc_account_tenant_id", "tenant", "tenant_id", "account_id", "ospc_account"],
+        "target_flex_region": ["target_flex_region", "region"],
+        "business_system_name": ["business_system_name", "system_name", "customer_name"],
+        "business_system_type": ["business_system_type", "industry", "archetype", "stack_category"],
+        "environment": ["environment", "env"],
+        "technical_owner": ["technical_owner", "towner"],
+        "business_owner": ["business_owner", "bowner"],
+        "component_name": ["component_name", "component"],
+        "component_type": ["component_type", "type"],
+        "ospc_source_ip_url": ["ospc_source_ip_url", "ospc_source", "ospc_url", "source_url"],
+        "flex_target_ip_url": ["flex_target_ip_url", "flex_target", "flex_url", "target_url"],
+        "health_test_path": ["health_test_path", "health_path"],
+        "in_scope_status": ["in_scope_status", "scope"],
+        "component_status": ["component_status"],
+        "description": ["description", "desc"],
+        "notes": ["notes", "special_requirements"],
+    }
+
+    def pick(row: Dict[str, str], field: str) -> str:
+        for key in [field] + aliases.get(field, []):
+            val = row.get(key)
+            if val not in (None, ""):
+                return str(val)
+        return ""
+
+    def split_multi(value: str) -> list[str]:
+        text = str(value or "").strip()
+        if not text:
+            return []
+        for sep in ("\r\n", "\n", ";"):
+            text = text.replace(sep, "|")
+        return [part.strip() for part in text.split("|") if part.strip()]
+
+    def infer_component_type(name: str, fallback: str = "") -> str:
+        existing = (fallback or "").strip()
+        if existing:
+            return existing
+        n = (name or "").lower()
+        if any(token in n for token in ("database", "db", "mysql", "postgres", "mariadb", "mongo", "sql")):
+            return "Database"
+        if any(token in n for token in ("cache", "redis", "memcache")):
+            return "Cache"
+        if any(token in n for token in ("queue", "rabbit", "kafka")):
+            return "Queue"
+        if any(token in n for token in ("worker", "batch", "scheduler")):
+            return "Worker"
+        if "monitor" in n:
+            return "Monitoring"
+        if any(token in n for token in ("gateway", "api", "frontend", "backend", "auth", "report", "search", "payment", "integration")):
+            return "Application"
+        return "Application"
+
+    def item_at(items: list[str], index: int) -> str:
+        if not items:
+            return ""
+        if index < len(items):
+            return items[index]
+        return items[0] if len(items) == 1 else ""
+
+    def expanded_component_rows(row: Dict[str, str]) -> list[Dict[str, str]]:
+        components = split_multi(pick(row, "components")) or split_multi(pick(row, "component_name"))
+        in_scope = split_multi(pick(row, "in_scope_components"))
+        sources = split_multi(pick(row, "ospc_source_ip_url"))
+        targets = split_multi(pick(row, "flex_target_ip_url"))
+        health_paths = split_multi(pick(row, "health_test_path"))
+        explicit_types = split_multi(pick(row, "component_type"))
+        max_rows = max(len(components), len(sources), len(targets), len(health_paths), 1)
+
+        base = {field: pick(row, field) for field in export_fields}
+        if not base.get("date_added_to_migration_list"):
+            base["date_added_to_migration_list"] = now
+
+        expanded = []
+        for idx in range(max_rows):
+            out = dict(base)
+            component = item_at(components, idx)
+            out["component_name"] = component
+            out["component_type"] = infer_component_type(component, item_at(explicit_types, idx))
+            out["ospc_source_ip_url"] = item_at(sources, idx)
+            out["flex_target_ip_url"] = item_at(targets, idx)
+            out["health_test_path"] = item_at(health_paths, idx)
+            out["in_scope_status"] = pick(row, "in_scope_status") or (
+                "In Scope" if not in_scope or component in in_scope else "Out of Scope"
+            )
+            out["component_status"] = pick(row, "component_status") or pick(row, "status")
+            expanded.append(out)
+        return expanded
+
+    source_fields = []
+    if rows:
+        for row in rows:
+            for key in row.keys():
+                if key not in source_fields:
+                    source_fields.append(key)
+    for key in source_fields:
+        if key not in export_fields:
+            export_fields.append(key)
+
+    writer = csv.DictWriter(output, fieldnames=export_fields, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        for out in expanded_component_rows(row):
+            writer.writerow(out)
 
     return (
         output.getvalue(),
         200,
         {
             "Content-Type": "text/csv",
-            "Content-Disposition": "attachment; filename=migration_summary_report.csv"
+            "Content-Disposition": "attachment; filename=migration_log.csv"
         }
     )
+
+@app.get("/api/tracker/export_xlsx")
+def tracker_export_xlsx():
+    import re as _re
+    import copy
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    except ImportError:
+        return "openpyxl not installed", 500
+
+    TEMPLATE_PATH = Path(__file__).parent.parent / "Migrationlog_newtemplate.xls.xlsx"
+    if not TEMPLATE_PATH.exists():
+        return "Template not found", 404
+
+    def _norm(k):
+        return _re.sub(r'_+$', '', _re.sub(r'[^a-z0-9]+', '_', _re.sub(r'[^a-zA-Z0-9\s_]', '', k).strip().lower()))
+
+    wb = load_workbook(str(TEMPLATE_PATH))
+    ws = wb.active
+
+    # Read header row to map column names → column indices
+    header_row = {}
+    for col_idx, cell in enumerate(ws[1], start=1):
+        raw = str(cell.value or '').strip()
+        if raw:
+            header_row[_norm(raw)] = col_idx
+
+    # Capture header row styles for reuse on data rows
+    header_cells = list(ws[1])
+    # Copy fill/font from a data row if template has sample rows
+    sample_fill_even = PatternFill(fill_type='solid', fgColor='DBEAFE')
+    sample_fill_odd  = PatternFill(fill_type='solid', fgColor='EFF6FF')
+    sample_font      = Font(name='Aptos Narrow', size=10)
+    sample_align     = Alignment(vertical='center', wrap_text=False)
+
+    # If template has sample data rows, grab style from row 2
+    if ws.max_row >= 2:
+        r2_cell = ws.cell(row=2, column=1)
+        if r2_cell.fill and r2_cell.fill.fill_type == 'solid':
+            sample_fill_even = copy.copy(r2_cell.fill)
+        if r2_cell.font:
+            sample_font = copy.copy(r2_cell.font)
+
+    # Delete all data rows (keep header row 1)
+    if ws.max_row > 1:
+        ws.delete_rows(2, ws.max_row - 1)
+
+    # Load migration log CSV
+    if not TRACKER_DB.exists():
+        out = io.BytesIO()
+        wb.save(out)
+        out.seek(0)
+        return Response(out.read(), 200, {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': f'attachment; filename=Migration_Log_{datetime.utcnow().strftime("%Y-%m-%d")}.xlsx'
+        })
+
+    rows = read_csv_rows(TRACKER_DB)
+
+    for row_idx, csv_row in enumerate(rows, start=2):
+        # Normalise CSV row keys
+        norm_row = {_norm(k): v for k, v in csv_row.items()}
+        for col_name, col_idx in header_row.items():
+            val = norm_row.get(col_name, '')
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.fill  = sample_fill_even if row_idx % 2 == 0 else sample_fill_odd
+            cell.font  = sample_font
+            cell.alignment = sample_align
+
+    # Set row height for data rows
+    for r in range(2, ws.max_row + 1):
+        ws.row_dimensions[r].height = 16
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return Response(out.read(), 200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': f'attachment; filename=Migration_Log_{datetime.utcnow().strftime("%Y-%m-%d")}.xlsx'
+    })
+
 
 @app.get("/api/topology/openrc-files")
 def list_topology_openrc_files():

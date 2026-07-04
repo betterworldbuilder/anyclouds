@@ -617,7 +617,7 @@
     const journeyTabs = Array.from(document.querySelectorAll('[data-journey-tab]'));
 
     function clearViews() {
-      document.body.classList.remove('show-guide', 'show-migration');
+      document.body.classList.remove('show-guide', 'show-migration', 'show-request');
       journeyTabs.forEach(tab => tab.classList.remove('active'));
       serversTab.classList.remove('active');
     }
@@ -678,11 +678,37 @@
       serversTab.classList.add('active');
     }
 
+    const MFR_CACHE_KEY = 'ospc_mfr_cache';
+    const MFR_FIELDS = ['mf-company','mf-contact','mf-email','mf-phone','mf-tenant','mf-region','mf-start-date','mf-completion-date','mf-notes'];
+
+    function saveMfrCache() {
+      const d = {};
+      MFR_FIELDS.forEach(id => { const el = document.getElementById(id); if (el) d[id] = el.value; });
+      localStorage.setItem(MFR_CACHE_KEY, JSON.stringify(d));
+    }
+
+    function restoreMfrCache() {
+      try {
+        const d = JSON.parse(localStorage.getItem(MFR_CACHE_KEY) || '{}');
+        MFR_FIELDS.forEach(id => { const el = document.getElementById(id); if (el && d[id] != null) el.value = d[id]; });
+      } catch(e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      restoreMfrCache();
+      MFR_FIELDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', saveMfrCache);
+        if (el) el.addEventListener('change', saveMfrCache);
+      });
+    });
+
     function showRequestPage(tabId) {
       clearViews();
       document.body.classList.add('show-request');
       setActiveJourney(tabId || 'request-tab');
       document.getElementById('req-confirm').style.display = 'none';
+      restoreMfrCache();
     }
 
     function reqSelectStrat(el, name) {
