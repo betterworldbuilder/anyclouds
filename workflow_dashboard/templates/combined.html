@@ -5563,6 +5563,113 @@ opencenter cluster --help</div>
     </script>
     </div><!-- end s2ocquickstart-pane -->
 
+    <script>
+    // ── OpenCenter Inline Quick Start (embedded in s2opencenter-pane) ──
+    (function(){
+      function gi(id){ return document.getElementById(id); }
+      function gv(id){ var el=gi(id); return el?el.value.trim():''; }
+
+      window.ocilUpdate = function(){
+        var org     = gv('ocil-org')     || 'my-org';
+        var cluster = gv('ocil-cluster') || 'my-cluster';
+        var region  = gv('ocil-region')  || 'dfw3';
+        var authUrl = gv('ocil-authurl') || 'https://identity.api.rackspacecloud.com/v3';
+        var credId  = gv('ocil-credid')  || 'YOUR_OPENSTACK_APP_CRED_ID';
+        var credSec = gv('ocil-credsec');
+        var gitRepo = gv('ocil-gitrepo') || 'YOUR_GITOPS_REPO_URL';
+        var tokFile = gv('ocil-tokfile') || '/home/dzoan/.config/opencenter/tokens/git-token.txt';
+        var branch  = gv('ocil-branch')  || 'main';
+
+        var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+org+'/'+cluster+'/'+cluster+'-config.yaml';
+        var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+org;
+        var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+org+'/'+cluster+'/';
+        var credDisplay = credSec ? '••••••••••••' : 'YOUR_OPENSTACK_APP_CRED_SECRET';
+
+        // Paths
+        var qc=gi('ocil-qr-config');  if(qc) qc.textContent=configPath;
+        var qg=gi('ocil-qr-gitops');  if(qg) qg.textContent=gitopsPath;
+        var ql=gi('ocil-qr-logs');    if(ql) ql.textContent=logPath;
+
+        // Step 2
+        var c2=gi('ocil-cmd-2');
+        if(c2) c2.textContent='opencenter cluster init '+cluster+' --org '+org;
+
+        // Step 3
+        var c3=gi('ocil-cmd-3');
+        if(c3) c3.textContent='# Edit config:\nCONFIG="'+configPath+'"\nnano "$CONFIG"\n\n# Set in config:\nauth_url: "'+authUrl+'"\nregion: "'+region+'"\napplication_credential_id: "'+credId+'"\napplication_credential_secret: "'+credDisplay+'"';
+
+        // Step 4
+        var c4=gi('ocil-cmd-4');
+        if(c4) c4.textContent='mkdir -p $(dirname '+tokFile+')\necho "YOUR_GIT_TOKEN" > '+tokFile+'\nchmod 600 '+tokFile+'\n\n# In config:\ngitops:\n  repository:\n    url: "'+gitRepo+'"\n  auth:\n    token:\n      token_file: "'+tokFile+'"';
+
+        // Step 5
+        var c5=gi('ocil-cmd-5');
+        if(c5) c5.textContent='opencenter cluster validate '+cluster;
+
+        // Step 6
+        var c6=gi('ocil-cmd-6');
+        if(c6) c6.textContent='opencenter secrets sync '+cluster+'\nopencenter cluster validate '+cluster+'\nopencenter cluster generate '+cluster+'\ngrep -R "CHANGEME" '+gitopsPath+' || true';
+
+        // Step 7
+        var c7=gi('ocil-cmd-7');
+        if(c7) c7.textContent='cd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps for '+cluster+'"\ngit remote add origin '+gitRepo+' 2>/dev/null || git remote set-url origin '+gitRepo+'\ngit branch -M '+branch+'\ngit push -u origin '+branch;
+
+        // Step 8
+        var c8=gi('ocil-cmd-8');
+        if(c8) c8.textContent='opencenter cluster validate '+cluster+'\nopencenter cluster deploy '+cluster;
+
+        // Full flow
+        var ff=gi('ocil-full');
+        if(ff) ff.textContent=
+          '# 1. Install CLI (see Step 1 above)\n\n'+
+          '# 2. Init\nopencenter cluster init '+cluster+' --org '+org+'\n\n'+
+          '# 3. Edit config\nnano "'+configPath+'"\n\n'+
+          '# 4. Validate\nopencenter cluster validate '+cluster+'\n\n'+
+          '# 5. Sync & Generate\nopencenter secrets sync '+cluster+'\nopencenter cluster generate '+cluster+'\n\n'+
+          '# 6. Check CHANGEME\ngrep -R "CHANGEME" '+gitopsPath+' || true\n\n'+
+          '# 7. Commit & push\ncd '+gitopsPath+'\ngit add . && git commit -m "Initial GitOps for '+cluster+'" && git push\n\n'+
+          '# 8. Deploy\nopencenter cluster validate '+cluster+'\nopencenter cluster deploy '+cluster;
+
+        // Validation hints
+        var vd=gi('ocil-val');
+        if(vd){
+          var h=[];
+          if(!gv('ocil-credid'))  h.push('<span style="color:#dc2626;font-weight:700;">✗ App credential ID missing</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ credential ID set</span>');
+          if(!gv('ocil-credsec')) h.push('<span style="color:#dc2626;font-weight:700;">✗ App credential secret missing</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ credential secret set</span>');
+          if(!gv('ocil-gitrepo')) h.push('<span style="color:#dc2626;font-weight:700;">✗ GitOps repo URL missing</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ GitOps repo set</span>');
+          if(!gv('ocil-region'))  h.push('<span style="color:#d97706;font-weight:700;">⚠ Region not set</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+gv('ocil-region')+'</span>');
+          vd.innerHTML=h.join('<br>');
+        }
+      };
+
+      window.ocilCopy = function(id){
+        var el=gi(id); if(!el) return;
+        navigator.clipboard.writeText(el.textContent||el.innerText).then(function(){
+          var term=gi('ocil-terminal');
+          if(term){
+            term.innerHTML+='<span style="color:#38bdf8;">$ '+(( el.textContent||el.innerText).split('\n')[0])+'</span>\n<span style="color:#64748b;">↑ Copied — paste into WSL/Linux terminal.</span>\n\n';
+            term.scrollTop=term.scrollHeight;
+          }
+        });
+      };
+
+      window.ocilDownload = function(){
+        var el=gi('ocil-full'); if(!el) return;
+        var cluster=gv('ocil-cluster')||'my-cluster';
+        var blob=new Blob(['#!/bin/bash\nset -e\n\n'+el.textContent],{type:'text/x-sh'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='opencenter-bootstrap-'+cluster+'.sh'; a.click();
+      };
+
+      // Initial render
+      ocilUpdate();
+    })();
+    </script>
+
     <div id="s2opencenter-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
       <div class="gov-header">
         <div class="gov-title-area">
@@ -5571,6 +5678,209 @@ opencenter cluster --help</div>
         </div>
         <div class="gov-status-badge status-pending" id="s2opencenter-status">Awaiting R6 Bundle</div>
       </div>
+
+      <!-- ── OpenCenter Quick Start Guide (collapsed) ── -->
+      <div style="margin-bottom:18px;border:2px solid #0ea5e9;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.15);">
+        <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0369a1,#0e7490);cursor:pointer;user-select:none;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:20px;">🚀</span>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:#fff;">OpenCenter Quick Start Guide</div>
+              <div style="font-size:12px;color:#bfdbfe;margin-top:2px;">Install CLI · Configure credentials · Generate GitOps · Deploy your first cluster</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button onclick="event.stopPropagation();stage2OpenPath&&stage2OpenPath('s2ocquickstart')" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;">Open Full Page ↗</button>
+            <span id="ocqs-inline-arrow" style="color:#fff;font-size:16px;font-weight:900;">▶</span>
+          </div>
+        </div>
+        <div id="ocqs-inline-body" style="display:none;background:#f0f4f8;padding:0;">
+
+          <!-- Mini hero strip -->
+          <div style="background:linear-gradient(135deg,#1d4ed8,#0369a1);padding:16px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:260px;">
+              <div style="color:#bfdbfe;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Learn by building</div>
+              <div style="color:#fff;font-size:13px;line-height:1.6;margin-top:4px;">Enter credentials once → run each guided command step by step → deploy your first Kubernetes cluster on FLEX/OpenStack.</div>
+            </div>
+            <!-- Journey mini -->
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Install CLI</span><span style="color:rgba(255,255,255,.5);font-size:12px;">→</span>
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Init Config</span><span style="color:rgba(255,255,255,.5);font-size:12px;">→</span>
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Credentials</span><span style="color:rgba(255,255,255,.5);font-size:12px;">→</span>
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Validate</span><span style="color:rgba(255,255,255,.5);font-size:12px;">→</span>
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Generate</span><span style="color:rgba(255,255,255,.5);font-size:12px;">→</span>
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Commit</span><span style="color:rgba(255,255,255,.5);font-size:12px;">→</span>
+              <span style="background:rgba(255,255,255,.2);border-radius:4px;padding:3px 8px;font-size:10px;color:#fff;font-weight:700;">Deploy</span>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 320px;gap:0;">
+          <!-- LEFT: Steps + Inputs -->
+          <div style="padding:20px 24px;overflow:auto;">
+
+            <!-- Cluster Inputs row -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+              <div style="font-size:13px;font-weight:800;color:#0369a1;margin-bottom:12px;display:flex;align-items:center;gap:6px;">⚙️ Cluster &amp; Credential Inputs <span style="font-size:11px;color:#64748b;font-weight:400;">(auto-generates all commands below)</span></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div><label class="ocqs-label">Org Name</label><input class="ocqs-input" id="ocil-org" value="my-org" oninput="ocilUpdate()"></div>
+                <div><label class="ocqs-label">Cluster Name</label><input class="ocqs-input" id="ocil-cluster" value="my-cluster" oninput="ocilUpdate()"></div>
+                <div><label class="ocqs-label">Region</label><input class="ocqs-input" id="ocil-region" placeholder="dfw3" oninput="ocilUpdate()"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocil-authurl" value="https://identity.api.rackspacecloud.com/v3" oninput="ocilUpdate()"></div>
+                <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocil-credid" placeholder="YOUR_OPENSTACK_APP_CRED_ID" oninput="ocilUpdate()"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocil-credsec" type="password" placeholder="YOUR_OPENSTACK_APP_CRED_SECRET" oninput="ocilUpdate()"></div>
+                <div><label class="ocqs-label">GitOps Repo URL</label><input class="ocqs-input" id="ocil-gitrepo" placeholder="https://github.com/YOUR_USER/my-cluster-gitops.git" oninput="ocilUpdate()"></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div><label class="ocqs-label">Git Token File</label><input class="ocqs-input" id="ocil-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocilUpdate()"></div>
+                <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocil-branch" value="main" oninput="ocilUpdate()"></div>
+              </div>
+            </div>
+
+            <!-- Step cards -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+              <!-- Step 1 -->
+              <div class="ocqs-card" style="grid-column:1/-1;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">1</span><strong style="color:#1e3a5f;">Install OpenCenter CLI</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-1">cd ~/OSPC2FLEX
+
+sudo apt update
+sudo apt install -y git curl build-essential ca-certificates
+
+# Install mise
+curl https://mise.run | sh
+
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+
+mise --version
+
+# Clone CLI source
+git clone https://github.com/opencenter-cloud/openCenter-cli.git
+cd openCenter-cli
+
+mise trust
+mise install
+mise run build
+
+./bin/opencenter version</div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-1')">📋 Copy</button>
+              </div>
+
+              <!-- Step 2 -->
+              <div class="ocqs-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">2</span><strong style="color:#1e3a5f;">Init Cluster Config</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-2"></div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-2')">📋 Copy</button>
+              </div>
+
+              <!-- Step 3 -->
+              <div class="ocqs-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">3</span><strong style="color:#1e3a5f;">Set FLEX Credentials</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-3" style="font-size:11px;"></div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-3')">📋 Copy</button>
+              </div>
+
+              <!-- Step 4 -->
+              <div class="ocqs-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">4</span><strong style="color:#1e3a5f;">Configure GitOps &amp; Token</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-4" style="font-size:11px;"></div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-4')">📋 Copy</button>
+              </div>
+
+              <!-- Step 5 -->
+              <div class="ocqs-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">5</span><strong style="color:#1e3a5f;">Validate</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-5"></div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-5')">📋 Copy</button>
+              </div>
+
+              <!-- Step 6 -->
+              <div class="ocqs-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">6</span><strong style="color:#1e3a5f;">Sync Secrets &amp; Generate</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-6"></div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-6')">📋 Copy</button>
+              </div>
+
+              <!-- Step 7 -->
+              <div class="ocqs-card">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num">7</span><strong style="color:#1e3a5f;">Commit &amp; Push GitOps</strong>
+                </div>
+                <div class="ocqs-cmd" id="ocil-cmd-7" style="font-size:11px;"></div>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-cmd-7')">📋 Copy</button>
+              </div>
+
+              <!-- Step 8 -->
+              <div class="ocqs-card" style="border-color:#fca5a5;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <span class="ocqs-step-num" style="background:#dc2626;">8</span><strong style="color:#dc2626;">Deploy Cluster</strong>
+                </div>
+                <div class="ocqs-warn-box" style="font-size:11px;padding:8px 10px;margin-bottom:8px;">⚠️ Only run after validate passes &amp; no CHANGEME remain.</div>
+                <div class="ocqs-cmd" id="ocil-cmd-8"></div>
+                <button class="ocqs-btn ocqs-btn-danger" onclick="ocilCopy('ocil-cmd-8')">📋 Copy Deploy</button>
+              </div>
+
+            </div><!-- end steps grid -->
+
+            <!-- Full flow copy -->
+            <div style="margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+              <div style="font-size:13px;font-weight:800;color:#0369a1;margin-bottom:8px;">⚡ Full Command Flow</div>
+              <div class="ocqs-cmd" id="ocil-full" style="font-size:11px;max-height:220px;overflow-y:auto;"></div>
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilCopy('ocil-full')">📋 Copy All</button>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocilDownload()">⬇ Download .sh</button>
+                <button class="ocqs-btn ocqs-btn-primary" onclick="stage2OpenPath&&stage2OpenPath('s2ocquickstart')" style="padding:6px 14px;font-size:12px;">Open Full Tutorial ↗</button>
+              </div>
+            </div>
+
+          </div><!-- end left -->
+
+          <!-- RIGHT: Quick ref panel -->
+          <div style="background:#fff;border-left:1px solid #e2e8f0;padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;">📌 Paths</div>
+            <div style="font-size:11px;color:#475569;line-height:2;font-family:monospace;word-break:break-all;">
+              <div><span style="color:#64748b;">Config:</span><br><span id="ocil-qr-config" style="color:#1d4ed8;"></span></div>
+              <div style="margin-top:6px;"><span style="color:#64748b;">GitOps:</span><br><span id="ocil-qr-gitops" style="color:#1d4ed8;"></span></div>
+              <div style="margin-top:6px;"><span style="color:#64748b;">Logs:</span><br><span id="ocil-qr-logs" style="color:#1d4ed8;"></span></div>
+            </div>
+            <div style="border-top:1px solid #f1f5f9;padding-top:10px;">
+              <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">🔍 Validation</div>
+              <div id="ocil-val" style="font-size:12px;line-height:1.9;color:#475569;">Fill credentials to see status.</div>
+            </div>
+            <div style="border-top:1px solid #f1f5f9;padding-top:10px;">
+              <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">⚡ Terminal</div>
+              <div id="ocil-terminal" style="background:#0f172a;border-radius:6px;padding:10px;font-family:monospace;font-size:11px;color:#94a3b8;min-height:120px;max-height:240px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;">$ Copied commands will appear here.
+</div>
+              <button class="ocqs-btn ocqs-btn-copy" style="margin-top:6px;font-size:11px;" onclick="document.getElementById('ocil-terminal').innerHTML='$ Cleared.\n'">🗑 Clear</button>
+            </div>
+            <div style="border-top:1px solid #f1f5f9;padding-top:10px;">
+              <div style="font-size:12px;font-weight:800;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">⛔ Safety</div>
+              <div style="font-size:11px;color:#7f1d1d;background:#fee2e2;border-radius:6px;padding:8px 10px;line-height:1.6;">Never run <code>deploy</code> until <code>validate</code> passes and no CHANGEME values remain in the GitOps repo.</div>
+            </div>
+          </div><!-- end right -->
+
+          </div><!-- end grid -->
+        </div><!-- end inline body -->
+      </div><!-- end quick start collapsed -->
+
       <div class="gov-section" style="border-left:5px solid #16a34a;background:linear-gradient(135deg,#f0fdf4,#ffffff);">
         <h3 style="margin-top:0;">Import R6 Containerization Outputs</h3>
         <p style="color:#334155;line-height:1.6;">R6 Containerization prepares the application workloads. OpenCenter deploys and operates them with GitOps, security, observability, backup, and lifecycle management.</p>
