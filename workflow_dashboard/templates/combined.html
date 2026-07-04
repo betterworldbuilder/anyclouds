@@ -1933,6 +1933,78 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 }
 
 </style>
+<style>
+/* ── OpenCenter Quick Start — LIGHT THEME ── */
+#s2ocquickstart-pane,#ocqs-inline-body{background:#f0f4f8;}
+.ocqs-hero{background:linear-gradient(135deg,#1d4ed8 0%,#0369a1 50%,#0e7490 100%);padding:36px 32px 28px;border-bottom:3px solid #0ea5e9;}
+.ocqs-hero h1{margin:0 0 8px;font-size:26px;color:#fff;font-weight:900;letter-spacing:-0.5px;}
+.ocqs-hero p{margin:0;color:#bfdbfe;font-size:14px;line-height:1.6;max-width:720px;}
+.ocqs-body{display:grid;grid-template-columns:1fr 360px;gap:0;}
+.ocqs-left{padding:24px 28px;overflow:auto;background:#f0f4f8;}
+.ocqs-right{background:#fff;border-left:2px solid #e2e8f0;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;box-shadow:-2px 0 8px rgba(0,0,0,.06);}
+.ocqs-section{margin-bottom:28px;}
+.ocqs-section h2{font-size:14px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid #bfdbfe;}
+.ocqs-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.ocqs-card h3{margin:0 0 6px;font-size:14px;color:#1e3a5f;font-weight:800;}
+.ocqs-card p{margin:0 0 10px;font-size:13px;color:#475569;line-height:1.55;}
+.ocqs-step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#0369a1;color:#fff;font-size:11px;font-weight:900;margin-right:8px;flex-shrink:0;}
+.ocqs-cmd{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px 14px;font-family:monospace;font-size:12px;color:#86efac;line-height:1.7;white-space:pre-wrap;word-break:break-all;position:relative;margin:8px 0;}
+.ocqs-btn{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;}
+.ocqs-btn-copy{background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;}
+.ocqs-btn-copy:hover{background:#0369a1;color:#fff;}
+.ocqs-btn-run{background:#dcfce7;color:#15803d;border:1px solid #86efac;}
+.ocqs-btn-run:hover{background:#16a34a;color:#fff;}
+.ocqs-btn-danger{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;}
+.ocqs-btn-danger:hover{background:#dc2626;color:#fff;}
+.ocqs-btn-primary{background:#0369a1;color:#fff;border:1px solid #0284c7;padding:8px 18px;font-size:13px;}
+.ocqs-btn-primary:hover{background:#0284c7;}
+.ocqs-status{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.ocqs-s-idle{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}
+.ocqs-s-pass{background:#dcfce7;color:#15803d;border:1px solid #86efac;}
+.ocqs-s-warn{background:#fef3c7;color:#d97706;border:1px solid #fcd34d;}
+.ocqs-s-fail{background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;}
+.ocqs-s-run{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;animation:ocqsPulse 1s infinite;}
+@keyframes ocqsPulse{0%,100%{opacity:1}50%{opacity:.6}}
+.ocqs-warn-box{background:#fffbeb;border:1px solid #f59e0b;border-left:4px solid #f59e0b;border-radius:8px;padding:12px 14px;color:#92400e;font-size:13px;margin:8px 0;}
+.ocqs-info-box{background:#eff6ff;border:1px solid #93c5fd;border-left:4px solid #3b82f6;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:13px;margin:8px 0;}
+.ocqs-input{width:100%;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:9px 12px;color:#1e293b;font-size:13px;box-sizing:border-box;}
+.ocqs-input:focus{outline:none;border-color:#0369a1;box-shadow:0 0 0 3px #dbeafe;}
+.ocqs-label{display:block;font-size:11px;color:#64748b;font-weight:700;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.5px;}
+.ocqs-select{width:100%;background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:9px 12px;color:#1e293b;font-size:13px;box-sizing:border-box;}
+.ocqs-select:focus{outline:none;border-color:#0369a1;}
+.ocqs-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;}
+.ocqs-toggle-row:last-child{border-bottom:none;}
+.ocqs-toggle{width:38px;height:22px;background:#cbd5e1;border-radius:20px;position:relative;cursor:pointer;transition:background .2s;}
+.ocqs-toggle.on{background:#0369a1;}
+.ocqs-toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+.ocqs-toggle.on::after{left:19px;}
+.ocqs-terminal{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;font-family:monospace;font-size:12px;color:#94a3b8;min-height:180px;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;}
+.ocqs-terminal .t-ok{color:#4ade80;}
+.ocqs-terminal .t-warn{color:#fbbf24;}
+.ocqs-terminal .t-err{color:#f87171;}
+.ocqs-terminal .t-cmd{color:#38bdf8;}
+.ocqs-checklist-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f9;font-size:13px;color:#334155;}
+.ocqs-checklist-item label{cursor:pointer;}
+.ocqs-checklist-item input[type=checkbox]{width:16px;height:16px;accent-color:#0369a1;cursor:pointer;}
+.ocqs-progress{background:#dbeafe;border-radius:20px;height:7px;margin:10px 0 18px;}
+.ocqs-progress-bar{height:7px;border-radius:20px;background:linear-gradient(90deg,#0ea5e9,#6366f1);transition:width .4s;}
+.ocqs-journey{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:14px 0;}
+.ocqs-journey-step{background:rgba(255,255,255,.2);border-radius:6px;padding:5px 10px;font-size:11px;color:#bfdbfe;font-weight:700;border:1px solid rgba(255,255,255,.25);}
+.ocqs-journey-step.active{background:#fff;color:#0369a1;}
+.ocqs-journey-arrow{color:rgba(255,255,255,.4);font-size:14px;}
+.ocqs-req-table{width:100%;border-collapse:collapse;font-size:13px;}
+.ocqs-req-table th{background:#f0f9ff;color:#0369a1;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;border-bottom:2px solid #bae6fd;}
+.ocqs-req-table td{padding:9px 12px;border-bottom:1px solid #f1f5f9;color:#334155;vertical-align:top;}
+.ocqs-req-table tr:hover td{background:#f8fafc;}
+.ocqs-badge-ready{background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;}
+.ocqs-badge-missing{background:#fee2e2;color:#dc2626;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;}
+.ocqs-badge-opt{background:#fef3c7;color:#d97706;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;}
+.ocqs-yaml{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;font-family:monospace;font-size:12px;color:#c4b5fd;line-height:1.7;white-space:pre;overflow-x:auto;}
+.ocqs-path-badge{background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:5px 12px;font-family:monospace;font-size:12px;color:#1d4ed8;display:inline-block;margin:4px 0;word-break:break-all;}
+/* ensure inline body renders correctly inside opencenter pane */
+#ocqs-inline-body .ocqs-body{min-height:0;}
+#ocqs-inline-body .ocqs-right{height:auto;position:relative;}
+</style>
   <script src="/static/jarvis_british_speak.js?v={{ v }}"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
