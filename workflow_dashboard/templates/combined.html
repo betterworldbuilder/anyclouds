@@ -5586,9 +5586,31 @@ opencenter cluster --help</div>
         ocqsUpdate();
       };
 
-      window.ocqsRunCmd = function(cmdId,outId,btnId){ var ta=document.getElementById('ta-'+cmdId); var cmd=ta?ta.value.trim():((document.getElementById(cmdId)||{}).textContent||''); if(!cmd.trim())return; var out=document.getElementById(outId); var btn=document.getElementById(btnId); if(!out)return; out.style.display='block'; out.innerHTML='<span style="color:#94a3b8;">$ '+cmd.replace(/</g,'&lt;')+'</span>
-<span style="color:#fbbf24;">Running...</span>'; if(btn){btn.disabled=true;btn.textContent='...';}  fetch('/api/run/execute-manual-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:cmd})}).then(function(r){return r.json();}).then(function(d){ var ok=d.status==='success'; var text=(d.output||d.error||'(no output)').replace(/</g,'&lt;'); out.innerHTML='<span style="color:#94a3b8;">$ '+cmd.replace(/</g,'&lt;')+'</span>
-<span style="color:'+( ok ? '#4ade80' : '#f87171')+';">'+text+'</span>'; if(btn){btn.disabled=false;btn.innerHTML='&#9654; Run';} }).catch(function(e){ out.innerHTML='<span style="color:#f87171;">Error: '+e+'</span>'; if(btn){btn.disabled=false;btn.innerHTML='&#9654; Run';} }); };
+      window.ocqsRunCmd = function(cmdId, outId, btnId){
+        var ta  = document.getElementById('ta-' + cmdId);
+        var cmd = ta ? ta.value.trim() : ((document.getElementById(cmdId)||{}).textContent||'').trim();
+        if (!cmd) return;
+        var out = document.getElementById(outId);
+        var btn = document.getElementById(btnId);
+        if (!out) return;
+        out.style.display = 'block';
+        out.textContent = '$ ' + cmd + '\n';
+        if (btn) { btn.disabled = true; btn.textContent = '⏹ Stop'; btn.onclick = function(){ if(window._ocqsES) window._ocqsES.close(); btn.disabled=false; btn.textContent='▶ Run'; btn.onclick=function(){ ocqsRunCmd(cmdId,outId,btnId); }; }; }
+        if (window._ocqsES) window._ocqsES.close();
+        var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
+        window._ocqsES = es;
+        es.onmessage = function(e){
+            out.textContent += e.data + '\n';
+            out.scrollTop = out.scrollHeight;
+            if (e.data.startsWith('[EXIT') || e.data.startsWith('[ERROR]')) {
+                es.close();
+                var ok = e.data === '[EXIT 0]';
+                if (btn) { btn.disabled=false; btn.textContent='▶ Run'; btn.onclick=function(){ ocqsRunCmd(cmdId,outId,btnId); }; }
+                out.style.borderColor = ok ? '#16a34a' : '#dc2626';
+            }
+        };
+        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} };
+      };
       window.ocqsToggleAuthType = function(){
             var t = (document.getElementById('ocqs-authtype')||{}).value;
             var pw = document.getElementById('ocqs-pw-fields');

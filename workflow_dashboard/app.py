@@ -20319,6 +20319,33 @@ def openstack_networks():
         return jsonify({"error": str(e)}), 500
     return jsonify(result)
 
+@app.route("/api/stream/run-cmd", methods=["GET"])
+def stream_run_cmd():
+    import shlex as _shlex
+    cmd = request.args.get("cmd", "").strip()
+    if not cmd:
+        return jsonify({"error": "no cmd"}), 400
+    def generate():
+        try:
+            proc = subprocess.Popen(
+                cmd, shell=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1, stdin=subprocess.DEVNULL
+            )
+            for line in iter(proc.stdout.readline, ""):
+                if line:
+                    yield f"data: {line.rstrip()}\n\n"
+            proc.wait()
+            yield f"data: [EXIT {proc.returncode}]\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] {e}\n\n"
+    from flask import stream_with_context
+    resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
 
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
