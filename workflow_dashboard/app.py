@@ -20285,6 +20285,41 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
     return resp
 
 
+@app.post("/api/openstack/networks")
+def openstack_networks():
+    import subprocess, json as _json
+    body = request.get_json(force=True, silent=True) or {}
+    env = {**os.environ, "OS_AUTH_TYPE": body.get("auth_type", "password"),
+           "OS_AUTH_URL": body.get("auth_url", ""),
+           "OS_REGION_NAME": body.get("region", ""),
+           "OS_USERNAME": body.get("username", ""),
+           "OS_PASSWORD": body.get("password", ""),
+           "OS_USER_DOMAIN_NAME": body.get("user_domain_name", "Default"),
+           "OS_PROJECT_DOMAIN_NAME": body.get("project_domain_name", "Default"),
+           "OS_PROJECT_ID": body.get("project_id", ""),
+           "OS_APPLICATION_CREDENTIAL_ID": body.get("application_credential_id", ""),
+           "OS_APPLICATION_CREDENTIAL_SECRET": body.get("application_credential_secret", ""),
+           "OS_IDENTITY_API_VERSION": "3", "OS_INTERFACE": "public"}
+    result = {"external_network_id": None, "network_id": None, "subnet_id": None}
+    try:
+        nets = subprocess.run(["openstack", "network", "list", "--format", "json"],
+                              capture_output=True, text=True, env=env, timeout=20)
+        net_data = _json.loads(nets.stdout or "[]")
+        for n in net_data:
+            if n.get("Router External") or "PUBLIC" in (n.get("Name") or "").upper():
+                result["external_network_id"] = n.get("ID")
+            elif not result["network_id"]:
+                result["network_id"] = n.get("ID")
+        subs = subprocess.run(["openstack", "subnet", "list", "--format", "json"],
+                              capture_output=True, text=True, env=env, timeout=20)
+        sub_data = _json.loads(subs.stdout or "[]")
+        if sub_data:
+            result["subnet_id"] = sub_data[0].get("ID")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify(result)
+
+
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))

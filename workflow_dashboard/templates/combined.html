@@ -5064,134 +5064,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         </table>
       </div>
 
-      <!-- Section B: Credentials & Inputs -->
-      <div class="ocqs-section">
-        <h2>B. Credentials &amp; Cluster Inputs</h2>
-        <div class="ocqs-card">
-          <h3>🏷 Cluster Identity</h3>
-          <label class="ocqs-label">Organization Name</label>
-          <input class="ocqs-input" id="ocqs-org" value="my-org" oninput="ocqsUpdate()">
-          <label class="ocqs-label">Cluster Name</label>
-          <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" oninput="ocqsUpdate()">
-          <label class="ocqs-label">Environment</label>
-          <select class="ocqs-select" id="ocqs-env" onchange="ocqsUpdate()">
-            <option value="dev" selected>dev</option><option value="uat">uat</option><option value="prod">prod</option>
-          </select>
-          <label class="ocqs-label">Target Provider</label>
-          <select class="ocqs-select" id="ocqs-provider" onchange="ocqsUpdate()">
-            <option value="openstack" selected>openstack</option><option value="kind">kind (local test)</option><option value="vmware">vmware</option><option value="baremetal">baremetal</option>
-          </select>
-        </div>
-
-        <div class="ocqs-card">
-          <h3>🔑 OpenStack / FLEX Credentials</h3>
-          <!-- OpenRC file upload -->
-          <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
-            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">⬆ Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <label style="background:#0369a1;color:#fff;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                📂 Choose OpenRC File
-                <input type="file" id="ocqs-openrc-input" accept=".sh,.env,.rc,text/plain" style="display:none" onchange="ocqsParseOpenRC(this)">
-              </label>
-              <span id="ocqs-openrc-filename" style="font-size:12px;color:#64748b;font-style:italic;">No file chosen</span>
-              <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
-            </div>
-          </div>
-          <!-- Auth type selector -->
-          <label class="ocqs-label">Auth Type</label>
-          <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
-            <option value="password">Password (username + API key)</option>
-            <option value="v3applicationcredential">Application Credential (app-cred-id + secret)</option>
-          </select>
-          <label class="ocqs-label">Auth URL</label>
-          <input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()">
-          <label class="ocqs-label">Region</label>
-          <input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()">
-          <!-- Password auth fields -->
-          <div id="ocqs-pw-fields">
-            <label class="ocqs-label">Username</label>
-            <input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck()">
-            <label class="ocqs-label">Password / API Key</label>
-            <input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck()">
-            <label class="ocqs-label">User Domain Name</label>
-            <input class="ocqs-input" id="ocqs-userdomain" placeholder="rackspace_cloud_domain" oninput="ocqsUpdate()">
-            <label class="ocqs-label">Project Domain Name</label>
-            <input class="ocqs-input" id="ocqs-projdomain" placeholder="rackspace_cloud_domain" oninput="ocqsUpdate()">
-            <label class="ocqs-label">Project ID</label>
-            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
-          </div>
-          <!-- App credential fields -->
-          <div id="ocqs-appcred-fields" style="display:none;">
-            <label class="ocqs-label">Application Credential ID</label>
-            <input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_OPENSTACK_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()">
-            <label class="ocqs-label">Application Credential Secret</label>
-            <input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_OPENSTACK_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()">
-          </div>
-          <!-- Network auto-detect -->
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin-top:12px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="font-size:12px;font-weight:700;color:#15803d;">🔍 Network / Subnet Auto-Detect</div>
-              <button onclick="ocqsAutoDetectNetwork()" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">▶ Run Detection</button>
-            </div>
-            <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Runs <code>openstack network list</code> + <code>openstack subnet list</code> — source your OpenRC first, then click Run.</div>
-            <label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:10px;">(PUBLICNET)</span></label>
-            <input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected or paste manually" oninput="ocqsUpdate()">
-            <label class="ocqs-label">Tenant Network ID</label>
-            <input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected or paste manually" oninput="ocqsUpdate()">
-            <label class="ocqs-label">Tenant Subnet ID</label>
-            <input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected or paste manually" oninput="ocqsUpdate()">
-          </div>
-        </div>
-
-        <div class="ocqs-card">
-          <h3>📦 GitOps Repository</h3>
-          <label class="ocqs-label">Git Provider</label>
-          <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()">
-            <option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option>
-          </select>
-          <label class="ocqs-label">GitOps Repository URL</label>
-          <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
-          <label class="ocqs-label">Git Branch</label>
-          <input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()">
-          <label class="ocqs-label">Git Token File Path</label>
-          <input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()">
-          <label class="ocqs-label">Git Token Value <span style="color:#64748b;font-size:10px;font-weight:400;">(used to generate token-file command only — never logged)</span></label>
-          <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
-        </div>
-
-        <div class="ocqs-card">
-          <h3>⚙️ Optional Services</h3>
-          <div class="ocqs-warn-box">For the first bootstrap, disable Keycloak, Loki, and Tempo unless you already have their required secrets and object storage credentials.</div>
-          <div class="ocqs-toggle-row"><span style="font-size:13px;color:#cbd5e1;">Keycloak</span><div class="ocqs-toggle" id="tog-keycloak" onclick="ocqsToggle('keycloak')"></div></div>
-          <div class="ocqs-toggle-row"><span style="font-size:13px;color:#cbd5e1;">Loki</span><div class="ocqs-toggle" id="tog-loki" onclick="ocqsToggle('loki')"></div></div>
-          <div class="ocqs-toggle-row"><span style="font-size:13px;color:#cbd5e1;">Tempo</span><div class="ocqs-toggle" id="tog-tempo" onclick="ocqsToggle('tempo')"></div></div>
-          <div class="ocqs-toggle-row"><span style="font-size:13px;color:#cbd5e1;">Velero</span><div class="ocqs-toggle on" id="tog-velero" onclick="ocqsToggle('velero')"></div></div>
-          <div class="ocqs-toggle-row"><span style="font-size:13px;color:#cbd5e1;">kube-prometheus-stack</span><div class="ocqs-toggle on" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
-        </div>
-
-        <!-- Auto-derived paths -->
-        <div class="ocqs-card">
-          <h3>📁 Auto-Derived Paths</h3>
-          <div class="ocqs-label">Config Path</div>
-          <div class="ocqs-path-badge" id="ocqs-configpath">/home/dzoan/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
-          <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
-          <div class="ocqs-path-badge" id="ocqs-gitopspath">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
-          <div class="ocqs-label" style="margin-top:10px;">Bootstrap Log Path</div>
-          <div class="ocqs-path-badge" id="ocqs-logpath">/home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/</div>
-        </div>
-
-        <!-- Generated YAML preview -->
-        <div class="ocqs-card">
-          <h3>📄 Generated Config Snippet</h3>
-          <pre class="ocqs-yaml" id="ocqs-yaml-preview"></pre>
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyYaml()">📋 Copy Config</button>
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsDownloadYaml()">⬇ Download Config</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section C: Guided Steps -->
+            <!-- Section C: Guided Steps -->
       <div class="ocqs-section">
         <h2>C. Guided Command Steps</h2>
 
@@ -5275,6 +5148,36 @@ opencenter cluster --help</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2','ocqs-st-2')">📋 Copy — cluster init</button>
           </div>
           <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
+          <!-- Inline Cluster Identity Inputs -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:12px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏷 Cluster Identity</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <label class="ocqs-label">Organization Name</label>
+                <input class="ocqs-input" id="ocqs-org" value="my-org" oninput="ocqsUpdate()">
+              </div>
+              <div>
+                <label class="ocqs-label">Cluster Name</label>
+                <input class="ocqs-input" id="ocqs-cluster" value="my-cluster" oninput="ocqsUpdate()">
+              </div>
+              <div>
+                <label class="ocqs-label">Environment</label>
+                <select class="ocqs-select" id="ocqs-env" onchange="ocqsUpdate()">
+                  <option value="dev" selected>dev</option><option value="uat">uat</option><option value="prod">prod</option>
+                </select>
+              </div>
+              <div>
+                <label class="ocqs-label">Target Provider</label>
+                <select class="ocqs-select" id="ocqs-provider" onchange="ocqsUpdate()">
+                  <option value="openstack" selected>openstack</option><option value="kind">kind (local)</option><option value="vmware">vmware</option><option value="baremetal">baremetal</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <div class="ocqs-label">Config Path</div>
+              <div class="ocqs-path-badge" id="ocqs-configpath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
+            </div>
+          </div>
           <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Select active cluster (required before validate/generate/deploy):</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-2c"></div>
           <div style="display:flex;gap:8px;margin-bottom:10px;">
@@ -5292,15 +5195,87 @@ opencenter cluster --help</div>
             <h3 style="margin:0;">Fill Required FLEX/OpenStack Values</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-3">Not Started</span>
           </div>
-          <p>OpenCenter needs OpenStack application credentials to create infrastructure on FLEX/OpenStack.</p>
-          <pre class="ocqs-yaml" id="ocqs-yaml-3"></pre>
-          <div style="display:flex;gap:8px;margin:8px 0;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyEl('ocqs-yaml-3','ocqs-st-3')">📋 Copy Snippet</button>
+          <p>Fill in your OpenStack / FLEX credentials. Import your OpenRC file to auto-fill all fields, then click <strong>Auto-Detect</strong> to populate network and subnet IDs automatically.</p>
+          <!-- OpenRC upload -->
+          <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label style="background:#0369a1;color:#fff;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                &#128194; Choose OpenRC File
+                <input type="file" id="ocqs-openrc-input" accept=".sh,.env,.rc,text/plain" style="display:none" onchange="ocqsParseOpenRC(this)">
+              </label>
+              <span id="ocqs-openrc-filename" style="font-size:12px;color:#64748b;font-style:italic;">No file chosen</span>
+              <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
+            </div>
           </div>
-          <p style="font-size:12px;color:#64748b;"><strong>Optional — environment variables:</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-3env"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-3env','ocqs-st-3')">📋 Copy</button>
-          <div class="ocqs-warn-box">For quick testing you can put credentials directly in the config. For production use secret files or environment variables.</div>
+          <!-- Auth type -->
+          <label class="ocqs-label">Auth Type</label>
+          <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
+            <option value="password">Password (username + API key)</option>
+            <option value="v3applicationcredential">Application Credential</option>
+          </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+            <div>
+              <label class="ocqs-label">Auth URL</label>
+              <input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()">
+            </div>
+            <div>
+              <label class="ocqs-label">Region</label>
+              <input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()">
+            </div>
+          </div>
+          <!-- Password fields -->
+          <div id="ocqs-pw-fields" style="margin-top:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
+            </div>
+            <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
+            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
+          </div>
+          <!-- App cred fields -->
+          <div id="ocqs-appcred-fields" style="display:none;margin-top:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+            </div>
+          </div>
+          <!-- Network auto-detect -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-top:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:800;color:#15803d;">&#128269; Network / Subnet — Auto-Detect</div>
+              <button onclick="ocqsAutoDetectNetwork()" id="ocqs-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
+            </div>
+            <div id="ocqs-detect-status" style="font-size:11px;color:#64748b;margin-bottom:10px;">Fill credentials above then click Run Detection to auto-populate network and subnet IDs.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div>
+                <label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:9px;">(PUBLICNET)</span></label>
+                <input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;">
+              </div>
+              <div>
+                <label class="ocqs-label">Tenant Network ID</label>
+                <input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;">
+              </div>
+              <div>
+                <label class="ocqs-label">Tenant Subnet ID</label>
+                <input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;">
+              </div>
+            </div>
+          </div>
+          <!-- Config snippet -->
+          <div style="margin-top:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div style="font-size:11px;font-weight:700;color:#64748b;">Generated Config Snippet</div>
+              <div style="display:flex;gap:6px;">
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyEl('ocqs-yaml-3','ocqs-st-3')" style="padding:4px 10px;font-size:11px;">&#128203; Copy</button>
+                <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsDownloadYaml()" style="padding:4px 10px;font-size:11px;">&#11015; Download</button>
+              </div>
+            </div>
+            <pre class="ocqs-yaml" id="ocqs-yaml-3" style="max-height:220px;overflow-y:auto;"></pre>
+          </div>
+          <div class="ocqs-warn-box" style="margin-top:10px;">For production use secret files or environment variables instead of inline credentials.</div>
         </div>
 
         <!-- Step 4 -->
@@ -5311,10 +5286,27 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-4">Not Started</span>
           </div>
           <p>OpenCenter generates a FluxCD-ready GitOps repository. You need a Git repo URL and token so OpenCenter can push generated manifests.</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#128230; GitOps Repository</div>
+            <label class="ocqs-label">Git Provider</label>
+            <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()">
+              <option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option>
+            </select>
+            <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
+            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+              <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()"></div>
+            </div>
+            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(used to generate token-file command only)</span></label>
+            <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
+          </div>
           <div class="ocqs-cmd" id="ocqs-cmd-4"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-4','ocqs-st-4')">📋 Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-4','ocqs-st-4')">&#128203; Copy Token Command</button>
           <pre class="ocqs-yaml" id="ocqs-yaml-4" style="margin-top:10px;"></pre>
-          <div class="ocqs-info-box"><strong>Common errors:</strong> missing GitOps URL, invalid token, repo does not exist, token lacks write permission.</div>
+          <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
+          <div class="ocqs-path-badge" id="ocqs-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
+          <div class="ocqs-info-box" style="margin-top:10px;"><strong>Common errors:</strong> missing GitOps URL, invalid token, repo does not exist, token lacks write permission.</div>
         </div>
 
         <!-- Step 5 -->
@@ -5325,8 +5317,16 @@ opencenter cluster --help</div>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-5">Not Started</span>
           </div>
           <p>Keycloak, Loki, and Tempo require extra secrets. Disable them for the first bootstrap.</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#9881;&#65039; Optional Services</div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Keycloak</span><div class="ocqs-toggle" id="tog-keycloak" onclick="ocqsToggle('keycloak')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Loki</span><div class="ocqs-toggle" id="tog-loki" onclick="ocqsToggle('loki')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Tempo</span><div class="ocqs-toggle" id="tog-tempo" onclick="ocqsToggle('tempo')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Velero</span><div class="ocqs-toggle on" id="tog-velero" onclick="ocqsToggle('velero')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">kube-prometheus-stack</span><div class="ocqs-toggle on" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
+          </div>
           <div class="ocqs-cmd" id="ocqs-cmd-5"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-5','ocqs-st-5')">📋 Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-5','ocqs-st-5')">&#128203; Copy</button>
           <pre class="ocqs-yaml" id="ocqs-yaml-5" style="margin-top:10px;"></pre>
           <div class="ocqs-warn-box">Re-enable these later with proper secrets and Swift/object storage credentials.</div>
         </div>
@@ -5586,6 +5586,10 @@ opencenter cluster --help</div>
             if (ap) ap.style.display = t === 'v3applicationcredential' ? '' : 'none';
         };
         window.ocqsAutoDetectNetwork = function(){
+            var btn = document.getElementById('ocqs-detect-btn');
+            var st  = document.getElementById('ocqs-detect-status');
+            if (btn) { btn.textContent='...detecting'; btn.disabled=true; }
+            if (st) st.textContent='Querying OpenStack API...';
             var authUrl = (document.getElementById('ocqs-authurl')||{}).value || '';
             var region = (document.getElementById('ocqs-region')||{}).value || '';
             var cmd = 'openstack network list --format json && openstack subnet list --format json';
@@ -5606,10 +5610,11 @@ opencenter cluster --help</div>
                 if (d.network_id) { sv('ocqs-networkid', d.network_id); }
                 if (d.subnet_id) { sv('ocqs-subnetid', d.subnet_id); }
                 if (typeof ocqsUpdate === 'function') ocqsUpdate();
+            }).then(function(){
+                if (btn) { btn.textContent='&#9654; Run Detection'; btn.disabled=false; }
             }).catch(function(){
-                // Backend not available — show command in terminal for manual run
-                var term = document.getElementById('ocqs-terminal');
-                if (term) term.textContent += '\n[Paste output above into network/subnet fields manually]';
+                if (btn) { btn.textContent='&#9654; Run Detection'; btn.disabled=false; }
+                if (st) st.textContent='Backend not reachable. Paste network/subnet IDs manually.';
             });
         };
         window.ocqsUpdate = function(){
