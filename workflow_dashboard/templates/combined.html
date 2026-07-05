@@ -5102,6 +5102,57 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} };
       };
     </script>
+        <!-- Prerequisites -->
+        <div class="ocqs-card" id="ocqs-prereq">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span class="ocqs-step-num" style="background:#6366f1;">&#10003;</span>
+            <h3 style="margin:0;">Prerequisites</h3>
+          </div>
+          <p>Before starting, ensure you have all of the following:</p>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">1 — Mise (tool version manager &amp; task runner)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-mise"># Linux
+curl https://mise.run | sh
+echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+mise --version</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-mise','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-mise" onclick="ocqsRunCmd('ocqs-cmd-pre-mise','ocqs-out-pre-mise','ocqs-run-pre-mise')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button>
+          </div>
+          <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-git">git --version
+# Should show: git version 2.x or higher</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-git','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-git" onclick="ocqsRunCmd('ocqs-cmd-pre-git','ocqs-out-pre-git','ocqs-run-pre-git')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button>
+          </div>
+          <div id="ocqs-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-pre-ssh"># Generate if you don't have one
+ssh-keygen -t ed25519 -C "your-email@example.com"
+cat ~/.ssh/id_ed25519.pub</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-ssh','')">&#128203; Copy</button>
+            <button id="ocqs-run-pre-ssh" onclick="ocqsRunCmd('ocqs-cmd-pre-ssh','ocqs-out-pre-ssh','ocqs-run-pre-ssh')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button>
+          </div>
+          <div id="ocqs-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+</div>
+
+          <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.8;">
+            <div>&#9679; <strong>OpenStack</strong> cloud credentials — recommended for production (FLEX IAD3)</div>
+            <div>&#9679; <strong>Kind</strong> — local development, needs Docker: <code>sudo apt install -y docker.io</code></div>
+            <div>&#9679; <strong>VMware vSphere</strong> — with pre-provisioned VMs</div>
+            <div>&#9679; <strong>AWS</strong> credentials — experimental</div>
+          </div>
+        </div>
+
         <!-- Step 1 -->
         <div class="ocqs-card" id="ocqs-step-1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -5234,7 +5285,12 @@ opencenter cluster --help</div>
             <h3 style="margin:0;">Fill Required FLEX/OpenStack Values</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-3">Not Started</span>
           </div>
-          <p>Fill in your OpenStack / FLEX credentials. Import your OpenRC file to auto-fill all fields, then click <strong>Auto-Detect</strong> to populate network and subnet IDs automatically.</p>
+          <p>Edit the configuration file to match your environment. Import your OpenRC file to auto-fill credentials, then Auto-Detect network IDs.</p>
+          <div class="ocqs-info-box" style="margin-bottom:12px;">
+            <strong>For Kind (local dev — no cloud needed):</strong><br>
+            <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">opencenter:<br>&nbsp;&nbsp;infrastructure:<br>&nbsp;&nbsp;&nbsp;&nbsp;provider: kind</code>
+            — select <strong>kind</strong> in Provider above.
+          </div>
           <!-- OpenRC upload -->
           <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
@@ -5385,9 +5441,18 @@ opencenter cluster --help</div>
           <div id="6" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <div class="ocqs-info-box">
-            <strong>PASS:</strong> No missing required fields, no critical CHANGEME values<br>
-            <strong>WARN:</strong> Optional services disabled, git local dirty, remote checks skipped offline<br>
-            <strong>FAIL:</strong> Missing app_credential_id/secret, missing GitOps URL/token, CHANGEME found
+            <strong>PASS:</strong> No missing required fields; no critical CHANGEME values<br>
+            <strong>WARN:</strong> Optional services disabled; git local dirty; remote checks skipped offline<br>
+            <strong>FAIL:</strong> Missing credentials; missing GitOps URL/token; CHANGEME found
+          </div>
+          <p style="font-size:12px;font-weight:700;color:#dc2626;margin-top:12px;">Common Validation Errors:</p>
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:12px;line-height:2;">
+            <div><code>ERROR: vrrp_ip must be set when use_octavia=false</code><br>
+            Fix: set <code>opencenter.cluster.networking.vrrp_ip: "10.0.0.10"</code></div>
+            <div style="margin-top:8px;"><code>ERROR: subnet_pods overlaps with subnet_services</code><br>
+            Fix: use <code>subnet_pods: "10.42.0.0/16"</code> and <code>subnet_services: "10.43.0.0/16"</code></div>
+            <div style="margin-top:8px;"><code>ERROR: application_credential_id required</code><br>
+            Fix: fill credentials in Step 3 and re-run generate</div>
           </div>
         </div>
 
@@ -5395,7 +5460,7 @@ opencenter cluster --help</div>
         <div class="ocqs-card" id="ocqs-step-7">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">7</span>
-            <h3 style="margin:0;">Sync Secrets &amp; Generate GitOps Repository</h3>
+            <h3 style="margin:0;">Setup GitOps Repository</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-7">Not Started</span>
           </div>
           <p>Sync any external secrets, run a final validate, then generate the FluxCD GitOps manifests.</p>
@@ -5403,7 +5468,21 @@ opencenter cluster --help</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7','ocqs-st-7')">📋 Copy</button><button id="ocqs-run-7" onclick="ocqsRunCmd('ocqs-cmd-7','ocqs-out-7','ocqs-run-7')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button>
           <div id="7" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
-          <div class="ocqs-info-box"><strong>Expected:</strong> Generate complete | GitOps path: <span id="ocqs-gitopspath2">/home/dzoan/.config/opencenter/clusters/gitops/my-org</span> | Manifests created: 97</div>
+          <div class="ocqs-info-box">
+            <strong>Expected output:</strong> Generate complete | Manifests created: 97+<br>
+            <strong>Creates:</strong><br>
+            <code style="font-size:10px;line-height:1.8;">
+            &lt;git_dir&gt;/<br>
+            ├── applications/overlays/demo/<br>
+            │   ├── flux-system/   # FluxCD bootstrap<br>
+            │   ├── services/      # Platform services<br>
+            │   └── managed-services/<br>
+            └── infrastructure/clusters/demo/<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;├── main.tf        # Terraform/OpenTofu<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;├── inventory/     # Kubespray Ansible<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;└── kubeconfig.yaml
+            </code>
+          </div>
           <div class="ocqs-cmd" id="ocqs-cmd-7b"></div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7b','ocqs-st-7')" style="margin-top:6px;">📋 Copy — Check CHANGEME</button>
           <div class="ocqs-warn-box">If CHANGEME values remain in critical fields, fix the config and regenerate before deploy.</div>
@@ -5433,6 +5512,13 @@ opencenter cluster --help</div>
           </div>
           <div class="ocqs-warn-box" style="margin-bottom:10px;">⚠️ <strong>NEVER run deploy until validation passes and no critical CHANGEME values remain.</strong></div>
           <p>Provisions infrastructure, deploys Kubernetes, bootstraps GitOps/Flux, and applies platform services.</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;line-height:1.9;margin-bottom:10px;">
+            <div><strong style="color:#0369a1;">Phase 1</strong> — Infrastructure (5-10 min): VMs, networks, load balancers, storage</div>
+            <div><strong style="color:#0369a1;">Phase 2</strong> — Kubernetes (10-15 min): ContainerD, control plane, worker nodes, Calico CNI</div>
+            <div><strong style="color:#0369a1;">Phase 3</strong> — GitOps (2-5 min): FluxCD controllers, GitRepository sources, Kustomizations</div>
+            <div><strong style="color:#0369a1;">Phase 4</strong> — Services (10-20 min): cert-manager, Keycloak, Prometheus, ingress, TLS</div>
+            <div style="margin-top:6px;color:#64748b;"><strong>Total: 30–50 minutes</strong> depending on provider and service count</div>
+          </div>
           <div class="ocqs-cmd" id="ocqs-cmd-9"></div>
           <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn" onclick="ocqsDeploy()">🚀 Copy Deploy Command</button>
           <div class="ocqs-info-box" style="margin-top:10px;"><strong>If deploy fails — view logs:</strong></div>
@@ -5454,8 +5540,15 @@ opencenter cluster --help</div>
           <div id="9b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <div class="ocqs-info-box" style="margin-top:10px;">
-            <strong>Expected:</strong> All nodes STATUS=Ready | kustomizations READY=True | helmreleases READY=True<br>
-            <strong>Access:</strong> Services at <code>https://&lt;svc&gt;.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</code>
+            <strong>Expected nodes output:</strong><br>
+            <code style="font-size:10px;">demo-cp-1  Ready  15m<br>demo-cp-2  Ready  15m<br>demo-cp-3  Ready  15m<br>demo-wn-1  Ready  12m<br>demo-wn-2  Ready  12m</code>
+          </div>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;margin-top:10px;line-height:2;">
+            <strong style="color:#15803d;">Service Access URLs:</strong><br>
+            <div>&#128202; <strong>Headlamp</strong>: <code>https://dashboard.&lt;org&gt;.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</code></div>
+            <div>&#128274; <strong>Keycloak</strong>: <code>https://auth.&lt;org&gt;.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</code></div>
+            <div>&#128200; <strong>Grafana</strong>: <code>https://grafana.&lt;org&gt;.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</code></div>
+            <div style="margin-top:4px;color:#64748b;">Default credentials are in your config file under the <code>secrets</code> section.</div>
           </div>
         </div>
 
@@ -5493,21 +5586,60 @@ opencenter cluster --help</div>
       <!-- Section E: Troubleshooting -->
       <div class="ocqs-section">
         <h2>E. Troubleshooting</h2>
+
         <div class="ocqs-card">
-          <h3>Common Issues</h3>
-          <table class="ocqs-req-table">
-            <thead><tr><th>Error</th><th>Fix</th></tr></thead>
-            <tbody>
-              <tr><td>"Not: command not found" after curl install</td><td>Downloaded 404 page. Use <code>curl -fL</code> + GitHub API asset discovery.</td></tr>
-              <tr><td>remote origin already exists</td><td><code>git remote set-url origin URL && git push</code></td></tr>
-              <tr><td>CHANGEME in generated manifests</td><td>Fix config, re-run <code>opencenter cluster generate</code></td></tr>
-              <tr><td>application_credential invalid</td><td>Re-check Horizon / App Credentials section. Regenerate if expired.</td></tr>
-              <tr><td>token invalid / permission denied</td><td>Ensure token has repo write scope. Recreate token file.</td></tr>
-              <tr><td>Network/image/flavor missing</td><td>Fill FLEX tenant network/image/flavor IDs in config before generate.</td></tr>
-              <tr><td>validate shows missing GitOps URL</td><td>Set <code>gitops.repository.url</code> in config then re-validate.</td></tr>
-            </tbody>
-          </table>
+          <h3>&#10060; Validation Fails</h3>
+          <p><strong>Problem:</strong> <code>opencenter cluster validate</code> shows errors</p>
+          <p><strong>Solution:</strong> Read error messages carefully. Common issues:</p>
+          <ul style="font-size:13px;line-height:2;padding-left:18px;">
+            <li>Missing required fields (credentials, network IDs)</li>
+            <li>Invalid CIDR ranges or overlapping subnets</li>
+            <li>Provider-specific constraints not met</li>
+          </ul>
+          <div class="ocqs-cmd" id="ocqs-cmd-t1">opencenter cluster validate
+# Read the error carefully — each line tells you exactly what to fix</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t1','')">&#128203; Copy</button>
+            <button id="ocqs-run-t1" onclick="ocqsRunCmd('ocqs-cmd-t1','ocqs-out-t1','ocqs-run-t1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button>
+          </div>
+          <div id="ocqs-out-t1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;">$ waiting...
+</div>
         </div>
+
+        <div class="ocqs-card">
+          <h3>&#9203; Bootstrap Hangs</h3>
+          <p><strong>Problem:</strong> <code>opencenter cluster deploy</code> appears stuck</p>
+          <p><strong>Solution:</strong> Check logs:</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-t2"># Terraform logs
+tail -f &lt;git_dir&gt;/infrastructure/clusters/demo/terraform.log
+
+# Ansible logs
+tail -f &lt;git_dir&gt;/infrastructure/clusters/demo/ansible.log</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t2','')">&#128203; Copy</button>
+          </div>
+          <div class="ocqs-info-box" style="margin-top:8px;">
+            <strong>Common causes:</strong> Network connectivity issues &bull; Insufficient cloud quotas &bull; SSH key not accessible
+          </div>
+        </div>
+
+        <div class="ocqs-card">
+          <h3>&#128260; Services Not Deploying</h3>
+          <p><strong>Problem:</strong> FluxCD shows errors, services not reconciling</p>
+          <p><strong>Solution:</strong> Check FluxCD status:</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-t3">kubectl get kustomizations -n flux-system
+kubectl describe kustomization &lt;name&gt; -n flux-system</div>
+          <div style="display:flex;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t3','')">&#128203; Copy</button>
+            <button id="ocqs-run-t3" onclick="ocqsRunCmd('ocqs-cmd-t3','ocqs-out-t3','ocqs-run-t3')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button>
+          </div>
+          <div id="ocqs-out-t3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;">$ waiting...
+</div>
+          <div class="ocqs-info-box" style="margin-top:8px;">
+            <strong>Common causes:</strong> Git repo not accessible (SSH key issue) &bull; SOPS decryption failure (Age key not found) &bull; Service configuration errors
+          </div>
+        </div>
+
       </div>
 
       <!-- Section F: Best Learning Path -->
@@ -5526,6 +5658,28 @@ opencenter cluster --help</div>
         </div>
       </div>
 
+      <div class="ocqs-section">
+        <h2>&#9989; Check Your Work</h2>
+        <div class="ocqs-card">
+          <p>After deployment, verify everything is running:</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-chk1">kubectl get nodes</div>
+          <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk1','')">&#128203; Copy</button><button id="ocqs-run-chk1" onclick="ocqsRunCmd('ocqs-cmd-chk1','ocqs-out-chk1','ocqs-run-chk1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button></div>
+          <div id="ocqs-out-chk1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
+</div>
+          <div class="ocqs-cmd" id="ocqs-cmd-chk2">kubectl get kustomizations -n flux-system</div>
+          <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk2','')">&#128203; Copy</button><button id="ocqs-run-chk2" onclick="ocqsRunCmd('ocqs-cmd-chk2','ocqs-out-chk2','ocqs-run-chk2')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button></div>
+          <div id="ocqs-out-chk2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
+</div>
+          <div class="ocqs-cmd" id="ocqs-cmd-chk3">kubectl get helmreleases -A</div>
+          <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk3','')">&#128203; Copy</button><button id="ocqs-run-chk3" onclick="ocqsRunCmd('ocqs-cmd-chk3','ocqs-out-chk3','ocqs-run-chk3')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button></div>
+          <div id="ocqs-out-chk3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
+</div>
+          <div class="ocqs-cmd" id="ocqs-cmd-chk4">kubectl get pods -A</div>
+          <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk4','')">&#128203; Copy</button><button id="ocqs-run-chk4" onclick="ocqsRunCmd('ocqs-cmd-chk4','ocqs-out-chk4','ocqs-run-chk4')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button></div>
+          <div id="ocqs-out-chk4" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;">$ waiting...
+</div>
+        </div>
+      </div>
       <!-- Section G: Safety Checklist -->
       <div class="ocqs-section">
         <h2>G. Safety Checklist Before Deploy</h2>
