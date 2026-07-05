@@ -5812,6 +5812,10 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         };
         window.ocqsUpdate = function(){
         var s = ocqsGetState();
+        // Slugify org/cluster names — OpenCenter identifiers must be DNS-safe (no spaces/uppercase)
+        var _slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
+        s.org = _slug(s.org) || 'my-org';
+        s.cluster = _slug(s.cluster) || 'my-cluster';
         var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
         var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
         var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
