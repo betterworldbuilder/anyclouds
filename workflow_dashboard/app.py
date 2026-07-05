@@ -20360,6 +20360,42 @@ def stream_run_cmd():
 
 
 
+@app.post("/api/openrc/edit-config")
+def edit_config_nano():
+    """Open the given config file in nano inside a real Windows Terminal (WSL interop)."""
+    body = request.get_json(force=True, silent=True) or {}
+    path = (body.get("path") or "").strip()
+    if not path:
+        return jsonify({"ok": False, "error": "no path"}), 400
+    # Create the file (and parent dirs) if it doesn't exist yet so nano opens cleanly
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if not os.path.exists(path):
+            open(path, "a").close()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"cannot create file: {e}"}), 500
+    # Launch nano in a new Windows Terminal window via WSL->Windows interop.
+    # Resolve Windows executables by absolute path (they aren't always on PATH).
+    import glob as _glob
+    wt = next(iter(_glob.glob("/mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/wt.exe")), "wt.exe")
+    cmd_exe = "/mnt/c/Windows/System32/cmd.exe"
+    wsl_exe = "/mnt/c/Windows/System32/wsl.exe"
+    launchers = [
+        [wt, wsl_exe, "-e", "nano", path],
+        [cmd_exe, "/c", "start", "wt", "wsl", "nano", path],
+        [cmd_exe, "/c", "start", "wsl", "nano", path],
+    ]
+    last_err = ""
+    for cmd in launchers:
+        try:
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return jsonify({"ok": True, "launcher": cmd[0], "path": path})
+        except Exception as e:
+            last_err = str(e)
+            continue
+    return jsonify({"ok": False, "error": f"could not launch a terminal: {last_err}"}), 500
+
+
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))

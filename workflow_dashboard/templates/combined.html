@@ -5063,6 +5063,18 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         <h2>C. Guided Command Steps</h2>
 
 <script>
+      window.ocqsEditConfig = function(btn){
+        var cmdEl = document.getElementById('ocqs-cmd-2b');
+        var path = '';
+        if (cmdEl){ var m = cmdEl.textContent.match(/CONFIG="([^"]+)"/); if(m) path=m[1]; }
+        var st = document.getElementById('ocqs-edit-status');
+        if(!path){ if(st){st.textContent='No config path yet.';st.style.color="#dc2626";} return; }
+        if(st){ st.textContent='Opening nano in a WSL terminal...'; st.style.color='#0369a1'; }
+        fetch('/api/openrc/edit-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:path})})
+          .then(function(r){return r.json();})
+          .then(function(d){ if(st){ st.textContent = d.ok ? '✓ nano opened in a new terminal window' : ('✗ '+(d.error||'failed')); st.style.color = d.ok?'#15803d':'#dc2626'; } })
+          .catch(function(e){ if(st){st.textContent='✗ '+e;st.style.color='#dc2626';} });
+      };
       window.ocqsCopyOut = function(outId, btn){
         var out = document.getElementById(outId);
         if (!out) return;
@@ -5263,9 +5275,6 @@ opencenter cluster --help</div>
           <div id="ocqs-out-2c" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
           </div>
           </div>
-          <p style="font-size:12px;color:#64748b;"><strong>Open config to edit:</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-2b"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2b','ocqs-st-2')">📋 Copy — Open Config</button>
         </div>
 
         <!-- Step 3 -->
@@ -5361,6 +5370,13 @@ opencenter cluster --help</div>
             <pre class="ocqs-yaml" id="ocqs-yaml-3" style="max-height:220px;overflow-y:auto;"></pre>
           </div>
           <div class="ocqs-warn-box" style="margin-top:10px;">For production use secret files or environment variables instead of inline credentials.</div>
+          <p style="font-size:12px;color:#64748b;margin-top:14px;"><strong>Open config to edit:</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-2b"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2b','ocqs-st-3')">📋 Copy — Open Config</button>
+            <button onclick="ocqsEditConfig(this)" style="background:#15803d;color:#fff;border:1px solid #166534;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">✏️ Edit openconfig (nano)</button>
+            <span id="ocqs-edit-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
+          </div>
         </div>
 
         <!-- Step 4 -->
