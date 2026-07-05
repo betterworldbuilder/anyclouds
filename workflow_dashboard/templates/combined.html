@@ -5164,36 +5164,7 @@ mise run build
           <div id="ocqs-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
           </div>
           <p style="font-size:11px;color:#64748b;">You should see version information including git commit and build date.</p>
-          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Option A — Full setup from scratch (installs mise + build deps):</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-1a">cd ~/OSPC2FLEX
-
-sudo apt update
-sudo apt install -y git curl build-essential ca-certificates
-
-# Install mise
-curl https://mise.run | sh
-
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$($HOME/.local/bin/mise activate bash)"' >> ~/.bashrc
-source ~/.bashrc
-
-mise --version
-
-# Clone CLI source
-git clone https://github.com/opencenter-cloud/openCenter-cli.git
-cd openCenter-cli
-
-mise trust
-mise install
-mise run build
-
-./bin/opencenter version</div>
-          <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1a','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1a" onclick="ocqsRunCmd('ocqs-cmd-1a','ocqs-out-1a','ocqs-run-1a')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button>
-          </div>
-<div id="ocqs-out-1a" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
-</div>
-          <p style="font-size:12px;color:#64748b;"><strong>Option B — GitHub release binary download:</strong></p>
+          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Alternative — GitHub release binary download:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-1b">sudo apt update && sudo apt install -y curl jq ca-certificates
 
 REPO="opencenter-cloud/openCenter-cli"
