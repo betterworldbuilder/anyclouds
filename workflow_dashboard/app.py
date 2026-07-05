@@ -20287,34 +20287,72 @@ printf 'avg_ms=%s\np95_ms=%s\nerror_pct=%s\ncpu_load=%s\nmem_pct=%s\niowait=%s\n
 
 @app.post("/api/openstack/networks")
 def openstack_networks():
-    import subprocess, json as _json
+    """Auto-detect network/subnet IDs via the OpenStack REST API (Keystone -> Neutron).
+
+    No openstack CLI needed. Supports password and application-credential auth.
+    """
+    import requests as _rq
     body = request.get_json(force=True, silent=True) or {}
-    env = {**os.environ, "OS_AUTH_TYPE": body.get("auth_type", "password"),
-           "OS_AUTH_URL": body.get("auth_url", ""),
-           "OS_REGION_NAME": body.get("region", ""),
-           "OS_USERNAME": body.get("username", ""),
-           "OS_PASSWORD": body.get("password", ""),
-           "OS_USER_DOMAIN_NAME": body.get("user_domain_name", "Default"),
-           "OS_PROJECT_DOMAIN_NAME": body.get("project_domain_name", "Default"),
-           "OS_PROJECT_ID": body.get("project_id", ""),
-           "OS_APPLICATION_CREDENTIAL_ID": body.get("application_credential_id", ""),
-           "OS_APPLICATION_CREDENTIAL_SECRET": body.get("application_credential_secret", ""),
-           "OS_IDENTITY_API_VERSION": "3", "OS_INTERFACE": "public"}
+    auth_url = (body.get("auth_url") or "").rstrip("/")
+    region = body.get("region") or ""
+    if not auth_url:
+        return jsonify({"error": "missing auth_url"}), 400
+    # Keystone v3 token URL
+    token_url = auth_url + ("/auth/tokens" if auth_url.endswith("/v3") else "/v3/auth/tokens")
+
+    # Build identity payload for password or app-credential auth
+    cred_id = body.get("application_credential_id")
+    cred_secret = body.get("application_credential_secret")
+    if cred_id and cred_secret:
+        identity = {"methods": ["application_credential"],
+                    "application_credential": {"id": cred_id, "secret": cred_secret}}
+        auth_body = {"auth": {"identity": identity}}
+    else:
+        user = {"name": body.get("username", ""),
+                "password": body.get("password", ""),
+                "domain": {"name": body.get("user_domain_name") or "Default"}}
+        identity = {"methods": ["password"], "password": {"user": user}}
+        scope = None
+        if body.get("project_id"):
+            scope = {"project": {"id": body["project_id"]}}
+        auth_body = {"auth": {"identity": identity}}
+        if scope:
+            auth_body["auth"]["scope"] = scope
+
     result = {"external_network_id": None, "network_id": None, "subnet_id": None}
     try:
-        nets = subprocess.run(["openstack", "network", "list", "--format", "json"],
-                              capture_output=True, text=True, env=env, timeout=20)
-        net_data = _json.loads(nets.stdout or "[]")
-        for n in net_data:
-            if n.get("Router External") or "PUBLIC" in (n.get("Name") or "").upper():
-                result["external_network_id"] = n.get("ID")
+        tr = _rq.post(token_url, json=auth_body, timeout=20)
+        if tr.status_code not in (200, 201):
+            return jsonify({"error": f"Keystone auth failed ({tr.status_code}): {tr.text[:200]}"}), 502
+        token = tr.headers.get("X-Subject-Token", "")
+        catalog = tr.json().get("token", {}).get("catalog", [])
+        # Find Neutron (network) public endpoint for the region
+        neutron = None
+        for svc in catalog:
+            if svc.get("type") == "network":
+                eps = svc.get("endpoints", [])
+                pick = ([e for e in eps if e.get("interface") == "public" and (not region or e.get("region") == region)]
+                        or [e for e in eps if e.get("interface") == "public"])
+                if pick:
+                    neutron = pick[0]["url"].rstrip("/")
+                    break
+        if not neutron:
+            return jsonify({"error": "no Neutron endpoint in catalog"}), 502
+        hdr = {"X-Auth-Token": token}
+        nets = _rq.get(neutron + "/v2.0/networks", headers=hdr, timeout=20).json().get("networks", [])
+        for n in nets:
+            if n.get("router:external") or "PUBLIC" in (n.get("name") or "").upper():
+                result["external_network_id"] = result["external_network_id"] or n.get("id")
             elif not result["network_id"]:
-                result["network_id"] = n.get("ID")
-        subs = subprocess.run(["openstack", "subnet", "list", "--format", "json"],
-                              capture_output=True, text=True, env=env, timeout=20)
-        sub_data = _json.loads(subs.stdout or "[]")
-        if sub_data:
-            result["subnet_id"] = sub_data[0].get("ID")
+                result["network_id"] = n.get("id")
+        # Prefer subnet belonging to the chosen tenant network
+        subs = _rq.get(neutron + "/v2.0/subnets", headers=hdr, timeout=20).json().get("subnets", [])
+        if result["network_id"]:
+            match = [s for s in subs if s.get("network_id") == result["network_id"]]
+            if match:
+                result["subnet_id"] = match[0].get("id")
+        if not result["subnet_id"] and subs:
+            result["subnet_id"] = subs[0].get("id")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     return jsonify(result)
@@ -20333,10 +20371,30 @@ def stream_run_cmd():
             env = {**os.environ}
             local_bin = os.path.join(home, ".local", "bin")
             env["PATH"] = local_bin + os.pathsep + env.get("PATH", "")
+            # Ensure terraform symlink exists pointing to tofu (OpenTofu)
+            tofu_path = os.path.join(home, ".local", "share", "mise", "shims", "tofu")
+            if not os.path.exists(tofu_path):
+                import glob as _glob
+                found = _glob.glob(os.path.join(home, ".local", "share", "mise", "installs", "opentofu", "*", "tofu"))
+                if found:
+                    tofu_path = sorted(found)[-1]
+            terraform_link = os.path.join(local_bin, "terraform")
+            if os.path.exists(tofu_path) and not os.path.exists(terraform_link):
+                try:
+                    os.symlink(tofu_path, terraform_link)
+                except Exception:
+                    pass
+            # Auto-set SOPS_AGE_KEY_FILE if not set — scans known locations
+            sops_setup = (
+                'if [ -z "$SOPS_AGE_KEY_FILE" ]; then '
+                'for _f in $HOME/.config/opencenter/clusters/secrets/*/*/age/keys/*.txt; do '
+                '[ -f "$_f" ] && export SOPS_AGE_KEY_FILE="$_f" && break; done; fi; '
+            )
             wrapped = (
                 f'export PATH="{local_bin}:$PATH"; '
                 f'[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null; '
                 f'command -v mise >/dev/null 2>&1 && eval "$(mise activate bash 2>/dev/null)"; '
+                f'{sops_setup}'
                 f'{cmd}'
             )
             proc = subprocess.Popen(
@@ -20358,6 +20416,85 @@ def stream_run_cmd():
     resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
+
+
+@app.post("/api/openrc/patch-config")
+def patch_config_file():
+    """Patch specific dot-path fields in the YAML config and optionally disable services."""
+    import re as _re
+    body = request.get_json(force=True, silent=True) or {}
+    cfg_path = (body.get("path") or "").strip()
+    fields = body.get("fields") or {}
+    disable_services = body.get("disable_services") or []
+    enable_services  = body.get("enable_services")  or []
+    if not cfg_path:
+        return jsonify({"ok": False, "error": "no path"}), 400
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            text = f.read()
+        patched = 0
+        # For each leaf key, find and replace value in YAML using regex on the last key segment
+        for dot_path, value in fields.items():
+            if not value:
+                continue
+            key = dot_path.split(".")[-1]
+            # Match: "  key: <anything>" and replace with new value (quoted string)
+            pattern = rf'(\b{_re.escape(key)}:\s*)(["\']?)[^\n]*(["\']?)'
+            replacement = f'{key}: "{value}"'
+            new_text, n = _re.subn(rf'^(\s*){_re.escape(key)}:\s*[^\n]*', lambda m: m.group(1) + replacement, text, flags=_re.MULTILINE)
+            if n:
+                text = new_text
+                patched += n
+        # Disable/enable services based on toggle state
+        for svc in disable_services:
+            text = _re.sub(
+                rf'(?m)(^\s+{_re.escape(svc)}:[^\n]*\n(?:\s+[^\n]+\n)*?\s+enabled:\s*)true',
+                r'\g<1>false', text
+            )
+        for svc in enable_services:
+            text = _re.sub(
+                rf'(?m)(^\s+{_re.escape(svc)}:[^\n]*\n(?:\s+[^\n]+\n)*?\s+enabled:\s*)false',
+                r'\g<1>true', text
+            )
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        return jsonify({"ok": True, "patched": patched})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/openrc/read-config")
+def read_config_file():
+    """Return the text content of a config file for inline editing."""
+    path = (request.args.get("path") or "").strip()
+    if not path:
+        return jsonify({"ok": False, "error": "no path"}), 400
+    try:
+        if not os.path.exists(path):
+            # Create empty file + dirs so the editor opens cleanly
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            open(path, "a").close()
+            return jsonify({"ok": True, "content": "", "created": True})
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return jsonify({"ok": True, "content": f.read()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/openrc/save-config")
+def save_config_file():
+    """Write edited content back to the config file."""
+    body = request.get_json(force=True, silent=True) or {}
+    path = (body.get("path") or "").strip()
+    if not path:
+        return jsonify({"ok": False, "error": "no path"}), 400
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(body.get("content", ""))
+        return jsonify({"ok": True, "bytes": len(body.get("content", ""))})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.post("/api/openrc/edit-config")
@@ -20399,4 +20536,8 @@ def edit_config_nano():
 if __name__ == "__main__":
     host = os.environ.get("WORKFLOW_DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("WORKFLOW_DASHBOARD_PORT", "5001"))
-    app.run(host=host, port=port, debug=False, threaded=True)
+    # Use werkzeug with higher thread count to prevent nbd/status polling from starving other routes
+    from werkzeug.serving import make_server
+    srv = make_server(host, port, app, threaded=True)
+    srv.socket.setsockopt(__import__('socket').SOL_SOCKET, __import__('socket').SO_REUSEADDR, 1)
+    srv.serve_forever()

@@ -1979,6 +1979,7 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
 .ocqs-toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
 .ocqs-toggle.on::after{left:19px;}
 .ocqs-terminal{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:14px;font-family:monospace;font-size:12px;color:#94a3b8;min-height:180px;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;}
+[id^="ocqs-out-"]{color:#00ff41 !important;}
 .ocqs-terminal .t-ok{color:#4ade80;}
 .ocqs-terminal .t-warn{color:#fbbf24;}
 .ocqs-terminal .t-err{color:#f87171;}
@@ -4953,7 +4954,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         if(c6) c6.textContent='opencenter secrets sync '+cluster+'\nopencenter cluster validate '+cluster+'\nopencenter cluster generate '+cluster+'\ngrep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 7
         var c7=gi('ocil-cmd-7');
-        if(c7) c7.textContent='cd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps for '+cluster+'"\ngit remote add origin '+gitRepo+' 2>/dev/null || git remote set-url origin '+gitRepo+'\ngit branch -M '+branch+'\ngit push -u origin '+branch;
+        if(c7) c7.textContent='cd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps for '+cluster+'"\ngit remote add origin '+gitRepo.replace('https://','https://'+s.tokVal+'@')+' 2>/dev/null || git remote set-url origin '+gitRepo.replace('https://','https://'+s.tokVal+'@')+'\ngit branch -M '+branch+'\ngit push -u origin '+branch;
 // Step 8
         var c8=gi('ocil-cmd-8');
         if(c8) c8.textContent='opencenter cluster validate '+cluster+'\nopencenter cluster deploy '+cluster;
@@ -5038,31 +5039,154 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
     <!-- LEFT COLUMN -->
     <div class="ocqs-left">
 
-      <!-- Section A: What You Need -->
+      <!-- Intro -->
       <div class="ocqs-section">
-        <h2>A. What You Need</h2>
-        <div class="ocqs-info-box">For a real FLEX/OpenStack deployment, fill all required fields below. For a local test, use Kind first if Docker is installed.</div>
-        <table class="ocqs-req-table">
-          <thead><tr><th>Requirement</th><th>Example / Check</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td><strong>OpenCenter CLI</strong></td><td><code>opencenter version</code></td><td><span id="ocqs-req-cli" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>Git</strong></td><td><code>git --version</code></td><td><span id="ocqs-req-git" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>GitHub/GitLab repo</strong></td><td>opencenter-my-cluster-gitops</td><td><span id="ocqs-req-repo" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>Git token</strong></td><td>~/.config/opencenter/tokens/git-token.txt</td><td><span id="ocqs-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>OpenStack App Cred ID</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>OpenStack App Cred Secret</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>Region</strong></td><td>dfw3, sjc3, iad3</td><td><span id="ocqs-req-region" class="ocqs-badge-missing">Missing</span></td></tr>
-            <tr><td><strong>Network / Flavor / Image</strong></td><td>from FLEX/OpenStack tenant</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
-            <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
-          </tbody>
-        </table>
+        <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:12px;padding:20px 24px;margin-bottom:20px;color:#fff;">
+          <div style="font-size:10px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">OpenCenter Quick Start Tutorial</div>
+          <div style="font-size:18px;font-weight:900;margin-bottom:10px;line-height:1.3;">Create your first production-ready Kubernetes cluster</div>
+          <div style="font-size:13px;color:#94a3b8;line-height:1.8;max-width:700px;">This tutorial walks you through creating your first Kubernetes cluster with openCenter. You will learn the core workflow: initialize, configure, validate, setup GitOps, and bootstrap. By the end you will have a working cluster and understand how to manage it.</div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">What You Will Build</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#334155;line-height:1.8;">
+            <div>&#10003; 3 control plane nodes (high availability)</div>
+            <div>&#10003; 2 worker nodes for workloads</div>
+            <div>&#10003; GitOps with FluxCD</div>
+            <div>&#10003; 20+ platform services</div>
+            <div>&#10003; Encrypted secrets (SOPS)</div>
+            <div>&#10003; Calico CNI networking</div>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:#64748b;">&#8987; <strong>Time to complete:</strong> 10-15 min setup + 30-50 min infrastructure provisioning</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:4px;">
+          <div style="font-size:12px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">A. What You Need</div>
+          <div class="ocqs-info-box" style="margin-bottom:10px;">For a real FLEX/OpenStack deployment, fill all required fields below. For a local test, use Kind first if Docker is installed.</div>
+          <table class="ocqs-req-table">
+            <thead><tr><th>Requirement</th><th>Example / Check</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><strong>OpenCenter CLI</strong></td><td><code>opencenter version</code></td><td><span id="ocqs-req-cli" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>Git</strong></td><td><code>git --version</code></td><td><span id="ocqs-req-git" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>GitHub/GitLab repo</strong></td><td>opencenter-my-cluster-gitops</td><td><span id="ocqs-req-repo" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>Git token</strong></td><td>~/.config/opencenter/tokens/git-token.txt</td><td><span id="ocqs-req-token" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>OpenStack App Cred ID</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credid" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>OpenStack App Cred Secret</strong></td><td>from Horizon / App Credentials</td><td><span id="ocqs-req-credsec" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>Region</strong></td><td>dfw3, sjc3, iad3</td><td><span id="ocqs-req-region" class="ocqs-badge-missing">Missing</span></td></tr>
+              <tr><td><strong>Network / Flavor / Image</strong></td><td>from FLEX/OpenStack tenant</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
+              <tr><td><strong>Docker / Kind</strong></td><td>local test cluster</td><td><span class="ocqs-badge-opt">Optional</span></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-            <!-- Section C: Guided Steps -->
+      <!-- Section C: Guided Stages -->
       <div class="ocqs-section">
-        <h2>C. Guided Command Steps</h2>
+        <h2>C. Guided Stages</h2>
 
 <script>
+      // Global ocqsGetState shim - available before main script loads
+      var _v=function(id){var el=document.getElementById(id);return el?el.value.trim():'';};
+      window.ocqsGetState=function(){
+        try{
+          var _svcs={keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
+          try{_svcs=window._qs?window._qs.services:_svcs;}catch(e){}
+          return {
+            org:_v('ocqs-org')||'my-org', cluster:_v('ocqs-cluster')||'my-cluster',
+            env:_v('ocqs-env')||'dev', provider:_v('ocqs-provider')||'openstack',
+            authUrl:_v('ocqs-authurl')||'https://keystone.api.iad3.rackspacecloud.com/v3/',
+            region:_v('ocqs-region')||'IAD3', authType:_v('ocqs-authtype')||'password',
+            username:_v('ocqs-username'), password:_v('ocqs-password'),
+            userDomain:_v('ocqs-userdomain')||'rackspace_cloud_domain',
+            projDomain:_v('ocqs-projdomain')||'rackspace_cloud_domain',
+            projectId:_v('ocqs-projectid'), credId:_v('ocqs-credid'), credSec:_v('ocqs-credsec'),
+            floatNet:_v('ocqs-floatnet'), networkId:_v('ocqs-networkid'), subnetId:_v('ocqs-subnetid'),
+            gitRepo:_v('ocqs-gitrepo'), gitBranch:_v('ocqs-gitbranch')||'main',
+            tokFile:_v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
+            tokVal:_v('ocqs-tokval'), sshKey:_v('ocqs-sshkey')||'~/.ssh/id_rsa', services:_svcs
+          };
+        }catch(e){return {};}
+      };
+      window.ocqsSave = function(){
+        try{
+          if(typeof ocqsGetState!=='function') return;
+          var s=ocqsGetState();
+          localStorage.setItem('ocqs_state',JSON.stringify({
+            org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,
+            authType:s.authType,authUrl:s.authUrl,region:s.region,
+            username:s.username,password:s.password,
+            userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,
+            credId:s.credId,credSec:s.credSec,
+            floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,
+            gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,
+            services:_qs.services
+          }));
+        }catch(e){}
+      };
+      window.ocqsCfgPath = function(){
+        var el=document.getElementById('ocqs-cmd-2b'); if(!el) return '';
+        var m=el.textContent.match(/CONFIG="([^"]+)"/); return m?m[1]:'';
+      };
+      window.ocqsApplyToConfig = function(btn, silent){
+        if(typeof ocqsGetState!=='function') return;
+        var s = ocqsGetState();
+        if(silent && !s.password && !s.credSec) return;
+        var st = silent ? null : document.getElementById('ocqs-apply-status');
+        var cfgEl = document.getElementById('ocqs-configpath');
+        var cfgPath = cfgEl ? cfgEl.textContent.trim() : '';
+        if (!cfgPath) { if(st){st.textContent='No config path — fill Stage 2 inputs.';st.style.color='#dc2626';} return; }
+        if(st){ st.textContent='Applying...'; st.style.color='#0369a1'; }
+        // Build patch: credentials + network + disable optional services that need Swift
+        var patch = {
+          path: cfgPath,
+          fields: {
+            'opencenter.infrastructure.cloud.openstack.auth_url': s.authUrl,
+            'opencenter.infrastructure.cloud.openstack.region': s.region,
+            'opencenter.infrastructure.cloud.openstack.username': s.username,
+            'opencenter.infrastructure.cloud.openstack.password': s.password,
+            'opencenter.infrastructure.cloud.openstack.user_domain_name': s.userDomain||'rackspace_cloud_domain',
+            'opencenter.infrastructure.cloud.openstack.project_domain_name': s.projDomain||'rackspace_cloud_domain',
+            'opencenter.infrastructure.cloud.openstack.project_id': s.projectId,
+            'opencenter.infrastructure.cloud.openstack.network_id': s.networkId,
+            'opencenter.infrastructure.cloud.openstack.subnet_id': s.subnetId,
+            'opencenter.infrastructure.cloud.openstack.router_external_network_id': s.floatNet,
+            'opencenter.infrastructure.cloud.openstack.floating_ip_pool': 'PUBLICNET',
+            'opencenter.infrastructure.cloud.openstack.application_credential_id': s.credId||s.username,
+            'opencenter.infrastructure.cloud.openstack.application_credential_secret': s.credSec||s.password
+          },
+          disable_services: Object.keys(_qs.services).filter(function(k){ return !_qs.services[k]; }),
+          enable_services: Object.keys(_qs.services).filter(function(k){ return !!_qs.services[k]; })
+        };
+        fetch('/api/openrc/patch-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch)})
+          .then(function(r){return r.json();})
+          .then(function(d){
+            if(st){ st.textContent = d.ok ? ('\u2713 Applied '+d.patched+' fields') : ('\u2717 '+(d.error||'failed')); st.style.color=d.ok?'#15803d':'#dc2626'; }
+          }).catch(function(e){ if(st){ st.textContent='\u2717 '+e; st.style.color='#dc2626'; } });
+      };
+      window.ocqsLoadConfig = function(btn){
+        var path=ocqsCfgPath();
+        var st=document.getElementById('ocqs-edit-status');
+        var wrap=document.getElementById('ocqs-edit-wrap');
+        var area=document.getElementById('ocqs-edit-area');
+        if(!path){ if(st){st.textContent='No config path yet.';st.style.color='#dc2626';} return; }
+        if(st){ st.textContent='Loading '+path+' ...'; st.style.color='#0369a1'; }
+        fetch('/api/openrc/read-config?path='+encodeURIComponent(path))
+          .then(function(r){return r.json();})
+          .then(function(d){
+            if(d.ok){ if(area) area.value=d.content; if(wrap) wrap.style.display='block';
+              if(st){ st.textContent='✓ Loaded'+(d.created?' (new empty file)':''); st.style.color='#15803d'; } }
+            else { if(st){ st.textContent='✗ '+(d.error||'read failed'); st.style.color='#dc2626'; } }
+          }).catch(function(e){ if(st){ st.textContent='✗ '+e; st.style.color='#dc2626'; } });
+      };
+      window.ocqsSaveConfig = function(btn){
+        var path=ocqsCfgPath();
+        var area=document.getElementById('ocqs-edit-area');
+        var ss=document.getElementById('ocqs-save-status');
+        if(!path||!area) return;
+        if(ss){ ss.textContent='Saving...'; ss.style.color='#94a3b8'; }
+        fetch('/api/openrc/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:path,content:area.value})})
+          .then(function(r){return r.json();})
+          .then(function(d){ if(ss){ ss.textContent = d.ok ? ('✓ Saved '+d.bytes+' bytes') : ('✗ '+(d.error||'save failed')); ss.style.color = d.ok?'#4ade80':'#f87171'; } })
+          .catch(function(e){ if(ss){ ss.textContent='✗ '+e; ss.style.color='#f87171'; } });
+      };
       window.ocqsEditConfig = function(btn){
         var cmdEl = document.getElementById('ocqs-cmd-2b');
         var path = '';
@@ -5105,9 +5229,106 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
             es.close();
             if (btn){ btn.disabled=false; btn.textContent='\u25b6 Run'; }
             out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
+            if (e.data === '[EXIT 0]' && cmdId==='ocqs-cmd-2' && typeof ocqsApplyToConfig==='function') setTimeout(ocqsApplyToConfig, 800);
           }
         };
         es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='\u25b6 Run';} };
+      };
+    </script>
+<script>
+      // Standalone globals - always available regardless of collapsed section state
+      // Stub for ocqsUpdate - replaced by real version when main IIFE loads
+      if(!window.ocqsUpdate) window.ocqsUpdate = function(){ setTimeout(function(){ if(window.ocqsUpdate._real) window.ocqsUpdate._real(); },0); };
+      if(!window.ocqsReqCheck) window.ocqsReqCheck = function(){};
+      var _ocqsV = function(id){ var e=document.getElementById(id); return e?e.value.trim():''; };
+      var _ocqsSv = function(id,v){ var e=document.getElementById(id); if(e){ e.value=v; e.dispatchEvent(new Event('input')); } };
+
+      // Persist credentials to localStorage immediately
+      window.ocqsPersist = function(){
+        try{
+          var d = {
+            authType:_ocqsV('ocqs-authtype'), authUrl:_ocqsV('ocqs-authurl'), region:_ocqsV('ocqs-region'),
+            username:_ocqsV('ocqs-username'), password:_ocqsV('ocqs-password'),
+            userDomain:_ocqsV('ocqs-userdomain'), projDomain:_ocqsV('ocqs-projdomain'),
+            projectId:_ocqsV('ocqs-projectid'), credId:_ocqsV('ocqs-credid'), credSec:_ocqsV('ocqs-credsec'),
+            floatNet:_ocqsV('ocqs-floatnet'), networkId:_ocqsV('ocqs-networkid'), subnetId:_ocqsV('ocqs-subnetid'),
+            gitRepo:_ocqsV('ocqs-gitrepo'), gitBranch:_ocqsV('ocqs-gitbranch'),
+            tokFile:_ocqsV('ocqs-tokfile'), tokVal:_ocqsV('ocqs-tokval'),
+            sshKey:_ocqsV('ocqs-sshkey'), org:_ocqsV('ocqs-org'), cluster:_ocqsV('ocqs-cluster')
+          };
+          // Only save if at least one credential field is filled
+          if(d.username||d.password||d.authUrl){
+            localStorage.setItem('ocqs_creds_v2', JSON.stringify(d));
+            // Also update ocqs_state so _ocqsRestore picks up credentials
+            try{ var st=JSON.parse(localStorage.getItem('ocqs_state')||'{}'); st.password=d.password; st.username=d.username; st.authUrl=d.authUrl; st.region=d.region; st.userDomain=d.userDomain; st.projDomain=d.projDomain; st.projectId=d.projectId; st.floatNet=d.floatNet; st.networkId=d.networkId; st.subnetId=d.subnetId; st.gitRepo=d.gitRepo; st.tokVal=d.tokVal; localStorage.setItem('ocqs_state',JSON.stringify(st)); }catch(e){}
+          }
+        }catch(e){}
+      };
+
+      // Restore credentials from localStorage
+      window.ocqsRestoreCreds = function(){
+        try{
+          var d = JSON.parse(localStorage.getItem('ocqs_creds_v2')||'null');
+          if(!d) return;
+          Object.keys(d).forEach(function(k){
+            var map = {authType:'ocqs-authtype',authUrl:'ocqs-authurl',region:'ocqs-region',
+              username:'ocqs-username',password:'ocqs-password',userDomain:'ocqs-userdomain',
+              projDomain:'ocqs-projdomain',projectId:'ocqs-projectid',credId:'ocqs-credid',
+              credSec:'ocqs-credsec',floatNet:'ocqs-floatnet',networkId:'ocqs-networkid',
+              subnetId:'ocqs-subnetid',gitRepo:'ocqs-gitrepo',gitBranch:'ocqs-gitbranch',
+              tokFile:'ocqs-tokfile',tokVal:'ocqs-tokval',sshKey:'ocqs-sshkey',
+              org:'ocqs-org',cluster:'ocqs-cluster'};
+            if(map[k] && d[k]) _ocqsSv(map[k], d[k]);
+          });
+          if(d.authType){ var sel=document.getElementById('ocqs-authtype'); if(sel){ sel.value=d.authType; if(typeof ocqsToggleAuthType==='function') ocqsToggleAuthType(); } }
+        }catch(e){}
+        setTimeout(function(){ if(typeof ocqsUpdate==='function') ocqsUpdate(); if(typeof ocqsReqCheck==='function') ocqsReqCheck(); }, 300);
+        setTimeout(function(){ if(typeof ocqsSave==='function') ocqsSave(); }, 600);
+      };
+
+      // Wire persist to all credential inputs
+      document.addEventListener('DOMContentLoaded', function(){
+        setTimeout(function(){
+          var ids = ['ocqs-authurl','ocqs-region','ocqs-username','ocqs-password','ocqs-userdomain',
+                     'ocqs-projdomain','ocqs-projectid','ocqs-credid','ocqs-credsec','ocqs-floatnet',
+                     'ocqs-networkid','ocqs-subnetid','ocqs-gitrepo','ocqs-tokval','ocqs-sshkey'];
+          ids.forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input', window.ocqsPersist); });
+          // Restore saved credentials AFTER _ocqsRestore completes
+          setTimeout(ocqsRestoreCreds, 400);
+        }, 500);
+      });
+
+      // Network auto-detect - standalone global
+      window.ocqsAutoDetectNetwork = function(){
+        var btn=document.getElementById('ocqs-detect-btn');
+        var st=document.getElementById('ocqs-detect-status');
+        var sv=function(id,v){var e=document.getElementById(id);if(e){e.value=v;e.dispatchEvent(new Event('input'));}};
+        var val=function(id){var e=document.getElementById(id);return e?e.value.trim():'';};
+        var reset=function(){if(btn){btn.innerHTML='&#9654; Run Detection';btn.disabled=false;}};
+        if(btn){btn.textContent='...detecting';btn.disabled=true;}
+        if(st){st.textContent='Querying OpenStack API...';st.style.color='#0369a1';}
+        var payload={
+          auth_url:val('ocqs-authurl'), region:val('ocqs-region'),
+          username:val('ocqs-username'), password:val('ocqs-password'),
+          user_domain_name:val('ocqs-userdomain'), project_domain_name:val('ocqs-projdomain'),
+          project_id:val('ocqs-projectid'),
+          application_credential_id:val('ocqs-credid'),
+          application_credential_secret:val('ocqs-credsec')
+        };
+        fetch('/api/openstack/networks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+        .then(function(res){
+          reset();
+          if(!res.ok||res.d.error){if(st){st.textContent='✗ '+(res.d.error||'failed');st.style.color='#dc2626';}return;}
+          var d=res.d;
+          if(d.external_network_id) sv('ocqs-floatnet',d.external_network_id);
+          if(d.network_id) sv('ocqs-networkid',d.network_id);
+          if(d.subnet_id) sv('ocqs-subnetid',d.subnet_id);
+          var n=[d.external_network_id,d.network_id,d.subnet_id].filter(Boolean).length;
+          if(st){st.textContent=n?'✓ '+n+' network field(s) auto-populated':'No networks found';st.style.color=n?'#15803d':'#dc2626';}
+          window.ocqsPersist();
+          if(typeof ocqsUpdate==='function') ocqsUpdate();
+        }).catch(function(e){reset();if(st){st.textContent='✗ '+e;st.style.color='#dc2626';}});
       };
     </script>
         <!-- Prerequisites -->
@@ -5128,7 +5349,7 @@ mise --version</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-mise','')">&#128203; Copy</button>
             <button id="ocqs-run-pre-mise" onclick="ocqsRunCmd('ocqs-cmd-pre-mise','ocqs-out-pre-mise','ocqs-run-pre-mise')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-mise',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+          <div id="ocqs-out-pre-mise" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
           <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">2 — Git (version control)</p>
@@ -5138,7 +5359,7 @@ mise --version</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-git','')">&#128203; Copy</button>
             <button id="ocqs-run-pre-git" onclick="ocqsRunCmd('ocqs-cmd-pre-git','ocqs-out-pre-git','ocqs-run-pre-git')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-git',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+          <div id="ocqs-out-pre-git" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
           <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">3 — SSH Key (for cluster access)</p>
@@ -5149,7 +5370,7 @@ cat ~/.ssh/id_ed25519.pub</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-pre-ssh','')">&#128203; Copy</button>
             <button id="ocqs-run-pre-ssh" onclick="ocqsRunCmd('ocqs-cmd-pre-ssh','ocqs-out-pre-ssh','ocqs-run-pre-ssh')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-pre-ssh',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
+          <div id="ocqs-out-pre-ssh" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-bottom:10px;">$ waiting...
 </div>
 
           <p style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:4px;">4 — Infrastructure access (choose one)</p>
@@ -5163,6 +5384,7 @@ cat ~/.ssh/id_ed25519.pub</div>
 
         <!-- Step 1 -->
         <div class="ocqs-card" id="ocqs-step-1">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 1</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">1</span>
             <h3 style="margin:0;">Install OpenCenter CLI</h3>
@@ -5186,7 +5408,7 @@ mise run build
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1rec','ocqs-st-1')">&#128203; Copy</button><button id="ocqs-run-1rec" onclick="ocqsRunCmd('ocqs-cmd-1rec','ocqs-out-1rec','ocqs-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
+          <div id="ocqs-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
           </div>
           <p style="font-size:11px;color:#64748b;">You should see version information including git commit and build date.</p>
           <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Alternative — GitHub release binary download:</strong></p>
@@ -5211,7 +5433,7 @@ opencenter version</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" onclick="ocqsRunCmd('ocqs-cmd-1b','ocqs-out-1b','ocqs-run-1b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-<div id="ocqs-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
+<div id="ocqs-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
 </div>
           <p style="font-size:12px;color:#64748b;"><strong>Verify:</strong></p>
           <div class="ocqs-cmd">./bin/opencenter version
@@ -5226,20 +5448,14 @@ opencenter cluster --help</div>
 
         <!-- Step 2 -->
         <div class="ocqs-card" id="ocqs-step-2">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 2</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">2</span>
-            <h3 style="margin:0;">Create Your First Cluster Config</h3>
+            <h3 style="margin:0;">Initialize Your First Cluster</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-2">Not Started</span>
           </div>
-          <p>Initialize a new cluster configuration. OpenCenter creates the config file and sets up the GitOps directory structure.</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-2"></div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2','ocqs-st-2')">&#128203; Copy</button><button id="ocqs-run-2" onclick="ocqsRunCmd('ocqs-cmd-2','ocqs-out-2','ocqs-run-2')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-2',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="ocqs-out-2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
-          </div>
-          </div>
-          <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
-          <!-- Inline Cluster Identity Inputs -->
+          <p>Create a new cluster configuration. OpenCenter generates a complete config file with defaults.</p>
+                    <!-- Inline Cluster Identity Inputs -->
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:12px;">
             <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏷 Cluster Identity</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -5269,29 +5485,60 @@ opencenter cluster --help</div>
               <div class="ocqs-path-badge" id="ocqs-configpath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
             </div>
           </div>
-          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Select active cluster (required before validate/generate/deploy):</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-2c"></div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">&#127760; Step 10 — Access Services</div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:12px;">Service URLs are generated from your cluster name and region. Set admin passwords below to store them alongside the config.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:6px;">&#128274; Keycloak (Authentication)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-keycloak" style="color:#0369a1;">https://auth.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Admin Password</label>
+                <input class="ocqs-input" id="ocqs-svc-keycloak-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
+              </div>
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#f59e0b;margin-bottom:6px;">&#128200; Grafana (Monitoring)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-grafana" style="color:#0369a1;">https://grafana.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Admin Password</label>
+                <input class="ocqs-input" id="ocqs-svc-grafana-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
+              </div>
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#8b5cf6;margin-bottom:6px;">&#128202; Headlamp (Dashboard)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;"><span id="ocqs-url-headlamp" style="color:#0369a1;">https://dashboard.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                <div style="font-size:11px;font-weight:700;color:#10b981;margin-bottom:6px;">&#128674; Harbor (Container Registry)</div>
+                <div style="font-size:11px;color:#334155;word-break:break-all;margin-bottom:6px;"><span id="ocqs-url-harbor" style="color:#0369a1;">https://harbor.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</span></div>
+                <label class="ocqs-label">Admin Password</label>
+                <input class="ocqs-input" id="ocqs-svc-harbor-pw" type="password" placeholder="set admin password" oninput="ocqsUpdate()">
+              </div>
+
+            </div>
+          </div>
+          <hr style="border:none;border-top:2px solid #e2e8f0;margin:18px 0;">
+          <div style="font-size:13px;font-weight:900;color:#0f172a;margin-bottom:10px;">Stage 2 — Init Cluster</div>
+          <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
+          <p style="font-size:12px;color:#64748b;margin-top:12px;"><strong>Initialize cluster:</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-2">opencenter cluster init my-cluster --org my-org || true</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2c','ocqs-st-2')">&#128203; Copy</button><button id="ocqs-run-2c" onclick="ocqsRunCmd('ocqs-cmd-2c','ocqs-out-2c','ocqs-run-2c')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-2c',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="ocqs-out-2c" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2','ocqs-st-2')">&#128203; Copy</button><button id="ocqs-run-2" onclick="ocqsRunCmd('ocqs-cmd-2','ocqs-out-2','ocqs-run-2')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-2',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          <div id="ocqs-out-2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
           </div>
           </div>
+          <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
         </div>
 
-        <!-- Step 3 -->
         <div class="ocqs-card" id="ocqs-step-3">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 3</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">3</span>
-            <h3 style="margin:0;">Fill Required FLEX/OpenStack Values</h3>
+            <h3 style="margin:0;">Configure Your Cluster</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-3">Not Started</span>
           </div>
-          <p>Edit the configuration file to match your environment. Import your OpenRC file to auto-fill credentials, then Auto-Detect network IDs.</p>
-          <div class="ocqs-info-box" style="margin-bottom:12px;">
-            <strong>For Kind (local dev — no cloud needed):</strong><br>
-            <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">opencenter:<br>&nbsp;&nbsp;infrastructure:<br>&nbsp;&nbsp;&nbsp;&nbsp;provider: kind</code>
-            — select <strong>kind</strong> in Provider above.
-          </div>
-          <!-- OpenRC upload -->
+          <p>Fill in your FLEX/OpenStack credentials. Import your OpenRC file to auto-fill, click <strong>&#9654; Run Detection</strong> to detect network IDs, then <strong>&#128190; Apply to Config File</strong> to write everything to the cluster config.</p>
           <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
             <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">&#11014; Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -5303,69 +5550,54 @@ opencenter cluster --help</div>
               <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
             </div>
           </div>
-          <!-- Auth type -->
           <label class="ocqs-label">Auth Type</label>
           <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
             <option value="password">Password (username + API key)</option>
             <option value="v3applicationcredential">Application Credential</option>
           </select>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-            <div>
-              <label class="ocqs-label">Auth URL</label>
-              <input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()">
-            </div>
-            <div>
-              <label class="ocqs-label">Region</label>
-              <input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()">
-            </div>
+            <div><label class="ocqs-label">Auth URL</label><input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()"></div>
+            <div><label class="ocqs-label">Region</label><input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()"></div>
           </div>
-          <!-- Password fields -->
           <div id="ocqs-pw-fields" style="margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck()"></div>
-              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck()"></div>
+              <div><label class="ocqs-label">Username</label><input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
+              <div><label class="ocqs-label">Password / API Key</label><input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck();ocqsSave()"></div>
               <div><label class="ocqs-label">User Domain Name</label><input class="ocqs-input" id="ocqs-userdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
               <div><label class="ocqs-label">Project Domain Name</label><input class="ocqs-input" id="ocqs-projdomain" value="rackspace_cloud_domain" oninput="ocqsUpdate()"></div>
             </div>
             <label class="ocqs-label" style="margin-top:8px;">Project ID</label>
             <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
           </div>
-          <!-- App cred fields -->
           <div id="ocqs-appcred-fields" style="display:none;margin-top:8px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div><label class="ocqs-label">App Credential ID</label><input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()"></div>
               <div><label class="ocqs-label">App Credential Secret</label><input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()"></div>
             </div>
           </div>
-          <!-- Network auto-detect -->
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-top:14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
               <div style="font-size:12px;font-weight:800;color:#15803d;">&#128269; Network / Subnet — Auto-Detect</div>
-              <button onclick="ocqsAutoDetectNetwork()" id="ocqs-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
+              <div style="display:flex;gap:6px;">
+                <button onclick="ocqsSave();var st=this;st.textContent='\u2713 Saved';setTimeout(function(){st.innerHTML='&#128190; Save Credentials';},1200);" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Save Credentials</button>
+                <button onclick="ocqsAutoDetectNetwork()" id="ocqs-detect-btn" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#9654; Run Detection</button>
+              </div>
             </div>
             <div id="ocqs-detect-status" style="font-size:11px;color:#64748b;margin-bottom:10px;">Fill credentials above then click Run Detection to auto-populate network and subnet IDs.</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-              <div>
-                <label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:9px;">(PUBLICNET)</span></label>
-                <input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;">
-              </div>
-              <div>
-                <label class="ocqs-label">Tenant Network ID</label>
-                <input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;">
-              </div>
-              <div>
-                <label class="ocqs-label">Tenant Subnet ID</label>
-                <input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;">
-              </div>
+              <div><label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:9px;">(PUBLICNET)</span></label><input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
+              <div><label class="ocqs-label">Tenant Network ID</label><input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
+              <div><label class="ocqs-label">Tenant Subnet ID</label><input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected" oninput="ocqsUpdate()" style="background:#fff;"></div>
             </div>
           </div>
-          <!-- Config snippet -->
           <div style="margin-top:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
               <div style="font-size:11px;font-weight:700;color:#64748b;">Generated Config Snippet</div>
               <div style="display:flex;gap:6px;">
                 <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyEl('ocqs-yaml-3','ocqs-st-3')" style="padding:4px 10px;font-size:11px;">&#128203; Copy</button>
                 <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsDownloadYaml()" style="padding:4px 10px;font-size:11px;">&#11015; Download</button>
+                <button onclick="ocqsApplyToConfig(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button>
+                <span id="ocqs-apply-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
               </div>
             </div>
             <pre class="ocqs-yaml" id="ocqs-yaml-3" style="max-height:220px;overflow-y:auto;"></pre>
@@ -5374,45 +5606,41 @@ opencenter cluster --help</div>
           <p style="font-size:12px;color:#64748b;margin-top:14px;"><strong>Open config to edit:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-2b"></div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2b','ocqs-st-3')">📋 Copy — Open Config</button>
-            <button onclick="ocqsEditConfig(this)" style="background:#15803d;color:#fff;border:1px solid #166534;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">✏️ Edit openconfig (nano)</button>
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2b','ocqs-st-3')">&#128203; Copy — Open Config</button>
+            <button onclick="ocqsLoadConfig(this)" style="background:#0369a1;color:#fff;border:1px solid #075985;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">&#128221; Edit openconfig here</button>
+            <button onclick="ocqsEditConfig(this)" style="background:#15803d;color:#fff;border:1px solid #166534;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">&#9999;&#65039; Open in nano (terminal)</button>
             <span id="ocqs-edit-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
           </div>
+          <div id="ocqs-edit-wrap" style="display:none;margin-top:8px;">
+            <textarea id="ocqs-edit-area" spellcheck="false" style="width:100%;box-sizing:border-box;background:#020817;color:#86efac;border:1px solid #334155;border-radius:6px 6px 0 0;padding:10px 12px;font-family:monospace;font-size:12px;line-height:1.5;resize:vertical;min-height:340px;outline:none;white-space:pre;overflow-wrap:normal;overflow-x:auto;"></textarea>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;background:#0f172a;border:1px solid #334155;border-top:none;border-radius:0 0 6px 6px;padding:8px 10px;align-items:center;">
+              <button onclick="ocqsSaveConfig(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Save</button>
+              <button onclick="ocqsLoadConfig(this)" style="background:#334155;color:#cbd5e1;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#8635; Reload</button>
+              <button onclick="document.getElementById('ocqs-edit-wrap').style.display='none'" style="background:#7f1d1d;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">&#10005; Close</button>
+              <span id="ocqs-save-status" style="font-size:11px;color:#94a3b8;"></span>
+            </div>
+          </div>
         </div>
 
-        <!-- Step 4 -->
         <div class="ocqs-card" id="ocqs-step-4">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 4</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">4</span>
-            <h3 style="margin:0;">Configure GitOps Repository</h3>
+            <h3 style="margin:0;">Select Active Cluster</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-4">Not Started</span>
           </div>
-          <p>OpenCenter generates a FluxCD-ready GitOps repository. You need a Git repo URL and token so OpenCenter can push generated manifests.</p>
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
-            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#128230; GitOps Repository</div>
-            <label class="ocqs-label">Git Provider</label>
-            <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()">
-              <option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option>
-            </select>
-            <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
-            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
-              <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
-              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()"></div>
-            </div>
-            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(used to generate token-file command only)</span></label>
-            <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
+          <p>Make this cluster the active one. Required before validate, generate, and deploy.</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-2c">opencenter cluster use my-org/my-cluster</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2c','ocqs-st-4')">&#128203; Copy</button><button id="ocqs-run-2c" onclick="ocqsRunCmd('ocqs-cmd-2c','ocqs-out-2c','ocqs-run-2c')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-2c',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          <div id="ocqs-out-2c" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
           </div>
-          <div class="ocqs-cmd" id="ocqs-cmd-4"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-4','ocqs-st-4')">&#128203; Copy Token Command</button>
-          <pre class="ocqs-yaml" id="ocqs-yaml-4" style="margin-top:10px;"></pre>
-          <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
-          <div class="ocqs-path-badge" id="ocqs-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
-          <div class="ocqs-info-box" style="margin-top:10px;"><strong>Common errors:</strong> missing GitOps URL, invalid token, repo does not exist, token lacks write permission.</div>
+          </div>
+          <div class="ocqs-info-box">Creates <code>~/.config/opencenter/active</code> pointing to your cluster. All subsequent commands run against this cluster without specifying the name.</div>
         </div>
 
-        <!-- Step 5 -->
         <div class="ocqs-card" id="ocqs-step-5">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 5</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">5</span>
             <h3 style="margin:0;">Simplify Optional Services for First Bootstrap</h3>
@@ -5424,56 +5652,53 @@ opencenter cluster --help</div>
             <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Keycloak</span><div class="ocqs-toggle" id="tog-keycloak" onclick="ocqsToggle('keycloak')"></div></div>
             <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Loki</span><div class="ocqs-toggle" id="tog-loki" onclick="ocqsToggle('loki')"></div></div>
             <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Tempo</span><div class="ocqs-toggle" id="tog-tempo" onclick="ocqsToggle('tempo')"></div></div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Velero</span><div class="ocqs-toggle on" id="tog-velero" onclick="ocqsToggle('velero')"></div></div>
-            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">kube-prometheus-stack</span><div class="ocqs-toggle on" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">Velero</span><div class="ocqs-toggle" id="tog-velero" onclick="ocqsToggle('velero')"></div></div>
+            <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">kube-prometheus-stack</span><div class="ocqs-toggle" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
           </div>
-          <div class="ocqs-cmd" id="ocqs-cmd-5"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px;">
+            <button onclick="ocqsApplyServices(this)" style="background:#15803d;color:#fff;border:none;border-radius:4px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer;">&#128190; Apply to Config File</button>
+            <span id="ocqs-svc-status" style="font-size:11px;color:#64748b;align-self:center;"></span>
+          </div>
+          <div class="ocqs-cmd" id="ocqs-cmd-5">grep -nE "keycloak|loki|tempo|enabled|CHANGEME" ~/.config/opencenter/clusters/blueprints/my-org/my-cluster/my-cluster-config.yaml</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-5','ocqs-st-5')">&#128203; Copy</button><button id="ocqs-run-5" onclick="ocqsRunCmd('ocqs-cmd-5','ocqs-out-5','ocqs-run-5')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-5',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="5" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
+          <div id="ocqs-out-5" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <pre class="ocqs-yaml" id="ocqs-yaml-5" style="margin-top:10px;"></pre>
           <div class="ocqs-warn-box">Re-enable these later with proper secrets and Swift/object storage credentials.</div>
         </div>
 
         <!-- Step 6 -->
-        <div class="ocqs-card" id="ocqs-step-6">
+        <div class="ocqs-card" id="ocqs-step-7">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 6</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">6</span>
-            <h3 style="margin:0;">Validate Cluster Configuration</h3>
-            <span class="ocqs-status ocqs-s-idle" id="ocqs-st-6">Not Started</span>
-          </div>
-          <p>Validates provider credentials, GitOps settings, services, secrets, and required fields. <strong>Do not deploy until this passes.</strong></p>
-          <div class="ocqs-cmd" id="ocqs-cmd-6"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-6','ocqs-st-6')">📋 Copy</button><button id="ocqs-run-6" onclick="ocqsRunCmd('ocqs-cmd-6','ocqs-out-6','ocqs-run-6')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-6',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="6" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
-          </div>
-          <div class="ocqs-info-box">
-            <strong>PASS:</strong> No missing required fields; no critical CHANGEME values<br>
-            <strong>WARN:</strong> Optional services disabled; git local dirty; remote checks skipped offline<br>
-            <strong>FAIL:</strong> Missing credentials; missing GitOps URL/token; CHANGEME found
-          </div>
-          <p style="font-size:12px;font-weight:700;color:#dc2626;margin-top:12px;">Common Validation Errors:</p>
-          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:12px;line-height:2;">
-            <div><code>ERROR: vrrp_ip must be set when use_octavia=false</code><br>
-            Fix: set <code>opencenter.cluster.networking.vrrp_ip: "10.0.0.10"</code></div>
-            <div style="margin-top:8px;"><code>ERROR: subnet_pods overlaps with subnet_services</code><br>
-            Fix: use <code>subnet_pods: "10.42.0.0/16"</code> and <code>subnet_services: "10.43.0.0/16"</code></div>
-            <div style="margin-top:8px;"><code>ERROR: application_credential_id required</code><br>
-            Fix: fill credentials in Step 3 and re-run generate</div>
-          </div>
-        </div>
-
-        <!-- Step 7 -->
-        <div class="ocqs-card" id="ocqs-step-7">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <span class="ocqs-step-num">7</span>
             <h3 style="margin:0;">Setup GitOps Repository</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-7">Not Started</span>
           </div>
-          <p>Sync any external secrets, run a final validate, then generate the FluxCD GitOps manifests.</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-7"></div>
+          <p>Configure your GitOps repository, then generate the FluxCD manifests with <code>cluster generate</code>.</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px;margin-top:10px;">
+            <div style="font-size:11px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">&#128230; GitOps Repository</div>
+            <label class="ocqs-label">Git Provider</label>
+            <select class="ocqs-select" id="ocqs-gitprovider" onchange="ocqsUpdate()"><option value="github" selected>GitHub</option><option value="gitlab">GitLab</option><option value="other">Other HTTPS Git</option></select>
+            <label class="ocqs-label" style="margin-top:8px;">GitOps Repository URL</label>
+            <input class="ocqs-input" id="ocqs-gitrepo" placeholder="https://github.com/YOUR_USER/opencenter-my-cluster-gitops.git" oninput="ocqsUpdate();ocqsReqCheck()">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+              <div><label class="ocqs-label">Git Branch</label><input class="ocqs-input" id="ocqs-gitbranch" value="main" oninput="ocqsUpdate()"></div>
+              <div><label class="ocqs-label">Token File Path</label><input class="ocqs-input" id="ocqs-tokfile" value="/home/dzoan/.config/opencenter/tokens/git-token.txt" oninput="ocqsUpdate()"></div>
+            </div>
+            <label class="ocqs-label" style="margin-top:8px;">Git Token Value <span style="color:#64748b;font-size:10px;">(for HTTPS auth)</span></label>
+            <input class="ocqs-input" id="ocqs-tokval" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxx" oninput="ocqsUpdate();ocqsReqCheck()">
+            <label class="ocqs-label" style="margin-top:8px;">SSH Key Path <span style="color:#64748b;font-size:10px;">(for SSH auth — used in git push)</span></label>
+            <input class="ocqs-input" id="ocqs-sshkey" value="~/.ssh/id_rsa" oninput="ocqsUpdate()">
+            <div style="font-size:11px;color:#64748b;margin-top:4px;">Ensure the corresponding public key is added to your GitHub account.</div>
+            <div class="ocqs-label" style="margin-top:10px;">GitOps Repo Path</div>
+            <div class="ocqs-path-badge" id="ocqs-gitopspath" style="font-size:10px;">/home/dzoan/.config/opencenter/clusters/gitops/my-org</div>
+          </div>
+          <div class="ocqs-cmd" id="ocqs-cmd-7">opencenter secrets sync my-cluster
+opencenter cluster validate my-cluster
+opencenter cluster generate my-cluster</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7','ocqs-st-7')">📋 Copy</button><button id="ocqs-run-7" onclick="ocqsRunCmd('ocqs-cmd-7','ocqs-out-7','ocqs-run-7')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-7',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="7" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
+          <div id="ocqs-out-7" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <div class="ocqs-info-box">
             <strong>Expected output:</strong> Generate complete | Manifests created: 97+<br>
@@ -5495,17 +5720,52 @@ opencenter cluster --help</div>
           <div class="ocqs-warn-box">If CHANGEME values remain in critical fields, fix the config and regenerate before deploy.</div>
         </div>
 
-        <!-- Step 8 -->
+        <div class="ocqs-card" id="ocqs-step-6">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 7</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="ocqs-step-num">7</span>
+            <h3 style="margin:0;">Validate Cluster Configuration</h3>
+            <span class="ocqs-status ocqs-s-idle" id="ocqs-st-6">Not Started</span>
+          </div>
+          <p>Validates provider credentials, GitOps settings, services, secrets, and required fields. <strong>Do not deploy until this passes.</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-6">opencenter cluster validate my-cluster</div>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-6','ocqs-st-6')">📋 Copy</button><button id="ocqs-run-6" onclick="ocqsRunCmd('ocqs-cmd-6','ocqs-out-6','ocqs-run-6')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-6',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          <div id="ocqs-out-6" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
+          </div>
+          <div class="ocqs-info-box">
+            <strong>PASS:</strong> No missing required fields; no critical CHANGEME values<br>
+            <strong>WARN:</strong> Optional services disabled; git local dirty; remote checks skipped offline<br>
+            <strong>FAIL:</strong> Missing credentials; missing GitOps URL/token; CHANGEME found
+          </div>
+          <p style="font-size:12px;font-weight:700;color:#dc2626;margin-top:12px;">Common Validation Errors:</p>
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:12px;line-height:2;">
+            <div><code>ERROR: vrrp_ip must be set when use_octavia=false</code><br>
+            Fix: set <code>opencenter.cluster.networking.vrrp_ip: "10.0.0.10"</code></div>
+            <div style="margin-top:8px;"><code>ERROR: subnet_pods overlaps with subnet_services</code><br>
+            Fix: use <code>subnet_pods: "10.42.0.0/16"</code> and <code>subnet_services: "10.43.0.0/16"</code></div>
+            <div style="margin-top:8px;"><code>ERROR: application_credential_id required</code><br>
+            Fix: fill credentials in Step 3 and re-run generate</div>
+          </div>
+        </div>
+
+        <!-- Step 7 -->
         <div class="ocqs-card" id="ocqs-step-8">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 8</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num">8</span>
             <h3 style="margin:0;">Commit &amp; Push GitOps Repository</h3>
             <span class="ocqs-status ocqs-s-idle" id="ocqs-st-8">Not Started</span>
           </div>
           <p>Commit the generated manifests to your GitOps repo so Flux can reconcile them on deploy.</p>
-          <div class="ocqs-cmd" id="ocqs-cmd-8"></div>
+          <div class="ocqs-cmd" id="ocqs-cmd-8">cd /home/dzoan/.config/opencenter/clusters/gitops/my-org
+git status
+git add .
+git commit -m "Initial OpenCenter GitOps generation for my-cluster" 2>/dev/null || true
+git remote set-url origin git@github.com:Sherlock2019/opencenter-my-cluster-gitops.git
+git branch -M main
+git push -u origin main</div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-8','ocqs-st-8')">📋 Copy</button><button id="ocqs-run-8" onclick="ocqsRunCmd('ocqs-cmd-8','ocqs-out-8','ocqs-run-8')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-8',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="8" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
+          <div id="ocqs-out-8" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting...
           </div>
           <div class="ocqs-info-box"><strong>Common errors:</strong> remote origin already exists → use <code>git remote set-url origin URL</code> | invalid token | branch protected</div>
         </div>
@@ -5526,16 +5786,31 @@ opencenter cluster --help</div>
             <div><strong style="color:#0369a1;">Phase 4</strong> — Services (10-20 min): cert-manager, Keycloak, Prometheus, ingress, TLS</div>
             <div style="margin-top:6px;color:#64748b;"><strong>Total: 30–50 minutes</strong> depending on provider and service count</div>
           </div>
-          <div class="ocqs-cmd" id="ocqs-cmd-9"></div>
-          <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn" onclick="ocqsDeploy()">🚀 Copy Deploy Command</button>
+          <div class="ocqs-cmd" id="ocqs-cmd-9">opencenter cluster validate my-cluster
+opencenter cluster deploy --break-lock --yes my-cluster</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">
+            <button class="ocqs-btn ocqs-btn-danger" id="ocqs-deploy-btn" onclick="ocqsDeploy()">🚀 Copy Deploy Command</button>
+            <button id="ocqs-run-9" onclick="ocqsRunCmd('ocqs-cmd-9','ocqs-out-9','ocqs-run-9')" style="background:#dc2626;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button>
+            <button onclick="ocqsCopyOut('ocqs-out-9',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-9" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-top:6px;">$ waiting...
+          </div>
           <div class="ocqs-info-box" style="margin-top:10px;"><strong>If deploy fails — view logs:</strong></div>
-          <div class="ocqs-cmd" id="ocqs-cmd-9logs"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9logs','ocqs-st-9')" style="margin-top:4px;">📋 Copy Log Commands</button>
+          <div class="ocqs-cmd" id="ocqs-cmd-9logs">ls -lah /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/
+tail -f /home/dzoan/.local/state/opencenter/logs/bootstrap/my-org/my-cluster/*.log</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9logs','ocqs-st-9')">📋 Copy Logs</button>
+            <button id="ocqs-run-9logs" onclick="ocqsRunCmd('ocqs-cmd-9logs','ocqs-out-9logs','ocqs-run-9logs')" style="background:#1e3a5f;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button>
+            <button onclick="ocqsCopyOut('ocqs-out-9logs',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
+          </div>
+          <div id="ocqs-out-9logs" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin-top:6px;">$ waiting...
+          </div>
           <div class="ocqs-info-box"><strong>Common errors:</strong> invalid app credential | network/image/flavor missing | GitOps repo dirty | CHANGEME placeholders</div>
         </div>
 
         <!-- Step 9b: Verify Deployment -->
         <div class="ocqs-card" id="ocqs-step-9b">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 9b</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num" style="background:#0369a1;">&#10003;</span>
             <h3 style="margin:0;">Verify Deployment</h3>
@@ -5561,6 +5836,7 @@ opencenter cluster --help</div>
 
         <!-- Step 10 -->
         <div class="ocqs-card" id="ocqs-step-10">
+          <div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">STAGE 10</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
             <span class="ocqs-step-num" style="background:#6366f1;">10</span>
             <h3 style="margin:0;">Import R6 Containerization Outputs</h3>
@@ -5579,7 +5855,7 @@ opencenter cluster --help</div>
 
       <!-- Section D: Minimal Command Flow -->
       <div class="ocqs-section">
-        <h2>D. Minimal Command Flow</h2>
+        <h2>D. Minimal Stage Flow</h2>
         <details style="background:#0f172a;border:1px solid #1e3a5f;border-radius:10px;padding:14px;">
           <summary style="cursor:pointer;color:#38bdf8;font-weight:700;font-size:14px;">Show / Hide Full Flow</summary>
           <pre class="ocqs-cmd" id="ocqs-full-flow" style="margin-top:12px;"></pre>
@@ -5609,7 +5885,7 @@ opencenter cluster --help</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t1','')">&#128203; Copy</button>
             <button id="ocqs-run-t1" onclick="ocqsRunCmd('ocqs-cmd-t1','ocqs-out-t1','ocqs-run-t1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-t1',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-t1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
+          <div id="ocqs-out-t1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
 </div>
         </div>
 
@@ -5622,9 +5898,12 @@ tail -f &lt;git_dir&gt;/infrastructure/clusters/demo/terraform.log
 
 # Ansible logs
 tail -f &lt;git_dir&gt;/infrastructure/clusters/demo/ansible.log</div>
-          <div style="display:flex;gap:6px;margin:6px 0;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t2','')">&#128203; Copy</button>
+            <button id="ocqs-run-t2" onclick="ocqsRunCmd('ocqs-cmd-t2','ocqs-out-t2','ocqs-run-t2')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button>
+            <button onclick="ocqsCopyOut('ocqs-out-t2',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#128203; Copy Output</button>
           </div>
+          <div id="ocqs-out-t2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:240px;overflow-y:auto;margin-top:4px;">$ waiting...\ </div>
           <div class="ocqs-info-box" style="margin-top:8px;">
             <strong>Common causes:</strong> Network connectivity issues &bull; Insufficient cloud quotas &bull; SSH key not accessible
           </div>
@@ -5640,7 +5919,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t3','')">&#128203; Copy</button>
             <button id="ocqs-run-t3" onclick="ocqsRunCmd('ocqs-cmd-t3','ocqs-out-t3','ocqs-run-t3')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-t3',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-t3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
+          <div id="ocqs-out-t3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
 </div>
           <div class="ocqs-info-box" style="margin-top:8px;">
             <strong>Common causes:</strong> Git repo not accessible (SSH key issue) &bull; SOPS decryption failure (Age key not found) &bull; Service configuration errors
@@ -5671,19 +5950,19 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           <p>After deployment, verify everything is running:</p>
           <div class="ocqs-cmd" id="ocqs-cmd-chk1">kubectl get nodes</div>
           <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk1','')">&#128203; Copy</button><button id="ocqs-run-chk1" onclick="ocqsRunCmd('ocqs-cmd-chk1','ocqs-out-chk1','ocqs-run-chk1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-chk1',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
-          <div id="ocqs-out-chk1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
+          <div id="ocqs-out-chk1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
 </div>
           <div class="ocqs-cmd" id="ocqs-cmd-chk2">kubectl get kustomizations -n flux-system</div>
           <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk2','')">&#128203; Copy</button><button id="ocqs-run-chk2" onclick="ocqsRunCmd('ocqs-cmd-chk2','ocqs-out-chk2','ocqs-run-chk2')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-chk2',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
-          <div id="ocqs-out-chk2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
+          <div id="ocqs-out-chk2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
 </div>
           <div class="ocqs-cmd" id="ocqs-cmd-chk3">kubectl get helmreleases -A</div>
           <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk3','')">&#128203; Copy</button><button id="ocqs-run-chk3" onclick="ocqsRunCmd('ocqs-cmd-chk3','ocqs-out-chk3','ocqs-run-chk3')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-chk3',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
-          <div id="ocqs-out-chk3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
+          <div id="ocqs-out-chk3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:140px;overflow-y:auto;margin-bottom:8px;">$ waiting...
 </div>
           <div class="ocqs-cmd" id="ocqs-cmd-chk4">kubectl get pods -A</div>
           <div style="display:flex;gap:6px;margin:6px 0;"><button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-chk4','')">&#128203; Copy</button><button id="ocqs-run-chk4" onclick="ocqsRunCmd('ocqs-cmd-chk4','ocqs-out-chk4','ocqs-run-chk4')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-chk4',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button></div>
-          <div id="ocqs-out-chk4" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:140px;overflow-y:auto;">$ waiting...
+          <div id="ocqs-out-chk4" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#00ff41;white-space:pre-wrap;max-height:140px;overflow-y:auto;">$ waiting...
 </div>
         </div>
       </div>
@@ -5754,10 +6033,55 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
           gitBranch:v('ocqs-gitbranch')||'main',
           tokFile:v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
           tokVal: v('ocqs-tokval'),
+          sshKey: v('ocqs-sshkey')||'~/.ssh/id_rsa',
           svc: _qs.services
         };
       }
 
+      window.ocqsApplyServices = function(btn){
+        var st  = document.getElementById('ocqs-svc-status');
+        var svcs = (typeof ocqsGetState==='function' ? ocqsGetState() : {}).services ||
+                   {keycloak:false,loki:false,tempo:false,velero:false,monitoring:false};
+        var out = document.getElementById('ocqs-out-5');
+        if(st){ st.textContent='Getting active cluster config path...'; st.style.color='#0369a1'; }
+        var nm = {keycloak:'keycloak',loki:'loki',tempo:'tempo',velero:'velero',monitoring:'kube-prometheus-stack'};
+        // Get config path from active cluster via CLI - no hardcoding
+        var getCfgCmd = 'opencenter cluster show | grep "Config File\|config_file\|blueprint" | head -1 | awk \'NF{print $NF}\' | tr -d "\n"';
+        var es1 = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(getCfgCmd));
+        var cfgPath = '';
+        es1.onmessage = function(e){
+          if(!e.data.startsWith('[EXIT') && e.data.trim().endsWith('.yaml')) cfgPath = e.data.trim();
+          if(e.data.startsWith('[EXIT')){
+            es1.close();
+            if(!cfgPath){
+              // Fallback: read from the configpath element which ocqsUpdate() populates from form inputs
+              var el = document.getElementById('ocqs-configpath');
+              cfgPath = el ? el.textContent.trim() : '';
+            }
+            if(!cfgPath){ if(st){st.textContent='\u2717 No active cluster. Run Stage 2 first.';st.style.color='#dc2626';} return; }
+            if(out) out.textContent='$ Patching '+cfgPath+'\n';
+            if(st){ st.textContent='Patching...'; st.style.color='#0369a1'; }
+            var cmds=['CFG="'+cfgPath+'"'];
+            Object.keys(nm).forEach(function(k){
+              var sn=nm[k]; var en=!!svcs[k]?'true':'false'; var op=!!svcs[k]?'false':'true';
+              cmds.push('python3 -c "import re,sys;t=open(sys.argv[1]).read();t=re.sub(r\'(\\n\\s+'+sn+':[^\\n]*\\n(?:[^\\n]+\\n){0,8}?\\s+enabled:\\s*)'+op+'\',r\'\\g<1>'+en+'\',t);open(sys.argv[1],\'w\').write(t)" "$CFG"');
+            });
+            var states=Object.keys(nm).map(function(k){return nm[k]+'='+(!!svcs[k]);}).join(' ');
+            cmds.push('echo "Applied: '+states+'"');
+            var es2=new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmds.join(' && ')));
+            es2.onmessage=function(e2){
+              if(out) out.textContent+=e2.data+'\n';
+              if(e2.data.startsWith('Applied:')||e2.data.startsWith('[EXIT')){
+                if(e2.data.startsWith('[EXIT')) es2.close();
+                var ok=e2.data.startsWith('Applied:')||e2.data==='[EXIT 0]';
+                if(st){st.textContent=ok?'\u2713 '+e2.data:'\u2717 Failed';st.style.color=ok?'#15803d':'#dc2626';}
+              }
+            };
+            es2.onerror=function(){es2.close();if(st){st.textContent='\u2717 stream error';st.style.color='#dc2626';}};
+          }
+        };
+        es1.onerror=function(){es1.close();if(st){st.textContent='\u2717 CLI not reachable';st.style.color='#dc2626';}};
+      };
       window.ocqsToggle = function(svc){
         _qs.services[svc] = !_qs.services[svc];
         var el=g('tog-'+svc);
@@ -5798,42 +6122,49 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
         window.ocqsAutoDetectNetwork = function(){
             var btn = document.getElementById('ocqs-detect-btn');
             var st  = document.getElementById('ocqs-detect-status');
+            var val = function(id){ return (document.getElementById(id)||{}).value || ''; };
+            var sv  = function(id, v){ var el=document.getElementById(id); if(el){ el.value=v; el.dispatchEvent(new Event('input')); } };
+            var reset = function(){ if (btn) { btn.innerHTML='▶ Run Detection'; btn.disabled=false; } };
             if (btn) { btn.textContent='...detecting'; btn.disabled=true; }
-            if (st) st.textContent='Querying OpenStack API...';
-            var authUrl = (document.getElementById('ocqs-authurl')||{}).value || '';
-            var region = (document.getElementById('ocqs-region')||{}).value || '';
-            var cmd = 'openstack network list --format json && openstack subnet list --format json';
-            // Copy to terminal and clipboard
-            var term = document.getElementById('ocqs-terminal');
-            if (term) term.textContent += '\n$ ' + cmd;
-            navigator.clipboard && navigator.clipboard.writeText(cmd);
-            // Try fetch via Flask proxy if available
-            fetch('/api/openstack/networks', {method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({auth_url: authUrl, region: region,
-                    username: (document.getElementById('ocqs-username')||{}).value,
-                    password: (document.getElementById('ocqs-password')||{}).value,
-                    user_domain_name: (document.getElementById('ocqs-userdomain')||{}).value,
-                    project_id: (document.getElementById('ocqs-projectid')||{}).value
-                })
-            }).then(function(r){ return r.json(); }).then(function(d){
-                if (d.external_network_id) { sv('ocqs-floatnet', d.external_network_id); }
-                if (d.network_id) { sv('ocqs-networkid', d.network_id); }
-                if (d.subnet_id) { sv('ocqs-subnetid', d.subnet_id); }
+            if (st) { st.textContent='Querying OpenStack API...'; st.style.color='#0369a1'; }
+            var payload = {
+                auth_url: val('ocqs-authurl'), region: val('ocqs-region'),
+                username: val('ocqs-username'), password: val('ocqs-password'),
+                user_domain_name: val('ocqs-userdomain'), project_domain_name: val('ocqs-projdomain'),
+                project_id: val('ocqs-projectid'),
+                application_credential_id: val('ocqs-credid'),
+                application_credential_secret: val('ocqs-credsec')
+            };
+            fetch('/api/openstack/networks', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
+            .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+            .then(function(res){
+                reset();
+                if (!res.ok || res.d.error) { if (st) { st.textContent='✗ ' + (res.d.error || 'detection failed'); st.style.color='#dc2626'; } return; }
+                var d = res.d;
+                if (d.external_network_id) sv('ocqs-floatnet', d.external_network_id);
+                if (d.network_id) sv('ocqs-networkid', d.network_id);
+                if (d.subnet_id) sv('ocqs-subnetid', d.subnet_id);
+                var n = [d.external_network_id, d.network_id, d.subnet_id].filter(Boolean).length;
+                if (st) { st.textContent = n ? ('✓ ' + n + ' network field(s) auto-populated') : 'No networks found — check credentials/region'; st.style.color = n ? '#15803d' : '#dc2626'; }
                 if (typeof ocqsUpdate === 'function') ocqsUpdate();
-            }).then(function(){
-                if (btn) { btn.textContent='&#9654; Run Detection'; btn.disabled=false; }
-            }).catch(function(){
-                if (btn) { btn.textContent='&#9654; Run Detection'; btn.disabled=false; }
-                if (st) st.textContent='Backend not reachable. Paste network/subnet IDs manually.';
-            });
+            }).catch(function(e){ reset(); if (st) { st.textContent='✗ ' + e; st.style.color='#dc2626'; } });
         };
+        var _autoApplyTimer=null;
         window.ocqsUpdate = function(){
         var s = ocqsGetState();
+        // Save to localStorage on every update (localStorage only - no Flask call)
+        if(typeof ocqsSave==='function') ocqsSave();
         // Slugify org/cluster names — OpenCenter identifiers must be DNS-safe (no spaces/uppercase)
         var _slug = function(x){ return (x||'').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,''); };
         s.org = _slug(s.org) || 'my-org';
         s.cluster = _slug(s.cluster) || 'my-cluster';
         var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
+        var _fqdn = s.cluster+'.'+(s.region||'dfw3').toLowerCase()+'.k8s.opencenter.cloud';
+        var _setUrl = function(id, prefix){ var el=g(id); if(el) el.textContent='https://'+prefix+'.'+_fqdn; };
+        _setUrl('ocqs-url-keycloak','auth');
+        _setUrl('ocqs-url-grafana','grafana');
+        _setUrl('ocqs-url-headlamp','dashboard');
+        _setUrl('ocqs-url-harbor','harbor');
         var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
         var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+s.org+'/'+s.cluster+'/';
 
@@ -5861,15 +6192,34 @@ var gp=g('ocqs-gitopspath'); if(gp) gp.textContent=gitopsPath;
 
         // Step 2
         var c2=g('ocqs-cmd-2');
-        if(c2) c2.textContent='opencenter cluster init '+s.cluster+' --org '+s.org;
+        if(c2) c2.textContent='opencenter cluster init '+s.cluster+' --org '+s.org+' || true';  // if exists, skip quietly
 var c2c=g('ocqs-cmd-2c');
         if(c2c) c2c.textContent='opencenter cluster use '+s.org+'/'+s.cluster;
 var c2b=g('ocqs-cmd-2b');
         if(c2b) c2b.textContent='CONFIG="'+configPath+'"\nnano "$CONFIG"';
 // Step 3
         var y3=g('ocqs-yaml-3');
-        if(y3) y3.textContent='opencenter:\n  infrastructure:\n    provider: '+s.provider+'\n    cloud:\n      openstack:\n        auth_url: "'+s.authUrl+'"\n        region: "'+s.region+'"\n        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n        application_credential_secret: "'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"';
-        var c3e=g('ocqs-cmd-3env');
+        if(y3){
+          var _pw = s.password ? '••••••••••••' : 'YOUR_API_KEY';
+          var _cs = s.credSec ? '••••••••••••' : 'YOUR_OPENSTACK_APP_CRED_SECRET';
+          var _cred = (s.authType==='password')
+            ? '        username: "'+(s.username||'YOUR_USERNAME')+'"\n'
+              +'        password: "'+_pw+'"\n'
+              +'        user_domain_name: "'+(s.userDomain||'rackspace_cloud_domain')+'"\n'
+              +'        project_domain_name: "'+(s.projDomain||'rackspace_cloud_domain')+'"\n'
+              +'        project_id: "'+(s.projectId||'YOUR_PROJECT_ID')+'"\n'
+            : '        application_credential_id: "'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\n'
+              +'        application_credential_secret: "'+_cs+'"\n';
+          var _net = '        network_id: "'+(s.networkId||'YOUR_NETWORK_ID')+'"\n'
+            +'        subnet_id: "'+(s.subnetId||'YOUR_SUBNET_ID')+'"\n'
+            +'        floating_ip_pool: PUBLICNET\n'
+            +'        router_external_network_id: "'+(s.floatNet||'YOUR_EXTERNAL_NET_ID')+'"';
+          y3.textContent='opencenter:\n  infrastructure:\n    provider: '+s.provider+'\n    cloud:\n      openstack:\n'
+            +'        auth_url: "'+s.authUrl+'"\n'
+            +'        region: "'+s.region+'"\n'
+            +_cred+_net;
+        }
+                var c3e=g('ocqs-cmd-3env');
         if(c3e) c3e.textContent='export OPENSTACK_APP_CRED_ID="'+(s.credId||'YOUR_OPENSTACK_APP_CRED_ID')+'"\nexport OPENSTACK_APP_CRED_SECRET="'+(s.credSec?'••••••••••••':'YOUR_OPENSTACK_APP_CRED_SECRET')+'"';
 // Step 4
         var c4=g('ocqs-cmd-4');
@@ -5893,10 +6243,11 @@ var c7b=g('ocqs-cmd-7b');
         if(c7b) c7b.textContent='grep -R "CHANGEME" '+gitopsPath+' || true';
 // Step 8
         var c8=g('ocqs-cmd-8');
-        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote add origin '+(s.gitRepo||'YOUR_GIT_REPO_URL')+' 2>/dev/null || git remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL')+'\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
+        if(c8) c8.textContent='cd '+gitopsPath+'\ngit status\ngit add .\ngit commit -m "Initial OpenCenter GitOps generation for '+s.cluster+'"\ngit remote set-url origin '+(s.gitRepo||'YOUR_GIT_REPO_URL').replace('https://github.com/','git@github.com:')+'
+export GIT_SSH_COMMAND="ssh -i '+(s.sshKey||'~/.ssh/id_rsa')+' -o StrictHostKeyChecking=no"'+\ngit branch -M '+s.gitBranch+'\ngit push -u origin '+s.gitBranch;
 // Step 9
         var c9=g('ocqs-cmd-9');
-        if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy '+s.cluster;
+        if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy --break-lock --yes '+s.cluster;
 var c9l=g('ocqs-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
 var c9b=g('ocqs-cmd-9b');
@@ -5938,17 +6289,38 @@ var c9b=g('ocqs-cmd-9b');
         }
 
         // Persist state
-        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authUrl:s.authUrl,region:s.region,credId:s.credId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,services:_qs.services})); }catch(e){}
+        try{ localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services})); }catch(e){}
       };
 
       window.ocqsReqCheck = function(){
-        var s=ocqsGetState();
-        var set=function(id,ok){ var el=g(id); if(el){el.className=ok?'ocqs-badge-ready':'ocqs-badge-missing'; el.textContent=ok?'Ready':'Missing';} };
-        set('ocqs-req-credid', !!s.credId);
-        set('ocqs-req-credsec', !!s.credSec);
-        set('ocqs-req-repo', !!s.gitRepo);
-        set('ocqs-req-token', !!s.tokVal);
-        set('ocqs-req-region', !!s.region);
+        var s = typeof ocqsGetState==='function' ? ocqsGetState() : {};
+        var set = function(id, ok, opt){
+          var el = g(id); if(!el) return;
+          if(opt){ el.className='ocqs-badge-opt'; el.textContent='Optional'; return; }
+          el.className = ok ? 'ocqs-badge-ready' : 'ocqs-badge-missing';
+          el.textContent = ok ? 'Ready' : 'Missing';
+        };
+        // Credentials: accept username OR credId
+        set('ocqs-req-credid',  !!(s.credId  || s.username));
+        set('ocqs-req-credsec', !!(s.credSec || s.password));
+        set('ocqs-req-repo',    !!s.gitRepo);
+        set('ocqs-req-token',   !!(s.tokVal || s.tokFile));
+        set('ocqs-req-region',  !!s.region);
+        // CLI and Git — check via streaming endpoint once on page load
+        if(!window._ocqsCliChecked){
+          window._ocqsCliChecked = true;
+          var check = function(cmd, badgeId){
+            var es = new EventSource('/api/stream/run-cmd?cmd='+encodeURIComponent(cmd));
+            var ok = false;
+            es.onmessage = function(e){
+              if(e.data && !e.data.startsWith('[EXIT') && e.data.trim().length > 0) ok = true;
+              if(e.data.startsWith('[EXIT')){ es.close(); set(badgeId, ok && e.data==='[EXIT 0]'); }
+            };
+            es.onerror = function(){ es.close(); set(badgeId, false); };
+          };
+          check('opencenter version 2>/dev/null | head -1', 'ocqs-req-cli');
+          check('git --version 2>/dev/null | head -1', 'ocqs-req-git');
+        }
       };
 
       window.ocqsCopyCmd = function(id,statusId){
@@ -6026,32 +6398,51 @@ var c9b=g('ocqs-cmd-9b');
         }
       };
 
-      // Restore state from localStorage
-      (function(){
+      // Restore credentials from localStorage — runs after DOM is ready
+      function _ocqsRestore(){
+        // Clear any stuck Apply status from previous session
+        var st=document.getElementById('ocqs-apply-status');
+        if(st && st.textContent==='Applying...') st.textContent='';
+        // Migrate stale default values in localStorage
+        try{
+          var _s=JSON.parse(localStorage.getItem('ocqs_state')||'null');
+
+
+        }catch(e){}
         try{
           var saved=JSON.parse(localStorage.getItem('ocqs_state')||'null');
-          if(saved){
-            if(saved.org)      { var el=g('ocqs-org');      if(el) el.value=saved.org; }
-            if(saved.cluster)  { var el=g('ocqs-cluster');  if(el) el.value=saved.cluster; }
-            if(saved.env)      { var el=g('ocqs-env');      if(el) el.value=saved.env; }
-            if(saved.provider) { var el=g('ocqs-provider'); if(el) el.value=saved.provider; }
-            if(saved.authUrl)  { var el=g('ocqs-authurl');  if(el) el.value=saved.authUrl; }
-            if(saved.region)   { var el=g('ocqs-region');   if(el) el.value=saved.region; }
-            if(saved.credId)   { var el=g('ocqs-credid');   if(el) el.value=saved.credId; }
-            if(saved.gitRepo)  { var el=g('ocqs-gitrepo');  if(el) el.value=saved.gitRepo; }
-            if(saved.gitBranch){ var el=g('ocqs-gitbranch');if(el) el.value=saved.gitBranch; }
-            if(saved.tokFile)  { var el=g('ocqs-tokfile');  if(el) el.value=saved.tokFile; }
-            if(saved.services) {
-              _qs.services=Object.assign(_qs.services,saved.services);
-              ['keycloak','loki','tempo','velero','monitoring'].forEach(function(sv){
-                var tel=g('tog-'+sv); if(tel) tel.classList.toggle('on',!!_qs.services[sv]);
-              });
-            }
+          if(!saved) return;
+          var sv2=function(id,v){ if(v){ var el=g(id); if(el) el.value=v; } };
+          sv2('ocqs-org',saved.org); sv2('ocqs-cluster',saved.cluster);
+          sv2('ocqs-env',saved.env); sv2('ocqs-provider',saved.provider);
+          sv2('ocqs-authurl',saved.authUrl); sv2('ocqs-region',saved.region);
+          if(saved.authType){ var at=g('ocqs-authtype'); if(at){ at.value=saved.authType; if(typeof ocqsToggleAuthType==='function') ocqsToggleAuthType(); } }
+          sv2('ocqs-username',saved.username); sv2('ocqs-password',saved.password);
+          sv2('ocqs-userdomain',saved.userDomain); sv2('ocqs-projdomain',saved.projDomain);
+          sv2('ocqs-projectid',saved.projectId); sv2('ocqs-credid',saved.credId);
+          sv2('ocqs-credsec',saved.credSec); sv2('ocqs-floatnet',saved.floatNet);
+          sv2('ocqs-networkid',saved.networkId); sv2('ocqs-subnetid',saved.subnetId);
+          sv2('ocqs-gitrepo',saved.gitRepo); sv2('ocqs-gitbranch',saved.gitBranch);
+          sv2('ocqs-tokfile',saved.tokFile); sv2('ocqs-tokval',saved.tokVal);
+          if(saved.services){
+            _qs.services=Object.assign(_qs.services,saved.services);
+            ['keycloak','loki','tempo','velero','monitoring'].forEach(function(s){
+              var t=g('tog-'+s); if(t) t.classList.toggle('on',!!_qs.services[s]);
+            });
           }
         }catch(e){}
-        ocqsUpdate();
-        ocqsReqCheck();
-      })();
+        if(typeof ocqsUpdate==='function') ocqsUpdate();
+        if(typeof ocqsReqCheck==='function') ocqsReqCheck();
+      }
+      // Restore on DOMContentLoaded (after all scripts parse) + save on page exit
+      if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded',function(){ setTimeout(_ocqsRestore,150); });
+      } else {
+        setTimeout(_ocqsRestore,150);
+      }
+      window.addEventListener('beforeunload',function(){
+        try{ if(typeof ocqsGetState==='function'){ var s=ocqsGetState(); localStorage.setItem('ocqs_state',JSON.stringify({org:s.org,cluster:s.cluster,env:s.env,provider:s.provider,authType:s.authType,authUrl:s.authUrl,region:s.region,username:s.username,password:s.password,userDomain:s.userDomain,projDomain:s.projDomain,projectId:s.projectId,credId:s.credId,credSec:s.credSec,floatNet:s.floatNet,networkId:s.networkId,subnetId:s.subnetId,gitRepo:s.gitRepo,gitBranch:s.gitBranch,tokFile:s.tokFile,tokVal:s.tokVal,services:_qs.services})); } }catch(e){}
+      });
 
     })();
     </script>
@@ -7438,11 +7829,11 @@ var c9b=g('ocqs-cmd-9b');
         window.uatNavTo = function(step, instant) {
           /* Update topbar title to reflect current step */
           var _TITLES = {
-            1: ['Step 1 — Server Targets',           'Define business systems, standalone servers, and databases'],
-            2: ['Step 2 — Service Comparison',     'OSPC → FLEX service-by-service comparison and validation'],
-            3: ['Step 3 — Performance Validation', 'Performance benchmarks and baseline comparison'],
-            4: ['Step 4 — Issues Tracker',         'Issue tracking, risk assessment and remediation'],
-            5: ['Step 5 — Cutover Readiness',      'Post-migration acceptance testing summary and decision']
+            1: ['Stage 1 — Server Targets',           'Define business systems, standalone servers, and databases'],
+            2: ['Stage 2 — Service Comparison',     'OSPC → FLEX service-by-service comparison and validation'],
+            3: ['Stage 3 — Performance Validation', 'Performance benchmarks and baseline comparison'],
+            4: ['Stage 4 — Issues Tracker',         'Issue tracking, risk assessment and remediation'],
+            5: ['Stage 5 — Cutover Readiness',      'Post-migration acceptance testing summary and decision']
           };
           var _t = _TITLES[Number(step)] || _TITLES[5];
           var _th = document.getElementById('uat-tb-title');
@@ -11607,17 +11998,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
 // Chain map: what to trigger after each step passes
             function _coTriggerNext(stepId) {
               var actions = {
-                precheck: ['Step 2: Configure HAProxy', function() {
+                precheck: ['Stage 2: Configure HAProxy', function() {
                   if (!_coIsStepEnabled('traffic')) { coMarkStep('traffic', 'skipped'); return; }
                   var btn = document.querySelector('#co-step-traffic .btn-primary');
                   if (btn && !btn.disabled) btn.click();
                 }],
-                traffic: ['Step 3: Validate App', function() {
+                traffic: ['Stage 3: Validate App', function() {
                   if (!_coIsStepEnabled('app')) { coMarkStep('app', 'skipped'); return; }
                   var btn = document.querySelector('#co-step-app .btn-primary');
                   if (btn && !btn.disabled) btn.click();
                 }],
-                app: [_co.dbInScope ? 'Step 4: Validate DB' : 'Step 5: Monitor', function() {
+                app: [_co.dbInScope ? 'Stage 4: Validate DB' : 'Stage 5: Monitor', function() {
                   if (_co.dbInScope) {
                     if (!_coIsStepEnabled('db')) { coMarkStep('db', 'skipped'); return; }
                     var btn = document.querySelector('#co-step-db .btn-primary');
@@ -11629,7 +12020,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                     if (btn2 && !btn2.disabled) btn2.click();
                   }
                 }],
-                db: ['Step 5: Monitor', function() {
+                db: ['Stage 5: Monitor', function() {
                   if (!_coIsStepEnabled('monitor')) { coMarkStep('monitor', 'skipped'); return; }
                   var btn = document.querySelector('#co-step-monitor .btn-dark');
                   if (btn && !btn.disabled) btn.click();
@@ -11732,8 +12123,8 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                 var ar = window._advRun;
                 if (ar && ar.steps && ar.steps.length) {
                   ar.steps.forEach(function(s) {
-                    if (s.status === 'FAIL')    issues.push({ sev:'FAIL',   source: s.name, detail: s.summary || 'Step failed in advanced pipeline.' });
-                    if (s.status === 'WARNING') issues.push({ sev:'REVIEW', source: s.name, detail: s.summary || 'Step completed with warnings.' });
+                    if (s.status === 'FAIL')    issues.push({ sev:'FAIL',   source: s.name, detail: s.summary || 'Stage failed in advanced pipeline.' });
+                    if (s.status === 'WARNING') issues.push({ sev:'REVIEW', source: s.name, detail: s.summary || 'Stage completed with warnings.' });
                   });
                 }
                 // Scan advanced log
@@ -11752,7 +12143,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
                   var st = _co.stepStatus[id];
                   if (st === 'fail' || st === 'review') {
                     issues.push({ sev: st === 'fail' ? 'FAIL' : 'REVIEW', source: _co.stepLabels[id] || id,
-                      detail: st === 'fail' ? 'Step failed — re-run or mark manually.' : 'Step needs manual review before proceeding.' });
+                      detail: st === 'fail' ? 'Stage failed — re-run or mark manually.' : 'Stage needs manual review before proceeding.' });
                   }
                 });
               }
@@ -12572,7 +12963,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
             var stepEl = document.getElementById('adv-prog-step');
             if (bar) bar.style.width = pct + '%';
             if (pctEl) pctEl.textContent = pct + '%';
-            if (stepEl) stepEl.textContent = 'Step ' + num + ' of 16: ' + stepName;
+            if (stepEl) stepEl.textContent = 'Stage ' + num + ' of 16: ' + stepName;
           }
 
           function _advSetBanner(state) {
@@ -13276,7 +13667,7 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
           var el=$id('bsc-s'+s.n);if(el)el.style.display=s.n===n?'':'none';
         });
         _rs();
-        var b=$id('bsc-step-badge');if(b)b.textContent='Step '+n+' — '+STEPS[n-1].l;
+        var b=$id('bsc-step-badge');if(b)b.textContent='Stage '+n+' — '+STEPS[n-1].l;
         if(n===2)_rc2();
         if(n===3)_rc3();
         if(n===4)_rc4();
@@ -25283,7 +25674,7 @@ ${certContent}
   }
   function setCurrent(side, step, text) {
     var c = el('uatLive-' + side + '-current');
-    if (c) c.textContent = 'Step ' + step + ': ' + text;
+    if (c) c.textContent = 'Stage ' + step + ': ' + text;
     var route = el('uatLive-' + side + '-route');
     if (route) route.innerHTML = [
       '<span>Mobile App</span>',

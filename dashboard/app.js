@@ -13,6 +13,9 @@ const els = {
   columnPickerPanel: document.getElementById('columnPickerPanel'),
   columnPicker: document.getElementById('columnPicker'),
   summary: document.getElementById('summary'),
+  ospcDetailTcoPanel: document.getElementById('ospcDetailTcoPanel'),
+  aggregateTcoPanel: document.getElementById('aggregateTcoPanel'),
+  componentTcoPanel: document.getElementById('componentTcoPanel'),
   sourceChartPanel: document.getElementById('sourceChartPanel'),
   sourceChartCount: document.getElementById('sourceChartCount'),
   sourcePie: document.getElementById('sourcePie'),
@@ -218,6 +221,7 @@ if (ospcPriceFileEl) {
       state.hasOspcPriceList = Object.keys(state.ospcPriceMap).length > 0;
       ospcPriceMeta.textContent = `${file.name} (${Object.keys(state.ospcPriceMap).length} entries)`;
       if (state.mapperRows.length) renderMapperSummary(state.mapperRows);
+      renderInventoryTcoPanels();
     };
     reader.readAsText(file);
   });
@@ -235,6 +239,7 @@ if (flexPriceFileEl) {
       state.hasFlexPriceList = Object.keys(state.flexPriceMap).length > 0;
       flexPriceMeta.textContent = `${file.name} (${Object.keys(state.flexPriceMap).length} entries)`;
       if (state.mapperRows.length) renderMapperSummary(state.mapperRows);
+      renderInventoryTcoPanels();
     };
     reader.readAsText(file);
   });
@@ -288,6 +293,7 @@ function onFileSelect(e, mode) {
         renderMapperSummary(parsed.rows);
         renderMapperTable(parsed.rows);
         renderFlavorInventory(parsed.rows);
+        renderInventoryTcoPanels();
 
         els.mapperSummary.classList.remove('hidden');
         els.mapperTablePanel.classList.remove('hidden');
@@ -305,6 +311,7 @@ function onFileSelect(e, mode) {
         if (state.mapperRows.length) {
           renderFlavorInventory(state.mapperFiltered);
         }
+        renderInventoryTcoPanels();
       } else if (isLb) {
         state.lbSourceName = file.name;
         state.lbHeaders = parsed.headers;
@@ -315,6 +322,7 @@ function onFileSelect(e, mode) {
         renderLbSummary(parsed.rows);
         renderLbTable(parsed.rows);
         renderLoadBalancerInventorySummary(parsed.rows);
+        renderInventoryTcoPanels();
         els.lbSummary.classList.remove('hidden');
         els.lbTablePanel.classList.remove('hidden');
       } else {
@@ -332,6 +340,7 @@ function onFileSelect(e, mode) {
         if (state.mapperRows.length) {
           renderFlavorInventory(state.mapperFiltered);
         }
+        renderInventoryTcoPanels();
       }
     } catch (err) {
       meta.textContent = `Could not parse file: ${err.message}`;
@@ -490,6 +499,7 @@ function applyFilters() {
   if (state.mapperRows.length) {
     renderFlavorInventory(state.mapperFiltered);
   }
+  renderInventoryTcoPanels();
 }
 
 function applyMapperFilters() {
@@ -502,6 +512,7 @@ function applyMapperFilters() {
   renderMapperSummary(rows);
   renderMapperTable(rows);
   renderFlavorInventory(rows);
+  renderInventoryTcoPanels();
 }
 
 function applyBlockFilters() {
@@ -515,6 +526,7 @@ function applyBlockFilters() {
   if (state.mapperRows.length) {
     renderFlavorInventory(state.mapperFiltered);
   }
+  renderInventoryTcoPanels();
 }
 
 function applyLbFilters() {
@@ -527,6 +539,7 @@ function applyLbFilters() {
   renderLbSummary(rows);
   renderLbTable(rows);
   renderLoadBalancerInventorySummary(rows);
+  renderInventoryTcoPanels();
 }
 
 function renderMapperSummary(rows) {
@@ -684,110 +697,313 @@ function renderSummary(rows, headers, summaryEl) {
   const assumptionNote = document.getElementById('tco-assumption-note');
   if (assumptionNote) assumptionNote.style.display = state.hasOspcPriceList ? 'none' : 'flex';
 
-  let tcoTableHtml = '';
-  if (headers.includes('target_daily_cost_min_usd') || headers.includes('target_monthly_cost_min_usd')) {
-    // FLEX total: use price list override if available, else CSV columns
-    let flexMonthlyTotal = 0;
-    if (state.hasFlexPriceList) {
-      for (const row of rows) {
-        const flavor = (row.target_flavor_name || row.target_flavor_id || '').trim().toLowerCase();
-        const rate = state.flexPriceMap[flavor];
-        if (rate != null) flexMonthlyTotal += rate <= 10 ? rate * 730 : rate; // hourly→monthly if small
-      }
-    }
-    if (!flexMonthlyTotal) flexMonthlyTotal = sumCurrency(rows, 'target_monthly_cost_min_usd');
-    const flexDailyTotal = flexMonthlyTotal / 30;
+  summaryEl.innerHTML = cards.join('');
+  if (summaryEl === els.summary) renderInventoryTcoPanels();
+}
 
-    if (flexMonthlyTotal > 0) {
-      // OSPC total: use price list override, else CSV columns, else 2.45× multiplier
-      let ospcMonthlyTotal = 0;
-      let isEstimated = false;
-      if (state.hasOspcPriceList) {
-        for (const row of rows) {
-          const name = (row.server_name || row.source_server_name || row.name || '').trim().toLowerCase();
-          const cost = state.ospcPriceMap[name];
-          if (cost != null) ospcMonthlyTotal += cost;
-        }
-      }
-      if (!ospcMonthlyTotal) {
-        ospcMonthlyTotal = sumCurrency(rows, 'source_monthly_cost_usd') || sumCurrency(rows, 'source_monthly_cost') || sumCurrency(rows, 'TCO_OSPC_Monthly') || sumCurrency(rows, 'TCO_OSPC_Estimate');
-      }
-      let ospcDailyTotal = sumCurrency(rows, 'source_daily_cost_usd') || sumCurrency(rows, 'source_daily_cost') || sumCurrency(rows, 'TCO_OSPC_Daily');
-      if (!ospcMonthlyTotal) {
-        const multiplier = 2.45;
-        ospcDailyTotal = flexDailyTotal * multiplier;
-        ospcMonthlyTotal = flexMonthlyTotal * multiplier;
-        isEstimated = true;
-      } else if (!ospcDailyTotal && ospcMonthlyTotal > 0) {
-        ospcDailyTotal = ospcMonthlyTotal / 30;
-      }
+const regionalTcoMatrix = {
+  IAD: [
+    ['general1-1', 'gp.0.2.2', 68.80, 28.08],
+    ['general1-2', 'gp.0.2.2', 77.62, 28.08],
+    ['compute1-4', 'gp.0.2.4', 86.44, 35.28],
+    ['general1-4', 'gp.0.4.4', 151.70, 61.92],
+    ['compute1-8', 'gp.0.4.8', 186.98, 76.32],
+    ['compute1-30', 'gp.0.16.64', 200.00, 398.16]
+  ],
+  DFW: [
+    ['general1-1', 'gp.5.2.2', 68.80, 28.08],
+    ['general1-2', 'gp.5.2.2', 77.62, 28.08],
+    ['compute1-4', 'gp.5.2.4', 86.44, 35.28],
+    ['general1-4', 'gp.5.4.4', 151.70, 61.92],
+    ['compute1-8', 'gp.5.4.8', 186.98, 76.32],
+    ['compute1-30', 'gp.5.16.64', 200.00, 398.16]
+  ],
+  SJC: [
+    ['general1-1', 'gp.0.2.2', 68.80, 28.08],
+    ['general1-2', 'gp.0.2.2', 77.62, 28.08],
+    ['compute1-4', 'gp.0.2.4', 86.44, 35.28],
+    ['general1-4', 'gp.0.4.4', 151.70, 61.92],
+    ['compute1-8', 'gp.0.4.8', 186.98, 76.32],
+    ['compute1-30', 'gp.0.16.64', 200.00, 398.16]
+  ]
+};
 
-      const ospcLabel = isEstimated ? 'Legacy OSPC (Estimated)' : (state.hasOspcPriceList ? 'Legacy OSPC (Price List)' : 'Legacy OSPC (Actual)');
-      
-      const monthlySavings = ospcMonthlyTotal - flexMonthlyTotal;
-      const yearlySavings = monthlySavings * 12;
-      const savingsPercent = Math.round((monthlySavings / ospcMonthlyTotal) * 100) || 0;
+function renderInventoryTcoPanels() {
+  if (!els.ospcDetailTcoPanel || !els.aggregateTcoPanel || !els.componentTcoPanel) return;
+  const rows = buildTcoRows();
+  if (!rows.length) {
+    [els.ospcDetailTcoPanel, els.aggregateTcoPanel, els.componentTcoPanel].forEach(el => el.classList.add('hidden'));
+    return;
+  }
+  renderOspcDetailTco(rows);
+  renderAggregateTco(rows);
+  renderComponentTco(rows);
+}
 
-      tcoTableHtml = `
-      <div class="tco-comparison-panel" style="grid-column: 1 / -1; margin-top: 10px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(165, 180, 252, 0.2); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-        <div style="background: linear-gradient(90deg, rgba(30, 58, 138, 0.8), rgba(49, 46, 129, 0.8)); padding: 14px 22px; border-bottom: 1px solid rgba(165, 180, 252, 0.2); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #e0e7ff; font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                TCO Comparison & Projected Savings
-            </h3>
-            <span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; border: 1px solid rgba(34, 197, 94, 0.3);">
-                ↓ ${savingsPercent}% Cost Reduction
-            </span>
-        </div>
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; text-align: left;">
-              <thead>
-                  <tr style="background: rgba(255,255,255,0.02);">
-                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Environment</th>
-                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Min Est. Daily Cost</th>
-                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Min Est. Monthly Cost</th>
-                      <th style="padding: 12px 22px; color: #94a3b8; font-weight: 500; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 0.05em;">Annualized Cost</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                      <td style="padding: 14px 22px; border-right: 1px solid rgba(255,255,255,0.05);">
-                          <div style="display: flex; align-items: center; gap: 8px;">
-                              <div style="width: 10px; height: 10px; border-radius: 50%; background: #f43f5e; box-shadow: 0 0 8px rgba(244,63,94,0.6);"></div>
-                              <span style="color: #cbd5e1; font-weight: 500;">${ospcLabel}</span>
-                          </div>
-                      </td>
-                      <td style="padding: 14px 22px; color: #f87171; font-family: 'JetBrains Mono', monospace;">$${ospcDailyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                      <td style="padding: 14px 22px; color: #f87171; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${ospcMonthlyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                      <td style="padding: 14px 22px; color: #f87171; font-family: 'JetBrains Mono', monospace;">$${(ospcMonthlyTotal * 12).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  </tr>
-                  <tr>
-                      <td style="padding: 14px 22px; border-right: 1px solid rgba(255,255,255,0.05); background: rgba(34, 197, 94, 0.05);">
-                          <div style="display: flex; align-items: center; gap: 8px;">
-                              <div style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6);"></div>
-                              <span style="color: #fff; font-weight: 600;">Target FLEX Platform</span>
-                          </div>
-                      </td>
-                      <td style="padding: 14px 22px; color: #4ade80; font-family: 'JetBrains Mono', monospace; background: rgba(34, 197, 94, 0.05);">$${flexDailyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                      <td style="padding: 14px 22px; color: #4ade80; font-family: 'JetBrains Mono', monospace; font-weight: 600; background: rgba(34, 197, 94, 0.05);">$${flexMonthlyTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                      <td style="padding: 14px 22px; color: #4ade80; font-family: 'JetBrains Mono', monospace; background: rgba(34, 197, 94, 0.05);">$${(flexMonthlyTotal * 12).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                  </tr>
-              </tbody>
-              <tfoot>
-                  <tr style="background: rgba(0,0,0,0.25); border-top: 1px solid rgba(165, 180, 252, 0.2);">
-                      <td style="padding: 16px 22px; color: #a5b4fc; font-weight: 600; text-align: right; border-right: 1px solid rgba(255,255,255,0.05);">Projected Platform Savings</td>
-                      <td style="padding: 16px 22px; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-weight: 600;">+$${monthlySavings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}/mo</td>
-                      <td colspan="2" style="padding: 16px 22px; color: #38bdf8; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.05rem;">+$${yearlySavings.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}/yr</td>
-                  </tr>
-              </tfoot>
-          </table>
-        </div>
-      </div>
-      `;
-    }
+function buildTcoRows() {
+  const out = [];
+  const seen = new Set();
+  const sourceRows = state.mapperRows.length ? state.mapperRows : state.filtered;
+
+  for (const row of sourceRows) {
+    const resourceType = field(row, ['source_resource_type', 'service_type', 'resource_type']);
+    if (resourceType && !/cloud_server|server|instance/i.test(resourceType)) continue;
+    const name = field(row, ['server_name', 'source_server_name', 'target_server_name', 'name', 'instance_name']) || 'Unnamed VM';
+    const id = field(row, ['server_id', 'source_server_id', 'id', 'instance_id']);
+    const key = `vm:${id || name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const sourceFlavor = field(row, ['source_flavor_id', 'flavor_id', 'source_flavor_name', 'flavor_name']);
+    const targetRegion = normalizeRegion(field(row, ['target_region', 'region']));
+    const matrix = lookupRegionalFlavor(sourceFlavor, targetRegion);
+    const flexCsvMonthly = moneyNumber(field(row, ['target_monthly_cost_min_usd', 'target_monthly_cost', 'flex_monthly_cost_usd']));
+    const ospcCsvMonthly = moneyNumber(field(row, ['source_monthly_cost_usd', 'source_monthly_cost', 'TCO_OSPC_Monthly', 'TCO_OSPC_Estimate']));
+    const flexMonthly = moneyNumber(state.flexPriceMap[String(field(row, ['target_flavor_name', 'target_flavor_id']) || '').toLowerCase()]) || flexCsvMonthly || matrix?.flexMonthly || 0;
+    const ospcMonthly = ospcCsvMonthly || lookupOspcPriceByName(row) || matrix?.ospcMonthly || (flexMonthly ? flexMonthly * 2.45 : 0);
+    const targetFlavor = matrix?.flexFlavor || field(row, ['target_flavor_name', 'target_flavor_id', 'flex_flavor']) || 'FLEX equivalent';
+    out.push(tcoRow({
+      type: classifyComponent(row, name),
+      name,
+      id,
+      sourceFlavor: sourceFlavor || 'unknown',
+      targetFlavor,
+      ospcMonthly,
+      flexMonthly,
+      basis: matrix ? `${targetRegion} price matrix` : (ospcCsvMonthly || flexCsvMonthly ? 'CSV cost fields' : 'estimated from FLEX baseline')
+    }));
   }
 
-  summaryEl.innerHTML = cards.join('') + tcoTableHtml;
+  const volumeRows = state.blockRows.length
+    ? state.blockRows
+    : (state.rows || []).filter(r => String(r.service_type || '').trim() === 'block_storage_volume');
+  for (const row of volumeRows) {
+    const id = field(row, ['volume_id', 'id', 'source_volume_id']);
+    const name = field(row, ['volume_name', 'name', 'display_name']) || id || 'Block volume';
+    const key = `vol:${id || name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const sizeGb = moneyNumber(field(row, ['volume_size_gb', 'size_gb', 'boot_from_volume_size_gb'])) || 0;
+    const ospcMonthly = moneyNumber(field(row, ['source_monthly_cost_usd', 'source_monthly_cost'])) || sizeGb * 0.10;
+    const flexMonthly = moneyNumber(field(row, ['target_monthly_cost_usd', 'target_monthly_cost'])) || sizeGb * 0.06;
+    out.push(tcoRow({
+      type: 'Block Volume',
+      name,
+      id,
+      sourceFlavor: `${formatNumber(sizeGb)} GB OSPC Cinder`,
+      targetFlavor: `${formatNumber(sizeGb)} GB FLEX Cinder`,
+      ospcMonthly,
+      flexMonthly,
+      basis: sizeGb ? 'storage estimate by scanned GB' : 'storage estimate'
+    }));
+  }
+
+  const lbSeen = new Set();
+  for (const row of state.lbRows || []) {
+    const id = field(row, ['load_balancer_id', 'lb_id']);
+    const name = field(row, ['load_balancer_name', 'name']) || id || 'Load balancer';
+    const key = id || name;
+    if (lbSeen.has(key)) continue;
+    lbSeen.add(key);
+    out.push(tcoRow({
+      type: 'Load Balancer',
+      name,
+      id,
+      sourceFlavor: 'OSPC LB',
+      targetFlavor: 'FLEX Octavia LB',
+      ospcMonthly: 25,
+      flexMonthly: 20,
+      basis: 'LB monthly estimate'
+    }));
+  }
+
+  return out.filter(r => r.ospcMonthly > 0 || r.flexMonthly > 0);
+}
+
+function tcoRow(row) {
+  const savings = row.ospcMonthly - row.flexMonthly;
+  return {
+    ...row,
+    savings,
+    oneYear: savings * 12,
+    threeYear: savings * 36,
+    fiveYear: savings * 60
+  };
+}
+
+function renderOspcDetailTco(rows) {
+  const totals = sumTco(rows);
+  const byType = groupTco(rows, 'type');
+  els.ospcDetailTcoPanel.innerHTML = `
+    <div class="tco-title-row">
+      <div>
+        <p class="tco-kicker">OSPC SCANNED INFRA DETAIL TCO</p>
+        <h2>Current OSPC infrastructure monthly baseline</h2>
+        <p class="meta">Calculated from scanned servers, DB-like instances, volumes, and load balancers. VM prices use the same regional OSPC/FLEX matrix from the Why/Who/What page.</p>
+      </div>
+      <span class="tco-badge">${rows.length.toLocaleString()} priced components</span>
+    </div>
+    <div class="tco-kpi-grid">
+      ${tcoKpi('OSPC / Day', money(totals.ospcMonthly / 30), 'danger')}
+      ${tcoKpi('OSPC / Month', money(totals.ospcMonthly), 'danger')}
+      ${tcoKpi('OSPC / Year', money(totals.ospcMonthly * 12), 'danger')}
+      ${tcoKpi('Compute + DB', money(sumByTypes(rows, ['VM / Compute', 'DB Instance'])), 'blue')}
+      ${tcoKpi('Storage', money(sumByTypes(rows, ['Block Volume'])), 'green')}
+      ${tcoKpi('Network / LB', money(sumByTypes(rows, ['Load Balancer'])), 'orange')}
+    </div>
+    <div class="tco-table-wrap">
+      <table class="tco-table">
+        <thead><tr><th>Scanned Component Type</th><th>Count</th><th>OSPC / Month</th><th>OSPC / Day</th><th>Annualized OSPC Cost</th></tr></thead>
+        <tbody>${byType.map(r => `<tr><td>${escapeHtml(r.type)}</td><td>${r.count}</td><td class="cost-danger">${money(r.ospcMonthly)}</td><td>${money(r.ospcMonthly / 30)}</td><td>${money(r.ospcMonthly * 12)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+  els.ospcDetailTcoPanel.classList.remove('hidden');
+}
+
+function renderAggregateTco(rows) {
+  const totals = sumTco(rows);
+  const reduction = totals.ospcMonthly ? Math.round((totals.savings / totals.ospcMonthly) * 100) : 0;
+  els.aggregateTcoPanel.innerHTML = `
+    <div class="tco-comparison-shell">
+      <div class="tco-comparison-head">
+        <h2>TCO Comparison & Projected Savings</h2>
+        <span class="tco-green-pill">↓ ${reduction}% Cost Reduction</span>
+      </div>
+      <div class="tco-table-wrap flush">
+        <table class="tco-table tco-comparison-table">
+          <thead><tr><th>Environment</th><th>Min Est. Daily Cost</th><th>Min Est. Monthly Cost</th><th>Annualized Cost</th></tr></thead>
+          <tbody>
+            <tr><td><span class="env-dot red"></span>Legacy OSPC current scanned infra</td><td>${money(totals.ospcMonthly / 30)}</td><td class="cost-danger">${money(totals.ospcMonthly)}</td><td>${money(totals.ospcMonthly * 12)}</td></tr>
+            <tr><td><span class="env-dot green"></span>Target FLEX equivalent</td><td>${money(totals.flexMonthly / 30)}</td><td class="cost-good">${money(totals.flexMonthly)}</td><td>${money(totals.flexMonthly * 12)}</td></tr>
+          </tbody>
+          <tfoot><tr><td>Projected Platform Savings</td><td>${money(totals.savings)}/mo</td><td colspan="2">${money(totals.savings * 12)}/yr</td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+  els.aggregateTcoPanel.classList.remove('hidden');
+}
+
+function renderComponentTco(rows) {
+  els.componentTcoPanel.innerHTML = `
+    <div class="tco-title-row">
+      <div>
+        <p class="tco-kicker">COMPONENT-LEVEL OSPC → FLEX TCO</p>
+        <h2>Detailed OSPC versus FLEX comparison for each scanned component</h2>
+      </div>
+    </div>
+    <div class="tco-table-wrap component-scroll">
+      <table class="tco-table tco-component-table">
+        <thead>
+          <tr><th>Component</th><th>Source Name</th><th>Source ID</th><th>OSPC Flavor / Size</th><th>FLEX Equivalent</th><th>OSPC / Month</th><th>FLEX / Month</th><th>Monthly Saving</th><th>1-Year Saving</th><th>3-Year Saving</th><th>5-Year Saving</th><th>Basis</th></tr>
+        </thead>
+        <tbody>${rows.map(r => {
+          const cls = r.savings >= 0 ? 'cost-good' : 'cost-danger';
+          return `<tr>
+            <td>${escapeHtml(r.type)}</td>
+            <td>${escapeHtml(r.name)}</td>
+            <td>${escapeHtml(r.id || '-')}</td>
+            <td>${escapeHtml(r.sourceFlavor)}</td>
+            <td>${escapeHtml(r.targetFlavor)}</td>
+            <td class="cost-danger">${money(r.ospcMonthly)}</td>
+            <td class="cost-good">${money(r.flexMonthly)}</td>
+            <td class="${cls}">${money(r.savings)}</td>
+            <td class="${cls}">${money(r.oneYear)}</td>
+            <td class="${cls}">${money(r.threeYear)}</td>
+            <td class="${cls}">${money(r.fiveYear)}</td>
+            <td>${escapeHtml(r.basis)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+  `;
+  els.componentTcoPanel.classList.remove('hidden');
+}
+
+function tcoKpi(label, value, tone) {
+  return `<div class="tco-kpi ${tone || ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function groupTco(rows, key) {
+  const map = {};
+  rows.forEach(r => {
+    const k = r[key] || 'Other';
+    if (!map[k]) map[k] = { type: k, count: 0, ospcMonthly: 0, flexMonthly: 0, savings: 0 };
+    map[k].count += 1;
+    map[k].ospcMonthly += r.ospcMonthly;
+    map[k].flexMonthly += r.flexMonthly;
+    map[k].savings += r.savings;
+  });
+  return Object.values(map).sort((a, b) => b.ospcMonthly - a.ospcMonthly);
+}
+
+function sumTco(rows) {
+  return rows.reduce((acc, r) => {
+    acc.ospcMonthly += r.ospcMonthly;
+    acc.flexMonthly += r.flexMonthly;
+    acc.savings += r.savings;
+    return acc;
+  }, { ospcMonthly: 0, flexMonthly: 0, savings: 0 });
+}
+
+function sumByTypes(rows, types) {
+  return rows.filter(r => types.includes(r.type)).reduce((sum, r) => sum + r.ospcMonthly, 0);
+}
+
+function lookupRegionalFlavor(sourceFlavor, region) {
+  const key = normalizeFlavor(sourceFlavor);
+  const matrix = regionalTcoMatrix[region] || regionalTcoMatrix.IAD;
+  const hit = matrix.find(r => normalizeFlavor(r[0]) === key);
+  return hit ? { sourceFlavor: hit[0], flexFlavor: hit[1], ospcMonthly: hit[2], flexMonthly: hit[3] } : null;
+}
+
+function lookupOspcPriceByName(row) {
+  if (!state.hasOspcPriceList) return 0;
+  const name = String(field(row, ['server_name', 'source_server_name', 'name', 'instance', 'vm_name']) || '').trim().toLowerCase();
+  return name ? moneyNumber(state.ospcPriceMap[name]) : 0;
+}
+
+function normalizeRegion(region) {
+  const value = String(region || '').trim().toUpperCase();
+  if (value.startsWith('DFW')) return 'DFW';
+  if (value.startsWith('SJC')) return 'SJC';
+  return 'IAD';
+}
+
+function normalizeFlavor(flavor) {
+  return String(flavor || '').trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function classifyComponent(row, fallbackName) {
+  const text = [field(row, ['source_resource_type', 'service_type', 'role', 'component']), fallbackName, field(row, ['source_image_name', 'image', 'detected_services'])].join(' ').toLowerCase();
+  if (/db|database|mysql|maria|postgres|mongo|sql/.test(text)) return 'DB Instance';
+  if (/load.?balancer|haproxy|\blb\b/.test(text)) return 'Load Balancer';
+  return 'VM / Compute';
+}
+
+function field(row, keys) {
+  for (const key of keys) {
+    const value = row?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+  }
+  return '';
+}
+
+function moneyNumber(value) {
+  if (value === undefined || value === null || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const text = String(value).trim();
+  if (!text) return 0;
+  const negative = /^\(.*\)$/.test(text) || /^-/.test(text);
+  const n = Number(text.replace(/[$,\s()]/g, ''));
+  if (Number.isNaN(n)) return 0;
+  return negative ? -Math.abs(n) : n;
+}
+
+function money(value) {
+  const n = Number(value) || 0;
+  const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n < 0 ? `-$${abs}` : `$${abs}`;
 }
 
 function renderMapperTable(rows) {

@@ -14,9 +14,31 @@
   <main class="app">
     <header class="hero">
       <p class="eyebrow" id="pageEyebrow">Rackspace Footprint Viewer</p>
-      <h1 id="pageTitle">CSV Dashboard</h1>
+      <h1 id="pageTitle">Inventory</h1>
       <p class="sub" id="pageSubtitle">Top section is for <code>account_overview.py</code>. Bottom section is optional for <code>flavor_mapper.py</code>.</p>
     </header>
+
+    <section class="panel hidden" id="sourceChartPanel">
+      <div class="table-header">
+        <h2>Source Inventory Chart</h2>
+        <span id="sourceChartCount" class="pill">0 resources</span>
+      </div>
+      <div class="chart-layout">
+        <div class="pie-wrap">
+          <div id="sourcePie" class="pie-chart" aria-label="Source resource distribution"></div>
+        </div>
+        <div id="sourceLegend" class="chart-legend"></div>
+      </div>
+    </section>
+
+    <details id="scannerToolsToggle" class="panel scanner-tools-toggle hidden">
+      <summary>OSPC Infra Scanner Tools</summary>
+      <div class="scanner-tools-grid">
+        <a class="btn tool-link" href="/run/">Open OSPC Infrastructure Scanner</a>
+        <a class="btn tool-link" href="/dashboard/">Open Full Inventory / Mapper Workspace</a>
+        <span class="meta">Upload controls, mapper tools, price-list tools, and scanner workspace are collapsed here for the Current inventory and TCO view.</span>
+      </div>
+    </details>
 
     <section class="panel upload-panel">
       <label for="csvFile" class="upload-label" id="overviewUploadLabel">Account Overview CSV</label>
@@ -67,20 +89,11 @@
       <div id="columnPicker" class="column-picker"></div>
     </section>
 
-    <section id="summary" class="summary hidden"></section>
+    <section id="ospcDetailTcoPanel" class="panel tco-detail-panel hidden"></section>
+    <section id="aggregateTcoPanel" class="panel tco-aggregate-panel hidden"></section>
+    <section id="componentTcoPanel" class="panel tco-component-panel hidden"></section>
 
-    <section class="panel hidden" id="sourceChartPanel">
-      <div class="table-header">
-        <h2>Source Inventory Chart</h2>
-        <span id="sourceChartCount" class="pill">0 resources</span>
-      </div>
-      <div class="chart-layout">
-        <div class="pie-wrap">
-          <div id="sourcePie" class="pie-chart" aria-label="Source resource distribution"></div>
-        </div>
-        <div id="sourceLegend" class="chart-legend"></div>
-      </div>
-    </section>
+    <section id="summary" class="summary hidden"></section>
 
     <section class="panel table-panel hidden" id="tablePanel">
       <div class="table-header">
@@ -248,14 +261,34 @@
   <script src="./app.js"></script>
   <script>
     (function customizeProviderView() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('inventory_tco') === '1') {
+        document.body.classList.add('inventory-tco-mode');
+        const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+        set('pageEyebrow', 'Current OSPC Inventory and TCO');
+        set('pageTitle', 'Current Ospc inventory and TCO');
+        set('pageSubtitle', 'Source inventory chart, raw scanned records, and calculated OSPC infrastructure TCO. Scanner and mapper tools are available in the collapsed toggle below.');
+        const tools = document.getElementById('scannerToolsToggle');
+        if (tools) tools.classList.remove('hidden');
+        const table = document.getElementById('tablePanel');
+        const tco = document.getElementById('ospcDetailTcoPanel');
+        if (table && tco) table.insertAdjacentElement('afterend', tco);
+      }
+      if (params.get('tco_compare') === '1') {
+        document.body.classList.add('tco-compare-mode');
+        const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+        set('pageEyebrow', 'Current OSPC Inventory vs FLEX Equivalent');
+        set('pageTitle', 'TCO Comparison & Projected Savings');
+        set('pageSubtitle', 'Projected savings and detailed OSPC versus FLEX comparison for each scanned component.');
+      }
       const source = (new URLSearchParams(window.location.search).get('source') || 'ospc').toLowerCase();
       const labels = { ospc: 'OSPC', flex2flex: 'FLEX2FLEX', aws: 'AWS', gcp: 'GCP', azure: 'Azure' };
       const label = labels[source] || 'OSPC';
       if (!['aws', 'gcp', 'azure', 'flex2flex'].includes(source)) return;
-      document.title = `${label} Inventory and FLEX Mapper`;
+      document.title = `${label} and TCO`;
       const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
       set('pageEyebrow', `${label} Source Footprint Viewer`);
-      set('pageTitle', `${label} Inventory and FLEX Mapper`);
+      set('pageTitle', `${label} and TCO`);
       set('pageSubtitle', `Load ${label} overview exports, review discovered resources, and pair them with FLEX flavor, block, and LB mapper files.`);
       set('overviewUploadLabel', `${label} Overview CSV`);
       set('mapperUploadLabel', `Optional ${label} to FLEX Flavor Mapper CSV`);

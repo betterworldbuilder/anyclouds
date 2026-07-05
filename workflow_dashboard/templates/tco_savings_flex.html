@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>TCO Saving with FLEX</title>
+  <title>Current Inventory and TCO | OSPC to FLEX</title>
   <style>
     :root {
       --navy: #172033;
@@ -153,10 +153,46 @@
       background: #f8fafc;
       font-weight: 950;
     }
+    .inventory-panel {
+      margin-top: 22px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(15,23,42,.08);
+      overflow: hidden;
+    }
+    .inventory-panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(135deg, #ecfdf5, #eff6ff);
+    }
+    .inventory-panel-head h2 {
+      margin: 0;
+      font-size: 20px;
+      color: #0f172a;
+    }
+    .inventory-panel-head p {
+      margin: 4px 0 0;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .inventory-frame {
+      width: 100%;
+      height: 980px;
+      border: 0;
+      display: block;
+      background: #f6f8fc;
+    }
     @media (max-width: 900px) {
       .top, .global-head { flex-direction: column; }
       .note { text-align: left; }
       .wrap { width: calc(100vw - 20px); padding: 14px; }
+      .inventory-frame { height: 820px; }
     }
   </style>
 </head>
@@ -165,12 +201,12 @@
     <div class="top">
       <div>
         <div class="eyebrow">OSPC &rarr; FLEX Regional Price Comparison</div>
-        <h1>Detailed flavor-level cost and savings comparison</h1>
+        <h1>Current OSPC inventory vs FLEX equivalent TCO comparison</h1>
       </div>
       <div class="note">
         <button class="btn" type="button" onclick="exportTcoXls()">Export Full 3 Detailed Tables XLS</button><br>
-        OSPC prices are inferred from <strong>TCO_Comparison_Report.csv</strong> aligned with the TCO flavormap.
-        FLEX prices come from <strong>uploads/flavors/*Flavors.csv</strong>.
+        OSPC prices are inferred from <strong>TCO_Comparison_Report.csv</strong> aligned with the current inventory/flavormap.
+        FLEX equivalent prices come from <strong>uploads/flavors/*Flavors.csv</strong>.
       </div>
     </div>
 
@@ -178,8 +214,8 @@
       <div class="global-head">
         <div>
           <div class="eyebrow" style="color:#93c5fd;">Global TCO View</div>
-          <h2>All-region OSPC vs FLEX cost comparison</h2>
-          <p>Monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings across IAD, DFW, and SJC.</p>
+          <h2>All current OSPC infrastructure vs FLEX equivalent cost comparison</h2>
+          <p>Calculated monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings across IAD, DFW, and SJC.</p>
         </div>
         <button class="btn" type="button" onclick="exportTcoXls()">Export Global XLS</button>
       </div>
@@ -203,6 +239,22 @@
           <tfoot id="global-tco-foot"></tfoot>
         </table>
       </div>
+    </section>
+
+    <section class="inventory-panel" aria-label="Current OSPC versus FLEX component TCO comparison">
+      <div class="inventory-panel-head">
+        <div>
+          <div class="eyebrow">Current Inventory TCO Detail</div>
+          <h2>TCO Comparison & Projected Savings</h2>
+          <p>Projected OSPC to FLEX savings plus detailed OSPC versus FLEX comparison for each scanned component.</p>
+        </div>
+        <button class="btn" type="button" onclick="document.getElementById('current-ospc-inventory-frame').contentWindow.location.reload()">Refresh TCO</button>
+      </div>
+      <iframe
+        id="current-ospc-inventory-frame"
+        class="inventory-frame"
+        src="/dashboard/?tco_compare=1"
+        title="TCO Comparison and Projected Savings"></iframe>
     </section>
   </main>
 

@@ -22,6 +22,12 @@ echo "================================================"
 echo " Starting OSPC to FLEX Migration Dashboard "
 echo "================================================"
 
+DASHBOARD_URL="https://127.0.0.1:5002"
+FLEX_MOCKUP_BASE_URL="http://127.0.0.1:5005/Flex-Skyline-New-Ui.html"
+FLEX_MOCKUP_URL="${FLEX_MOCKUP_BASE_URL}?v=$(date +%s)"
+OSPC_MOCKUP_URL="https://127.0.0.1:5002/ospc_cloud_mockup/"
+OSPC_MIGRATION_URL="https://127.0.0.1:5002/ospc_cloud_mockup/?migration=1"
+
 echo "-> Cleaning up previous background instances..."
 systemctl --user stop osflex-dashboard >/dev/null 2>&1 || true
 pkill -f "$SCRIPT_DIR/workflow_dashboard/run_dashboard.sh" >/dev/null 2>&1 || true
@@ -62,7 +68,7 @@ MOCKUP_HTML="$SCRIPT_DIR/Flex-Skyline-New-Ui.html"
 MOCKUP_LOG="$SCRIPT_DIR/flex_mockup_5005.log"
 MOCKUP_PID=""
 if [[ -f "$MOCKUP_HTML" ]]; then
-    echo "-> Starting FLEX web UI mockup on http://127.0.0.1:5005/Flex-Skyline-New-Ui.html..."
+    echo "-> Starting FLEX web UI mockup on $FLEX_MOCKUP_URL..."
     (cd "$SCRIPT_DIR" && python3 -m http.server 5005 --bind 127.0.0.1) &> "$MOCKUP_LOG" &
     MOCKUP_PID=$!
 else
@@ -83,7 +89,7 @@ for i in $(seq 1 30); do
         cat "$SCRIPT_DIR/dashboard.log" | tail -20
         exit 1
     fi
-    if curl -sk --max-time 1 https://127.0.0.1:5002/ > /dev/null 2>&1; then
+    if curl -sk --max-time 1 "$DASHBOARD_URL/" > /dev/null 2>&1; then
         echo "-> Server is up!"
         break
     fi
@@ -99,7 +105,7 @@ if [[ -n "$MOCKUP_PID" ]]; then
             tail -20 "$MOCKUP_LOG" 2>/dev/null || true
             break
         fi
-        if curl -s --max-time 1 "http://127.0.0.1:5005/Flex-Skyline-New-Ui.html" > /dev/null 2>&1; then
+        if curl -s --max-time 1 "$FLEX_MOCKUP_BASE_URL" > /dev/null 2>&1; then
             echo "-> FLEX web UI mockup is up!"
             break
         fi
@@ -107,25 +113,39 @@ if [[ -n "$MOCKUP_PID" ]]; then
     done
 fi
 
-echo "-> Opening Google Chrome to https://127.0.0.1:5002..."
-if command -v cmd.exe > /dev/null 2>&1; then
-    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "https://127.0.0.1:5002")
-    [[ -n "$MOCKUP_PID" ]] && (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "http://127.0.0.1:5005/Flex-Skyline-New-Ui.html")
-elif command -v explorer.exe > /dev/null 2>&1; then
-    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "https://127.0.0.1:5002")
-    [[ -n "$MOCKUP_PID" ]] && (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "http://127.0.0.1:5005/Flex-Skyline-New-Ui.html")
-elif command -v xdg-open > /dev/null 2>&1; then
-    xdg-open "https://127.0.0.1:5002"
-    [[ -n "$MOCKUP_PID" ]] && xdg-open "http://127.0.0.1:5005/Flex-Skyline-New-Ui.html"
+echo "-> Verifying OSPC web UI mockup on $OSPC_MOCKUP_URL..."
+if curl -sk --max-time 3 "$OSPC_MOCKUP_URL" > /dev/null 2>&1; then
+    echo "-> OSPC web UI mockup is up!"
 else
-    echo "Please manually open https://127.0.0.1:5002 in Google Chrome."
-    [[ -n "$MOCKUP_PID" ]] && echo "Please manually open http://127.0.0.1:5005/Flex-Skyline-New-Ui.html in Google Chrome."
+    echo "WARN: OSPC web UI mockup did not respond yet. It is served by the dashboard route."
+fi
+
+echo "-> Opening Google Chrome to dashboard and mockup web UIs..."
+if command -v cmd.exe > /dev/null 2>&1; then
+    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$DASHBOARD_URL")
+    [[ -n "$MOCKUP_PID" ]] && (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$FLEX_MOCKUP_URL")
+    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; cmd.exe /C start "" chrome "$OSPC_MIGRATION_URL")
+elif command -v explorer.exe > /dev/null 2>&1; then
+    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$DASHBOARD_URL")
+    [[ -n "$MOCKUP_PID" ]] && (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$FLEX_MOCKUP_URL")
+    (cd /mnt/c/Windows/System32 2>/dev/null || cd /tmp; explorer.exe "$OSPC_MIGRATION_URL")
+elif command -v xdg-open > /dev/null 2>&1; then
+    xdg-open "$DASHBOARD_URL"
+    [[ -n "$MOCKUP_PID" ]] && xdg-open "$FLEX_MOCKUP_URL"
+    xdg-open "$OSPC_MIGRATION_URL"
+else
+    echo "Please manually open $DASHBOARD_URL in Google Chrome."
+    [[ -n "$MOCKUP_PID" ]] && echo "Please manually open $FLEX_MOCKUP_URL in Google Chrome."
+    echo "Please manually open $OSPC_MIGRATION_URL in Google Chrome."
 fi
 
 echo "================================================"
 echo " Dashboard is running. Press [Ctrl+C] to stop."
 echo " Logs: $SCRIPT_DIR/dashboard.log"
-[[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup: http://127.0.0.1:5005/Flex-Skyline-New-Ui.html"
+echo " Dashboard: $DASHBOARD_URL"
+[[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup: $FLEX_MOCKUP_URL"
+echo " OSPC mockup: $OSPC_MOCKUP_URL"
+echo " OSPC mockup with Migration to FLEX open: $OSPC_MIGRATION_URL"
 [[ -n "$MOCKUP_PID" ]] && echo " FLEX mockup logs: $MOCKUP_LOG"
 echo "================================================"
 

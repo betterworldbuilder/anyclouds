@@ -6,9 +6,9 @@
   <title>Rackspace Cloud | FLEX Region DR Creation</title>
   <style>
     :root {
-      --topbar: #1f232b;
+      --topbar: #ffffff;
       --sidebar: #ffffff;
-      --page: #f4f6f8;
+      --page: #f6f8fc;
       --panel: #ffffff;
       --line: #e6e9ee;
       --line-strong: #d6dbe3;
@@ -39,16 +39,17 @@
       display: flex;
       align-items: center;
       background: var(--topbar);
-      color: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      color: #1f2937;
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 3px rgba(15,23,42,.08);
     }
     .hamburger {
       width: 43px;
       height: 42px;
       display: grid;
       place-items: center;
-      background: #222936;
-      border-right: 1px solid rgba(255,255,255,.06);
+      background: #f8fafc;
+      border-right: 1px solid var(--line);
       font-size: 24px;
       line-height: 1;
     }
@@ -73,15 +74,15 @@
       gap: 14px;
       height: 100%;
       padding: 0 18px;
-      border-left: 1px solid rgba(255,255,255,.08);
-      color: #f7f7f8;
+      border-left: 1px solid var(--line);
+      color: #334155;
       white-space: nowrap;
     }
-    .grid-icon { color: #cfd4dc; font-size: 15px; }
+    .grid-icon { color: #64748b; font-size: 15px; }
     .domain {
       margin-left: 8px;
       padding-left: 22px;
-      border-left: 1px solid rgba(255,255,255,.25);
+      border-left: 1px solid var(--line-strong);
       font-weight: 600;
     }
     .profile {
@@ -90,7 +91,7 @@
       width: 31px;
       height: 31px;
       border-radius: 50%;
-      background: #fff;
+      background: #f1f5f9;
       color: #20242c;
       display: grid;
       place-items: center;
@@ -220,6 +221,52 @@
     }
     .nav-dr-secondary {
       margin-top: -6px;
+    }
+    .nav-dr-opencenter {
+      min-height: 92px;
+      margin-top: -6px;
+      padding: 12px 10px;
+      flex-direction: column;
+      gap: 4px;
+      border-color: #fbcfe8;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(244,114,182,.22), transparent 25%),
+        linear-gradient(135deg, #0f172a 0%, #111827 48%, #3b1026 100%);
+      color: #fce7f3;
+      box-shadow: 0 10px 24px rgba(219,39,119,.20);
+    }
+    .nav-dr-opencenter:hover {
+      border-color: #ec4899;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(244,114,182,.28), transparent 25%),
+        linear-gradient(135deg, #111827 0%, #172033 46%, #831843 100%);
+      box-shadow: 0 14px 30px rgba(219,39,119,.28);
+    }
+    .oc-badge-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #f9a8d4;
+      border: 1px solid rgba(249,168,212,.55);
+      background: rgba(255,255,255,.08);
+      font-size: 20px;
+      box-shadow: inset 0 0 18px rgba(236,72,153,.16), 0 0 18px rgba(236,72,153,.16);
+    }
+    .oc-badge-title {
+      font-weight: 900;
+      font-size: 15px;
+      letter-spacing: .02em;
+      color: #fff;
+      line-height: 1;
+    }
+    .oc-badge-sub {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #f9a8d4;
     }
     .dr-logo {
       display: block;
@@ -440,14 +487,16 @@
     <a class="nav-item section" href="#"><span>▧ Container</span><span class="chev">⌄</span></a>
     <a class="nav-item section" href="#" onclick="toggleDrButtons(event)"><span>🌈 FLEX Migrations</span><span class="chev" id="flex-tools-chev">⌄</span></a>
     <div id="dr-buttons-container" style="display: none; padding-top: 6px;">
-    <button id="ospc2flex-dr-btn" class="btn btn-dr nav-dr nav-dr-primary" type="button" title="Open OSPC2FLEX migration workflow" aria-label="Open OSPC2FLEX migration workflow">
-      <img src="../assets/ospc_to_flex.png" class="dr-logo" alt="OSPC to FLEX">
-    </button>
     <button id="flexanywhere-cross-cloud-btn" class="btn btn-dr nav-dr nav-dr-secondary" type="button" title="Open Flex Anywhere cross-cloud solutions workflow" aria-label="Open Flex Anywhere cross-cloud solutions workflow">
       <img src="../assets/hyperflex.png" class="dr-logo" alt="HYPERFLEX">
     </button>
     <button id="flex-region-dr-btn" class="btn btn-dr nav-dr" type="button" title="Open FLEX2FLEX region cloning workflow" aria-label="Open FLEX2FLEX region cloning workflow">
       <img src="../assets/flex2flex.png" class="dr-logo" alt="Flex2Flex">
+    </button>
+    <button id="opencenter-dr-btn" class="btn btn-dr nav-dr nav-dr-opencenter" type="button" title="Open OpenCenter modernization workflow" aria-label="Open OpenCenter modernization workflow">
+      <span class="oc-badge-mark">⌘</span>
+      <span class="oc-badge-title">OpenCenter</span>
+      <span class="oc-badge-sub">GitOps Modernization</span>
     </button>
     </div>
     <a class="nav-item" href="#"><span>□</span><span>Documentation</span></a>
@@ -470,11 +519,11 @@
     (function () {
       const flex2flexWorkflowUrl = '/image_migrator/?mode=flex2flex&skin=flexlight';
       const hyperFlexWorkflowUrl = '/image_migrator/?mode=flexanywhere&skin=flexlight';
-      const ospcWorkflowUrl = '/image_migrator/?skin=flexlight';
+      const opencenterWorkflowUrl = '/?stage=s9';
       const frame = document.getElementById('dr-frame');
-      const ospcBtn = document.getElementById('ospc2flex-dr-btn');
       const openBtn = document.getElementById('flex-region-dr-btn');
       const crossCloudBtn = document.getElementById('flexanywhere-cross-cloud-btn');
+      const opencenterBtn = document.getElementById('opencenter-dr-btn');
 
       function loadDr() {
         if (frame) frame.src = flex2flexWorkflowUrl;
@@ -488,14 +537,14 @@
         if (frame) frame.src = hyperFlexWorkflowUrl + '&_=' + Date.now();
       }
 
-      function refreshOspcDr() {
-        if (frame) frame.src = ospcWorkflowUrl + (ospcWorkflowUrl.includes('?') ? '&' : '?') + '_=' + Date.now();
+      function refreshOpenCenter() {
+        if (frame) frame.src = opencenterWorkflowUrl + '&_=' + Date.now() + '#opencenter';
       }
 
       loadDr();
-      if (ospcBtn) ospcBtn.addEventListener('click', refreshOspcDr);
       if (openBtn) openBtn.addEventListener('click', refreshFlex2FlexDr);
       if (crossCloudBtn) crossCloudBtn.addEventListener('click', refreshHyperFlexDr);
+      if (opencenterBtn) opencenterBtn.addEventListener('click', refreshOpenCenter);
     })();
     function toggleDrButtons(e) {
       e.preventDefault();
