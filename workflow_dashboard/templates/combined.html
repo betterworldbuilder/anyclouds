@@ -5064,28 +5064,25 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
 <script>
       window.ocqsRunCmd = function(cmdId, outId, btnId){
         var cmd = ((document.getElementById(cmdId)||{}).textContent||'').trim();
-        if (!cmd){ var o=document.getElementById(outId); if(o) o.textContent='No command yet — fill in credentials above to generate commands.'; return; }
         var out = document.getElementById(outId);
         var btn = document.getElementById(btnId);
         if (!out) return;
-        out.textContent = '$ ' + cmd.split('
-')[0] + '...
-';
+        if (!cmd){ out.textContent = 'No command yet - fill credentials above first.'; return; }
+        out.textContent = '$ ' + cmd.split('\n')[0] + '...\n';
         if (btn){ btn.disabled=true; btn.textContent='Stop'; }
         if (window._ocqsES) window._ocqsES.close();
         var es = new EventSource('/api/stream/run-cmd?cmd=' + encodeURIComponent(cmd));
         window._ocqsES = es;
         es.onmessage = function(e){
-          out.textContent += e.data + '
-';
+          out.textContent += e.data + '\n';
           out.scrollTop = out.scrollHeight;
           if (e.data.indexOf('[EXIT') === 0 || e.data.indexOf('[ERROR]') === 0){
             es.close();
-            if (btn){ btn.disabled=false; btn.textContent='▶ Run'; }
+            if (btn){ btn.disabled=false; btn.textContent='\u25b6 Run'; }
             out.style.borderColor = e.data === '[EXIT 0]' ? '#16a34a' : '#dc2626';
           }
         };
-        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='▶ Run';} };
+        es.onerror = function(){ es.close(); if(btn){btn.disabled=false;btn.textContent='\u25b6 Run';} };
       };
     </script>
         <!-- Prerequisites -->
