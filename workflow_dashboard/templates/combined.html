@@ -5272,9 +5272,15 @@ opencenter cluster --help</div>
           <p>Initialize a new cluster configuration. OpenCenter creates the config file and sets up the GitOps directory structure.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-2"></div>
           <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2','ocqs-st-2')">📋 Copy</button>
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2','ocqs-st-2')">📋 Copy — cluster init</button>
           </div>
           <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
+          <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Select active cluster (required before validate/generate/deploy):</strong></p>
+          <div class="ocqs-cmd" id="ocqs-cmd-2c"></div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2c','ocqs-st-2')">📋 Copy — cluster use</button>
+          </div>
+          <p style="font-size:12px;color:#64748b;"><strong>Open config to edit:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-2b"></div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2b','ocqs-st-2')">📋 Copy — Open Config</button>
         </div>
@@ -5386,6 +5392,22 @@ opencenter cluster --help</div>
           <div class="ocqs-cmd" id="ocqs-cmd-9logs"></div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9logs','ocqs-st-9')" style="margin-top:4px;">📋 Copy Log Commands</button>
           <div class="ocqs-info-box"><strong>Common errors:</strong> invalid app credential | network/image/flavor missing | GitOps repo dirty | CHANGEME placeholders</div>
+        </div>
+
+        <!-- Step 9b: Verify Deployment -->
+        <div class="ocqs-card" id="ocqs-step-9b">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="ocqs-step-num" style="background:#0369a1;">&#10003;</span>
+            <h3 style="margin:0;">Verify Deployment</h3>
+            <span class="ocqs-status ocqs-s-idle" id="ocqs-st-9b">Not Started</span>
+          </div>
+          <p>After deploy completes, verify nodes are Ready and all FluxCD kustomizations have reconciled.</p>
+          <div class="ocqs-cmd" id="ocqs-cmd-9b"></div>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9b','ocqs-st-9b')">&#128203; Copy</button>
+          <div class="ocqs-info-box" style="margin-top:10px;">
+            <strong>Expected:</strong> All nodes STATUS=Ready | kustomizations READY=True | helmreleases READY=True<br>
+            <strong>Access:</strong> Services at <code>https://&lt;svc&gt;.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</code>
+          </div>
         </div>
 
         <!-- Step 10 -->
@@ -5621,6 +5643,8 @@ opencenter cluster --help</div>
         // Step 2
         var c2=g('ocqs-cmd-2');
         if(c2) c2.textContent='opencenter cluster init '+s.cluster+' --org '+s.org;
+        var c2c=g('ocqs-cmd-2c');
+        if(c2c) c2c.textContent='opencenter cluster use '+s.org+'/'+s.cluster;
         var c2b=g('ocqs-cmd-2b');
         if(c2b) c2b.textContent='CONFIG="'+configPath+'"\nnano "$CONFIG"';
 
@@ -5661,6 +5685,8 @@ opencenter cluster --help</div>
         if(c9) c9.textContent='opencenter cluster validate '+s.cluster+'\nopencenter cluster deploy '+s.cluster;
         var c9l=g('ocqs-cmd-9logs');
         if(c9l) c9l.textContent='ls -lah '+logPath+'\ntail -f '+logPath+'*.log';
+        var c9b=g('ocqs-cmd-9b');
+        if(c9b) c9b.textContent='export KUBECONFIG='+gitopsPath+'/infrastructure/clusters/'+s.cluster+'/kubeconfig.yaml\nkubectl get nodes\nkubectl get kustomizations -n flux-system\nkubectl get helmreleases -A';
 
         // YAML preview
         var yp=g('ocqs-yaml-preview');
@@ -5671,7 +5697,7 @@ opencenter cluster --help</div>
         var ff=g('ocqs-full-flow');
         if(ff) ff.textContent=
           '# 1. Check CLI\nopencenter version\n\n'+
-          '# 2. Init config\nopencenter cluster init '+s.cluster+' --org '+s.org+'\n\n'+
+          '# 2. Init config\nopencenter cluster init '+s.cluster+' --org '+s.org+'\n\n'+'# 3. Select active cluster\nopencenter cluster use '+s.org+'/'+s.cluster+'\n\n'+
           '# 3. Edit config\nCONFIG="'+configPath+'"\nnano "$CONFIG"\n\n'+
           '# 4. Validate\nopencenter cluster validate '+s.cluster+'\n\n'+
           '# 5. Sync secrets\nopencenter secrets sync '+s.cluster+'\n\n'+
