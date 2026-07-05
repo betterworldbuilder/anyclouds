@@ -20327,10 +20327,23 @@ def stream_run_cmd():
         return jsonify({"error": "no cmd"}), 400
     def generate():
         try:
+            # Run as an interactive-login bash so ~/.bashrc, mise, and PATH
+            # (including ~/.local/bin) are available — matches a real terminal.
+            home = os.path.expanduser("~")
+            env = {**os.environ}
+            local_bin = os.path.join(home, ".local", "bin")
+            env["PATH"] = local_bin + os.pathsep + env.get("PATH", "")
+            wrapped = (
+                f'export PATH="{local_bin}:$PATH"; '
+                f'[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null; '
+                f'command -v mise >/dev/null 2>&1 && eval "$(mise activate bash 2>/dev/null)"; '
+                f'{cmd}'
+            )
             proc = subprocess.Popen(
-                cmd, shell=True,
+                ["bash", "-lc", wrapped],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, stdin=subprocess.DEVNULL
+                text=True, bufsize=1, stdin=subprocess.DEVNULL,
+                cwd=home, env=env,
             )
             for line in iter(proc.stdout.readline, ""):
                 if line:
