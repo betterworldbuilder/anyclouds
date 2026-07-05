@@ -4876,13 +4876,25 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
             var m = line.match(/^\s*export\s+(\w+)\s*=\s*["']?([^"'\r\n]*)["']?/);
             if (!m) return;
             var k = m[1], v = m[2].trim();
-            if (k === 'OS_AUTH_URL')                          { sv('ocqs-authurl', v); found.authUrl = true; }
-            if (k === 'OS_REGION_NAME')                       { sv('ocqs-region', v);  found.region = true; }
-            if (k === 'OS_APPLICATION_CREDENTIAL_ID')         { sv('ocqs-credid', v);  found.credId = true; }
-            if (k === 'OS_APPLICATION_CREDENTIAL_SECRET')     { sv('ocqs-credsec', v); found.credSec = true; }
-            // fallback: username/password style
-            if (k === 'OS_USERNAME' && !found.credId)         { sv('ocqs-credid', v);  found.credId = true; }
-            if (k === 'OS_PASSWORD' && !found.credSec)        { sv('ocqs-credsec', v); found.credSec = true; }
+            if (k === 'OS_AUTH_URL')  { sv('ocqs-authurl', v); found.authUrl = true; }
+            if (k === 'OS_REGION_NAME') { sv('ocqs-region', v);  found.region = true; }
+            // Application credential auth
+            if (k === 'OS_APPLICATION_CREDENTIAL_ID') {
+              sv('ocqs-credid', v); found.credId = true;
+              var sel = document.getElementById('ocqs-authtype');
+              if (sel) { sel.value = 'v3applicationcredential'; if (typeof ocqsToggleAuthType==='function') ocqsToggleAuthType(); }
+            }
+            if (k === 'OS_APPLICATION_CREDENTIAL_SECRET') { sv('ocqs-credsec', v); found.credSec = true; }
+            // Password auth
+            if (k === 'OS_USERNAME') { sv('ocqs-username', v); found.username = true; }
+            if (k === 'OS_PASSWORD' || k === 'OS_API_KEY') { sv('ocqs-password', v); found.password = true; }
+            if (k === 'OS_USER_DOMAIN_NAME') { sv('ocqs-userdomain', v); found.domain = true; }
+            if (k === 'OS_PROJECT_DOMAIN_NAME') { sv('ocqs-projdomain', v); }
+            if (k === 'OS_PROJECT_ID' || k === 'OS_TENANT_ID') { if (!found.projId) { sv('ocqs-projectid', v); found.projId = true; } }
+            if (k === 'OS_AUTH_TYPE' && v === 'password') {
+              var sel = document.getElementById('ocqs-authtype');
+              if (sel && !found.credId) { sel.value = 'password'; if (typeof ocqsToggleAuthType==='function') ocqsToggleAuthType(); }
+            }
           });
           var count = Object.keys(found).length;
           if (st) {
@@ -5075,7 +5087,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
           <h3>🔑 OpenStack / FLEX Credentials</h3>
           <!-- OpenRC file upload -->
           <div style="background:#eff6ff;border:1px dashed #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">
-            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">⬆ Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills fields below)</span></div>
+            <div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:8px;">⬆ Import OpenRC File <span style="font-weight:400;color:#64748b;">(auto-fills all fields below)</span></div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <label style="background:#0369a1;color:#fff;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
                 📂 Choose OpenRC File
@@ -5085,14 +5097,50 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
               <span id="ocqs-openrc-status" style="font-size:12px;font-weight:700;"></span>
             </div>
           </div>
+          <!-- Auth type selector -->
+          <label class="ocqs-label">Auth Type</label>
+          <select class="ocqs-select" id="ocqs-authtype" onchange="ocqsToggleAuthType();ocqsUpdate();ocqsReqCheck()">
+            <option value="password">Password (username + API key)</option>
+            <option value="v3applicationcredential">Application Credential (app-cred-id + secret)</option>
+          </select>
           <label class="ocqs-label">Auth URL</label>
-          <input class="ocqs-input" id="ocqs-authurl" value="https://identity.api.rackspacecloud.com/v3" oninput="ocqsUpdate()">
+          <input class="ocqs-input" id="ocqs-authurl" value="https://keystone.api.iad3.rackspacecloud.com/v3/" oninput="ocqsUpdate()">
           <label class="ocqs-label">Region</label>
-          <input class="ocqs-input" id="ocqs-region" placeholder="dfw3" oninput="ocqsUpdate();ocqsReqCheck()">
-          <label class="ocqs-label">Application Credential ID</label>
-          <input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_OPENSTACK_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()">
-          <label class="ocqs-label">Application Credential Secret</label>
-          <input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_OPENSTACK_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()">
+          <input class="ocqs-input" id="ocqs-region" placeholder="IAD3" oninput="ocqsUpdate();ocqsReqCheck()">
+          <!-- Password auth fields -->
+          <div id="ocqs-pw-fields">
+            <label class="ocqs-label">Username</label>
+            <input class="ocqs-input" id="ocqs-username" placeholder="dzng.8294" oninput="ocqsUpdate();ocqsReqCheck()">
+            <label class="ocqs-label">Password / API Key</label>
+            <input class="ocqs-input" id="ocqs-password" type="password" placeholder="your-api-key" oninput="ocqsUpdate();ocqsReqCheck()">
+            <label class="ocqs-label">User Domain Name</label>
+            <input class="ocqs-input" id="ocqs-userdomain" placeholder="rackspace_cloud_domain" oninput="ocqsUpdate()">
+            <label class="ocqs-label">Project Domain Name</label>
+            <input class="ocqs-input" id="ocqs-projdomain" placeholder="rackspace_cloud_domain" oninput="ocqsUpdate()">
+            <label class="ocqs-label">Project ID</label>
+            <input class="ocqs-input" id="ocqs-projectid" placeholder="49a2c18a567c402ef560bb0f11821b61" oninput="ocqsUpdate()">
+          </div>
+          <!-- App credential fields -->
+          <div id="ocqs-appcred-fields" style="display:none;">
+            <label class="ocqs-label">Application Credential ID</label>
+            <input class="ocqs-input" id="ocqs-credid" placeholder="YOUR_OPENSTACK_APP_CRED_ID" oninput="ocqsUpdate();ocqsReqCheck()">
+            <label class="ocqs-label">Application Credential Secret</label>
+            <input class="ocqs-input" id="ocqs-credsec" type="password" placeholder="YOUR_OPENSTACK_APP_CRED_SECRET" oninput="ocqsUpdate();ocqsReqCheck()">
+          </div>
+          <!-- Network auto-detect -->
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;margin-top:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:700;color:#15803d;">🔍 Network / Subnet Auto-Detect</div>
+              <button onclick="ocqsAutoDetectNetwork()" style="background:#15803d;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">▶ Run Detection</button>
+            </div>
+            <div style="font-size:11px;color:#64748b;margin-bottom:8px;">Runs <code>openstack network list</code> + <code>openstack subnet list</code> — source your OpenRC first, then click Run.</div>
+            <label class="ocqs-label">Floating Network ID <span style="color:#94a3b8;font-size:10px;">(PUBLICNET)</span></label>
+            <input class="ocqs-input" id="ocqs-floatnet" placeholder="auto-detected or paste manually" oninput="ocqsUpdate()">
+            <label class="ocqs-label">Tenant Network ID</label>
+            <input class="ocqs-input" id="ocqs-networkid" placeholder="auto-detected or paste manually" oninput="ocqsUpdate()">
+            <label class="ocqs-label">Tenant Subnet ID</label>
+            <input class="ocqs-input" id="ocqs-subnetid" placeholder="auto-detected or paste manually" oninput="ocqsUpdate()">
+          </div>
         </div>
 
         <div class="ocqs-card">
@@ -5480,10 +5528,19 @@ opencenter cluster --help</div>
           cluster:v('ocqs-cluster') || 'my-cluster',
           env:    v('ocqs-env') || 'dev',
           provider: v('ocqs-provider') || 'openstack',
-          authUrl:v('ocqs-authurl') || 'https://identity.api.rackspacecloud.com/v3',
-          region: v('ocqs-region') || 'dfw3',
-          credId: v('ocqs-credid'),
-          credSec:v('ocqs-credsec'),
+          authUrl:  v('ocqs-authurl') || 'https://keystone.api.iad3.rackspacecloud.com/v3/',
+          region:   v('ocqs-region') || 'IAD3',
+          authType: v('ocqs-authtype') || 'password',
+          username: v('ocqs-username'),
+          password: v('ocqs-password'),
+          userDomain: v('ocqs-userdomain') || 'rackspace_cloud_domain',
+          projDomain: v('ocqs-projdomain') || 'rackspace_cloud_domain',
+          projectId: v('ocqs-projectid'),
+          credId:   v('ocqs-credid'),
+          credSec:  v('ocqs-credsec'),
+          floatNet: v('ocqs-floatnet'),
+          networkId:v('ocqs-networkid'),
+          subnetId: v('ocqs-subnetid'),
           gitRepo:v('ocqs-gitrepo'),
           gitBranch:v('ocqs-gitbranch')||'main',
           tokFile:v('ocqs-tokfile')||'/home/dzoan/.config/opencenter/tokens/git-token.txt',
@@ -5499,7 +5556,41 @@ opencenter cluster --help</div>
         ocqsUpdate();
       };
 
-      window.ocqsUpdate = function(){
+      window.ocqsToggleAuthType = function(){
+            var t = (document.getElementById('ocqs-authtype')||{}).value;
+            var pw = document.getElementById('ocqs-pw-fields');
+            var ap = document.getElementById('ocqs-appcred-fields');
+            if (pw) pw.style.display = t === 'password' ? '' : 'none';
+            if (ap) ap.style.display = t === 'v3applicationcredential' ? '' : 'none';
+        };
+        window.ocqsAutoDetectNetwork = function(){
+            var authUrl = (document.getElementById('ocqs-authurl')||{}).value || '';
+            var region = (document.getElementById('ocqs-region')||{}).value || '';
+            var cmd = 'openstack network list --format json && openstack subnet list --format json';
+            // Copy to terminal and clipboard
+            var term = document.getElementById('ocqs-terminal');
+            if (term) term.textContent += '\n$ ' + cmd;
+            navigator.clipboard && navigator.clipboard.writeText(cmd);
+            // Try fetch via Flask proxy if available
+            fetch('/api/openstack/networks', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({auth_url: authUrl, region: region,
+                    username: (document.getElementById('ocqs-username')||{}).value,
+                    password: (document.getElementById('ocqs-password')||{}).value,
+                    user_domain_name: (document.getElementById('ocqs-userdomain')||{}).value,
+                    project_id: (document.getElementById('ocqs-projectid')||{}).value
+                })
+            }).then(function(r){ return r.json(); }).then(function(d){
+                if (d.external_network_id) { sv('ocqs-floatnet', d.external_network_id); }
+                if (d.network_id) { sv('ocqs-networkid', d.network_id); }
+                if (d.subnet_id) { sv('ocqs-subnetid', d.subnet_id); }
+                if (typeof ocqsUpdate === 'function') ocqsUpdate();
+            }).catch(function(){
+                // Backend not available — show command in terminal for manual run
+                var term = document.getElementById('ocqs-terminal');
+                if (term) term.textContent += '\n[Paste output above into network/subnet fields manually]';
+            });
+        };
+        window.ocqsUpdate = function(){
         var s = ocqsGetState();
         var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+s.org+'/'+s.cluster+'/'+s.cluster+'-config.yaml';
         var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+s.org;
