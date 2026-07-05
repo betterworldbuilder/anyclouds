@@ -5101,7 +5101,7 @@ mise run build
 
 ./bin/opencenter version</div>
           <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1a','ocqs-st-1')">📋 Copy</button>
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1a','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1a" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-1a','ocqs-out-1a','ocqs-run-1a')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-1a" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           </div>
           <p style="font-size:12px;color:#64748b;"><strong>Option B — GitHub release binary download:</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-1b">sudo apt update && sudo apt install -y curl jq ca-certificates
@@ -5123,7 +5123,7 @@ chmod +x /tmp/opencenter && /tmp/opencenter version
 sudo mv /tmp/opencenter /usr/local/bin/opencenter
 opencenter version</div>
           <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button>
+            <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-1b','ocqs-out-1b','ocqs-run-1b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-1b" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           </div>
           <p style="font-size:12px;color:#64748b;"><strong>Verify:</strong></p>
           <div class="ocqs-cmd">./bin/opencenter version
@@ -5132,7 +5132,8 @@ opencenter version
 opencenter --help
 opencenter cluster --help</div>
           <div class="ocqs-info-box"><strong>Expected:</strong> opencenter version: 1.0.0-rc02 | Platform: linux/amd64<br>
-          <strong>mise build tip:</strong> <code>mise trust</code> must run inside the cloned repo dir. If <code>mise run build</code> fails, check the .mise.toml in the repo for required tool versions.</div>
+          <strong>mise build tip:</strong> <code>mise trust</code> must run inside the cloned repo dir. If <code>mise run build</code> fails, check the .mise.toml in the repo for required tool versions.<br>
+          <strong>Local test with Kind:</strong> Set provider to <code>kind</code> in Step 2 — no OpenStack credentials required. Needs Docker: <code>sudo apt install -y docker.io &amp;&amp; sudo usermod -aG docker $USER</code> then re-login. Kind cluster spins up in ~2 min with <code>opencenter cluster deploy</code>.</div>
         </div>
 
         <!-- Step 2 -->
@@ -5326,7 +5327,7 @@ opencenter cluster --help</div>
             <div class="ocqs-toggle-row"><span style="font-size:13px;color:#475569;">kube-prometheus-stack</span><div class="ocqs-toggle on" id="tog-monitoring" onclick="ocqsToggle('monitoring')"></div></div>
           </div>
           <div class="ocqs-cmd" id="ocqs-cmd-5"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-5','ocqs-st-5')">&#128203; Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-5','ocqs-st-5')">&#128203; Copy</button><button id="ocqs-run-5" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-5','ocqs-out-5','ocqs-run-5')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-5" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           <pre class="ocqs-yaml" id="ocqs-yaml-5" style="margin-top:10px;"></pre>
           <div class="ocqs-warn-box">Re-enable these later with proper secrets and Swift/object storage credentials.</div>
         </div>
@@ -5340,7 +5341,7 @@ opencenter cluster --help</div>
           </div>
           <p>Validates provider credentials, GitOps settings, services, secrets, and required fields. <strong>Do not deploy until this passes.</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-6"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-6','ocqs-st-6')">📋 Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-6','ocqs-st-6')">📋 Copy</button><button id="ocqs-run-6" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-6','ocqs-out-6','ocqs-run-6')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-6" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           <div class="ocqs-info-box">
             <strong>PASS:</strong> No missing required fields, no critical CHANGEME values<br>
             <strong>WARN:</strong> Optional services disabled, git local dirty, remote checks skipped offline<br>
@@ -5357,7 +5358,7 @@ opencenter cluster --help</div>
           </div>
           <p>Sync any external secrets, run a final validate, then generate the FluxCD GitOps manifests.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-7"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7','ocqs-st-7')">📋 Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7','ocqs-st-7')">📋 Copy</button><button id="ocqs-run-7" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-7','ocqs-out-7','ocqs-run-7')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-7" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           <div class="ocqs-info-box"><strong>Expected:</strong> Generate complete | GitOps path: <span id="ocqs-gitopspath2">/home/dzoan/.config/opencenter/clusters/gitops/my-org</span> | Manifests created: 97</div>
           <div class="ocqs-cmd" id="ocqs-cmd-7b"></div>
           <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-7b','ocqs-st-7')" style="margin-top:6px;">📋 Copy — Check CHANGEME</button>
@@ -5373,7 +5374,7 @@ opencenter cluster --help</div>
           </div>
           <p>Commit the generated manifests to your GitOps repo so Flux can reconcile them on deploy.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-8"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-8','ocqs-st-8')">📋 Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-8','ocqs-st-8')">📋 Copy</button><button id="ocqs-run-8" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-8','ocqs-out-8','ocqs-run-8')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-8" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           <div class="ocqs-info-box"><strong>Common errors:</strong> remote origin already exists → use <code>git remote set-url origin URL</code> | invalid token | branch protected</div>
         </div>
 
@@ -5403,7 +5404,7 @@ opencenter cluster --help</div>
           </div>
           <p>After deploy completes, verify nodes are Ready and all FluxCD kustomizations have reconciled.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-9b"></div>
-          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9b','ocqs-st-9b')">&#128203; Copy</button>
+          <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-9b','ocqs-st-9b')">&#128203; Copy</button><button id="ocqs-run-9b" class="ocqs-btn" onclick="ocqsRunCmd('ocqs-cmd-9b','ocqs-out-9b','ocqs-run-9b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #1e3a5f;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><div id="ocqs-out-9b" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#86efac;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin-top:4px;display:none;"></div>
           <div class="ocqs-info-box" style="margin-top:10px;">
             <strong>Expected:</strong> All nodes STATUS=Ready | kustomizations READY=True | helmreleases READY=True<br>
             <strong>Access:</strong> Services at <code>https://&lt;svc&gt;.&lt;cluster&gt;.&lt;region&gt;.k8s.opencenter.cloud</code>
@@ -5578,6 +5579,9 @@ opencenter cluster --help</div>
         ocqsUpdate();
       };
 
+      window.ocqsRunCmd = function(cmdId,outId,btnId){ var cmd=(document.getElementById(cmdId)||{}).textContent||''; if(!cmd.trim())return; var out=document.getElementById(outId); var btn=document.getElementById(btnId); if(!out)return; out.style.display='block'; out.innerHTML='<span style="color:#94a3b8;">$ '+cmd.replace(/</g,'&lt;')+'</span>
+<span style="color:#fbbf24;">Running...</span>'; if(btn){btn.disabled=true;btn.textContent='...';}  fetch('/api/run/execute-manual-cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({command:cmd})}).then(function(r){return r.json();}).then(function(d){ var ok=d.status==='success'; var text=(d.output||d.error||'(no output)').replace(/</g,'&lt;'); out.innerHTML='<span style="color:#94a3b8;">$ '+cmd.replace(/</g,'&lt;')+'</span>
+<span style="color:'+( ok ? '#4ade80' : '#f87171')+';">'+text+'</span>'; if(btn){btn.disabled=false;btn.innerHTML='&#9654; Run';} }).catch(function(e){ out.innerHTML='<span style="color:#f87171;">Error: '+e+'</span>'; if(btn){btn.disabled=false;btn.innerHTML='&#9654; Run';} }); };
       window.ocqsToggleAuthType = function(){
             var t = (document.getElementById('ocqs-authtype')||{}).value;
             var pw = document.getElementById('ocqs-pw-fields');
