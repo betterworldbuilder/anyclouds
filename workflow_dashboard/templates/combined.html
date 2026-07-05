@@ -4869,33 +4869,34 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
         var reader = new FileReader();
         reader.onload = function(e){
           var text = e.target.result;
-          var found = {};
-          // Parse export KEY="VALUE" or export KEY=VALUE lines
-          var lines = text.split('\n');
-          lines.forEach(function(line){
+          var found = {}; var kv = {};
+          // Pass 1: collect all values, resolve $VAR references (e.g. OS_PASSWORD="$OS_API_KEY")
+          text.split('\n').forEach(function(line){
             var m = line.match(/^\s*export\s+(\w+)\s*=\s*["']?([^"'\r\n]*)["']?/);
             if (!m) return;
-            var k = m[1], v = m[2].trim();
-            if (k === 'OS_AUTH_URL')  { sv('ocqs-authurl', v); found.authUrl = true; }
-            if (k === 'OS_REGION_NAME') { sv('ocqs-region', v);  found.region = true; }
-            // Application credential auth
-            if (k === 'OS_APPLICATION_CREDENTIAL_ID') {
-              sv('ocqs-credid', v); found.credId = true;
-              var sel = document.getElementById('ocqs-authtype');
-              if (sel) { sel.value = 'v3applicationcredential'; if (typeof ocqsToggleAuthType==='function') ocqsToggleAuthType(); }
-            }
-            if (k === 'OS_APPLICATION_CREDENTIAL_SECRET') { sv('ocqs-credsec', v); found.credSec = true; }
-            // Password auth
-            if (k === 'OS_USERNAME') { sv('ocqs-username', v); found.username = true; }
-            if (k === 'OS_PASSWORD' || k === 'OS_API_KEY') { sv('ocqs-password', v); found.password = true; }
-            if (k === 'OS_USER_DOMAIN_NAME') { sv('ocqs-userdomain', v); found.domain = true; }
-            if (k === 'OS_PROJECT_DOMAIN_NAME') { sv('ocqs-projdomain', v); }
-            if (k === 'OS_PROJECT_ID' || k === 'OS_TENANT_ID') { if (!found.projId) { sv('ocqs-projectid', v); found.projId = true; } }
-            if (k === 'OS_AUTH_TYPE' && v === 'password') {
-              var sel = document.getElementById('ocqs-authtype');
-              if (sel && !found.credId) { sel.value = 'password'; if (typeof ocqsToggleAuthType==='function') ocqsToggleAuthType(); }
-            }
+            var k = m[1], v = m[2].trim().replace(/\$(\w+)/g, function(_,r){ return kv[r]||''; });
+            kv[k] = v;
           });
+          // Pass 2: apply to form fields
+          if (kv.OS_AUTH_URL)  { sv('ocqs-authurl', kv.OS_AUTH_URL); found.authUrl=true; }
+          if (kv.OS_REGION_NAME) { sv('ocqs-region', kv.OS_REGION_NAME); found.region=true; }
+          if (kv.OS_APPLICATION_CREDENTIAL_ID) {
+            sv('ocqs-credid', kv.OS_APPLICATION_CREDENTIAL_ID); found.credId=true;
+            var sel=document.getElementById('ocqs-authtype');
+            if(sel){sel.value='v3applicationcredential';if(typeof ocqsToggleAuthType==='function')ocqsToggleAuthType();}
+          }
+          if (kv.OS_APPLICATION_CREDENTIAL_SECRET) { sv('ocqs-credsec', kv.OS_APPLICATION_CREDENTIAL_SECRET); found.credSec=true; }
+          if (kv.OS_USERNAME) { sv('ocqs-username', kv.OS_USERNAME); found.username=true; }
+          var pw = kv.OS_PASSWORD || kv.OS_API_KEY || '';
+          if (pw) { sv('ocqs-password', pw); found.password=true; }
+          if (kv.OS_USER_DOMAIN_NAME) { sv('ocqs-userdomain', kv.OS_USER_DOMAIN_NAME); found.domain=true; }
+          if (kv.OS_PROJECT_DOMAIN_NAME) { sv('ocqs-projdomain', kv.OS_PROJECT_DOMAIN_NAME); }
+          var pid = kv.OS_PROJECT_ID || kv.OS_TENANT_ID || '';
+          if (pid) { sv('ocqs-projectid', pid); found.projId=true; }
+          if (!found.credId) {
+            var sel=document.getElementById('ocqs-authtype');
+            if(sel){sel.value='password';if(typeof ocqsToggleAuthType==='function')ocqsToggleAuthType();}
+          }
           var count = Object.keys(found).length;
           if (st) {
             if (count > 0) {
