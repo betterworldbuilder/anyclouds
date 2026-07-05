@@ -4833,7 +4833,7 @@ openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</p
       <!-- K8s Manifests Output -->
       <div id="r6-manifests-section" class="gov-section" style="display:none;">
         <h3>Generated K8s Manifests</h3>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
           <button class="gov-btn btn-save" onclick="r6CopyManifests()">📋 Copy All</button>
           <button class="gov-btn btn-export" onclick="r6DownloadManifests()">📥 Download YAML</button>
           <button class="gov-btn btn-save" onclick="r6GenerateOpenCenterBundle()">📦 Generate OpenCenter Import Bundle</button>
@@ -5170,7 +5170,7 @@ mise run build
 
 # Verify installation
 ./bin/opencenter version</div>
-          <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1rec','ocqs-st-1')">&#128203; Copy</button><button id="ocqs-run-1rec" onclick="ocqsRunCmd('ocqs-cmd-1rec','ocqs-out-1rec','ocqs-run-1rec')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1rec',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
           <div id="ocqs-out-1rec" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;margin-bottom:10px;">$ waiting...
@@ -5195,7 +5195,7 @@ curl -fL -o /tmp/opencenter "$ASSET_URL"
 chmod +x /tmp/opencenter && /tmp/opencenter version
 sudo mv /tmp/opencenter /usr/local/bin/opencenter
 opencenter version</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-1b','ocqs-st-1')">📋 Copy</button><button id="ocqs-run-1b" onclick="ocqsRunCmd('ocqs-cmd-1b','ocqs-out-1b','ocqs-run-1b')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-1b',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
 <div id="ocqs-out-1b" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:240px;overflow-y:auto;margin-top:6px;">$ waiting for command...
@@ -5220,9 +5220,9 @@ opencenter cluster --help</div>
           </div>
           <p>Initialize a new cluster configuration. OpenCenter creates the config file and sets up the GitOps directory structure.</p>
           <div class="ocqs-cmd" id="ocqs-cmd-2"></div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2','ocqs-st-2')">&#128203; Copy</button><button id="ocqs-run-2" onclick="ocqsRunCmd('ocqs-cmd-2','ocqs-out-2','ocqs-run-2')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-2',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="ocqs-out-2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;">$ waiting...
+          <div id="ocqs-out-2" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
           </div>
           </div>
           <div class="ocqs-info-box"><strong>Note:</strong> Always use the config path printed by the init command — it may differ from old docs.</div>
@@ -5258,9 +5258,9 @@ opencenter cluster --help</div>
           </div>
           <p style="font-size:12px;color:#64748b;margin-top:10px;"><strong>Select active cluster (required before validate/generate/deploy):</strong></p>
           <div class="ocqs-cmd" id="ocqs-cmd-2c"></div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-2c','ocqs-st-2')">&#128203; Copy</button><button id="ocqs-run-2c" onclick="ocqsRunCmd('ocqs-cmd-2c','ocqs-out-2c','ocqs-run-2c')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-2c',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
-          <div id="ocqs-out-2c" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:4px;">$ waiting...
+          <div id="ocqs-out-2c" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
           </div>
           </div>
           <p style="font-size:12px;color:#64748b;"><strong>Open config to edit:</strong></p>
@@ -5592,7 +5592,7 @@ opencenter cluster --help</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t1','')">&#128203; Copy</button>
             <button id="ocqs-run-t1" onclick="ocqsRunCmd('ocqs-cmd-t1','ocqs-out-t1','ocqs-run-t1')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-t1',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-t1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;">$ waiting...
+          <div id="ocqs-out-t1" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
 </div>
         </div>
 
@@ -5623,7 +5623,7 @@ kubectl describe kustomization &lt;name&gt; -n flux-system</div>
             <button class="ocqs-btn ocqs-btn-copy" onclick="ocqsCopyCmd('ocqs-cmd-t3','')">&#128203; Copy</button>
             <button id="ocqs-run-t3" onclick="ocqsRunCmd('ocqs-cmd-t3','ocqs-out-t3','ocqs-run-t3')" style="background:#1e3a5f;color:#7dd3fc;border:1px solid #334155;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">&#9654; Run</button><button onclick="ocqsCopyOut('ocqs-out-t3',this)" style="background:#334155;color:#cbd5e1;border:1px solid #475569;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">&#128203; Copy Output</button>
           </div>
-          <div id="ocqs-out-t3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;">$ waiting...
+          <div id="ocqs-out-t3" style="background:#020817;border:1px solid #334155;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:180px;overflow-y:auto;margin-top:4px;width:100%;flex-basis:100%;">$ waiting...
 </div>
           <div class="ocqs-info-box" style="margin-top:8px;">
             <strong>Common causes:</strong> Git repo not accessible (SSH key issue) &bull; SOPS decryption failure (Age key not found) &bull; Service configuration errors
