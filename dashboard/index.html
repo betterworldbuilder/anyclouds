@@ -14,38 +14,37 @@
   <main class="app">
     <header class="hero">
       <p class="eyebrow" id="pageEyebrow">Rackspace Footprint Viewer</p>
-      <h1 id="pageTitle">Inventory</h1>
+      <h1 id="pageTitle">TCO Saving with FLEX</h1>
       <p class="sub" id="pageSubtitle">Top section is for <code>account_overview.py</code>. Bottom section is optional for <code>flavor_mapper.py</code>.</p>
     </header>
 
-    <section class="panel hidden" id="sourceChartPanel">
-      <div class="table-header">
-        <h2>Source Inventory Chart</h2>
-        <span id="sourceChartCount" class="pill">0 resources</span>
+
+
+
+
+    <section id="ospcDetailTcoPanel" class="panel tco-detail-panel hidden">
+      <div id="ospcDetailTcoExportBar" style="display:none;padding:10px 0 0;text-align:right;">
+        <button onclick="dashExportTableCsv('ospcDetailTcoTable','ospc_detail_tco.csv')" class="btn" style="background:#b23a3a;color:#fff;font-weight:700;">&#11015; Export Detail TCO CSV</button>
       </div>
-      <div class="chart-layout">
-        <div class="pie-wrap">
-          <div id="sourcePie" class="pie-chart" aria-label="Source resource distribution"></div>
-        </div>
-        <div id="sourceLegend" class="chart-legend"></div>
+    </section>
+    <section id="ospcPerCompPanel" class="panel tco-component-panel hidden"></section>
+    <section id="aggregateTcoPanel" class="panel tco-aggregate-panel hidden">
+      <div id="aggregateTcoExportBar" style="display:none;padding:10px 0 0;text-align:right;">
+        <button onclick="dashExportTableCsv('aggregateTcoTable','ospc_aggregate_tco.csv')" class="btn" style="background:#b23a3a;color:#fff;font-weight:700;">&#11015; Export Aggregate TCO CSV</button>
+      </div>
+    </section>
+    <section id="componentTcoPanel" class="panel tco-component-panel hidden">
+      <div id="componentTcoExportBar" style="display:none;padding:10px 0 0;text-align:right;">
+        <button onclick="dashExportTableCsv('componentTcoTable','ospc_component_tco.csv')" class="btn" style="background:#b23a3a;color:#fff;font-weight:700;">&#11015; Export Component TCO CSV</button>
       </div>
     </section>
 
-    <details id="scannerToolsToggle" class="panel scanner-tools-toggle hidden">
-      <summary>OSPC Infra Scanner Tools</summary>
-      <div class="scanner-tools-grid">
-        <a class="btn tool-link" href="/run/">Open OSPC Infrastructure Scanner</a>
-        <a class="btn tool-link" href="/dashboard/">Open Full Inventory / Mapper Workspace</a>
-        <span class="meta">Upload controls, mapper tools, price-list tools, and scanner workspace are collapsed here for the Current inventory and TCO view.</span>
-      </div>
-    </details>
-
+    <!-- ── Moved: Inventory Chart, Upload, Controls ── -->
     <section class="panel upload-panel">
       <label for="csvFile" class="upload-label" id="overviewUploadLabel">Account Overview CSV</label>
       <input id="csvFile" type="file" accept=".csv,text/csv" />
       <p id="fileMeta" class="meta">No file loaded</p>
     </section>
-
     <section id="controls" class="panel controls hidden">
       <div class="field">
         <label for="search">Search</label>
@@ -88,10 +87,27 @@
       <h3 class="picker-title">Visible Columns</h3>
       <div id="columnPicker" class="column-picker"></div>
     </section>
+    <section class="panel hidden" id="sourceChartPanel">
+      <div class="table-header">
+        <h2>Source Inventory Chart</h2>
+        <span id="sourceChartCount" class="pill">0 resources</span>
+      </div>
+      <div class="chart-layout">
+        <div class="pie-wrap">
+          <div id="sourcePie" class="pie-chart" aria-label="Source resource distribution"></div>
+        </div>
+        <div id="sourceLegend" class="chart-legend"></div>
+      </div>
+    </section>
+    <details id="scannerToolsToggle" class="panel scanner-tools-toggle hidden">
+      <summary>OSPC Infra Scanner Tools</summary>
+      <div class="scanner-tools-grid">
+        <a class="btn tool-link" href="/run/">Open OSPC Infrastructure Scanner</a>
+        <a class="btn tool-link" href="/dashboard/">Open Full Inventory / Mapper Workspace</a>
+        <span class="meta">Upload controls, mapper tools, price-list tools, and scanner workspace are collapsed here for the Current inventory and TCO view.</span>
+      </div>
+    </details>
 
-    <section id="ospcDetailTcoPanel" class="panel tco-detail-panel hidden"></section>
-    <section id="aggregateTcoPanel" class="panel tco-aggregate-panel hidden"></section>
-    <section id="componentTcoPanel" class="panel tco-component-panel hidden"></section>
 
     <section id="summary" class="summary hidden"></section>
 
@@ -353,7 +369,43 @@
         // Dashboard opened as file:// or server not available — silent fail
       }
     })();
-    // ── Export Full Inventory XLSX (all loaded sheets) ─────────────────────
+    // ── Generic table-to-CSV export ──────────────────────────────────────────
+    function dashExportTableCsv(tableId, filename) {
+      var tbl = document.getElementById(tableId);
+      if (!tbl) { alert('Table not loaded yet.'); return; }
+      var rows = Array.from(tbl.querySelectorAll('tr'));
+      var csv = rows.map(function(r) {
+        return Array.from(r.querySelectorAll('th,td')).map(function(c) {
+          var v = c.textContent.trim().replace(/"/g,'""');
+          return '"' + v + '"';
+        }).join(',');
+      }).join('\n');
+      var a = document.createElement('a');
+      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+      a.download = filename;
+      a.click();
+    }
+    window.dashExportTableCsv = dashExportTableCsv;
+
+    // Show export bars when TCO panels become visible (MutationObserver)
+    (function() {
+      var panelPairs = [
+        ['componentTcoPanel', 'componentTcoExportBar'],
+        ['aggregateTcoPanel', 'aggregateTcoExportBar'],
+        ['ospcDetailTcoPanel', 'ospcDetailTcoExportBar'],
+      ];
+      panelPairs.forEach(function(pair) {
+        var panel = document.getElementById(pair[0]);
+        var bar   = document.getElementById(pair[1]);
+        if (!panel || !bar) return;
+        new MutationObserver(function() {
+          var visible = !panel.classList.contains('hidden') && panel.style.display !== 'none';
+          bar.style.display = visible ? 'block' : 'none';
+        }).observe(panel, { attributes: true, attributeFilter: ['class', 'style'] });
+      });
+    })();
+
+  // ── Export Full Inventory XLSX (all loaded sheets) ─────────────────────
     document.getElementById('exportAllXlsx').addEventListener('click', function () {
       if (typeof XLSX === 'undefined') {
         alert('SheetJS library not loaded. Please check your internet connection.');

@@ -467,7 +467,7 @@
     <button type="button">Databases <span>⌄</span></button>
     <button type="button">Backups <span>⌄</span></button>
     <div class="journey-dropdown journey-start">
-      <button type="button" class="journey-tab journey-cost journey-dropdown-toggle" data-journey-tab id="cost-tab" onclick="showToolPage('cost-tab','/dashboard/?inventory_tco=1','Current Ospc inventory and TCO')">
+      <button type="button" class="journey-tab journey-cost journey-dropdown-toggle" data-journey-tab id="cost-tab" onclick="showToolPage('cost-tab','/dashboard/','Current Ospc inventory and TCO')">
         Current inventory and TCO
       </button>
     </div>
@@ -647,6 +647,7 @@
       setActiveJourney(tabId || 'cost-tab');
       guideFrame.title = title || 'OSPC tool';
       guideFrame.src = url;
+      guideFrame.onload = function() { try { guideFrame.contentWindow.scrollTo(0,0); } catch(e) {} };
     }
 
     function showStrategyPage(tabId) {

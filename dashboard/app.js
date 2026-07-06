@@ -736,6 +736,7 @@ function renderInventoryTcoPanels() {
     return;
   }
   renderOspcDetailTco(rows);
+  renderOspcPerComponent(rows);
   renderAggregateTco(rows);
   renderComponentTco(rows);
 }
@@ -836,7 +837,7 @@ function renderOspcDetailTco(rows) {
   els.ospcDetailTcoPanel.innerHTML = `
     <div class="tco-title-row">
       <div>
-        <p class="tco-kicker">OSPC SCANNED INFRA DETAIL TCO</p>
+        <p class="tco-kicker">TCO SAVING WITH FLEX</p>
         <h2>Current OSPC infrastructure monthly baseline</h2>
         <p class="meta">Calculated from scanned servers, DB-like instances, volumes, and load balancers. VM prices use the same regional OSPC/FLEX matrix from the Why/Who/What page.</p>
       </div>
@@ -882,6 +883,19 @@ function renderAggregateTco(rows) {
     </div>
   `;
   els.aggregateTcoPanel.classList.remove('hidden');
+}
+
+function renderOspcPerComponent(rows) {
+  const el = document.getElementById('ospcPerCompPanel'); if(!el) return;
+  const typeColors = {'VM / Compute':'#3b82f6','DB Instance':'#7c3aed','Block Volume':'#0891b2','Load Balancer':'#d97706'};
+  let totalMo = 0;
+  const rowsHtml = rows.map(r => {
+    const mo = r.ospcMonthly || 0; totalMo += mo;
+    const tc = typeColors[r.type] || '#3b82f6';
+    return `<tr><td style="font-weight:600;color:#1e293b;">${escapeHtml(r.name||r.type)}</td><td><span style="background:${tc}22;color:${tc};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;">${escapeHtml(r.type)}</span></td><td style="font-family:monospace;font-size:11px;color:#64748b;">${r.sourceFlavor&&r.sourceFlavor!=='-'?escapeHtml(r.sourceFlavor):'—'}</td><td style="color:#64748b;">${r.region||'IAD'}</td><td style="text-align:right;font-weight:700;color:#dc2626;">${money(mo)}</td><td style="text-align:right;color:#64748b;">$${(mo/30).toFixed(2)}</td><td style="text-align:right;color:#374151;">${money(mo*12)}</td><td style="text-align:right;color:#374151;">${money(mo*36)}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<div class="tco-title-row"><div><p class="tco-kicker">DETAILED OSPC TCO — PER SCANNED COMPONENT</p><h2>Full OSPC cost breakdown for each scanned component</h2><p class="meta">Each VM, DB instance, block volume, and load balancer with individual monthly and annualized OSPC cost.</p></div><button onclick="(function(){var rows=Array.from(document.querySelectorAll('#ospcPerCompPanel tbody tr'));var csv='Component,Type,Flavor/Size,Region,OSPC/Month,OSPC/Day,1-Year OSPC,3-Year OSPC\\n'+rows.map(function(r){return Array.from(r.querySelectorAll('td')).map(function(c){return '\"'+c.textContent.trim().replace(/\"/g,'\"\"')+'\"';}).join(',');}).join('\\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='OSPC_Component_TCO.csv';a.click();})()" class="btn" style="background:#b23a3a;color:#fff;font-weight:700;white-space:nowrap;">&#11015; Export CSV</button></div><div class="tco-table-wrap"><table class="tco-table"><thead><tr><th>Component</th><th>Type</th><th>Flavor / Size</th><th>Region</th><th style="text-align:right;">OSPC / Month</th><th style="text-align:right;">OSPC / Day</th><th style="text-align:right;">1-Year OSPC</th><th style="text-align:right;">3-Year OSPC</th></tr></thead><tbody>${rowsHtml}</tbody><tfoot><tr style="font-weight:800;background:#f8fafc;"><td colspan="4" style="font-weight:800;color:#1e293b;">TOTAL</td><td style="text-align:right;font-weight:900;color:#dc2626;">${money(totalMo)}</td><td style="text-align:right;color:#dc2626;">$${(totalMo/30).toFixed(2)}</td><td style="text-align:right;font-weight:900;color:#1e293b;">${money(totalMo*12)}</td><td style="text-align:right;font-weight:900;color:#1e293b;">${money(totalMo*36)}</td></tr></tfoot></table></div>`;
+  el.classList.remove('hidden');
 }
 
 function renderComponentTco(rows) {
