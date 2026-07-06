@@ -1,0 +1,310 @@
+    <div id="s1appdep-pane" style="width:100%; height:100%; display:none; overflow:auto;">
+      <div class="info-panel" style="max-width:1500px;margin:0 auto 40px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;margin-bottom:18px;">
+          <div>
+            <h2 style="margin-bottom:6px;">🔎 App Dependency Auto-Discovery</h2>
+            <p style="color:#94a3b8;margin:0;max-width:900px;">Select source VMs and scan running apps, services, ports, volumes, and database dependencies automatically.</p>
+          </div>
+          <span style="display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;border:1px solid rgba(34,197,94,.45);background:rgba(22,101,52,.18);color:#bbf7d0;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;">READ-ONLY SCAN</span>
+        </div>
+
+        <div class="appdep-cred-shell">
+          <div class="appdep-cred-title">
+            <span>Cloud Credentials</span>
+            <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">OSPC / FLEX / Hyperscaler</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin-bottom:14px;">
+            <section style="border:1px solid rgba(125,211,252,.24);border-radius:8px;padding:12px;background:rgba(2,6,23,.28);">
+              <div class="appdep-cred-title" style="border-bottom-color:rgba(125,211,252,.18);margin-bottom:12px;">
+                <span>OSPC Cloud Credentials</span>
+                <button type="button" class="appdep-cred-action" onclick="appdepUseCloudCredential('OSPC')">Use OSPC</button>
+              </div>
+              <div class="appdep-cred-grid">
+                <label class="appdep-cred-field">Username
+                  <input id="appdep_ospc_username" class="appdep-cred-input" type="text" autocomplete="username" placeholder="Rackspace / OSPC username">
+                </label>
+                <label class="appdep-cred-field">API Key / Password
+                  <input id="appdep_ospc_api_key" class="appdep-cred-input" type="text" autocomplete="off" placeholder="Masked">
+                </label>
+                <label class="appdep-cred-field">Account / Project ID
+                  <input id="appdep_ospc_account_id" class="appdep-cred-input" type="text" placeholder="Account ID">
+                </label>
+                <label class="appdep-cred-field">Region
+                  <select id="appdep_ospc_region" class="appdep-cred-input">
+                    <option value="">All regions</option>
+                    <option>DFW</option>
+                    <option>IAD</option>
+                    <option>ORD</option>
+                    <option>HKG</option>
+                    <option>SYD</option>
+                    <option>LON</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section style="border:1px solid rgba(167,139,250,.26);border-radius:8px;padding:12px;background:rgba(2,6,23,.28);">
+              <div class="appdep-cred-title" style="border-bottom-color:rgba(167,139,250,.20);margin-bottom:12px;color:#c4b5fd;">
+                <span>FLEX Cloud Credentials <span style="font-size:11px;color:#94a3b8;">Keystone v3</span></span>
+                <button type="button" class="appdep-cred-action" onclick="appdepUseCloudCredential('FLEX')">Use FLEX</button>
+              </div>
+              <div class="appdep-cred-grid">
+                <label class="appdep-cred-field">Auth URL
+                  <input id="appdep_flex_auth_url" class="appdep-cred-input" type="text" value="https://keystone.api.dfw3.rackspacecloud.com/v3/" placeholder="https://keystone.../v3/">
+                </label>
+                <label class="appdep-cred-field">Username
+                  <input id="appdep_flex_username" class="appdep-cred-input" type="text" autocomplete="username" placeholder="FLEX username">
+                </label>
+                <label class="appdep-cred-field">Password
+                  <input id="appdep_flex_password" class="appdep-cred-input" type="text" autocomplete="off" placeholder="Masked">
+                </label>
+                <label class="appdep-cred-field">Project ID
+                  <input id="appdep_flex_project_id" class="appdep-cred-input" type="text" placeholder="Project UUID">
+                </label>
+                <label class="appdep-cred-field">Domain
+                  <input id="appdep_flex_domain" class="appdep-cred-input" type="text" value="rackspace_cloud_domain" placeholder="Domain">
+                </label>
+                <label class="appdep-cred-field">Region
+                  <input id="appdep_flex_region" class="appdep-cred-input" type="text" placeholder="DFW3 / IAD3 / ORD3">
+                </label>
+                <label class="appdep-cred-field" style="grid-column:1 / -1;">Import OpenRC File
+                  <span style="display:flex;gap:8px;align-items:center;">
+                    <input id="appdep_flex_openrc_file" class="appdep-cred-input" type="file" accept=".sh,.rc,.txt" style="flex:1;">
+                    <button type="button" class="appdep-cred-action" onclick="appdepImportOpenRc()">Import OpenRC</button>
+                  </span>
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <section style="border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:12px;background:rgba(2,6,23,.28);">
+            <div class="appdep-cred-title" style="border-bottom-color:rgba(56,189,248,.20);margin-bottom:12px;color:#67e8f9;">
+              <span>Hyperscaler Cloud Credentials <span style="font-size:11px;color:#94a3b8;">AWS / Azure / GCP</span></span>
+              <button type="button" class="appdep-cred-action" onclick="appdepUseCloudCredential('HYPERSCALER')">Use Hyperscaler</button>
+            </div>
+            <div class="appdep-cred-links">
+              <a href="https://manage.rackspace.com/aws/accounts" target="_blank" rel="noopener">AWS Accounts</a>
+              <a href="https://manage.rackspace.com/gcp" target="_blank" rel="noopener">GCP Accounts</a>
+              <a href="https://manage.rackspace.com/azure/enrollment" target="_blank" rel="noopener">Azure Enrollment</a>
+            </div>
+            <div class="appdep-cred-grid" style="margin-bottom:10px;">
+              <label class="appdep-cred-field">Migration Direction
+                <select id="appdep_hyper_direction" class="appdep-cred-input">
+                  <option value="hyperscaler_to_flex">AWS / Azure / GCP → FLEX</option>
+                  <option value="flex_to_hyperscaler">FLEX → AWS / Azure / GCP</option>
+                </select>
+              </label>
+              <label class="appdep-cred-field">Provider
+                <select id="appdep_hyper_provider" class="appdep-cred-input" onchange="appdepSwitchHyperProvider()">
+                  <option value="AWS">AWS</option>
+                  <option value="Azure">Azure</option>
+                  <option value="GCP">GCP</option>
+                </select>
+              </label>
+              <label class="appdep-cred-field">Account / Project / Subscription
+                <input id="appdep_hyper_account_id" class="appdep-cred-input" type="text" placeholder="Account / project / subscription">
+              </label>
+              <label class="appdep-cred-field">Source Region
+                <input id="appdep_hyper_source_region" class="appdep-cred-input" type="text" placeholder="us-east-1 / eastus / us-central1">
+              </label>
+              <label class="appdep-cred-field">Target Region
+                <input id="appdep_hyper_target_region" class="appdep-cred-input" type="text" placeholder="FLEX target or paired region">
+              </label>
+            </div>
+            <div id="appdep_hyper_aws_fields" class="appdep-cred-grid">
+              <label class="appdep-cred-field">AWS Access Key ID
+                <input id="appdep_aws_access_key_id" class="appdep-cred-input" type="text" placeholder="AKIA...">
+              </label>
+              <label class="appdep-cred-field">AWS Secret Access Key
+                <input id="appdep_aws_secret_access_key" class="appdep-cred-input" type="text" autocomplete="off" placeholder="Masked">
+              </label>
+              <label class="appdep-cred-field">AWS Session Token
+                <input id="appdep_aws_session_token" class="appdep-cred-input" type="text" autocomplete="off" placeholder="Optional STS token">
+              </label>
+              <label class="appdep-cred-field">AWS Profile / Role ARN
+                <input id="appdep_aws_profile_role" class="appdep-cred-input" type="text" placeholder="default / arn:aws:iam::...">
+              </label>
+            </div>
+            <div id="appdep_hyper_azure_fields" class="appdep-cred-grid" style="display:none;">
+              <label class="appdep-cred-field">Tenant ID
+                <input id="appdep_azure_tenant_id" class="appdep-cred-input" type="text" placeholder="Tenant UUID">
+              </label>
+              <label class="appdep-cred-field">Subscription ID
+                <input id="appdep_azure_subscription_id" class="appdep-cred-input" type="text" placeholder="Subscription UUID">
+              </label>
+              <label class="appdep-cred-field">Client ID
+                <input id="appdep_azure_client_id" class="appdep-cred-input" type="text" placeholder="App/client ID">
+              </label>
+              <label class="appdep-cred-field">Client Secret
+                <input id="appdep_azure_client_secret" class="appdep-cred-input" type="text" autocomplete="off" placeholder="Masked">
+              </label>
+            </div>
+            <div id="appdep_hyper_gcp_fields" class="appdep-cred-grid" style="display:none;">
+              <label class="appdep-cred-field">GCP Project ID
+                <input id="appdep_gcp_project_id" class="appdep-cred-input" type="text" placeholder="Project ID">
+              </label>
+              <label class="appdep-cred-field">Service Account JSON Path
+                <input id="appdep_gcp_credentials_file" class="appdep-cred-input" type="text" placeholder="/path/to/service-account.json">
+              </label>
+              <label class="appdep-cred-field">GCS Staging Bucket
+                <input id="appdep_gcp_bucket" class="appdep-cred-input" type="text" placeholder="gs://bucket/prefix">
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px;">
+          <div style="background:#e0f2fe;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Workflow</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">1. Select source cloud. 2. Scan VMs or snapshots with the existing discovery engines. 3. Check reachable app VM rows. 4. Scan dependencies. 5. Export the report and wave plan.</p></div>
+          <div style="background:#e0f2fe;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Safe Commands</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">Runs hostname, IP, route, ss, systemctl, df, lsblk, fstab, ps, OS release, and uname only. No install, restart, firewall, disk, or mount changes.</p></div>
+          <div style="background:#e0f2fe;border:1px solid rgba(148,163,184,.18);border-radius:8px;padding:13px;"><strong style="color:#7dd3fc;">Output</strong><p style="margin:7px 0 0;color:#cbd5e1;font-size:13px;line-height:1.45;">App servers, DBs, ports, services, attached volumes, important mounts, risks, complexity, and recommended migration waves.</p></div>
+        </div>
+
+        <div style="background:rgba(3,7,18,.58);border:1px solid rgba(45,212,191,.34);border-radius:8px;padding:14px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <div>
+              <div style="color:#5eead4;font-weight:900;">Source VM &amp; Snapshot Discovery</div>
+              <div style="color:#94a3b8;font-size:12px;margin-top:3px;">Reuses the existing OSPC scanner, Shift-and-Lift snapshot scanner, FLEX scanner, and FLEX2FLEX source image scanner. Snapshot rows become dependency scan targets only when the source/attached VM IP is known.</div>
+            </div>
+            <button type="button" onclick="appdepSelectReachableRows()" style="background:#164e63;border:1px solid #67e8f9;color:#cffafe;border-radius:7px;padding:8px 12px;font-weight:900;cursor:pointer;">☑ Select Reachable App VMs</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;margin-bottom:12px;">
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">FLEX / Snapshot Runner IP
+              <input id="appdep_scan_runner_ip" type="text" placeholder="Jumphost / scanner VM IP" style="background:#e0f2fe;border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Runner User
+              <input id="appdep_scan_runner_user" type="text" value="ubuntu" placeholder="ubuntu" style="background:#e0f2fe;border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Runner SSH Key
+              <input id="appdep_scan_runner_key" type="text" value="~/.ssh/id_rsa" placeholder="~/.ssh/id_rsa" style="background:#e0f2fe;border:1px solid rgba(45,212,191,.34);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+          </div>
+          <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap;">
+            <button type="button" onclick="appdepScanAssets('ospc_vm')" style="background:#0f766e;border:1px solid #5eead4;color:white;border-radius:7px;padding:9px 12px;font-weight:900;cursor:pointer;">☁ OSPC VM Scanner</button>
+            <button type="button" onclick="appdepScanAssets('ospc_snapshot')" style="background:#064e3b;border:1px solid #34d399;color:#dcfce7;border-radius:7px;padding:9px 12px;font-weight:900;cursor:pointer;">▣ OSPC Snapshot Scanner</button>
+            <button type="button" onclick="appdepScanAssets('flex_vm')" style="background:#4338ca;border:1px solid #a5b4fc;color:#eef2ff;border-radius:7px;padding:9px 12px;font-weight:900;cursor:pointer;">☁ FLEX VM Scanner</button>
+            <button type="button" onclick="appdepScanAssets('flex_snapshot')" style="background:#581c87;border:1px solid #c084fc;color:#f3e8ff;border-radius:7px;padding:9px 12px;font-weight:900;cursor:pointer;">▣ FLEX Snapshot Scanner</button>
+            <button type="button" onclick="appdepScanAssets('hyper_vm')" style="background:#075985;border:1px solid #7dd3fc;color:#e0f2fe;border-radius:7px;padding:9px 12px;font-weight:900;cursor:pointer;">☁ Hyperscaler VM Scanner</button>
+            <button type="button" onclick="appdepScanAssets('hyper_snapshot')" style="background:#0e7490;border:1px solid #67e8f9;color:#cffafe;border-radius:7px;padding:9px 12px;font-weight:900;cursor:pointer;">▣ Hyperscaler Snapshot Scanner</button>
+          </div>
+        </div>
+
+        <div style="background:rgba(2,6,23,.46);border:1px solid rgba(125,211,252,.28);border-radius:8px;padding:14px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end;">
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source Cloud
+              <select id="appdep_auto_source_cloud" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;"><option>OSPC</option><option>FLEX</option><option>AWS</option><option>Azure</option><option>GCP</option><option>Manual</option></select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source Region
+              <input id="appdep_auto_source_region" type="text" placeholder="All / IAD / DFW / us-east-1" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">VM Filter
+              <input id="appdep_vm_filter" type="text" placeholder="Search name, IP, ID, image..." oninput="appdepRenderVmInventory()" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">SSH Username
+              <input id="appdep_auto_ssh_user" type="text" value="ubuntu" placeholder="ubuntu / root / cloud-user" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">SSH Port
+              <input id="appdep_auto_ssh_port" type="number" value="22" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">SSH Key Path / Profile
+              <input id="appdep_auto_ssh_key" type="text" placeholder="~/.ssh/id_rsa" style="background:#e0f2fe;border:1px solid rgba(125,211,252,.35);border-radius:6px;padding:9px 10px;color:#e2e8f0;">
+            </label>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
+            <button type="button" onclick="appdepRefreshVmList()" style="background:#0f766e;border:1px solid #5eead4;color:white;border-radius:7px;padding:9px 13px;font-weight:900;cursor:pointer;">🔄 Refresh VM List</button>
+            <button type="button" onclick="appdepScanSelectedVms()" style="background:linear-gradient(135deg,#0891b2,#2563eb);border:1px solid #7dd3fc;color:white;border-radius:7px;padding:9px 13px;font-weight:900;cursor:pointer;">🔎 Scan Selected VMs</button>
+            <button type="button" onclick="appdepQuickScan()" style="background:#334155;border:1px solid #94a3b8;color:#e2e8f0;border-radius:7px;padding:9px 13px;font-weight:900;cursor:pointer;">🧪 Run Quick Scan</button>
+            <button type="button" onclick="appdepExportReports()" style="background:#14532d;border:1px solid #86efac;color:#dcfce7;border-radius:7px;padding:9px 13px;font-weight:900;cursor:pointer;">📦 Export Discovery Report</button>
+            <button type="button" onclick="appdepExportReports()" style="background:#3b0764;border:1px solid #c084fc;color:#f3e8ff;border-radius:7px;padding:9px 13px;font-weight:900;cursor:pointer;">🧭 Generate Migration Wave Plan</button>
+            <button type="button" onclick="appdepPromoteStage2()" style="background:linear-gradient(135deg,#ea580c,#dc2626);border:1px solid #fdba74;color:white;border-radius:7px;padding:9px 13px;font-weight:900;cursor:pointer;">🚀 Promote to Stage 2</button>
+            <span id="appdep_status" style="color:#94a3b8;font-size:13px;">Refresh VM list to begin.</span>
+          </div>
+        </div>
+
+        <div style="overflow:auto;margin-bottom:16px;border:1px solid rgba(125,211,252,.25);border-radius:8px;background:#e0f2fe;">
+          <table class="matrix-table" style="min-width:1420px;margin:0;">
+            <thead><tr><th>Select</th><th>Source</th><th>Asset</th><th>VM / App Server</th><th>Instance / Source VM ID</th><th>IP Address</th><th>Snapshot / Image</th><th>Snapshot ID</th><th>Status</th><th>Size</th><th>Flavor</th><th>Image</th><th>Region</th><th>Scan Target</th></tr></thead>
+            <tbody id="appdep_vm_inventory_body"><tr><td colspan="14" style="padding:18px;color:#64748b;font-style:italic;">No VM or snapshot list loaded yet.</td></tr></tbody>
+          </table>
+        </div>
+
+        <div id="appdep_results" style="display:none;">
+          <div id="appdep_warnings" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px;"></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;">
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">VMs Scanned</div><div id="appdep_card_vms" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">App Servers</div><div id="appdep_card_app" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">DB Servers</div><div id="appdep_card_db" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">Web/API Servers</div><div id="appdep_card_web" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">Stateful VMs</div><div id="appdep_card_stateful" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">High Risk VMs</div><div id="appdep_card_high" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">Volumes Found</div><div id="appdep_card_vols" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+            <div style="background:rgba(8,47,73,.45);border:1px solid rgba(125,211,252,.3);border-radius:8px;padding:12px;"><div style="font-size:11px;text-transform:uppercase;color:#93c5fd;">Open Ports</div><div id="appdep_card_ports" style="font-size:20px;font-weight:900;color:#e0f2fe;margin-top:5px;">0</div></div>
+          </div>
+
+          <div id="appdep_artifacts" style="margin-bottom:16px;padding:12px;border:1px solid rgba(34,197,94,.35);border-radius:8px;background:rgba(22,101,52,.16);color:#bbf7d0;"></div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('overview')">Overview</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('ports')">Ports</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('services')">Services</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('databases')">Databases</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('volumes')">Volumes &amp; Mounts</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('ips')">External IPs</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('waves')">Migration Waves</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('stage2')">Stage 2 Readiness</button>
+            <button type="button" class="appdep-tab-btn" onclick="appdepShowDetailTab('raw')">Raw Evidence</button>
+          </div>
+
+          <div id="appdep_tab_overview" class="appdep-detail-tab" style="overflow:auto;"><h3>App Dependency Summary</h3><table class="matrix-table" style="min-width:1100px;"><thead><tr><th>VM Name</th><th>Instance ID</th><th>IP</th><th>Cloud</th><th>Region</th><th>Workload Type</th><th>DB</th><th>Web/API</th><th>Ports</th><th>Important Mounts</th><th>Volumes</th><th>Complexity</th><th>Recommended Wave</th><th>Status</th></tr></thead><tbody id="appdep_summary_table"></tbody></table></div>
+          <div id="appdep_tab_ports" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>Listening Ports</h3><table class="matrix-table" style="min-width:900px;"><thead><tr><th>VM Name</th><th>IP</th><th>Protocol</th><th>Listen Address</th><th>Port</th><th>Service Hint</th><th>Process</th></tr></thead><tbody id="appdep_ports_table"></tbody></table></div>
+          <div id="appdep_tab_services" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>Running Services</h3><table class="matrix-table" style="min-width:900px;"><thead><tr><th>VM Name</th><th>Service</th><th>State</th><th>Description</th><th>Category</th></tr></thead><tbody id="appdep_services_table"></tbody></table></div>
+          <div id="appdep_tab_databases" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>Databases</h3><table class="matrix-table" style="min-width:850px;"><thead><tr><th>VM Name</th><th>DB Type</th><th>Port</th><th>Process</th><th>Data Path Hint</th><th>Risk</th></tr></thead><tbody id="appdep_database_table"></tbody></table></div>
+          <div id="appdep_tab_volumes" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>Volumes &amp; Mounts</h3><table class="matrix-table" style="min-width:900px;"><thead><tr><th>VM Name</th><th>Device</th><th>Size</th><th>Mount Point</th><th>Filesystem</th><th>Used</th><th>Important</th><th>Migration Needed</th></tr></thead><tbody id="appdep_volumes_table"></tbody></table></div>
+          <div id="appdep_tab_ips" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>External IPs</h3><table class="matrix-table" style="min-width:520px;"><thead><tr><th>VM Name</th><th>IP</th><th>Scope</th><th>Range</th></tr></thead><tbody id="appdep_ips_table"></tbody></table></div>
+          <div id="appdep_tab_waves" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>Migration Waves</h3><table class="matrix-table" style="min-width:760px;"><thead><tr><th>Wave</th><th>VM Name</th><th>IP</th><th>Workload</th><th>Complexity</th><th>Risk Notes</th></tr></thead><tbody id="appdep_waves_table"></tbody></table></div>
+          <div id="appdep_tab_stage2" class="appdep-detail-tab" style="display:none;overflow:auto;"><h3>Stage 2 Readiness</h3><table class="matrix-table" style="min-width:980px;"><thead><tr><th>VM Name</th><th>IP</th><th>Readiness</th><th>Recommended Stage 2 Path</th><th>Wave</th><th>Blockers</th><th>Review Notes</th></tr></thead><tbody id="appdep_stage2_table"></tbody></table></div>
+          <div id="appdep_tab_raw" class="appdep-detail-tab" style="display:none;"><h3>Raw Evidence</h3><pre id="appdep_raw_evidence" style="white-space:pre-wrap;background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:8px;color:#cbd5e1;padding:12px;max-height:420px;overflow:auto;"></pre></div>
+        </div>
+
+        <details style="margin-top:18px;border:1px solid rgba(148,163,184,.22);border-radius:8px;background:#e0f2fe;padding:12px;">
+          <summary style="cursor:pointer;color:#cbd5e1;font-weight:900;">Advanced: Manual Paste Mode</summary>
+          <div style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+              <p style="margin:0;color:#94a3b8;font-size:13px;">Use this fallback when SSH credentials, network route, or security groups are not ready.</p>
+              <button type="button" onclick="appdepCopyCommands()" style="background:#0f766e;border:1px solid #5eead4;color:white;border-radius:6px;padding:8px 12px;font-weight:800;cursor:pointer;">Copy Commands</button>
+            </div>
+            <pre id="appdep_command_block" style="white-space:pre-wrap;background:#020617;border:1px solid rgba(94,234,212,.25);border-radius:8px;padding:12px;color:#5eead4;font-size:12px;line-height:1.45;overflow:auto;">hostname
+hostname -I
+ip route
+ip addr
+ss -tulpn
+systemctl list-units --type=service --state=running
+df -h
+lsblk
+cat /etc/fstab
+ps aux
+cat /etc/os-release
+uname -a</pre>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:10px;">
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source VM Name<input id="appdep_source_vm_name" type="text" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:8px;"></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source VM ID<input id="appdep_source_vm_id" type="text" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:8px;"></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source VM IP<input id="appdep_source_vm_ip" type="text" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:8px;"></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Source Cloud<input id="appdep_source_cloud" type="text" value="Manual" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:8px;"></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:12px;">Region<input id="appdep_source_region" type="text" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:8px;"></label>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:12px;">
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">ss -tulpn output<textarea id="appdep_ss_output" rows="6" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">systemctl running services output<textarea id="appdep_systemctl_output" rows="6" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">df -h output<textarea id="appdep_df_output" rows="6" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">lsblk output<textarea id="appdep_lsblk_output" rows="6" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">/etc/fstab output<textarea id="appdep_fstab_output" rows="6" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+              <label style="display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">ps aux output<textarea id="appdep_ps_output" rows="6" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+              <label style="grid-column:1 / -1;display:flex;flex-direction:column;gap:5px;color:#cbd5e1;font-size:13px;">Optional notes<textarea id="appdep_notes" rows="3" style="background:#020617;border:1px solid rgba(148,163,184,.28);border-radius:6px;color:#e2e8f0;padding:9px;font-family:monospace;font-size:12px;"></textarea></label>
+            </div>
+            <button type="button" onclick="analyzeAppDependencies()" style="margin-top:12px;background:linear-gradient(135deg,#0891b2,#2563eb);border:1px solid #7dd3fc;color:#fff;border-radius:8px;padding:10px 14px;font-weight:900;cursor:pointer;">Analyze Manual Paste</button>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- 1d.1: Migration Readiness Scanner -->

@@ -1,0 +1,175 @@
+  <div class="panel" id="panel-s7a">
+    <div class="info-panel" style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- ── Header ── -->
+      <div class="stage-hero" style="background:radial-gradient(circle at top left,rgba(34,197,94,.18),rgba(2,6,23,.92));border:1px solid rgba(34,197,94,.36);border-radius:12px;padding:24px;">
+        <div style="color:#86efac;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-family:'Share Tech Mono',monospace;">Stage 7</div>
+        <h2 style="margin:8px 0 6px;color:#dcfce7;font-family:'Orbitron',sans-serif;">Performance Gain</h2>
+        <p style="color:#94a3b8;margin:0 0 16px;max-width:940px;font-size:13px;line-height:1.6;">Import UAT baseline and cutover execution results to prove performance, sizing, and cost improvements after migration.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" onclick="s7aImportUAT()" style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.55);color:#86efac;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">📥 Import From UAT</button>
+          <button type="button" onclick="s7aImportCutover()" style="background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.45);color:#7dd3fc;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">📥 Import From Cutover</button>
+          <button type="button" onclick="s7aRefreshAll()" style="background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.45);color:#c4b5fd;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">🔄 Refresh All</button>
+          <button type="button" onclick="s7aExportReport()" style="background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);color:#fcd34d;padding:9px 18px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;">📄 Export Performance Gain Report</button>
+        </div>
+      </div>
+
+      <!-- ── 1. Import Status Summary ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(14,165,233,.35);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">Performance Gain Data Sources</div>
+        <div id="s7a-status-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div class="s7a-src-card" id="s7a-src-uat" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">UAT Baseline</div>
+            <div id="s7a-src-uat-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-uat-ts" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+            <div id="s7a-src-uat-id" style="font-size:11px;color:#64748b;"></div>
+          </div>
+          <div class="s7a-src-card" id="s7a-src-co" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">Cutover Result</div>
+            <div id="s7a-src-co-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-co-ts" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+            <div id="s7a-src-co-id" style="font-size:11px;color:#64748b;"></div>
+          </div>
+          <div class="s7a-src-card" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">Post-Cutover Monitoring</div>
+            <div id="s7a-src-mon-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-mon-ts" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+          </div>
+          <div class="s7a-src-card" style="background:#f0f9ff;border:1px solid rgba(14,165,233,.3);border-radius:8px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#0369a1;margin-bottom:6px;">TCO Pricing</div>
+            <div id="s7a-src-tco-status" style="font-weight:800;font-size:13px;color:#94a3b8;">Missing</div>
+            <div id="s7a-src-tco-note" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+          </div>
+        </div>
+        <div id="s7a-status-msg" style="margin-top:12px;padding:10px;border-radius:6px;font-size:12px;display:none;"></div>
+      </div>
+
+      <!-- ── 2. Imported UAT Baseline ── -->
+      <div class="stage-chain-box" id="s7a-uat-section" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.32);border-radius:10px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="color:#0284c7;font-weight:800;font-size:14px;">📊 Imported UAT Baseline</div>
+          <span style="font-size:11px;color:#0369a1;background:#bae6fd;padding:2px 8px;border-radius:4px;">Source: Stage 3 — UAT Validation</span>
+          <span id="s7a-uat-ts" style="font-size:11px;color:#64748b;margin-left:auto;"></span>
+        </div>
+        <div id="s7a-uat-content" style="color:#64748b;font-size:13px;">Awaiting UAT baseline — click <strong>Import From UAT</strong> or run UAT testing in Stage 3.</div>
+      </div>
+
+      <!-- ── 3. Imported Cutover Result ── -->
+      <div class="stage-chain-box" id="s7a-co-section" style="background:#e0f2fe;border:1px solid rgba(56,189,248,.32);border-radius:10px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <div style="color:#0284c7;font-weight:800;font-size:14px;">⚡ Imported Cutover Result</div>
+          <span style="font-size:11px;color:#0369a1;background:#bae6fd;padding:2px 8px;border-radius:4px;">Source: Stage 4/4B — Cutover Execution</span>
+          <span id="s7a-co-ts" style="font-size:11px;color:#64748b;margin-left:auto;"></span>
+        </div>
+        <div id="s7a-co-content" style="color:#64748b;font-size:13px;">Awaiting cutover result — click <strong>Import From Cutover</strong> or complete cutover in Stage 4/4B.</div>
+      </div>
+
+      <!-- ── 4. Before / After Performance Comparison ── -->
+            <!-- Visual Performance Dashboard -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(14,165,233,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">&#128202; Visual Performance Dashboard</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px;">
+          <div style="background:#fff;border:1px solid rgba(14,165,233,.2);border-radius:10px;padding:14px;">
+            <div style="font-weight:700;font-size:11px;color:#0369a1;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Server Performance Comparison</div>
+            <div id="s7a-chart-bars"><div style="color:#94a3b8;font-size:12px;padding:20px;text-align:center;">Import UAT baseline</div></div>
+          </div>
+          <div style="background:#fff;border:1px solid rgba(14,165,233,.2);border-radius:10px;padding:14px;">
+            <div style="font-weight:700;font-size:11px;color:#0369a1;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">System Health Radar</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;display:flex;gap:14px;"><span style="color:#ef4444;">&#9679; Source</span><span style="color:#22c55e;">&#9679; Target</span></div>
+            <div id="s7a-chart-radar" style="display:flex;flex-direction:column;align-items:center;"><div style="color:#94a3b8;font-size:12px;padding:20px;">Import cutover result</div></div>
+          </div>
+          <div style="background:#fff;border:1px solid rgba(14,165,233,.2);border-radius:10px;padding:14px;">
+            <div style="font-weight:700;font-size:11px;color:#0369a1;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Performance Trend (24H)</div>
+            <div style="font-size:10px;margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap;"><span style="color:#ef4444;">&#8212; SRC CPU</span><span style="color:#f97316;">&#8212; TGT CPU</span><span style="color:#94a3b8;">--- SRC Lat</span><span style="color:#22c55e;">--- TGT Lat</span></div>
+            <div id="s7a-chart-trend"><div style="color:#94a3b8;font-size:12px;padding:16px;text-align:center;">Import cutover result</div></div>
+          </div>
+          <div style="background:#fff;border:1px solid rgba(14,165,233,.2);border-radius:10px;padding:14px;">
+            <div style="font-weight:700;font-size:11px;color:#0369a1;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Top Transactions (24H)</div>
+            <div id="s7a-chart-txns"><div style="color:#94a3b8;font-size:12px;padding:20px;text-align:center;">Import cutover result</div></div>
+          </div>
+        </div>
+      </div>
+
+<div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(14,165,233,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:4px;">📈 Performance Comparison — UAT Baseline vs Post-Cutover FLEX</div>
+        <div style="color:#0369a1;font-size:12px;margin-bottom:14px;">Lower is better for latency, error rate, CPU/memory pressure. Higher is better for throughput, success rate, IOPS.</div>
+        <div id="s7a-comparison-table">
+          <div style="color:#64748b;font-size:13px;padding:20px;text-align:center;">Import UAT baseline and cutover results to see before/after comparison.</div>
+        </div>
+      </div>
+
+      <!-- ── 5. VM Size / Resource Comparison ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">🖥 VM Size / Resource Comparison</div>
+        <div id="s7a-vm-sizing" style="color:#64748b;font-size:13px;">Import UAT baseline to see VM sizing comparison.</div>
+      </div>
+
+      <!-- ── 6. TCO Cost Estimation ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(251,191,36,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">💰 TCO Cost Estimation</div>
+        <div id="s7a-tco-content">
+          <div style="color:#64748b;font-size:13px;">Import UAT baseline to load TCO estimate. FLEX price list is required for accurate savings calculation.</div>
+        </div>
+        <div id="s7a-tco-optimization" style="margin-top:12px;display:none;"></div>
+      </div>
+
+      <!-- ── 7. System Health Radar ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(167,139,250,.32);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">🎯 System Health Radar</div>
+        <div id="s7a-health-radar" style="color:#64748b;font-size:13px;">Import cutover result to see system health scores.</div>
+      </div>
+
+      <!-- ── 8. Performance Trend ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(56,189,248,.28);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:6px;">📉 Performance Trend</div>
+        <div style="color:#0369a1;font-size:11px;margin-bottom:12px;">Trend data is imported from post-cutover monitoring.</div>
+        <div id="s7a-trend-content" style="color:#64748b;font-size:13px;">Awaiting monitoring trend data — import cutover result to populate.</div>
+      </div>
+
+      <!-- ── 9. Top Transactions ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(251,146,60,.28);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:14px;">🔄 Top Transactions</div>
+        <div id="s7a-transactions" style="color:#64748b;font-size:13px;">Import cutover result to see top transaction performance.</div>
+      </div>
+
+      <!-- ── 10. Performance Gain Summary ── -->
+      <div class="stage-chain-box" id="s7a-gain-summary-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.4);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:16px;margin-bottom:14px;">🏆 Performance Gain Summary</div>
+        <div id="s7a-gain-summary">
+          <div style="color:#64748b;font-size:13px;padding:20px;text-align:center;">Import both UAT baseline and cutover result to calculate performance gain.</div>
+        </div>
+      </div>
+
+      <!-- ── 11. Right-Sizing Recommendations ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.28);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:6px;">⚙️ Right-Sizing Recommendations</div>
+        <div style="color:#0369a1;font-size:11px;margin-bottom:12px;">Recommendations require evidence from UAT, cutover, or monitoring. Downsize only recommended when performance is stable.</div>
+        <div id="s7a-rightsizing" style="color:#64748b;font-size:13px;">Import UAT baseline and cutover result to generate recommendations.</div>
+      </div>
+
+      <!-- ── 12. Compute Optimization Recommendation ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:18px;">
+        <div style="color:#0284c7;font-weight:800;font-size:14px;margin-bottom:4px;">🔧 Compute Optimization Recommendation</div>
+        <div style="color:#0369a1;font-size:12px;margin-bottom:14px;">Use utilization, performance, flavor maps, and TCO files to recommend right-sized FLEX compute options.</div>
+        <div id="s7a-compute-opt-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;"></div>
+        <div id="s7a-compute-opt-table" style="color:#64748b;font-size:13px;">Import UAT baseline and cutover result to generate compute optimization recommendations.</div>
+        <div id="s7a-compute-opt-flavor-status" style="margin-top:10px;font-size:11px;color:#64748b;"></div>
+        <div style="margin-top:12px;padding:10px;background:rgba(245,158,11,.08);border-left:3px solid #f59e0b;border-radius:4px;font-size:11px;color:#0369a1;line-height:1.5;">
+          <strong>⚠️ Advisory Only:</strong> Optimization recommendations are advisory. Apply changes only after owner approval, change control, and additional validation.
+        </div>
+      </div>
+
+      <!-- ── 13. Source Infrastructure Snapshot ── -->
+      <div class="stage-chain-box" style="background:#e0f2fe;border:1px solid rgba(34,197,94,.32);border-radius:10px;padding:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="color:#0284c7;font-weight:800;font-size:14px;">Source Infrastructure Snapshot</div>
+          <button type="button" onclick="s7aRefreshSnapshot()" style="background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.4);color:#0284c7;padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">Refresh</button>
+        </div>
+        <div id="s7a-infra-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;"></div>
+        <div id="s7a-infra-empty" style="color:#64748b;font-size:13px;display:none;">No discovery data loaded.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Stage 8 — IaC Backup, DR & Restore -->

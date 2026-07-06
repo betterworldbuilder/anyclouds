@@ -1,0 +1,2801 @@
+  <div class="panel" id="panel-s4">
+    <div class="info-panel" style="display:flex; flex-direction:column; gap:20px;">
+      <link rel="stylesheet" href="/static/uat/uat.css?v={{ v }}">
+
+      <div class="uat-console" id="uat-console">
+        <div class="uat-hero">
+          <div style="max-width:860px;">
+            <h2>Stage 3 — Validation &amp; UAT</h2>
+            <p style="margin-bottom:10px;">Post-migration acceptance testing — confirms the cloned server on FLEX is functionally and operationally equivalent to the source on OSPC before cutover.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px;">
+              <div style="background:#f0f4ff;border:1px solid #c7d7f9;border-radius:7px;padding:9px 11px;">
+                <div style="font-size:10px;font-weight:900;color:#3b5bdb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Step 1</div>
+                <div style="font-size:12px;color:#1e3a6e;font-weight:700;">Server Targets</div>
+                <div style="font-size:11px;color:#475569;margin-top:2px;">Enter source &amp; target IPs — auto-fills all tools below.</div>
+              </div>
+              <div style="background:#f0f4ff;border:1px solid #c7d7f9;border-radius:7px;padding:9px 11px;">
+                <div style="font-size:10px;font-weight:900;color:#3b5bdb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Step 2</div>
+                <div style="font-size:12px;color:#1e3a6e;font-weight:700;">Service Comparison</div>
+                <div style="font-size:11px;color:#475569;margin-top:2px;">SSH compares running systemd services — flags missing or extra daemons.</div>
+              </div>
+              <div style="background:#f0f4ff;border:1px solid #c7d7f9;border-radius:7px;padding:9px 11px;">
+                <div style="font-size:10px;font-weight:900;color:#3b5bdb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Step 2b</div>
+                <div style="font-size:12px;color:#1e3a6e;font-weight:700;">Health Check</div>
+                <div style="font-size:11px;color:#475569;margin-top:2px;">Validates network reachability, port availability, and disk / memory health.</div>
+              </div>
+              <div style="background:#f0f4ff;border:1px solid #c7d7f9;border-radius:7px;padding:9px 11px;">
+                <div style="font-size:10px;font-weight:900;color:#3b5bdb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Step 3</div>
+                <div style="font-size:12px;color:#1e3a6e;font-weight:700;">Performance</div>
+                <div style="font-size:11px;color:#475569;margin-top:2px;">SSHes in, runs HTTP response, latency, CPU &amp; memory tests — computes delta vs 15% threshold.</div>
+              </div>
+              <div style="background:#f0f4ff;border:1px solid #c7d7f9;border-radius:7px;padding:9px 11px;">
+                <div style="font-size:10px;font-weight:900;color:#3b5bdb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Step 4</div>
+                <div style="font-size:12px;color:#1e3a6e;font-weight:700;">Issues Tracker</div>
+                <div style="font-size:11px;color:#475569;margin-top:2px;">Log any gaps found during testing. Block cutover until critical issues are resolved.</div>
+              </div>
+              <div style="background:#f0f4ff;border:1px solid #c7d7f9;border-radius:7px;padding:9px 11px;">
+                <div style="font-size:10px;font-weight:900;color:#3b5bdb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">Step 5</div>
+                <div style="font-size:12px;color:#1e3a6e;font-weight:700;">Cutover Readiness</div>
+                <div style="font-size:11px;color:#475569;margin-top:2px;">Auto-scores all steps — shows Go / No-Go status and generates the UAT sign-off report.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DB Compare Modal (rendered by uatCompareDB()) -->
+        <div id="db-compare-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:9999;overflow-y:auto;align-items:flex-start;justify-content:center;padding:40px 20px;box-sizing:border-box;"></div>
+
+        <!-- Step 5: Cutover Readiness Dashboard -->
+        <div id="uat-dashboard">
+          <div id="uat-layout">
+
+            <!-- ══ LEFT SIDEBAR ══ -->
+            <div id="uat-sidebar" style="background:#ffffff !important;background-color:#ffffff !important;">
+              <div class="udsb-header">
+                <div class="udsb-logo">🛡</div>
+                <div>
+                  <div class="udsb-title">UAT Dashboard</div>
+                  <div class="udsb-sub">Migration</div>
+                </div>
+              </div>
+              <nav class="udsb-nav">
+                <button class="udsb-item udsb-done" onclick="uatNavTo(1)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 1</em>Server Targets</span>
+                </button>
+                <button class="udsb-item udsb-done" onclick="uatNavTo(2)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 2</em>Service Comparison</span>
+                </button>
+                <button class="udsb-item udsb-done" onclick="uatNavTo(3)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 3</em>Performance</span>
+                </button>
+                <button class="udsb-item udsb-done" onclick="uatNavTo(4)">
+                  <span class="udsb-ic udsb-ic-done">✓</span>
+                  <span class="udsb-item-text"><em>Step 4</em>Issues Tracker</span>
+                </button>
+                <button class="udsb-item udsb-active" onclick="uatNavTo(5)">
+                  <span class="udsb-ic udsb-ic-active">🛡</span>
+                  <span class="udsb-item-text"><em>Step 5</em>Cutover Readiness</span>
+                </button>
+                <div class="udsb-sep"></div>
+                <button class="udsb-item" onclick="uatDownloadFullCsv && uatDownloadFullCsv()">
+                  <span class="udsb-ic" style="font-size:14px;background:#f1f5f9;">📄</span>
+                  <span class="udsb-item-text"><em></em>Reports &amp; Export</span>
+                </button>
+              </nav>
+            </div><!-- /uat-sidebar -->
+
+            <!-- ══ MAIN ══ -->
+            <div id="uat-main">
+
+              <!-- TOP HEADER -->
+              <div id="uat-topbar">
+                <div>
+                  <div class="udtb-h" id="uat-tb-title">Step 5 — Cutover Readiness</div>
+                  <div class="udtb-s" id="uat-tb-sub">Post-migration acceptance testing summary and decision</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <div class="ud-mode-pill">
+                    <button id="uat-mode-compact" class="ud-mode-btn ud-mode-btn--on" onclick="uatSetMode('compact')">Compact</button>
+                    <button id="uat-mode-detailed" class="ud-mode-btn" onclick="uatSetMode('detailed')">Detailed</button>
+                  </div>
+                  <button class="ud-export-btn" onclick="uatDownloadFullCsv ? uatDownloadFullCsv() : null">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Export Report
+                  </button>
+                </div>
+              </div>
+
+              <!-- SCROLLABLE CONTENT -->
+              <div id="uat-content">
+
+                <!-- ── STEPS 1-4 (inside the full-page overlay) ── -->
+                <div id="uat-message" class="uat-note" style="display:none;margin-bottom:10px;">Loading UAT state...</div>
+
+                <!-- STEP 1 -->
+                <section class="uat-panel" data-uat-step="1" style="display:none;">
+
+<div class="uat-s1-wrap">
+
+  <!-- ── Top bar ───────────────────────────────────────────── -->
+  <div class="uat-s1-topbar">
+    <div class="uat-s1-title">
+      <h2>Stage 3 — UAT Validation &amp; Business System Scope</h2>
+      <p>Define complete business systems, generate component tests, and export a cutover-ready package.</p>
+    </div>
+    <div class="uat-s1-toolbar">
+      <div class="uat-s1-views">
+        <button class="uat-s1-tab active" onclick="uatS1SetView('systems')">Business System Target List</button>
+        <button class="uat-s1-tab" onclick="uatS1SetView('servers')">Server DB Target List</button>
+      </div>
+      <button class="uat-s1-btn-primary" onclick="uatS1OpenModal()">+ Add Business System</button>
+      <button class="uat-s1-btn-soft"    onclick="uatS1OpenSaModal()">+ Add Server / DB</button>
+      <button class="uat-s1-btn-soft"    onclick="uatS1ExportPackage()">Export UAT Package</button>
+    </div>
+  </div>
+
+  <!-- ── Hero ─────────────────────────────────────────────── -->
+  <div class="uat-s1-card uat-s1-hero">
+    <div class="uat-s1-card-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;border-radius:10px;background:#eaf2ff;color:#2563eb;display:grid;place-items:center;font-weight:900;font-size:12px;">BS</div>
+        <div>
+          <div style="font-weight:800;color:#0f172a;">Business-System-Aware UAT</div>
+          <div style="font-size:12px;color:#64748b;">Test the whole service stack: frontend, API, backend, database, cache, queue, workers, and monitoring.</div>
+        </div>
+      </div>
+      <div class="uat-s1-pill-row" id="uatS1HeroPills">
+        <span class="uat-s1-pill blue">0 Business Systems</span>
+        <span class="uat-s1-pill blue">0 Components</span>
+        <span class="uat-s1-pill gray">0 Standalone</span>
+        <span class="uat-s1-pill gray">0 Tests</span>
+      </div>
+    </div>
+    <div class="uat-s1-card-body">
+      <div class="uat-s1-hero-inner">
+        <div class="uat-s1-hero-card">
+          <h3>UAT should validate a business system, not only a VM.</h3>
+          <p>Add a business system archetype such as Banking, Ecommerce, CRM, ERP, API Platform, Reporting, or Custom. The tool pre-fills standard components and generates the correct UAT and cutover checks automatically.</p>
+          <div class="uat-s1-pill-row">
+            <span class="uat-s1-pill blue">API Gateway</span><span class="uat-s1-pill blue">API Server</span><span class="uat-s1-pill green">Database</span><span class="uat-s1-pill orange">Cache</span><span class="uat-s1-pill purple">Queue</span><span class="uat-s1-pill gray">Monitoring</span>
+          </div>
+        </div>
+        <div class="uat-s1-kpis">
+          <div class="uat-s1-kpi"><span>Systems</span><strong id="uatS1KpiSys">0</strong><small id="uatS1KpiSysLbl">—</small></div>
+          <div class="uat-s1-kpi"><span>Critical</span><strong id="uatS1KpiCrit">0</strong><small id="uatS1KpiCritLbl">—</small></div>
+          <div class="uat-s1-kpi"><span>DB in scope</span><strong id="uatS1KpiDB">0</strong><small id="uatS1KpiDBLbl">—</small></div>
+          <div class="uat-s1-kpi"><span>Ready tests</span><strong id="uatS1KpiTests">0</strong><small>Generated</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Source / Target live UAT workbench ───────────────────── -->
+  <div class="uat-live-compare-bench" id="uatLiveCompareBench">
+    <div class="uat-live-side uat-live-side--source" data-uat-live-side="source">
+      <div class="uat-live-head">
+        <div>
+          <div class="uat-live-kicker">Source OSPC</div>
+          <h3>Source Mobile UI</h3>
+          <p>Validate the current production/source frontend and service path.</p>
+        </div>
+        <span class="uat-live-badge">LEFT</span>
+      </div>
+      <div class="uat-live-controls">
+        <label>Type
+          <select id="uatLive-source-type" onchange="uatLiveTypeChanged('source')">
+            <option value="frontend">Frontend Mobile UI</option>
+            <option value="api">API Gateway</option>
+            <option value="backend">Backend Service</option>
+            <option value="db">Database API</option>
+          </select>
+        </label>
+        <label>IP / Host
+          <input id="uatLive-source-host" value="23.253.159.71" placeholder="23.253.159.71">
+        </label>
+        <label>Port
+          <input id="uatLive-source-port" value="8080" placeholder="8080">
+        </label>
+        <label>Path
+          <input id="uatLive-source-path" value="/#" placeholder="/#">
+        </label>
+      </div>
+      <div class="uat-live-actions">
+        <button type="button" onclick="uatLiveLoadMobile('source')">Load Mobile</button>
+        <button type="button" onclick="uatLiveRun('source','health')">Health</button>
+        <button type="button" onclick="uatLiveRun('source','ready')">Ready</button>
+        <button type="button" onclick="uatLiveRun('source','login')">Login</button>
+        <button type="button" onclick="uatLiveRun('source','summary')">Summary</button>
+        <button type="button" onclick="uatLiveRun('source','recipients')">Users</button>
+      </div>
+      <div class="uat-live-phone">
+        <div class="uat-live-notch"></div>
+        <iframe id="uatLive-source-frame" title="Source mobile frontend preview" src="http://23.253.159.71:8080/#"></iframe>
+      </div>
+      <div class="uat-live-dev">
+        <div class="uat-live-dev-head">
+          <strong>Dev View - Live Data Movement</strong>
+          <span id="uatLive-source-current">Step 1: frontend loaded</span>
+        </div>
+        <div class="uat-live-route" id="uatLive-source-route"></div>
+        <pre id="uatLive-source-log" class="uat-live-log"></pre>
+        <div class="uat-live-table-wrap">
+          <table>
+            <thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>
+            <tbody id="uatLive-source-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="uat-live-side uat-live-side--target" data-uat-live-side="target">
+      <div class="uat-live-head">
+        <div>
+          <div class="uat-live-kicker">Target FLEX</div>
+          <h3>Target Mobile UI</h3>
+          <p>Enter the cloned FLEX frontend or service endpoint and compare behavior.</p>
+        </div>
+        <span class="uat-live-badge">RIGHT</span>
+      </div>
+      <div class="uat-live-controls">
+        <label>Type
+          <select id="uatLive-target-type" onchange="uatLiveTypeChanged('target')">
+            <option value="frontend">Frontend Mobile UI</option>
+            <option value="api">API Gateway</option>
+            <option value="backend">Backend Service</option>
+            <option value="db">Database API</option>
+          </select>
+        </label>
+        <label>IP / Host
+          <input id="uatLive-target-host" value="" placeholder="FLEX frontend IP">
+        </label>
+        <label>Port
+          <input id="uatLive-target-port" value="8080" placeholder="8080">
+        </label>
+        <label>Path
+          <input id="uatLive-target-path" value="/#" placeholder="/#">
+        </label>
+      </div>
+      <div class="uat-live-actions">
+        <button type="button" onclick="uatLiveLoadMobile('target')">Load Mobile</button>
+        <button type="button" onclick="uatLiveRun('target','health')">Health</button>
+        <button type="button" onclick="uatLiveRun('target','ready')">Ready</button>
+        <button type="button" onclick="uatLiveRun('target','login')">Login</button>
+        <button type="button" onclick="uatLiveRun('target','summary')">Summary</button>
+        <button type="button" onclick="uatLiveRun('target','recipients')">Users</button>
+      </div>
+      <div class="uat-live-phone">
+        <div class="uat-live-notch"></div>
+        <iframe id="uatLive-target-frame" title="Target mobile frontend preview" src="about:blank"></iframe>
+      </div>
+      <div class="uat-live-dev">
+        <div class="uat-live-dev-head">
+          <strong>Dev View - Live Data Movement</strong>
+          <span id="uatLive-target-current">Waiting for FLEX endpoint</span>
+        </div>
+        <div class="uat-live-route" id="uatLive-target-route"></div>
+        <pre id="uatLive-target-log" class="uat-live-log"></pre>
+        <div class="uat-live-table-wrap">
+          <table>
+            <thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>
+            <tbody id="uatLive-target-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Business Systems view ─────────────────────────────── -->
+  <div id="uatS1SystemsView">
+    <div class="uat-s1-card">
+      <div class="uat-s1-card-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:10px;background:#eafaf0;color:#16a34a;display:grid;place-items:center;font-weight:900;">✓</div>
+          <div>
+            <div style="font-weight:800;color:#0f172a;">Business Systems</div>
+            <div style="font-size:12px;color:#64748b;">Default view. Select or expand a business system to inspect components and generated UAT tests.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="uat-s1-btn-muted" onclick="uatS1ImportJSON()">Import JSON</button>
+          <button class="uat-s1-btn-soft"  onclick="uatS1ExportSystems()">Export Systems</button>
+        </div>
+      </div>
+      <div class="uat-s1-card-body">
+        <div class="uat-s1-biz-grid">
+          <div id="uatS1Cards">
+            <div id="uatS1Empty" style="text-align:center;padding:40px 0;color:#64748b;font-size:14px;">
+              No business systems yet.<br><br>
+              <button class="uat-s1-btn-primary" onclick="uatS1OpenModal()">+ Add Business System</button>
+            </div>
+          </div>
+          <div class="uat-s1-arch-selector">
+            <div class="uat-s1-arch-head">
+              <div class="uat-s1-arch-title">Business System Templates</div>
+              <span class="uat-s1-arch-badge">10 Templates</span>
+            </div>
+            <p class="uat-s1-arch-desc">Use templates to create a complete UAT scope in seconds. Operators can edit every component before saving.</p>
+            <div class="uat-s1-template-tabs" role="tablist" aria-label="Business System Templates">
+              <button type="button" class="uat-s1-template-tab active" data-uat-template-tab="classic" onclick="uatS1SetTemplateTab('classic')">Business System Models</button>
+              <button type="button" class="uat-s1-template-tab" data-uat-template-tab="das" onclick="uatS1SetTemplateTab('das')">Customers Business Template</button>
+            </div>
+            <div class="uat-s1-template-pane active" data-uat-template-pane="classic">
+              <div id="uatS1ArchList" class="uat-s1-arch-grid">
+                <!-- rendered by JS -->
+              </div>
+              <div class="uat-s1-arch-footer">
+                <span class="uat-s1-arch-footer-text">Selected template pre-fills components, generated checks, and UAT scope. Operators can still edit every field.</span>
+                <button class="uat-s1-arch-use-btn" id="uatS1UseTemplateBtn" disabled>Use Selected Template</button>
+              </div>
+            </div>
+            <div class="uat-s1-template-pane" data-uat-template-pane="das">
+              <div id="uatS1CustomerTemplateList" class="uat-s1-customer-template-list">
+                <!-- rendered by JS: saved custom business system templates only -->
+              </div>
+              <div class="uat-s1-arch-footer" style="margin-top:12px;">
+                <span class="uat-s1-arch-footer-text">Only custom business systems created from the Custom model and saved by the operator appear here.</span>
+                <button class="uat-s1-arch-use-btn" onclick="uatS1OpenCustomerTemplate()">Create Custom Template</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Standalone Servers & Databases -->
+    <div class="uat-s1-card" id="uatS1StandaloneSection">
+      <div class="uat-s1-card-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:10px;background:#fff7df;color:#f59e0b;display:grid;place-items:center;font-weight:900;font-size:16px;">+</div>
+          <div>
+            <div style="font-weight:800;color:#0f172a;">Standalone Servers &amp; Databases</div>
+            <div style="font-size:12px;color:#64748b;">Add standalone infrastructure not yet in a business system — map later.</div>
+          </div>
+        </div>
+        <button class="uat-s1-btn-primary" onclick="uatS1OpenSaModal()">+ Add Server / DB</button>
+      </div>
+      <div class="uat-s1-card-body">
+        <div class="uat-s1-sa-grid" id="uatS1SaCards">
+          <div id="uatS1SaEmpty" style="grid-column:1/-1;color:#64748b;padding:20px 0;text-align:center;">No standalone servers or databases yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Raw Server Targets view (hidden) ──────────────────── -->
+  <div id="uatS1ServersView" style="display:none;">
+    <div class="uat-s1-card">
+      <div class="uat-s1-card-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:10px;background:#fff7df;color:#f59e0b;display:grid;place-items:center;font-weight:900;font-size:11px;">VM</div>
+          <div>
+            <div style="font-weight:800;color:#0f172a;">Raw Server Targets</div>
+            <div style="font-size:12px;color:#64748b;">Fallback / manual mode. These rows can be auto-mapped into business system components.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="uat-s1-btn-soft" onclick="uatS1OpenSaModal()">+ Add Server / DB</button>
+          <button class="uat-s1-btn-soft" onclick="uatS1AutoMapStandalones()">Auto-map to Standalone</button>
+        </div>
+      </div>
+      <div class="uat-s1-card-body">
+        <div class="uat-s1-table-wrap">
+          <table>
+            <thead><tr><th>Type</th><th>Name</th><th>Tier</th><th>Source IP</th><th>Target IP</th><th>App Port</th><th>DB Port</th><th>DB Engine</th><th>Suggested</th><th>Status</th></tr></thead>
+            <tbody id="uatS1ScopeRows">
+              <!-- populated by existing uat scope data -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+              </section>
+
+                <!-- STEP 2 -->
+                <section class="uat-panel" data-uat-step="2" style="display:none;">
+                  <div class="uat-panel-header">
+                    <h3>Step 2 — Service Comparison: OSPC → FLEX</h3>
+                    <span class="uat-note">Auto-filled from Step 1 · SSH compares running systemd services</span>
+                  </div>
+                  <div class="uat-panel-body">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;">
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Source OSPC IP<input class="uat-input" id="svc-source-ip" placeholder="e.g. 10.1.2.100"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Target FLEX IP<input class="uat-input" id="svc-target-ip" placeholder="e.g. 10.2.3.200"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">SSH User<input class="uat-input" id="svc-ssh-user" value="ubuntu"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">SSH Key<input class="uat-input" id="svc-ssh-key" value="~/.ssh/id_rsa"></label>
+                      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Port<input class="uat-input" id="svc-ssh-port" value="22" style="max-width:70px;"></label>
+                    </div>
+                    <div class="uat-actions" style="margin-bottom:12px;">
+                      <button class="uat-btn uat-btn-good" onclick="svcCompareRun()">Compare Servers</button>
+                      <button class="uat-btn" onclick="uatCompareDbGlobal()" id="svc-compare-db-btn" style="background:#0e7490;border-color:#0891b2;">Compare DB</button>
+                    </div>
+                    <div id="svc-status" class="uat-note" style="margin-bottom:10px;min-height:18px;"></div>
+                    <div id="svc-summary" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
+                    <div id="svc-analysis" style="display:none;margin-bottom:12px;"></div>
+                    <div class="uat-table-wrap" id="svc-table-wrap" style="display:none;">
+                      <table class="uat-table">
+                        <thead><tr><th>Service</th><th style="text-align:center;">OSPC</th><th style="text-align:center;">FLEX</th><th>Status</th><th>Analysis</th></tr></thead>
+                        <tbody id="svc-compare-body"></tbody>
+                      </table>
+                    </div>
+                    <div id="svc-next-step" style="display:none;margin-top:14px;padding:12px 14px;border-radius:8px;border:1px solid #334155;background:rgba(30,41,59,0.6);">
+                      <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Next Step</div>
+                      <div id="svc-next-step-body"></div>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- STEP 3 -->
+                <section class="uat-panel" id="perf-section" data-uat-step="3" style="display:none;">
+                  <div class="uat-panel-header">
+                    <div>
+                      <h3>Step 3 — Performance Validation</h3>
+                      <span class="uat-note" style="font-size:11px;">SSHes into source &amp; target servers · runs HTTP response, error rate, latency, sessions, CPU, memory &amp; I/O tests · calculates delta vs 15% threshold</span>
+                    </div>
+                    <div class="uat-actions">
+                      <button class="uat-btn" onclick="perfRunSSHTests()" id="perf-run-btn">&#9658; SERVER TESTS</button>
+                      <button class="uat-btn" onclick="uatCompareDbGlobal()" id="perf-db-test-btn" style="background:#0e7490;border-color:#0891b2;">&#9658; Run DB Test</button>
+                      <button class="uat-btn uat-btn-good" onclick="uatSavePerformance()">Calculate &amp; Save</button>
+                    </div>
+                  </div>
+                  <div class="uat-panel-body">
+                    <div id="perf-run-status" style="margin-bottom:10px;font-size:12px;color:#86efac;display:none;"></div>
+
+                    <!-- SSH Log Terminal -->
+                    <div id="perf-log-wrap" style="display:none;margin-bottom:16px;">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#93c5fd;">SSH Output Log</span>
+                        <button class="uat-btn" style="font-size:10px;padding:3px 8px;" onclick="document.getElementById('perf-log-wrap').style.display='none'">✕ Hide</button>
+                      </div>
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div>
+                          <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:4px;">▶ SOURCE SERVER</div>
+                          <pre id="perf-log-src" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;"></pre>
+                        </div>
+                        <div>
+                          <div style="font-size:10px;color:#86efac;font-weight:700;margin-bottom:4px;">▶ TARGET SERVER</div>
+                          <pre id="perf-log-tgt" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;"></pre>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Parsed SSH results table — injected by buildPerfTable() -->
+                    <div id="perf-parsed-result" style="display:none;margin-bottom:16px;background:rgba(8,16,48,0.7);border:1px solid rgba(148,163,184,0.15);border-radius:8px;overflow:hidden;"></div>
+                  </div>
+                </section>
+
+                <!-- STEP 4 -->
+                <section class="uat-panel" data-uat-step="4" style="display:none;">
+                  <div class="uat-panel-header">
+                    <h3>Step 4 — Issues Tracker</h3>
+                    <div class="uat-actions">
+                      <button class="uat-btn" onclick="uatAddIssue()">+ Add Issue</button>
+                      <button class="uat-btn uat-btn-good" onclick="uatSaveIssues()">Save</button>
+                    </div>
+                  </div>
+                  <div class="uat-panel-body">
+                    <div class="uat-table-wrap">
+                      <table class="uat-table">
+                        <thead><tr><th>ID</th><th>System</th><th>Test</th><th>Severity</th><th>Owner</th><th>Status</th><th>Description</th><th>Evidence</th><th></th></tr></thead>
+                        <tbody id="uat-issues-body"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+
+                <section id="uat-step5-view" data-uat-step="5">
+                <!-- ── STEP 5 DIVIDER ── -->
+                <div id="uat-step5-divider" style="display:none;align-items:center;gap:10px;margin:20px 0 14px;">
+                  <div style="flex:1;height:2px;background:#bfdbfe;border-radius:2px;"></div>
+                  <span style="background:#2563eb;color:#fff;font-size:10px;font-weight:800;padding:4px 14px;border-radius:12px;white-space:nowrap;letter-spacing:.05em;">▼ STEP 5 — CUTOVER READINESS</span>
+                  <div style="flex:1;height:2px;background:#bfdbfe;border-radius:2px;"></div>
+                </div>
+
+                <!-- C: STATUS BANNER -->
+                <div id="uat-s1-hero" class="ud-banner ud-banner--red"></div>
+
+                <!-- C2: SCOPE SUMMARY CARD -->
+                <div id="uat-scope-card-container" style="margin-bottom:10px;"></div>
+
+                <!-- D: READINESS / KPI / FLOW -->
+                <div class="ud-card ud-card--blue" style="margin-bottom:12px;">
+                  <div class="ud-kpi-row">
+                    <div class="ud-gauge-wrap">
+                      <div class="ud-gauge-lbl">Readiness Score</div>
+                      <div id="uat-gauge-wrap"></div>
+                    </div>
+                    <div id="uat-summary-grid" class="ud-kpi-grid"></div>
+                  </div>
+                  <div id="uat-flow-strip" class="ud-flow"></div>
+                </div>
+
+                <!-- E: REVIEW + ACTIONS (4 cols) -->
+                <div id="uat-s4-why-actions" class="ud-why-grid"></div>
+
+                <!-- F: CHARTS -->
+                <div class="ud-card ud-card--blue ud-chart-card" style="margin-bottom:12px;">
+                  <div id="uat-perf-chart" class="ud-chart-col ud-chart-col--border"></div>
+                  <div id="uat-vm-chart"   class="ud-chart-col ud-chart-col--border"></div>
+                  <div id="uat-tco-chart"  class="ud-chart-col"></div>
+                </div>
+                <!-- Hidden price list file inputs -->
+                <input id="uat-ospc-price-input" type="file" accept=".csv,text/csv" style="display:none">
+                <input id="uat-flex-price-input" type="file" accept=".csv,text/csv" style="display:none">
+
+                <!-- G+H: SUMMARY + CTA -->
+                <div class="ud-bottom-row">
+                  <div class="ud-card ud-summary-card">
+                    <div id="uat-svc-health"   class="ud-sum-col ud-sum-col--border"></div>
+                    <div id="uat-perf-summary" class="ud-sum-col ud-sum-col--border"></div>
+                    <div id="uat-db-status"    class="ud-sum-col"></div>
+                  </div>
+                  <div id="uat-cta-buttons" class="ud-cta-wrap"></div>
+                </div>
+
+                <!-- FOOTER -->
+                <div id="uat-footer" class="ud-footer"></div>
+                </section>
+
+                <!-- DETAIL SECTIONS (hidden in compact) -->
+                <div id="uat-detailed-sections" style="display:none;"></div>
+
+              </div><!-- /uat-content -->
+
+            </div><!-- /uat-main -->
+          </div><!-- /uat-layout -->
+
+          <!-- Hidden scope controls (do NOT remove) -->
+          <div id="uat-s3-scope" style="display:none;">
+            <select id="uat-scope-apptype" onchange="uatScopeChange()">
+              <option value="web">Web Application</option>
+              <option value="api">API / Microservice</option>
+              <option value="db">Database-Only</option>
+              <option value="mixed">Mixed (Web + API + DB)</option>
+              <option value="batch">Batch / Background Jobs</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="uat-scope-dbtype" onchange="uatScopeChange()">
+              <option value="none">None / Not Applicable</option>
+              <option value="mysql">MySQL / MariaDB</option>
+              <option value="postgres">PostgreSQL</option>
+              <option value="mssql">SQL Server</option>
+              <option value="oracle">Oracle</option>
+              <option value="mongo">MongoDB</option>
+              <option value="redis">Redis</option>
+              <option value="other">Other</option>
+            </select>
+            <div id="uat-scope-dbtype-wrap"><select id="uat-scope-dbtype-inner" onchange="uatScopeChange()"></select></div>
+            <input type="checkbox" id="uat-scope-http"    onchange="uatScopeChange()">
+            <input type="checkbox" id="uat-scope-api"     onchange="uatScopeChange()">
+            <input type="checkbox" id="uat-scope-db"      onchange="uatScopeChange()">
+            <input type="checkbox" id="uat-scope-network" onchange="uatScopeChange()">
+            <span id="uat-scope-db-detected" style="display:none;"></span>
+            <div id="uat-scope-pills"></div>
+          </div>
+          <div id="uat-readiness-panel" style="display:none;"></div>
+          <div id="uat-export-links"    style="display:none;"></div>
+        </div><!-- /uat-dashboard -->
+
+        <script>
+        // ── UAT Dashboard Bootstrap ───────────────────────────────────────────────────
+        (function initUatScope() {
+          var saved = {};
+          try { saved = JSON.parse(localStorage.getItem('uat_workload_scope') || 'null') || {}; } catch(e) {}
+          // Fix stale all-false state
+          if (saved.hasHTTP === false && saved.hasAPI === false && saved.hasDatabase === false && saved.hasNetwork === false) {
+            saved = { appType: saved.appType || 'web', dbType: saved.dbType || 'none' };
+            try { localStorage.removeItem('uat_workload_scope'); } catch(e) {}
+          }
+          function el(id) { return document.getElementById(id); }
+          if (saved.appType) { var at = el('uat-scope-apptype'); if (at) at.value = saved.appType; }
+          if (saved.dbType)  { var dt = el('uat-scope-dbtype');  if (dt) dt.value = saved.dbType; }
+          var cb_http    = el('uat-scope-http');    if (cb_http)    cb_http.checked    = saved.hasHTTP    !== false;
+          var cb_api     = el('uat-scope-api');     if (cb_api)     cb_api.checked     = saved.hasAPI     !== false;
+          var cb_db      = el('uat-scope-db');      if (cb_db)      cb_db.checked      = saved.hasDatabase !== false;
+          var cb_network = el('uat-scope-network'); if (cb_network) cb_network.checked = saved.hasNetwork  !== false;
+          uatScopeChange();
+        })();
+
+        window.uatSetMode = function(mode, silent) {
+          document.body.classList.add('uat-dashboard-active');
+          ['compact','detailed'].forEach(function(m) {
+            var btn = document.getElementById('uat-mode-' + m);
+            if (btn) btn.classList.toggle('ud-mode-btn--on', m === mode);
+          });
+          var content = document.getElementById('uat-content');
+          if (content) content.setAttribute('data-uat-mode', mode);
+          if (mode === 'compact') {
+            if (window.uatNavTo) window.uatNavTo(1, true);
+          } else {
+            if (content) {
+              content.querySelectorAll('[data-uat-step]').forEach(function(panel) { panel.style.display = ''; });
+              var msg = document.getElementById('uat-message');
+              if (msg) msg.style.display = '';
+              content.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }
+          if (!silent) try { localStorage.setItem('uatMode', mode); } catch(e) {}
+        };
+
+        window.uatNavTo = function(step, instant) {
+          /* Update topbar title to reflect current step */
+          var _TITLES = {
+            1: ['Stage 1 — Server Targets',           'Define business systems, standalone servers, and databases'],
+            2: ['Stage 2 — Service Comparison',     'OSPC → FLEX service-by-service comparison and validation'],
+            3: ['Stage 3 — Performance Validation', 'Performance benchmarks and baseline comparison'],
+            4: ['Stage 4 — Issues Tracker',         'Issue tracking, risk assessment and remediation'],
+            5: ['Stage 5 — Cutover Readiness',      'Post-migration acceptance testing summary and decision']
+          };
+          var _t = _TITLES[Number(step)] || _TITLES[5];
+          var _th = document.getElementById('uat-tb-title');
+          var _ts = document.getElementById('uat-tb-sub');
+          if (_th) _th.textContent = _t[0];
+          if (_ts) _ts.textContent = _t[1];
+          document.body.classList.add('uat-dashboard-active');
+          var content = document.getElementById('uat-content');
+          if (!content) return;
+          content.setAttribute('data-uat-mode', 'compact');
+          ['compact','detailed'].forEach(function(m) {
+            var btn = document.getElementById('uat-mode-' + m);
+            if (btn) btn.classList.toggle('ud-mode-btn--on', m === 'compact');
+          });
+          content.querySelectorAll('[data-uat-step]').forEach(function(panel) {
+            panel.style.display = Number(panel.getAttribute('data-uat-step')) === Number(step) ? '' : 'none';
+          });
+          var msg = document.getElementById('uat-message');
+          if (msg) msg.style.display = step === 5 ? 'none' : '';
+          var theme = document.getElementById('top-theme-dropdown');
+          if (theme) theme.style.display = 'none';
+          document.querySelectorAll('#uat-sidebar .udsb-item').forEach(function(btn, idx) {
+            var isReport = idx > 4;
+            btn.classList.toggle('udsb-active', !isReport && idx === step - 1);
+          });
+          var target = content.querySelector('[data-uat-step="' + step + '"]');
+          if (!target) return;
+          // Walk up offsetParent chain to get top relative to #uat-content
+          var top = 0, el = target;
+          while (el && el !== content) { top += el.offsetTop; el = el.offsetParent; }
+          content.scrollTo({ top: top - 10, behavior: instant ? 'auto' : 'smooth' });
+        };
+
+        setTimeout(function() { if (window.uatSetMode) window.uatSetMode('compact', true); }, 0);
+
+        window.uatToggleSection = function(id) {
+          var el = document.getElementById(id);
+          if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+        };
+
+        window.uatScopeChange = function() {
+          function el(id) { return document.getElementById(id); }
+          var appType    = (el('uat-scope-apptype')  || {}).value || 'web';
+          var dbType     = (el('uat-scope-dbtype')   || {}).value || 'none';
+          var hasHTTP    = !!(el('uat-scope-http')    || {}).checked;
+          var hasAPI     = !!(el('uat-scope-api')     || {}).checked;
+          var hasDB      = !!(el('uat-scope-db')      || {}).checked;
+          var hasNetwork = !!(el('uat-scope-network') || {}).checked;
+          var dbDetected = Array.from(document.querySelectorAll('#uat-scope-body tr')).some(function(tr) {
+            var sels = tr.querySelectorAll('select');
+            if (sels[0] && sels[0].value === 'DB') return true;
+            var engines = ['mysql','postgresql','mariadb','mssql','oracle','mongo','redis'];
+            if (sels[10] && engines.indexOf((sels[10].value||'').toLowerCase()) >= 0) return true;
+            return false;
+          });
+          var dbDetEl = el('uat-scope-db-detected');
+          if (dbDetEl) dbDetEl.style.display = dbDetected ? 'inline' : 'none';
+          var scope = { appType:appType, dbType:hasDB?dbType:'none', hasHTTP:hasHTTP, hasAPI:hasAPI, hasDatabase:hasDB, hasNetwork:hasNetwork };
+          try { localStorage.setItem('uat_workload_scope', JSON.stringify(scope)); } catch(e) {}
+          // Keep UAT.workloadScope in sync so uat.js reads the latest without a page reload
+          if (window.UAT) window.UAT.workloadScope = scope;
+          if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
+        };
+
+        // ── Flavor & TCO Data Loader ────────────────────────────────────────────────
+        window._uatFlavorData = null;
+
+        window.uatLoadFlavorDataLegacy = function() {
+          fetch('/api/dashboard/csv-files')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (!d.ok || !d.files) return;
+              var flavorFile = d.files.find(function(f) { return f.toLowerCase().indexOf('_flavormap') >= 0; });
+              var tcoFile    = d.files.find(function(f) { return f.toLowerCase().indexOf('tco_comparison') >= 0 || f.toLowerCase().indexOf('final_migration_tco') >= 0; });
+
+              var promises = [];
+              promises.push(fetch('/api/uat/flavor-summary').then(function(r){ return r.json(); }).catch(function(){ return null; }));
+              if (flavorFile) promises.push(fetch('/api/dashboard/csv-content/' + flavorFile).then(function(r){return r.text();}));
+              else promises.push(Promise.resolve(''));
+              if (tcoFile) promises.push(fetch('/api/dashboard/csv-content/' + tcoFile).then(function(r){return r.text();}));
+              else promises.push(Promise.resolve(''));
+
+              return Promise.all(promises);
+            })
+            .then(function(results) {
+              if (!results) return;
+              var flavorSummary = results[0] || null;
+              var flavorCsv = results[1] || '';
+              var tcoCsv = results[2] || '';
+
+              function parseCsv(text) {
+                var lines = text.split('\n').filter(function(l){ return l.trim(); });
+                if (!lines.length) return [];
+                var headers = lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g,''); });
+                return lines.slice(1).map(function(line) {
+                  var vals = line.split(',');
+                  var obj = {};
+                  headers.forEach(function(h, i) { obj[h] = (vals[i] || '').trim().replace(/^"|"$/g,''); });
+                  return obj;
+                });
+              }
+
+              var fmRows = parseCsv(flavorCsv).filter(function(r){ return r.source_resource_type === 'cloud_server' || r.source_vcpus || r.source_flavor_name || r.target_flavor_name; });
+              var tcoRows = parseCsv(tcoCsv);
+
+              // VM size aggregation
+              var srcVcpus = [], tgtVcpus = [], srcRamGb = [], tgtRamGb = [], srcDiskGb = [], tgtDiskGb = [];
+              var totalTargetMonthly = 0;
+              fmRows.forEach(function(r) {
+                var sv = parseFloat(r.source_vcpus); if (sv > 0) srcVcpus.push(sv);
+                var tv = parseFloat(r.target_vcpus); if (tv > 0) tgtVcpus.push(tv);
+                var srm = parseFloat(r.source_ram_mb); if (srm > 0) srcRamGb.push(srm/1024);
+                var trm = parseFloat(r.target_ram_mb); if (trm > 0) tgtRamGb.push(trm/1024);
+                var sd = parseFloat(r.source_disk_gb); if (sd > 0) srcDiskGb.push(sd);
+                var td = parseFloat(r.target_disk_gb); if (td > 0) tgtDiskGb.push(td);
+                var mc = parseFloat(r.target_monthly_cost_min_usd); if (mc > 0) totalTargetMonthly += mc;
+              });
+
+              function avg(arr) { return arr.length ? arr.reduce(function(a,b){return a+b;},0)/arr.length : 0; }
+
+              var vmData = flavorSummary && flavorSummary.ok && flavorSummary.vmData ? flavorSummary.vmData : {
+                srcVcpu: Math.round(avg(srcVcpus)),
+                tgtVcpu: Math.round(avg(tgtVcpus)),
+                srcRam:  Math.round(avg(srcRamGb)),
+                tgtRam:  Math.round(avg(tgtRamGb)),
+                srcDisk: Math.round(avg(srcDiskGb)),
+                tgtDisk: Math.round(avg(tgtDiskGb)),
+                rows: fmRows.length,
+                sourceFlavors: [],
+                targetFlavors: [],
+                flavorPairs: [],
+                flavorMapFile: flavorFile || '',
+              };
+
+              // TCO aggregation
+              var srcMonthly = 0, tgtMonthlyFromTco = 0;
+              tcoRows.forEach(function(r) {
+                var lc = parseFloat((r['Legacy Cloud Cost ($)'] || r['Legacy Cost'] || '').replace(/[$,]/g,''));
+                var fc = parseFloat((r['FLEX Cloud Cost ($)'] || r['FLEX Cost'] || '').replace(/[$,]/g,''));
+                if (lc > 0) srcMonthly += lc;
+                if (fc > 0) tgtMonthlyFromTco += fc;
+              });
+              if (!srcMonthly) srcMonthly = (vmData.targetMonthly || totalTargetMonthly) * 2.5;
+              var tgtMonthly = tgtMonthlyFromTco || totalTargetMonthly;
+              if (!tgtMonthly && vmData.targetMonthly) tgtMonthly = vmData.targetMonthly;
+              if (!tgtMonthly) tgtMonthly = srcMonthly * 0.74;
+              var savings = srcMonthly - tgtMonthly;
+              var savingsPct = srcMonthly > 0 ? (savings / srcMonthly * 100) : 0;
+
+              var tcoData = {
+                srcMonthly:  Math.round(srcMonthly),
+                tgtMonthly:  Math.round(tgtMonthly),
+                savings:     Math.round(savings),
+                savingsPct:  savingsPct.toFixed(1),
+              };
+
+              window._uatFlavorData = { vmData: vmData, tcoData: tcoData };
+              if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
+            })
+            .catch(function(e) {
+              // Use placeholder data on error
+              window._uatFlavorData = {
+                vmData: { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000, rows:0 },
+                tcoData: { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:'26.2' },
+              };
+              if (typeof window.uatRerenderReadiness === 'function') try { window.uatRerenderReadiness(); } catch(e) {}
+            });
+        };
+
+        // Price list upload handlers for UAT TCO
+        window._uatPriceListState = { ospcMeta:'No file loaded', flexMeta:'No file loaded', ospcMonthly:0, flexMonthly:0 };
+        function _uatParsePriceTotal(text, costKeys) {
+          var lines = text.trim().split(/\r?\n/);
+          if (lines.length < 2) return 0;
+          var headers = lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g,'').toLowerCase(); });
+          var total = 0;
+          lines.slice(1).forEach(function(line) {
+            if (!line.trim()) return;
+            var vals = line.split(',');
+            var obj = {};
+            headers.forEach(function(h,i){ obj[h] = (vals[i]||'').trim().replace(/^"|"$/g,''); });
+            var cost = 0;
+            for (var k = 0; k < costKeys.length; k++) {
+              var v = parseFloat((obj[costKeys[k]]||'').replace(/[^0-9.]/g,''));
+              if (!isNaN(v) && v > 0) { cost = v; break; }
+            }
+            total += cost;
+          });
+          return total;
+        }
+        function _uatRerunTco() {
+          if (window._uatFlavorData && typeof window.uatRerenderReadiness === 'function') {
+            try { window.uatRerenderReadiness(); } catch(e) {}
+          }
+        }
+        (function() {
+          var ospcEl = document.getElementById('uat-ospc-price-input');
+          var flexEl = document.getElementById('uat-flex-price-input');
+          if (ospcEl) ospcEl.addEventListener('change', function(e) {
+            var f = e.target.files[0]; if (!f) return;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+              var total = _uatParsePriceTotal(ev.target.result, ['monthly_cost_usd','monthly_cost','cost_monthly','cost_per_month']);
+              window._uatPriceListState.ospcMonthly = total;
+              window._uatPriceListState.ospcMeta = f.name + (total > 0 ? ' ($' + Math.round(total).toLocaleString() + '/mo)' : ' (no costs found)');
+              _uatRerunTco();
+            };
+            reader.readAsText(f);
+          });
+          if (flexEl) flexEl.addEventListener('change', function(e) {
+            var f = e.target.files[0]; if (!f) return;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+              // Hourly rates × 730 = monthly; if value > 10 assume already monthly
+              var lines = ev.target.result.trim().split(/\r?\n/);
+              var hdrs = lines.length ? lines[0].split(',').map(function(h){ return h.trim().replace(/^"|"$/g,'').toLowerCase(); }) : [];
+              var total = 0;
+              lines.slice(1).forEach(function(line) {
+                if (!line.trim()) return;
+                var vals = line.split(','), obj = {};
+                hdrs.forEach(function(h,i){ obj[h] = (vals[i]||'').trim().replace(/^"|"$/g,''); });
+                var costKeys = ['hourly_rate','cost_per_hour','hourly_rate_usd','hourly_cost','monthly_cost_usd','monthly_cost'];
+                for (var k = 0; k < costKeys.length; k++) {
+                  var v = parseFloat((obj[costKeys[k]]||'').replace(/[^0-9.]/g,''));
+                  if (!isNaN(v) && v > 0) { total += (v <= 10 ? v * 730 : v); break; }
+                }
+              });
+              window._uatPriceListState.flexMonthly = total;
+              window._uatPriceListState.flexMeta = f.name + (total > 0 ? ' ($' + Math.round(total).toLocaleString() + '/mo)' : ' (no costs found)');
+              _uatRerunTco();
+            };
+            reader.readAsText(f);
+          });
+        })();
+
+
+        // ── Business System (Stage 3) ──────────────────────────────────────────────
+        // Static /static/uat/uat.js owns the active flavor loader.
+        </script>
+
+        <!-- UTILITY: Migration Logs (collapsed) -->
+        <details class="uat-panel" style="overflow:visible;">
+          <summary style="padding:10px 14px;cursor:pointer;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+            Migration Logs &amp; Findings
+            <div class="uat-actions" onclick="event.preventDefault()">
+              <button class="uat-btn" onclick="uatRefreshFindings(true)">Rescan Logs</button>
+            </div>
+          </summary>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Time</th><th>Source</th><th>Stage</th><th>Severity</th><th>Category</th><th>System</th><th>Message</th><th>Suggested Test</th><th>Action</th></tr></thead>
+                <tbody id="uat-findings-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+        <!-- UTILITY: Command History (collapsed) -->
+        <details class="uat-panel" style="overflow:visible;">
+          <summary style="padding:10px 14px;cursor:pointer;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;list-style:none;">
+            Command Run History
+          </summary>
+          <div class="uat-panel-body">
+            <div class="uat-table-wrap">
+              <table class="uat-table">
+                <thead><tr><th>Started</th><th>System</th><th>Test</th><th>Mode</th><th>Status</th><th>Exit</th><th>Duration</th><th>Command</th><th>Output</th></tr></thead>
+                <tbody id="uat-runs-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+
+      </div>
+
+      <style>
+        /* ══════════════════════════════════════════════════
+           UAT DASHBOARD — COMPLETE STYLE RESET
+           ══════════════════════════════════════════════════ */
+
+        /* Kill parent container constraints */
+        body.uat-dashboard-active #panel-s4,
+        #panel-s4 {
+          width: 100vw !important;
+          max-width: 100vw !important;
+        }
+        body.uat-dashboard-active #panel-s4 {
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        #panel-s4 > .info-panel { padding: 0 !important; gap: 0 !important; background: transparent !important; }
+        #panel-s4 .uat-console  {
+          display: block !important;
+          gap: 0 !important;
+          color: #0f172a !important;
+          width: min(100vw, 1692px) !important;
+          max-width: 1692px !important;
+          margin: 0 auto !important;
+        }
+        /* Hide hero from original DOM position — it's now inside the overlay */
+        .uat-hero { display: none !important; }
+        /* #uat-message is inside #uat-content now — keep it visible */
+
+        /* CSS Variables */
+        #uat-dashboard {
+          --ud-bg:       #f7faff;
+          --ud-surface:  #ffffff;
+          --ud-text:     #0f172a;
+          --ud-muted:    #64748b;
+          --ud-blue:     #2563eb;
+          --ud-blue-bg:  #eff6ff;
+          --ud-blue-bd:  #2563eb;
+          --ud-red:      #ef4444;
+          --ud-red-bg:   #fff1f2;
+          --ud-red-bd:   #ef4444;
+          --ud-green:    #16a34a;
+          --ud-orange:   #f59e0b;
+          --ud-border:   #dbeafe;
+          --ud-shadow:   0 2px 12px rgba(15,23,42,.07);
+          --ud-radius:   12px;
+        }
+
+        /* ── Outer shell ── */
+        #uat-dashboard {
+          display: flex !important;
+          width: 100% !important;
+          background: var(--ud-bg) !important;
+          color: var(--ud-text) !important;
+          font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
+          padding: 0 !important; margin: 0 !important;
+          border-radius: 0 !important; box-shadow: none !important;
+        }
+        #uat-dashboard * { box-sizing: border-box; }
+
+        /* ── Layout ── */
+        #uat-layout { display: flex; width: 100%; min-height: calc(100vh - 280px); background: #f7faff; }
+
+        /* ══ SIDEBAR ══ */
+        #uat-sidebar {
+          width: 175px; flex-shrink: 0;
+          background: #ffffff !important; background-color: #ffffff !important;
+          color: #374151 !important;
+          border-right: 1px solid #e5e7eb;
+          display: flex; flex-direction: column;
+          height: calc(100vh - 280px);
+          position: sticky; top: 0;
+          overflow-y: auto;
+        }
+        /* Force all sidebar text dark — prevent dark parent theme bleeding through */
+        #uat-sidebar, #uat-sidebar * { color: #374151 !important; }
+        #uat-sidebar .udsb-title  { color: #1e293b !important; }
+        #uat-sidebar .udsb-sub    { color: #94a3b8 !important; }
+        #uat-sidebar .udsb-ic-done, #uat-sidebar .udsb-ic-active { color: #fff !important; }
+        #uat-sidebar .udsb-active .udsb-item-text * { color: #1e40af !important; }
+        #uat-sidebar .udsb-uname  { color: #1e293b !important; }
+        #uat-sidebar .udsb-uemail { color: #94a3b8 !important; }
+        .udsb-header {
+          padding: 18px 16px 14px; display: flex; align-items: center; gap: 10px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .udsb-logo {
+          width: 34px; height: 34px; background: var(--ud-blue); border-radius: 8px;
+          display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+        }
+        .udsb-title { font-size: 13px; font-weight: 800; color: #1e293b; line-height: 1.2; }
+        .udsb-sub   { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+        .udsb-nav   { flex: 1; padding: 8px 0; }
+        .udsb-item  {
+          display: flex; align-items: center; gap: 10px;
+          width: 100%; padding: 10px 16px; border: none; background: transparent;
+          text-align: left; cursor: pointer; transition: background .12s;
+        }
+        .udsb-item:hover { background: #f8fafc; }
+        .udsb-active { background: #eff6ff !important; border-left: 3px solid var(--ud-blue); padding-left: 13px !important; }
+        .udsb-ic {
+          width: 24px; height: 24px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 900; flex-shrink: 0;
+          background: #e5e7eb; color: #9ca3af;
+        }
+        .udsb-ic-done   { background: #16a34a !important; color: #fff !important; }
+        .udsb-ic-active { background: var(--ud-blue) !important; color: #fff !important; font-size: 13px; }
+        .udsb-item-text { display: flex; flex-direction: column; min-width: 0; }
+        .udsb-item-text em { font-size: 9px; color: #94a3b8; font-style: normal; text-transform: uppercase; letter-spacing: .05em; }
+        .udsb-item-text span, .udsb-item-text { font-size: 12px; font-weight: 600; color: #374151; }
+        .udsb-active .udsb-item-text { color: #1e40af !important; }
+        .udsb-active .udsb-item-text em { color: #93c5fd !important; }
+        .udsb-sep  { border-top: 1px solid #f1f5f9; margin: 6px 16px; }
+        .udsb-foot { padding: 12px 16px; border-top: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 8px; }
+        .udsb-env  {
+          display: flex; align-items: center; gap: 5px; font-size: 11px; color: #374151;
+          background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 10px; cursor: pointer;
+        }
+        .udsb-env strong { margin-left: 3px; font-weight: 700; }
+        .udsb-arr  { margin-left: auto; color: #9ca3af; font-size: 11px; }
+        .udsb-user { display: flex; align-items: center; gap: 8px; }
+        .udsb-av   {
+          width: 28px; height: 28px; background: var(--ud-blue); border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0;
+        }
+        .udsb-uinfo { flex: 1; min-width: 0; }
+        .udsb-uname  { font-size: 11px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .udsb-uemail { font-size: 9px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ══ MAIN ══ */
+        #uat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--ud-bg); }
+
+        /* ── Top bar ── */
+        #uat-topbar {
+          background: #fff; border-bottom: 1px solid #e5e7eb;
+          padding: 14px 24px; display: flex; align-items: center;
+          justify-content: space-between; flex-shrink: 0; gap: 12px;
+        }
+        .udtb-h { font-size: 18px; font-weight: 800; color: #111827; }
+        .udtb-s { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+        /* ── Content ── */
+        #uat-content { flex: 1; padding: 16px 20px; overflow-y: visible; }
+
+        /* ── Cards ── */
+        .ud-card {
+          background: #fff; border: 1.5px solid #e5e7eb;
+          border-radius: var(--ud-radius); box-shadow: var(--ud-shadow);
+          margin-bottom: 12px;
+        }
+        .ud-card--blue { border-color: var(--ud-blue-bd) !important; background: #fff; }
+        .ud-card--red  { border-color: var(--ud-red-bd)  !important; background: var(--ud-red-bg); }
+
+        /* ── Banner ── */
+        .ud-banner { padding: 14px 20px; border-radius: var(--ud-radius); margin-bottom: 12px; }
+        .ud-banner--red { border: 1.5px solid var(--ud-red-bd); background: var(--ud-red-bg); }
+
+        /* ── Topbar controls ── */
+        .ud-mode-pill { display: flex; border: 1px solid #d1d5db; border-radius: 7px; overflow: hidden; }
+        .ud-mode-btn  { padding: 5px 14px; font-size: 12px; font-weight: 700; background: #fff; color: #6b7280; border: none; cursor: pointer; }
+        .ud-mode-btn--on { background: var(--ud-blue); color: #fff; }
+        .ud-export-btn  { padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 7px; background: #fff; font-size: 12px; font-weight: 700; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+
+        /* ── KPI row ── */
+        .ud-kpi-row  { display: flex; align-items: flex-start; gap: 24px; padding: 20px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+        .ud-gauge-wrap { flex-shrink: 0; }
+        .ud-gauge-lbl  { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 6px; }
+        .ud-kpi-grid   { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; align-items: flex-start; }
+        .ud-kpi {
+          background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+          padding: 10px 14px; flex: 1; min-width: 90px;
+        }
+        .ud-kpi-lbl { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: 5px; }
+        .ud-kpi-val { font-size: 26px; font-weight: 900; line-height: 1; margin: 4px 0 2px; }
+        .ud-kpi-sub { font-size: 11px; color: #9ca3af; }
+
+        /* ── Flow ── */
+        .ud-flow { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 16px 20px; }
+        .ud-flow-node {
+          display: flex; flex-direction: column; padding: 12px 16px;
+          border-radius: 10px; min-width: 140px; flex: 1; border: 1px solid #e5e7eb; background: #fff;
+        }
+        .ud-flow-node-title { font-size: 11px; font-weight: 800; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+        .ud-flow-arr  { display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #93c5fd; font-size: 22px; flex-shrink: 0; }
+        .ud-flow-tag  { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 700; margin: 2px 2px 2px 0; }
+
+        /* ── Why/Actions grid ── */
+        .ud-why-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1.1fr; gap: 12px; margin-bottom: 12px; }
+        .ud-why-col  { border-radius: 10px; padding: 14px 16px; }
+        .ud-why-title { font-size: 12px; font-weight: 800; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid; display: flex; align-items: center; gap: 7px; }
+        .ud-why-item { font-size: 11px; padding: 3px 0; }
+        .ud-why-item-main { font-weight: 700; color: #111827; }
+        .ud-why-item-sub  { color: #6b7280; font-size: 10px; padding-left: 10px; }
+        .ud-action-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; }
+        .ud-action-num  { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; flex-shrink: 0; color: #fff; }
+        .ud-action-lbl  { flex: 1; font-size: 11px; font-weight: 600; color: #374151; }
+        .ud-action-tag  { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+        .ud-action-arr  { color: #9ca3af; font-size: 12px; }
+
+        /* ── Chart card ── */
+        .ud-chart-card { display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 0; overflow: hidden; }
+        .ud-chart-col  { padding: 18px 20px; }
+        .ud-chart-col--border { border-right: 1px solid var(--ud-border); }
+        .ud-chart-title { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 8px; }
+        .ud-chart-legend { display: flex; gap: 12px; font-size: 10px; margin-bottom: 8px; }
+        .ud-legend-dot  { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+        .ud-bar-row     { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+        .ud-bar-lbl     { font-size: 10px; color: #374151; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ud-bar-stack   { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+        .ud-bar-line    { display: flex; align-items: center; gap: 4px; }
+        .ud-bar-track   { flex: 1; height: 7px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+        .ud-bar-fill-b  { height: 100%; background: var(--ud-blue); border-radius: 3px; transition: width .4s; }
+        .ud-bar-fill-g  { height: 100%; background: var(--ud-green); border-radius: 3px; transition: width .4s; }
+        .ud-bar-val     { font-size: 9px; color: #6b7280; min-width: 22px; text-align: right; }
+        .ud-tco-bars    { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px; }
+        .ud-tco-col     { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .ud-tco-bar     { border-radius: 4px 4px 0 0; min-width: 34px; display: flex; align-items: flex-start; justify-content: center; padding-top: 4px; }
+        .ud-tco-bar-v   { font-size: 9px; font-weight: 700; color: #fff; }
+        .ud-tco-bar-l   { font-size: 9px; color: #6b7280; text-align: center; max-width: 70px; }
+        .ud-savings-card { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+
+        /* ── Bottom row ── */
+        .ud-bottom-row   { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: stretch; margin-bottom: 12px; }
+        .ud-summary-card { display: grid; grid-template-columns: 1fr 1fr 1fr; overflow: hidden; }
+        .ud-sum-col      { padding: 16px 18px; }
+        .ud-sum-col--border { border-right: 1px solid #e5e7eb; }
+        .ud-sum-title    { font-size: 11px; font-weight: 700; color: #374151; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .ud-svc-counts   { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .ud-svc-stat     { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; }
+        .ud-seg-bar      { height: 8px; border-radius: 4px; overflow: hidden; display: flex; background: #f3f4f6; margin-bottom: 4px; }
+        .ud-seg-ok   { background: #22c55e; }
+        .ud-seg-rev  { background: #f59e0b; }
+        .ud-seg-warn { background: #fbbf24; }
+        .ud-seg-crit { background: #ef4444; }
+
+        /* ── CTA ── */
+        .ud-cta-wrap { display: flex; flex-direction: row; gap: 8px; align-items: stretch; }
+        .ud-cta-pass, .ud-cta-fix {
+          display: flex !important; flex-direction: row !important;
+          align-items: center !important; justify-content: flex-start !important;
+          gap: 12px; padding: 12px 20px; border: none; border-radius: 8px;
+          cursor: pointer; min-width: 185px; font-family: inherit; text-align: left;
+          flex: 1;
+        }
+        .ud-cta-pass { background: #16a34a !important; color: #fff !important; }
+        .ud-cta-fix  { background: #dc2626 !important; color: #fff !important; }
+        .ud-cta-ic-wrap {
+          width: 38px; height: 38px; border-radius: 50%;
+          background: rgba(255,255,255,.25);
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .ud-cta-ic   { font-size: 18px; color: #fff; font-weight: 900; }
+        .ud-cta-txt  { display: flex; flex-direction: column; gap: 1px; }
+        .ud-cta-main { font-size: 20px; font-weight: 900; letter-spacing: .02em; color: #fff !important; line-height: 1.1; }
+        .ud-cta-sub  { font-size: 10px; color: rgba(255,255,255,.88) !important; line-height: 1.3; }
+
+        /* ── Footer ── */
+        .ud-footer { text-align: center; font-size: 11px; color: #9ca3af; padding: 10px 0; border-top: 1px solid #f3f4f6; }
+
+        /* ── Stage 3 source/target live UAT workbench ── */
+        .uat-live-compare-bench {
+          display: grid;
+          grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+          gap: 14px;
+          align-items: start;
+          margin: 14px 0;
+        }
+        .uat-live-side {
+          background: #ffffff;
+          border: 1.5px solid #d8e2f0;
+          border-radius: 12px;
+          padding: 14px;
+          box-shadow: 0 10px 24px rgba(15,23,42,.08);
+          min-width: 0;
+        }
+        .uat-live-side--source { border-left: 4px solid #2563eb; }
+        .uat-live-side--target { border-left: 4px solid #16a34a; }
+        .uat-live-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+          margin-bottom: 10px;
+        }
+        .uat-live-kicker {
+          color: #64748b;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: .12em;
+          text-transform: uppercase;
+        }
+        .uat-live-head h3 {
+          color: #172033;
+          font-size: 18px;
+          line-height: 1.15;
+          margin: 3px 0 4px;
+        }
+        .uat-live-head p {
+          color: #64748b;
+          font-size: 12px;
+          margin: 0;
+        }
+        .uat-live-badge {
+          border-radius: 999px;
+          background: #eff6ff;
+          color: #1d4ed8;
+          border: 1px solid #bfdbfe;
+          padding: 4px 9px;
+          font-size: 10px;
+          font-weight: 900;
+        }
+        .uat-live-side--target .uat-live-badge {
+          background: #ecfdf5;
+          color: #047857;
+          border-color: #bbf7d0;
+        }
+        .uat-live-controls {
+          display: grid;
+          grid-template-columns: 1.1fr 1.4fr .7fr 1fr;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .uat-live-controls label {
+          color: #334155;
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .uat-live-controls input,
+        .uat-live-controls select {
+          width: 100%;
+          min-width: 0;
+          border: 1px solid #cbd5e1;
+          background: #f8fafc;
+          color: #0f172a;
+          border-radius: 7px;
+          padding: 8px 9px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .uat-live-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .uat-live-actions button {
+          border: 0;
+          border-radius: 7px;
+          background: #b23a3a;
+          color: #fff;
+          padding: 7px 10px;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .uat-live-actions button:hover { background: #8f2e2e; }
+        .uat-live-phone {
+          position: relative;
+          width: min(100%, 410px);
+          height: 840px;
+          margin: 0 auto 12px;
+          background: #050505;
+          border: 12px solid #050505;
+          border-radius: 54px;
+          box-shadow:
+            0 0 0 2px #202633,
+            0 24px 52px rgba(15,23,42,.35),
+            inset 0 0 0 1px rgba(255,255,255,.08);
+          overflow: hidden;
+        }
+        .uat-live-phone::before {
+          content: "13:23";
+          position: absolute;
+          top: 12px;
+          left: 32px;
+          z-index: 3;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: .02em;
+          text-shadow: 0 1px 2px rgba(0,0,0,.45);
+          pointer-events: none;
+        }
+        .uat-live-phone::after {
+          content: "▮▮ 5G 🔋";
+          position: absolute;
+          top: 12px;
+          right: 28px;
+          z-index: 3;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: .02em;
+          text-shadow: 0 1px 2px rgba(0,0,0,.45);
+          pointer-events: none;
+        }
+        .uat-live-notch {
+          display: block;
+          position: absolute;
+          top: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 4;
+          width: 42%;
+          height: 34px;
+          background: #050505;
+          border-radius: 0 0 22px 22px;
+          pointer-events: none;
+        }
+        .uat-live-phone iframe {
+          width: 100%;
+          height: 100%;
+          border: 0;
+          background: #13233d;
+          border-radius: 38px;
+        }
+        .uat-live-bottom-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: 18px 0 10px;
+          padding: 12px 14px;
+          border: 1px solid #d8e2f0;
+          border-left: 4px solid #38bdf8;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #172033;
+          font-weight: 900;
+        }
+        .uat-live-bottom-title span {
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .uat-live-dev {
+          border: 1px solid #334155;
+          border-radius: 12px;
+          background: #020617;
+          color: #d1fae5;
+          overflow: hidden;
+        }
+        .uat-live-dev-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          background: #111827;
+          border-bottom: 1px solid #334155;
+          padding: 10px 12px;
+        }
+        .uat-live-dev-head strong {
+          color: #a7f3d0;
+          font-size: 12px;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+        }
+        .uat-live-dev-head span {
+          color: #00ff7f;
+          background: rgba(16,185,129,.12);
+          border: 1px solid rgba(16,185,129,.35);
+          border-radius: 999px;
+          padding: 5px 9px;
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .uat-live-route {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 7px;
+          align-items: center;
+          padding: 10px 12px 6px;
+          color: #22d3ee;
+          font-size: 11px;
+          font-weight: 800;
+        }
+        .uat-live-route span {
+          border: 1px solid #0891b2;
+          background: rgba(8,145,178,.16);
+          color: #cffafe;
+          border-radius: 999px;
+          padding: 5px 8px;
+        }
+        .uat-live-log {
+          min-height: 92px;
+          max-height: 170px;
+          margin: 0;
+          overflow: auto;
+          background: #030712;
+          border-top: 1px solid #1f2937;
+          border-bottom: 1px solid #1f2937;
+          color: #00ff66;
+          padding: 10px 12px;
+          font-family: "Consolas", "SFMono-Regular", monospace;
+          font-size: 11px;
+          line-height: 1.45;
+          white-space: pre-wrap;
+        }
+        .uat-live-table-wrap {
+          max-height: 250px;
+          overflow: auto;
+          background: #eef6ff;
+        }
+        .uat-live-table-wrap table {
+          width: 100%;
+          border-collapse: collapse;
+          color: #0f172a;
+          font-size: 11px;
+        }
+        .uat-live-table-wrap th {
+          position: sticky;
+          top: 0;
+          background: #f8fafc;
+          color: #334155;
+          text-align: left;
+          padding: 8px;
+          border-bottom: 1px solid #cbd5e1;
+          z-index: 1;
+        }
+        .uat-live-table-wrap td {
+          padding: 8px;
+          border-bottom: 1px solid #cbd5e1;
+          vertical-align: top;
+        }
+        .uat-live-table-wrap tr.uat-live-active td {
+          background: #dcfce7;
+          border-top: 1px solid #86efac;
+          border-bottom: 1px solid #86efac;
+        }
+        .uat-live-step-dot {
+          display: inline-grid;
+          place-items: center;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #dff6ff;
+          color: #0284c7;
+          font-weight: 900;
+        }
+
+        /* ── Steps 1-4 inside the overlay: dark card style ── */
+        #uat-content .uat-panel {
+          background: #ffffff !important;
+          border: 1.5px solid #dbe4f0 !important;
+          border-radius: 12px !important;
+          margin-bottom: 14px !important;
+          overflow: hidden;
+        }
+        #uat-content .uat-panel .uat-panel-header {
+          background: #f1f5f9 !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          border-radius: 12px 12px 0 0 !important;
+        }
+        #uat-content .uat-panel .uat-panel-header h3 { color: #1e3a6e !important; }
+        #uat-content .uat-panel .uat-panel-body { padding: 14px 16px !important; }
+        #uat-content .uat-note { color: #64748b !important; }
+
+        /* ── Step divider ── */
+        #uat-step5-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0 14px; }
+
+        /* ── Responsive ── */
+        @media(max-width:900px){
+          .uat-live-compare-bench { grid-template-columns: 1fr; }
+          .uat-live-controls { grid-template-columns: 1fr 1fr; }
+          .ud-why-grid  { grid-template-columns: 1fr 1fr !important; }
+          .ud-chart-card { grid-template-columns: 1fr !important; }
+          .ud-bottom-row { grid-template-columns: 1fr !important; }
+          .ud-summary-card { grid-template-columns: 1fr !important; }
+          .ud-cta-wrap  { flex-direction: column !important; }
+          #uat-sidebar  { display: none; }
+        }
+
+        /* Keep old variable names for uat.js compatibility */
+        .ud-card { background:#fff; border:1.5px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+        .ud-card--red  { border-color:#fecaca !important; background:#fef2f2 !important; }
+        .ud-card--blue { border-color:#bfdbfe !important; }
+        .ud-kpi { padding:10px 14px; background:#fff; border:1px solid #e5e7eb; border-radius:10px; min-width:90px; flex:1; }
+        .ud-kpi-label { font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap; }
+        .ud-kpi-val { font-size:26px;font-weight:900;margin:3px 0 2px;line-height:1; }
+        .ud-kpi-sub { font-size:11px;color:#9ca3af; }
+        .ud-flow-node { display:flex;flex-direction:column;padding:12px 16px;border-radius:10px;min-width:130px;flex:1;border:1px solid #e5e7eb;background:#fff; }
+        .ud-flow-node-title { font-size:11px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:5px; }
+        .ud-flow-arrow { display:flex;align-items:center;justify-content:center;padding:0 8px;color:#93c5fd;font-size:22px;flex-shrink:0; }
+        .ud-flow-tag { display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;margin:2px 2px 2px 0; }
+        .ud-why-col { border-radius:10px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.05); }
+        .ud-why-title { font-size:12px;font-weight:800;padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid;display:flex;align-items:center;gap:7px; }
+        .ud-why-item { font-size:11px;padding:3px 0; }
+        .ud-why-item-main { font-weight:700;color:#111827; }
+        .ud-why-item-sub  { color:#6b7280;font-size:10px;padding-left:10px; }
+        .ud-action-row { display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6; }
+        .ud-action-num  { width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;flex-shrink:0;color:#fff; }
+        .ud-action-label { flex:1;font-size:11px;font-weight:600;color:#374151; }
+        .ud-action-tag   { padding:2px 6px;border-radius:4px;font-size:9px;font-weight:800;text-transform:uppercase; }
+        .ud-action-arrow { color:#9ca3af;font-size:12px; }
+        .ud-chart-row  { display:flex;align-items:center;gap:6px;margin-bottom:6px; }
+        .ud-chart-label { font-size:11px;color:#374151;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+        .ud-chart-bars  { flex:1;display:flex;flex-direction:column;gap:2px; }
+        .ud-bar-line    { display:flex;align-items:center;gap:4px; }
+        .ud-bar-src-lbl { width:32px;text-align:right;font-size:9px;color:#6b7280; }
+        .ud-bar-track   { flex:1;height:7px;background:#f3f4f6;border-radius:3px;overflow:hidden; }
+        .ud-bar-fill-blue  { height:100%;background:#3b82f6;border-radius:3px;transition:width .4s; }
+        .ud-bar-fill-green { height:100%;background:#22c55e;border-radius:3px;transition:width .4s; }
+        .ud-bar-val     { font-size:9px;color:#6b7280;min-width:22px;text-align:right; }
+        .ud-chart-xlabel { text-align:center;margin-top:4px;font-size:9px;color:#9ca3af; }
+        .ud-tco-wrap    { display:flex;gap:10px;align-items:flex-end;margin-bottom:8px; }
+        .ud-tco-bar-col { display:flex;flex-direction:column;align-items:center;gap:3px; }
+        .ud-tco-bar     { border-radius:4px 4px 0 0;min-width:34px;display:flex;align-items:flex-start;justify-content:center;padding-top:4px; }
+        .ud-tco-bar-val { font-size:9px;font-weight:700;color:#fff;white-space:nowrap; }
+        .ud-tco-bar-lbl { font-size:9px;color:#6b7280;text-align:center;max-width:70px; }
+        .ud-tco-savings-card { background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px; }
+        .ud-svc-counts  { display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px; }
+        .ud-svc-stat    { display:flex;align-items:center;gap:3px;font-size:11px;font-weight:700; }
+        .ud-seg-bar     { height:8px;border-radius:4px;overflow:hidden;display:flex;background:#f3f4f6;margin-bottom:4px; }
+        .ud-seg-ok  { background:#22c55e; }
+        .ud-seg-rev { background:#f59e0b; }
+        .ud-seg-warn{ background:#fbbf24; }
+        .ud-seg-crit{ background:#ef4444; }
+        /* duplicate CTA removed — canonical rules above */
+
+        /* ── Final template fit overrides: white nav, compact readable dashboard ── */
+        body.uat-dashboard-active #top-theme-dropdown {
+          display: none !important;
+        }
+        #uat-dashboard {
+          width: 100% !important;
+          max-width: 1692px !important;
+          border: 1px solid #cbd5e1 !important;
+          background: #eef3f8 !important;
+          box-shadow: 0 2px 8px rgba(15,23,42,.08) !important;
+          min-height: calc(100vh - 2px) !important;
+          height: calc(100vh - 2px) !important;
+          overflow: hidden !important;
+        }
+        #uat-layout {
+          width: 100% !important;
+          min-height: 0 !important;
+          height: 100% !important;
+          background: #f7faff !important;
+        }
+        #uat-sidebar {
+          width: 232px !important;
+          height: 100% !important;
+          min-height: 0 !important;
+          background: #ffffff !important;
+          border-right: 1px solid #dbe3ef !important;
+        }
+        #uat-sidebar, #uat-sidebar * { color: #24324a !important; }
+        #uat-sidebar .udsb-logo,
+        #uat-sidebar .udsb-av,
+        #uat-sidebar .udsb-ic-done,
+        #uat-sidebar .udsb-ic-active { color: #ffffff !important; }
+        #uat-sidebar .udsb-active {
+          background: #eaf3ff !important;
+          border-left-color: #2563eb !important;
+        }
+        #uat-main {
+          min-width: 0 !important;
+          height: 100% !important;
+          overflow: hidden !important;
+          background: #f7faff !important;
+        }
+        #uat-topbar {
+          padding: 10px 18px !important;
+          background: #ffffff !important;
+          border-bottom: 1px solid #dbe3ef !important;
+        }
+        #uat-content {
+          padding: 8px 18px !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          min-height: 0 !important;
+        }
+        #uat-step5-view {
+          display: block;
+          width: 100%;
+          min-width: 0;
+        }
+        #uat-step5-view .ud-banner {
+          margin-bottom: 6px !important;
+          padding: 10px 16px !important;
+          border-radius: 8px !important;
+          border: 2px solid #ef4444 !important;
+          background: #fff1f2 !important;
+        }
+        #uat-step5-view .ud-card {
+          border-radius: 8px !important;
+          box-shadow: 0 1px 4px rgba(15,23,42,.06) !important;
+          margin-bottom: 6px !important;
+        }
+        #uat-step5-view .ud-card--blue {
+          border: 2px solid #2563eb !important;
+        }
+        #uat-step5-view .ud-kpi-row {
+          display: grid !important;
+          grid-template-columns: 142px minmax(0, 1fr);
+          gap: 12px !important;
+          padding: 9px 16px !important;
+          align-items: center !important;
+        }
+        #uat-step5-view .ud-gauge-wrap {
+          width: 142px;
+        }
+        #uat-step5-view .ud-kpi-grid {
+          display: grid !important;
+          grid-template-columns: repeat(7, minmax(92px, 1fr));
+          gap: 8px !important;
+        }
+        #uat-step5-view .ud-kpi {
+          min-width: 0 !important;
+          padding: 7px 10px !important;
+          border-radius: 8px !important;
+        }
+        #uat-step5-view .ud-kpi-label {
+          white-space: normal !important;
+          line-height: 1.15 !important;
+          font-size: 9px !important;
+        }
+        #uat-step5-view .ud-kpi-val {
+          font-size: 21px !important;
+          margin: 2px 0 1px !important;
+        }
+        #uat-step5-view .ud-kpi-sub {
+          font-size: 10px !important;
+        }
+        #uat-step5-view .ud-flow {
+          padding: 8px 16px !important;
+          gap: 5px !important;
+          overflow-x: auto !important;
+        }
+        #uat-step5-view .ud-flow-node {
+          min-width: 128px !important;
+          height: 82px !important;
+          min-height: 82px !important;
+          padding: 7px 10px !important;
+          border-radius: 8px !important;
+          overflow: hidden !important;
+        }
+        #uat-step5-view .ud-flow-node-title {
+          font-size: 10px !important;
+          margin-bottom: 3px !important;
+        }
+        #uat-step5-view .ud-flow-tag {
+          font-size: 9px !important;
+          padding: 1px 6px !important;
+          margin: 1px 1px 1px 0 !important;
+        }
+        #uat-step5-view .ud-flow-arrow {
+          padding: 0 2px !important;
+          font-size: 18px !important;
+          color: #60a5fa !important;
+        }
+        #uat-step5-view .ud-why-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(240px, 1.2fr) !important;
+          gap: 8px !important;
+          margin-bottom: 6px !important;
+        }
+        #uat-step5-view .ud-why-col {
+          border-radius: 8px !important;
+          padding: 8px 12px !important;
+          min-height: 104px !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        #uat-step5-view .ud-why-title {
+          font-size: 11px !important;
+          padding-bottom: 5px !important;
+          margin-bottom: 5px !important;
+        }
+        #uat-step5-view .ud-why-item {
+          font-size: 10px !important;
+          padding: 1px 0 !important;
+        }
+        #uat-step5-view .ud-why-item-sub {
+          font-size: 9px !important;
+          line-height: 1.2 !important;
+        }
+        #uat-step5-view .ud-chart-card {
+          grid-template-columns: 1.05fr 1.05fr 1.2fr !important;
+          min-height: 156px !important;
+          height: auto !important;
+        }
+        #uat-step5-view .ud-chart-col {
+          padding: 8px 16px !important;
+          min-width: 0 !important;
+          overflow: visible !important;
+        }
+        #uat-step5-view .ud-chart-row {
+          margin-bottom: 3px !important;
+        }
+        #uat-step5-view .ud-chart-label {
+          font-size: 10px !important;
+          min-width: 74px !important;
+        }
+        #uat-step5-view .ud-bar-track {
+          height: 6px !important;
+        }
+        #uat-step5-view .ud-bar-val,
+        #uat-step5-view .ud-tco-bar-val,
+        #uat-step5-view .ud-tco-bar-lbl {
+          font-size: 8px !important;
+        }
+        #uat-step5-view .ud-footer {
+          padding: 6px 0 !important;
+          font-size: 10px !important;
+        }
+        #uat-step5-view .ud-bottom-row {
+          grid-template-columns: minmax(0, 1fr) 490px !important;
+          gap: 12px !important;
+          margin-bottom: 6px !important;
+          min-height: 105px !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        #uat-step5-view .ud-summary-card {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+        #uat-step5-view .ud-sum-col {
+          padding: 8px 16px !important;
+          min-width: 0 !important;
+          overflow: hidden !important;
+        }
+        #uat-step5-view .ud-cta-wrap {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 12px !important;
+          min-width: 490px !important;
+          align-self: stretch !important;
+          padding: 10px !important;
+          border: 2px solid #ef4444 !important;
+          border-radius: 8px !important;
+          background: #ffffff !important;
+        }
+        #uat-step5-view .ud-cta-pass,
+        #uat-step5-view button.ud-cta-pass {
+          background: linear-gradient(180deg, #16a34a, #059669) !important;
+          color: #ffffff !important;
+          border: 0 !important;
+          min-width: 0 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(5,150,105,.16) !important;
+          padding: 12px 12px !important;
+          min-height: 82px !important;
+        }
+        #uat-step5-view .ud-cta-fix,
+        #uat-step5-view button.ud-cta-fix {
+          background: linear-gradient(180deg, #ef1f1f, #dc2626) !important;
+          color: #ffffff !important;
+          border: 0 !important;
+          min-width: 0 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(220,38,38,.16) !important;
+          padding: 12px 12px !important;
+          min-height: 82px !important;
+        }
+        #uat-step5-view .ud-cta-main {
+          font-size: 22px !important;
+          color: #ffffff !important;
+        }
+        #uat-step5-view .ud-cta-sub {
+          color: rgba(255,255,255,.9) !important;
+          font-size: 9px !important;
+        }
+
+        /* Global theme firewall: Flex Skyline makes generic buttons red. UAT owns its palette. */
+        body.flex-skyline-mode #uat-dashboard,
+        body.flex-skyline-mode #uat-layout,
+        body.flex-skyline-mode #uat-main,
+        body.flex-skyline-mode #uat-content {
+          background: #f7faff !important;
+          color: #0f172a !important;
+        }
+        body.flex-skyline-mode #uat-sidebar {
+          background: #ffffff !important;
+          background-color: #ffffff !important;
+          border-right: 1px solid #dbe3ef !important;
+        }
+        body.flex-skyline-mode #uat-sidebar,
+        body.flex-skyline-mode #uat-sidebar * {
+          color: #24324a !important;
+          text-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-item {
+          background: transparent !important;
+          border: 0 !important;
+          border-radius: 8px !important;
+          box-shadow: none !important;
+          color: #24324a !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-item:hover {
+          background: #f8fafc !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-active {
+          background: #eaf3ff !important;
+          border-left: 3px solid #2563eb !important;
+          color: #1e40af !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar button.udsb-item.udsb-active,
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar .udsb-nav button.udsb-item.udsb-active {
+          background: #eaf3ff !important;
+          background-image: none !important;
+          border-top: 0 !important;
+          border-right: 0 !important;
+          border-bottom: 0 !important;
+          border-left: 3px solid #2563eb !important;
+          color: #1e40af !important;
+          border-radius: 0 8px 8px 0 !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar button.udsb-item:not(.udsb-active),
+        body.flex-skyline-mode #uat-dashboard #uat-sidebar .udsb-nav button.udsb-item:not(.udsb-active) {
+          background: transparent !important;
+          background-image: none !important;
+          border: 0 !important;
+          color: #24324a !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-logo,
+        body.flex-skyline-mode #uat-sidebar .udsb-av,
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-done,
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-active {
+          color: #ffffff !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-done {
+          background: #16a34a !important;
+        }
+        body.flex-skyline-mode #uat-sidebar .udsb-ic-active,
+        body.flex-skyline-mode #uat-sidebar .udsb-logo,
+        body.flex-skyline-mode #uat-sidebar .udsb-av {
+          background: #2563eb !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .ud-mode-btn {
+          background: #ffffff !important;
+          border: 0 !important;
+          color: #475569 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .ud-mode-btn--on {
+          background: #2563eb !important;
+          color: #ffffff !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .ud-export-btn {
+          background: #ffffff !important;
+          border: 1px solid #d1d5db !important;
+          color: #0f172a !important;
+          border-radius: 7px !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-topbar button.ud-mode-btn,
+        body.flex-skyline-mode #uat-dashboard #uat-topbar .ud-mode-pill button.ud-mode-btn {
+          background: #ffffff !important;
+          background-image: none !important;
+          border: 0 !important;
+          color: #475569 !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-topbar button.ud-mode-btn.ud-mode-btn--on,
+        body.flex-skyline-mode #uat-dashboard #uat-topbar .ud-mode-pill button.ud-mode-btn.ud-mode-btn--on {
+          background: #2563eb !important;
+          background-image: none !important;
+          color: #ffffff !important;
+        }
+        body.flex-skyline-mode #uat-dashboard #uat-topbar button.ud-export-btn {
+          background: #ffffff !important;
+          background-image: none !important;
+          border: 1px solid #d1d5db !important;
+          color: #0f172a !important;
+          border-radius: 7px !important;
+          box-shadow: none !important;
+        }
+        body.flex-skyline-mode #uat-dashboard button.ud-cta-pass,
+        body.flex-skyline-mode #uat-step5-view button.ud-cta-pass,
+        #uat-dashboard #uat-step5-view button.ud-cta-pass {
+          background: linear-gradient(180deg, #16a34a, #059669) !important;
+          border: 0 !important;
+          border-color: transparent !important;
+          color: #ffffff !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(5,150,105,.16) !important;
+        }
+        body.flex-skyline-mode #uat-dashboard button.ud-cta-fix,
+        body.flex-skyline-mode #uat-step5-view button.ud-cta-fix,
+        #uat-dashboard #uat-step5-view button.ud-cta-fix {
+          background: linear-gradient(180deg, #ef1f1f, #dc2626) !important;
+          border: 0 !important;
+          border-color: transparent !important;
+          color: #ffffff !important;
+          border-radius: 8px !important;
+          box-shadow: 0 8px 16px rgba(220,38,38,.16) !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .uat-btn {
+          background: rgba(37, 99, 235, .16) !important;
+          border: 1px solid rgba(96, 165, 250, .35) !important;
+          border-radius: 6px !important;
+          color: #bfdbfe !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .uat-btn-good {
+          background: rgba(22, 101, 52, .28) !important;
+          border-color: rgba(74, 222, 128, .5) !important;
+          color: #bbf7d0 !important;
+        }
+        body.flex-skyline-mode #uat-dashboard .uat-btn-danger {
+          background: rgba(127, 29, 29, .22) !important;
+          border-color: rgba(248, 113, 113, .45) !important;
+          color: #fecaca !important;
+        }
+        @media(max-width:1200px){
+          #uat-step5-view .ud-kpi-grid { grid-template-columns: repeat(4, minmax(96px, 1fr)) !important; }
+          #uat-step5-view .ud-chart-card { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-chart-col--border { border-right: 0 !important; border-bottom: 1px solid #dbeafe !important; }
+          #uat-step5-view .ud-bottom-row { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-cta-wrap { min-width: 0 !important; }
+        }
+        @media(max-width:760px){
+          #uat-step5-view .ud-kpi-row { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          #uat-step5-view .ud-why-grid { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-summary-card { grid-template-columns: 1fr !important; }
+          #uat-step5-view .ud-cta-wrap { grid-template-columns: 1fr !important; }
+        }
+
+        #uatPage { display:none !important; }
+
+        /* ── Performance section — white background ── */
+        #perf-section { background: #ffffff !important; border-color: #e2e8f0 !important; }
+        #perf-section .uat-panel-header { background: #f8fafc !important; border-bottom-color: #e2e8f0 !important; }
+        #perf-section .uat-panel-header h3,
+        #perf-section .uat-panel-header h3 *,
+        #perf-section .uat-panel-header span { color: #1e3a6e !important; }
+        #perf-section .uat-table { background: #ffffff; }
+        #perf-section .uat-table th { background: #f1f5f9 !important; color: #334155 !important; border-bottom-color: #e2e8f0 !important; }
+        #perf-section .uat-table td { color: #1e293b !important; border-bottom-color: #f1f5f9 !important; }
+        #perf-section .uat-table tr:hover td { background: #f8fafc !important; }
+        #perf-section .uat-input, #perf-section .uat-select { background: #ffffff !important; border-color: #cbd5e1 !important; color: #1e293b !important; }
+        #perf-section .uat-stat { background: #f0f4ff !important; border-color: #c7d7f9 !important; }
+        #perf-section .uat-stat-label { color: #3b5bdb !important; }
+        #perf-section .uat-stat-value { color: #1e3a6e !important; }
+        #perf-section .uat-panel-body label,
+        #perf-section .uat-panel-body span:not([style*="color"]) { color: #475569 !important; }
+        #perf-section #perf-run-status { background: transparent !important; }
+
+        /* ── Structural white text: headers, labels, stats, description text ── */
+        .uat-panel-header h3,
+        .uat-panel-header h3 *,
+        .uat-panel-header > span,
+        .uat-panel-header > div > span { color: #ffffff !important; }
+        .uat-panel-body > p,
+        .uat-panel-body > div > p { color: #bfdbfe !important; }
+        .uat-panel-body label { color: #bfdbfe !important; }
+        .uat-panel-body .uat-note { color: #93c5fd !important; }
+        .uat-stat { background: rgba(20,50,110,0.5) !important; border-color: rgba(147,197,253,0.25) !important; }
+        .uat-stat-label { color: #bfdbfe !important; }
+        .uat-stat-value { color: #ffffff !important; }
+        /* table structure (headers always white on dark) */
+        .uat-table th { color: #ffffff !important; background: rgba(20,50,110,0.55) !important; }
+        /* inputs/selects: white background, black text */
+        .uat-input, .uat-select, .uat-textarea {
+          color: #1e293b !important;
+          background: #ffffff !important;
+          border-color: #94a3b8 !important;
+        }
+        .uat-input::placeholder { color: #94a3b8 !important; }
+        /* table data cells: white on dark panel (default for all uat tables) */
+        .uat-table td { color: #e2e8f0 !important; }
+        /* comparison form labels need to be visible (blue tint on dark bg) */
+        #svc-analysis * { color: inherit !important; }
+        /* svc-next-step panel has dark bg — keep light text */
+        #svc-next-step { background: rgba(15,23,42,0.7) !important; }
+        #svc-next-step * { color: #e2e8f0 !important; }
+        /* gov-section cards inside UAT panels */
+        .uat-panel .gov-section h3 { color: #ffffff !important; border-color: rgba(147,197,253,0.5) !important; }
+        .uat-panel .gov-section p  { color: #e2e8f0 !important; }
+
+        /* ── UAT light-theme: high-specificity overrides for Steps 1-4 ─────── */
+        /* Must come after the dark defaults above to win via specificity (#uat-content ID) */
+        #uat-content .uat-panel-header > span,
+        #uat-content .uat-panel-header > div > span { color: #64748b !important; }
+        #uat-content .uat-panel-body label { color: #334155 !important; }
+        #uat-content .uat-panel-body > p,
+        #uat-content .uat-panel-body > div > p { color: #334155 !important; }
+        #uat-content .uat-table th { color: #334155 !important; background: #f1f5f9 !important; border-bottom-color: #e2e8f0 !important; }
+        #uat-content .uat-table td { color: #1e293b !important; }
+        #uat-content .uat-table tr:hover td { background: #f8fafc !important; }
+        #uat-content #svc-next-step { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; }
+        #uat-content #svc-next-step * { color: #334155 !important; }
+        #uat-content .uat-panel .gov-section h3 { color: #1e3a6e !important; border-color: #dbe4f0 !important; }
+        #uat-content .uat-panel .gov-section p  { color: #475569 !important; }
+        #uat-content .uat-stat { background: #f0f4ff !important; border-color: #bfdbfe !important; }
+        #uat-content .uat-stat-label { color: #3b5bdb !important; }
+        #uat-content .uat-stat-value { color: #1e3a6e !important; }
+        /* performance section (white background) */
+        #perf-section { background: #ffffff !important; border-color: #e2e8f0 !important; }
+        #perf-section .uat-panel-header { background: #f8fafc !important; border-bottom-color: #e2e8f0 !important; }
+        #perf-section .uat-panel-header h3,
+        #perf-section .uat-panel-header span { color: #1e3a6e !important; }
+        #perf-section .uat-table th { background: #f1f5f9 !important; color: #334155 !important; border-bottom-color: #e2e8f0 !important; }
+        #perf-section .uat-table td { color: #1e293b !important; }
+        #perf-section .uat-stat { background: #f0f4ff !important; border-color: #c7d7f9 !important; }
+        #perf-section .uat-stat-label { color: #3b5bdb !important; }
+        #perf-section .uat-stat-value { color: #1e3a6e !important; }
+        #perf-section label { color: #475569 !important; }
+        /* ── UAT Simple Page ─────────────────────────── */
+        .uat-page { display:flex; flex-direction:column; gap:18px; max-width:1100px; }
+        .uat-section { background:rgba(30,64,130,.55); border:1px solid rgba(147,197,253,.25); border-radius:12px; overflow:hidden; }
+        .uat-sec-hdr { display:flex; align-items:center; gap:10px; padding:11px 18px;
+          background:rgba(20,50,110,.6); border-bottom:1px solid rgba(147,197,253,.25); }
+        .uat-sec-hdr span { font-size:0.82rem; font-weight:700; color:#ffffff; text-transform:uppercase; letter-spacing:.07em; }
+        .uat-sec-body { padding:16px 18px; }
+        /* editable cells */
+        .uat-ed { background:rgba(255,255,255,.08); border:1px solid rgba(147,197,253,.25); border-radius:5px;
+          padding:5px 9px; color:#ffffff; font-size:0.82rem; min-width:60px; outline:none;
+          transition:border-color .15s; }
+        .uat-ed:focus { border-color:rgba(147,197,253,.6); background:rgba(255,255,255,.12); }
+        .uat-ed[data-ph]:empty::before { content:attr(data-ph); color:#4a5a7a; pointer-events:none; }
+        /* tables */
+        .uat-tbl { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        .uat-tbl th { padding:7px 12px; text-align:left; color:#7a9acc; font-size:0.69rem; font-weight:700;
+          text-transform:uppercase; background:#e0f2fe; border-bottom:2px solid rgba(79,126,248,.18); white-space:nowrap; }
+        .uat-tbl td { padding:6px 12px; border-bottom:1px solid rgba(79,126,248,.07); vertical-align:middle; }
+        .uat-tbl tr:last-child td { border-bottom:none; }
+        .uat-tbl tr:hover td { background:rgba(255,255,255,.02); }
+        /* select */
+        .uat-sel { background:rgba(6,14,48,.9); border:1px solid rgba(79,126,248,.25); border-radius:5px;
+          color:#e2e8f0; font-size:0.78rem; padding:4px 8px; cursor:pointer; }
+        .uat-sel:focus { outline:none; border-color:#60a5fa; }
+        /* status badge */
+        .uat-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.7rem; font-weight:700; }
+        /* checklist */
+        .uat-check-row { display:grid; grid-template-columns:28px minmax(180px,.7fr) minmax(220px,1fr) minmax(280px,1.2fr); align-items:start; gap:10px;
+          padding:8px 4px; border-bottom:1px solid rgba(79,126,248,.07); }
+        .uat-check-row:last-child { border-bottom:none; }
+        .uat-chk { width:18px; height:18px; accent-color:#22c55e; cursor:pointer; }
+        .uat-check-label { font-size:0.82rem; color:#c8d9ff; }
+        .uat-check-note { font-size:0.75rem; }
+        /* decision row */
+        .uat-decision-row { display:flex; gap:12px; flex-wrap:wrap; align-items:stretch; margin-top:4px; }
+        .uat-dec-card { flex:1; min-width:160px; border-radius:10px; border:2px solid; padding:14px 16px;
+          cursor:pointer; transition:all .15s; user-select:none; }
+        .uat-dec-card:hover { filter:brightness(1.12); }
+        .uat-dec-card.selected { filter:brightness(1.2); box-shadow:0 0 0 3px rgba(255,255,255,.15); }
+        /* export btn */
+        .uat-export-btn { background:rgba(37,99,235,.18); border:1px solid rgba(59,130,246,.4); color:#93c5fd;
+          border-radius:7px; padding:6px 16px; font-size:0.77rem; font-weight:700; cursor:pointer;
+          transition:background .15s; margin-left:auto; }
+        .uat-export-btn:hover { background:rgba(37,99,235,.3); }
+        /* issue add btn */
+        .uat-add-btn { background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.35); color:#a5b4fc;
+          border-radius:6px; padding:5px 13px; font-size:0.75rem; font-weight:700; cursor:pointer; }
+        .uat-add-btn:hover { background:rgba(99,102,241,.25); }
+        .uat-cmd-box { width:100%; min-height:48px; resize:vertical; background:rgba(2,6,23,.88); border:1px solid rgba(96,165,250,.22); border-radius:6px; color:#93c5fd; font-family:'JetBrains Mono',monospace; font-size:0.72rem; padding:7px 9px; box-sizing:border-box; }
+        .uat-mini-input { width:100%; box-sizing:border-box; background:rgba(255,255,255,.04); border:1px solid rgba(79,126,248,.15); border-radius:5px; color:#e2e8f0; font-size:0.78rem; padding:6px 8px; }
+        /* severity badges */
+        .sev-critical { background:rgba(239,68,68,.2); border:1px solid rgba(239,68,68,.4); color:#fca5a5; }
+        .sev-high     { background:rgba(249,115,22,.2); border:1px solid rgba(249,115,22,.4); color:#fdba74; }
+        .sev-medium   { background:rgba(234,179,8,.2);  border:1px solid rgba(234,179,8,.4);  color:#fde047; }
+        .sev-low      { background:rgba(34,197,94,.2);  border:1px solid rgba(34,197,94,.4);  color:#86efac; }
+      </style>
+
+      <div class="uat-page" id="uatPage">
+
+        <!-- PAGE HEADER -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2 style="margin:0 0 3px;font-size:1.1rem;color:#c8d9ff;">🛡️ UAT Sign-off — OSPC → FLEX</h2>
+            <p style="margin:0;color:#6b8aad;font-size:0.76rem;">Purpose: Validate the migrated system on FLEX before cutover &nbsp;·&nbsp; All fields are editable</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="uat-export-btn" onclick="generateUATInputBundle()">📦 Generate / inject UAT bundle</button>
+            <button class="uat-export-btn" onclick="uatExport()">⬇ Export UAT report</button>
+          </div>
+        </div>
+
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>0 · Migration Evidence Injection</span>
+          </div>
+          <div class="uat-sec-body">
+            <p style="margin:0 0 10px;color:#6b8aad;font-size:0.76rem;">UAT reuses the Migration Output Bundle as the source of truth. This generates a `uat-input/` view containing the evidence map, readiness checklist, and test plan needed before cutover.</p>
+            <div id="uat-bundle-status" style="padding:11px 13px;background:#e0f2fe;border:1px solid rgba(14,165,233,0.25);border-radius:8px;color:#0369a1;font-size:0.78rem;">No UAT input bundle generated in this browser session.</div>
+          </div>
+        </div>
+
+        <!-- ── BLOCK 1: UAT SUMMARY ─────────────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>1 · UAT Summary</span>
+          </div>
+          <div class="uat-sec-body" style="display:flex;flex-direction:column;gap:14px;">
+
+            <!-- Customer info row -->
+            <div>
+              <p style="margin:0 0 8px;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Customer info</p>
+              <table class="uat-tbl">
+                <thead><tr><th>Customer Name</th><th>Industry</th><th>Contact (name / email / phone)</th></tr></thead>
+                <tbody><tr>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="customer name" id="uat_cust_name"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="industry" id="uat_cust_industry"></span></td>
+                  <td><span class="uat-ed" contenteditable="true" data-ph="name / email / phone" id="uat_cust_contact" style="min-width:220px;"></span></td>
+                </tr></tbody>
+              </table>
+            </div>
+
+            <!-- Business context -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+                <p style="margin:0;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Business context</p>
+                <button class="uat-add-btn" onclick="uatAddBusinessApp()">＋ Add Business App / DB</button>
+              </div>
+              <table class="uat-tbl" id="uatBusinessTable">
+                <thead><tr><th>Type</th><th>Business System / App / DB</th><th>Role / What it does</th><th>Dependencies</th><th>Input source</th><th>Outputs to</th><th></th></tr></thead>
+                <tbody id="uatBusinessTbody"></tbody>
+              </table>
+            </div>
+
+            <!-- Status table -->
+            <div>
+              <p style="margin:0 0 8px;font-size:0.73rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Migration / UAT status</p>
+              <table class="uat-tbl" style="max-width:580px;">
+                <tbody>
+                  <tr><td style="color:#8ba3cc;width:200px;">Source Environment</td><td><span class="uat-badge" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.4);color:#fb923c;">OSPC</span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Target Environment</td><td><span class="uat-badge" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#86efac;">FLEX</span></td></tr>
+                  <tr><td style="color:#8ba3cc;">UAT Status</td><td>
+                    <select class="uat-sel" id="uat_status" onchange="uatSave()">
+                      <option>Not Started</option><option>In Progress</option>
+                      <option>Passed</option><option>Failed</option><option>Blocked</option>
+                    </select>
+                  </td></tr>
+                  <tr><td style="color:#8ba3cc;">UAT Owner</td><td><span class="uat-ed" contenteditable="true" data-ph="owner name" id="uat_owner"></span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Planned UAT Date</td><td><span class="uat-ed" contenteditable="true" data-ph="YYYY-MM-DD" id="uat_date"></span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Cutover Readiness</td><td>
+                    <select class="uat-sel" id="uat_readiness" onchange="uatSave()">
+                      <option>Not Ready</option><option>At Risk</option><option>Ready</option>
+                    </select>
+                  </td></tr>
+                  <tr><td style="color:#8ba3cc;">Overall Progress</td><td><span class="uat-ed" contenteditable="true" data-ph="0%" id="uat_progress"></span></td></tr>
+                  <tr><td style="color:#8ba3cc;">Critical Issues</td><td><span class="uat-ed" contenteditable="true" data-ph="0" id="uat_critical_count"></span></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── BLOCK 2: TEST CHECKLIST ──────────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>2 · Test Checklist</span>
+            <span style="font-size:0.7rem;color:#4a5a7a;font-weight:400;text-transform:none;letter-spacing:0;">Scope: core flows, data, integrations, access, outputs</span>
+          </div>
+          <div class="uat-sec-body">
+            <div id="uatChecklist">
+              <!-- rows injected by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BLOCK 3: ISSUES ──────────────────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>3 · Issues</span>
+            <button class="uat-add-btn" onclick="uatAddIssue()" style="margin-left:auto;">＋ Add issue</button>
+          </div>
+          <div class="uat-sec-body" style="padding:0;">
+            <table class="uat-tbl" id="uatIssueTable">
+              <thead><tr><th>#</th><th>Issue description</th><th>Severity</th><th>Owner</th><th>Status</th><th style="width:32px;"></th></tr></thead>
+              <tbody id="uatIssueTbody">
+                <!-- rows injected by JS -->
+              </tbody>
+            </table>
+            <div id="uatNoIssues" style="text-align:center;padding:18px;color:#4a5a7a;font-size:0.78rem;">No issues logged — click ＋ Add issue to log one</div>
+          </div>
+        </div>
+
+        <!-- ── BLOCK 4: GO / NO-GO DECISION ────────────────────────────── -->
+        <div class="uat-section">
+          <div class="uat-sec-hdr">
+            <span>4 · Go / No-Go Decision</span>
+          </div>
+          <div class="uat-sec-body" style="display:flex;flex-direction:column;gap:16px;">
+
+            <div class="uat-decision-row" id="uatDecisionCards">
+              <div class="uat-dec-card" id="dec-go" data-dec="Go"
+                style="background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.35);"
+                onclick="uatPickDecision('Go')">
+                <div style="font-size:1.4rem;">✅</div>
+                <div style="font-weight:700;color:#86efac;margin-top:6px;">Go</div>
+                <div style="font-size:0.73rem;color:#6b8aad;margin-top:4px;">All tests passed — ready for cutover</div>
+              </div>
+              <div class="uat-dec-card" id="dec-nogo" data-dec="No-Go"
+                style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3);"
+                onclick="uatPickDecision('No-Go')">
+                <div style="font-size:1.4rem;">🚫</div>
+                <div style="font-weight:700;color:#fca5a5;margin-top:6px;">No-Go</div>
+                <div style="font-size:0.73rem;color:#6b8aad;margin-top:4px;">Critical issues remain — do not cut over</div>
+              </div>
+              <div class="uat-dec-card" id="dec-conditional" data-dec="Conditional Go"
+                style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);"
+                onclick="uatPickDecision('Conditional Go')">
+                <div style="font-size:1.4rem;">⚠️</div>
+                <div style="font-weight:700;color:#fde047;margin-top:6px;">Conditional Go</div>
+                <div style="font-size:0.73rem;color:#6b8aad;margin-top:4px;">Minor issues — proceed with mitigation plan</div>
+              </div>
+            </div>
+
+            <!-- Sign-off row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding-top:4px;">
+              <div>
+                <p style="margin:0 0 5px;font-size:0.71rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Sign-off name</p>
+                <span class="uat-ed" contenteditable="true" data-ph="full name" id="uat_signoff_name" style="display:block;"></span>
+              </div>
+              <div>
+                <p style="margin:0 0 5px;font-size:0.71rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Sign-off date</p>
+                <span class="uat-ed" contenteditable="true" data-ph="YYYY-MM-DD" id="uat_signoff_date" style="display:block;"></span>
+              </div>
+              <div>
+                <p style="margin:0 0 5px;font-size:0.71rem;color:#6b8aad;text-transform:uppercase;letter-spacing:.06em;">Notes</p>
+                <span class="uat-ed" contenteditable="true" data-ph="any final notes..." id="uat_signoff_notes" style="display:block;"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /uat-page -->
+
+      <script>
+      // ── UAT page data ────────────────────────────────────────────────────
+      const UAT_CHECKS = [
+        {id:'ck_login',   label:'Login works', note:'All user roles can authenticate on FLEX', cmd:'curl -k -I https://<app_url>/login\n# Or open the app and test each UAT user role manually.'},
+        {id:'ck_flows',   label:'Main business flows work', note:'Core transactions / workflows complete end-to-end', cmd:'# Run the customer critical path:\n# 1. create/read/update a test record\n# 2. submit one transaction\n# 3. confirm the expected success page/log entry'},
+        {id:'ck_data',    label:'Data looks correct', note:'Records, counts, and spot-checks match OSPC', cmd:'mysql -h <flex_db_ip> -e "SELECT COUNT(*) FROM <table>;"\npsql -h <flex_db_ip> -c "SELECT COUNT(*) FROM <table>;"\n# Compare against OSPC source counts.'},
+        {id:'ck_api',     label:'APIs / integrations work', note:'All external API calls and webhooks respond correctly', cmd:'curl -k -sS https://<app_url>/health\ncurl -k -sS https://<app_url>/api/status\n# Check upstream/downstream webhook logs.'},
+        {id:'ck_reports', label:'Reports / emails / outputs work', note:'Scheduled jobs, email notifications, report exports run', cmd:`ssh <user>@<flex_app_ip> "systemctl list-timers --all | head"
+ssh <user>@<flex_app_ip> "tail -100 /var/log/syslog | grep -Ei 'cron|mail|report'"`},
+        {id:'ck_perms',   label:'Permissions / roles work', note:'Users have correct access — no over- or under-privilege', cmd:'# Test admin, operator, readonly, and customer users.\n# Confirm each role can access only the expected screens/actions.'},
+      ];
+
+      const UAT_EDITABLE_IDS = [
+        'uat_cust_name','uat_cust_industry','uat_cust_contact',
+        'uat_owner','uat_date','uat_progress','uat_critical_count',
+        'uat_signoff_name','uat_signoff_date','uat_signoff_notes',
+      ];
+
+      let uatIssues = [];
+      let uatBusinessApps = [];
+      let uatDecision = '';
+      const uatEsc = v => String(v || '').replace(/[&<>"']/g, ch => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      }[ch]));
+
+      function uatSave() {
+        const data = {};
+        UAT_EDITABLE_IDS.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) data[id] = el.innerText;
+        });
+        ['uat_status','uat_readiness'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) data[id] = el.value;
+        });
+        UAT_CHECKS.forEach(c => {
+          const el = document.getElementById(c.id);
+          if (el) data[c.id] = el.checked;
+          const noteEl = document.getElementById(c.id + '_note');
+          if (noteEl) data[c.id + '_note'] = noteEl.innerText;
+          const cmdEl = document.getElementById(c.id + '_cmd');
+          if (cmdEl) data[c.id + '_cmd'] = cmdEl.value;
+        });
+        data._businessApps = uatBusinessApps;
+        data._issues = uatIssues;
+        data._decision = uatDecision;
+        localStorage.setItem('uatData', JSON.stringify(data));
+      }
+
+      function uatLoad() {
+        const raw = localStorage.getItem('uatData');
+        if (!raw) return;
+        try {
+          const data = JSON.parse(raw);
+          UAT_EDITABLE_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && data[id] !== undefined) el.innerText = data[id];
+          });
+          ['uat_status','uat_readiness'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && data[id]) el.value = data[id];
+          });
+          UAT_CHECKS.forEach(c => {
+            const el = document.getElementById(c.id);
+            if (el && data[c.id] !== undefined) el.checked = data[c.id];
+            const noteEl = document.getElementById(c.id + '_note');
+            if (noteEl && data[c.id + '_note'] !== undefined) noteEl.innerText = data[c.id + '_note'];
+            const cmdEl = document.getElementById(c.id + '_cmd');
+            if (cmdEl && data[c.id + '_cmd'] !== undefined) cmdEl.value = data[c.id + '_cmd'];
+          });
+          if (data._businessApps) { uatBusinessApps = data._businessApps; renderBusinessApps(); }
+          if (data._issues) { uatIssues = data._issues; renderIssues(); }
+          if (data._decision) uatPickDecision(data._decision, true);
+        } catch(e) {}
+      }
+
+      function buildChecklist() {
+        const el = document.getElementById('uatChecklist');
+        el.innerHTML = '';
+        UAT_CHECKS.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'uat-check-row';
+          row.innerHTML = `
+            <input type="checkbox" class="uat-chk" id="${c.id}" onchange="uatSave()">
+            <label for="${c.id}" class="uat-check-label">${c.label}</label>
+            <span class="uat-ed uat-check-note" contenteditable="true"
+              data-ph="${c.note}" id="${c.id}_note"></span>
+            <textarea class="uat-cmd-box" id="${c.id}_cmd" oninput="uatSave()">${c.cmd}</textarea>`;
+          el.appendChild(row);
+        });
+      }
+
+      function uatAddBusinessApp() {
+        uatBusinessApps.push({type:'App', name:'', role:'', deps:'', input:'', output:''});
+        renderBusinessApps();
+        uatSave();
+      }
+
+      function renderBusinessApps() {
+        const tbody = document.getElementById('uatBusinessTbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (uatBusinessApps.length === 0) {
+          uatBusinessApps.push({type:'App', name:'', role:'', deps:'', input:'', output:''});
+        }
+        uatBusinessApps.forEach((app, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><select class="uat-sel" onchange="uatBusinessApps[${i}].type=this.value;uatSave()">
+              ${['App','DB','API','Batch','Queue','Shared Files'].map(t => `<option${app.type===t?' selected':''}>${t}</option>`).join('')}
+            </select></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.name)}" placeholder="app / db name" oninput="uatBusinessApps[${i}].name=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.role)}" placeholder="what this system does" oninput="uatBusinessApps[${i}].role=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.deps)}" placeholder="DB / API / LDAP / DNS" oninput="uatBusinessApps[${i}].deps=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.input)}" placeholder="users / API / upstream app" oninput="uatBusinessApps[${i}].input=this.value;uatSave()"></td>
+            <td><input class="uat-mini-input" value="${uatEsc(app.output)}" placeholder="billing / CRM / reports" oninput="uatBusinessApps[${i}].output=this.value;uatSave()"></td>
+            <td><button class="uat-add-btn" onclick="uatBusinessApps.splice(${i},1);renderBusinessApps();uatSave();">Remove</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function uatAddIssue() {
+        const n = uatIssues.length + 1;
+        uatIssues.push({n, desc:'', sev:'Medium', owner:'', status:'Open'});
+        renderIssues();
+      }
+
+      function renderIssues() {
+        const tbody = document.getElementById('uatIssueTbody');
+        const noEl  = document.getElementById('uatNoIssues');
+        tbody.innerHTML = '';
+        if (uatIssues.length === 0) { noEl.style.display='block'; return; }
+        noEl.style.display = 'none';
+        uatIssues.forEach((iss, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="color:#6b8aad;font-size:0.73rem;">${iss.n}</td>
+            <td><span class="uat-ed" contenteditable="true" data-ph="describe the issue"
+              oninput="uatIssues[${i}].desc=this.innerText;uatSave()"
+              style="min-width:220px;display:block;">${iss.desc}</span></td>
+            <td>
+              <select class="uat-sel" onchange="uatIssues[${i}].sev=this.value;uatSave()">
+                ${['Critical','High','Medium','Low'].map(s =>
+                  `<option${iss.sev===s?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td><span class="uat-ed" contenteditable="true" data-ph="owner"
+              oninput="uatIssues[${i}].owner=this.innerText;uatSave()"
+              style="display:block;">${iss.owner}</span></td>
+            <td>
+              <select class="uat-sel" onchange="uatIssues[${i}].status=this.value;uatSave()">
+                ${['Open','In Progress','Resolved','Closed'].map(s =>
+                  `<option${iss.status===s?' selected':''}>${s}</option>`).join('')}
+              </select>
+            </td>
+            <td style="text-align:center;">
+              <button onclick="uatIssues.splice(${i},1);uatIssues.forEach((x,j)=>x.n=j+1);renderIssues();uatSave();"
+                style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.85rem;" title="Remove">✕</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function uatPickDecision(dec, skipSave) {
+        uatDecision = dec;
+        document.querySelectorAll('.uat-dec-card').forEach(c => c.classList.remove('selected'));
+        const map = {'Go':'dec-go','No-Go':'dec-nogo','Conditional Go':'dec-conditional'};
+        const el = document.getElementById(map[dec]);
+        if (el) el.classList.add('selected');
+        if (!skipSave) uatSave();
+      }
+
+      function uatExport() {
+        const lines = ['UAT REPORT — OSPC → FLEX', '='.repeat(50), ''];
+        const g = id => (document.getElementById(id)||{}).innerText || '';
+        const gs = id => (document.getElementById(id)||{}).value || '';
+        lines.push('CUSTOMER');
+        lines.push('  Name: ' + g('uat_cust_name'));
+        lines.push('  Industry: ' + g('uat_cust_industry'));
+        lines.push('  Contact: ' + g('uat_cust_contact'));
+        lines.push('');
+        lines.push('BUSINESS APPS / DATABASES');
+        if (!uatBusinessApps.length) {
+          lines.push('  None entered');
+        }
+        uatBusinessApps.forEach((app, idx) => {
+          lines.push(`  ${idx + 1}. [${app.type || 'App'}] ${app.name || 'unnamed'}`);
+          lines.push(`     Role: ${app.role || ''}`);
+          lines.push(`     Dependencies: ${app.deps || ''}`);
+          lines.push(`     Inputs: ${app.input || ''}`);
+          lines.push(`     Outputs: ${app.output || ''}`);
+        });
+        lines.push('');
+        lines.push('STATUS');
+        lines.push('  UAT Status: ' + gs('uat_status'));
+        lines.push('  Owner: ' + g('uat_owner'));
+        lines.push('  Date: ' + g('uat_date'));
+        lines.push('  Readiness: ' + gs('uat_readiness'));
+        lines.push('  Progress: ' + g('uat_progress'));
+        lines.push('  Critical issues: ' + g('uat_critical_count'));
+        lines.push('');
+        lines.push('TEST CHECKLIST');
+        UAT_CHECKS.forEach(c => {
+          const chk = (document.getElementById(c.id)||{}).checked;
+          const cmd = (document.getElementById(c.id + '_cmd')||{}).value || '';
+          lines.push('  [' + (chk ? 'X' : ' ') + '] ' + c.label);
+          if (cmd.trim()) lines.push('      Command / instruction: ' + cmd.replace(/\n/g, '\n      '));
+        });
+        lines.push('');
+        lines.push('ISSUES (' + uatIssues.length + ')');
+        uatIssues.forEach(iss => {
+          lines.push(`  #${iss.n} [${iss.sev}] ${iss.desc} — Owner: ${iss.owner} — ${iss.status}`);
+        });
+        lines.push('');
+        lines.push('DECISION: ' + (uatDecision || 'Pending'));
+        lines.push('Sign-off: ' + g('uat_signoff_name') + '  Date: ' + g('uat_signoff_date'));
+        lines.push('Notes: ' + g('uat_signoff_notes'));
+        const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'UAT-report.txt';
+        a.click();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        buildChecklist();
+        renderBusinessApps();
+        renderIssues();
+        uatLoad();
+        // auto-save on every contenteditable change inside uat page
+        document.getElementById('uatPage').addEventListener('input', () => uatSave());
+      });
+      </script>
+      <script src="/static/uat/uat.js?v={{ v }}"></script>
+
+      <!-- keep stub so old JS refs don't throw -->
+      <div id="uat-terminal-box" style="display:none;"></div>
+      <div id="uat-log-output" style="display:none;"></div>
+      <span id="uat-status-indicator" style="display:none;"></span>
+      <div id="rbac-terminal-box" style="display:none;"></div>
+      <div id="rbac-log-output" style="display:none;"></div>
+      <span id="rbac-status-indicator" style="display:none;"></span>
+      <div id="s3-report-panel" style="display:none;"></div>
+      <div id="uat-app-blocks" style="display:none;"></div>
+
+
+        <!-- old automated engine removed -->
+        <form id="uat-runner-form" novalidate onsubmit="return false;" style="display:none;">
+            <!-- 1. CLOUD CREDENTIALS -->
+            <div style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:32px; background:#e0f2fe; border-radius:4px; padding:20px; border-left:4px solid #f39c12;">
+                <!-- OSPC -->
+                <div>
+                    <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">OSPC Cloud Credentials</h3>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Username
+                            <input id="uat_ospc_username" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">API Key / Password
+                            <input id="uat_ospc_apikey" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Account / Project ID
+                            <input id="uat_ospc_accountid" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- FLEX -->
+                <div>
+                    <h3 style="margin:0 0 14px;font-size:1rem;color:#a5b4fc;border-bottom:1px solid rgba(165,180,252,.2);padding-bottom:8px;">FLEX Cloud Credentials <span style="font-size:.75rem;color:#64748b;">(Keystone v3)</span></h3>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Auth URL
+                            <input id="uat_flex_os_auth_url" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Username
+                            <input id="uat_flex_os_username" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Password
+                            <input id="uat_flex_os_password" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Project ID
+                            <input id="uat_flex_os_project_id" type="text" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:#aaa;">Domain
+                            <input id="uat_flex_os_user_domain_id" type="text" value="default" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:9px 12px;color:#e2e8f0;font-size:.9rem;" />
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1A-IMPORT. REHOST MIGRATION RESULTS (auto-imported from Stage 2 report) -->
+            <div id="s3-report-panel" style="display:none; margin-bottom:20px; padding:15px; background:rgba(16,185,129,0.06); border-left:4px solid #10b981; border-radius:4px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <h3 style="margin:0; color:#4ade80; font-size:14px;">📊 Rehost Migration Results</h3>
+                        <p style="font-size:11px; color:#aaa; margin-top:4px;">Imported from Stage 2 parallel execution report · <span id="s3-report-ts" style="color:#64748b;"></span></p>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="s3LoadReport()" style="background:transparent; border:1px solid #4ade80; color:#4ade80; border-radius:5px; padding:5px 12px; cursor:pointer; font-size:12px;">🔄 Reload</button>
+                        <button onclick="s3DownloadReport()" id="s3-dl-btn" style="display:none; background:#10b981; color:#fff; border:none; border-radius:5px; padding:5px 12px; cursor:pointer; font-size:12px;">⬇ Download .csv</button>
+                    </div>
+                </div>
+                <div style="overflow-x:auto; max-height:280px; overflow-y:auto;">
+                    <table id="s3-report-table" style="width:100%; border-collapse:collapse; font-size:12px; font-family:monospace;">
+                        <thead id="s3-report-thead" style="background:rgba(0,0,0,0.5); position:sticky; top:0;"></thead>
+                        <tbody id="s3-report-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 1B. CROSS-CLOUD IDENTITY PARITY -->
+            <div style="margin-bottom:20px; padding:15px; background:#e0f2fe; border-left:4px solid #9b59b6; border-radius:4px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h3 style="margin-top:0; color:#fb7185; font-size:14px;">1B. User Profile &amp; Target Permissions Matching (RBAC validation)</h3>
+                        <p style="font-size:11px; color:#aaa; margin-bottom:10px;">Compare your assigned roles and permissions in OSPC against the new FLEX tenant to ensure no operational access was lost.</p>
+
+                        <div style="margin: 15px 0; background:rgba(0,0,0,0.3); border:1px solid #7c3aed; border-radius:6px; overflow:hidden;">
+                            <table style="width:100%; border-collapse:collapse; font-size:11px; color:#ddd; text-align:left;">
+                                <thead>
+                                    <tr style="background:#3b0764; border-bottom:1px solid #7c3aed;">
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">Identity / RBAC area</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">OSPC / legacy words</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">FLEX words people use now</th>
+                                        <th style="padding:8px 10px; font-weight:bold; color:#fb7185;">What it really means</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Top business boundary</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Account + Domain</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX still sits under a Rackspace account, but OpenStack identity structure adds the domain concept.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Main resource ownership</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Tenant</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Project</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">In practice, old "tenant" thinking maps to FLEX project thinking. FLEX UI/docs explicitly surface project and domain.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Person who logs in</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">User / cloud user</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">User</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Same basic concept, but FLEX user access is more formally tied to project/domain permissions.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Team of users</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">List of users</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Group</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX / Keystone makes groups a clearer identity object for assigning access by team instead of one-by-one.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">What someone is allowed to do</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Permissions</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Permissions</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Same word exists, but FLEX docs emphasize explicit role/permission setup for users.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Named privilege bundle</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">"admin" / "read-only"</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Role</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX uses more formal role-based language under Keystone/OpenStack.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Access model</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Simpler account access model</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">RBAC on user/group/role</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX is more structured and closer to upstream OpenStack identity concepts.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth secret for humans</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">User+Pass / API creds</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Username + API key</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX explicitly calls out username, API key, project, and domain.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth secret for scripts/apps</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Reused user creds</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Application Credential</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX supports standalone execution credentials instead of reusing human login secrets.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Single sign-on</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">SSO</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Federation</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX/Rackspace supports identity federation to sign in with corporate credentials.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Admin manager</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account owner</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Account Administrator</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">Account Admins manage users and platform permissions at the project level.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3); background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Login Context</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Account/region/tenant</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Project + Domain + Region</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX login and CLI context explicitly require both project and domain variables.</td>
+                                    </tr>
+                                    <tr style="border-bottom:1px solid rgba(124,58,237,0.3);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Session proof</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Auth</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">Token</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX uses strictly token-based access headers behind the scenes via Keystone.</td>
+                                    </tr>
+                                    <tr style="background:rgba(255,255,255,0.02);">
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">Server login shell</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3);">SSH key</td>
+                                        <td style="padding:8px 10px; border-right:1px solid rgba(124,58,237,0.3); font-weight:bold; color:#a5b4fc;">SSH keypair</td>
+                                        <td style="padding:8px 10px; color:#94a3b8;">FLEX explicitly mandates OpenStack SSH Keypair objects for initial VM deployment access.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px; text-align:right;">
+                    <button id="btnRunRbac" type="button" onclick="executeRbacCheck()" style="padding:12px 25px; font-size:14px; font-weight:bold; background:#7c3aed; color:white; border:none; border-radius:6px; cursor:pointer; box-shadow:0 0 15px rgba(124,58,237,.5); transition:0.2s;">🔍 VERIFY PLATFORM IDENTITY ROLES</button>
+                </div>
+
+                <div id="rbac-terminal-box" style="margin-top:10px; display:none;">
+                    <div style="display:flex; justify-content:space-between; background:#3b0764; padding:6px 12px; border-radius:6px 6px 0 0; border:1px solid #7c3aed; border-bottom:0;">
+                        <span style="color:#fb7185; font-size:11px; font-weight:bold; font-family:monospace;">🔗 Cross-Cloud RBAC Comparator</span>
+                        <span id="rbac-status-indicator" style="color:#ffcc00; font-size:10px; font-weight:bold;">Authenticating...</span>
+                    </div>
+                    <div id="rbac-log-output" style="height:250px; background:#000; color:#f8fafc; font-family:'JetBrains Mono', monospace; font-size:12px; padding:12px; overflow-y:auto; border:1px solid #7c3aed; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+                </div>
+            </div>
+
+            <!-- 2. SPECIFIC TARGETS -->
+            <div style="margin-bottom:20px; padding:15px; background:#e0f2fe; border-left:4px solid #7ecfff; border-radius:4px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div>
+                        <h3 style="margin:0; color:#7ecfff; font-size:14px;">2. Explicit End-to-End Application Targets</h3>
+                        <p style="font-size:11px; color:#aaa; margin-top:4px;">Enter the exact IP addresses the migrated VMs leased in the FLEX cloud to run deep connectivity validations.</p>
+                    </div>
+                    <button type="button" onclick="addAppBlock()" style="background:rgba(99,102,241,0.15); border:1px solid #6366f1; color:#a5b4fc; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap;">＋ Add Application</button>
+                </div>
+                <!-- App blocks container — first block is the original -->
+                <div id="uat-app-blocks">
+                    <div class="uat-app-block" style="background:rgba(255,255,255,0.03); border:1px solid #2d4a6b; border-radius:6px; padding:12px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:11px; color:#7ecfff; font-weight:600;">Application 1</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                            <div><label style="font-size:11px; color:#aaa; display:block;">Web Application URL</label><input type="text" id="uat_app_url" placeholder="e.g. www.mypayroll.com" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div><label style="font-size:11px; color:#aaa; display:block;">App/LoadBalancer IP (Ping Test)</label><input type="text" id="uat_app_ip" placeholder="e.g. 10.250.0.15" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div><label style="font-size:11px; color:#aaa; display:block;">Database Node IP (SSH SQL Test)</label><input type="text" id="uat_db_ip" placeholder="e.g. 10.250.0.8" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div><label style="font-size:11px; color:#aaa; display:block;">SSH Username</label><input type="text" id="uat_ssh_user" value="ubuntu" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                            <div style="grid-column: span 2;"><label style="font-size:11px; color:#aaa; display:block;">SSH Private Key (.pem Path)</label><input type="text" id="uat_ssh_key" placeholder="/home/dzoan/keys/target.pem" style="width:100%; padding:6px; background:#111; border:1px solid #4b6fa0; color:#fff; border-radius:3px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. EXECUTION BUTTON & TERMINAL -->
+            <button id="btnRunUAT" type="button" onclick="executeUATTests()" style="width:100%; padding:15px; font-size:16px; font-weight:bold; background:#2ecc71; color:white; border:none; border-radius:6px; cursor:pointer; box-shadow:0 0 10px rgba(46,204,113,.4); transition:0.2s;">▶️ RUN ALL AUTOMATED TESTS</button>
+        </form>
+
+        <div id="uat-terminal-box" style="margin-top:20px; display:none;">
+            <div style="display:flex; justify-content:space-between; background:#1a3a5c; padding:8px 12px; border-radius:6px 6px 0 0; border:1px solid #4b6fa0; border-bottom:0;">
+                <span style="color:#7ecfff; font-size:12px; font-weight:bold; font-family:monospace;">🟢 UAT Runtime Engine</span>
+                <span id="uat-status-indicator" style="color:#ffcc00; font-size:11px; font-weight:bold;">Waiting...</span>
+            </div>
+            <div id="uat-log-output" style="height:350px; background:#000; color:#00ff00; font-family:'JetBrains Mono', monospace; font-size:12px; padding:15px; overflow-y:auto; border:1px solid #4b6fa0; border-radius:0 0 6px 6px; white-space:pre-wrap;"></div>
+        </div>
+      </div>
+
+      <div style="display:none;">
+        <h3>🔬 Internal UAT Tasks Reference</h3>
+      <h3>🔬 Internal UAT Tasks</h3>
+      <ul>
+        <li><strong>Verify VM boot</strong> – Ensure VMs start successfully in Flex.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">openstack server list --project &lt;project_id&gt; -c Name -c Status | grep ACTIVE</pre>
+        </li>
+        <li><strong>Validate network connectivity</strong> – Confirm instances communicate as expected.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">ping -c 4 &lt;flex_floating_ip&gt;<br>nc -zv &lt;flex_private_ip&gt; 22</pre>
+        </li>
+        <li><strong>Confirm storage accessibility</strong> – Verify volumes and storage resources are accessible.
+          <pre style="background:#1e1e1e; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:5px 0 15px 0;">openstack volume list --project &lt;project_id&gt; -c Name -c Status<br>ssh user@&lt;flex_ip&gt; 'df -h | grep /dev/vd'</pre>
+        </li>
+      </ul>
+      <h3>👤 Customer UAT Tasks</h3>
+      <ul>
+        <li><strong>Access confirmed</strong> – Customer confirmed access to the new Flex environment.</li>
+        <li><strong>Confirm application functionality</strong> – Applications operating correctly after migration.</li>
+      </ul>
+      <h3>📊 Validation Matrix</h3>
+      <table class="matrix-table">
+        <thead><tr><th>Workload Type</th><th>Internal UAT</th><th>Customer UAT</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge">Databases</span></td><td>Service up, replication healthy, storage OK, backup works</td><td>Queries correct, app reads/writes correct, reports match</td></tr>
+          <tr><td><span class="badge">App tiers</span></td><td>VM boots, services start, DNS resolves, storage mounts</td><td>Users log in, transactions succeed, integrations work</td></tr>
+          <tr><td><span class="badge">Containers</span></td><td>Pods healthy, PVCs mount, ingress works</td><td>App flow works, no missing data, no broken sessions</td></tr>
+          <tr><td><span class="badge">Legacy / Monolith</span></td><td>Boot and services stable</td><td>Core business workflow works exactly as expected</td></tr>
+          <tr><td><span class="badge">SaaS replacement</span></td><td>Import / reconciliation complete</td><td>Users validate records, process flow, reports</td></tr>
+          <tr><td><span class="badge">Archive / Retain</span></td><td>Data readable, access controlled</td><td>Business can retrieve required data</td></tr>
+        </tbody>
+      </table>
+      <h3>🛠 Automated Checking Commands</h3>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+        <div style="background:#e0f2fe; padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">Databases (Service &amp; Replication)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># MySQL Replication Status
+ssh admin@&lt;db_ip&gt; 'mysql -e "SHOW SLAVE STATUS\\G" | grep "Running:"'
+
+# PostgreSQL Replication
+ssh postgres@&lt;db_ip&gt; 'psql -xc "select * from pg_stat_replication;"'</pre>
+        </div>
+        <div style="background:#e0f2fe; padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">App Tiers (DNS &amp; Services)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Check DNS Resolution
+dig @&lt;flex_dns&gt; +short &lt;app_url&gt;
+
+# Verify Web Service HTTP 200
+curl -I -s https://&lt;app_url&gt; | head -n 1
+
+# Systemd Service Status
+ssh user@&lt;app_ip&gt; 'systemctl is-active &lt;service_name&gt;'</pre>
+        </div>
+        <div style="background:#e0f2fe; padding:15px; border-radius:8px;">
+          <h4 style="margin:0 0 10px 0; color:#7ecfff;">Containers (Pod/PVC Health)</h4>
+          <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;"># Verify Kubernetes Workload Health
+kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 3 UAT panel — white text on dark blue backgrounds -->
+  <style id="uat-panel-white-text">
+    /* .uat-panel sections (Steps 1-4) have dark blue bg; Step 5 has no .uat-panel class */
+    #panel-s4 .uat-panel h2,
+    #panel-s4 .uat-panel h3,
+    #panel-s4 .uat-panel h4,
+    #panel-s4 .uat-panel summary,
+    #panel-s4 .uat-panel .uat-panel-header h3,
+    #panel-s4 .uat-panel .uat-panel-header span,
+    #panel-s4 .uat-panel .uat-note,
+    #panel-s4 .uat-panel .uat-form-grid label,
+    #panel-s4 .uat-panel p { color: #ffffff !important; }
+
+    /* Inline grey/blue text colours used in step panel bodies */
+    #panel-s4 .uat-panel [style*="color:#94a3b8"],
+    #panel-s4 .uat-panel [style*="color:#8ba3cc"],
+    #panel-s4 .uat-panel [style*="color:#bfdbfe"],
+    #panel-s4 .uat-panel [style*="color:#cbd5e1"],
+    #panel-s4 .uat-panel [style*="color:#a0aec0"] { color: #ffffff !important; }
+  </style>
+
+  <!-- Stage 4 — Cutover & Traffic Transition -->
+  <style id="cutover-stage-light-overrides">
+    /* Badge colors only — all other overrides moved to main stylesheet */
+    #panel-s5 .uat-badge.pass, #panel-s5 .uat-badge.loaded, #panel-s5 .uat-badge.ready { color: #15803d !important; background: rgba(22,163,74,.12) !important; border: 1px solid rgba(22,163,74,.35) !important; }
+    #panel-s5 .uat-badge.fail, #panel-s5 .uat-badge.invalid, #panel-s5 .uat-badge.failed, #panel-s5 .uat-badge.blocked, #panel-s5 .uat-badge.not-ready { color: #b91c1c !important; background: rgba(220,38,38,.10) !important; border: 1px solid rgba(220,38,38,.30) !important; }
+    #panel-s5 .uat-badge.missing, #panel-s5 .uat-badge.review, #panel-s5 .uat-badge.testing, #panel-s5 .uat-badge.accepted { color: #b45309 !important; background: rgba(217,119,6,.10) !important; border: 1px solid rgba(217,119,6,.30) !important; }
+    #perf-parsed-result li { color: #ffffff !important; }
+    #perf-parsed-result ul { color: #ffffff !important; }
+  </style>

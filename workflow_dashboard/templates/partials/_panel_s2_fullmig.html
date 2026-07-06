@@ -1,0 +1,110 @@
+    <div id="s2fullmig-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🏢 Full Business System Migration</h2>
+          <p>Select a business system from Stage 1 and migrate all its components — VMs, databases, volumes, load balancers — using the Stage 2 tools.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="s2fullmig-status">Select a System</div>
+      </div>
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="gov-section"><h3>Business Systems</h3><div id="fsm-stat-sys" style="font-size:28px;font-weight:900;color:#7dd3fc;">0</div></div>
+        <div class="gov-section"><h3>Total Components</h3><div id="fsm-stat-comp" style="font-size:28px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Linux / Windows</h3><div id="fsm-stat-vm" style="font-size:28px;font-weight:900;color:#60a5fa;">0</div></div>
+        <div class="gov-section"><h3>Databases</h3><div id="fsm-stat-db" style="font-size:28px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Volumes</h3><div id="fsm-stat-vol" style="font-size:28px;font-weight:900;color:#fbbf24;">0</div></div>
+        <div class="gov-section"><h3>Migrated</h3><div id="fsm-stat-done" style="font-size:28px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Pending</h3><div id="fsm-stat-pending" style="font-size:28px;font-weight:900;color:#fcd34d;">0</div></div>
+      </div>
+      <div class="gov-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">Business System Scope Engine &nbsp;<span id="fsm-sys-badge" style="background:#eaf2ff;color:#2563eb;border-radius:12px;padding:2px 10px;font-size:12px;">0</span></h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#1e3a5f;border:1px solid #7c3aed;color:#c4b5fd;" onclick="fsmLoadDemo()">🏦 Load Banking Demo</button>
+            <button class="gov-btn btn-save" onclick="fsmRefresh()">↻ Refresh Migration Matrix</button>
+          </div>
+        </div>
+        <p style="color:#64748b;font-size:12px;margin:0 0 10px;">This is the same Add Business System engine used by the UAT stage: same cards, Business System Templates, component editor, modal, import/export controls, and localStorage model.</p>
+        <div id="fsm-uat-engine-host" style="background:#fff;border:1px solid #d6e3f3;border-radius:10px;padding:0;overflow:hidden;"></div>
+      </div>
+      <div id="fsm-plan-section" class="gov-section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">
+            Selected Business System Source Infra Details —
+            <span id="fsm-plan-name" style="color:#7dd3fc;"></span>
+            <span id="fsm-plan-wave" style="background:#1e3a5f;color:#94a3b8;border-radius:12px;padding:2px 10px;font-size:12px;margin-left:6px;"></span>
+          </h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="gov-btn" style="padding:5px 10px;font-size:12px;background:#0f172a;border:1px solid #38bdf8;color:#e0f2fe;" onclick="fsmValidateEndpointMappings(true)">Validate Endpoint Mapping</button>
+            <button class="gov-btn" style="padding:5px 10px;font-size:12px;background:#0f172a;border:1px solid #475569;color:#94a3b8;" onclick="fsmMarkAllMigrated()">✓ Mark All Migrated</button>
+          </div>
+        </div>
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Select a business system above to inspect every component source mapping: source infra, source IP, OS type, source flavor, target endpoint, health test, and the migration engine that will handle it.</p>
+        <div id="fsm-endpoint-warning" style="display:none;margin:0 0 12px;padding:10px 12px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:8px;font-size:12px;font-weight:700;"></div>
+        <div style="overflow:auto;"><table class="gov-table" style="min-width:1800px;">
+          <thead><tr><th>Component</th><th>Workload</th><th>Source Infra</th><th>Source Name / ID</th><th>Source IP</th><th>OS / Engine</th><th>Source Flavor</th><th>Snapshot Name / ID</th><th>Volume Snapshot</th><th>Target</th><th>Migration Engine</th><th>Migration Status</th><th>Status</th></tr></thead>
+          <tbody id="fsm-plan-body"></tbody>
+        </table></div>
+      </div>
+      <!-- MIGRATION ENGINES — embedded iframes, lazy-loaded on tab click -->
+      <div class="gov-section" id="fsm-engines-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;">🔧 Migration Engines</h3>
+          <span id="fsm-engine-active-label" style="font-size:12px;color:#64748b;">Linux Snapshot engine selected</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:end;margin-bottom:12px;padding:12px;border:1px solid #d6e3f3;border-radius:8px;background:#f8fbff;">
+          <div>
+            <label for="fsm-engine-slider" style="display:block;font-size:11px;font-weight:900;color:#0f172a;text-transform:uppercase;margin-bottom:6px;">Migration Engine Selector</label>
+            <input id="fsm-engine-slider" type="range" min="0" max="3" step="1" value="0" oninput="fsmSetEngineFromSlider(this.value)" style="width:100%;accent-color:#2563eb;">
+            <div style="display:flex;justify-content:space-between;color:#475569;font-size:10px;font-weight:800;margin-top:5px;">
+              <span>Linux</span><span>Windows</span><span>Volume</span><span>DB</span>
+            </div>
+          </div>
+          <div>
+            <label for="fsm-engine-height-slider" style="display:block;font-size:11px;font-weight:900;color:#0f172a;text-transform:uppercase;margin-bottom:6px;">Console Height <span id="fsm-engine-height-label" style="color:#2563eb;">1200px</span></label>
+            <input id="fsm-engine-height-slider" type="range" min="900" max="1800" step="100" value="1200" oninput="fsmSetEngineHeight(this.value)" style="width:100%;accent-color:#16a34a;">
+            <div style="display:flex;justify-content:space-between;color:#64748b;font-size:10px;margin-top:5px;">
+              <span>Compact</span><span>Full operator view</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;grid-column:1 / -1;">
+            <button class="gov-btn btn-example" style="padding:6px 12px;font-size:12px;" onclick="fsmSlideEngine(-1)">← Previous Engine</button>
+            <button class="gov-btn btn-save" style="padding:6px 12px;font-size:12px;" onclick="fsmSlideEngine(1)">Next Engine →</button>
+            <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#0f172a;border:1px solid #38bdf8;color:#e0f2fe;" onclick="fsmSetEngineHeight(1600)">Expand Console</button>
+            <button class="gov-btn" style="padding:6px 12px;font-size:12px;background:#0f172a;border:1px solid #94a3b8;color:#e2e8f0;" onclick="fsmSetEngineHeight(1200)">Reset Height</button>
+          </div>
+        </div>
+        <div id="fsm-endpoint-map-bar" style="display:none;margin:0 0 12px;padding:12px;border:1px solid #0ea5e9;border-radius:8px;background:#ecfeff;color:#0f172a;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:12px;font-weight:900;text-transform:uppercase;color:#0369a1;">Endpoint Selection Mode</div>
+            <div id="fsm-endpoint-map-label" style="font-size:13px;color:#0f172a;">Select one scanned row in the engine table, then update the business system.</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="gov-btn btn-save" style="padding:7px 12px;font-size:12px;" onclick="fsmCaptureSelectedEndpoint()">Add to Business Component</button>
+            <button class="gov-btn" style="padding:7px 12px;font-size:12px;background:#0f172a;border:1px solid #94a3b8;color:#e2e8f0;" onclick="fsmCancelEndpointSelection()">Cancel</button>
+          </div>
+        </div>
+        <!-- Engine selector tabs -->
+        <div id="fsm-engine-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:0;border-bottom:2px solid #1e3a5f;padding-bottom:0;">
+          <button id="fsm-etab-linux" class="fsm-etab fsm-etab-active" onclick="fsmShowEngine('linux')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#1e3a5f;color:#7dd3fc;border-bottom:2px solid #7dd3fc;margin-bottom:-2px;">🐧 Linux Snapshot</button>
+          <button id="fsm-etab-windows" class="fsm-etab"              onclick="fsmShowEngine('windows')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">🪟 Windows Snapshot</button>
+          <button id="fsm-etab-vol"   class="fsm-etab"                 onclick="fsmShowEngine('vol')"  style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">💾 Volume Snapshot</button>
+          <button id="fsm-etab-db"    class="fsm-etab"                 onclick="fsmShowEngine('db')"   style="padding:8px 16px;font-size:12px;font-weight:600;border:none;border-radius:6px 6px 0 0;cursor:pointer;background:#0f172a;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;">⚙️ App &amp; DB Replication</button>
+        </div>
+        <!-- Engine frames -->
+        <div id="fsm-engine-linux" class="fsm-engine-frame" style="height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
+          <iframe id="fsm-iframe-linux" src=""                                          style="width:100%;height:100%;border:none;" title="Linux Snapshot Migration"></iframe>
+        </div>
+        <div id="fsm-engine-windows" class="fsm-engine-frame" style="display:none;height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
+          <iframe id="fsm-iframe-windows" src=""                                       style="width:100%;height:100%;border:none;" title="Windows Snapshot Migration"></iframe>
+        </div>
+        <div id="fsm-engine-vol" class="fsm-engine-frame" style="display:none;height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
+          <iframe id="fsm-iframe-vol"   src=""                                          style="width:100%;height:100%;border:none;" title="Volume Snapshot Migration"></iframe>
+        </div>
+        <div id="fsm-engine-db" class="fsm-engine-frame" style="display:none;height:1200px;min-height:80vh;border:1px solid #1e3a5f;border-top:none;border-radius:0 0 8px 8px;overflow:visible;background:#0f172a;">
+          <iframe id="fsm-iframe-db"    src=""                                          style="width:100%;height:100%;border:none;" title="DB Replication"></iframe>
+        </div>
+        <p style="color:#475569;font-size:11px;margin:8px 0 0;text-align:right;">Engines are loaded on first click. Each engine is an independent session.</p>
+      </div>
+    </div>
+
+    <!-- Migration Strategy -->

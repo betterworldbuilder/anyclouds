@@ -1,0 +1,86 @@
+    <div id="s2retain-pane" class="gov-page path-retain" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>⏸ R1 Retain — Keep on OSPC for Now</h2>
+          <p>Governance workflow for workloads staying on OSPC temporarily due to blockers or business cycles.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r1-status">Status: Pending</div>
+      </div>
+
+      <div class="gov-grid">
+        <div class="gov-section">
+          <h3>1. Business System Selector</h3>
+          <div class="gov-form-group"><span class="gov-label">Customer Name</span><input type="text" class="gov-input" id="r1-customer" placeholder="e.g. Acme Financial"></div>
+          <div class="gov-form-group"><span class="gov-label">Business System</span><input type="text" class="gov-input" id="r1-system" placeholder="e.g. Legacy Loan Reporting"></div>
+          <div class="gov-form-group"><span class="gov-label">Retain Reason</span>
+            <select class="gov-select" id="r1-reason">
+              <option>Business freeze</option>
+              <option>Vendor certification not ready</option>
+              <option>Technical blocker</option>
+              <option>Compliance blocker</option>
+              <option>Dependency blocker</option>
+              <option>Cost decision</option>
+              <option>End-of-life pending</option>
+            </select>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">Risk Level</span>
+            <select class="gov-select" id="r1-risk">
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+              <option>Critical</option>
+            </select>
+          </div>
+        </div>
+        <div class="gov-section">
+          <h3>2. Related Workloads (Inventory)</h3>
+          <table class="gov-table">
+            <thead><tr><th>Type</th><th>Name</th><th>Notes</th></tr></thead>
+            <tbody id="r1-workloads-body">
+              <tr><td><span class="badge">App</span></td><td><input type="text" class="gov-input" value="loan-report-web"></td><td>Web UI</td></tr>
+              <tr><td><span class="badge">DB</span></td><td><input type="text" class="gov-input" value="loan_reporting_mysql8"></td><td>DBaaS</td></tr>
+            </tbody>
+          </table>
+          <button class="gov-btn btn-example" style="margin-top:10px; width:100%;" onclick="addWorkloadRow('r1-workloads-body')">+ Add Workload Item</button>
+        </div>
+        <div class="gov-section">
+          <h3>3. Dates & Owners</h3>
+          <div class="gov-grid" style="grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="gov-form-group"><span class="gov-label">Review Date</span><input type="date" class="gov-input" id="r1-review-date"></div>
+            <div class="gov-form-group"><span class="gov-label">Expiry Date</span><input type="date" class="gov-input" id="r1-expiry-date"></div>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">Business Owner</span><input type="text" class="gov-input" id="r1-b-owner"></div>
+          <div class="gov-form-group"><span class="gov-label">Technical Owner</span><input type="text" class="gov-input" id="r1-t-owner"></div>
+        </div>
+        <div class="gov-section">
+          <h3>4. Required Actions Checklist</h3>
+          <table class="gov-table">
+            <thead><tr><th>Step</th><th>Action</th><th>Status</th></tr></thead>
+            <tbody id="r1-actions-body">
+              <tr><td>1</td><td>Confirm business reason</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>2</td><td>Capture dependency blockers</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>3</td><td>Record OSPC cost</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>4</td><td>Approve decision</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>5. Output Artifacts</h3>
+        <div class="artifact-list">
+          <a href="#" class="artifact-link">📄 retain_register.csv</a>
+          <a href="#" class="artifact-link">📄 retain_decisions.json</a>
+          <a href="#" class="artifact-link">📄 retain_review_schedule.csv</a>
+        </div>
+      </div>
+
+      <div class="gov-actions">
+        <button class="gov-btn btn-example" onclick="loadR1Example()">🧬 Load Retain Example</button>
+        <button class="gov-btn btn-save" onclick="saveGov('R1')">💾 Save Retain Register</button>
+        <button class="gov-btn btn-export">📊 Export Retain Report</button>
+        <button class="gov-btn btn-export" style="background:rgba(255,255,255,0.05); border-color:rgba(126,207,255,0.3); color:#7ecfff;">🚀 Convert to Migration Path</button>
+      </div>
+    </div>
+
+    <!-- R2 Retire -->

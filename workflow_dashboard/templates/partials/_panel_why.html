@@ -1,0 +1,914 @@
+<div class="panel-area">
+
+  <!-- Stage 0 — Who Why When What to Move to Flex? -->
+  <div class="panel active" id="panel-s_why">
+    <div id="s0-container" style="background:#f8fafc; padding:0; max-width:100%; margin:0; overflow:auto; height:100%;">
+
+      <!-- Hero banner — Dawn Sky Edition -->
+      <div class="s0-dawn-hero">
+        <button id="s0-view-toggle" onclick="s0Toggle3D()" title="Switch to 3D cloud fly-through view">&#127775; 3D View</button>
+        <div class="s0-dawn-sky"></div>
+        <!-- Stratus — flat layers, very slow, lowest z-index -->
+        <div class="s0-st st-1"></div>
+        <div class="s0-st st-2"></div>
+        <div class="s0-st st-3"></div>
+        <!-- Puffy clouds — oval base + circular bumps, right→left, lower sky -->
+        <div class="s0-cl cl-1"></div>
+        <div class="s0-cl cl-2"></div>
+        <div class="s0-cl cl-3"></div>
+        <div class="s0-cl cl-4"></div>
+        <div class="s0-cl cl-5"></div>
+        <div class="s0-cl cl-6"></div>
+        <div class="s0-cl cl-7"></div>
+        <div class="s0-cl cl-8"></div>
+        <div class="s0-cl cl-9"></div>
+        <div class="s0-cl cl-10"></div>
+        <!-- Altocumulus — mid level rounded puffs, medium-fast -->
+        <div class="s0-ac ac-1"></div>
+        <div class="s0-ac ac-2"></div>
+        <div class="s0-ac ac-3"></div>
+        <div class="s0-ac ac-4"></div>
+        <div class="s0-ac ac-5"></div>
+        <!-- Cirrus — high altitude thin wisps, very fast -->
+        <div class="s0-ci ci-1"></div>
+        <div class="s0-ci ci-2"></div>
+        <div class="s0-ci ci-3"></div>
+        <div class="s0-ci ci-4"></div>
+        <div class="s0-ci ci-5"></div>
+        <div class="s0-ci ci-6"></div>
+        
+        <!-- 3D Cloud Fly-Through Overlay -->
+        <div id="s0-hero-3d">
+          <div id="s0-3d-sky" style="position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(180deg,#1a3a6b 0%,#2e5fa3 15%,#4a8fd1 30%,#6bb5e0 45%,#8ecae6 55%,#a8d8ea 65%,#c4e8f5 75%,#d6f0fa 85%,#e8f7fc 100%);z-index:0;"></div>
+          <div id="s0-3d-sun" style="position:absolute;top:-80px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(255,230,150,0.4) 0%,rgba(255,210,100,0.2) 30%,rgba(255,200,80,0.1) 50%,transparent 70%);border-radius:50%;z-index:1;animation:s0SunPulse 6s ease-in-out infinite;"></div>
+          <div id="s0-3d-clouds" class="s03d-clouds-wrap"></div>
+          <div class="s03d-fly-ctrl">
+            <div class="s03d-ctrl-label">Fly</div>
+            <div class="s03d-ctrl-row"><div style="width:38px;"></div><button id="s0-btn-up" class="s03d-btn">&#9650;</button><div style="width:38px;"></div></div>
+            <div class="s03d-ctrl-row"><button id="s0-btn-left" class="s03d-btn">&#9664;</button><button id="s0-btn-ctr" class="s03d-btn s03d-btn-ctr">&#9679;</button><button id="s0-btn-right" class="s03d-btn">&#9654;</button></div>
+            <div class="s03d-ctrl-row"><div style="width:38px;"></div><button id="s0-btn-down" class="s03d-btn">&#9660;</button><div style="width:38px;"></div></div>
+            <div class="s03d-speed-ind" id="s0-3d-speed">Speed: 1x</div>
+          </div>
+        </div>
+        <div class="s0-dawn-content">
+          <div class="s0-dawn-badge">
+            <span class="s0-dawn-badge-dot">&#9733;</span>
+            MIGRATION STRATEGY GUIDE
+          </div>
+          <h1 class="s0-dawn-title"><span class="s0-dawn-title-line"><span class="s0-dawn-title-word s0-title-why">Why</span><span class="s0-dawn-title-word s0-title-who">Who</span><span class="s0-dawn-title-word s0-title-what">What</span><span class="s0-dawn-title-word s0-title-when">When</span> <span style="font-size:0.6em;">Move to</span></span><span class="s0-dawn-title-line"><span class="s0-dawn-title-highlight">FLEX <span style="font-size:0.6em;">Your AI-Ready Open Cloud Hub</span></span></span></h1>
+          <p class="s0-dawn-desc">Before any technical migration begins, customers need a clear business answer: <strong>who should move, why the move matters, and when the move makes sense.</strong> FLEX is the next-generation platform for customers who want better performance, lower TCO, and a more future-ready cloud foundation.</p>
+          <div class="s0-dawn-stats">
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">4</div><div class="s0-dawn-stat-lbl">WHY REASONS</div></div>
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">5</div><div class="s0-dawn-stat-lbl">WHEN TRIGGERS</div></div>
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">8</div><div class="s0-dawn-stat-lbl">MIGRATION TRIGGERS</div></div>
+            <div class="s0-dawn-stat"><div class="s0-dawn-stat-num">0</div><div class="s0-dawn-stat-lbl">VENDOR LOCK-IN</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content area -->
+      <div style="max-width:1160px;margin:0 auto;padding:40px 40px 60px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- STRATEGIC MESSAGE (top) -->
+        <div style="background:linear-gradient(160deg,#f0f9ff 0%,#e0f2fe 18%,#bae6fd 40%,#7dd3fc 65%,#38bdf8 85%,#0ea5e9 100%);border-radius:16px;border:1px solid #7dd3fc;border-top:4px solid #0284c7;padding:28px 32px;box-shadow:0 4px 20px rgba(14,165,233,0.18);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,0.3);border:1px solid rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128203;</div>
+            <div>
+              <h2 style="color:#0c4a6e;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">FLEX Migration Strategy Guide</h2>
+              <p style="color:#0284c7;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">From Legacy OSPC to AI-Ready Open Cloud</p>
+            </div>
+          </div>
+          <p style="color:#0c4a6e;line-height:1.5;font-size:18px;font-weight:800;margin:0 0 12px;">Still on Legacy OSPC? Move to FLEX and Unlock Your AI-Ready Cloud Future.</p>
+          <p style="color:#0c4a6e;line-height:1.7;font-size:15px;margin:0 0 18px;">Before any migration starts, customers need one clear business answer: <strong>who should move, why it matters, and when to move.</strong> FLEX gives OSPC customers a modern open-cloud foundation with better <strong>performance</strong>, <strong>lower TCO</strong>, <strong>Kubernetes readiness</strong>, <strong>OpenCenter modernization</strong>, and makes your Business System ready for <strong>AI-Power Up</strong>.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;">
+            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
+              <div style="font-size:22px;margin-bottom:8px;">&#128161;</div>
+              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">Why move?</strong>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Lower TCO, fewer VMware and hyperscaler surprises, stronger performance, and a safer path to growth.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
+              <div style="font-size:22px;margin-bottom:8px;">&#127919;</div>
+              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">Who should move?</strong>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">Customers with critical OSPC, VMware, private cloud, or hyperscaler workloads needing control and cost clarity.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
+              <div style="font-size:22px;margin-bottom:8px;">&#9889;</div>
+              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">What moves?</strong>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">VMs, apps, data, images, networks, security rules, sovereignty controls, and operations move into FLEX.</p>
+            </div>
+            <div style="background:rgba(255,255,255,0.72);border:1px solid rgba(255,255,255,0.9);border-radius:12px;padding:16px;backdrop-filter:blur(6px);">
+              <div style="font-size:22px;margin-bottom:8px;">&#9200;</div>
+              <strong style="color:#0c4a6e;font-size:13px;display:block;margin-bottom:6px;">When to move?</strong>
+              <p style="color:#1e3a5f;font-size:13px;margin:0;line-height:1.5;">When OSPC ages, VMware renewals hurt, hyperscaler spend grows, sovereignty matters, or disruption risk is too high.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- WHO -->
+        <div style="order:20;background:#ffffff;border-radius:16px;border:1px solid #dcfce7;border-top:4px solid #16a34a;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#16a34a,#22c55e);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#127919;</div>
+            <div>
+              <h2 style="color:#14532d;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">Who Should Move to FLEX?</h2>
+              <p style="color:#4ade80;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Ideal Customer Profile</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 12px;">FLEX is ideal for customers ready to modernize beyond legacy OSPC, VMware cost pressure, or hyperscaler complexity without losing openness, control, data sovereignty, and enterprise-grade operations. The best candidates are customers who:</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Run important production workloads on legacy OSPC, VMware, private cloud, or hyperscaler platforms.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Need better performance, scalability, availability, and predictable infrastructure outcomes.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Want to reduce long-term cost, VMware licensing exposure, hyperscaler bill shock, and vendor lock-in.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Planning AI, Kubernetes, analytics, sovereign cloud, or modern application platforms.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Need hybrid cloud flexibility across public, private, dedicated, regulated, or data-sovereign environments.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Want a phased migration path from OSPC, VMware, or hyperscaler estates instead of a risky big-bang cutover.</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;grid-column:1/-1;">
+              <span style="color:#16a34a;font-size:14px;margin-top:1px;">&#10003;</span>
+              <span style="color:#374151;font-size:13px;line-height:1.5;">Require enterprise-grade support, security, compliance alignment, data residency, and operational expertise.</span>
+            </div>
+          </div>
+          <div style="background:#f0fdf4;border-left:3px solid #16a34a;border-radius:0 8px 8px 0;padding:12px 16px;">
+            <p style="color:#15803d;font-size:14px;margin:0;font-style:italic;line-height:1.6;">FLEX is for customers who want to lower up to <strong>3x their current TCO</strong>, regain control from VMware or hyperscaler lock-in, protect data sovereignty, and improve business system performance, resiliency, and security &mdash; to grow their business revenue.</p>
+          </div>
+        </div>
+
+        <!-- WHY -->
+        <div style="order:10;background:#ffffff;border-radius:16px;border:1px solid #fef3c7;border-top:4px solid #d97706;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#d97706,#f59e0b);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#128161;</div>
+            <div>
+              <h2 style="color:#78350f;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">Why Move to FLEX?</h2>
+              <p style="color:#f59e0b;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Business Value &amp; TCO</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 22px;">The move to FLEX is not only a technical upgrade. It is a business opportunity to escape VMware renewal pressure, reduce hyperscaler cost volatility, protect data sovereignty, and deliver better performance with lower operational friction.</p>
+
+          <!-- 4 sub-reasons as mini cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px;">
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">1</div>
+                <strong style="color:#78350f;font-size:13px;">More than 2x Lower TCO</strong>
+              </div>
+              <!-- TCO mini table -->
+              <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #fde68a;">
+                    <th style="padding:5px 8px;text-align:left;color:#92400e;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;">Area</th>
+                    <th style="padding:5px 8px;text-align:left;color:#92400e;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.05em;">Business Impact</th>
+                  </tr>
+                </thead>
+                <tbody style="color:#374151;">
+                  <tr style="border-bottom:1px solid #fef3c7;">
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Open-source foundation</td>
+                    <td style="padding:5px 8px;">Less lock-in than proprietary virtualization or hyperscaler-only patterns.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #fef3c7;">
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Modern sizing</td>
+                    <td style="padding:5px 8px;">Better utilization than overbuilt VMware clusters or idle cloud capacity.</td>
+                  </tr>
+                  <tr style="border-bottom:1px solid #fef3c7;">
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Predictable bandwidth</td>
+                    <td style="padding:5px 8px;">Less exposure to hyperscaler egress and traffic surprises.</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:5px 8px;font-weight:600;color:#78350f;">Operational efficiency</td>
+                    <td style="padding:5px 8px;">Managed operations reduce platform toil and migration drag.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">2</div>
+                <strong style="color:#78350f;font-size:13px;">Better Performance &amp; Infrastructure</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Modern compute options, better scalability, stronger availability, and cloud economics without forcing every workload into hyperscaler sprawl.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">3</div>
+                <strong style="color:#78350f;font-size:13px;">Less Risk, More Control</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Migrate one application at a time from OSPC, VMware, or hyperscaler estates. Validate results and cut over only when workloads are ready.</p>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px 18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <div style="width:28px;height:28px;background:#d97706;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;">4</div>
+                <strong style="color:#78350f;font-size:13px;">Future-Proof Cloud Strategy</strong>
+              </div>
+              <p style="color:#374151;font-size:13px;margin:0;line-height:1.6;">Supports hybrid cloud, Kubernetes, AI, sovereign workloads, modern networking, flexible storage, automation, and enterprise security.</p>
+            </div>
+          </div>
+          <div style="background:#fffbeb;border-left:3px solid #d97706;border-radius:0 8px 8px 0;padding:12px 16px;">
+            <p style="color:#92400e;font-size:13px;margin:0;font-style:italic;line-height:1.6;">Not just a migration away from legacy OSPC, VMware pressure, or hyperscaler complexity &mdash; a move toward a platform that supports the next 5&ndash;10 years of infrastructure strategy.</p>
+          </div>
+        </div>
+
+        <!-- ── WHY PROOF POINTS — TCO & PERFORMANCE ── -->
+        <div style="order:11;background:#f1f5f9;border-top:2px solid #e2e8f0;margin-top:0;padding:36px 0 4px;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">&#128200; WHY FLEX WINS</div>
+            <h2 style="font-size:24px;font-weight:900;color:#1e293b;margin:0 0 10px;">TCO Savings &amp; Performance Gains</h2>
+            <p style="color:#64748b;font-size:14px;max-width:640px;margin:0 auto;line-height:1.6;">Business-proof views that show how FLEX reduces current-estate cost pressure and improves cutover performance using real UAT data.</p>
+          </div>
+
+          <script>
+            function s0CsvEscape(value) {
+              const text = String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+              return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+            }
+            function s0DownloadCsv(filename, rows) {
+              const csv = rows.map(row => row.map(s0CsvEscape).join(',')).join('\n') + '\n';
+              const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }
+            function s0ExportPriceComparisonXls(trigger) {
+              const scope = trigger && trigger.closest ? (trigger.closest('[data-price-comparison-section]') || document) : document;
+              const tcoCards = Array.from(scope.querySelectorAll('[data-region-tco-card], [data-stage3a-region-tco-card]'));
+              let html = '<html><head><meta charset="utf-8"><style>table{border-collapse:collapse;margin-bottom:22px;min-width:980px;}th,td{border:1px solid #cbd5e1;padding:7px 9px;font-family:Arial;font-size:12px;}th{background:#e0f2fe;font-weight:700;color:#172033;}h2{font-family:Arial;color:#172033;}h3{font-family:Arial;color:#1e40af;margin-bottom:8px;}.save{background:#dcfce7;color:#166534;font-weight:700;}.cost{background:#fee2e2;color:#991b1b;font-weight:700;}.flex{background:#ecfdf5;color:#166534;font-weight:700;}</style></head><body>';
+              html += '<h2>OSPC to FLEX Detailed Regional Flavor Price Comparison</h2>';
+              if (tcoCards.length) {
+                const globalTcoTable = scope.querySelector('[data-global-tco-table]');
+                if (globalTcoTable) html += '<h3>Global TCO Summary</h3>' + globalTcoTable.outerHTML;
+                tcoCards.forEach(card => {
+                  const region = card.getAttribute('data-region') || 'Region';
+                  const table = card.querySelector('table');
+                  html += '<h3>' + region + ' Detailed Price Comparison</h3>';
+                  if (table) html += table.outerHTML;
+                });
+              } else {
+                const cards = Array.from(document.querySelectorAll('[data-price-comparison-card]'));
+                html += '<h2>Inferred OSPC price list vs FLEX regional flavor catalogs</h2>';
+                cards.forEach(card => {
+                  const title = card.querySelector('[data-export-title]')?.innerText || 'Regional Price Comparison';
+                  const table = card.querySelector('table');
+                  if (table) html += '<h3>' + title + '</h3>' + table.outerHTML;
+                });
+              }
+              html += '
+</body></html>';
+              const blob = new Blob([html], {type:'application/vnd.ms-excel;charset=utf-8;'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'OSPC_FLEX_Detailed_Regional_Price_Comparison.xls';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }
+            function s0ExportNearestTable(button, filename) {
+              const box = button.closest('[data-export-card]');
+              const table = box ? box.querySelector('table') : null;
+              if (!table) return;
+              const rows = Array.from(table.querySelectorAll('tr')).map(tr =>
+                Array.from(tr.children).map(cell => cell.innerText.replace(/\n/g, ' ').trim())
+              );
+              s0DownloadCsv(filename, rows);
+            }
+            function s0ExportRegionTco(region) {
+              const rows = [
+                ['Region','Matched Flavors','OSPC Monthly','FLEX Monthly','Monthly Savings','Savings %','1-Year Savings','3-Year Savings','5-Year Savings'],
+                [region,'6','$771.54','$627.84','$143.70','18.6%','$1724.40','$5173.20','$8622.00']
+              ];
+              s0DownloadCsv(region + '_OSPC_FLEX_TCO_Summary.csv', rows);
+            }
+            function s0FlavorMoney(value) {
+              const n = Number(value || 0);
+              const sign = n < 0 ? '-' : '';
+              return sign + '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            }
+	            function s0UpdateFlavorBaseline(select) {
+	              const opt = select && select.options ? select.options[select.selectedIndex] : null;
+	              const card = select ? select.closest('[data-region-tco-card], [data-stage3a-region-tco-card]') : null;
+	              if (!opt || !card) return;
+              const ospc = Number(opt.getAttribute('data-ospc-cost') || 0);
+              const flex = Number(opt.getAttribute('data-flex-cost') || 0);
+              const saving = ospc - flex;
+              const flexPct = ospc > 0 ? Math.min(100, Math.max(4, (flex / ospc) * 100)) : 0;
+              const savePct = ospc > 0 ? (saving / ospc) * 100 : 0;
+              const setText = function(sel, value) {
+                card.querySelectorAll(sel).forEach(el => { el.textContent = value; });
+              };
+              setText('[data-selected-map]', opt.getAttribute('data-map') || '');
+              setText('[data-selected-ospc]', s0FlavorMoney(ospc));
+              setText('[data-selected-flex]', s0FlavorMoney(flex));
+              setText('[data-selected-ospc-bar]', s0FlavorMoney(ospc) + '/mo');
+              setText('[data-selected-flex-bar]', s0FlavorMoney(flex) + '/mo');
+              setText('[data-selected-saving-main]', s0FlavorMoney(saving));
+              setText('[data-selected-saving-percent]', savePct.toFixed(1) + '%');
+              setText('[data-selected-1y]', s0FlavorMoney(saving * 12));
+              setText('[data-selected-3y]', s0FlavorMoney(saving * 36));
+              setText('[data-selected-5y]', s0FlavorMoney(saving * 60));
+              setText('[data-selected-saving]', s0FlavorMoney(saving) + '/mo saved (' + savePct.toFixed(1) + '%)');
+              const flexBar = card.querySelector('[data-selected-flexbar]');
+	              if (flexBar) flexBar.style.width = flexPct + '%';
+	            }
+	            function s0BuildGlobalTcoTable() {
+	              const flavors = [
+	                ['general1-1','2.2',68.80,28.08],
+	                ['general1-2','2.2',77.62,28.08],
+	                ['compute1-4','2.4',86.44,35.28],
+	                ['general1-4','4.4',151.70,61.92],
+	                ['compute1-8','4.8',186.98,76.32],
+	                ['compute1-30','16.64',200.00,398.16]
+	              ];
+	              const regions = [
+	                ['IAD','gp.0.'],
+	                ['DFW','gp.5.'],
+	                ['SJC','gp.0.']
+	              ];
+	              const money = n => {
+	                const sign = n < 0 ? '-' : '';
+	                return sign + '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+	              };
+	              const td = (value, align, bg, color) => `<td style="padding:9px 11px;border-bottom:1px solid #e2e8f0;text-align:${align || 'left'};background:${bg || '#fff'};color:${color || '#0f172a'};font-weight:900;white-space:nowrap;">${value}</td>`;
+	              const header = `
+	                <thead>
+	                  <tr style="background:#f8fafc;">
+	                    <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#0f172a;">Region</th>
+	                    <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#0f172a;">OSPC Flavor</th>
+	                    <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#0f172a;">FLEX Flavor</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#991b1b;">OSPC / Month</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">FLEX / Month</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Monthly Saving</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">1-Year Saving</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">3-Year Saving</th>
+	                    <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">5-Year Saving</th>
+	                    <th style="text-align:center;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#475569;">Matched</th>
+	                  </tr>
+	                </thead>`;
+	              let globalOspc = 0, globalFlex = 0, globalSaving = 0, globalMatched = 0;
+	              let body = '<tbody>';
+	              regions.forEach(([region, flexPrefix]) => {
+	                let regionOspc = 0, regionFlex = 0, regionSaving = 0;
+	                flavors.forEach(([ospcFlavor, flexSuffix, ospc, flex], idx) => {
+	                  const saving = ospc - flex;
+	                  regionOspc += ospc; regionFlex += flex; regionSaving += saving;
+	                  globalOspc += ospc; globalFlex += flex; globalSaving += saving; globalMatched += 1;
+	                  const saveBg = saving >= 0 ? '#dcfce7' : '#fee2e2';
+	                  const saveColor = saving >= 0 ? '#166534' : '#991b1b';
+	                  body += '<tr>' +
+	                    td(idx === 0 ? region : '', 'left', idx === 0 ? '#eff6ff' : '#fff', region === 'IAD' ? '#1e40af' : region === 'DFW' ? '#047857' : '#c2410c') +
+	                    td(ospcFlavor, 'left') +
+	                    td(flexPrefix + flexSuffix, 'left') +
+	                    td(money(ospc), 'right', '#fee2e2', '#991b1b') +
+	                    td(money(flex), 'right', '#ecfdf5', '#166534') +
+	                    td(money(saving), 'right', saveBg, saveColor) +
+	                    td(money(saving * 12), 'right', saveBg, saveColor) +
+	                    td(money(saving * 36), 'right', saveBg, saveColor) +
+	                    td(money(saving * 60), 'right', saveBg, saveColor) +
+	                    td('1', 'center') +
+	                  '</tr>';
+	                });
+	                body += '<tr style="background:#f8fafc;">' +
+	                  td(region + ' Total Matched Flavor Baseline', 'left', '#f8fafc', '#0f172a') +
+	                  td('', 'left', '#f8fafc') +
+	                  td('', 'left', '#f8fafc') +
+	                  td(money(regionOspc), 'right', '#fee2e2', '#991b1b') +
+	                  td(money(regionFlex), 'right', '#ecfdf5', '#166534') +
+	                  td(money(regionSaving), 'right', '#eff6ff', '#1e40af') +
+	                  td(money(regionSaving * 12), 'right', '#dcfce7', '#166534') +
+	                  td(money(regionSaving * 36), 'right', '#dcfce7', '#166534') +
+	                  td(money(regionSaving * 60), 'right', '#dcfce7', '#166534') +
+	                  td('6', 'center', '#f8fafc') +
+	                '</tr>';
+	              });
+	              body += '</tbody><tfoot><tr style="background:#f8fafc;">' +
+	                td('Global 3-Region Total', 'left', '#f8fafc', '#0f172a') +
+	                td('', 'left', '#f8fafc') +
+	                td('', 'left', '#f8fafc') +
+	                td(money(globalOspc), 'right', '#fee2e2', '#991b1b') +
+	                td(money(globalFlex), 'right', '#ecfdf5', '#166534') +
+	                td(money(globalSaving), 'right', '#eff6ff', '#1e40af') +
+	                td(money(globalSaving * 12), 'right', '#dcfce7', '#166534') +
+	                td(money(globalSaving * 36), 'right', '#dcfce7', '#166534') +
+	                td(money(globalSaving * 60), 'right', '#dcfce7', '#166534') +
+	                td(String(globalMatched), 'center', '#f8fafc') +
+	              '</tr></tfoot>';
+	              document.querySelectorAll('[data-global-tco-table]').forEach(table => {
+	                table.style.minWidth = '1320px';
+	                table.innerHTML = header + body;
+	              });
+	            }
+	            if (document.readyState === 'loading') {
+	              document.addEventListener('DOMContentLoaded', s0BuildGlobalTcoTable);
+	            } else {
+	              s0BuildGlobalTcoTable();
+	            }
+	          </script>
+
+          <div data-price-comparison-section style="background:#fff;border:1px solid #d8e2f0;border-radius:14px;padding:18px 20px;margin:0 0 24px;box-shadow:0 8px 24px rgba(15,23,42,.08);width:calc(100vw - 48px);max-width:1780px;box-sizing:border-box;position:relative;left:50%;transform:translateX(-50%);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
+              <div>
+                <div style="font-size:10px;font-weight:900;color:#0369a1;text-transform:uppercase;letter-spacing:.12em;margin-bottom:5px;">OSPC &rarr; FLEX Regional Price Comparison</div>
+                <h3 style="font-size:18px;font-weight:900;color:#0f172a;margin:0;line-height:1.25;">Detailed flavor-level cost and savings comparison</h3>
+              </div>
+              <div style="font-size:11px;color:#64748b;line-height:1.45;max-width:420px;text-align:right;">
+                <button type="button" onclick="s0ExportPriceComparisonXls(this)" style="border:none;border-radius:4px;background:#b23a3a;color:#fff;padding:8px 12px;font-size:10px;font-weight:900;cursor:pointer;margin-bottom:8px;box-shadow:0 2px 6px rgba(15,23,42,.16);">Export Full 3 Detailed Tables XLS</button><br>
+                OSPC prices are inferred from <strong>TCO_Comparison_Report.csv</strong> aligned with the TCO flavormap. FLEX prices come from <strong>uploads/flavors/*Flavors.csv</strong>.
+              </div>
+            </div>
+
+            <div data-global-tco-view style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin-bottom:16px;box-shadow:0 12px 28px rgba(15,23,42,.16);overflow:hidden;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px;">
+                <div>
+                  <div style="font-size:10px;font-weight:900;color:#93c5fd;text-transform:uppercase;letter-spacing:.14em;margin-bottom:5px;">Global TCO View</div>
+                  <h3 style="font-size:21px;font-weight:950;color:#fff;margin:0 0 4px;line-height:1.15;">All-region OSPC vs FLEX cost comparison</h3>
+                  <p style="font-size:12px;font-weight:700;color:#dbeafe;margin:0;">Monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings across IAD, DFW, and SJC.</p>
+                </div>
+                <button type="button" onclick="s0ExportPriceComparisonXls(this)" style="border:1px solid rgba(255,255,255,.28);border-radius:7px;background:#b23a3a;color:#fff;padding:9px 12px;font-size:10px;font-weight:950;cursor:pointer;box-shadow:0 5px 14px rgba(0,0,0,.22);white-space:nowrap;">Export Global XLS</button>
+              </div>
+              <div style="background:#fff;border-radius:12px;border:1px solid rgba(255,255,255,.3);overflow:auto;">
+                <table data-global-tco-table style="width:100%;min-width:1120px;border-collapse:collapse;font-size:11px;color:#0f172a;">
+                  <thead>
+                    <tr style="background:#eff6ff;">
+                      <th style="text-align:left;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Region</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#991b1b;">OSPC / Month</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">FLEX / Month</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#1e40af;">Monthly Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">1-Year Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">3-Year Saving</th>
+                      <th style="text-align:right;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#166534;">5-Year Saving</th>
+                      <th style="text-align:center;padding:10px 12px;border-bottom:1px solid #cbd5e1;font-size:10px;font-weight:950;color:#475569;">Matched Flavors</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#1e40af;">IAD</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#047857;">DFW</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                    <tr><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:950;color:#c2410c;">SJC</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$771.54</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$627.84</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$143.70</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$1,724.40</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$8,622.00</td><td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:950;">6</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:#f8fafc;"><td style="padding:11px 12px;font-weight:950;color:#0f172a;">Global 3-Region Total</td><td style="padding:11px 12px;text-align:right;background:#fee2e2;color:#991b1b;font-weight:950;">$2,314.62</td><td style="padding:11px 12px;text-align:right;background:#ecfdf5;color:#166534;font-weight:950;">$1,883.52</td><td style="padding:11px 12px;text-align:right;background:#eff6ff;color:#1e40af;font-weight:950;">$431.10</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$5,173.20</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$15,519.60</td><td style="padding:11px 12px;text-align:right;background:#dcfce7;color:#166534;font-weight:950;">$25,866.00</td><td style="padding:11px 12px;text-align:center;font-weight:950;">18</td></tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr;gap:16px;">
+            <div data-export-card data-region-tco-card data-region="IAD" style="background:#fff;border:1px solid #bfdbfe;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.08);">
+              <div style="padding:18px 20px;overflow:auto;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-left:7px solid #2563eb;border-radius:12px;padding:13px 14px;box-shadow:0 8px 20px rgba(37,99,235,.12);">
+                  <div>
+                    <h3 style="font-size:20px;font-weight:950;color:#1e40af;margin:0 0 4px;line-height:1.15;letter-spacing:.01em;">IAD Detailed Price Comparison</h3>
+                    <p style="font-size:12px;font-weight:800;color:#1d4ed8;margin:0;">OSPC vs FLEX matched regional flavors with monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings.</p>
+                  </div>
+                  <button type="button" onclick="s0ExportNearestTable(this,'IAD_Detailed_OSPC_FLEX_Price_Comparison.csv')" style="border:none;border-radius:6px;background:#b23a3a;color:#fff;padding:8px 11px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 3px 10px rgba(178,58,58,.22);white-space:nowrap;">Export CSV</button>
+                </div>
+                <div style="font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin:2px 0 10px;">Flavor-level CAPEX/OPEX comparison</div>
+                <table style="width:100%;min-width:1480px;border-collapse:collapse;font-size:11px;color:#0f172a;">
+                  <thead><tr style="background:#f8fafc;"><th rowspan="2" style="text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;">OSPC Flavor</th><th rowspan="2" style="text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;">FLEX Flavor</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#eff6ff;color:#1e40af;">Monthly</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">1 Year</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">3 Years</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">5 Years</th></tr>
+                  <tr style="background:#fff;"><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th></tr></thead>
+                  <tbody>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-1<br><strong>$68.80</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.2.2<br><strong>$28.08</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$68.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$28.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$40.72</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$825.60</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$336.96</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$488.64</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,476.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,010.88</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,465.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$4,128.00</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,684.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$2,443.20</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-2<br><strong>$77.62</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.2.2<br><strong>$28.08</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$77.62</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$28.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$49.54</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$931.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$336.96</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$594.48</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,794.32</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,010.88</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,783.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$4,657.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,684.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$2,972.40</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">compute1-4<br><strong>$86.44</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.2.4<br><strong>$35.28</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$86.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$35.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$51.16</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$1,037.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$423.36</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$613.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$3,111.84</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,270.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,841.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$5,186.40</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,116.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,069.60</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-4<br><strong>$151.70</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.4.4<br><strong>$61.92</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$151.70</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$61.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$89.78</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$1,820.40</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$743.04</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,077.36</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$5,461.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,229.12</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,232.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$9,102.00</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$3,715.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$5,386.80</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">compute1-8<br><strong>$186.98</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.4.8<br><strong>$76.32</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$186.98</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$76.32</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$110.66</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,243.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$915.84</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,327.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$6,731.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,747.52</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,983.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$11,218.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$4,579.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$6,639.60</td></tr>
+                    <tr><td style="padding:8px 10px;line-height:1.25;">compute1-30<br><strong>$200.00</strong></td><td style="padding:8px 10px;line-height:1.25;">gp.0.16.64<br><strong>$398.16</strong></td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$200.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$398.16</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$198.16</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,400.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$4,777.92</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$2,377.92</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$7,200.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$14,333.76</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$7,133.76</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$12,000.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$23,889.60</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$11,889.60</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:#f8fafc;"><td style="padding:10px;font-weight:900;" colspan="2">IAD Total Matched Flavor Baseline</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$771.54</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$627.84</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$143.70</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$9,258.48</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$7,534.08</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,724.40</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$27,775.44</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$22,602.24</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$5,173.20</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$46,292.40</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$37,670.40</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$8,622.00</td></tr>
+                  </tfoot>
+                </table>
+
+                <div data-flavor-selector style="margin-top:16px;background:#f8fafc;border:1px solid #d8e2f0;border-radius:12px;padding:14px 16px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div>
+                      <div style="font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Selected OSPC flavor monthly baseline</div>
+                      <div data-selected-map style="font-size:13px;font-weight:900;color:#0f172a;">general1-1 -> gp.0.2.2</div>
+                    </div>
+                    <select onchange="s0UpdateFlavorBaseline(this)" style="min-width:320px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#172033;padding:8px 10px;font-size:12px;font-weight:800;">
+                      <option value="general1-1" data-map="general1-1 -> gp.0.2.2" data-ospc-cost="68.80" data-flex-cost="28.08" selected>general1-1 -> gp.0.2.2 | OSPC $68.80 / FLEX $28.08 / Save $40.72</option><option value="general1-2" data-map="general1-2 -> gp.0.2.2" data-ospc-cost="77.62" data-flex-cost="28.08">general1-2 -> gp.0.2.2 | OSPC $77.62 / FLEX $28.08 / Save $49.54</option><option value="compute1-4" data-map="compute1-4 -> gp.0.2.4" data-ospc-cost="86.44" data-flex-cost="35.28">compute1-4 -> gp.0.2.4 | OSPC $86.44 / FLEX $35.28 / Save $51.16</option><option value="general1-4" data-map="general1-4 -> gp.0.4.4" data-ospc-cost="151.70" data-flex-cost="61.92">general1-4 -> gp.0.4.4 | OSPC $151.70 / FLEX $61.92 / Save $89.78</option><option value="compute1-8" data-map="compute1-8 -> gp.0.4.8" data-ospc-cost="186.98" data-flex-cost="76.32">compute1-8 -> gp.0.4.8 | OSPC $186.98 / FLEX $76.32 / Save $110.66</option><option value="compute1-30" data-map="compute1-30 -> gp.0.16.64" data-ospc-cost="200.00" data-flex-cost="398.16">compute1-30 -> gp.0.16.64 | OSPC $200.00 / FLEX $398.16 / Save -$198.16</option>
+                    </select>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px;">
+                    <div style="text-align:center;padding:13px 10px;background:#fee2e2;border-radius:10px;border:1px solid #fecaca;"><div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;margin-bottom:5px;">OSPC / Month</div><div data-selected-ospc style="font-size:20px;font-weight:900;color:#991b1b;">$68.80</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#dcfce7;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">FLEX / Month</div><div data-selected-flex style="font-size:20px;font-weight:900;color:#166534;">$28.08</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;"><div style="font-size:9px;font-weight:900;color:#1d4ed8;text-transform:uppercase;margin-bottom:5px;">Monthly Savings</div><div data-selected-saving-main style="font-size:20px;font-weight:900;color:#1e40af;">$40.72</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">Savings %</div><div data-selected-saving-percent style="font-size:20px;font-weight:900;color:#16a34a;">59.2%</div></div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px;">
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">1-Year Savings</div><div data-selected-1y style="font-size:22px;font-weight:900;color:#166534;">$488.64</div></div>
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">3-Year Savings</div><div data-selected-3y style="font-size:22px;font-weight:900;color:#166534;">$1,465.92</div></div>
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">5-Year Savings</div><div data-selected-5y style="font-size:22px;font-weight:900;color:#166534;">$2,443.20</div></div>
+                  </div>
+                  <div style="display:grid;gap:8px;">
+                    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span>OSPC selected flavor monthly baseline</span><strong data-selected-ospc-bar style="color:#ef4444;">$68.80/mo</strong></div><div style="background:#fee2e2;height:13px;border-radius:999px;overflow:hidden;"><div style="width:100%;height:13px;background:#ef4444;border-radius:999px;"></div></div></div>
+                    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span>FLEX mapped flavor projected monthly</span><strong data-selected-flex-bar style="color:#22c55e;">$28.08/mo</strong></div><div style="background:#dcfce7;height:13px;border-radius:999px;overflow:hidden;"><div data-selected-flexbar style="width:40.8%;height:13px;background:#22c55e;border-radius:999px;"></div></div></div>
+                    <div data-selected-saving style="font-size:12px;font-weight:900;color:#166534;text-align:right;">$40.72/mo saved (59.2%)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div data-export-card data-region-tco-card data-region="DFW" style="background:#fff;border:1px solid #bbf7d0;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.08);">
+              <div style="padding:18px 20px;overflow:auto;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #bbf7d0;border-left:7px solid #059669;border-radius:12px;padding:13px 14px;box-shadow:0 8px 20px rgba(5,150,105,.12);">
+                  <div>
+                    <h3 style="font-size:20px;font-weight:950;color:#047857;margin:0 0 4px;line-height:1.15;letter-spacing:.01em;">DFW Detailed Price Comparison</h3>
+                    <p style="font-size:12px;font-weight:800;color:#047857;margin:0;">OSPC vs FLEX matched regional flavors with monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings.</p>
+                  </div>
+                  <button type="button" onclick="s0ExportNearestTable(this,'DFW_Detailed_OSPC_FLEX_Price_Comparison.csv')" style="border:none;border-radius:6px;background:#b23a3a;color:#fff;padding:8px 11px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 3px 10px rgba(178,58,58,.22);white-space:nowrap;">Export CSV</button>
+                </div>
+                <div style="font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin:2px 0 10px;">Flavor-level CAPEX/OPEX comparison</div>
+                <table style="width:100%;min-width:1480px;border-collapse:collapse;font-size:11px;color:#0f172a;">
+                  <thead><tr style="background:#f8fafc;"><th rowspan="2" style="text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;">OSPC Flavor</th><th rowspan="2" style="text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;">FLEX Flavor</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#eff6ff;color:#1e40af;">Monthly</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">1 Year</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">3 Years</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">5 Years</th></tr>
+                  <tr style="background:#fff;"><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th></tr></thead>
+                  <tbody>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-1<br><strong>$68.80</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.5.2.2<br><strong>$28.08</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$68.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$28.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$40.72</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$825.60</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$336.96</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$488.64</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,476.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,010.88</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,465.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$4,128.00</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,684.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$2,443.20</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-2<br><strong>$77.62</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.5.2.2<br><strong>$28.08</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$77.62</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$28.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$49.54</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$931.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$336.96</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$594.48</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,794.32</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,010.88</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,783.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$4,657.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,684.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$2,972.40</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">compute1-4<br><strong>$86.44</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.5.2.4<br><strong>$35.28</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$86.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$35.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$51.16</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$1,037.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$423.36</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$613.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$3,111.84</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,270.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,841.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$5,186.40</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,116.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,069.60</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-4<br><strong>$151.70</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.5.4.4<br><strong>$61.92</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$151.70</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$61.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$89.78</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$1,820.40</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$743.04</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,077.36</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$5,461.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,229.12</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,232.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$9,102.00</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$3,715.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$5,386.80</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">compute1-8<br><strong>$186.98</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.5.4.8<br><strong>$76.32</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$186.98</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$76.32</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$110.66</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,243.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$915.84</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,327.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$6,731.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,747.52</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,983.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$11,218.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$4,579.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$6,639.60</td></tr>
+                    <tr><td style="padding:8px 10px;line-height:1.25;">compute1-30<br><strong>$200.00</strong></td><td style="padding:8px 10px;line-height:1.25;">gp.5.16.64<br><strong>$398.16</strong></td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$200.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$398.16</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$198.16</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,400.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$4,777.92</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$2,377.92</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$7,200.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$14,333.76</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$7,133.76</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$12,000.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$23,889.60</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$11,889.60</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:#f8fafc;"><td style="padding:10px;font-weight:900;" colspan="2">DFW Total Matched Flavor Baseline</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$771.54</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$627.84</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$143.70</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$9,258.48</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$7,534.08</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,724.40</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$27,775.44</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$22,602.24</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$5,173.20</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$46,292.40</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$37,670.40</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$8,622.00</td></tr>
+                  </tfoot>
+                </table>
+
+                <div data-flavor-selector style="margin-top:16px;background:#f8fafc;border:1px solid #d8e2f0;border-radius:12px;padding:14px 16px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div>
+                      <div style="font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Selected OSPC flavor monthly baseline</div>
+                      <div data-selected-map style="font-size:13px;font-weight:900;color:#0f172a;">general1-1 -> gp.5.2.2</div>
+                    </div>
+                    <select onchange="s0UpdateFlavorBaseline(this)" style="min-width:320px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#172033;padding:8px 10px;font-size:12px;font-weight:800;">
+                      <option value="general1-1" data-map="general1-1 -> gp.5.2.2" data-ospc-cost="68.80" data-flex-cost="28.08" selected>general1-1 -> gp.5.2.2 | OSPC $68.80 / FLEX $28.08 / Save $40.72</option><option value="general1-2" data-map="general1-2 -> gp.5.2.2" data-ospc-cost="77.62" data-flex-cost="28.08">general1-2 -> gp.5.2.2 | OSPC $77.62 / FLEX $28.08 / Save $49.54</option><option value="compute1-4" data-map="compute1-4 -> gp.5.2.4" data-ospc-cost="86.44" data-flex-cost="35.28">compute1-4 -> gp.5.2.4 | OSPC $86.44 / FLEX $35.28 / Save $51.16</option><option value="general1-4" data-map="general1-4 -> gp.5.4.4" data-ospc-cost="151.70" data-flex-cost="61.92">general1-4 -> gp.5.4.4 | OSPC $151.70 / FLEX $61.92 / Save $89.78</option><option value="compute1-8" data-map="compute1-8 -> gp.5.4.8" data-ospc-cost="186.98" data-flex-cost="76.32">compute1-8 -> gp.5.4.8 | OSPC $186.98 / FLEX $76.32 / Save $110.66</option><option value="compute1-30" data-map="compute1-30 -> gp.5.16.64" data-ospc-cost="200.00" data-flex-cost="398.16">compute1-30 -> gp.5.16.64 | OSPC $200.00 / FLEX $398.16 / Save -$198.16</option>
+                    </select>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px;">
+                    <div style="text-align:center;padding:13px 10px;background:#fee2e2;border-radius:10px;border:1px solid #fecaca;"><div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;margin-bottom:5px;">OSPC / Month</div><div data-selected-ospc style="font-size:20px;font-weight:900;color:#991b1b;">$68.80</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#dcfce7;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">FLEX / Month</div><div data-selected-flex style="font-size:20px;font-weight:900;color:#166534;">$28.08</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;"><div style="font-size:9px;font-weight:900;color:#1d4ed8;text-transform:uppercase;margin-bottom:5px;">Monthly Savings</div><div data-selected-saving-main style="font-size:20px;font-weight:900;color:#1e40af;">$40.72</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">Savings %</div><div data-selected-saving-percent style="font-size:20px;font-weight:900;color:#16a34a;">59.2%</div></div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px;">
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">1-Year Savings</div><div data-selected-1y style="font-size:22px;font-weight:900;color:#166534;">$488.64</div></div>
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">3-Year Savings</div><div data-selected-3y style="font-size:22px;font-weight:900;color:#166534;">$1,465.92</div></div>
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">5-Year Savings</div><div data-selected-5y style="font-size:22px;font-weight:900;color:#166534;">$2,443.20</div></div>
+                  </div>
+                  <div style="display:grid;gap:8px;">
+                    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span>OSPC selected flavor monthly baseline</span><strong data-selected-ospc-bar style="color:#ef4444;">$68.80/mo</strong></div><div style="background:#fee2e2;height:13px;border-radius:999px;overflow:hidden;"><div style="width:100%;height:13px;background:#ef4444;border-radius:999px;"></div></div></div>
+                    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span>FLEX mapped flavor projected monthly</span><strong data-selected-flex-bar style="color:#22c55e;">$28.08/mo</strong></div><div style="background:#dcfce7;height:13px;border-radius:999px;overflow:hidden;"><div data-selected-flexbar style="width:40.8%;height:13px;background:#22c55e;border-radius:999px;"></div></div></div>
+                    <div data-selected-saving style="font-size:12px;font-weight:900;color:#166534;text-align:right;">$40.72/mo saved (59.2%)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div data-export-card data-region-tco-card data-region="SJC" style="background:#fff;border:1px solid #fed7aa;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.08);">
+              <div style="padding:18px 20px;overflow:auto;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-left:7px solid #f97316;border-radius:12px;padding:13px 14px;box-shadow:0 8px 20px rgba(249,115,22,.13);">
+                  <div>
+                    <h3 style="font-size:20px;font-weight:950;color:#c2410c;margin:0 0 4px;line-height:1.15;letter-spacing:.01em;">SJC Detailed Price Comparison</h3>
+                    <p style="font-size:12px;font-weight:800;color:#c2410c;margin:0;">OSPC vs FLEX matched regional flavors with monthly, 1-year, 3-year, and 5-year CAPEX/OPEX savings.</p>
+                  </div>
+                  <button type="button" onclick="s0ExportNearestTable(this,'SJC_Detailed_OSPC_FLEX_Price_Comparison.csv')" style="border:none;border-radius:6px;background:#b23a3a;color:#fff;padding:8px 11px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 3px 10px rgba(178,58,58,.22);white-space:nowrap;">Export CSV</button>
+                </div>
+                <div style="font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin:2px 0 10px;">Flavor-level CAPEX/OPEX comparison</div>
+                <table style="width:100%;min-width:1480px;border-collapse:collapse;font-size:11px;color:#0f172a;">
+                  <thead><tr style="background:#f8fafc;"><th rowspan="2" style="text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;">OSPC Flavor</th><th rowspan="2" style="text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;">FLEX Flavor</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#eff6ff;color:#1e40af;">Monthly</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">1 Year</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">3 Years</th><th colspan="3" style="text-align:center;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:10px;font-weight:900;background:#f0fdf4;color:#166534;">5 Years</th></tr>
+                  <tr style="background:#fff;"><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Cost</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">Savings</th></tr></thead>
+                  <tbody>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-1<br><strong>$68.80</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.2.2<br><strong>$28.08</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$68.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$28.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$40.72</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$825.60</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$336.96</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$488.64</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,476.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,010.88</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,465.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$4,128.00</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,684.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$2,443.20</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-2<br><strong>$77.62</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.2.2<br><strong>$28.08</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$77.62</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$28.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$49.54</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$931.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$336.96</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$594.48</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,794.32</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,010.88</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,783.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$4,657.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,684.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$2,972.40</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">compute1-4<br><strong>$86.44</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.2.4<br><strong>$35.28</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$86.44</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$35.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$51.16</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$1,037.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$423.36</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$613.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$3,111.84</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$1,270.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,841.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$5,186.40</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,116.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,069.60</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">general1-4<br><strong>$151.70</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.4.4<br><strong>$61.92</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$151.70</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$61.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$89.78</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$1,820.40</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$743.04</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,077.36</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$5,461.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,229.12</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,232.08</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$9,102.00</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$3,715.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$5,386.80</td></tr>
+                    <tr><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">compute1-8<br><strong>$186.98</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;line-height:1.25;">gp.0.4.8<br><strong>$76.32</strong></td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$186.98</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$76.32</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$110.66</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,243.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$915.84</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,327.92</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$6,731.28</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$2,747.52</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$3,983.76</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$11,218.80</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$4,579.20</td><td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$6,639.60</td></tr>
+                    <tr><td style="padding:8px 10px;line-height:1.25;">compute1-30<br><strong>$200.00</strong></td><td style="padding:8px 10px;line-height:1.25;">gp.0.16.64<br><strong>$398.16</strong></td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$200.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$398.16</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$198.16</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$2,400.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$4,777.92</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$2,377.92</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$7,200.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$14,333.76</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$7,133.76</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$12,000.00</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$23,889.60</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">-$11,889.60</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:#f8fafc;"><td style="padding:10px;font-weight:900;" colspan="2">SJC Total Matched Flavor Baseline</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$771.54</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$627.84</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$143.70</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$9,258.48</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$7,534.08</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$1,724.40</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$27,775.44</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$22,602.24</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$5,173.20</td><td style="padding:8px 10px;text-align:right;color:#991b1b;background:#fee2e2;font-weight:900;white-space:nowrap;">$46,292.40</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#ecfdf5;font-weight:900;white-space:nowrap;">$37,670.40</td><td style="padding:8px 10px;text-align:right;color:#166534;background:#dcfce7;font-weight:900;white-space:nowrap;">$8,622.00</td></tr>
+                  </tfoot>
+                </table>
+
+                <div data-flavor-selector style="margin-top:16px;background:#f8fafc;border:1px solid #d8e2f0;border-radius:12px;padding:14px 16px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div>
+                      <div style="font-size:10px;font-weight:900;color:#334155;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Selected OSPC flavor monthly baseline</div>
+                      <div data-selected-map style="font-size:13px;font-weight:900;color:#0f172a;">general1-1 -> gp.0.2.2</div>
+                    </div>
+                    <select onchange="s0UpdateFlavorBaseline(this)" style="min-width:320px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#172033;padding:8px 10px;font-size:12px;font-weight:800;">
+                      <option value="general1-1" data-map="general1-1 -> gp.0.2.2" data-ospc-cost="68.80" data-flex-cost="28.08" selected>general1-1 -> gp.0.2.2 | OSPC $68.80 / FLEX $28.08 / Save $40.72</option><option value="general1-2" data-map="general1-2 -> gp.0.2.2" data-ospc-cost="77.62" data-flex-cost="28.08">general1-2 -> gp.0.2.2 | OSPC $77.62 / FLEX $28.08 / Save $49.54</option><option value="compute1-4" data-map="compute1-4 -> gp.0.2.4" data-ospc-cost="86.44" data-flex-cost="35.28">compute1-4 -> gp.0.2.4 | OSPC $86.44 / FLEX $35.28 / Save $51.16</option><option value="general1-4" data-map="general1-4 -> gp.0.4.4" data-ospc-cost="151.70" data-flex-cost="61.92">general1-4 -> gp.0.4.4 | OSPC $151.70 / FLEX $61.92 / Save $89.78</option><option value="compute1-8" data-map="compute1-8 -> gp.0.4.8" data-ospc-cost="186.98" data-flex-cost="76.32">compute1-8 -> gp.0.4.8 | OSPC $186.98 / FLEX $76.32 / Save $110.66</option><option value="compute1-30" data-map="compute1-30 -> gp.0.16.64" data-ospc-cost="200.00" data-flex-cost="398.16">compute1-30 -> gp.0.16.64 | OSPC $200.00 / FLEX $398.16 / Save -$198.16</option>
+                    </select>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px;">
+                    <div style="text-align:center;padding:13px 10px;background:#fee2e2;border-radius:10px;border:1px solid #fecaca;"><div style="font-size:9px;font-weight:900;color:#b91c1c;text-transform:uppercase;margin-bottom:5px;">OSPC / Month</div><div data-selected-ospc style="font-size:20px;font-weight:900;color:#991b1b;">$68.80</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#dcfce7;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">FLEX / Month</div><div data-selected-flex style="font-size:20px;font-weight:900;color:#166534;">$28.08</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;"><div style="font-size:9px;font-weight:900;color:#1d4ed8;text-transform:uppercase;margin-bottom:5px;">Monthly Savings</div><div data-selected-saving-main style="font-size:20px;font-weight:900;color:#1e40af;">$40.72</div></div>
+                    <div style="text-align:center;padding:13px 10px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">Savings %</div><div data-selected-saving-percent style="font-size:20px;font-weight:900;color:#16a34a;">59.2%</div></div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px;">
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">1-Year Savings</div><div data-selected-1y style="font-size:22px;font-weight:900;color:#166534;">$488.64</div></div>
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">3-Year Savings</div><div data-selected-3y style="font-size:22px;font-weight:900;color:#166534;">$1,465.92</div></div>
+                    <div style="padding:13px 15px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;"><div style="font-size:9px;font-weight:900;color:#15803d;text-transform:uppercase;margin-bottom:5px;">5-Year Savings</div><div data-selected-5y style="font-size:22px;font-weight:900;color:#166534;">$2,443.20</div></div>
+                  </div>
+                  <div style="display:grid;gap:8px;">
+                    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span>OSPC selected flavor monthly baseline</span><strong data-selected-ospc-bar style="color:#ef4444;">$68.80/mo</strong></div><div style="background:#fee2e2;height:13px;border-radius:999px;overflow:hidden;"><div style="width:100%;height:13px;background:#ef4444;border-radius:999px;"></div></div></div>
+                    <div><div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span>FLEX mapped flavor projected monthly</span><strong data-selected-flex-bar style="color:#22c55e;">$28.08/mo</strong></div><div style="background:#dcfce7;height:13px;border-radius:999px;overflow:hidden;"><div data-selected-flexbar style="width:40.8%;height:13px;background:#22c55e;border-radius:999px;"></div></div></div>
+                    <div data-selected-saving style="font-size:12px;font-weight:900;color:#166534;text-align:right;">$40.72/mo saved (59.2%)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #d8e2f0;border-radius:14px;padding:18px 20px;margin:0 0 24px;box-shadow:0 8px 24px rgba(15,23,42,.08);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
+              <div>
+                <div style="font-size:10px;font-weight:900;color:#1d4ed8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:5px;">OSPC &rarr; FLEX Regional Performance Comparison</div>
+                <h3 style="font-size:18px;font-weight:900;color:#172033;margin:0;">Matched source flavor capacity vs FLEX target capacity</h3>
+              </div>
+              <div style="font-size:11px;color:#64748b;line-height:1.45;max-width:360px;text-align:right;">CPU, memory, and disk indexes compare matched FLEX capacity to source OSPC flavor capacity. FLEX bandwidth comes from the regional flavor catalogs.</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;overflow:auto;">
+              <div data-export-card style="border:1px solid #bfdbfe;border-radius:10px;overflow:hidden;min-width:380px;">
+                <div style="background:#eff6ff;color:#1e40af;font-size:13px;font-weight:900;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;"><span>IAD Performance Comparison</span><button type="button" onclick="s0ExportNearestTable(this,'IAD_OSPC_FLEX_Performance_Comparison.csv')" style="border:1px solid #bfdbfe;border-radius:7px;background:#fff;color:#1e40af;padding:5px 8px;font-size:10px;font-weight:900;cursor:pointer;">Export CSV</button></div>
+                <table style="width:100%;border-collapse:collapse;font-size:11px;color:#334155;">
+                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Flavor</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Flavor</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
+                  <tbody>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
+                    <tr><td style="padding:7px 8px;">compute1-30</td><td style="padding:7px 8px;"><strong>gp.0.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div data-export-card style="border:1px solid #bbf7d0;border-radius:10px;overflow:hidden;min-width:380px;">
+                <div style="background:#ecfdf5;color:#047857;font-size:13px;font-weight:900;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;"><span>DFW Performance Comparison</span><button type="button" onclick="s0ExportNearestTable(this,'DFW_OSPC_FLEX_Performance_Comparison.csv')" style="border:1px solid #bbf7d0;border-radius:7px;background:#fff;color:#047857;padding:5px 8px;font-size:10px;font-weight:900;cursor:pointer;">Export CSV</button></div>
+                <table style="width:100%;border-collapse:collapse;font-size:11px;color:#334155;">
+                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Flavor</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Flavor</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
+                  <tbody>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.5.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
+                    <tr><td style="padding:7px 8px;">compute1-30</td><td style="padding:7px 8px;"><strong>gp.5.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div data-export-card style="border:1px solid #fed7aa;border-radius:10px;overflow:hidden;min-width:380px;">
+                <div style="background:#fff7ed;color:#c2410c;font-size:13px;font-weight:900;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;"><span>SJC Performance Comparison</span><button type="button" onclick="s0ExportNearestTable(this,'SJC_OSPC_FLEX_Performance_Comparison.csv')" style="border:1px solid #fed7aa;border-radius:7px;background:#fff;color:#c2410c;padding:5px 8px;font-size:10px;font-weight:900;cursor:pointer;">Export CSV</button></div>
+                <table style="width:100%;border-collapse:collapse;font-size:11px;color:#334155;">
+                  <thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">OSPC Flavor</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;">FLEX Flavor</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">CPU</th><th style="text-align:center;padding:8px;border-bottom:1px solid #e2e8f0;">RAM</th><th style="text-align:right;padding:8px;border-bottom:1px solid #e2e8f0;">BW</th></tr></thead>
+                  <tbody>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-1</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">200%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-2</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.2</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">1G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.2.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">general1-4</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.4</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">2G</td></tr>
+                    <tr><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;">compute1-8</td><td style="padding:7px 8px;border-bottom:1px solid #e2e8f0;"><strong>gp.0.4.8</strong></td><td style="padding:7px 8px;text-align:center;border-bottom:1px solid #e2e8f0;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;border-bottom:1px solid #e2e8f0;">107%</td><td style="padding:7px 8px;text-align:right;border-bottom:1px solid #e2e8f0;">3G</td></tr>
+                    <tr><td style="padding:7px 8px;">compute1-30</td><td style="padding:7px 8px;"><strong>gp.0.16.64</strong></td><td style="padding:7px 8px;text-align:center;">100%</td><td style="padding:7px 8px;text-align:center;color:#15803d;font-weight:900;">213%</td><td style="padding:7px 8px;text-align:right;">7G</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        <!-- WHAT -->
+        <div style="order:30;background:#ffffff;border-radius:16px;border:1px solid #fecdd3;border-top:4px solid #f43f5e;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#e11d48,#fb7185);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#9889;</div>
+            <div>
+              <h2 style="color:#881337;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">What Moves to FLEX?</h2>
+              <p style="color:#fb7185;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Modernization Scope</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 18px;">FLEX is not just a landing zone for virtual machines. It is the next operating foundation for business systems leaving legacy OSPC, VMware estates, or hyperscaler sprawl while improving cost control, sovereignty, network governance, security posture, and automation.</p>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:18px;">
+            <div style="background:linear-gradient(160deg,#fff1f2,#ffe4e6);border:1px solid #fecdd3;border-radius:14px;padding:18px 20px;">
+              <h3 style="color:#9f1239;font-size:15px;font-weight:800;margin:0 0 12px;">Move the Workloads That Matter</h3>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;">
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Business Systems</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">ERP, CRM, commerce, portals, regulated apps, and revenue systems.</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Application Tiers</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">Web, API, middleware, worker, VMware VM, and cloud-native services.</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Data Foundations</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">Databases, files, object data, backups, sync plans, and data residency rules.</span>
+                </div>
+                <div style="background:rgba(255,255,255,0.74);border:1px solid rgba(254,205,211,0.9);border-radius:10px;padding:12px;">
+                  <strong style="display:block;color:#881337;font-size:12px;margin-bottom:4px;">Cloud Controls</strong>
+                  <span style="color:#475569;font-size:12px;line-height:1.5;">Images, flavors, networks, security groups, IPs, access, and sovereignty controls.</span>
+                </div>
+              </div>
+            </div>
+            <div style="background:linear-gradient(160deg,#fff7ed,#fff1f2);border:1px solid #fecdd3;border-radius:14px;padding:18px 20px;box-shadow:0 1px 8px rgba(244,63,94,0.08);">
+              <div style="font-size:10px;font-weight:800;color:#be123c;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Outcome</div>
+              <h3 style="color:#881337;font-size:17px;font-weight:900;margin:0 0 10px;">A cleaner, faster, future-ready platform.</h3>
+              <p style="color:#475569;font-size:13px;line-height:1.65;margin:0 0 14px;">The migration captures what exists, maps what must change, and lands each workload on FLEX with right sizing, network design, governance, sovereignty, and validation.</p>
+              <div style="display:grid;gap:8px;">
+                <div style="display:flex;gap:9px;align-items:flex-start;color:#475569;font-size:12px;line-height:1.45;"><span style="color:#be123c;font-weight:900;">01</span><span>Discover application dependency, business criticality, and current platform cost drivers.</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start;color:#475569;font-size:12px;line-height:1.45;"><span style="color:#be123c;font-weight:900;">02</span><span>Map compute, storage, network, security, sovereignty, and cutover requirements.</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start;color:#475569;font-size:12px;line-height:1.45;"><span style="color:#be123c;font-weight:900;">03</span><span>Validate performance, resiliency, access, compliance, and rollback readiness.</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:16px;">
+            <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:800;color:#be123c;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">From</div>
+              <p style="color:#475569;font-size:13px;line-height:1.55;margin:0;">Legacy OSPC patterns, VMware renewal pressure, hyperscaler sprawl, aging images, fixed designs, and infrastructure constraints.</p>
+            </div>
+            <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:800;color:#c2410c;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">Through</div>
+              <p style="color:#475569;font-size:13px;line-height:1.55;margin:0;">Discovery, assessment, right-sizing, cost modeling, migration waves, sovereignty mapping, UAT, staged cutover, and rollback planning.</p>
+            </div>
+            <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;">
+              <div style="font-size:10px;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">To</div>
+              <p style="color:#475569;font-size:13px;line-height:1.55;margin:0;">Modern OpenStack services, better economics, stronger automation, data control, and a cloud foundation ready for AI and Kubernetes.</p>
+            </div>
+          </div>
+
+          <div style="background:#fff1f2;border-left:3px solid #f43f5e;border-radius:0 8px 8px 0;padding:12px 16px;">
+            <p style="color:#9f1239;font-size:13px;margin:0;font-style:italic;line-height:1.6;">The WHAT is the customer&rsquo;s complete operating footprint: workloads, data, controls, sovereignty, and confidence needed to keep the business moving while the platform becomes stronger.</p>
+          </div>
+        </div>
+
+
+        <!-- WHEN -->
+        <div style="order:40;background:#ffffff;border-radius:16px;border:1px solid #dbeafe;border-top:4px solid #2563eb;padding:28px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#9200;</div>
+            <div>
+              <h2 style="color:#1e3a8a;margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;">When Should Customers Move to FLEX?</h2>
+              <p style="color:#3b82f6;margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Migration Triggers</p>
+            </div>
+          </div>
+          <p style="color:#374151;line-height:1.7;font-size:15px;margin:0 0 18px;">Customers should consider moving when one or more OSPC, VMware, hyperscaler, sovereignty, or modernization triggers appear:</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px;">
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">1</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Current platform limits performance or scalability</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">OSPC ages, VMware clusters constrain capacity, or hyperscaler architecture becomes too complex.</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">2</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Infrastructure cost needs optimization</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">VMware renewal costs rise, hyperscaler bills become unpredictable, or utilization needs improvement.</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">3</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">New projects are being launched</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">AI pilots, Kubernetes, analytics, sovereign cloud, or modernization programs should start on FLEX directly.</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">4</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Reduce migration risk with phased move</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">FLEX supports discover &rarr; assess &rarr; migrate &rarr; validate &rarr; cut over from OSPC, VMware, or hyperscaler estates. No big-bang required.</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;grid-column:1/-1;">
+              <div style="width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">5</div>
+              <div>
+                <strong style="color:#1e3a8a;font-size:13px;display:block;margin-bottom:4px;">Need a future-ready cloud foundation</strong>
+                <p style="color:#374151;font-size:12px;margin:0;line-height:1.5;">Hybrid cloud, open-source flexibility, data sovereignty, or long-term workload portability &mdash; FLEX is the right platform to evaluate now.</p>
+              </div>
+            </div>
+          </div>
+
+
+
+          <!-- Migration Trigger Conditions table -->
+          <h3 style="color:#1e3a8a;font-size:17px;font-weight:700;margin:0 0 4px;">Migration Trigger Conditions</h3>
+          <p style="color:#64748b;font-size:13px;margin-bottom:14px;">Technical and business conditions driving migration from OSPC, VMware, hyperscaler, or legacy environments to FLEX.</p>
+          <div style="border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 1px 8px rgba(0,0,0,0.05);">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;margin-top:0;">
+              <colgroup><col style="width:25%"><col style="width:40%"><col style="width:35%"></colgroup>
+              <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                <tr>
+                  <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Condition / trigger</th>
+                  <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Why it matters</th>
+                  <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Example use case</th>
+                </tr>
+              </thead>
+<tbody>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Need for modern, OpenStack-based infrastructure</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX runs on current-generation OpenStack with newer APIs, better automation, and open cloud standards, giving customers an alternative to aging OSPC, VMware dependency, or hyperscaler-only operating models.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A company operating legacy apps on OSPC and VMware wants Terraform and Kubernetes-friendly automation without moving every workload into a hyperscaler account.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Desire for more flexible networking and segmentation</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX supports modern segmentation, tenant isolation, floating IPs, and network governance without forcing customers into complex hyperscaler networking or rigid legacy designs.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">An e-commerce platform needs isolated PCI, analytics, and internal application networks while avoiding hyperscaler networking sprawl and data egress exposure.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Need to import custom images or use vendor images</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX supports custom images and common vendor images, helping customers migrate VMware VM patterns, OSPC images, or hyperscaler-built workloads into a controlled open platform.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A DevOps team wants to move hardened Linux and Windows images out of VMware or a hyperscaler into FLEX while preserving security baselines and operational consistency.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Scaling beyond legacy limits or regions</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX provides scalable capacity and modern hardware when OSPC is constrained, VMware clusters are expensive to expand, or hyperscaler growth is creating runaway spend.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A SaaS provider needs regional growth but wants predictable economics, less licensing exposure, and fewer hyperscaler egress surprises.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Push toward cost-efficient, license-free infrastructure</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX helps reduce proprietary virtualization exposure, hyperscaler bill volatility, and lock-in by using an open-source-based private cloud model.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A financial services firm wants to reduce VMware renewal pressure and repatriate steady-state cloud workloads from a hyperscaler into managed open infrastructure.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Requirement for advanced automation and CI/CD pipelines</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX integrates with Kubernetes, Terraform, Ansible, and GitOps workflows while avoiding brittle legacy tooling and hyperscaler-specific automation lock-in.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A platform team wants consistent pipelines across VMware exits, OSPC migrations, and selected hyperscaler repatriation workloads.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Compliance, security, or data sovereignty upgrade</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX supports stronger segmentation, isolation, and data placement control for customers facing sovereignty, residency, regulated workload, or hyperscaler data-control concerns.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A healthcare or public-sector organization needs data residency, isolation, and compliance alignment that is harder to prove across sprawling hyperscaler accounts.</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="color:#1e3a8a; font-weight:700;">Long-term roadmap and platform exit strategy</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">FLEX gives customers a managed modernization path for OSPC migration, VMware exit planning, hyperscaler repatriation, or hybrid cloud rebalancing.</td>
+                <td style="color:#374151;padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;">A customer phases legacy WebLogic, VMware-hosted apps, and steady-state hyperscaler workloads into FLEX over several migration waves.</td>
+              </tr>
+            </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- OSPC vs FLEX Services table (moved to bottom) -->
+        <div style="order:50;margin-top:40px;padding:0 0 8px;">
+          <!-- OSPC vs FLEX Services table -->
+          <div style="margin-bottom:28px;">
+            <details style="border:1px solid #dbeafe;border-radius:14px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,0.05);overflow:hidden;">
+              <summary style="list-style:none;cursor:pointer;padding:18px 22px;background:linear-gradient(135deg,#eff6ff,#f8fafc);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+                <span>
+                  <span style="display:block;color:#1e3a8a;font-size:17px;font-weight:800;margin-bottom:4px;">OpenStack Service Compatibility</span>
+                  <span style="display:block;color:#64748b;font-size:13px;">OpenStack service availability &mdash; OSPC (2024.2 Dalmatian) vs FLEX (2025.1 Epoxy+)</span>
+                </span>
+                <span style="background:#2563eb;color:#fff;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:800;white-space:nowrap;">Show Table</span>
+              </summary>
+            <div style="border-top:1px solid #e2e8f0;overflow:hidden;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+                <colgroup>
+                  <col style="width:13%"><col style="width:15%"><col style="width:7%"><col style="width:7%">
+                  <col style="width:13%"><col style="width:14%"><col style="width:17%"><col style="width:14%">
+                </colgroup>
+                <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                  <tr>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Service</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Role</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC</th>
+                    <th style="padding:11px 14px;text-align:center;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">OSPC Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">FLEX Min Ver.</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">What it does</th>
+                    <th style="padding:11px 14px;text-align:left;color:#475569;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;">Benefit</th>
+                  </tr>
+                </thead>
+                <tbody id="compatTbody"></tbody>
+              </table>
+            </div>
+            </details>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Customer Migration Tracker -->

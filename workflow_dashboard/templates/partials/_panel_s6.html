@@ -1,0 +1,145 @@
+  <div class="panel" id="panel-s6">
+    <div class="info-panel">
+      <h2>Stage 5 — Stabilization &amp; Handover</h2>
+      <p style="color:var(--muted);margin-bottom:12px;">Generate the formal Cloud Jumper handoff package, then review the completed migration tasks and close out the customer in the Migration Log.</p>
+
+      <div class="stage-hero" style="margin:16px 0 22px; padding:20px; background:radial-gradient(circle at top left, rgba(14,165,233,.18), rgba(2,6,23,.86)); border:1px solid rgba(56,189,248,.35); border-radius:10px; box-shadow:0 0 22px rgba(14,165,233,.12);">
+        <div style="display:flex; justify-content:space-between; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+          <div>
+            <div style="color:#7dd3fc; font-size:12px; letter-spacing:3px; text-transform:uppercase; font-family:'Share Tech Mono',monospace;">Cloud Jumper Mission Artifact</div>
+            <h3 style="margin:7px 0 8px; color:#e0f2fe; font-family:'Orbitron',sans-serif; letter-spacing:1px;">📦 Migration Output Bundle</h3>
+            <p style="margin:0; color:#94a3b8; font-size:13px; max-width:760px;">Creates the migration output bundle on this dashboard server. After <strong style="color:#e2e8f0;">Generate Bundle</strong> succeeds, download the ZIP to your <strong style="color:#e2e8f0;">operator laptop</strong> and optionally push the same stamp into a GitOps repo path the server can reach (<code style="color:#7dd3fc;">GITOPS_REPO_PATH</code>).</p>
+          </div>
+          <button type="button" onclick="generateMigrationOutputBundle()" style="background:linear-gradient(135deg,#0ea5e9,#2563eb); border:1px solid #38bdf8; color:#fff; padding:10px 16px; border-radius:7px; cursor:pointer; font-weight:800; box-shadow:0 0 14px rgba(56,189,248,.35);">Generate Bundle</button>
+        </div>
+
+        <div class="stage-artifact-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:16px; font-family:'Share Tech Mono',monospace; color:#d1d5db; font-size:13px;">
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #38bdf8;">migration_manifest.json</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #38bdf8;">discovery-output bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #0ea5e9;">stage2 migration output</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #22c55e;">terraform.tfvars.json</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #a78bfa;">ansible inventory</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #f59e0b;">repaired image metadata</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #fb7185;">boot/test results</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #14b8a6;">dependency graph</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #818cf8;">uat-input bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #34d399;">customer migration report</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #f97316;">tco / finops bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #22c55e;">opencenter output bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #60a5fa;">tenant-iac-dr output bundle</div>
+          <div style="padding:10px 12px; background:#e0f2fe; border-left:3px solid #f472b6;">ai-anywhere context bundle</div>
+        </div>
+
+        <div id="migration-output-bundle-status" style="display:none; margin-top:16px; padding:12px; background:#e0f2fe; border:1px solid rgba(148,163,184,.25); border-radius:8px; color:#cbd5e1; font-size:13px;"></div>
+      </div>
+
+      <section class="uat-panel" style="margin:18px 0;">
+        <div class="uat-panel-header">
+          <h3>📦 Customer Migration Report Export</h3>
+          <span class="uat-note">Customer-facing evidence from Stages 1 through 4</span>
+        </div>
+        <div class="uat-panel-body">
+          <p style="margin:0 0 10px;color:#94a3b8;font-size:13px;">Generate a customer-facing migration evidence report from discovery, migration, validation, cutover, and rollback artifacts.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:12px;">
+            <div class="gov-section"><h3>Why</h3><p>Customers need clear evidence of what was migrated, how it was migrated, what passed validation, what risks remain, and how rollback is handled.</p></div>
+            <div class="gov-section"><h3>When</h3><p>Run this after Stage 3 validation and Stage 4 cutover planning, during Stage 5 stabilization and handover.</p></div>
+            <div class="gov-section"><h3>Where</h3><p>Stage 5 — Stabilization &amp; Handover.</p></div>
+            <div class="gov-section"><h3>By Who</h3><p>Cloud Admin Team, Migration Lead, Project Manager, Customer Success, Managed Services, and Account Team.</p></div>
+            <div class="gov-section"><h3>How</h3><p>Collect artifacts from Stages 1 to 4, generate JSON, Markdown, and HTML reports, then include the report in the final migration handover bundle.</p></div>
+          </div>
+          <div class="uat-actions" style="margin-bottom:12px;flex-wrap:wrap;">
+            <button class="uat-btn" onclick="customerReportCollectEvidence()">📥 Collect Migration Evidence</button>
+            <button class="uat-btn uat-btn-good" onclick="customerReportGenerate()">📦 Generate Customer Migration Report</button>
+            <button class="uat-btn" onclick="customerReportGenerate()">🌐 Export HTML Report</button>
+            <button class="uat-btn" onclick="customerReportGenerate()">📝 Export Markdown Report</button>
+            <button class="uat-btn" onclick="customerReportGenerate()">🧾 Export JSON Report</button>
+            <button class="uat-btn uat-btn-good" onclick="customerReportAddToBundle()">📁 Add Report to Handover Bundle</button>
+          </div>
+          <div id="customer-report-status" class="uat-note" style="margin-bottom:10px;">No migration evidence collected yet.</div>
+          <div class="uat-grid" style="margin-bottom:12px;">
+            <div class="uat-card"><div>Source VMs</div><strong id="customer_report_card_source">0</strong></div>
+            <div class="uat-card"><div>Migrated VMs</div><strong id="customer_report_card_migrated">0</strong></div>
+            <div class="uat-card"><div>Validated VMs</div><strong id="customer_report_card_validated">0</strong></div>
+            <div class="uat-card"><div>Failed Validations</div><strong id="customer_report_card_failed">0</strong></div>
+            <div class="uat-card"><div>Rollback Items</div><strong id="customer_report_card_rollback">0</strong></div>
+            <div class="uat-card"><div>Open Risks</div><strong id="customer_report_card_risks">0</strong></div>
+            <div class="uat-card"><div>Artifacts Loaded</div><strong id="customer_report_card_loaded">0</strong></div>
+            <div class="uat-card"><div>Artifacts Missing</div><strong id="customer_report_card_missing">0</strong></div>
+          </div>
+          <div class="uat-table-wrap">
+            <table class="uat-table">
+              <thead><tr><th>stage</th><th>artifact</th><th>path</th><th>status</th><th>included_in_report</th><th>warning</th><th>actions</th></tr></thead>
+              <tbody id="customer_report_evidence_body"><tr><td colspan="7" style="color:#64748b;font-style:italic;">No evidence collected yet.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="artifact-list" id="customer_report_artifacts" style="margin-top:10px;"><span style="color:#64748b;">No customer report artifacts exported yet.</span></div>
+        </div>
+      </section>
+
+      <div style="margin:18px 0 8px; padding:14px 16px; background:rgba(99,102,241,.1); border:1px solid rgba(129,140,248,.35); border-radius:8px; border-left:4px solid #818cf8;">
+        <p style="margin:0; color:#e2e8f0; font-size:13px; line-height:1.55;"><strong>Feeds Stage 7 — IaC Backup, DR &amp; Restore:</strong> the bundle above materializes <code style="color:#7dd3fc;">tenant-iac-dr/</code> (Terraform/Ansible layouts, runbooks, policy files) under the same customer + timestamp the server records when <strong>Generate Bundle</strong> succeeds. Download the bundle locally from the green result panel, optionally <strong>push to GitOps</strong> there (same API as Stage 7), then use Stage 7 for restore profiles and execution — all against <em>this</em> bundle, not a separate manual upload.</p>
+        <div style="margin-top:10px;">
+          <button type="button" onclick="activateStage('s8')" style="background:rgba(99,102,241,.25); border:1px solid #a5b4fc; color:#e0e7ff; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:700;">Open Stage 7 — IaC Backup, DR &amp; Restore</button>
+        </div>
+      </div>
+
+      <h3>✅ Migration Checklist</h3>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Stage 1 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2fe; padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox1">
+          <div><span id="stgIcon1" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 1:</strong> Discovery &amp; Assessment</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(1, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(1, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 2 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2fe; padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox2">
+          <div><span id="stgIcon2" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 2:</strong> Infrastructure Cloned to FLEX</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(2, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(2, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 3 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2fe; padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox3">
+          <div><span id="stgIcon3" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 3:</strong> Data Migrated Successfully</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(3, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(3, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 4 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2fe; padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox4">
+          <div><span id="stgIcon4" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 4:</strong> Validation &amp; UAT Signed Off</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(4, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(4, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+
+        <!-- Stage 5 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#e0f2fe; padding:10px 15px; border-radius:6px; border-left:4px solid #4b6fa0;" id="stgBox5">
+          <div><span id="stgIcon5" style="display:inline-block; width:20px;">⬜</span> <strong>Stage 5:</strong> Production Cutover Complete</div>
+          <div style="display:flex; gap:8px;">
+            <button onclick="setStageState(5, 'Success')" style="background:#28a745; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">✅ Success</button>
+            <button onclick="setStageState(5, 'Failed')" style="background:#dc3545; border:none; color:white; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">❌ Failed</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px; padding:15px; background:#e0f2fe; border-radius:8px; border:1px solid #4b6fa0;">
+        <h3 style="margin-top:0;">Update Migration Log</h3>
+        <p style="font-size:12px; color:#0369a1; margin-bottom:12px;">Finalize the customer migration status in the CRM Tracker.</p>
+        <div style="display:flex; gap:10px;">
+          <button id="btnStage6Success" style="background:#28a745; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">✅ Mark as Successful</button>
+          <button id="btnStage6Fail" style="background:#dc3545; border:none; color:white; padding:8px 14px; border-radius:6px; font-weight:bold; cursor:pointer;">❌ Mark as Failed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 6 — Cost Optimization (native TCO dashboard) -->

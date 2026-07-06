@@ -1,0 +1,290 @@
+  <div class="panel" id="panel-s0">
+    <div style="padding:20px 16px; width:100%; box-sizing:border-box; margin:0 auto; overflow:auto; height:100%; background:#f8fafc;">
+      <!-- Migration to FLEX Request Panel -->
+      <div id="mig-flex-req-panel" style="background:#fff;border:1px solid #c7d2fe;border-radius:12px;margin-bottom:18px;overflow:hidden;box-shadow:0 4px 20px rgba(79,70,229,.12);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#1e1b4b,#4f46e5);">
+          <div style="font-size:14px;font-weight:900;color:#fff;letter-spacing:.06em;">🚀 New Migration Project</div>
+          <button onclick="var p=document.getElementById('mfr-body');p.style.display=p.style.display==='none'?'flex':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">▼ Expand</button>
+        </div>
+        <div id="mfr-body" style="display:none;flex-direction:column;">
+          <!-- Form bar -->
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:130px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Migration Operator *</label><input id="mfr-operator" type="text" placeholder="Operator name" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:120px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Company *</label><input id="mfr-company" type="text" placeholder="ACME Corp" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Contact *</label><input id="mfr-contact" type="text" placeholder="Jane Smith" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:140px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Email *</label><input id="mfr-email" type="email" placeholder="jane@acme.com" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:100px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Phone</label><input id="mfr-phone" type="text" placeholder="+1 555 000 0000" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:100px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Tenant ID</label><input id="mfr-tenant" type="text" placeholder="ospc-001" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:130px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Target FLEX Region</label>
+              <select id="mfr-region" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;">
+                <option value="">— Select —</option><option>IAD — Northern Virginia</option><option>DFW — Dallas</option><option>ORD1 — Chicago</option><option>LON — London</option><option>SYD — Sydney</option>
+              </select></div>
+            <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Start Date</label><input id="mfr-start" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Completion Date</label><input id="mfr-end" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:3;min-width:150px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Notes</label><input id="mfr-notes" type="text" placeholder="Compliance, cutover window…" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+          </div>
+          <!-- Business Systems iframe -->
+          <div style="flex:1;min-height:520px;border-bottom:1px solid #e2e8f0;">
+            <iframe src="/?only=biz_cards&stage=s4" style="display:block;width:100%;height:560px;border:0;" title="Business Systems"></iframe>
+          </div>
+          <!-- Actions -->
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;background:#f8fafc;">
+            <button onclick="document.getElementById('mfr-body').style.display='none'" style="background:#f1f5f9;color:#475569;border:1px solid #d1d5db;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="submitMfrPanel()" style="background:linear-gradient(135deg,#4f46e5,#0284c7);color:#fff;border:none;border-radius:7px;padding:9px 24px;font-size:13px;font-weight:900;cursor:pointer;">➕ Add to Migration Log</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer Migration Request board -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:0;margin-bottom:22px;overflow:hidden;box-shadow:0 2px 12px rgba(2,132,199,.10);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,#0c4a6e,#1e40af);">
+          <div style="font-size:14px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.07em;">🚀 Customer Migration Request</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button onclick="loadMigWaitingList()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">⟳ Refresh</button>
+            <button onclick="document.getElementById('inline-mig-form').style.display=document.getElementById('inline-mig-form').style.display==='none'?'block':'none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;">+ New Request</button>
+          </div>
+        </div>
+        <!-- Inline quick-add form -->
+        <div id="inline-mig-form" style="display:none;padding:14px 20px;background:#f0f9ff;border-bottom:1px solid #bae6fd;">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:130px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Company *</label><input id="imf-company" type="text" placeholder="ACME Corp" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:120px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Contact *</label><input id="imf-contact" type="text" placeholder="Jane Smith" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2;min-width:150px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Email *</label><input id="imf-email" type="email" placeholder="jane@acme.com" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Tenant ID</label><input id="imf-tenant" type="text" placeholder="ospc-001" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Region</label>
+              <select id="imf-region" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;">
+                <option value="">— Select —</option><option>IAD — Northern Virginia</option><option>DFW — Dallas</option><option>ORD1 — Chicago</option><option>LON — London</option><option>SYD — Sydney</option>
+              </select></div>
+            <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Start Date</label><input id="imf-start" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;min-width:110px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Completion</label><input id="imf-end" type="date" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:3;min-width:150px;"><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Notes</label><input id="imf-notes" type="text" placeholder="Compliance, cutover window…" style="border:1px solid #d1d5db;border-radius:5px;padding:6px 9px;font-size:12px;"></div>
+            <button onclick="submitInlineMigRequest()" style="background:linear-gradient(135deg,#0284c7,#4f46e5);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap;height:32px;align-self:flex-end;">📨 Submit</button>
+          </div>
+        </div>
+        <!-- Waiting list rows -->
+        <div id="mig-waiting-list-banner" style="display:none;">
+          <div id="mig-waiting-list-rows" style="padding:10px 20px;"></div>
+        </div>
+        <div id="mig-no-requests" style="padding:14px 20px;color:#94a3b8;font-size:12px;font-style:italic;">No migration requests yet. Click "+ New Request" to add one.</div>
+      </div>
+
+      <!-- Waiting List Details Panel -->
+      <div id="wl-details-panel" style="display:none;background:#fff;border:1px solid #bae6fd;border-radius:12px;padding:0;margin-bottom:22px;overflow:hidden;box-shadow:0 8px 32px rgba(2,132,199,0.14);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0c4a6e,#1e40af);color:#fff;">
+          <div>
+            <div id="wld-title" style="font-size:15px;font-weight:900;letter-spacing:.04em;">📋 Migration Request Details</div>
+            <div id="wld-meta" style="font-size:11px;color:#bae6fd;margin-top:2px;"></div>
+          </div>
+          <button onclick="document.getElementById('wl-details-panel').style.display='none'" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:13px;font-weight:700;">✕ Close</button>
+        </div>
+        <!-- Customer info bar -->
+        <div id="wld-customer-bar" style="display:flex;flex-wrap:wrap;gap:16px;padding:12px 20px;background:#f0f9ff;border-bottom:1px solid #bae6fd;font-size:12px;"></div>
+        <!-- Strategy + notes -->
+        <div id="wld-strategy-bar" style="display:flex;align-items:center;gap:10px;padding:10px 20px;background:#fafafa;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;font-size:12px;"></div>
+        <!-- Business systems cards -->
+        <div id="wld-systems" style="padding:16px 20px;display:grid;grid-template-columns:1fr;gap:12px;"></div>
+        <div id="wld-empty" style="display:none;padding:30px;text-align:center;color:#94a3b8;font-size:13px;">No business systems recorded in this request. Use 🔄 Sync Business Systems to add systems from the UAT stage.</div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div>
+          <h1 style="color:#0f172a; margin:0; font-size:28px;">Customer Migration Tracker</h1>
+          <p style="color:#64748b; margin-top:5px;">Manage customer queue, track infrastructure scale, and monitor migration status.</p>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; padding:0 24px;">
+          <button id="btnToggleProjectDocsUpload" style="padding:12px 20px; background:linear-gradient(135deg, #0f766e, #0891b2); color:white; border:1px solid #67e8f9; border-radius:8px; font-weight:700; cursor:pointer; box-shadow:0 0 16px rgba(34,211,238,0.18); white-space:nowrap;">
+            ⬆ Upload projects data (docx, pdf, xls, ppt, visio)
+          </button>
+          <div style="display:flex;align-items:center;gap:8px;width:100%;max-width:460px;">
+            <div style="background:#7f1d1d;border-radius:6px;padding:3px 8px;display:flex;align-items:center;gap:5px;flex-shrink:0;"><span style="font-size:11px;">📺</span><span style="color:#fca5a5;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">VIDEO TUTORIAL</span></div>
+            <div style="background:#172554;border-radius:4px;padding:2px 6px;flex-shrink:0;"><span style="color:#93c5fd;font-size:9px;font-weight:700;">YT</span></div>
+            <input id="stginp-pnl-s0" type="url" placeholder="Paste video URL to link tutorial..." style="flex:1;background:rgba(15,23,42,.06);border:1px solid rgba(14,165,233,.30);border-radius:4px;padding:5px 8px;color:#0c4a6e;font-size:10px;box-sizing:border-box;outline:none;min-width:0;" />
+            <button onclick="stgVidSave('pnl-s0')" style="background:rgba(37,99,235,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#10003; Save</button>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btnAddNewRow" style="padding:10px 15px; background:#17a2b8; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">➕ Add Row</button>
+          <button id="btnSyncBizSystems" onclick="syncBizSystemsToTracker()" style="padding:10px 15px; background:linear-gradient(135deg,#0284c7,#4f46e5); color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">🔄 Sync Business Systems</button>
+          <button id="btnSaveEdits" style="padding:10px 15px; background:#2ecc71; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; display:none; box-shadow:0 0 10px #2ecc71;">💾 Save Edits</button>
+          <button id="btnExportCsv" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">Export Migration Log</button>
+          <button id="btnToggleUploadAppend" style="padding:10px 15px; background:#2b4570; color:white; border:1px solid #7ecfff; border-radius:4px; cursor:pointer;">+ Append Missing</button>
+          <button id="btnToggleUploadOver" style="padding:10px 15px; background:#dc3545; color:white; border:1px solid #ff4d4d; border-radius:4px; cursor:pointer;">+ Add New Template</button>
+          <button id="btnDelAll" onclick="deleteAllTrackerRows()" style="padding:10px 15px; background:#7f1d1d; color:white; border:1px solid #ef4444; border-radius:4px; font-weight:bold; cursor:pointer;">🗑 DEL ALL</button>
+        </div>
+      </div>
+
+      <div id="uploadZone" style="display:none; border:2px dashed #7ecfff; padding:30px; text-align:center; border-radius:8px; margin-bottom:20px; background:#e0f2fe; cursor:pointer;">
+        <p style="color:#a8d8ff; margin:0; font-weight:bold;" id="uploadModeText">Drag & Drop your <code>customers_backlog.csv</code> or <code>.xlsx</code> here, or click to browse.</p>
+        <input type="file" id="fileBacklog" style="display:none;" accept=".csv, .xls, .xlsx" />
+      </div>
+
+      <div id="projectDocsUploadZone" style="display:none; border:2px dashed #67e8f9; padding:28px; text-align:center; border-radius:10px; margin-bottom:20px; background:rgba(8,145,178,0.08); cursor:pointer; box-shadow:inset 0 0 20px rgba(103,232,249,0.08);">
+        <p style="color:#cffafe; margin:0; font-weight:700;" id="projectDocsUploadText">Drag & Drop project documents here, or click to browse. Accepted: <code>.doc</code>, <code>.docx</code>, <code>.pdf</code>, <code>.xls</code>, <code>.xlsx</code>, <code>.ppt</code>, <code>.pptx</code>, <code>.vsd</code>, <code>.vsdx</code>.</p>
+        <div id="projectDocsUploadStatus" style="margin-top:10px; color:#89e6ff; font-size:13px;"></div>
+        <input type="file" id="fileProjectDocs" style="display:none;" accept=".doc,.docx,.pdf,.xls,.xlsx,.ppt,.pptx,.vsd,.vsdx" multiple />
+      </div>
+
+      <div style="display:flex; gap:15px; margin-bottom:20px;">
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #64748b; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">To Be Migrated</div>
+          <div id="kpiToMigrate" style="font-size:28px; font-weight:bold; color:#0f172a;">-</div>
+        </div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #f59e0b; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">Ready for Migration</div>
+          <div id="kpiReady" style="font-size:28px; font-weight:bold; color:#d97706;">-</div>
+        </div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #22c55e; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">Successfully Migrated</div>
+          <div id="kpiSuccess" style="font-size:28px; font-weight:bold; color:#16a34a;">-</div>
+        </div>
+        <div style="flex:1; background:#ffffff; padding:15px; border-radius:10px; border-top:4px solid #f87171; text-align:center; box-shadow:0 1px 6px rgba(0,0,0,0.07);">
+          <div style="font-size:11px; text-transform:uppercase; color:#64748b; font-weight:600; letter-spacing:.05em; margin-bottom:5px;">Failed Migrations</div>
+          <div id="kpiFailed" style="font-size:28px; font-weight:bold; color:#dc2626;">-</div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+        <input type="text" id="trackerSearch" placeholder="🔍 Search backlog by customer, status, readiness..." style="width:100%; max-width:400px; padding:12px; border-radius:6px; border:1px solid #e2e8f0; background:#ffffff; color:#0f172a; font-size:14px; outline:none; box-shadow:0 1px 3px rgba(0,0,0,0.05);" />
+      </div>
+
+      <!-- top scrollbar mirror -->
+      <div id="trackerTopScroll" style="width:100%;overflow-x:auto;overflow-y:hidden;margin-top:20px;height:14px;">
+        <div id="trackerTopScrollInner" style="height:1px;"></div>
+      </div>
+      <div id="trackerScrollWrap" style="width:100%; overflow-x:auto; background:#ffffff; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+        <table style="width:100%; border-collapse:collapse; white-space:nowrap;" id="trackerTable">
+        <thead>
+          <tr>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Priority Rank</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Customer Details</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Status</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Readiness &amp; Size</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Progress</th>
+            <th style="padding:12px 15px; text-align:left; border-bottom:2px solid #e2e8f0; background:#f8fafc; color:#475569; font-weight:700; text-transform:uppercase; font-size:11px; letter-spacing:.05em;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="trackerBody">
+          <tr><td colspan="8" style="text-align:center; padding:50px; color:#666; font-style:italic;">Loading Customer Migration Queue...</td></tr>
+        </tbody>
+      </table>
+      </div>
+
+      <!-- Documentation / Guidelines Tables -->
+      <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <h2 style="color:#16a34a; margin-bottom:15px; font-size: 22px;">📚 Migration Prioritization Guidelines</h2>
+
+        <div style="background:#ffffff; border:1px solid #e2e8f0; padding:20px; border-radius:10px; margin-bottom: 30px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+          <h3 style="color:#d97706; margin-top:0; font-size:16px;">1️⃣ What Can and Should be Migrated to Flex</h3>
+          <div style="overflow-x:auto;">
+            <table class="matrix-table" style="min-width: 1000px;">
+              <thead>
+                <tr>
+                  <th style="width:15%">Category</th>
+                  <th style="width:25%">FLEX Ready app stacks</th>
+                  <th style="width:20%">Why FLEX Ready</th>
+                  <th style="width:20%">Not Yet FLEX Ready app stacks</th>
+                  <th style="width:20%">Why not yet FLEX Ready</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Open-source web apps</td><td>WordPress, Drupal, Magento, Laravel, Django, Flask, Node.js web apps</td><td>Standard Linux runtimes, portable app/data tiers, easy VM or app-tier rebuild</td><td>Very old PHP/Apache apps tied to obsolete OS or local legacy modules</td><td>Old runtime, unsupported packages, hidden dependencies</td></tr>
+                <tr><td>Standard 3-tier business apps</td><td>Web + API + DB on supported Linux/Windows</td><td>Clean separation of app and data tiers, easier rehost or replatform</td><td>Monolith with app + DB + files + scheduler all on one VM</td><td>Tight coupling, hardcoded paths, embedded dependencies</td></tr>
+                <tr><td>Open-source databases</td><td>MySQL, Percona, PostgreSQL, Redis</td><td>Easy to move with replication, backup/restore, export/import</td><td>DB versions too old, unsupported, or bound to obsolete OS/storage stack</td><td>Upgrade and schema compatibility issues</td></tr>
+                <tr><td>Standard Windows business apps</td><td>Windows Server 2019/2022 app servers, IIS apps, .NET-supported apps</td><td>Modern OS, portable workloads, easier rebuild on FLEX VMs</td><td>Windows 2003/2008 legacy apps, old IIS/.NET dependencies</td><td>Unsupported OS, security risk, migration blockers</td></tr>
+                <tr><td>Linux application tiers</td><td>Ubuntu 20.04/22.04/24.04, RHEL 8/9, Rocky, AlmaLinux, Debian 11/12</td><td>Supported guest OS, predictable package ecosystem</td><td>RHEL/CentOS 5/6, Ubuntu 14/16, old Debian, old custom kernels</td><td>Legacy kernel/userspace, driver and package issues</td></tr>
+                <tr><td>API / middleware tiers</td><td>Java app servers, Tomcat, Spring Boot, Nginx, HAProxy, RabbitMQ, modern middleware</td><td>Usually portable if config and connectivity are understood</td><td>Middleware requiring old libraries, old JVM, legacy init scripts, appliance-like packaging</td><td>Runtime drift and dependency fragility</td></tr>
+                <tr><td>Containerized workloads</td><td>Kubernetes apps with portable images, separated PVs, standard registries</td><td>Stateless layers easy to move, stateful parts manageable with storage plan</td><td>K8s workloads with tangled storage, old CSI bindings, hidden infra dependencies</td><td>PV portability and platform coupling issues</td></tr>
+                <tr><td>File/content platforms</td><td>Shared content repos, NFS-backed app content, object-compatible app data</td><td>Can be copied/synced and repointed</td><td>Apps with business logic tightly coupled to local filesystem layouts</td><td>Hardcoded mounts and path assumptions</td></tr>
+                <tr><td>ERP/CRM/custom LOB on supported stack</td><td>Supported OS + supported DB + normal app/data separation</td><td>Can often be stabilized on FLEX first</td><td>Old ERP/CRM on obsolete OS or vendor stack with no clean export path</td><td>Better treated as replacement/replatform project</td></tr>
+                <tr><td>Analytics / reporting apps</td><td>Modern BI/reporting apps using supported DBs and standard app hosts</td><td>Often portable if data sources are reachable</td><td>Old report servers with brittle dependencies and low business value</td><td>Usually better to retire or archive</td></tr>
+                <tr><td>Batch / worker tiers</td><td>ETL jobs, schedulers, queue workers on supported OS</td><td>Easy to relocate if dependencies are documented</td><td>Cron-heavy legacy boxes with undocumented local scripts and old runtimes</td><td>Hidden operational logic and local-state risk</td></tr>
+                <tr><td>Customer-built apps</td><td>Modern custom apps using standard stacks and supported OS</td><td>Best candidates for phased migration</td><td>Deeply customized legacy monoliths</td><td>Need refactor/replatform, not simple move</td></tr>
+                <tr><td>Appliance-like stacks</td><td>Few, unless virtual appliance is vendor-supported on KVM/FLEX</td><td>Possible only with explicit support</td><td>Xen-dependent virtual appliances, proprietary clusters, special kernel appliances</td><td>Hypervisor dependency or vendor lock-in</td></tr>
+                <tr><td>Mainframe / proprietary core</td><td>Downstream integration to FLEX data only</td><td>FLEX can host replicas, feeds, analytics</td><td>Mainframe DBs, RAC appliances, proprietary hardware platforms</td><td>Retain in place, integrate rather than move</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:30px; margin-bottom:30px;">
+          <div style="flex:1; background:#ffffff; border:1px solid #e2e8f0; padding:20px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+            <h3 style="color:#2563eb; margin-top:0; font-size:16px;">2️⃣ Best Examples</h3>
+            <div style="overflow-x:auto;">
+              <table class="matrix-table" style="min-width: 500px;">
+                <thead>
+                  <tr>
+                    <th style="width:50%; background:rgba(46,204,113,0.1); border-color:#2ecc71;">FLEX Ready examples</th>
+                    <th style="width:50%; background:rgba(231,76,60,0.1); border-color:#e74c3c;">Not Yet FLEX Ready examples</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>WordPress on Ubuntu 22.04 + MySQL</td><td>WordPress on CentOS 6 + old PHP + local legacy plugins</td></tr>
+                  <tr><td>Drupal on RHEL 8 + MariaDB</td><td>Drupal on old Apache/PHP stack tied to obsolete OS</td></tr>
+                  <tr><td>Spring Boot API + PostgreSQL</td><td>Java app requiring old JVM and deprecated middleware</td></tr>
+                  <tr><td>IIS/.NET app on Windows Server 2022</td><td>IIS app on Windows 2008 with legacy .NET dependencies</td></tr>
+                  <tr><td>Node.js app + Redis + Postgres</td><td>Single VM monolith with app, DB, cron, files all together</td></tr>
+                  <tr><td>Kubernetes app with clean PVC strategy</td><td>Old K8s/stateful app with tightly coupled legacy storage</td></tr>
+                  <tr><td>Nginx + Flask + PostgreSQL</td><td>Xen-dependent appliance or proprietary virtual machine</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="flex:1; background:#ffffff; border:1px solid #e2e8f0; padding:20px; border-radius:10px; box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+            <h3 style="color:#7c3aed; margin-top:0; font-size:16px;">3️⃣ Migration Prioritization Guidelines</h3>
+            <div style="overflow-x:auto;">
+              <table class="matrix-table" style="min-width: 500px;">
+                <thead>
+                  <tr>
+                    <th>Layer 1: FLEX readiness</th>
+                    <th>Layer 2: Size / complexity</th>
+                    <th>Layer 3: Blast radius</th>
+                    <th>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>FLEX Ready</td><td>Small</td><td>Secondary</td><td><strong>Earliest priority</strong></td></tr>
+                  <tr><td>FLEX Ready</td><td>Small</td><td>Important</td><td><strong>Early priority</strong></td></tr>
+                  <tr><td>FLEX Ready</td><td>Small</td><td>Core</td><td>Early, but only after guardrail is satisfied</td></tr>
+                  <tr><td>FLEX Ready</td><td>Medium</td><td>Secondary</td><td>Early-mid priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Medium</td><td>Important</td><td>Mid priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Medium</td><td>Core</td><td>Mid priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Large</td><td>Secondary</td><td>Mid-late priority</td></tr>
+                  <tr><td>FLEX Ready</td><td>Large</td><td>Important</td><td>Late in FLEX-ready group</td></tr>
+                  <tr><td>FLEX Ready</td><td>Large</td><td>Core</td><td>Very late in FLEX-ready group</td></tr>
+                  <tr><td>FLEX Ready</td><td>Very Large / Interconnected</td><td>Secondary</td><td>Very late</td></tr>
+                  <tr><td>FLEX Ready</td><td>Very Large / Interconnected</td><td>Important</td><td>Very late</td></tr>
+                  <tr><td>FLEX Ready</td><td>Very Large / Interconnected</td><td>Core</td><td>Final FLEX-ready wave</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Small</td><td>Secondary</td><td>After all FLEX-ready equivalents</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Small</td><td>Important</td><td>After all FLEX-ready equivalents</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Small</td><td>Core</td><td>After guardrail and FLEX-ready maturity</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Medium</td><td>Secondary</td><td>Later</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Medium</td><td>Important</td><td>Later</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Medium</td><td>Core</td><td>Later</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Large</td><td>Secondary</td><td>Late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Large</td><td>Important</td><td>Late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Large</td><td>Core</td><td>Very late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Very Large / Interconnected</td><td>Secondary</td><td>Very late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Very Large / Interconnected</td><td>Important</td><td>Very late</td></tr>
+                  <tr><td>Partially FLEX Ready</td><td>Very Large / Interconnected</td><td>Core</td><td>End of partial-ready group</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Small</td><td>Secondary</td><td>After ready and partial groups</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Small</td><td>Important</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Small</td><td>Core</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Medium</td><td>Secondary</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Medium</td><td>Important</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Medium</td><td>Core</td><td>Late-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Large</td><td>Secondary</td><td>Final-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Large</td><td>Important</td><td>Final-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Large</td><td>Core</td><td>Final-stage</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Very Large / Interconnected</td><td>Secondary</td><td>Near-final</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Very Large / Interconnected</td><td>Important</td><td>Near-final</td></tr>
+                  <tr><td><span style="color:#e74c3c">Not Yet FLEX Ready</span></td><td>Very Large / Interconnected</td><td>Core</td><td>Absolute last</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Stage 1 — Discovery & Assessment -->

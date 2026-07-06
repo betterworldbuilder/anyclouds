@@ -1,0 +1,329 @@
+    <div id="s2rehost_p2_2-pane" class="gov-page" style="display:none;overflow:auto;padding:18px 20px;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>☸️ R6 Refactor / Rearchitect APPs to Containerization</h2>
+          <p>Transform selected customer business applications into container-ready, Kubernetes-packaged workloads that can be imported into the OpenCenter GitOps modernization stage.</p>
+          <p style="margin-top:8px;color:#475569;font-size:13px;line-height:1.55;"><strong>R6 is the bridge between VM migration and OpenCenter modernization.</strong> It converts selected business application components into container-ready, Kubernetes-packaged workloads that can be imported into OpenCenter for GitOps-based deployment, security, observability, backup, and lifecycle operations.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r6-status">Select a Template</div>
+      </div>
+
+      <div class="gov-section" style="border-left:5px solid #0ea5e9;background:linear-gradient(135deg,#eff6ff,#f8fafc);">
+        <h3 style="margin-top:0;color:#0f172a;">OpenCenter handoff positioning</h3>
+        <p style="margin:0;color:#334155;line-height:1.6;">OpenCenter runs the production Kubernetes/GitOps platform. R6 prepares the business applications for OpenCenter by assessing, containerizing, externalizing state/config, generating CI/CD, and packaging Kubernetes manifests.</p>
+      </div>
+
+      <!-- Stats -->
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="gov-section"><h3>Templates</h3><div style="font-size:26px;font-weight:900;color:#7dd3fc;">8</div></div>
+        <div class="gov-section"><h3>Selected</h3><div id="r6-sel-count" style="font-size:26px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Components</h3><div id="r6-comp-count" style="font-size:26px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Ready to Containerize</h3><div id="r6-ready-count" style="font-size:26px;font-weight:900;color:#16a34a;">0</div></div>
+        <div class="gov-section"><h3>Need Refactor</h3><div id="r6-refactor-count" style="font-size:26px;font-weight:900;color:#f97316;">0</div></div>
+        <div class="gov-section"><h3>Stay on VM</h3><div id="r6-vm-count" style="font-size:26px;font-weight:900;color:#60a5fa;">0</div></div>
+        <div class="gov-section"><h3>Blockers</h3><div id="r6-blocker-count" style="font-size:26px;font-weight:900;color:#ef4444;">0</div></div>
+        <div class="gov-section"><h3>Generated Artifacts</h3><div id="r6-artifact-count" style="font-size:26px;font-weight:900;color:#fcd34d;">0</div></div>
+        <div class="gov-section"><h3>OpenCenter Export</h3><div id="r6-export-status" style="font-size:18px;font-weight:900;color:#64748b;">Not Ready</div></div>
+      </div>
+
+      <div class="gov-section">
+        <h3 style="margin-top:0;">R6 Containerization Flow</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <div class="r6-step-card"><strong>A. Business App Selection</strong><span>Ready</span><small>Select business system or architecture template.</small></div>
+          <div class="r6-step-card"><strong>B. Readiness Assessment</strong><span id="r6-step-readiness">Not Started</span><small>Score statefulness, dependencies, runtime, and blockers.</small></div>
+          <div class="r6-step-card"><strong>C. Containerization Factory</strong><span id="r6-step-factory">Not Started</span><small>Dockerfile, image plan, ports, health checks.</small></div>
+          <div class="r6-step-card"><strong>D. State & Config</strong><span id="r6-step-state">Not Started</span><small>ConfigMaps, Secrets, PVCs, logs, sessions, uploads.</small></div>
+          <div class="r6-step-card"><strong>E. CI/CD Pipeline</strong><span id="r6-step-cicd">Not Started</span><small>Build, scan, push, SBOM, GitOps update.</small></div>
+          <div class="r6-step-card"><strong>F. K8s Packaging</strong><span id="r6-step-k8s">Not Started</span><small>Helm, Kustomize, Flux handoff files.</small></div>
+          <div class="r6-step-card"><strong>G. OpenCenter Export</strong><span id="r6-step-export">Not Started</span><small>Complete import bundle for OpenCenter.</small></div>
+        </div>
+      </div>
+
+      <!-- Architecture Template Cards -->
+      <div class="gov-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h3 style="margin:0;">Architecture Templates</h3>
+          <div style="display:flex;gap:8px;">
+            <button class="gov-btn btn-example" onclick="r6ClearAll()">✕ Clear All</button>
+            <button class="gov-btn btn-save" onclick="r6GenerateManifests()">⚡ Generate K8s Manifests</button>
+          </div>
+        </div>
+        <div id="r6-template-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
+      </div>
+
+      <!-- Selected System Component Topology -->
+      <div id="r6-topology-section" class="gov-section" style="display:none;">
+        <h3>Component Topology — <span id="r6-topo-name" style="color:#7dd3fc;"></span></h3>
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 12px;">Each component maps to a K8s workload type. Review and adjust before generating manifests.</p>
+        <div style="overflow:auto;">
+          <table class="gov-table" style="min-width:820px;">
+            <thead><tr><th>Layer</th><th>Component</th><th>K8s Kind</th><th>Readiness</th><th>Recommended Action</th><th>Replicas</th><th>Image Placeholder</th><th>Resources</th></tr></thead>
+            <tbody id="r6-topo-body"></tbody>
+          </table>
+        </div>
+        <div class="gov-actions" style="margin-top:12px;">
+          <button class="gov-btn btn-save" onclick="r6GenerateManifests()">⚡ Generate Helm / K8s Manifests</button>
+          <button class="gov-btn btn-example" onclick="stage2OpenPath('s2rehost_p2_1')">⚙️ Also Run DB Replication</button>
+          <button class="gov-btn btn-export" onclick="r6ExportTopology()">📥 Export Topology JSON</button>
+          <button class="gov-btn btn-save" onclick="r6GenerateOpenCenterBundle()">📦 Generate OpenCenter Import Bundle</button>
+          <button class="gov-btn btn-export" onclick="r6SendToOpenCenter()">🚀 Send to OpenCenter Stage</button>
+        </div>
+      </div>
+
+      <!-- K8s Manifests Output -->
+      <div id="r6-manifests-section" class="gov-section" style="display:none;">
+        <h3>Generated K8s Manifests</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <button class="gov-btn btn-save" onclick="r6CopyManifests()">📋 Copy All</button>
+          <button class="gov-btn btn-export" onclick="r6DownloadManifests()">📥 Download YAML</button>
+          <button class="gov-btn btn-save" onclick="r6GenerateOpenCenterBundle()">📦 Generate OpenCenter Import Bundle</button>
+          <button class="gov-btn btn-export" onclick="r6SendToOpenCenter()">🚀 Send to OpenCenter Stage</button>
+        </div>
+        <pre id="r6-manifests-out" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:16px;color:#86efac;font-size:11px;overflow:auto;max-height:480px;white-space:pre-wrap;"></pre>
+      </div>
+
+      <div id="r6-bundle-section" class="gov-section" style="display:none;">
+        <h3>Export to OpenCenter</h3>
+        <p style="color:#64748b;margin-top:0;">The handoff bundle includes readiness, image plans, CI/CD metadata, Helm/Kustomize placeholders, Flux handoff, secrets placeholders, and README_OpenCenter_Import.md.</p>
+        <div id="r6-bundle-summary" style="background:#f8fafc;border:1px solid #dbeafe;border-radius:10px;padding:12px;color:#0f172a;font-size:13px;margin-bottom:10px;"></div>
+        <pre id="r6-bundle-out" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:16px;color:#86efac;font-size:11px;overflow:auto;max-height:360px;white-space:pre-wrap;"></pre>
+      </div>
+
+    </div>
+
+
+
+    <script>
+    // ── OpenRC parser + ocil stubs ──
+    (function(){
+      function gi(id){ return document.getElementById(id); }
+      function gv(id){ var el=gi(id); return el?el.value.trim():''; }
+      function sv(id,val){ var el=gi(id); if(el){ el.value=val; el.dispatchEvent(new Event('input')); } }
+
+      window.ocqsParseOpenRC = function(input){
+        var file = input.files[0];
+        if (!file) return;
+        var fn = gi('ocqs-openrc-filename');
+        var st = gi('ocqs-openrc-status');
+        if (fn) fn.textContent = file.name;
+        var reader = new FileReader();
+        reader.onload = function(e){
+          var text = e.target.result;
+          var found = {}; var kv = {};
+          // Pass 1: collect all values, resolve $VAR references (e.g. OS_PASSWORD="$OS_API_KEY")
+          text.split('\n').forEach(function(line){
+            var m = line.match(/^\s*export\s+(\w+)\s*=\s*["']?([^"'\r\n]*)["']?/);
+            if (!m) return;
+            var k = m[1], v = m[2].trim().replace(/\$(\w+)/g, function(_,r){ return kv[r]||''; });
+            kv[k] = v;
+          });
+          // Pass 2: apply to form fields
+          if (kv.OS_AUTH_URL)  { sv('ocqs-authurl', kv.OS_AUTH_URL); found.authUrl=true; }
+          if (kv.OS_REGION_NAME) { sv('ocqs-region', kv.OS_REGION_NAME); found.region=true; }
+          if (kv.OS_APPLICATION_CREDENTIAL_ID) {
+            sv('ocqs-credid', kv.OS_APPLICATION_CREDENTIAL_ID); found.credId=true;
+            var sel=document.getElementById('ocqs-authtype');
+            if(sel){sel.value='v3applicationcredential';if(typeof ocqsToggleAuthType==='function')ocqsToggleAuthType();}
+          }
+          if (kv.OS_APPLICATION_CREDENTIAL_SECRET) { sv('ocqs-credsec', kv.OS_APPLICATION_CREDENTIAL_SECRET); found.credSec=true; }
+          if (kv.OS_USERNAME) { sv('ocqs-username', kv.OS_USERNAME); found.username=true; }
+          var pw = kv.OS_PASSWORD || kv.OS_API_KEY || '';
+          if (pw) { sv('ocqs-password', pw); found.password=true; }
+          if (kv.OS_USER_DOMAIN_NAME) { sv('ocqs-userdomain', kv.OS_USER_DOMAIN_NAME); found.domain=true; }
+          if (kv.OS_PROJECT_DOMAIN_NAME) { sv('ocqs-projdomain', kv.OS_PROJECT_DOMAIN_NAME); }
+          var pid = kv.OS_PROJECT_ID || kv.OS_TENANT_ID || '';
+          if (pid) { sv('ocqs-projectid', pid); found.projId=true; }
+          if (!found.credId) {
+            var sel=document.getElementById('ocqs-authtype');
+            if(sel){sel.value='password';if(typeof ocqsToggleAuthType==='function')ocqsToggleAuthType();}
+          }
+          var count = Object.keys(found).length;
+          if (st) {
+            if (count > 0) {
+              st.style.color = '#15803d'; st.style.fontWeight = '700';
+              st.textContent = '✓ ' + count + ' field' + (count > 1 ? 's' : '') + ' imported';
+            } else {
+              st.style.color = '#dc2626'; st.style.fontWeight = '700';
+              st.textContent = '✗ No OpenRC fields found — check file format';
+            }
+          }
+          setTimeout(function(){
+            if (typeof ocqsUpdate === 'function') ocqsUpdate();
+            if (typeof ocqsReqCheck === 'function') ocqsReqCheck();
+          }, 50);
+        };
+        reader.readAsText(file);
+      };
+
+      window.ocilUpdate = function(){
+        var org     = gv('ocil-org')     || 'my-org';
+        var cluster = gv('ocil-cluster') || 'my-cluster';
+        var region  = gv('ocil-region')  || 'dfw3';
+        var authUrl = gv('ocil-authurl') || 'https://identity.api.rackspacecloud.com/v3';
+        var credId  = gv('ocil-credid')  || 'YOUR_OPENSTACK_APP_CRED_ID';
+        var credSec = gv('ocil-credsec');
+        var gitRepo = gv('ocil-gitrepo') || 'YOUR_GITOPS_REPO_URL';
+        var tokFile = gv('ocil-tokfile') || '/home/dzoan/.config/opencenter/tokens/git-token.txt';
+        var branch  = gv('ocil-branch')  || 'main';
+
+        var configPath = '/home/dzoan/.config/opencenter/clusters/blueprints/'+org+'/'+cluster+'/'+cluster+'-config.yaml';
+        var gitopsPath = '/home/dzoan/.config/opencenter/clusters/gitops/'+org;
+        var logPath    = '/home/dzoan/.local/state/opencenter/logs/bootstrap/'+org+'/'+cluster+'/';
+        var credDisplay = credSec ? '••••••••••••' : 'YOUR_OPENSTACK_APP_CRED_SECRET';
+
+        // Paths
+        var qc=gi('ocil-qr-config');  if(qc) qc.textContent=configPath;
+        var qg=gi('ocil-qr-gitops');  if(qg) qg.textContent=gitopsPath;
+        var ql=gi('ocil-qr-logs');    if(ql) ql.textContent=logPath;
+
+        // Step 2
+        var c2=gi('ocil-cmd-2');
+        if(c2) c2.textContent='opencenter cluster init '+cluster+' --org '+org;
+// Step 3
+        var c3=gi('ocil-cmd-3');
+        if(c3) c3.textContent='# Edit config:\nCONFIG="'+configPath+'"\nnano "$CONFIG"\n\n# Set in config:\nauth_url: "'+authUrl+'"\nregion: "'+region+'"\napplication_credential_id: "'+credId+'"\napplication_credential_secret: "'+credDisplay+'"';
+// Step 4
+        var c4=gi('ocil-cmd-4');
+        if(c4) c4.textContent='mkdir -p $(dirname '+tokFile+')\necho "YOUR_GIT_TOKEN" > '+tokFile+'\nchmod 600 '+tokFile+'\n\n# In config:\ngitops:\n  repository:\n    url: "'+gitRepo+'"\n  auth:\n    token:\n      token_file: "'+tokFile+'"';
+// Step 5
+        var c5=gi('ocil-cmd-5');
+        if(c5) c5.textContent='opencenter cluster validate '+cluster;
+// Step 6
+        var c6=gi('ocil-cmd-6');
+        if(c6) c6.textContent='opencenter secrets sync '+cluster+'\nopencenter cluster validate '+cluster+'\nopencenter cluster generate '+cluster+'\ngrep -R "CHANGEME" '+gitopsPath+' || true';
+// Step 7
+        var c7=gi('ocil-cmd-7');
+        if(c7) c7.textContent='cd '+gitopsPath+'\ngit add .\ngit commit -m "Initial OpenCenter GitOps for '+cluster+'"\ngit remote add origin '+gitRepo.replace('https://','https://'+s.tokVal+'@')+' 2>/dev/null || git remote set-url origin '+gitRepo.replace('https://','https://'+s.tokVal+'@')+'\ngit branch -M '+branch+'\ngit push -u origin '+branch;
+// Step 8
+        var c8=gi('ocil-cmd-8');
+        if(c8) c8.textContent='opencenter cluster validate '+cluster+'\nopencenter cluster deploy '+cluster;
+// Full flow
+        var ff=gi('ocil-full');
+        if(ff) ff.textContent=
+          '# 1. Install CLI (see Step 1 above)\n\n'+
+          '# 2. Init\nopencenter cluster init '+cluster+' --org '+org+'\n\n'+
+          '# 3. Edit config\nnano "'+configPath+'"\n\n'+
+          '# 4. Validate\nopencenter cluster validate '+cluster+'\n\n'+
+          '# 5. Sync & Generate\nopencenter secrets sync '+cluster+'\nopencenter cluster generate '+cluster+'\n\n'+
+          '# 6. Check CHANGEME\ngrep -R "CHANGEME" '+gitopsPath+' || true\n\n'+
+          '# 7. Commit & push\ncd '+gitopsPath+'\ngit add . && git commit -m "Initial GitOps for '+cluster+'" && git push\n\n'+
+          '# 8. Deploy\nopencenter cluster validate '+cluster+'\nopencenter cluster deploy '+cluster;
+
+        // Validation hints
+        var vd=gi('ocil-val');
+        if(vd){
+          var h=[];
+          if(!gv('ocil-credid'))  h.push('<span style="color:#dc2626;font-weight:700;">✗ App credential ID missing</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ credential ID set</span>');
+          if(!gv('ocil-credsec')) h.push('<span style="color:#dc2626;font-weight:700;">✗ App credential secret missing</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ credential secret set</span>');
+          if(!gv('ocil-gitrepo')) h.push('<span style="color:#dc2626;font-weight:700;">✗ GitOps repo URL missing</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ GitOps repo set</span>');
+          if(!gv('ocil-region'))  h.push('<span style="color:#d97706;font-weight:700;">⚠ Region not set</span>');
+          else h.push('<span style="color:#15803d;font-weight:700;">✓ Region: '+gv('ocil-region')+'</span>');
+          vd.innerHTML=h.join('<br>');
+        }
+      };
+
+      window.ocilCopy = function(id){
+        var el=gi(id); if(!el) return;
+        navigator.clipboard.writeText(el.textContent||el.innerText).then(function(){
+          var term=gi('ocil-terminal');
+          if(term){
+            term.innerHTML+='<span style="color:#38bdf8;">$ '+(( el.textContent||el.innerText).split('\n')[0])+'</span>\n<span style="color:#64748b;">↑ Copied — paste into WSL/Linux terminal.</span>\n\n';
+            term.scrollTop=term.scrollHeight;
+          }
+        });
+      };
+
+      window.ocilDownload = function(){
+        var el=gi('ocil-full'); if(!el) return;
+        var cluster=gv('ocil-cluster')||'my-cluster';
+        var blob=new Blob(['#!/bin/bash\nset -e\n\n'+el.textContent],{type:'text/x-sh'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='opencenter-bootstrap-'+cluster+'.sh'; a.click();
+      };
+
+      // Initial render
+      ocilUpdate();
+    })();
+    </script>
+
+
+    <!-- APPS to Container Refactor Engine (r6ace_pane.html v4) -->
+<!-- APPS to Container Refactor Engine — r6ace_pane.html v3 -->
+<style>
+#s2r6ace-pane *{box-sizing:border-box;}
+.r6p-hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0369a1 100%);padding:28px 5%;}
+.r6p-hero-inner{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;}
+.r6p-title{font-size:26px;font-weight:900;color:#fff;margin:0 0 6px;}
+.r6p-sub{font-size:13px;color:#bfdbfe;margin:0 0 10px;}
+.r6p-flow{font-size:12px;color:#7dd3fc;font-weight:600;}
+.r6p-hero-btns{display:flex;gap:8px;flex-shrink:0;}
+.r6p-hero-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;}
+.r6p-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 5%;background:#1e293b;}
+.r6p-sum-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:12px 16px;}
+.r6p-sum-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.r6p-sum-val{font-size:14px;font-weight:800;color:#fff;}
+.r6p-progress{position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #e2e8f0;}
+.r6p-progress-inner{display:flex;align-items:center;padding:10px 5%;overflow-x:auto;gap:0;white-space:nowrap;}
+.r6p-step{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;transition:all .2s;border:2px solid transparent;margin-right:2px;}
+.r6p-step.ns{background:#f1f5f9;color:#64748b;border-color:#e2e8f0;}
+.r6p-step.current{background:#eff6ff;color:#0369a1;border-color:#0369a1;}
+.r6p-step.done{background:#dcfce7;color:#16a34a;border-color:#16a34a;}
+.r6p-step.warn{background:#fef3c7;color:#d97706;border-color:#f59e0b;}
+.r6p-step.blocked{background:#fee2e2;color:#dc2626;border-color:#dc2626;}
+.r6p-arrow{color:#cbd5e1;font-size:11px;margin-right:2px;}
+.r6p-stages{padding:20px 5%;}
+.r6p-stage{background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:16px;overflow:hidden;transition:border-color .3s,box-shadow .3s,transform .2s;}
+.r6p-stage.current{border-color:#0369a1;box-shadow:0 0 0 4px rgba(3,105,161,.08);}
+.r6p-stage.done{border-left:4px solid #16a34a;}
+.r6p-stage.warn{border-left:4px solid #f59e0b;}
+.r6p-stage.blocked{border-left:4px solid #dc2626;}
+.r6p-stage-hd{display:flex;align-items:center;gap:12px;padding:16px 22px;background:#f8fafc;border-bottom:1px solid #e2e8f0;cursor:pointer;user-select:none;transition:background .15s;}
+.r6p-stage-hd:hover{background:#f1f5f9;}
+.r6p-stage-num{width:30px;height:30px;border-radius:50%;background:#0369a1;color:#fff;font-size:13px;font-weight:900;display:grid;place-items:center;flex-shrink:0;}
+.r6p-stage.done .r6p-stage-num{background:#16a34a;}
+.r6p-stage.blocked .r6p-stage-num{background:#dc2626;}
+.r6p-stage-info{flex:1;min-width:0;}
+.r6p-stage-title{font-size:16px;font-weight:800;color:#0f172a;}
+.r6p-stage-desc{font-size:12px;color:#64748b;margin-top:2px;}
+.r6p-stage-badge{padding:3px 12px;border-radius:999px;font-size:11px;font-weight:700;flex-shrink:0;}
+/* Domino animation */
+.r6p-stage-body{max-height:0;overflow:hidden;transition:max-height .55s cubic-bezier(0.4,0,0.2,1),opacity .35s ease;opacity:0;}
+.r6p-stage-body.open{max-height:3000px;opacity:1;}
+.r6p-stage-body-inner{padding:22px;}
+.r6p-stage-footer{display:flex;gap:8px;flex-wrap:wrap;padding-top:16px;border-top:1px solid #f1f5f9;margin-top:16px;}
+.r6p-bottombar{position:fixed;bottom:0;left:0;right:0;z-index:200;background:#fff;border-top:2px solid #e2e8f0;padding:10px 5%;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.r6p-btn{border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.r6p-btn:hover{opacity:.85;}
+.r6p-btn.primary{background:#0369a1;color:#fff;}
+.r6p-btn.secondary{background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;}
+.r6p-btn.success{background:#16a34a;color:#fff;}
+.r6p-btn.danger{background:#dc2626;color:#fff;}
+.r6p-btn.purple{background:#7c3aed;color:#fff;}
+.r6p-btn.teal{background:#0e7490;color:#fff;}
+.r6p-btn.amber{background:#d97706;color:#fff;}
+.r6p-warn-box{background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:700;color:#92400e;margin-bottom:14px;}
+.r6p-info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:14px;line-height:1.6;}
+.r6p-success-box{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;margin-bottom:14px;}
+.r6p-bs-card{border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;background:#fff;transition:all .15s;}
+.r6p-bs-card:hover{border-color:#93c5fd;background:#f8fafc;}
+.r6p-bs-card.selected{border-color:#0369a1;background:#eff6ff;border-left:4px solid #0369a1;}
+.r6p-chip{background:#eff6ff;color:#2563eb;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;display:inline-block;margin:2px;}
+.r6p-method-card{border:2px solid #e2e8f0;border-radius:12px;padding:18px;cursor:pointer;background:#fff;transition:all .15s;flex:1;min-width:240px;}
+.r6p-method-card:hover{border-color:#93c5fd;}
+.r6p-method-card.selected{border-color:#0369a1;background:#eff6ff;}
+.r6p-method-card.compat.selected{border-color:#7c3aed;background:#faf5ff;}
+.r6p-table{width:100%;border-collapse:collapse;font-size:12px;}
+.r6p-table th{padding:8px 12px;background:#f8fafc;color:#0369a1;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e2e8f0;}
+.r6p-table td{padding:8px 12px;border-bottom:1px solid #f1f5f9;color:#334155;}
+.r6p-artifact-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;margin-bottom:14px;}
+.r6p-artifact{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:10px;font-family:monospace;color:#64748b;}
+.r6p-artifact.ready{background:#dcfce7;border-color:#86efac;color:#16a34a;}
+.r6p-cmd-box{background:#e0f2fe;border-left:3px solid #0369a1;border-radius:6px;padding:8px 12px;font-family:monospace;font-size:11px;color:#0c4a6e;white-space:pre-wrap;margin-bottom:6px;}
+.r6p-terminal{background:#042f2e;border:1px solid #134e4a;border-radius:6px;padding:10px 12px;font-family:monospace;font-size:11px;color:#2dd4bf;max-height:160px;overflow-y:auto;white-space:pre-wrap;margin-bottom:8px;}
+@media(max-width:768px){.r6p-summary{grid-template-columns:1fr 1fr;}.r6p-hero-inner{flex-direction:column;}}
+#s2r6ace-pane{padding-bottom:72px;}
+</style>
+

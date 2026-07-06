@@ -1,0 +1,53 @@
+    <div id="s1k8s-pane" style="width:100%; height:100%; display:none; overflow:auto;">
+      <div class="info-panel">
+        <h2>☸️ Kubernetes Dual-Layer Scanner</h2>
+        <p style="color:var(--muted); margin-bottom:12px;">Discover and map Kubernetes clusters to their underlying OpenStack compute and storage dependencies before migration.</p>
+
+        <div style="background:#e0f2fe; padding:20px; border-radius:8px; border-left:4px solid #7ecfff; margin-bottom:20px;">
+          <h3 style="margin-top:0; color:#fff;">Run Automated K8s &amp; OSPC Dual-Scan</h3>
+          <p style="font-size:13px; color:#aaa; margin-bottom:15px;">Paste your <code>kubeconfig</code> below or connect to the Bastion node to automatically map Kubernetes workloads to OpenStack VMs.</p>
+          <textarea placeholder="Paste kubeconfig here..." style="width:100%; height:80px; background:#111; color:#5eead4; border:1px solid #4b6fa0; border-radius:4px; padding:10px; font-family:monospace; margin-bottom:10px;"></textarea>
+          <button style="background:#2b70c9; border:none; color:white; padding:10px 20px; font-weight:bold; cursor:pointer; border-radius:4px;">Run Full Cluster Inventory Scan</button>
+        </div>
+
+        <h3>📚 Simplest Discovery Path by Tooling</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:15px;">The best file to get from the existing OSPC deployment relies entirely on how the cluster was built. Do not blindly copy VM nodes or disks.</p>
+
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          <div style="background:#e0f2fe; padding:15px; border-radius:8px; border-left:3px solid #3498db;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">1) Helm-Managed App (Highest Priority)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">Export the app configuration and rendered YAML. The <code>values.yaml</code> is the single most reusable import path for Flex.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">helm list -A
+helm get values &lt;release&gt; -n &lt;namespace&gt; -a -o yaml &gt; &lt;release&gt;-values.yaml
+helm get manifest &lt;release&gt; -n &lt;namespace&gt; &gt; &lt;release&gt;-manifest.yaml</pre>
+          </div>
+
+          <div style="background:#e0f2fe; padding:15px; border-radius:8px; border-left:3px solid #f1c40f;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">2) Kustomize-Managed App</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">Download the entire repository folder containing the <code>kustomization.yaml</code>, base manifests, patches, and overlays.</p>
+          </div>
+
+          <div style="background:#e0f2fe; padding:15px; border-radius:8px; border-left:3px solid #e67e22;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">3) Raw Kubernetes YAML (Source Repo)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">If a Git repo exists without Helm/Kustomize, download all declarative objects: <code>deployment.yaml</code>, <code>statefulset.yaml</code>, <code>service.yaml</code>, <code>ingress.yaml</code>, <code>configmap.yaml</code>, <code>pvc.yaml</code>.</p>
+          </div>
+
+          <div style="background:#e0f2fe; padding:15px; border-radius:8px; border-left:3px solid #e74c3c;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">4) Live Cluster Export (Fallback Path)</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">If there is ZERO source repository, fallback to exporting exactly what is running on OSPC. Note: this YAML will be messy and contain runtime state strings.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get all,cm,secret,ingress,pvc,networkpolicy -A -o yaml &gt; k8s-inventory-main.yaml
+kubectl get storageclass,pv -o yaml &gt; k8s-storage-export.yaml</pre>
+          </div>
+
+          <div style="background:#e0f2fe; padding:15px; border-radius:8px; border-left:3px solid #9b59b6;">
+            <h4 style="margin:0 0 10px 0; color:#fff;">Infrastructure Mapping Database</h4>
+            <p style="font-size:12px; color:#ccc; margin-top:0;">You MUST execute these to map Kubernetes to OpenStack Nova VMs and Cinder Storage.</p>
+            <pre style="background:#111; padding:10px; border-radius:4px; font-family:monospace; font-size:12px; color:#5eead4; margin:0;">kubectl get nodes -o wide
+openstack server list --all-projects --long   # Map Internal K8s IPs to OSPC VM IDs
+kubectl get pvc -A -o wide
+openstack volume list --long   # Map Bound PVs to OpenStack Cinder Volume IDs</pre>
+          </div>
+        </div>
+
+      </div>
+    </div>

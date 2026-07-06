@@ -1,0 +1,67 @@
+    <div id="s2repurchase-pane" class="gov-page path-repurchase" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🛒 R7 Repurchase — Replace with SaaS or New Product</h2>
+          <p>Workflow for replacing legacy OSPC workloads with SaaS, managed services, or modern products.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r7-status">Status: Pending</div>
+      </div>
+
+      <div class="gov-grid">
+        <div class="gov-section">
+          <h3>1. Replacement Strategy</h3>
+          <div class="gov-form-group"><span class="gov-label">Customer Name</span><input type="text" class="gov-input" id="r7-customer"></div>
+          <div class="gov-form-group"><span class="gov-label">Legacy System</span><input type="text" class="gov-input" id="r7-system"></div>
+          <div class="gov-form-group"><span class="gov-label">Replacement Product</span><input type="text" class="gov-input" id="r7-product" placeholder="e.g. Salesforce / ServiceNow"></div>
+          <div class="gov-form-group"><span class="gov-label">Replacement Type</span>
+            <select class="gov-select" id="r7-type">
+              <option>SaaS</option>
+              <option>Commercial off-the-shelf</option>
+              <option>Managed service</option>
+              <option>New internal platform</option>
+            </select>
+          </div>
+        </div>
+        <div class="gov-section">
+          <h3>2. Transition Planning</h3>
+          <div class="gov-form-group"><span class="gov-label">Contract Status</span>
+            <select class="gov-select" id="r7-contract">
+              <option>In evaluation</option>
+              <option>In negotiation</option>
+              <option>Signed</option>
+              <option>Live</option>
+            </select>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">SaaS Go-Live Date</span><input type="date" class="gov-input" id="r7-golive-date"></div>
+          <div class="gov-form-group"><span class="gov-label">Legacy Shutdown Date</span><input type="date" class="gov-input" id="r7-shutdown-date"></div>
+          <div class="gov-form-group"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="r7-datamig" checked> Data Migration Required</label></div>
+        </div>
+        <div class="gov-section" style="grid-column: span 2;">
+          <h3>3. Capabilities & Mapping</h3>
+          <table class="gov-table">
+            <thead><tr><th>Legacy Feature</th><th>SaaS Equivalent</th><th>Migration Method</th><th>Status</th></tr></thead>
+            <tbody id="r7-mapping-body"></tbody>
+          </table>
+          <button class="gov-btn btn-example" style="margin-top:10px; width:100%;" onclick="addMappingRow('r7-mapping-body')">+ Add Mapping Item</button>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>4. Output Artifacts</h3>
+        <div class="artifact-list">
+          <a href="#" class="artifact-link">📄 repurchase_candidates.csv</a>
+          <a href="#" class="artifact-link">📄 capability_mapping.csv</a>
+          <a href="#" class="artifact-link">📄 integration_tracker.csv</a>
+        </div>
+      </div>
+
+      <div class="gov-actions">
+        <button class="gov-btn btn-example" onclick="loadR7Example()">🧬 Load Repurchase Example</button>
+        <button class="gov-btn btn-save" onclick="saveGov('R7')">💾 Approve Replacement</button>
+        <button class="gov-btn btn-export">⚖️ Compare Vendors</button>
+        <button class="gov-btn btn-export">📅 Plan Legacy Shutdown</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 3 — Validation & UAT -->

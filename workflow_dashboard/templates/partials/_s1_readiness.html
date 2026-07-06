@@ -1,0 +1,50 @@
+    <div id="s1readiness-pane" class="gov-page" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>✅ Migration Readiness Scanner</h2>
+          <p>Check if selected VMs, volumes, images, databases, and snapshots are ready to move to FLEX.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="readiness-status">Status: Waiting for inventory</div>
+      </div>
+
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+        <div class="gov-section"><h3>Why</h3><p>Use this scanner before migration to identify blockers, warnings, missing snapshots, unsupported configurations, and manual actions required before moving workloads to FLEX.</p></div>
+        <div class="gov-section"><h3>When</h3><p>Use it after source infrastructure discovery and before Stage 2 migration execution.</p></div>
+        <div class="gov-section"><h3>Where</h3><p>Stage 1 — Discovery &amp; Assessment. The output feeds into Stage 2 Migration planning and snapshot execution.</p></div>
+        <div class="gov-section"><h3>By Who</h3><p>Cloud Admin Team, Migration Team, SRE, DevOps, Database Admins, Windows Admins, and Managed Services Operations.</p></div>
+        <div class="gov-section"><h3>How</h3><p>Select discovered source resources, run readiness checks, review READY / WARNING / BLOCKED results, then export selected migration-ready items to Stage 2.</p></div>
+      </div>
+
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="gov-section"><h3>Total Items</h3><div id="readiness_card_total" style="font-size:24px;font-weight:900;color:#e2e8f0;">0</div></div>
+        <div class="gov-section"><h3>Ready</h3><div id="readiness_card_ready" style="font-size:24px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Ready With Warning</h3><div id="readiness_card_warning" style="font-size:24px;font-weight:900;color:#fcd34d;">0</div></div>
+        <div class="gov-section"><h3>Blocked</h3><div id="readiness_card_blocked" style="font-size:24px;font-weight:900;color:#fca5a5;">0</div></div>
+        <div class="gov-section"><h3>Needs Manual Action</h3><div id="readiness_card_manual" style="font-size:24px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Selected for Stage 2</h3><div id="readiness_card_selected" style="font-size:24px;font-weight:900;color:#7dd3fc;">0</div></div>
+      </div>
+
+      <div class="gov-section">
+        <h3>Migration Readiness Results</h3>
+        <p style="margin:0 0 12px;color:#94a3b8;font-size:13px;">Load inventory → run readiness scan → review table → select rows → export or send to Stage 2.</p>
+        <div class="gov-actions" style="margin:0 0 14px;">
+          <button class="gov-btn btn-example" onclick="refreshReadinessInventory()">🔄 Refresh Source Inventory</button>
+          <button class="gov-btn btn-save" onclick="runReadinessScan()">✅ Run Readiness Scan</button>
+          <button class="gov-btn btn-export" onclick="exportReadinessReport()">📦 Export Readiness Report</button>
+          <button class="gov-btn btn-save" onclick="sendReadinessToStage2()">🚀 Send Ready Items to Stage 2</button>
+          <button class="gov-btn btn-example" onclick="generateReadinessFixPlan()">🧭 Generate Fix Plan</button>
+        </div>
+        <div style="overflow:auto;">
+          <table class="gov-table" style="min-width:1900px;">
+            <thead><tr><th>Select</th><th>resource_type</th><th>resource_name</th><th>resource_id</th><th>source_cloud</th><th>source_region</th><th>vm_status</th><th>os_type</th><th>boot_mode</th><th>image_type</th><th>disk_size_gb</th><th>volume_count</th><th>snapshot_status</th><th>network_status</th><th>db_detected</th><th>readiness_status</th><th>risk_level</th><th>manual_action_required</th><th>recommended_action</th><th>notes</th></tr></thead>
+            <tbody id="readiness_results_body"><tr><td colspan="20" style="color:#64748b;font-style:italic;">No readiness scan has run yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="gov-section">
+        <h3>Output Artifacts</h3>
+        <div class="artifact-list" id="readiness_artifacts"><span style="color:#64748b;">No readiness artifacts exported yet.</span></div>
+      </div>
+    </div>
+
+    <!-- 1d.2: Migration Pre-Flight Compatibility Check -->

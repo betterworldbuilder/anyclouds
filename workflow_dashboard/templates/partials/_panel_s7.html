@@ -1,0 +1,858 @@
+  <div class="panel" id="panel-s7">
+    <div class="info-panel" style="background:#f5f7fb;min-height:100%;padding:28px 32px;display:flex;flex-direction:column;gap:20px;">
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f59e0b;margin-bottom:6px;">Stage 6 — Cost Optimization</div>
+          <h2 style="margin:0 0 6px;font-size:26px;font-weight:900;color:#1e293b;">TCO Dashboard</h2>
+          <p style="margin:0;color:#64748b;font-size:13px;">CAPEX &amp; OPEX cost of servers from UAT — monthly, yearly, 3-year and 5-year projections with full savings analysis.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+          <button onclick="tcoLoadFromUat()" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;color:#fff;padding:9px 18px;border-radius:8px;cursor:pointer;font-weight:800;font-size:13px;box-shadow:0 4px 12px rgba(245,158,11,.3);">Load from UAT</button>
+          <span id="tco-uat-ts" style="font-size:11px;color:#94a3b8;line-height:2.4;"></span>
+          <button onclick="tcoExportCsv()" style="background:#fff;border:1.5px solid #e2e8f0;color:#374151;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">Export CSV</button>
+          <button onclick="window.open('/tco/?source=ospc','_blank')" style="background:#fff;border:1.5px solid #e2e8f0;color:#374151;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">Advanced TCO Tool ↗</button>
+        </div>
+      </div>
+
+      <!-- Summary chips -->
+      <div id="tco-summary-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #3b82f6;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Servers</div>
+          <div id="tco-chip-servers" style="font-size:26px;font-weight:900;color:#1e293b;">—</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #3b82f6;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Month</div>
+          <div id="tco-chip-ospc-monthly" style="font-size:22px;font-weight:900;color:#3b82f6;">—</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #22c55e;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">FLEX / Month</div>
+          <div id="tco-chip-flex-monthly" style="font-size:22px;font-weight:900;color:#22c55e;">—</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #10b981;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Monthly Savings</div>
+          <div id="tco-chip-savings-monthly" style="font-size:22px;font-weight:900;color:#10b981;">—</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #f59e0b;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Savings %</div>
+          <div id="tco-chip-savings-pct" style="font-size:26px;font-weight:900;color:#f59e0b;">—</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;border-top:3px solid #a78bfa;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">5-Year Savings</div>
+          <div id="tco-chip-5yr" style="font-size:22px;font-weight:900;color:#a78bfa;">—</div>
+        </div>
+      </div>
+
+      <!-- TCO Metrics + CAPEX inputs side by side -->
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;">
+
+        <!-- TCO Metrics -->
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;">Cost Projection by Period</div>
+            <span id="tco-chart-demo-badge" style="font-size:10px;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:10px;font-weight:700;border:1px solid #fcd34d;">DEMO VALUES</span>
+          </div>
+          <div id="tco-projection-chart" style="display:flex;flex-direction:column;gap:0;">
+            <!-- pre-rendered demo bars; JS overwrites on load -->
+            <div id="tco-bar-monthly"></div>
+            <div id="tco-bar-1yr"></div>
+            <div id="tco-bar-3yr"></div>
+            <div id="tco-bar-5yr"></div>
+          </div>
+        </div>
+
+        <!-- CAPEX Inputs -->
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+          <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;">CAPEX Inputs (One-Time)</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div>
+              <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:4px;">Migration Cost ($)</label>
+              <input id="tco-capex-migration" type="number" value="15000" min="0" onchange="tcoRecalc()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;color:#374151;background:#f8fafc;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:4px;">Setup &amp; Config ($)</label>
+              <input id="tco-capex-setup" type="number" value="5000" min="0" onchange="tcoRecalc()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;color:#374151;background:#f8fafc;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:4px;">Training &amp; Handover ($)</label>
+              <input id="tco-capex-training" type="number" value="3000" min="0" onchange="tcoRecalc()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:700;color:#374151;background:#f8fafc;box-sizing:border-box;">
+            </div>
+            <div style="padding:12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;margin-top:4px;">
+              <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total CAPEX</div>
+              <div id="tco-capex-total" style="font-size:20px;font-weight:900;color:#d97706;">$23,000</div>
+            </div>
+            <div style="padding:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+              <div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Payback Period</div>
+              <div id="tco-payback" style="font-size:18px;font-weight:900;color:#16a34a;">— months</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key TCO metrics row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Annual Savings</div>
+          <div id="tco-annual-savings" style="font-size:20px;font-weight:900;color:#10b981;">—</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">OSPC → FLEX per year</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">3-Year Net Savings</div>
+          <div id="tco-3yr-savings" style="font-size:20px;font-weight:900;color:#3b82f6;">—</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">After migration CAPEX</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">5-Year Net Savings</div>
+          <div id="tco-5yr-savings" style="font-size:20px;font-weight:900;color:#a78bfa;">—</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">After migration CAPEX</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">ROI at 3 Years</div>
+          <div id="tco-roi" style="font-size:20px;font-weight:900;color:#f59e0b;">—</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Return on CAPEX</div>
+        </div>
+      </div>
+
+      <!-- Cost breakdown insights -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6;"></div>
+            <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.3px;">Compute OPEX</div>
+          </div>
+          <div id="tco-insight-compute" style="font-size:13px;color:#64748b;line-height:1.6;">Load UAT data to see compute cost breakdown.</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#f59e0b;"></div>
+            <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.3px;">Storage OPEX</div>
+          </div>
+          <div id="tco-insight-storage" style="font-size:13px;color:#64748b;line-height:1.6;">Load UAT data to see storage cost breakdown.</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#10b981;"></div>
+            <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.3px;">License Savings</div>
+          </div>
+          <div id="tco-insight-license" style="font-size:13px;color:#64748b;line-height:1.6;">FLEX has no vendor license fees — unlike proprietary OSPC subscriptions.</div>
+        </div>
+        <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:#a78bfa;"></div>
+            <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.3px;">Right-Sizing Gain</div>
+          </div>
+          <div id="tco-insight-rightsizing" style="font-size:13px;color:#64748b;line-height:1.6;">Load UAT data to identify over-provisioned VMs that can be downsized on FLEX.</div>
+        </div>
+      </div>
+
+      <!-- Per-Server Cost Table -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:12px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;">Per-Server Cost Breakdown</div>
+          <div style="font-size:11px;color:#94a3b8;">Estimated from UAT scope — monthly OPEX per server</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:760px;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Server</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Type</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Source IP</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Target IP</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC/Month</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#22c55e;text-align:right;border-bottom:2px solid #e2e8f0;">FLEX/Month</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#10b981;text-align:right;border-bottom:2px solid #e2e8f0;">Save/Month</th>
+                <th style="padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#a78bfa;text-align:right;border-bottom:2px solid #e2e8f0;">Save/Year</th>
+              </tr>
+            </thead>
+            <tbody id="tco-server-tbody">
+              <tr><td colspan="8" style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;font-style:italic;">Click "Load from UAT" to populate server cost data.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Executive Summary -->
+      <div id="tco-exec-summary" style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:14px;padding:24px 28px;border:1px solid rgba(245,158,11,.2);">
+        <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Executive Summary</div>
+        <div id="tco-exec-text" style="font-size:14px;color:#cbd5e1;line-height:1.8;max-width:860px;">Load UAT data above to generate the executive cost summary and business case narrative.</div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button onclick="window.open('/tco/?source=ospc','_blank')" style="background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.4);color:#fcd34d;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">Full TCO Report Tool ↗</button>
+          <button onclick="window.open('/tco/?source=flex2flex','_blank')" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:#86efac;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">FLEX2FLEX TCO ↗</button>
+          <button onclick="window.open('/tco/?source=aws','_blank')" style="background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.4);color:#7dd3fc;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">AWS to FLEX TCO ↗</button>
+          <button onclick="tcoExportCsv()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#e2e8f0;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;">Export CSV</button>
+        </div>
+      </div>
+
+      <!-- OSPC Scanned Infra Detail TCO -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">OSPC Scanned Infra Detail TCO</div>
+        <div style="font-size:18px;font-weight:900;color:#1e293b;margin-bottom:16px;">Current OSPC infrastructure monthly baseline</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:16px;">Calculated from scanned servers, DB-like instances, volumes, and load balancers.</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Day</div>
+            <div id="tco-infra-day" style="font-size:20px;font-weight:900;color:#dc2626;">—</div>
+          </div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Month</div>
+            <div id="tco-infra-month" style="font-size:20px;font-weight:900;color:#1d4ed8;">—</div>
+          </div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">OSPC / Year</div>
+            <div id="tco-infra-year" style="font-size:20px;font-weight:900;color:#1d4ed8;">—</div>
+          </div>
+          <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Compute + DB</div>
+            <div id="tco-infra-compute" style="font-size:20px;font-weight:900;color:#3b82f6;">—</div>
+          </div>
+          <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Storage</div>
+            <div id="tco-infra-storage" style="font-size:20px;font-weight:900;color:#16a34a;">—</div>
+          </div>
+          <div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:14px;">
+            <div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Network / LB</div>
+            <div id="tco-infra-network" style="font-size:20px;font-weight:900;color:#d97706;">—</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:600px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Scanned Component Type</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Count</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Month</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Day</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Annualized OSPC Cost</th>
+            </tr></thead>
+            <tbody id="tco-infra-tbody">
+              <tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see scanned infra breakdown.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detailed per-component OSPC TCO table -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">DETAILED OSPC TCO — PER SCANNED COMPONENT</div>
+            <div style="font-size:18px;font-weight:900;color:#1e293b;">Full OSPC cost breakdown for each scanned component</div>
+            <div style="font-size:11px;color:#64748b;margin-top:3px;">Each VM, DB instance, block volume, and load balancer with individual monthly and annualized OSPC cost. VM prices use the same regional OSPC/FLEX matrix.</div>
+          </div>
+          <button onclick="(function(){var rows=[];var tbl=document.getElementById('tco-comp-detail-tbody');if(!tbl)return;var trs=tbl.querySelectorAll('tr');trs.forEach(function(tr){var cells=tr.querySelectorAll('td');var row=[];cells.forEach(function(td){row.push('\"'+td.textContent.trim().replace(/\"/g,'\"\"')+'\"');});if(row.length)rows.push(row.join(','));});var header='\"Component\",\"Type\",\"Flavor / Size\",\"Region\",\"OSPC / Month\",\"OSPC / Day\",\"1-Year OSPC Cost\",\"3-Year OSPC Cost\"';var csv=header+'\n'+rows.join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='OSPC_Component_TCO_Detail.csv';a.click();})()" style="background:#b23a3a;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">&#11015; Export CSV</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Component</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Type</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Flavor / Size</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Region</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Month</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Day</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">1-Year OSPC</th>
+                <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">3-Year OSPC</th>
+              </tr>
+            </thead>
+            <tbody id="tco-comp-detail-tbody">
+              <tr><td colspan="8" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see per-component OSPC cost breakdown.</td></tr>
+            </tbody>
+            <tfoot id="tco-comp-detail-tfoot" style="display:none;">
+              <tr style="background:#f1f5f9;font-weight:700;">
+                <td colspan="4" style="padding:9px 12px;font-size:11px;color:#1e293b;">TOTAL</td>
+                <td id="tco-comp-detail-total-month" style="padding:9px 12px;text-align:right;color:#dc2626;font-size:12px;font-weight:900;"></td>
+                <td id="tco-comp-detail-total-day" style="padding:9px 12px;text-align:right;color:#dc2626;font-size:12px;font-weight:900;"></td>
+                <td id="tco-comp-detail-total-1yr" style="padding:9px 12px;text-align:right;color:#1e293b;font-size:12px;font-weight:900;"></td>
+                <td id="tco-comp-detail-total-3yr" style="padding:9px 12px;text-align:right;color:#1e293b;font-size:12px;font-weight:900;"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- How to 3x Your TCO Savings -->
+      <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0c4a6e 100%);border-radius:14px;padding:26px 28px;margin-bottom:18px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-30px;right:-30px;width:180px;height:180px;background:rgba(14,165,233,.1);border-radius:50%;pointer-events:none;"></div>
+        <div style="position:absolute;bottom:-40px;left:60px;width:120px;height:120px;background:rgba(99,102,241,.08);border-radius:50%;pointer-events:none;"></div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:20px;">
+          <div>
+            <div style="font-size:11px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">💡 TCO OPTIMIZATION GUIDE</div>
+            <div style="font-size:22px;font-weight:900;color:#fff;line-height:1.2;">How to <span style="color:#fbbf24;">3×</span> Your TCO Savings</div>
+            <div style="font-size:13px;color:#94a3b8;margin-top:6px;max-width:520px;line-height:1.6;">Most migrations only capture <strong style="color:#e2e8f0;">30–40%</strong> savings from lift-and-shift. Apply these multipliers to reach <strong style="color:#4ade80;">3× or greater</strong> total cost reduction.</div>
+          </div>
+          <div style="background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:10px;padding:12px 18px;text-align:center;flex-shrink:0;">
+            <div style="font-size:11px;color:#fbbf24;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Potential Multiplier</div>
+            <div style="font-size:36px;font-weight:900;color:#fbbf24;line-height:1;">3×</div>
+            <div style="font-size:11px;color:#fcd34d;">vs. lift-and-shift only</div>
+          </div>
+        </div>
+        <!-- Embedded Current OSPC TCO Baseline -->
+        <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+          <div style="font-size:10px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;">📊 Your Current OSPC Baseline — Live from UAT Scan</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:14px;">
+            <div style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OSPC / Day</div>
+              <div id="tco3x-infra-day" style="font-size:16px;font-weight:900;color:#fca5a5;">—</div>
+            </div>
+            <div style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OSPC / Month</div>
+              <div id="tco3x-infra-month" style="font-size:16px;font-weight:900;color:#93c5fd;">—</div>
+            </div>
+            <div style="background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OSPC / Year</div>
+              <div id="tco3x-infra-year" style="font-size:16px;font-weight:900;color:#93c5fd;">—</div>
+            </div>
+            <div style="background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Compute + DB</div>
+              <div id="tco3x-infra-compute" style="font-size:16px;font-weight:900;color:#c4b5fd;">—</div>
+            </div>
+            <div style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#86efac;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Storage</div>
+              <div id="tco3x-infra-storage" style="font-size:16px;font-weight:900;color:#86efac;">—</div>
+            </div>
+            <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px;">
+              <div style="font-size:9px;font-weight:700;color:#fde68a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Network / LB</div>
+              <div id="tco3x-infra-network" style="font-size:16px;font-weight:900;color:#fde68a;">—</div>
+            </div>
+          </div>
+          <!-- TCO Comparison mini table -->
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;min-width:480px;">
+              <thead><tr style="background:rgba(255,255,255,.05);">
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:left;border-bottom:1px solid rgba(255,255,255,.1);">Environment</th>
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:right;border-bottom:1px solid rgba(255,255,255,.1);">Daily</th>
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:right;border-bottom:1px solid rgba(255,255,255,.1);">Monthly</th>
+                <th style="padding:7px 12px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;text-align:right;border-bottom:1px solid rgba(255,255,255,.1);">Annual</th>
+              </tr></thead>
+              <tbody id="tco3x-comparison-tbody">
+                <tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;font-size:11px;font-style:italic;">Load from UAT to see comparison.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3 columns of saving levers -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
+            <div style="font-size:13px;font-weight:800;color:#38bdf8;margin-bottom:8px;">🔁 Lever 1 — Right-Size on FLEX</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.7;">Over-provisioned VMs on OSPC are a major cost driver. FLEX flavor mapping lets you right-size to actual utilization.<br><strong style="color:#4ade80;">Typical saving: +15–25% on top of base migration.</strong></div>
+            <div style="margin-top:10px;background:rgba(74,222,128,.1);border-radius:6px;padding:6px 10px;font-size:11px;color:#4ade80;font-weight:700;">✓ Use FLEX flavor optimizer in this dashboard</div>
+          </div>
+          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
+            <div style="font-size:13px;font-weight:800;color:#a78bfa;margin-bottom:8px;">☸️ Lever 2 — Containerize with R6</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.7;">R6 Containerization consolidates workloads onto shared Kubernetes clusters. Bin-packing reduces idle compute.<br><strong style="color:#4ade80;">Typical saving: +20–40% over VM-only migration.</strong></div>
+            <div style="margin-top:10px;background:rgba(167,139,250,.1);border-radius:6px;padding:6px 10px;font-size:11px;color:#a78bfa;font-weight:700;">✓ Go to R6 Containerization stage</div>
+          </div>
+          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
+            <div style="font-size:13px;font-weight:800;color:#fb923c;margin-bottom:8px;">📦 Lever 3 — Retire &amp; Decommission</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.7;">R1 Retain and R2 Retire stages eliminate unused workloads before migration begins. Zero migration cost.<br><strong style="color:#4ade80;">Typical saving: +10–30% by eliminating dead weight.</strong></div>
+            <div style="margin-top:10px;background:rgba(251,146,60,.1);border-radius:6px;padding:6px 10px;font-size:11px;color:#fb923c;font-weight:700;">✓ Review R1/R2 stages before migrating</div>
+          </div>
+          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
+            <div style="font-size:13px;font-weight:800;color:#34d399;margin-bottom:8px;">🗄 Lever 4 — Storage Tier Optimization</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.7;">Migrating block volumes to object storage (Swift/S3) for cold data drastically cuts storage TCO.<br><strong style="color:#4ade80;">Typical saving: +10–20% on storage line items.</strong></div>
+            <div style="margin-top:10px;background:rgba(52,211,153,.1);border-radius:6px;padding:6px 10px;font-size:11px;color:#34d399;font-weight:700;">✓ Review Block Volume rows in component table</div>
+          </div>
+          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
+            <div style="font-size:13px;font-weight:800;color:#f472b6;margin-bottom:8px;">🔁 Lever 5 — Wave &amp; Priority Scheduling</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.7;">Migrate high-cost, high-readiness systems first. Cash-flow benefit compounds with each wave completed early.<br><strong style="color:#4ade80;">Accelerates payback by 3–6 months.</strong></div>
+            <div style="margin-top:10px;background:rgba(244,114,182,.1);border-radius:6px;padding:6px 10px;font-size:11px;color:#f472b6;font-weight:700;">✓ Use Priority Rank in Migration Log</div>
+          </div>
+          <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px;">
+            <div style="font-size:13px;font-weight:800;color:#fbbf24;margin-bottom:8px;">🤖 Lever 6 — AI Power-Up After Migration</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.7;">FLEX + OpenCenter enables GPU-accelerated AI workloads. New revenue from modernized platform offsets migration cost entirely.<br><strong style="color:#4ade80;">ROI beyond pure savings.</strong></div>
+            <div style="margin-top:10px;background:rgba(251,191,36,.1);border-radius:6px;padding:6px 10px;font-size:11px;color:#fbbf24;font-weight:700;">✓ Unlock Stage 9 — AI Power-Up panel</div>
+          </div>
+        </div>
+        <!-- Combined multiplier bar -->
+        <div style="margin-top:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:14px 18px;">
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Combined Saving Stack</div>
+          <div style="display:flex;align-items:center;gap:0;border-radius:8px;overflow:hidden;height:28px;">
+            <div style="background:#0369a1;flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;" title="Base lift-and-shift">Base 40%</div>
+            <div style="background:#16a34a;width:14%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;" title="Right-size">+20%</div>
+            <div style="background:#7c3aed;width:16%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;" title="Containerize">+30%</div>
+            <div style="background:#ea580c;width:10%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;" title="Retire">+20%</div>
+            <div style="background:#fbbf24;width:8%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#0f172a;" title="Storage">+15%</div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#0369a1;border-radius:2px;margin-right:4px;"></span>Lift &amp; Shift</span>
+            <span style="font-size:11px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px;margin-right:4px;"></span>Right-Size</span>
+            <span style="font-size:11px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#7c3aed;border-radius:2px;margin-right:4px;"></span>Containerize</span>
+            <span style="font-size:11px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#ea580c;border-radius:2px;margin-right:4px;"></span>Retire/Decommission</span>
+            <span style="font-size:11px;color:#64748b;"><span style="display:inline-block;width:10px;height:10px;background:#fbbf24;border-radius:2px;margin-right:4px;"></span>Storage Tier</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- TCO Comparison & Projected Savings -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div style="font-size:15px;font-weight:900;color:#1e293b;">TCO Comparison &amp; Projected Savings</div>
+          <div id="tco-savings-badge" style="background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:4px 14px;font-size:12px;font-weight:800;">— Cost Reduction</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:560px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Environment</th>
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Min Est. Daily Cost</th>
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Min Est. Monthly Cost</th>
+              <th style="padding:10px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:right;border-bottom:2px solid #e2e8f0;">Annualized Cost</th>
+            </tr></thead>
+            <tbody id="tco-comparison-tbody">
+              <tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see comparison.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Component-Level OSPC → FLEX TCO -->
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">Component-Level OSPC → FLEX TCO</div>
+        <div style="font-size:16px;font-weight:900;color:#1e293b;margin-bottom:16px;">Detailed OSPC versus FLEX comparison for each scanned component</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;min-width:760px;">
+            <thead><tr style="background:#f8fafc;">
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Component</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Source Name</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">Source ID</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;text-align:left;border-bottom:2px solid #e2e8f0;">OSPC Flavor / Size</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#22c55e;text-align:left;border-bottom:2px solid #e2e8f0;">FLEX Equivalent</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;text-align:right;border-bottom:2px solid #e2e8f0;">OSPC / Month</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#22c55e;text-align:right;border-bottom:2px solid #e2e8f0;">FLEX / Month</th>
+              <th style="padding:9px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#10b981;text-align:right;border-bottom:2px solid #e2e8f0;">Monthly Savings</th>
+            </tr></thead>
+            <tbody id="tco-comp-tbody">
+              <tr><td colspan="8" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;font-style:italic;">Load from UAT to see per-component cost comparison.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TCO JS engine -->
+      <script>
+      (function(){
+        // Demo defaults: used immediately so charts/insights render without needing "Load from UAT"
+        var _demo = { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:26.2 };
+        var _demoVm = { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000, rows:4 };
+
+        // Try loading real data from localStorage immediately
+        var _initRaw = null;
+        try { _initRaw = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
+        var _initScope = null;
+        try { _initScope = JSON.parse(localStorage.getItem('osflex_uat_scope') || 'null'); } catch(_) {}
+
+        var _usingDemo = !_initRaw || !_initRaw.tcoData;
+        var _initT = _usingDemo ? _demo : _initRaw.tcoData;
+        var _initVm = _usingDemo ? _demoVm : (_initRaw.vmData || _demoVm);
+
+        var _tcoState = {
+          srcMonthly: parseFloat(_initT.srcMonthly) || _demo.srcMonthly,
+          tgtMonthly: parseFloat(_initT.tgtMonthly) || _demo.tgtMonthly,
+          savings:    parseFloat(_initT.savings)    || _demo.savings,
+          savingsPct: parseFloat(_initT.savingsPct) || _demo.savingsPct,
+          servers:    Array.isArray(_initScope) ? _initScope : [],
+          vmData:     _initVm,
+          isDemo:     _usingDemo
+        };
+
+        function _fmt(n){ return '$' + Math.round(n).toLocaleString(); }
+        function _fmtK(n){ return n >= 1000 ? '$' + (n/1000).toFixed(1) + 'K' : _fmt(n); }
+
+        function _capex() {
+          var m = parseFloat(document.getElementById('tco-capex-migration').value)||0;
+          var s = parseFloat(document.getElementById('tco-capex-setup').value)||0;
+          var t = parseFloat(document.getElementById('tco-capex-training').value)||0;
+          var tot = m+s+t;
+          var el = document.getElementById('tco-capex-total');
+          if (el) el.textContent = _fmt(tot);
+          return tot;
+        }
+
+        function _renderBar(label, ospc, flex, maxVal, period) {
+          var ospcW = maxVal > 0 ? Math.round(ospc/maxVal*100) : 0;
+          var flexW = maxVal > 0 ? Math.round(flex/maxVal*100) : 0;
+          var sav = ospc - flex;
+          var savColor = sav >= 0 ? '#10b981' : '#ef4444';
+          return '<div style="margin-bottom:14px;">'
+            + '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
+            + '<span style="font-size:12px;font-weight:700;color:#374151;">' + label + '</span>'
+            + '<span style="font-size:12px;font-weight:800;color:' + savColor + ';">' + (sav>=0?'Save ':'Over ') + _fmtK(Math.abs(sav)) + '</span>'
+            + '</div>'
+            + '<div style="display:flex;flex-direction:column;gap:4px;">'
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:10px;font-weight:700;color:#3b82f6;width:42px;flex-shrink:0;">OSPC</span>'
+            + '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:18px;overflow:hidden;">'
+            + '<div style="width:'+ospcW+'%;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa);border-radius:4px;"></div></div>'
+            + '<span style="font-size:11px;font-weight:700;color:#3b82f6;width:72px;text-align:right;flex-shrink:0;">' + _fmtK(ospc) + '</span></div>'
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:10px;font-weight:700;color:#22c55e;width:42px;flex-shrink:0;">FLEX</span>'
+            + '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:18px;overflow:hidden;">'
+            + '<div style="width:'+flexW+'%;height:100%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:4px;"></div></div>'
+            + '<span style="font-size:11px;font-weight:700;color:#22c55e;width:72px;text-align:right;flex-shrink:0;">' + _fmtK(flex) + '</span></div>'
+            + '</div></div>';
+        }
+
+        window.tcoRecalc = function() {
+          var s = _tcoState;
+          var capex = _capex();
+          // Show/hide demo badge
+          var badge = document.getElementById('tco-chart-demo-badge');
+          if (badge) badge.style.display = s.isDemo ? 'inline' : 'none';
+          var savMonthly = s.savings;
+          var savAnnual  = savMonthly * 12;
+          var sav3yr     = savAnnual * 3 - capex;
+          var sav5yr     = savAnnual * 5 - capex;
+          var roi3       = capex > 0 ? (sav3yr / capex * 100) : 0;
+          var payback    = savMonthly > 0 ? (capex / savMonthly) : 0;
+
+          var ospcAnnual = s.srcMonthly * 12;
+          var flexAnnual = s.tgtMonthly * 12;
+          var ospc3yr    = s.srcMonthly * 36;
+          var flex3yr    = s.tgtMonthly * 36 + capex;
+          var ospc5yr    = s.srcMonthly * 60;
+          var flex5yr    = s.tgtMonthly * 60 + capex;
+
+          // Summary chips
+          var n = s.servers.length;
+          _set('tco-chip-servers', n > 0 ? n : (s.vmData.rows || '—'));
+          _set('tco-chip-ospc-monthly', _fmtK(s.srcMonthly));
+          _set('tco-chip-flex-monthly', _fmtK(s.tgtMonthly));
+          var savEl = document.getElementById('tco-chip-savings-monthly');
+          if (savEl) { savEl.textContent = _fmtK(savMonthly); savEl.style.color = savMonthly >= 0 ? '#10b981' : '#ef4444'; }
+          _set('tco-chip-savings-pct', Math.abs(s.savingsPct).toFixed(1) + '%');
+          _set('tco-chip-5yr', _fmtK(Math.max(0, sav5yr)));
+          _set('tco-annual-savings', _fmtK(savAnnual));
+          _set('tco-3yr-savings', (sav3yr >= 0 ? '' : '-') + _fmtK(Math.abs(sav3yr)));
+          _set('tco-5yr-savings', (sav5yr >= 0 ? '' : '-') + _fmtK(Math.abs(sav5yr)));
+          _set('tco-roi', (roi3 >= 0 ? '+' : '') + roi3.toFixed(0) + '%');
+
+          var pb = document.getElementById('tco-payback');
+          if (pb) pb.textContent = payback > 0 ? payback.toFixed(1) + ' months' : 'Immediate';
+
+          // Projection chart bars — write to individual slots so pre-render layout is never blank
+          var maxV = Math.max(ospcAnnual, flexAnnual, ospc3yr, flex3yr, ospc5yr, flex5yr, 1);
+          var moMax = Math.max(s.srcMonthly, s.tgtMonthly, 1);
+          var b1 = document.getElementById('tco-bar-monthly');
+          var b2 = document.getElementById('tco-bar-1yr');
+          var b3 = document.getElementById('tco-bar-3yr');
+          var b4 = document.getElementById('tco-bar-5yr');
+          if (b1) b1.innerHTML = _renderBar('Monthly', s.srcMonthly, s.tgtMonthly, moMax, 'mo');
+          if (b2) b2.innerHTML = _renderBar('Year 1', ospcAnnual, flexAnnual, maxV, 'yr');
+          if (b3) b3.innerHTML = _renderBar('Year 3 (incl. CAPEX)', ospc3yr, flex3yr, maxV, '3yr');
+          if (b4) b4.innerHTML = _renderBar('Year 5 (incl. CAPEX)', ospc5yr, flex5yr, maxV, '5yr');
+
+          // Insight cards — always populate; use actual vmData when available, demo fallback otherwise
+          var vm = s.vmData;
+          var vcpuSrc = vm.srcVcpu || 16, vcpuTgt = vm.tgtVcpu || 16;
+          var ramSrc  = vm.srcRam  || 64,  ramTgt  = vm.tgtRam  || 64;
+          var diskSrc = vm.srcDisk || 1000, diskTgt = vm.tgtDisk || 1000;
+          var demoLabel = s.isDemo ? ' (demo)' : '';
+          _set('tco-insight-compute',
+            'Source: ' + vcpuSrc + ' vCPU / ' + ramSrc + ' GB RAM → FLEX: ' + vcpuTgt + ' vCPU / ' + ramTgt + ' GB RAM. Compute OPEX saves ~' + _fmtK(savMonthly * 0.6) + '/mo' + demoLabel + '.');
+          _set('tco-insight-storage',
+            'Source: ' + diskSrc + ' GB → FLEX: ' + diskTgt + ' GB. Storage OPEX saves ~' + _fmtK(savMonthly * 0.2) + '/mo' + demoLabel + '.');
+          _set('tco-insight-license',
+            'FLEX has no vendor license fees. License saves ~' + _fmtK(savMonthly * 0.1) + '/mo vs OSPC subscription model' + demoLabel + '.');
+          _set('tco-insight-rightsizing',
+            (n > 0 ? n + ' VMs in scope.' : 'Est. ' + (vm.rows || 4) + ' VMs' + demoLabel + '.') + ' Right-sizing on modern FLEX flavors can add 10–15% further savings (~' + _fmtK(s.tgtMonthly * 0.15) + '/mo).');
+
+          // Per-server table
+          var tbody = document.getElementById('tco-server-tbody');
+          if (tbody) {
+            if (n > 0) {
+              var ospcPer = n > 0 ? s.srcMonthly / n : 0;
+              var flexPer = n > 0 ? s.tgtMonthly / n : 0;
+              tbody.innerHTML = s.servers.map(function(srv, i) {
+                var typeColor = srv.type === 'DB' ? '#f59e0b' : srv.type === 'K8s' ? '#a78bfa' : '#3b82f6';
+                var factor = srv.type === 'DB' ? 1.3 : srv.type === 'K8s' ? 1.1 : 1.0;
+                var sm = Math.round(ospcPer * factor);
+                var fm = Math.round(flexPer * factor);
+                var sv = sm - fm;
+                return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                  + '<td style="padding:10px 12px;font-size:12px;font-weight:600;color:#374151;">' + (srv.name || 'Server ' + (i+1)) + '</td>'
+                  + '<td style="padding:10px 12px;"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:' + typeColor + '20;color:' + typeColor + ';border:1px solid ' + typeColor + '40;">' + (srv.type||'App') + '</span></td>'
+                  + '<td style="padding:10px 12px;font-size:11px;color:#94a3b8;font-family:monospace;">' + (srv.source_ip||'—') + '</td>'
+                  + '<td style="padding:10px 12px;font-size:11px;color:#94a3b8;font-family:monospace;">' + (srv.target_ip||'—') + '</td>'
+                  + '<td style="padding:10px 12px;font-size:13px;font-weight:700;color:#3b82f6;text-align:right;">' + _fmt(sm) + '</td>'
+                  + '<td style="padding:10px 12px;font-size:13px;font-weight:700;color:#22c55e;text-align:right;">' + _fmt(fm) + '</td>'
+                  + '<td style="padding:10px 12px;font-size:13px;font-weight:800;color:' + (sv>=0?'#10b981':'#ef4444') + ';text-align:right;">' + (sv>=0?'+':'') + _fmt(sv) + '</td>'
+                  + '<td style="padding:10px 12px;font-size:13px;font-weight:800;color:#a78bfa;text-align:right;">' + (sv>=0?'+':'') + _fmt(sv*12) + '</td>'
+                  + '</tr>';
+              }).join('');
+            } else if (s.vmData.rows) {
+              var ospcPer = s.srcMonthly / s.vmData.rows;
+              var flexPer = s.tgtMonthly / s.vmData.rows;
+              var sv = ospcPer - flexPer;
+              tbody.innerHTML = '<tr style="border-bottom:1px solid #f1f5f9;">'
+                + '<td colspan="4" style="padding:10px 12px;font-size:12px;color:#64748b;font-style:italic;">' + s.vmData.rows + ' VMs averaged (load scope from UAT for per-server detail)</td>'
+                + '<td style="padding:10px 12px;font-size:13px;font-weight:700;color:#3b82f6;text-align:right;">' + _fmt(ospcPer) + '/ea</td>'
+                + '<td style="padding:10px 12px;font-size:13px;font-weight:700;color:#22c55e;text-align:right;">' + _fmt(flexPer) + '/ea</td>'
+                + '<td style="padding:10px 12px;font-size:13px;font-weight:800;color:#10b981;text-align:right;">' + (sv>=0?'+':'') + _fmt(sv) + '/ea</td>'
+                + '<td style="padding:10px 12px;font-size:13px;font-weight:800;color:#a78bfa;text-align:right;">' + (sv>=0?'+':'') + _fmt(sv*12) + '/ea</td>'
+                + '</tr>';
+            }
+          }
+
+          // Executive summary
+          var pct = s.savingsPct;
+          var isGood = pct > 0;
+          _set('tco-exec-text',
+            isGood
+            ? 'Migrating from OSPC to FLEX delivers $' + Math.round(savMonthly).toLocaleString() + '/month in OPEX savings (' + pct.toFixed(1) + '%). '
+              + 'After a one-time migration CAPEX of ' + _fmt(capex) + ', the investment is recovered in ' + (payback > 0 ? payback.toFixed(1) + ' months' : 'the first month') + '. '
+              + 'Over 3 years the net savings are ' + _fmtK(Math.abs(sav3yr)) + ' — over 5 years ' + _fmtK(Math.abs(sav5yr)) + '. '
+              + 'FLEX eliminates vendor license fees, enables right-sizing on modern instance types, and delivers a projected ' + roi3.toFixed(0) + '% ROI at the 3-year mark.'
+            : 'FLEX monthly run-rate is currently higher than the OSPC baseline by ' + _fmtK(Math.abs(savMonthly)) + '/month. '
+              + 'Review flavor right-sizing in UAT to reduce FLEX cost before cutover. '
+              + 'License elimination and right-sizing on FLEX can recover this gap — re-run UAT with optimized flavors.'
+          );
+
+          // Color the exec summary
+          var es = document.getElementById('tco-exec-summary');
+          if (es) es.style.borderColor = isGood ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.3)';
+
+          // --- OSPC Scanned Infra Detail TCO ---
+          var ospcDay   = s.srcMonthly / 30;
+          var ospcYear  = s.srcMonthly * 12;
+          var compute   = s.srcMonthly * 0.807;
+          var storage   = s.srcMonthly * 0.136;
+          var network   = s.srcMonthly * 0.057;
+          _set('tco-infra-day',     '$' + ospcDay.toFixed(2));
+          _set('tco-infra-month',   _fmt(s.srcMonthly));
+          _set('tco-infra-year',    _fmt(ospcYear));
+          _set('tco-infra-compute', _fmt(compute));
+          _set('tco-infra-storage', _fmt(storage));
+          _set('tco-infra-network', _fmt(network));
+          _set('tco3x-infra-day',     '$' + ospcDay.toFixed(2));
+          _set('tco3x-infra-month',   _fmt(s.srcMonthly));
+          _set('tco3x-infra-year',    _fmt(ospcYear));
+          _set('tco3x-infra-compute', _fmt(compute));
+          _set('tco3x-infra-storage', _fmt(storage));
+          _set('tco3x-infra-network', _fmt(network));
+
+          var infraTbody = document.getElementById('tco-infra-tbody');
+          if (infraTbody && s.srcMonthly) {
+            var types = {};
+            s.servers.forEach(function(srv) {
+              var t = (srv.type||'VM / Compute');
+              if (!types[t]) types[t] = {count:0, cost:0};
+              types[t].count++;
+            });
+            var typeKeys = Object.keys(types);
+            if (!typeKeys.length) {
+              types = {'VM / Compute':{count:s.vmData.rows||0,cost:compute*0.64}, 'DB Instance':{count:0,cost:compute*0.36}, 'Block Volume':{count:0,cost:storage}, 'Load Balancer':{count:0,cost:network}};
+              typeKeys = Object.keys(types);
+            }
+            var totalCost = s.srcMonthly;
+            var nSrv = s.servers.length || s.vmData.rows || 1;
+            typeKeys.forEach(function(t) {
+              var factor = t.indexOf('DB')>=0?1.3:t.indexOf('Vol')>=0||t.indexOf('Block')>=0?0:t.indexOf('LB')>=0||t.indexOf('Load')>=0?0:1;
+              types[t].cost = types[t].count > 0 ? Math.round((types[t].count/nSrv)*totalCost) : 0;
+            });
+            infraTbody.innerHTML = typeKeys.map(function(t){
+              var c=types[t]; var mo=c.cost; var dy=mo/30; var yr=mo*12;
+              return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:600;color:#374151;">'+t+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;color:#374151;text-align:right;">'+c.count+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#3b82f6;text-align:right;">'+_fmt(mo)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;color:#64748b;text-align:right;">$'+dy.toFixed(2)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#374151;text-align:right;">'+_fmt(yr)+'</td>'
+                +'</tr>';
+            }).join('')
+            +'<tr style="background:#f8fafc;font-weight:800;">'
+            +'<td style="padding:9px 12px;font-size:12px;color:#1e293b;">Total</td>'
+            +'<td style="padding:9px 12px;font-size:12px;color:#1e293b;text-align:right;">'+nSrv+'</td>'
+            +'<td style="padding:9px 12px;font-size:12px;font-weight:900;color:#1d4ed8;text-align:right;">'+_fmt(s.srcMonthly)+'</td>'
+            +'<td style="padding:9px 12px;font-size:12px;font-weight:900;color:#1d4ed8;text-align:right;">$'+ospcDay.toFixed(2)+'</td>'
+            +'<td style="padding:9px 12px;font-size:12px;font-weight:900;color:#1e293b;text-align:right;">'+_fmt(ospcYear)+'</td>'
+            +'</tr>';
+          }
+
+          // --- Detailed per-component OSPC TCO table ---
+          var compDetailTbody = document.getElementById('tco-comp-detail-tbody');
+          var compDetailTfoot = document.getElementById('tco-comp-detail-tfoot');
+          if (compDetailTbody && s.servers && s.servers.length) {
+            var _fmtD = function(n){ return '$' + (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+            var perSrvCost = s.srcMonthly / (s.servers.length || 1);
+            var totalMo = 0;
+            compDetailTbody.innerHTML = s.servers.map(function(srv, i) {
+              var type = srv.service_type || srv.type || 'VM / Compute';
+              var name = srv.name || srv.public_ip || ('Component-' + (i+1));
+              var flavor = srv.flavor || srv.size || srv.targetFlavor || '—';
+              var region = srv.region || (s.srcRegion||'IAD') ;
+              var isDB  = (type+'').toLowerCase().indexOf('db')>=0||(type+'').toLowerCase().indexOf('database')>=0;
+              var isVol = (type+'').toLowerCase().indexOf('vol')>=0||(type+'').toLowerCase().indexOf('block')>=0;
+              var isLB  = (type+'').toLowerCase().indexOf('lb')>=0||(type+'').toLowerCase().indexOf('load')>=0;
+              var mo = Math.round(srv.ospcMonthly || srv.monthlyPrice || (isVol?10:isLB?45:isDB?perSrvCost*1.3:perSrvCost));
+              totalMo += mo;
+              var dy = mo/30; var yr1 = mo*12; var yr3 = mo*36;
+              var typeColor = isDB?'#7c3aed':isVol?'#0891b2':isLB?'#d97706':'#3b82f6';
+              return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                +'<td style="padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+name+'">'+name+'</td>'
+                +'<td style="padding:8px 12px;"><span style="background:'+typeColor+'22;color:'+typeColor+';padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;">'+type+'</span></td>'
+                +'<td style="padding:8px 12px;font-size:11px;color:#64748b;font-family:monospace;">'+flavor+'</td>'
+                +'<td style="padding:8px 12px;font-size:11px;color:#64748b;">'+region+'</td>'
+                +'<td style="padding:8px 12px;text-align:right;font-size:12px;font-weight:700;color:#dc2626;">'+_fmtD(mo)+'</td>'
+                +'<td style="padding:8px 12px;text-align:right;font-size:12px;color:#64748b;">$'+dy.toFixed(2)+'</td>'
+                +'<td style="padding:8px 12px;text-align:right;font-size:12px;color:#374151;">'+_fmtD(yr1)+'</td>'
+                +'<td style="padding:8px 12px;text-align:right;font-size:12px;color:#374151;">'+_fmtD(yr3)+'</td>'
+                +'</tr>';
+            }).join('');
+            // total footer
+            if (compDetailTfoot) {
+              compDetailTfoot.style.display = '';
+              var _s = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+              _s('tco-comp-detail-total-month', _fmtD(totalMo));
+              _s('tco-comp-detail-total-day', '$'+(totalMo/30).toFixed(2));
+              _s('tco-comp-detail-total-1yr', _fmtD(totalMo*12));
+              _s('tco-comp-detail-total-3yr', _fmtD(totalMo*36));
+            }
+          }
+
+          // --- TCO Comparison & Projected Savings ---
+          var badge = document.getElementById('tco-savings-badge');
+          if (badge) badge.textContent = (s.savingsPct>0?'↓':'↑') + Math.abs(s.savingsPct).toFixed(0) + '% Cost Reduction';
+          var compTbody = document.getElementById('tco-comparison-tbody');
+          if (compTbody && s.srcMonthly) {
+            var flexDay = s.tgtMonthly / 30;
+            var flexYear = s.tgtMonthly * 12;
+            var savDay = (s.srcMonthly - s.tgtMonthly) / 30;
+            var savYear = (s.srcMonthly - s.tgtMonthly) * 12;
+            compTbody.innerHTML =
+              '<tr style="border-bottom:1px solid #f1f5f9;">'
+              +'<td style="padding:10px 14px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:8px;"></span><span style="font-size:12px;font-weight:600;color:#374151;">Legacy OSPC current scanned infra</span></td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#374151;text-align:right;">$'+ospcDay.toFixed(2)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#374151;text-align:right;">'+_fmt(s.srcMonthly)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#374151;text-align:right;">'+_fmt(ospcYear)+'</td>'
+              +'</tr>'
+              +'<tr style="border-bottom:1px solid #f1f5f9;">'
+              +'<td style="padding:10px 14px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:8px;"></span><span style="font-size:12px;font-weight:600;color:#374151;">Target FLEX equivalent</span></td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">$'+flexDay.toFixed(2)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">'+_fmt(s.tgtMonthly)+'</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">'+_fmt(flexYear)+'</td>'
+              +'</tr>'
+              +'<tr style="background:#f0fdf4;">'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:800;color:#1e293b;">Projected Platform Savings</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.abs(savDay).toFixed(2)+'/day</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.round(Math.abs(s.savings)).toLocaleString()+'/mo</td>'
+              +'<td style="padding:10px 14px;font-size:12px;font-weight:900;color:#10b981;text-align:right;">$'+Math.round(Math.abs(savYear)).toLocaleString()+'/yr</td>'
+              +'</tr>';
+            var tco3xComp = document.getElementById('tco3x-comparison-tbody');
+            if (tco3xComp) tco3xComp.innerHTML = compTbody.innerHTML;
+          }
+
+          // --- Component-Level OSPC → FLEX TCO ---
+          var compLevelTbody = document.getElementById('tco-comp-tbody');
+          if (compLevelTbody && n > 0) {
+            var ospcPerSrv = s.srcMonthly / n;
+            var flexPerSrv = s.tgtMonthly / n;
+            compLevelTbody.innerHTML = s.servers.map(function(srv, i) {
+              var factor = srv.type==='DB'?1.3:srv.type==='K8s'?1.1:1.0;
+              var sm = Math.round(ospcPerSrv * factor);
+              var fm = Math.round(flexPerSrv * factor);
+              var sv = sm - fm;
+              var typeColor = srv.type==='DB'?'#f59e0b':srv.type==='K8s'?'#a78bfa':'#3b82f6';
+              var compLabel = srv.type === 'DB' ? 'DB Instance' : srv.type === 'LB' ? 'Load Balancer' : 'VM / Compute';
+              var ospcFlavor = srv.flavor || (srv.vcpu ? 'general-' + Math.ceil((srv.vcpu||2)/2) : 'general-2');
+              var flexFlavor = 'gp.' + Math.ceil((srv.vcpu||2)/2) + '.' + Math.ceil((srv.ram||4)/2);
+              return '<tr style="border-bottom:1px solid #f1f5f9;">'
+                +'<td style="padding:9px 12px;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:'+typeColor+'20;color:'+typeColor+';border:1px solid '+typeColor+'40;">'+compLabel+'</span></td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:600;color:#374151;">'+(srv.name||'Server '+(i+1))+'</td>'
+                +'<td style="padding:9px 12px;font-size:11px;color:#94a3b8;font-family:monospace;">'+(srv.id||srv.source_ip||'—')+'</td>'
+                +'<td style="padding:9px 12px;font-size:11px;color:#374151;">'+ospcFlavor+'</td>'
+                +'<td style="padding:9px 12px;font-size:11px;font-weight:600;color:#22c55e;">'+flexFlavor+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#3b82f6;text-align:right;">'+_fmt(sm)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:700;color:#22c55e;text-align:right;">'+_fmt(fm)+'</td>'
+                +'<td style="padding:9px 12px;font-size:12px;font-weight:800;color:'+(sv>=0?'#10b981':'#ef4444')+';text-align:right;">'+(sv>=0?'+':'')+_fmt(sv)+'</td>'
+                +'</tr>';
+            }).join('');
+          }
+        };
+
+        function _set(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
+
+        window.tcoLoadFromUat = function() {
+          var raw = null, scope = null;
+          try { raw = JSON.parse(localStorage.getItem('osflex_uat_flavor_data') || 'null'); } catch(_) {}
+          try { scope = JSON.parse(localStorage.getItem('osflex_uat_scope') || 'null'); } catch(_) {}
+          var ts = localStorage.getItem('osflex_uat_flavor_ts') || localStorage.getItem('osflex_uat_scope_ts') || '';
+
+          // Use defaults from window._uatFlavorData if localStorage is empty
+          if (!raw && window._uatFlavorData) raw = window._uatFlavorData;
+
+          if (!raw || !raw.tcoData) {
+            alert('No UAT TCO data found. Run UAT Testing in Stage 3 first.');
+            return;
+          }
+          var t = raw.tcoData;
+          _tcoState.srcMonthly  = parseFloat(t.srcMonthly) || 0;
+          _tcoState.tgtMonthly  = parseFloat(t.tgtMonthly) || 0;
+          _tcoState.savings     = parseFloat(t.savings)    || 0;
+          _tcoState.savingsPct  = parseFloat(t.savingsPct) || 0;
+          _tcoState.vmData      = raw.vmData || {};
+          _tcoState.servers     = Array.isArray(scope) ? scope : [];
+          _tcoState.isDemo      = false;
+
+          var tsEl = document.getElementById('tco-uat-ts');
+          if (tsEl) tsEl.textContent = ts ? 'UAT: ' + ts.replace('T',' ').slice(0,16) + ' UTC' : '';
+
+          tcoRecalc();
+        };
+
+        window.tcoExportCsv = function() {
+          var s = _tcoState;
+          if (!s.srcMonthly) { alert('Load UAT data first.'); return; }
+          var capex = _capex();
+          var rows = [
+            ['Metric','Value'],
+            ['OSPC Monthly ($)', s.srcMonthly],
+            ['FLEX Monthly ($)', s.tgtMonthly],
+            ['Monthly Savings ($)', s.savings],
+            ['Savings %', s.savingsPct.toFixed(1)+'%'],
+            ['Annual Savings ($)', s.savings*12],
+            ['Total CAPEX ($)', capex],
+            ['3-Year Net Savings ($)', s.savings*12*3 - capex],
+            ['5-Year Net Savings ($)', s.savings*12*5 - capex],
+            ['ROI at 3yr (%)', capex > 0 ? ((s.savings*12*3-capex)/capex*100).toFixed(1)+'%' : 'N/A'],
+            ['Payback (months)', s.savings > 0 ? (capex/s.savings).toFixed(1) : 'N/A'],
+            ['Servers in scope', s.servers.length || (s.vmData.rows||'N/A')],
+          ];
+          if (s.servers.length) {
+            rows.push(['',''],['Server','Type','Source IP','Target IP','OSPC/Month','FLEX/Month','Save/Month','Save/Year']);
+            var ospcPer = s.srcMonthly / s.servers.length;
+            var flexPer = s.tgtMonthly / s.servers.length;
+            s.servers.forEach(function(srv) {
+              var f = srv.type==='DB'?1.3:srv.type==='K8s'?1.1:1.0;
+              var sm = Math.round(ospcPer*f), fm = Math.round(flexPer*f);
+              rows.push([srv.name||'—', srv.type||'App', srv.source_ip||'—', srv.target_ip||'—', sm, fm, sm-fm, (sm-fm)*12]);
+            });
+          }
+          var csv = rows.map(function(r){ return r.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+          var blob = new Blob([csv], {type:'text/csv'});
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = 'tco_dashboard_' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        // Render immediately when DOM is ready (always fires, even with demo data)
+        function _tcoInit() {
+          _capex();
+          tcoRecalc();
+          // Also try real UAT data from window._uatFlavorData (set by Stage 3 loader)
+          if (_tcoState.isDemo && window._uatFlavorData && window._uatFlavorData.tcoData) {
+            tcoLoadFromUat();
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', _tcoInit);
+        } else {
+          _tcoInit();
+        }
+      })();
+      </script>
+
+    </div>
+  </div>
+
+  <!-- Stage 7 — Performance Gain -->

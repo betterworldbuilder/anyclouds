@@ -1,0 +1,60 @@
+    <div id="s1preflight-pane" class="gov-page" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🧪 Migration Pre-Flight Check</h2>
+          <p>Validate if selected source workloads can land successfully in the target FLEX region before starting migration.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="preflight-status">Status: Waiting for readiness handoff</div>
+      </div>
+
+      <div class="gov-section">
+        <h3>Target FLEX Inputs</h3>
+        <p style="margin:0 0 12px;color:#94a3b8;font-size:13px;">The readiness scanner says what exists. Pre-flight checks whether it can land in the selected FLEX region.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;">
+          <label class="gov-form-group"><span class="gov-label">Source Cloud</span><input class="gov-input" id="preflight_source_cloud" value="OSPC"></label>
+          <label class="gov-form-group"><span class="gov-label">Source Region</span><input class="gov-input" id="preflight_source_region" placeholder="IAD"></label>
+          <label class="gov-form-group"><span class="gov-label">Target FLEX Cloud</span><input class="gov-input" id="preflight_target_cloud" value="FLEX"></label>
+          <label class="gov-form-group"><span class="gov-label">Target FLEX Region</span><input class="gov-input" id="preflight_target_region" value="DFW3"></label>
+          <label class="gov-form-group"><span class="gov-label">Target Tenant / Project</span><input class="gov-input" id="preflight_target_project" placeholder="project UUID/name"></label>
+          <label class="gov-form-group"><span class="gov-label">Target Network</span><input class="gov-input" id="preflight_target_network" placeholder="network ID/name"></label>
+          <label class="gov-form-group"><span class="gov-label">Target Subnet</span><input class="gov-input" id="preflight_target_subnet" placeholder="subnet ID/name"></label>
+          <label class="gov-form-group"><span class="gov-label">Security Group Mapping</span><input class="gov-input" id="preflight_target_sg" placeholder="mapped SG"></label>
+          <label class="gov-form-group"><span class="gov-label">Target Keypair</span><input class="gov-input" id="preflight_target_keypair" placeholder="keypair"></label>
+          <label class="gov-form-group"><span class="gov-label">Target Flavor Mapping</span><input class="gov-input" id="preflight_target_flavor" placeholder="flex flavor"></label>
+          <label class="gov-form-group"><span class="gov-label">Floating IP Requirement</span><select class="gov-select" id="preflight_fip_required"><option>No</option><option>Yes</option></select></label>
+          <label class="gov-form-group"><span class="gov-label">Migration Method</span><select class="gov-select" id="preflight_migration_method"><option>Instance snapshot migration</option><option>Image migration</option><option>Volume snapshot migration</option><option>VM rebuild from image</option><option>DB volume restore</option><option>Flex2Flex region clone</option><option>Hyperscaler to FLEX</option><option>FLEX to hyperscaler</option></select></label>
+        </div>
+      </div>
+
+      <div class="gov-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="gov-section"><h3>Total Checks</h3><div id="preflight_card_total" style="font-size:24px;font-weight:900;color:#e2e8f0;">0</div></div>
+        <div class="gov-section"><h3>Pass</h3><div id="preflight_card_pass" style="font-size:24px;font-weight:900;color:#86efac;">0</div></div>
+        <div class="gov-section"><h3>Pass With Warning</h3><div id="preflight_card_warning" style="font-size:24px;font-weight:900;color:#fcd34d;">0</div></div>
+        <div class="gov-section"><h3>Fail</h3><div id="preflight_card_fail" style="font-size:24px;font-weight:900;color:#fca5a5;">0</div></div>
+        <div class="gov-section"><h3>Needs Input</h3><div id="preflight_card_input" style="font-size:24px;font-weight:900;color:#c4b5fd;">0</div></div>
+        <div class="gov-section"><h3>Selected for Stage 2</h3><div id="preflight_card_selected" style="font-size:24px;font-weight:900;color:#7dd3fc;">0</div></div>
+      </div>
+
+      <div class="gov-section">
+        <h3>Migration Pre-Flight Results</h3>
+        <div class="gov-actions" style="margin:0 0 14px;">
+          <button class="gov-btn btn-example" onclick="importReadyItemsForPreflight()">📥 Import Ready Items from Readiness Scanner</button>
+          <button class="gov-btn btn-save" onclick="runMigrationPreflight()">🧪 Run Pre-Flight Check</button>
+          <button class="gov-btn btn-export" onclick="exportPreflightReport()">📦 Export Pre-Flight Report</button>
+          <button class="gov-btn btn-save" onclick="sendPreflightToStage2()">🚀 Send Passed Items to Stage 2 Migration</button>
+          <button class="gov-btn btn-example" onclick="generatePreflightRemediationPlan()">🛠 Generate Remediation Plan</button>
+        </div>
+        <div style="overflow:auto;">
+          <table class="gov-table" style="min-width:1700px;">
+            <thead><tr><th>Select</th><th>source_resource</th><th>source_resource_id</th><th>source_type</th><th>target_region</th><th>check_name</th><th>source_value</th><th>target_requirement</th><th>target_value</th><th>status</th><th>impact</th><th>recommended_fix</th><th>blocks_migration</th><th>notes</th></tr></thead>
+            <tbody id="preflight_results_body"><tr><td colspan="14" style="color:#64748b;font-style:italic;">No pre-flight checks have run yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="gov-section">
+        <h3>Output Artifacts</h3>
+        <div class="artifact-list" id="preflight_artifacts"><span style="color:#64748b;">No pre-flight artifacts exported yet.</span></div>
+      </div>
+    </div>
+
+    <!-- 1e: Kubernetes Dual-Layer Scanner -->

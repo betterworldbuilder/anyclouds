@@ -1,0 +1,78 @@
+    <div id="s2retire-pane" class="gov-page path-retire" style="display:none;">
+      <div class="gov-header">
+        <div class="gov-title-area">
+          <h2>🗑 R2 Retire / Decommission — Shut Down Safely</h2>
+          <p>Controlled shutdown workflow for obsolete workloads that should be removed instead of migrated.</p>
+        </div>
+        <div class="gov-status-badge status-pending" id="r2-status">Status: Pending</div>
+      </div>
+
+      <div class="gov-grid">
+        <div class="gov-section">
+          <h3>1. Business System Selector</h3>
+          <div class="gov-form-group"><span class="gov-label">Customer Name</span><input type="text" class="gov-input" id="r2-customer"></div>
+          <div class="gov-form-group"><span class="gov-label">Business System</span><input type="text" class="gov-input" id="r2-system"></div>
+          <div class="gov-form-group"><span class="gov-label">Decommission Reason</span>
+            <select class="gov-select" id="r2-reason">
+              <option>Replaced by new platform</option>
+              <option>No longer used</option>
+              <option>Duplicate system</option>
+              <option>End of life</option>
+              <option>Cost reduction</option>
+              <option>Security risk</option>
+            </select>
+          </div>
+          <div class="gov-form-group"><span class="gov-label">Usage Status</span><input type="text" class="gov-input" id="r2-usage" placeholder="e.g. No login in 180 days"></div>
+        </div>
+        <div class="gov-section">
+          <h3>2. Safety & Backup Controls</h3>
+          <div class="gov-form-group"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="r2-backup" checked> Final DB Backup Required</label></div>
+          <div class="gov-form-group"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="r2-archive" checked> Archive Required (7 Years Retention)</label></div>
+          <div class="gov-form-group"><span class="gov-label">Planned Shutdown</span><input type="date" class="gov-input" id="r2-shutdown-date"></div>
+          <div class="gov-form-group"><span class="gov-label">Rollback Window (Days)</span><input type="number" class="gov-input" id="r2-rollback" value="30"></div>
+        </div>
+        <div class="gov-section">
+          <h3>3. Related Workloads</h3>
+          <table class="gov-table">
+            <thead><tr><th>Type</th><th>Name</th><th>Notes</th></tr></thead>
+            <tbody id="r2-workloads-body"></tbody>
+          </table>
+          <button class="gov-btn btn-example" style="margin-top:10px; width:100%;" onclick="addWorkloadRow('r2-workloads-body')">+ Add Workload Item</button>
+        </div>
+        <div class="gov-section">
+          <h3>4. Decommission Checklist</h3>
+          <table class="gov-table">
+            <thead><tr><th>Step</th><th>Action</th><th>Status</th></tr></thead>
+            <tbody id="r2-actions-body">
+              <tr><td>1</td><td>No active usage confirmed</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>2</td><td>Final DB backup created</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>3</td><td>Approve decommission window</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+              <tr><td>4</td><td>Power off systems</td><td><select class="gov-select"><option>Pending</option><option>Done</option></select></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="gov-section">
+        <h3>5. Output Artifacts</h3>
+        <div class="artifact-list">
+          <a href="#" class="artifact-link">📄 decommission_register.csv</a>
+          <a href="#" class="artifact-link">📄 archive_manifest.json</a>
+          <a href="#" class="artifact-link">📄 shutdown_schedule.csv</a>
+        </div>
+      </div>
+
+      <div class="gov-actions">
+        <button class="gov-btn btn-example" onclick="loadR2Example()">🧬 Load Decommission Example</button>
+        <button class="gov-btn btn-save" onclick="saveGov('R2')">💾 Approve Decommission</button>
+        <button class="gov-btn btn-export">📉 Run Dependency Check</button>
+        <button class="gov-btn btn-export">🗑 Mark Powered Off</button>
+      </div>
+    </div>
+
+    <iframe id="s2rehost_p1-pane" src="about:blank" data-src="/designer/?source=ospc" title="Shared FLEX Infra Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2image-pane" src="/image_migrator/?v={{ cache_bust|default('') }}" title="Direct Shift and Lift of VM" style="width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2vmware-pane" src="/image_migrator/?mode=vmware&v={{ cache_bust|default('') }}" title="VMware to FLEX Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2flex2flex-pane" src="/image_migrator/?mode=flex2flex&v={{ cache_bust|default('') }}" title="R3 FLEX2FLEX-Region Cloning" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2flexanywhere-pane" src="/image_migrator/?mode=flexanywhere&v={{ cache_bust|default('') }}" title="R3 FLEX Anywhere Hyperscaler Bridge" style="display:none; width:100%; height:100%; border:none;"></iframe>
+    <iframe id="s2rehost_p2_1-pane" src="/agent1/" title="REHOST Apps Migration" style="display:none; width:100%; height:100%; border:none;"></iframe>
