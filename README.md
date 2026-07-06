@@ -152,6 +152,64 @@ Rackspace hyperscaler account links for operators:
 
 Status: **WIP**. The page, provider credential sections, account access links, and operator flow are being added first. Provider-specific export/import adapters should be implemented by extending the working FLEX2FLEX and OSPC2FLEX paths, not by replacing them.
 
+## 🗂️ Dashboard Template Architecture
+
+The dashboard UI is served as a single Flask route (`/`) that renders `combined.html`. As of July 2026, `combined.html` is a **20-line Jinja2 shell** — all stage and sub-stage content lives in isolated partial files under `workflow_dashboard/templates/partials/`.
+
+### Why partials?
+
+| Problem (monolithic) | Solution (partials) |
+|---|---|
+| 27,846-line single file — any edit risks breaking unrelated stages | Each stage is isolated — edit `_panel_s5.html` without touching Stage 2 |
+| Duplicate insertion accidents grew file to 53k lines twice | Each partial has one insertion point — duplication impossible |
+| Non-ASCII chars in one stage break entire dashboard JS | Errors are scoped to one file |
+| Git diffs unreadable (300-line diffs in a 27k file) | Clean per-stage diffs |
+| 20-second browser parse on slow connections | Identical runtime — Flask assembles at render time, browser receives same HTML |
+
+### Stage & Sub-stage Partial Map
+
+| Partial File | Lines | Stage | Pane ID | What it contains |
+|---|---|---|---|---|
+| `_head_nav.html` | 2276 | Shell | — | `<head>`, global CSS, navbar, all tab/sub-menu buttons |
+| `_panel_why.html` | 914 | Why FLEX | `panel-s_why` | FLEX value proposition — WHO / WHAT / WHEN / WHY |
+| `_panel_tour.html` | 432 | Quick Tour | `panel-s_tour` | 3D mission control tour animation |
+| `_panel_s0.html` | 290 | Stage 0 | `panel-s0` | OSPC Cloud portal mockup, quick-access links |
+| `_panel_s1.html` | 8 | Stage 1 shell | `panel-s1` | Includes all Stage 1 sub-stages below |
+| `_s1_info.html` | 26 | S1 — Overview | `s1info-pane` | Stage 1 header and overview |
+| `_s1_iframes.html` | 24 | S1 — Scanners | `s1ospc/flex2flex/hyper*-pane` | OSPC Scanner, FLEX2FLEX Scanner, Hyper-AWS/GCP/Azure, TCO Dashboard, References |
+| `_s1_appdep.html` | 310 | S1 — App Dependency | `s1appdep-pane` | Migration Log, Business Systems, topology cards |
+| `_s1_readiness.html` | 50 | S1 — Readiness | `s1readiness-pane` | Migration readiness checklist |
+| `_s1_preflight.html` | 60 | S1 — Preflight | `s1preflight-pane` | Pre-migration preflight checks |
+| `_s1_k8s.html` | 53 | S1 — Kubernetes | `s1k8s-pane` | Kubernetes cluster assessment |
+| `_s1_business_ontology.html` | 17 | S1 — Business Ontology | `s1business_ontology-pane` | Business system ontology |
+| `_s1_system_ontology.html` | 30 | S1 — System Ontology | `s1system_ontology_handoff-pane` | System ontology handoff |
+| `_panel_s2.html` | 16 | Stage 2 shell | `panel-s2` | Includes all Stage 2 sub-stages below |
+| `_panel_s2_fullmig.html` | 110 | S2 — R0 Full Rehost | `s2fullmig-pane` | Full business system rehost workflow |
+| `_panel_s2_migstrategy.html` | 5 | S2 — Strategy | `s2migstrategy-pane` | Migration strategy overview |
+| `_panel_s2_retain.html` | 86 | S2 — R1 Retain | `s2retain-pane` | Keep on OSPC / decommission plan |
+| `_panel_s2_retire.html` | 72 | S2 — R2 Retire | `s2retire-pane` | Retire and decommission workflow |
+| *(inline iframes in `_panel_s2.html`)* | 6 | S2 — Iframe tools | `s2rehost_p1/image/vmware/flex2flex/flexanywhere/rehost_p2_1-pane` | Infrastructure Migration, VMware→FLEX, FLEX2FLEX Cloning, FLEX Anywhere, R5 Agent |
+| `_panel_s2_rehost_p2_2.html` | 252 | S2 — R6 Rearchitect | `s2rehost_p2_2-pane` | R6 Refactor / Rearchitect APPs to Containerization |
+| `r6ace_pane.html` | 137 | S2 — APPS to Container Refactor | `s2r6ace-pane` | 12-step domino workflow: Preflight → Snapshot → Scan → Build → GitOps → OpenCenter bundle |
+| `_panel_s2_opencenter.html` | 2323 | S2 — OpenCenter | `s2opencenter-pane` | OpenCenter GitOps platform — credentials, cluster deploy, Flux, R6 bundle import |
+| `_panel_s2_repurchase.html` | 65 | S2 — R7 Repurchase | `s2repurchase-pane` | Replace with SaaS / managed product |
+| `_panel_s4.html` | 2801 | Stage 4 | `panel-s4` | DNS cutover, traffic transition, rollback controls |
+| `_panel_s5.html` | 3356 | Stage 5 | `panel-s5` | Backup verification, DR plan, restore runbook |
+| `_panel_s5b.html` | 868 | Stage 5b | `panel-s5b` | Business system cutover, final sign-off |
+| `_panel_s6.html` | 145 | Stage 6 | `panel-s6` | Customer handover pack, deliverables |
+| `_panel_s7.html` | 858 | Stage 7 | `panel-s7` | UAT test runner, DB compare, cutover readiness scanner |
+| `_panel_s7a.html` | 175 | Stage 7a | `panel-s7a` | TCO chart, OSPC vs FLEX cost comparison |
+| `_panel_s8.html` | 208 | Stage 8 | `panel-s8` | AIOps monitoring, continuous operations telemetry |
+| `_panel_s9.html` | 78 | Stage 9 | `panel-s9` | AI Power Up panel |
+| `_panel_s10.html` | 23 | Stage 10 | `panel-s10` | Reserved + panel-area close |
+| `_closing_scripts.html` | 11789 | Shell | — | All shared JavaScript — activateSub, stage logic, JARVIS, UAT engine |
+
+Full editing guide: [`workflow_dashboard/templates/partials/README.md`](workflow_dashboard/templates/partials/README.md)
+
+Backup of original monolithic file: `workflow_dashboard/templates/backups/combined.html.bak_20260707_013959`
+
+---
+
 ## 🌌 The "Why" and "So What"
 
 **Why:** OSPC was a powerful chapter in Rackspace cloud history. It gave customers dedicated OpenStack environments, real control, familiar APIs, and the confidence of a managed private cloud. But platforms age. Images accumulate assumptions. Networks drift. Kernels, initramfs, cloud-init, virtio drivers, static routes, bootloaders, and application dependencies all remember the cloud they came from. FLEX is the forward path: modern Rackspace cloud capacity, newer operating models, cleaner automation targets, and a better place for customers to keep building. The challenge is carrying customer trust forward without losing the details that make their workloads boot, connect, and serve traffic.
