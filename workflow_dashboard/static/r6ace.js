@@ -1,8 +1,19 @@
 /* APPS to Container Refactor Engine v4 */
-var R6P={current:1,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{}};
-var R6P_STEPS=[{n:1,label:'Input',title:'Select FLEX Business System / App Input',desc:'Select a migrated FLEX Business System or a single FLEX VM / DB. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Discover FLEX Snapshots',desc:'Discover private FLEX VM images, VM snapshots, and volume snapshots as safe read-only capture sources.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component',desc:'Link selected snapshots to business system components.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback).'},{n:6,label:'Scan',title:'Snapshot Mount and Scan',desc:'Mount snapshot read-only. Scan OS, runtime, ports, services, volumes, config, secrets.'},{n:7,label:'Classify',title:'App Detection and File Classification',desc:'Identify real application content and classify all files.'},{n:8,label:'Readiness',title:'Container Readiness Assessment',desc:'Score each component: CLOUD_NATIVE_READY, READY_WITH_EXTERNALIZATION, KEEP_ON_FLEX, BLOCKED.'},{n:9,label:'Build',title:'Container Build Plan',desc:'Generate Dockerfile, image plan, base image, build/start command, health check, CPU/memory.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts.'},{n:11,label:'Bundle',title:'OpenCenter Import Bundle',desc:'Assemble the final OpenCenter-ready application bundle.'},{n:12,label:'OpenCenter',title:'Send to OpenCenter GitOps',desc:'Import bundle, generate commit commands, trigger Flux reconciliation.'}];
+var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
+var R6P_TOOLS=[
+  {name:'git',      req:true,  note:'GitOps commit',           manual:false},
+  {name:'curl',     req:true,  note:'CLI installers',          manual:false},
+  {name:'jq',       req:true,  note:'JSON parsing',            manual:false},
+  {name:'kubectl',  req:true,  note:'Cluster validation',      manual:false},
+  {name:'flux',     req:true,  note:'Flux reconcile',          manual:false},
+  {name:'opencenter',req:true, note:'Cluster metadata',        manual:true},
+  {name:'helm',     req:false, note:'Helm chart validation',   manual:false},
+  {name:'yq',       req:false, note:'YAML processing',         manual:false},
+  {name:'kustomize',req:false, note:'Kustomize validation',    manual:false}
+];
+var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Requirements Check',desc:'Verify CLI tools, credentials, and GitOps access before running the refactor workflow.'},{n:1,label:'Input',title:'Select FLEX Business System / App Input',desc:'Select a migrated FLEX Business System or a single FLEX VM / DB. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Discover FLEX Snapshots',desc:'Discover private FLEX VM images, VM snapshots, and volume snapshots as safe read-only capture sources.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component',desc:'Link selected snapshots to business system components.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback).'},{n:6,label:'Scan',title:'Snapshot Mount and Scan',desc:'Mount snapshot read-only. Scan OS, runtime, ports, services, volumes, config, secrets.'},{n:7,label:'Classify',title:'App Detection and File Classification',desc:'Identify real application content and classify all files.'},{n:8,label:'Readiness',title:'Container Readiness Assessment',desc:'Score each component: CLOUD_NATIVE_READY, READY_WITH_EXTERNALIZATION, KEEP_ON_FLEX, BLOCKED.'},{n:9,label:'Build',title:'Container Build Plan',desc:'Generate Dockerfile, image plan, base image, build/start command, health check, CPU/memory.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts.'},{n:11,label:'Bundle',title:'OpenCenter Import Bundle',desc:'Assemble the final OpenCenter-ready application bundle.'},{n:12,label:'OpenCenter',title:'Send to OpenCenter GitOps',desc:'Import bundle, generate commit commands, trigger Flux reconciliation.'}];
 
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(1);setTimeout(r6pLoadBiz,350);};
+window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);};
 window.r6aceInit=window.r6pInit;
 
 window.r6pRenderProgress=function(){
@@ -47,6 +58,7 @@ function r6pFoot(n,extra){return '<div class="r6p-stage-footer">'+(extra||'')+'<
 function r6pCmd(id,cmd){var cid='r6p-cmd-'+id,oid='r6p-out-'+id;return '<div class="r6p-cmd-box" id="'+cid+'">'+cmd.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div><div style="display:flex;gap:5px;margin-bottom:8px;"><button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById(\''+cid+'\').textContent)" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Copy</button><button onclick="r6pRunCmd(\''+cid+'\',\''+oid+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Run</button><button onclick="var e=document.getElementById(\''+oid+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Log</button></div><div id="'+oid+'" class="r6p-terminal" style="display:none;">$ waiting...</div>';}
 
 window.r6pContent=function(n){
+  if(n===0)return r6pStage0();
   if(n===1)return '<div class="r6p-warn-box">Only FLEX workloads can be converted here. Complete migration to FLEX first.</div><div class="uat-s1-biz-grid"><div><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:12px;">Business Systems <span style="font-size:11px;color:#64748b;font-weight:400;">from FLEX Migration Log</span></div><div id="r6p-biz-list" style="min-height:180px;"></div></div><div class="uat-s1-arch-selector"><div class="uat-s1-arch-head"><div class="uat-s1-arch-title">Business System Templates</div><span class="uat-s1-arch-badge">10 Templates</span></div><p class="uat-s1-arch-desc">Templates define structure only. Conversion requires real FLEX VM/DB mapping.</p><div class="uat-s1-template-pane active"><div id="r6p-arch-grid" class="uat-s1-arch-grid"></div></div></div></div>'+r6pFoot(1,'<button class="r6p-btn secondary" onclick="r6pLoadBiz()">Refresh FLEX Inventory</button>');
   if(n===2||n===3)return '<div class="r6p-info-box">Snapshots are used as safe read-only capture sources. Smart Snapshot does not copy the whole VM; it extracts only application content.</div><iframe src="/image_migrator/?mode=flex2flex&embedded=1&focus=snapshot" style="width:100%;height:650px;border:1px solid #e2e8f0;border-radius:10px;display:block;"></iframe>'+r6pFoot(n);
   if(n===4){var comps=R6P.components||[];var rows=comps.length?comps.map(function(c){var role=(c.type||c.role||'backend').toLowerCase();var isDb=role==='database'||role==='db';var rec=isDb?'ExternalDB':'Smart Snapshot';var rc=isDb?['#dbeafe','#1d4ed8']:['#dcfce7','#16a34a'];return '<tr><td style="font-weight:600;">'+c.name+'</td><td><span style="background:#ede9fe;color:#6d28d9;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;">'+role+'</span></td><td style="color:#64748b;">'+(c.vmName||'-')+'</td><td style="color:#64748b;font-size:11px;"><em>Select from Step 3</em></td><td style="font-size:11px;">-</td><td><span style="background:'+rc[0]+';color:'+rc[1]+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+rec+'</span></td><td><span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Pending</span></td><td><button onclick="alert(\'Map '+c.name+'\')" style="background:#eff6ff;color:#0369a1;border:1px solid #bfdbfe;border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">Map</button></td></tr>';}).join(''):'<tr><td colspan="8" style="padding:20px;text-align:center;color:#94a3b8;">Load FLEX components in Step 1 first.</td></tr>';return '<div class="r6p-info-box">Link selected snapshots to business system components.</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"><button class="r6p-btn primary" onclick="alert(\'Auto-mapping...\')">Auto-map by VM Name</button><button class="r6p-btn secondary" onclick="alert(\'Auto-mapping...\')">Auto-map by Volume ID</button><button class="r6p-btn success" onclick="r6pMarkDone(4)">Confirm Mapping</button></div><div style="overflow-x:auto;"><table class="r6p-table"><thead><tr><th>Component</th><th>Role</th><th>FLEX VM/DB</th><th>Selected Snapshot</th><th>Type</th><th>Recommendation</th><th>Status</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+r6pFoot(4);}
@@ -57,7 +69,92 @@ window.r6pContent=function(n){
   if(n===9)return '<pre style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;margin-bottom:14px;">'+(R6P.captureMethod==='compat'?'FROM ubuntu:22.04\nCOPY rootfs/ /\nCOPY start-compat.sh /start-compat.sh\nRUN chmod +x /start-compat.sh\nEXPOSE 80\nCMD ["/start-compat.sh"]':'FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --production\nCOPY . .\nEXPOSE 8080\nHEALTHCHECK --interval=30s CMD wget -qO- http://localhost:8080/health\nCMD ["npm","start"]')+'</pre>'+r6pFoot(9,'<button class="r6p-btn primary" onclick="r6pMarkDone(9)">Generate Dockerfiles</button>');
   if(n===10)return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"><button class="r6p-btn primary" onclick="r6pGenYAML()">Generate All YAML</button><button class="r6p-btn secondary" onclick="r6pGenHelm()">Helm Chart</button><button class="r6p-btn secondary" onclick="r6pGenKustomize()">Kustomize</button><button class="r6p-btn secondary" onclick="r6pGenFlux()">Flux</button></div><pre id="r6p-yaml-preview" style="background:#0f172a;color:#2dd4bf;border-radius:8px;padding:14px;font-size:11px;max-height:280px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:14px;">-- Click Generate All YAML --</pre>'+r6pFoot(10);
   if(n===11)return '<div id="r6p-bundle-status" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px;color:#64748b;">Generate bundle to see status.</div><pre id="r6p-bundle-preview" style="background:#0f172a;color:#c4b5fd;border-radius:8px;padding:14px;font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;min-height:60px;margin-bottom:12px;">-- Generate bundle to see manifest --</pre>'+r6pFoot(11,'<button class="r6p-btn primary" onclick="r6pGenBundle()">Generate OpenCenter Bundle</button><button class="r6p-btn secondary" onclick="r6pDownloadBundle()">Download</button>');
-  if(n===12){var isC=R6P.captureMethod==='compat';return (isC?'<div class="r6p-warn-box">COMPATIBILITY CONTAINER: Not fully cloud-native. Manual hardening required before production.</div>':'<div class="r6p-success-box">SMART SNAPSHOT CAPTURE: App content extracted and packaged into Kubernetes/OpenCenter-ready GitOps artifacts.</div>')+r6pCmd('12-git','GITOPS_DIR=$(opencenter cluster describe rackspace-flex/flex-prod-k8s 2>/dev/null | grep "git_dir:" | awk \'{print $2}\')\ngit -C "$GITOPS_DIR" add applications/workloads/<business-system>\ngit -C "$GITOPS_DIR" commit -m "Import R6 app bundle"\ngit -C "$GITOPS_DIR" push\nflux reconcile kustomization flux-system --with-source')+'<div class="r6p-stage-footer"><button class="r6p-btn success" onclick="r6pGenBundle();r6pSendToOC()">Send to OpenCenter Stage</button><button class="r6p-btn secondary" onclick="r6pMarkDone(12)">Mark Complete</button></div>';}
+  if(n===12){
+    var isC=R6P.captureMethod==='compat';
+    var bsName=(R6P.bs&&R6P.bs.name)||'your-business-system';
+    var bsSlug=bsName.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+    var out=R6P.bundle||{};
+    var pkg_defs=[
+      {f:'opencenter_import_manifest.json',req:'Required',   note:'Main OpenCenter import descriptor'},
+      {f:'k8s/',                            req:'Required',   note:'Kubernetes workload YAML'},
+      {f:'helm/',                           req:'Required',   note:'Helm chart package'},
+      {f:'kustomize/',                      req:'Required',   note:'Kustomize base and overlays'},
+      {f:'flux/',                           req:'Required',   note:'Flux GitOps definitions'},
+      {f:'Dockerfile',                      req:'Recommended',note:'Container build recipe'},
+      {f:'image_build_plan.yaml',           req:'Required',   note:'Container image build and push plan'},
+      {f:'app_capture_manifest.json',       req:'Required',   note:'Application content captured from snapshot'},
+      {f:'externalization_plan.yaml',       req:'Required',   note:'Config, secrets, state, DB, PVC plan'},
+      {f:'container_readiness_report.json', req:'Required',   note:'Machine-readable readiness report'},
+      {f:'container_readiness_report.md',   req:'Recommended',note:'Human-readable readiness report'},
+      {f:'compatibility_warnings.json',     req:'Conditional',note:isC?'Required for Full Snapshot mode':'Not required for Smart Snapshot'}
+    ];
+    var pkgRows=pkg_defs.map(function(p){
+      var done=R6P.artifacts&&R6P.artifacts[p.f];
+      var isOk=done||(R6P.yaml&&['k8s/','helm/','flux/','kustomize/','Dockerfile'].indexOf(p.f)>=0&&R6P.yaml.length>10);
+      var isCond=p.req==='Conditional';
+      var st=isCond?(isC?'Found':'Not Required'):isOk?'Found':'Missing';
+      var sbg={Found:'#dcfce7','Not Required':'#f1f5f9',Missing:'#fee2e2'}[st]||'#fef3c7';
+      var sfg={Found:'#16a34a','Not Required':'#64748b',Missing:'#dc2626'}[st]||'#d97706';
+      var reqBg=p.req==='Required'?'#fee2e2':p.req==='Recommended'?'#fef3c7':'#f1f5f9';
+      var reqFg=p.req==='Required'?'#dc2626':p.req==='Recommended'?'#d97706':'#64748b';
+      return '<tr><td style="font-family:monospace;font-size:11px;font-weight:600;">'+p.f+'</td>'
+        +'<td><span style="background:'+reqBg+';color:'+reqFg+';padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;">'+p.req+'</span></td>'
+        +'<td><span style="background:'+sbg+';color:'+sfg+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+st+'</span></td>'
+        +'<td style="font-size:11px;color:#64748b;">'+p.note+'</td>'
+        +'<td><button onclick="r6pPreviewArtifact(\''+p.f+'\')" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">Preview</button></td></tr>';
+    }).join('');
+
+    var wloads=(out.workloads||[]).map(function(w){return w.name||w;}).join(', ')||'—';
+    var extSvcs=(out.externalServices||[]).map(function(s){return s.name||s;}).join(', ')||'None';
+    var warns=(out.warnings||[]).length;
+    var validation=R6P._bundleValidated?'<div class="r6p-success-box">Bundle validated. Ready to send to OpenCenter.</div>':'<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px;">Run <strong>Validate Bundle</strong> before sending to OpenCenter.</div>';
+
+    return (isC?'<div class="r6p-warn-box">COMPATIBILITY CONTAINER: Not fully cloud-native. Manual hardening required before production.</div>':'<div class="r6p-success-box">SMART SNAPSHOT CAPTURE: App content ready for OpenCenter import.</div>')
+
+    /* ─── OpenCenter Managed Handoff panel ─── */
+    +'<div style="background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:16px;margin-bottom:16px;">'
+    +'<div style="font-size:13px;font-weight:800;color:#166534;margin-bottom:6px;">OpenCenter Managed Handoff</div>'
+    +'<p style="font-size:12px;color:#14532d;margin:0 0 10px;line-height:1.6;">This app bundle is ready to be imported by OpenCenter. OpenCenter manages GitOps and Kubernetes deployment automatically. No local <code>git push</code>, <code>kubectl</code>, or <code>flux</code> commands are needed.</p>'
+    +'<div style="font-size:12px;color:#166534;font-weight:700;">Next: Click <em>Send to OpenCenter Import Stage</em> below to populate the OpenCenter import section.</div>'
+    +'</div>'
+
+    /* ─── Package Contents table ─── */
+    +'<div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:8px;">Package Contents</div>'
+    +'<div style="overflow-x:auto;margin-bottom:16px;"><table class="r6p-table"><thead><tr><th>File / Folder</th><th>Required?</th><th>Status</th><th>Purpose</th><th>Action</th></tr></thead><tbody>'+pkgRows+'</tbody></table></div>'
+
+    /* ─── Bundle Summary ─── */
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:16px;">'
+    +'<div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:10px;">Import Package Summary</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Business System</div><div style="font-weight:700;color:#0f172a;">'+bsName+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Source Platform</div><div style="font-weight:700;color:#0369a1;">FLEX</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Capture Method</div><div style="font-weight:700;color:'+(isC?'#7c3aed':'#16a34a')+';">'+(isC?'Full Snapshot Compatibility':'Smart Snapshot')+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Cloud-Native Status</div><div style="font-weight:700;color:'+(isC?'#7c3aed':'#16a34a')+';">'+(isC?'COMPATIBILITY_CONTAINER_ONLY':'CLOUD_NATIVE_READY')+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Workloads</div><div style="font-weight:700;color:#0f172a;">'+wloads+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">External Services</div><div style="font-weight:700;color:#0f172a;">'+extSvcs+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Warnings</div><div style="font-weight:700;color:'+(warns?'#d97706':'#16a34a')+';">'+warns+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Import Status</div><div id="r6p-s12-status" style="font-weight:700;color:'+(R6P._bundleValidated?'#16a34a':'#d97706')+'">'+(R6P._bundleValidated?'Ready for Import':'Pending Validation')+'</div></div>'
+    +'</div></div>'
+
+    +validation
+
+    +'<div class="r6p-stage-footer">'
+    +'<button class="r6p-btn primary" onclick="r6pValidateBundle()">Validate Bundle</button>'
+    +'<button class="r6p-btn success" id="r6p-send-oc-btn" onclick="r6pSendToOC()" style="'+(R6P._bundleValidated?'':'opacity:.5;cursor:not-allowed;')+'" '+(R6P._bundleValidated?'':'title="Validate bundle first"')+'>Send to OpenCenter Import Stage</button>'
+    +'<button class="r6p-btn secondary" onclick="r6pMarkDone(12)">Mark Complete</button>'
+    +'</div>'
+
+    /* ─── Advanced Direct GitOps (hidden by default) ─── */
+    +'<div style="margin-top:18px;border:1px dashed #cbd5e1;border-radius:8px;overflow:hidden;">'
+    +'<div onclick="this.nextSibling.style.display=this.nextSibling.style.display===\'none\'?\'block\':\'none\'" style="padding:10px 14px;background:#f8fafc;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">'
+    +'<span style="font-size:12px;font-weight:700;color:#64748b;">Advanced Direct GitOps Mode</span>'
+    +'<span style="font-size:10px;color:#94a3b8;">Click to expand</span></div>'
+    +'<div style="display:none;padding:14px;">'
+    +'<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px;">'
+    +'<strong>Warning:</strong> Direct GitOps bypasses OpenCenter-managed deployment. Use only for development or troubleshooting.</div>'
+    +r6pCmd('12-git-adv','BS_NAME="'+bsSlug+'"\n\n# Verify opencenter CLI\nif ! command -v opencenter &>/dev/null; then\n  echo "[ERROR] opencenter CLI not installed."\n  exit 127\nfi\n\nGITOPS_DIR=$(opencenter cluster describe rackspace-flex/flex-prod-k8s 2>/dev/null | grep "git_dir:" | awk \'{print $2}\')\n\n[ -z "$GITOPS_DIR" ] && { echo "[ERROR] GITOPS_DIR empty. Run: opencenter cluster list"; exit 1; }\n\ngit -C "$GITOPS_DIR" add "applications/workloads/$BS_NAME"\ngit -C "$GITOPS_DIR" commit -m "Import R6 app bundle: $BS_NAME"\ngit -C "$GITOPS_DIR" push\ncommand -v flux &>/dev/null && flux reconcile kustomization flux-system --with-source || echo "[WARN] flux not installed"')
+    +'</div></div>';
+  }
   return '<p style="color:#94a3b8;">Stage '+n+'</p>';
 };
 
@@ -67,8 +164,33 @@ window.r6pNext=function(){if(R6P.current<12)r6pGoTo(R6P.current+1);};
 window.r6pPrev=function(){if(R6P.current>1)r6pGoTo(R6P.current-1);};
 window.r6pRunCurrent=function(){r6pMarkDone(R6P.current);};
 
-window.r6pSetMethod=function(m){if(m==='compat'){var b=document.getElementById('r6p-compat-confirm-box');if(b)b.style.display='block';return;}R6P.captureMethod='smart';var b=document.getElementById('r6p-compat-banner');if(b)b.style.display='none';var sm=document.getElementById('r6p-sum-method');if(sm)sm.textContent='Smart Snapshot';var cards=document.querySelectorAll('.r6p-method-card');cards.forEach(function(c){c.classList.toggle('selected',!c.classList.contains('compat'));});};
-window.r6pConfirmCompat=function(){R6P.captureMethod='compat';R6P.compatConfirmed=true;var b=document.getElementById('r6p-compat-banner');if(b)b.style.display='block';var box=document.getElementById('r6p-compat-confirm-box');if(box)box.style.display='none';var sm=document.getElementById('r6p-sum-method');if(sm){sm.textContent='Full Snapshot';sm.style.color='#a78bfa';}};
+window.r6pSetMethod=function(m){
+  var box=document.getElementById('r6p-compat-confirm-box');
+  var banner=document.getElementById('r6p-compat-banner');
+  var sm=document.getElementById('r6p-sum-method');
+  var cards=document.querySelectorAll('.r6p-method-card');
+  if(m==='compat'){
+    if(box)box.style.display='block';
+    cards.forEach(function(c){c.classList.toggle('selected',c.classList.contains('compat'));});
+    return;
+  }
+  R6P.captureMethod='smart';
+  if(box)box.style.display='none';
+  if(banner)banner.style.display='none';
+  if(sm){sm.textContent='Smart Snapshot';sm.style.color='#38bdf8';}
+  cards.forEach(function(c){c.classList.toggle('selected',!c.classList.contains('compat'));});
+};
+window.r6pConfirmCompat=function(){
+  R6P.captureMethod='compat';R6P.compatConfirmed=true;
+  var box=document.getElementById('r6p-compat-confirm-box');
+  var banner=document.getElementById('r6p-compat-banner');
+  var sm=document.getElementById('r6p-sum-method');
+  var cards=document.querySelectorAll('.r6p-method-card');
+  if(box)box.style.display='none';
+  if(banner)banner.style.display='block';
+  if(sm){sm.textContent='Full Snapshot';sm.style.color='#a78bfa';}
+  cards.forEach(function(c){c.classList.toggle('selected',c.classList.contains('compat'));});
+};;
 
 window.r6pLoadBiz=function(){var list=document.getElementById('r6p-biz-list');if(!list)return;try{var sys=JSON.parse(localStorage.getItem('uatS1_systems')||'[]');if(!sys.length){list.innerHTML='<div style="color:#94a3b8;font-size:13px;padding:20px;text-align:center;">No business systems. Create them in Migration Logs first.</div>';return;}list.innerHTML=sys.map(function(s){var comps=s.components||[];return '<div class="r6p-bs-card" id="r6p-bsc-'+s.id+'" onclick="r6pSelectBS(\''+s.id+'\')">'+'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'+'<div style="display:flex;align-items:center;gap:8px;">'+'<div style="width:32px;height:32px;border-radius:8px;background:#eff6ff;color:#2563eb;font-weight:900;font-size:11px;display:grid;place-items:center;">'+s.name.slice(0,2).toUpperCase()+'</div>'+'<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+s.name+'</div><div style="font-size:11px;color:#64748b;">'+(s.type||'')+(s.criticality?' - '+s.criticality:'')+(s.migrationWave?' - Wave '+s.migrationWave:'')+'</div></div></div>'+'<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Active</span></div>'+'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px;">'+comps.slice(0,7).map(function(c){return '<span class="r6p-chip">'+c.name+'</span>';}).join('')+'</div>'+'<div style="display:flex;gap:6px;"><button onclick="event.stopPropagation();r6pSelectBS(\''+s.id+'\')" class="r6p-btn primary" style="padding:5px 12px;font-size:11px;">Select for Refactor</button><button onclick="event.stopPropagation();typeof uatS1OpenModal===\'function\'&&uatS1OpenModal(\''+s.id+'\')" class="r6p-btn secondary" style="padding:5px 12px;font-size:11px;">Inspect</button></div></div>';}).join('');var ag=document.getElementById('r6p-arch-grid'),lg=document.getElementById('uatS1ArchList');if(ag&&lg&&lg.innerHTML.trim()){ag.innerHTML=lg.innerHTML;ag.querySelectorAll('.uat-s1-arch-card').forEach(function(c){c.style.cursor='pointer';c.addEventListener('click',function(){ag.querySelectorAll('.uat-s1-arch-card').forEach(function(x){x.classList.remove('selected');});c.classList.add('selected');var k=c.getAttribute('data-arch-key');typeof window.uatS1OpenModal==='function'&&window.uatS1OpenModal(null,k);});});}}catch(e){if(list)list.innerHTML='<div style="color:#dc2626;padding:10px;">'+e.message+'</div>';}};
 
@@ -82,11 +204,657 @@ window.r6pGenHelm=function(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().
 window.r6pGenKustomize=function(){var el=document.getElementById('r6p-yaml-preview');if(el)el.textContent='# kustomization.yaml\napiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n- namespace.yaml\n- deployment.yaml\n- service.yaml\n- configmap.yaml\n- ingress.yaml\noverlays: dev/ uat/ prod/\n';};
 window.r6pGenFlux=function(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/\s+/g,'-');var el=document.getElementById('r6p-yaml-preview');if(el)el.textContent='apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: '+n+'\n  namespace: flux-system\nspec:\n  interval: 5m\n  path: "./applications/overlays/'+n+'"\n  prune: true\n  sourceRef:\n    kind: GitRepository\n    name: opencenter-gitops\n';};
 
-window.r6pGenBundle=function(){if(!R6P.components.length&&!R6P.bs){alert('Select a FLEX input in Step 1 first.');return;}r6pGenYAML();r6pGenHelm();r6pGenFlux();var m={source:'flex_business_system',sourcePlatform:'flex',captureMethod:R6P.captureMethod==='smart'?'SMART_SNAPSHOT_CAPTURE':'FULL_SNAPSHOT_COMPATIBILITY_CONTAINER',businessSystem:R6P.bs&&R6P.bs.name||'',conversionEngine:'APPS_to_Container_Refactor_Engine',cloudNativeStatus:R6P.captureMethod==='smart'?'CLOUD_NATIVE_READY':'COMPATIBILITY_CONTAINER_ONLY',workloads:R6P.components.filter(function(c){return (c.type||c.role||'').toLowerCase()!=='database';}).map(function(c){return {name:c.name,kind:'Deployment'};}),externalServices:R6P.components.filter(function(c){return (c.type||c.role||'').toLowerCase()==='database';}).map(function(c){return {name:c.name,type:'ExternalDB'};}),warnings:R6P.captureMethod==='compat'?['COMPATIBILITY_CONTAINER: not fully cloud-native']:[]};R6P.bundle=m;var el=document.getElementById('r6p-bundle-preview');if(el)el.textContent=JSON.stringify(m,null,2);var st=document.getElementById('r6p-bundle-status');if(st){st.style.background=m.warnings.length?'#fef3c7':'#dcfce7';st.style.color=m.warnings.length?'#d97706':'#16a34a';st.innerHTML='<strong>'+(m.warnings.length?'PASS WITH WARNINGS':'PASS')+'</strong> | '+m.captureMethod;}var sb=document.getElementById('r6p-sum-bundle');if(sb){sb.textContent=m.warnings.length?'WARNING':'Generated (PASS)';sb.style.color=m.warnings.length?'#fbbf24':'#86efac';}localStorage.setItem('r6OpenCenterHandoffBundle',JSON.stringify(m));r6pMarkDone(11);};
+window.r6pGenBundle=function(){
+  if(!R6P.components.length&&!R6P.bs){alert('Select a FLEX input in Step 1 first.');return;}
+  r6pGenYAML();r6pGenHelm();r6pGenFlux();
+  var isC=R6P.captureMethod==='compat';
+  var bsName=R6P.bs&&R6P.bs.name||'';
+  var bsSlug=bsName.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  var workloads=R6P.components.filter(function(c){return (c.type||c.role||'').toLowerCase()!=='database';}).map(function(c){return {name:c.name,kind:'Deployment'};});
+  var extsvc=R6P.components.filter(function(c){return (c.type||c.role||'').toLowerCase()==='database';}).map(function(c){return {name:c.name,type:'ExternalDB'};});
+  var warns=isC?['COMPATIBILITY_CONTAINER: not fully cloud-native']:[];
+  var now=new Date().toISOString();
+
+  /* Build opencenter_import_manifest */
+  var manifest={
+    sourcePlatform:'flex',
+    conversionEngine:'APPS_to_Container_Refactor_Engine',
+    captureMethod:isC?'FULL_SNAPSHOT_COMPATIBILITY_CONTAINER':'SMART_SNAPSHOT_CAPTURE',
+    cloudNativeStatus:isC?'COMPATIBILITY_CONTAINER_ONLY':'CLOUD_NATIVE_READY',
+    businessSystem:bsName,
+    businessSystemId:R6P.bs&&R6P.bs.id||'',
+    targetCluster:R6P.creds.opencenter.clusterRef||'rackspace-flex/flex-prod-k8s',
+    namespace:bsSlug+'-prod',
+    workloads:workloads,
+    externalServices:extsvc,
+    keptOnFlexVm:[],
+    warnings:warns,
+    blockers:[],
+    createdAt:now
+  };
+
+  /* Build full appsContainerRefactorOutput shared state */
+  var output={
+    status:'ready_for_opencenter_import',
+    sourceStage:'APPS_to_Container_Refactor_Engine',
+    bundleName:'opencenter-ready-app-bundle',
+    bundlePath:'./opencenter-ready-app-bundle/'+bsSlug,
+    bundleArchivePath:'./opencenter-ready-app-bundle.tar.gz',
+    businessSystemName:bsName,
+    businessSystemId:R6P.bs&&R6P.bs.id||'',
+    customerName:'',
+    sourcePlatform:'flex',
+    captureMethod:manifest.captureMethod,
+    cloudNativeStatus:manifest.cloudNativeStatus,
+    targetCluster:manifest.targetCluster,
+    namespace:manifest.namespace,
+    packageContents:{
+      'opencenter_import_manifest.json':'found',
+      'k8s/':R6P.yaml&&R6P.yaml.length>10?'found':'missing',
+      'helm/':R6P.yaml&&R6P.yaml.length>10?'found':'missing',
+      'kustomize/':'found',
+      'flux/':'found',
+      'Dockerfile':'found',
+      'image_build_plan.yaml':'found',
+      'app_capture_manifest.json':'found',
+      'container_readiness_report.json':'found',
+      'container_readiness_report.md':'found',
+      'externalization_plan.yaml':'found',
+      'compatibility_warnings.json':isC?'found':'not_required'
+    },
+    manifest:manifest,
+    workloads:workloads,
+    externalServices:extsvc,
+    keptOnFlexVm:[],
+    warnings:warns,
+    blockers:[],
+    createdAt:now
+  };
+
+  R6P.bundle=output;
+  R6P._bundleValidated=false;
+
+  /* Update Stage 11 UI */
+  var el=document.getElementById('r6p-bundle-preview');if(el)el.textContent=JSON.stringify(manifest,null,2);
+  var st=document.getElementById('r6p-bundle-status');
+  if(st){st.style.background=warns.length?'#fef3c7':'#dcfce7';st.style.color=warns.length?'#d97706':'#16a34a';st.innerHTML='<strong>'+(warns.length?'PASS WITH WARNINGS':'PASS')+'</strong> | '+manifest.captureMethod;}
+  var sb=document.getElementById('r6p-sum-bundle');
+  if(sb){sb.textContent=warns.length?'WARNING':'Generated (PASS)';sb.style.color=warns.length?'#fbbf24':'#86efac';}
+
+  /* Persist — legacy key kept for backwards compat */
+  localStorage.setItem('appsContainerRefactorOutput',JSON.stringify(output));
+  localStorage.setItem('r6OpenCenterHandoffBundle',JSON.stringify(manifest));
+  r6pMarkDone(11);
+  return output;
+};
+
+window.r6pValidateBundle=function(){
+  if(!R6P.bundle)r6pGenBundle();
+  var b=R6P.bundle;
+  var blockers=[];
+  if(!b.businessSystemName)blockers.push('businessSystem missing');
+  if(!b.captureMethod)blockers.push('captureMethod missing');
+  if(b.cloudNativeStatus==='BLOCKED')blockers.push('cloudNativeStatus is BLOCKED');
+  if(!b.workloads||!b.workloads.length)blockers.push('No workloads defined');
+  b.blockers=blockers;
+  R6P._bundleValidated=blockers.length===0;
+  /* Re-render Stage 12 to show updated validation state */
+  var body=document.getElementById('r6p-body-12');
+  if(body){var inner=body.querySelector('.r6p-stage-body-inner');if(inner)inner.innerHTML=r6pContent(12);}
+  var sb=document.getElementById('r6p-sum-bundle');
+  if(sb){sb.textContent=blockers.length?'BLOCKED':b.warnings.length?'Ready (warnings)':'Ready for Import';sb.style.color=blockers.length?'#f87171':b.warnings.length?'#fbbf24':'#86efac';}
+  if(!R6P._bundleValidated){alert('Validation failed:\n\n'+blockers.join('\n'));}
+  return R6P._bundleValidated;
+};
+
+window.r6pSendToOC=function(){
+  if(!R6P.bundle)r6pGenBundle();
+  if(!R6P._bundleValidated&&!r6pValidateBundle()){return;}
+  var out=R6P.bundle;
+  out.status='ready_for_opencenter_import';
+  localStorage.setItem('appsContainerRefactorOutput',JSON.stringify(out));
+  localStorage.setItem('r6OpenCenterHandoffBundle',JSON.stringify(out.manifest||out));
+  /* Notify OpenCenter stage */
+  setTimeout(function(){if(typeof openCenterImportFromR6==='function')openCenterImportFromR6();},300);
+  /* Navigate to OpenCenter */
+  var s=document.querySelector('[data-sub="s2opencenter"]');
+  if(s)setTimeout(function(){s.click();},600);
+  /* Show success in Stage 12 */
+  var sb=document.getElementById('r6p-sum-bundle');if(sb){sb.textContent='Sent to OpenCenter';sb.style.color='#86efac';}
+  var st=document.getElementById('r6p-s12-status');if(st){st.textContent='Sent to OpenCenter Import Stage';st.style.color='#16a34a';}
+  /* Flash success message */
+  var banner=document.createElement('div');
+  banner.style.cssText='position:fixed;top:70px;right:20px;z-index:9999;background:#16a34a;color:#fff;padding:14px 20px;border-radius:8px;font-size:13px;font-weight:700;max-width:380px;box-shadow:0 4px 20px rgba(0,0,0,.2);';
+  banner.textContent='Apps Container Refactor output sent to OpenCenter Import stage. Review the package, validate the bundle, then import through OpenCenter.';
+  document.body.appendChild(banner);
+  setTimeout(function(){banner.style.opacity='0';banner.style.transition='opacity .5s';setTimeout(function(){banner.parentNode&&banner.parentNode.removeChild(banner);},500);},5000);
+  r6pMarkDone(12);
+};
+
 window.r6pRunAll=function(){r6pGenBundle();for(var i=1;i<=12;i++)r6pMarkDone(i);r6pGoTo(12);};
-window.r6pSendToOC=function(){r6pGenBundle();setTimeout(function(){if(typeof openCenterImportFromR6==='function')openCenterImportFromR6();},300);var s=document.querySelector('[data-sub="s2opencenter"]');if(s)setTimeout(function(){s.click();},600);};
-window.r6pDownloadEvidence=function(){if(R6P.bundle){var a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(R6P.bundle,null,2));a.download='opencenter_import_manifest.json';a.click();}};
+
+window.r6pPreviewArtifact=function(f){
+  var content='';
+  if(f==='opencenter_import_manifest.json')content=JSON.stringify((R6P.bundle&&R6P.bundle.manifest)||{},null,2);
+  else if(f.match(/^(k8s\/|Dockerfile)/))content=R6P.yaml||'-- Generate YAML in Step 10 first --';
+  else if(f.match(/helm\//))content=r6pHelmPreview();
+  else if(f.match(/flux\//))content=r6pFluxPreview();
+  else content='-- Preview not available. Generate artifacts in Steps 9-11 first. --';
+  var w=window.open('','_blank','width=700,height=600');
+  if(w){w.document.write('<pre style="font-family:monospace;font-size:12px;padding:20px;background:#0f172a;color:#2dd4bf;margin:0;white-space:pre-wrap;">'+content.replace(/</g,'&lt;')+'</pre>');w.document.close();}
+};
+
+function r6pHelmPreview(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/\s+/g,'-');return '# Chart.yaml\napiVersion: v2\nname: '+n+'\nversion: 1.0.0\n\n# values.yaml\nreplicaCount: 2\nimage:\n  repository: registry.example.com/'+n+'\n  tag: v1.0.0\n';}
+function r6pFluxPreview(){var n=((R6P.bs&&R6P.bs.name)||'app').toLowerCase().replace(/\s+/g,'-');return 'apiVersion: kustomize.toolkit.fluxcd.io/v1\nkind: Kustomization\nmetadata:\n  name: '+n+'\n  namespace: flux-system\nspec:\n  interval: 5m\n  path: "./applications/overlays/'+n+'"\n  prune: true\n  sourceRef:\n    kind: GitRepository\n    name: opencenter-gitops\n';}
+
+window.r6pDownloadEvidence=function(){
+  var data=R6P.bundle||{};
+  var a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(data,null,2));
+  a.download='opencenter_import_manifest.json';a.click();
+};
 window.r6pDownloadBundle=window.r6pDownloadEvidence;
+
+/* ── Stage 0: Preflight ─────────────────────────────────── */
+window.r6pStage0=function(){
+  function toolRow(t){
+    var s=R6P.preflight[t.name]||'unchecked';
+    var sbg={ok:'#dcfce7',missing:'#fee2e2',checking:'#fef3c7',unchecked:'#f1f5f9'}[s]||'#f1f5f9';
+    var sfg={ok:'#16a34a',missing:'#dc2626',checking:'#d97706',unchecked:'#94a3b8'}[s]||'#94a3b8';
+    var stxt={ok:'Installed',missing:t.manual?'Manual Setup Required':'Missing',checking:'Checking...',unchecked:'Not Checked'}[s]||'Not Checked';
+    var ver=R6P.preflight[t.name+'_ver']||'—';
+    var btn='';
+    if(s==='missing'&&!t.manual)btn='<button onclick="r6pShowInstallConfirm([\''+t.name+'\'])" style="background:#0369a1;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Install</button>';
+    else if(s==='missing'&&t.manual)btn='<button onclick="r6pShowOcSetup()" style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Configure Path</button>';
+    else if(s==='ok')btn='<span style="color:#16a34a;font-size:11px;font-weight:700;">OK</span>';
+    return '<tr id="r6p-tr-'+t.name+'">'
+      +'<td style="font-weight:700;font-size:12px;">'+t.name+'</td>'
+      +'<td><span style="background:'+(t.req?'#fee2e2':'#fef3c7')+';color:'+(t.req?'#dc2626':'#d97706')+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+(t.req?'Required':'Recommended')+'</span></td>'
+      +'<td><span id="r6p-st-'+t.name+'" style="background:'+sbg+';color:'+sfg+';padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">'+stxt+'</span></td>'
+      +'<td id="r6p-ver-'+t.name+'" style="font-size:11px;color:#475569;font-family:monospace;">'+ver+'</td>'
+      +'<td id="r6p-btn-'+t.name+'">'+btn+'</td>'
+      +'<td style="font-size:11px;color:#64748b;">'+t.note+'</td></tr>';
+  }
+
+  var csStatus=R6P.creds.cloud.status,ocStatus=R6P.creds.opencenter.status,gsStatus=R6P.creds.gitops.status;
+  function statusBadge(s){var m={not_configured:['#f1f5f9','#94a3b8','Not Configured'],configured:['#fef3c7','#d97706','Configured'],connected:['#dcfce7','#16a34a','Connected'],failed:['#fee2e2','#dc2626','Failed'],validating:['#fef3c7','#d97706','Validating'],manual_setup:['#faf5ff','#7c3aed','Manual Setup Required']}[s]||['#f1f5f9','#94a3b8','Unknown'];return '<span style="background:'+m[0]+';color:'+m[1]+';padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700;">'+m[2]+'</span>';}
+
+  return '<div style="display:flex;flex-direction:column;gap:20px;">'
+
+    /* ─── SECTION A: CLI Tools ─── */
+    +'<div style="border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;">'
+    +'<div style="background:#0f172a;color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;">'
+    +'<div style="font-weight:800;font-size:14px;">A — CLI Tools</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+    +'<button class="r6p-btn primary" onclick="r6pRunPreflight()" style="padding:5px 12px;font-size:11px;">Run Preflight</button>'
+    +'<button class="r6p-btn success" onclick="r6pShowInstallConfirm(\'missing\')" style="padding:5px 12px;font-size:11px;">Install Missing</button>'
+    +'<button class="r6p-btn danger"  onclick="r6pShowInstallConfirm(\'required\')" style="padding:5px 12px;font-size:11px;">Install Required Only</button>'
+    +'<button class="r6p-btn amber"   onclick="r6pShowInstallConfirm(\'recommended\')" style="padding:5px 12px;font-size:11px;">Install Recommended</button>'
+    +'</div></div>'
+    +'<div style="padding:14px;overflow-x:auto;">'
+    +'<table class="r6p-table"><thead><tr><th>Tool</th><th>Required?</th><th>Status</th><th>Version</th><th>Install</th><th>Notes</th></tr></thead>'
+    +'<tbody id="r6p-tool-tbody">'+R6P_TOOLS.map(toolRow).join('')+'</tbody></table>'
+    +'</div>'
+    +'<div id="r6p-preflight-out" class="r6p-terminal" style="display:none;margin:0 14px 14px;max-height:140px;"></div>'
+    +'</div>'
+
+    /* ─── SECTION B: Credentials & Access ─── */
+    +'<div style="border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;">'
+    +'<div style="background:#0f172a;color:#fff;padding:12px 18px;font-weight:800;font-size:14px;">B — Credentials & Access</div>'
+    +'<div style="padding:14px;display:flex;flex-direction:column;gap:12px;">'
+
+    /* Cloud/OpenStack */
+    +'<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">'
+    +'<div onclick="r6pToggleCred(\'cloud\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f8fafc;cursor:pointer;">'
+    +'<div><div style="font-weight:700;font-size:13px;">1. FLEX / OpenStack Cloud Credentials</div>'
+    +'<div style="font-size:11px;color:#64748b;">Application Credential recommended for automation</div></div>'
+    +statusBadge(csStatus)+'</div>'
+    +'<div id="r6p-cred-cloud" style="display:none;padding:14px;">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_AUTH_URL</label><input id="r6p-c-authurl" placeholder="https://identity.{region}.rackspacecloud.com/v3" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'authUrl\',this.value)"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_REGION_NAME</label><input id="r6p-c-region" placeholder="IAD" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'region\',this.value)"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">Application Credential ID</label><input id="r6p-c-credid" placeholder="OS_APPLICATION_CREDENTIAL_ID" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'credId\',this.value)"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">Application Credential Secret</label><input id="r6p-c-secret" type="password" placeholder="OS_APPLICATION_CREDENTIAL_SECRET" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_PROJECT_ID / OS_TENANT_ID</label><input id="r6p-c-proj" placeholder="project ID or name" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'projectId\',this.value)"></div>'
+    +'</div>'
+    /* v2/v3 password row — hidden until OpenRC import detects password auth */
+    +'<div id="r6p-c-pw-row" style="display:none;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">'
+    +'<div><label style="font-size:11px;font-weight:700;color:#d97706;">OS_USERNAME</label><input id="r6p-c-username" placeholder="username" style="width:100%;padding:6px 8px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#d97706;">OS_PASSWORD</label><input id="r6p-c-password" type="password" placeholder="password" style="width:100%;padding:6px 8px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
+    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_USER_DOMAIN_NAME</label><input id="r6p-c-domain" value="Default" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
+    +'</div>'
+    +'<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:5px;padding:6px 10px;font-size:11px;color:#92400e;margin-bottom:10px;display:none;" id="r6p-c-pw-warn">Password auth detected. Consider creating an Application Credential for automation.</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
+    +'<label style="display:flex;gap:6px;align-items:center;font-size:11px;cursor:pointer;"><input type="file" accept=".sh,.rc,.env,.txt" style="display:none;" onchange="r6pImportOpenRC(event)"><button onclick="this.previousSibling.click()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:5px;padding:6px 12px;font-size:11px;cursor:pointer;">Import OpenRC</button></label>'
+    +'<button onclick="r6pTestCloud()" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">Test Cloud Login</button>'
+    +'<span style="font-size:10px;color:#94a3b8;">Supports v2 password, v3 password, v3 app credential</span>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+    +'<div id="r6p-cloud-result" style="font-size:11px;color:#64748b;padding:4px 0;min-height:16px;"></div>'
+    +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Secrets stored session-only. Never committed to GitOps repo or evidence bundles.</div>'
+    +'</div></div>'
+
+    +'</div></div>'/* end section B */
+
+    /* ─── SECTION C: GitOps Preflight ─── */
+    +'<div style="border:1.5px solid #e2e8f0;border-radius:10px;overflow:hidden;">'
+    +'<div style="background:#0f172a;color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;">'
+    +'<div style="font-weight:800;font-size:14px;">C — GitOps Preflight</div>'
+    +'<div style="display:flex;gap:6px;">'
+    +'<button class="r6p-btn primary" onclick="r6pRunGitopsPreflight()" style="padding:5px 12px;font-size:11px;">Run GitOps Preflight</button>'
+    +'<button class="r6p-btn secondary" onclick="r6pRunPreflight()" style="padding:5px 12px;font-size:11px;">Re-run All Checks</button>'
+    +'</div></div>'
+    +'<div style="padding:14px;overflow-x:auto;">'
+    +'<table class="r6p-table"><thead><tr><th>Check</th><th>Status</th><th>Result</th></tr></thead><tbody id="r6p-gitops-checks">'
+    +[['GITOPS_DIR set','r6p-gc-gitdir'],['Is a Git repo','r6p-gc-isrepo'],['Has remote','r6p-gc-remote'],['applications/workloads exists','r6p-gc-workloads'],['git user.name configured','r6p-gc-gituser'],['git user.email configured','r6p-gc-gitemail'],['Flux installed','r6p-gc-flux'],['kubectl access','r6p-gc-kubectl']].map(function(c){return '<tr><td style="font-weight:600;font-size:12px;">'+c[0]+'</td><td><span id="'+c[1]+'-st" style="background:#f1f5f9;color:#94a3b8;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;">Not Checked</span></td><td id="'+c[1]+'-val" style="font-size:11px;color:#64748b;">—</td></tr>';}).join('')
+    +'</tbody></table>'
+    +'</div>'
+    +'<div id="r6p-gc-out" class="r6p-terminal" style="display:none;margin:0 14px 14px;max-height:140px;"></div>'
+    +'</div>'/* end section C */
+
+    /* ─── CONTINUE BUTTON ─── */
+    +'<div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px;">'
+    +'<button class="r6p-btn secondary" onclick="r6pRunPreflight()" style="padding:8px 18px;">Re-run Preflight</button>'
+    +'<button id="r6p-s0-continue" class="r6p-btn success" onclick="r6pS0Continue()" style="padding:8px 22px;opacity:0.5;cursor:not-allowed;">Continue to Refactor</button>'
+    +'</div>'
+
+    /* ─── INSTALL CONFIRMATION MODAL ─── */
+    +'<div id="r6p-install-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:none;align-items:center;justify-content:center;">'
+    +'<div style="background:#fff;border-radius:12px;padding:24px;max-width:560px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);">'
+    +'<h3 style="margin:0 0 8px;font-size:16px;color:#0f172a;">Install Missing CLI Tools</h3>'
+    +'<p style="font-size:13px;color:#475569;margin:0 0 12px;">The following tools will be installed. This may require <code>sudo</code> access.</p>'
+    +'<div id="r6p-modal-toollist" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-family:monospace;font-size:12px;color:#0f172a;margin-bottom:12px;white-space:pre-wrap;"></div>'
+    +'<div id="r6p-modal-oserr" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px;"></div>'
+    +'<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Detected OS: <span id="r6p-modal-os">Ubuntu/Debian — auto-install supported</span></div>'
+    +'<div style="margin-bottom:14px;">'
+    +'<label style="font-size:12px;font-weight:700;color:#0f172a;display:block;margin-bottom:5px;">sudo Password</label>'
+    +'<input type="password" id="r6p-sudo-pass" placeholder="Enter your sudo password" autocomplete="current-password" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box;" onkeydown="if(event.key===\'Enter\')r6pDoInstall()">'
+    +'<div style="font-size:10px;color:#94a3b8;margin-top:4px;">Used once to authenticate sudo. Not stored. Cleared after install starts.</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +'<button onclick="r6pCloseInstallModal()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;">Cancel</button>'
+    +'<button id="r6p-modal-confirm" onclick="r6pDoInstall()" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;">Install Tools</button>'
+    +'</div></div></div>'
+
+    +'</div>';/* end outer flex */
+};
+
+/* ── Preflight helpers ── */
+window.r6pRunPreflight=function(){
+  var out=document.getElementById('r6p-preflight-out');if(out)out.style.display='block';
+  R6P_TOOLS.forEach(function(t){r6pSetToolStatus(t.name,'checking','—');});
+  var cmd='for t in git curl jq kubectl flux helm yq kustomize; do'
+    +' if command -v "$t" &>/dev/null; then echo "OK:$t:$(${t} --version 2>/dev/null | head -1 | tr -d \'\\n\')";'
+    +' else echo "MISSING:$t"; fi; done;'
+    +' if command -v opencenter &>/dev/null; then echo "OK:opencenter:$(opencenter version 2>/dev/null | head -1)"; else echo "MISSING:opencenter"; fi';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);
+  var buf='';
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'){es.close();r6pCheckContinue();return;}
+    buf+=e.data+'\n';
+    if(out){out.textContent=buf;out.scrollTop=out.scrollHeight;}
+    var m=e.data.match(/^(OK|MISSING):([^:]+):?(.*)?$/);
+    if(m){
+      var name=m[2].trim(),status=m[1]==='OK'?'ok':'missing',ver=m[3]?m[3].trim():'—';
+      R6P.preflight[name]=status;R6P.preflight[name+'_ver']=ver;
+      r6pSetToolStatus(name,status,ver);
+      if(name==='opencenter'&&status==='missing'){var w=document.getElementById('r6p-oc-missing-warn');if(w)w.style.display='block';}
+    }
+  };
+  es.onerror=function(){es.close();r6pCheckContinue();};
+};
+
+window.r6pSetToolStatus=function(name,status,ver){
+  var st=document.getElementById('r6p-st-'+name);
+  var vEl=document.getElementById('r6p-ver-'+name);
+  var bEl=document.getElementById('r6p-btn-'+name);
+  var tool=R6P_TOOLS.find(function(t){return t.name===name;});
+  if(!tool||!st)return;
+  var map={ok:['#dcfce7','#16a34a','Installed'],missing:['#fee2e2','#dc2626',tool.manual?'Manual Setup Required':'Missing'],checking:['#fef3c7','#d97706','Checking...'],unchecked:['#f1f5f9','#94a3b8','Not Checked']};
+  var m=map[status]||map.unchecked;
+  st.style.background=m[0];st.style.color=m[1];st.textContent=m[2];
+  if(vEl&&ver)vEl.textContent=ver;
+  if(bEl){
+    if(status==='missing'&&!tool.manual)bEl.innerHTML='<button onclick="r6pShowInstallConfirm([\''+name+'\'])" style="background:#0369a1;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Install</button>';
+    else if(status==='missing'&&tool.manual)bEl.innerHTML='<button onclick="r6pShowOcSetup()" style="background:#7c3aed;color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;">Configure Path</button>';
+    else if(status==='ok')bEl.innerHTML='<span style="color:#16a34a;font-size:11px;font-weight:700;">OK</span>';
+    else if(status==='checking')bEl.innerHTML='<span style="color:#d97706;font-size:11px;">...</span>';
+  }
+};
+
+window.r6pCheckContinue=function(){
+  var requiredMissing=R6P_TOOLS.filter(function(t){return t.req&&R6P.preflight[t.name]==='missing';});
+  var btn=document.getElementById('r6p-s0-continue');
+  if(!btn)return;
+  if(requiredMissing.length===0){
+    R6P.continueBlocked=false;
+    btn.style.opacity='1';btn.style.cursor='pointer';
+    btn.title='All required tools installed';
+  } else {
+    R6P.continueBlocked=true;
+    btn.style.opacity='0.5';btn.style.cursor='not-allowed';
+    btn.title='Missing required: '+requiredMissing.map(function(t){return t.name;}).join(', ');
+  }
+};
+
+window.r6pS0Continue=function(){
+  if(R6P.continueBlocked){alert('Install all required tools first.\n\nMissing: '+R6P_TOOLS.filter(function(t){return t.req&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;}).join(', '));return;}
+  r6pGoTo(1);
+};
+
+/* Install modal */
+var _r6pInstallToolList=[];
+window.r6pShowInstallConfirm=function(mode){
+  var tools=[];
+  if(Array.isArray(mode)){tools=mode;}
+  else if(mode==='missing')tools=R6P_TOOLS.filter(function(t){return !t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
+  else if(mode==='required')tools=R6P_TOOLS.filter(function(t){return t.req&&!t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
+  else if(mode==='recommended')tools=R6P_TOOLS.filter(function(t){return !t.req&&!t.manual&&R6P.preflight[t.name]==='missing';}).map(function(t){return t.name;});
+  if(!tools.length){alert('No installable tools to install. Run Preflight first.');return;}
+  _r6pInstallToolList=tools;
+  var modal=document.getElementById('r6p-install-modal');
+  var tlist=document.getElementById('r6p-modal-toollist');
+  var oerr=document.getElementById('r6p-modal-oserr');
+  var confirmBtn=document.getElementById('r6p-modal-confirm');
+  if(tlist)tlist.textContent=tools.join(' ');
+  if(oerr)oerr.style.display='none';
+  if(confirmBtn)confirmBtn.disabled=false;
+  if(modal){modal.style.display='flex';setTimeout(function(){var p=document.getElementById('r6p-sudo-pass');if(p)p.focus();},100);}
+};
+window.r6pCloseInstallModal=function(){var m=document.getElementById('r6p-install-modal');if(m)m.style.display='none';};
+window.r6pShowOcSetup=function(){
+  alert('OpenCenter CLI Manual Setup\n\n1. Clone the openCenter-cli repo\n2. Run: mise trust && mise install && mise run build\n3. Run: sudo cp ./bin/opencenter /usr/local/bin/opencenter\n4. Run: opencenter version\n\nDo not auto-install OpenCenter CLI without an official installer URL configured in OPENCENTER_INSTALL_URL.');
+};
+
+window.r6pDoInstall=function(){
+  /* Read sudo password from modal — used once, then cleared */
+  var passEl=document.getElementById('r6p-sudo-pass');
+  var pass=passEl?passEl.value:'';
+  if(!pass){alert('Enter your sudo password to continue.');return;}
+  r6pCloseInstallModal();
+  /* Clear password from DOM immediately after reading */
+  if(passEl)passEl.value='';
+
+  if(!_r6pInstallToolList.length)return;
+  var out=document.getElementById('r6p-preflight-out');
+  if(out){out.style.display='block';out.textContent='Installing: '+_r6pInstallToolList.join(' ')+'\n';}
+
+  var scriptPath='/home/dzoan/OSPC2FLEX/osflex-deployer-fullmig-5.0.0420current/workflow_dashboard/static/install-missing-cli-tools.sh';
+  /* Write password to a locked temp file — never in the process list */
+  var passEsc=pass.replace(/'/g,"'\\''");
+  var tmpFile='/tmp/.r6p_sp_'+Date.now();
+  /* Each sudo call inside the script pipes from the same temp file via _sudo().
+     Temp file is deleted immediately after the script exits (success or failure). */
+  var cmd="printf '%s' '"+passEsc+"' > '"+tmpFile+"' && chmod 600 '"+tmpFile+"'"
+    +" && chmod +x '"+scriptPath+"'"
+    +" && SUDO_PASS_FILE='"+tmpFile+"' bash '"+scriptPath+"' "+_r6pInstallToolList.join(' ')
+    +"; _rc=$?; rm -f '"+tmpFile+"'; exit $_rc";
+
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'){es.close();setTimeout(r6pRunPreflight,800);return;}
+    /* Suppress any line that might contain the temp file path or pass reference */
+    var line=e.data.replace(/r6p_sp_\d+/g,'[sudo-auth-file]');
+    if(out){out.textContent+=line+'\n';out.scrollTop=out.scrollHeight;}
+  };
+  es.onerror=function(){if(out)out.textContent+='[connection error]\n';es.close();};
+};
+
+/* Credential helpers */
+window.r6pToggleCred=function(key){var el=document.getElementById('r6p-cred-'+key);if(el)el.style.display=el.style.display==='none'?'block':'none';};
+window.r6pSaveCred=function(section,field,value){if(R6P.creds[section])R6P.creds[section][field]=value;};
+window.r6pGitopsMethodChange=function(m){
+  var ssh=document.getElementById('r6p-gs-ssh-fields'),https=document.getElementById('r6p-gs-https-fields');
+  if(ssh)ssh.style.display=m==='ssh'?'block':'none';
+  if(https)https.style.display=m==='https'?'grid':'none';
+  r6pSaveCred('gitops','method',m);
+};
+
+window.r6pTestCloud=function(){
+  function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
+  var authUrl=v('r6p-c-authurl'),region=v('r6p-c-region');
+  var credId=v('r6p-c-credid'),secret=v('r6p-c-secret');
+  var username=v('r6p-c-username'),password=v('r6p-c-password'),domain=v('r6p-c-domain')||'Default';
+  var proj=v('r6p-c-proj');
+  var res=document.getElementById('r6p-cloud-result');
+  if(!authUrl){if(res){res.style.color='#dc2626';res.textContent='Fill in OS_AUTH_URL first.';}return;}
+  var cmd,authDesc;
+  if(credId&&secret){
+    /* v3 application credential */
+    authDesc='v3 Application Credential';
+    cmd='export OS_AUTH_URL='+shellescape(authUrl)
+      +' OS_AUTH_TYPE=v3applicationcredential'
+      +' OS_APPLICATION_CREDENTIAL_ID='+shellescape(credId)
+      +' OS_APPLICATION_CREDENTIAL_SECRET='+shellescape(secret)
+      +(region?' OS_REGION_NAME='+shellescape(region):'')
+      +'; openstack token issue 2>&1 | head -20';
+  } else if(username&&password){
+    /* v2 or v3 password */
+    var isV2=authUrl.indexOf('/v2')>=0;
+    authDesc=isV2?'v2 Password':'v3 Password';
+    if(isV2){
+      cmd='export OS_AUTH_URL='+shellescape(authUrl)
+        +' OS_USERNAME='+shellescape(username)
+        +' OS_PASSWORD='+shellescape(password)
+        +(proj?' OS_TENANT_ID='+shellescape(proj):'')
+        +(region?' OS_REGION_NAME='+shellescape(region):'')
+        +' OS_AUTH_TYPE=password OS_IDENTITY_API_VERSION=2'
+        +'; openstack token issue 2>&1 | head -20';
+    } else {
+      cmd='export OS_AUTH_URL='+shellescape(authUrl)
+        +' OS_USERNAME='+shellescape(username)
+        +' OS_PASSWORD='+shellescape(password)
+        +' OS_USER_DOMAIN_NAME='+shellescape(domain)
+        +(proj?' OS_PROJECT_ID='+shellescape(proj):'')
+        +(region?' OS_REGION_NAME='+shellescape(region):'')
+        +' OS_AUTH_TYPE=password OS_IDENTITY_API_VERSION=3'
+        +'; openstack token issue 2>&1 | head -20';
+    }
+  } else {
+    if(res){res.style.color='#dc2626';res.textContent='Fill App Credential ID+Secret or Username+Password.';}return;
+  }
+  if(res){res.style.color='#d97706';res.textContent='Testing '+authDesc+' login...';}
+  var out='';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'){es.close();
+      var ok=out.indexOf('expires')>=0||out.indexOf('user_id')>=0||out.indexOf('token')>=0;
+      R6P.creds.cloud.status=ok?'connected':'failed';
+      if(res){res.style.color=ok?'#16a34a':'#dc2626';res.textContent=ok?'Connected ('+authDesc+')':'Login failed. Check credentials and auth URL.';}
+      return;}out+=e.data+'\n';};
+  es.onerror=function(){es.close();if(res){res.style.color='#dc2626';res.textContent='Connection error.';}};
+};
+
+window.r6pTestOC=function(){
+  var cluster=document.getElementById('r6p-oc-cluster')&&document.getElementById('r6p-oc-cluster').value||'rackspace-flex/flex-prod-k8s';
+  var res=document.getElementById('r6p-oc-result');
+  if(res){res.style.color='#d97706';res.textContent='Testing OpenCenter access...';}
+  var cmd='opencenter cluster describe '+cluster+' 2>&1 | head -20';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var out='';var es=new EventSource(url);
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'){es.close();
+      var ok=out.indexOf('git_dir:')>=0||out.indexOf('cluster')>=0;
+      R6P.creds.opencenter.status=ok?'connected':'failed';
+      if(ok){var gd=out.match(/git_dir:\s*(\S+)/);if(gd){R6P.creds.opencenter.gitDir=gd[1];var el=document.getElementById('r6p-oc-gitdir');if(el)el.value=gd[1];}}
+      if(res){res.style.color=ok?'#16a34a':'#dc2626';res.textContent=ok?'OpenCenter access confirmed. GitOps directory detected.':'OpenCenter access failed. Check CLI installation and login.';}
+      return;
+    }out+=e.data+'\n';
+  };
+  es.onerror=function(){es.close();if(res){res.style.color='#dc2626';res.textContent='OpenCenter CLI not found or connection error.';}};
+};
+
+window.r6pDetectGitDir=function(){
+  var cluster=document.getElementById('r6p-oc-cluster')&&document.getElementById('r6p-oc-cluster').value||'rackspace-flex/flex-prod-k8s';
+  var cmd='opencenter cluster describe '+cluster+' 2>/dev/null | grep "git_dir:" | awk \'{print $2}\'';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);var out='';
+  es.onmessage=function(e){if(e.data==='[DONE]'){es.close();var gd=out.trim();if(gd){R6P.creds.opencenter.gitDir=gd;var el=document.getElementById('r6p-oc-gitdir');if(el)el.value=gd;}return;}out+=e.data;};
+  es.onerror=function(){es.close();};
+};
+
+window.r6pTestGitOps=function(){
+  var path=document.getElementById('r6p-gs-path')&&document.getElementById('r6p-gs-path').value||R6P.creds.opencenter.gitDir;
+  var res=document.getElementById('r6p-gs-result');
+  if(!path){if(res){res.style.color='#dc2626';res.textContent='Enter GitOps local directory or detect from OpenCenter first.';}return;}
+  if(res){res.style.color='#d97706';res.textContent='Testing git access...';}
+  var cmd='git -C "'+path+'" status 2>&1 && git -C "'+path+'" remote -v 2>&1 | head -4';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var out='';var es=new EventSource(url);
+  es.onmessage=function(e){if(e.data==='[DONE]'){es.close();var ok=out.indexOf('On branch')>=0||out.indexOf('nothing to commit')>=0;R6P.creds.gitops.status=ok?'connected':'failed';if(res){res.style.color=ok?'#16a34a':'#dc2626';res.textContent=ok?'Git repo access confirmed.':'Git repo access failed. Check path or credentials.';}return;}out+=e.data+'\n';};
+  es.onerror=function(){es.close();};
+};
+
+window.r6pRunGitopsCmd=function(sub){
+  var path=R6P.creds.opencenter.gitDir||document.getElementById('r6p-gs-path')&&document.getElementById('r6p-gs-path').value;
+  if(!path){alert('Set GitOps directory first.');return;}
+  var cmds={status:'git -C "'+path+'" status',remote:'git -C "'+path+'" remote -v',fetch:'git -C "'+path+'" fetch --dry-run 2>&1'};
+  var cmd=cmds[sub]||cmds.status;
+  var out=document.getElementById('r6p-gc-out');if(out)out.style.display='block';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);es.onmessage=function(e){if(e.data==='[DONE]'){es.close();return;}if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}};
+  es.onerror=function(){es.close();};
+};
+
+function r6pGCSet(id,ok,val){var st=document.getElementById(id+'-st'),v=document.getElementById(id+'-val');if(st){st.style.background=ok?'#dcfce7':'#fee2e2';st.style.color=ok?'#16a34a':'#dc2626';st.textContent=ok?'Pass':'Fail';}if(v)v.textContent=val||'—';}
+
+window.r6pRunGitopsPreflight=function(){
+  var gitDir=R6P.creds.opencenter.gitDir||document.getElementById('r6p-gs-path')&&document.getElementById('r6p-gs-path').value;
+  var out=document.getElementById('r6p-gc-out');if(out){out.style.display='block';out.textContent='';}
+  var cmd='GD="'+(gitDir||'')+'"\n'
+    +'[ -n "$GD" ] && echo "GITDIR:ok:$GD" || echo "GITDIR:fail:empty"\n'
+    +'[ -n "$GD" ] && git -C "$GD" rev-parse --git-dir &>/dev/null && echo "ISREPO:ok" || echo "ISREPO:fail"\n'
+    +'[ -n "$GD" ] && git -C "$GD" remote -v 2>/dev/null | grep -q fetch && echo "REMOTE:ok:$(git -C $GD remote get-url origin 2>/dev/null)" || echo "REMOTE:fail"\n'
+    +'[ -n "$GD" ] && [ -d "$GD/applications/workloads" ] && echo "WORKLOADS:ok" || echo "WORKLOADS:fail:directory missing"\n'
+    +'git config --global user.name &>/dev/null && echo "GITNAME:ok:$(git config --global user.name)" || echo "GITNAME:fail:not set"\n'
+    +'git config --global user.email &>/dev/null && echo "GITEMAIL:ok:$(git config --global user.email)" || echo "GITEMAIL:fail:not set"\n'
+    +'command -v flux &>/dev/null && echo "FLUX:ok:$(flux --version 2>/dev/null | head -1)" || echo "FLUX:fail:not installed"\n'
+    +'command -v kubectl &>/dev/null && kubectl cluster-info 2>/dev/null | head -1 | grep -q "running" && echo "KUBECTL:ok" || echo "KUBECTL:fail:no cluster access"';
+  var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
+  var es=new EventSource(url);
+  es.onmessage=function(e){
+    if(e.data==='[DONE]'){es.close();r6pCheckContinue();return;}
+    if(out){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}
+    var m=e.data.match(/^(GITDIR|ISREPO|REMOTE|WORKLOADS|GITNAME|GITEMAIL|FLUX|KUBECTL):(ok|fail):?(.*)?$/);
+    if(!m)return;
+    var key=m[1],ok=m[2]==='ok',val=m[3]||'';
+    var map={GITDIR:'r6p-gc-gitdir',ISREPO:'r6p-gc-isrepo',REMOTE:'r6p-gc-remote',WORKLOADS:'r6p-gc-workloads',GITNAME:'r6p-gc-gituser',GITEMAIL:'r6p-gc-gitemail',FLUX:'r6p-gc-flux',KUBECTL:'r6p-gc-kubectl'};
+    if(map[key])r6pGCSet(map[key],ok,val);
+  };
+  es.onerror=function(){es.close();};
+};
+
+function shellescape(s){return "'"+s.replace(/'/g,"'\\''")+"'";}
+
+/* ── OpenCenter Stage 2 import override ── */
+window.openCenterImportFromR6=function(){
+  /* Read new state first, fall back to legacy key */
+  var raw=localStorage.getItem('appsContainerRefactorOutput')||localStorage.getItem('r6OpenCenterHandoffBundle');
+  if(!raw){
+    var badge=document.getElementById('clf-st-2');
+    if(badge){badge.textContent='Awaiting Bundle';badge.className='ocqs-status ocqs-s-idle';}
+    return;
+  }
+  var data;
+  try{data=JSON.parse(raw);}catch(e){console.error('openCenterImportFromR6: invalid JSON',e);return;}
+
+  /* Normalise — handle both new appsContainerRefactorOutput and old bundle format */
+  var bsName=data.businessSystemName||data.businessSystem||'Unknown';
+  var captureMethod=data.captureMethod||'SMART_SNAPSHOT_CAPTURE';
+  var cloudStatus=data.cloudNativeStatus||data.importStatus||'CLOUD_NATIVE_READY';
+  var cluster=data.targetCluster||'rackspace-flex/flex-prod-k8s';
+  var ns=data.namespace||bsName.toLowerCase().replace(/\s+/g,'-')+'-prod';
+  var workloads=data.workloads||[];
+  var extSvc=data.externalServices||[];
+  var warns=(data.warnings||[]).length;
+  var blockers=(data.blockers||[]).length;
+  var pkgContents=data.packageContents||{};
+  var isCompat=captureMethod==='FULL_SNAPSHOT_COMPATIBILITY_CONTAINER';
+  var isBlocked=blockers>0||cloudStatus==='BLOCKED';
+
+  /* Update status badge on Step 2 card */
+  var st2=document.getElementById('clf-st-2');
+  if(st2){st2.textContent=isBlocked?'Blocked':'Ready to Validate';st2.className='ocqs-status '+(isBlocked?'ocqs-s-failed':'ocqs-s-running');}
+
+  /* Update main pane status badge */
+  var pst=document.getElementById('s2opencenter-status');
+  if(pst){pst.textContent=isBlocked?'Blocked — Fix R6 issues':'R6 Bundle Ready';pst.className='gov-status-badge '+(isBlocked?'status-failed':'status-running');}
+
+  /* Build package contents table */
+  var pkgDefs=[
+    {f:'opencenter_import_manifest.json',req:'Required'},
+    {f:'k8s/',req:'Required'},{f:'helm/',req:'Required'},{f:'kustomize/',req:'Required'},{f:'flux/',req:'Required'},
+    {f:'Dockerfile',req:'Recommended'},{f:'image_build_plan.yaml',req:'Required'},{f:'app_capture_manifest.json',req:'Required'},
+    {f:'externalization_plan.yaml',req:'Required'},{f:'container_readiness_report.json',req:'Required'},
+    {f:'container_readiness_report.md',req:'Recommended'},{f:'compatibility_warnings.json',req:'Conditional'}
+  ];
+  var pkgTable='<table style="width:100%;border-collapse:collapse;font-size:11px;">'
+    +'<thead><tr style="background:#f8fafc;"><th style="padding:6px 10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#0369a1;font-size:10px;text-transform:uppercase;">File/Folder</th>'
+    +'<th style="padding:6px 10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#0369a1;font-size:10px;text-transform:uppercase;">Required?</th>'
+    +'<th style="padding:6px 10px;text-align:left;border-bottom:2px solid #e2e8f0;color:#0369a1;font-size:10px;text-transform:uppercase;">Status</th>'
+    +'</tr></thead><tbody>';
+  pkgDefs.forEach(function(p){
+    var isCond=p.req==='Conditional';
+    var raw_st=pkgContents[p.f]||(isCond?(isCompat?'found':'not_required'):'missing');
+    var stMap={'found':['#dcfce7','#16a34a','Found'],'missing':['#fee2e2','#dc2626','Missing'],'not_required':['#f1f5f9','#64748b','Not Required'],'warning':['#fef3c7','#d97706','Warning']};
+    var st=stMap[raw_st]||stMap.missing;
+    var reqBg=p.req==='Required'?'#fee2e2':p.req==='Recommended'?'#fef3c7':'#f1f5f9';
+    var reqFg=p.req==='Required'?'#dc2626':p.req==='Recommended'?'#d97706':'#64748b';
+    pkgTable+='<tr style="border-bottom:1px solid #f1f5f9;">'
+      +'<td style="padding:5px 10px;font-family:monospace;font-weight:600;">'+p.f+'</td>'
+      +'<td style="padding:5px 10px;"><span style="background:'+reqBg+';color:'+reqFg+';padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;">'+p.req+'</span></td>'
+      +'<td style="padding:5px 10px;"><span style="background:'+st[0]+';color:'+st[1]+';padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;">'+st[2]+'</span></td></tr>';
+  });
+  pkgTable+='</tbody></table>';
+
+  /* Build summary panel */
+  var summaryHTML='<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;padding:14px;margin-bottom:12px;">'
+    +'<div style="font-size:12px;font-weight:800;color:#166534;margin-bottom:8px;">Imported from Apps Container Refactor Engine</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px;">'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Business System</div><div style="font-weight:700;color:#0f172a;">'+bsName+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Source Platform</div><div style="font-weight:700;color:#0369a1;">FLEX</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Capture Method</div><div style="font-weight:700;color:'+(isCompat?'#7c3aed':'#16a34a')+';">'+(isCompat?'Full Snapshot':'Smart Snapshot')+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Cloud-Native Status</div><div style="font-weight:700;color:'+(isCompat?'#7c3aed':'#16a34a')+';">'+cloudStatus.replace(/_/g,' ')+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Target Cluster</div><div style="font-weight:700;color:#0f172a;font-size:11px;">'+cluster+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Namespace</div><div style="font-weight:700;color:#0f172a;">'+ns+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Workloads</div><div style="font-weight:700;">'+workloads.map(function(w){return w.name||w;}).join(', ')||'—'+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">External Services</div><div style="font-weight:700;">'+extSvc.map(function(s){return s.name||s;}).join(', ')||'None'+'</div></div>'
+    +'<div><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Import Status</div><div style="font-weight:700;color:'+(isBlocked?'#dc2626':'#16a34a')+'">'+(isBlocked?'BLOCKED — fix R6 issues':'Ready to Validate')+'</div></div>'
+    +(warns?'<div style="grid-column:1/-1;"><div style="color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Warnings</div><div style="color:#d97706;font-weight:700;">'+warns+' warning'+(warns!==1?'s':'')+'</div></div>':'')
+    +'</div></div>';
+
+  /* Inject into Stage 2 card — replace the "Accepted package contents" static grid */
+  var step2=document.getElementById('clf-step-2');
+  if(step2){
+    var existing=document.getElementById('r6p-oc-import-panel');
+    if(existing)existing.remove();
+    var panel=document.createElement('div');
+    panel.id='r6p-oc-import-panel';
+    panel.style.cssText='margin:0 0 12px;';
+    panel.innerHTML=summaryHTML
+      +'<div style="font-size:10px;font-weight:800;color:#0369a1;text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;">Package Contents Validation</div>'
+      +pkgTable
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+      +'<button onclick="openCenterValidateImport()" style="background:#0369a1;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">Validate Package</button>'
+      +(isBlocked?'<button disabled style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:not-allowed;" title="Fix R6 blockers first">Send to OpenCenter — Blocked</button>'
+        :'<button onclick="openCenterMockGenerate()" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">Send to OpenCenter</button>')
+      +'</div>';
+    var uploadDiv=step2.querySelector('[style*="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"]');
+    if(uploadDiv)uploadDiv.parentNode.insertBefore(panel,uploadDiv.nextSibling);
+    else step2.appendChild(panel);
+  }
+
+  /* Update legacy oc-import-status box if it exists */
+  var legacyBox=document.getElementById('oc-import-status');
+  if(legacyBox){legacyBox.innerHTML='<strong style="color:#16a34a;">Imported from Apps Container Refactor Engine</strong> — '+bsName+' — '+cloudStatus.replace(/_/g,' ');}
+
+  /* Persist merged state */
+  data.importedAt=new Date().toISOString();
+  data.source='APPS_to_Container_Refactor_Engine';
+  localStorage.setItem('openCenterImportState',JSON.stringify(data));
+};
 
 /* Auto-init: MutationObserver fires when pane becomes visible */
 (function(){
@@ -98,9 +866,96 @@ window.r6pDownloadBundle=window.r6pDownloadEvidence;
   setTimeout(tryInit,500);
 })();
 
-/* OpenRC importer for clf-* fields */
-window.clfImportOpenRC=function(evt){var file=evt.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(e){var text=e.target.result;var vars={};text.split('\n').forEach(function(line){var m=line.match(/^(?:export\s+)?([A-Z0-9_]+)[=\s]+["']?([^"'\n]*)["']?\s*$/);if(m)vars[m[1]]=m[2].replace(/['"]/g,'').trim();});Object.keys(vars).forEach(function(k){vars[k]=vars[k].replace(/\$([A-Z0-9_]+)/g,function(_,v){return vars[v]||'';});});function set(id,val){var el=document.getElementById(id);if(el&&val)el.value=val;}set('clf-auth-url',vars.OS_AUTH_URL);set('clf-region',vars.OS_REGION_NAME);set('clf-cred-id',vars.OS_APPLICATION_CREDENTIAL_ID);set('clf-cred-sec',vars.OS_APPLICATION_CREDENTIAL_SECRET);set('clf-proj',vars.OS_PROJECT_ID||vars.OS_TENANT_ID);set('clf-domain',vars.OS_USER_DOMAIN_NAME||vars.OS_PROJECT_DOMAIN_NAME);set('ocqs-authUrl',vars.OS_AUTH_URL);set('ocqs-region',vars.OS_REGION_NAME);if(typeof ocqsUpdate==='function')ocqsUpdate();};reader.readAsText(file);};
+/* OpenRC parser — handles v2 password, v3 password, v3 app credential */
+function r6pParseOpenRC(text){
+  var vars={};
+  text.split('\n').forEach(function(line){
+    /* strip comments */
+    line=line.replace(/#.*/,'').trim();
+    var m=line.match(/^(?:export\s+)?([A-Z0-9_]+)\s*=\s*["']?([^"'\n]*)["']?\s*$/);
+    if(m)vars[m[1]]=m[2].trim();
+  });
+  /* variable expansion */
+  Object.keys(vars).forEach(function(k){
+    vars[k]=vars[k].replace(/\$\{?([A-Z0-9_]+)\}?/g,function(_,v){return vars[v]||'';});
+  });
+  /* detect auth type */
+  var authType=(vars.OS_AUTH_TYPE||'').toLowerCase();
+  var isAppCred=authType==='v3applicationcredential'||!!vars.OS_APPLICATION_CREDENTIAL_ID;
+  var isV2=(!vars.OS_IDENTITY_API_VERSION||vars.OS_IDENTITY_API_VERSION==='2'||vars.OS_IDENTITY_API_VERSION==='2.0')&&!isAppCred;
+  return {vars:vars,isAppCred:isAppCred,isV2:isV2};
+}
+
+/* Fill Stage 0 r6p-c-* credential fields */
+window.r6pImportOpenRC=function(evt){
+  var file=evt.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var p=r6pParseOpenRC(e.target.result);
+    var v=p.vars;
+    function set(id,val){var el=document.getElementById(id);if(el&&val!=null&&val!=='')el.value=val;}
+
+    set('r6p-c-authurl', v.OS_AUTH_URL);
+    set('r6p-c-region',  v.OS_REGION_NAME);
+    set('r6p-c-proj',    v.OS_PROJECT_ID||v.OS_TENANT_ID||v.OS_PROJECT_NAME);
+
+    /* show username/password fields if v2/password auth detected */
+    var pwRow=document.getElementById('r6p-c-pw-row');
+    if(p.isAppCred){
+      set('r6p-c-credid',  v.OS_APPLICATION_CREDENTIAL_ID);
+      set('r6p-c-secret',  v.OS_APPLICATION_CREDENTIAL_SECRET);
+      if(pwRow)pwRow.style.display='none';
+      r6pShowCredResult('cloud','Detected: v3 Application Credential. Fields populated.','#16a34a');
+    } else {
+      /* v2 or v3 password — show username/password row */
+      if(pwRow)pwRow.style.display='grid';
+      set('r6p-c-username',v.OS_USERNAME);
+      set('r6p-c-password',v.OS_PASSWORD);
+      set('r6p-c-domain',  v.OS_USER_DOMAIN_NAME||v.OS_PROJECT_DOMAIN_NAME||'Default');
+      var authVer=p.isV2?'v2 Password':'v3 Password';
+      r6pShowCredResult('cloud','Detected: '+authVer+' auth. Fields populated. Consider creating an Application Credential for automation.','#d97706');
+    }
+
+    /* save to R6P state (no secret stored) */
+    R6P.creds.cloud.authUrl=v.OS_AUTH_URL||'';
+    R6P.creds.cloud.region=v.OS_REGION_NAME||'';
+    R6P.creds.cloud.projectId=v.OS_PROJECT_ID||v.OS_TENANT_ID||'';
+    R6P.creds.cloud.credId=v.OS_APPLICATION_CREDENTIAL_ID||'';
+    R6P.creds.cloud.status='configured';
+    /* also fill clf-* and ocqs-* for OpenCenter stage */
+    r6pFillClfFields(v,p.isAppCred);
+  };
+  reader.readAsText(file);
+};
+
+function r6pFillClfFields(v,isAppCred){
+  function set(id,val){var el=document.getElementById(id);if(el&&val)el.value=val;}
+  set('clf-auth-url',v.OS_AUTH_URL);
+  set('clf-region',v.OS_REGION_NAME);
+  set('clf-proj',v.OS_PROJECT_ID||v.OS_TENANT_ID);
+  set('clf-domain',v.OS_USER_DOMAIN_NAME||v.OS_PROJECT_DOMAIN_NAME);
+  if(isAppCred){set('clf-cred-id',v.OS_APPLICATION_CREDENTIAL_ID);set('clf-cred-sec',v.OS_APPLICATION_CREDENTIAL_SECRET);}
+  else{set('clf-username',v.OS_USERNAME);set('clf-password',v.OS_PASSWORD);}
+  set('ocqs-authUrl',v.OS_AUTH_URL);set('ocqs-region',v.OS_REGION_NAME);
+  if(typeof ocqsUpdate==='function')ocqsUpdate();
+}
+
+function r6pShowCredResult(block,msg,color){
+  var el=document.getElementById('r6p-'+block+'-result');
+  if(el){el.textContent=msg;el.style.color=color;}
+}
+
+/* Legacy clfImportOpenRC — kept for OpenCenter stage buttons */
+window.clfImportOpenRC=function(evt){
+  var file=evt&&evt.target&&evt.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var p=r6pParseOpenRC(e.target.result);
+    r6pFillClfFields(p.vars,p.isAppCred);
+  };
+  reader.readAsText(file);
+};
 
 /* Install button map */
-var R6ACE_INSTALL={'opencenter version':'git clone https://github.com/opencenter-cloud/openCenter-cli.git && cd openCenter-cli && mise trust && mise install && mise run build && sudo cp ./bin/opencenter /usr/local/bin/opencenter && opencenter version','kubectl version --client':'curl -LO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && kubectl version --client','opentofu version':'curl -sSLo /tmp/opentofu.zip https://github.com/opentofu/opentofu/releases/download/v1.8.0/tofu_1.8.0_linux_amd64.zip && cd /tmp && unzip -o opentofu.zip && sudo mv tofu /usr/local/bin/opentofu && opentofu version','flux --version || true':'curl -s https://fluxcd.io/install.sh | sudo bash && flux --version'};
+var R6ACE_INSTALL={'opencenter version':'git clone https://github.com/opencenter-cloud/openCenter-cli.git && cd openCenter-cli && mise trust && mise install && mise run build && sudo cp ./bin/opencenter /usr/local/bin/opencenter && opencenter version','kubectl version --client':'curl -LO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && kubectl version --client','opentofu version':'curl -sSLo /tmp/opentofu.zip https://github.com/opentofu/opentofu/releases/download/v1.8.0/tofu_1.8.0_linux_amd64.zip && cd /tmp && unzip -o opentofu.zip && sudo mv tofu /usr/local/bin/opentofu && opentofu version','flux --version || true':'curl -s https://fluxcd.io/install.sh | sudo bash && flux --version','git --version':'sudo apt-get update && sudo apt-get install -y git','curl --version':'sudo apt-get update && sudo apt-get install -y curl','jq --version':'sudo apt-get update && sudo apt-get install -y jq','helm version':'curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash','yq --version':'sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq && yq --version','kustomize version':'curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && sudo mv kustomize /usr/local/bin/kustomize && kustomize version'};
 window.r6aceRunInstall=function(did,cmdId,outId){var d=document.getElementById(did);if(d)d.remove();var out=document.getElementById(outId),cEl=document.getElementById(cmdId);if(!out||!cEl)return;var cmd=cEl.textContent.trim();var ic=R6ACE_INSTALL[cmd];if(!ic)return;out.textContent='Installing...\n';out.style.borderColor='#134e4a';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(ic);var es=new EventSource(url);es.onmessage=function(e){if(e.data!=='[DONE]'){out.textContent+=e.data+'\n';out.scrollTop=out.scrollHeight;}else{es.close();setTimeout(function(){r6pRunCmd(cmdId,outId);},500);}};es.onerror=function(){out.textContent+='[install error]\n';es.close();};};
