@@ -14157,5 +14157,38 @@ function val(id) {
 })();
 </script>
 
+
+<!-- ACE Source B focus: show only the snapshot discovery panel -->
+<script>
+(function(){
+  try{
+    var params=new URLSearchParams(window.location.search||'');
+    if((params.get('focus')||'')!=='snapshot') return;
+    var showOnly=function(){
+      var panel=document.getElementById('imageScannerPanel');
+      if(!panel) return;
+      // Walk up, hiding every sibling that is not the panel ancestor chain
+      var node=panel;
+      while(node && node!==document.body){
+        var parent=node.parentElement; if(!parent) break;
+        Array.prototype.forEach.call(parent.children,function(sib){
+          if(sib===node) return;
+          if(sib.tagName==='STYLE'||sib.tagName==='SCRIPT') return;
+          var pos=window.getComputedStyle(sib).position;
+          if(pos==='fixed'||pos==='absolute') return;
+          sib.style.display='none';
+        });
+        node.style.display='block';
+        node=parent;
+      }
+      panel.style.display='block'; panel.style.marginTop='0';
+      document.body.style.background='#fff';
+      document.documentElement.style.background='#fff';
+    };
+    setTimeout(showOnly,150); setTimeout(showOnly,500); setTimeout(showOnly,1000);
+  }catch(e){}
+})();
+</script>
+
 </body>
 </html>
