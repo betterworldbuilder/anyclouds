@@ -1,19 +1,20 @@
 /* APPS to Container Refactor Engine v4 */
 var R6P={current:0,status:{},bs:null,components:[],captureMethod:'smart',compatConfirmed:false,yaml:'',bundle:null,artifacts:{},preflight:{},continueBlocked:true,creds:{cloud:{status:'not_configured',authUrl:'',region:'',credId:'',projectId:''},opencenter:{status:'not_configured',clusterRef:'rackspace-flex/flex-prod-k8s',gitDir:''},gitops:{status:'not_configured',localPath:'',branch:'main',method:'existing'}}};
 var R6P_TOOLS=[
-  {name:'git',      req:true,  note:'GitOps commit',           manual:false},
-  {name:'curl',     req:true,  note:'CLI installers',          manual:false},
-  {name:'jq',       req:true,  note:'JSON parsing',            manual:false},
-  {name:'kubectl',  req:true,  note:'Cluster validation',      manual:false},
-  {name:'flux',     req:true,  note:'Flux reconcile',          manual:false},
-  {name:'opencenter',req:true, note:'Cluster metadata',        manual:true},
-  {name:'helm',     req:false, note:'Helm chart validation',   manual:false},
-  {name:'yq',       req:false, note:'YAML processing',         manual:false},
-  {name:'kustomize',req:false, note:'Kustomize validation',    manual:false}
+  {name:'git',        req:true,  note:'GitOps commit',           manual:false},
+  {name:'curl',       req:true,  note:'CLI installers',          manual:false},
+  {name:'jq',         req:true,  note:'JSON parsing',            manual:false},
+  {name:'kubectl',    req:true,  note:'Cluster validation',      manual:false},
+  {name:'flux',       req:true,  note:'Flux reconcile',          manual:false},
+  {name:'openstack',  req:true,  note:'Cloud API / token test',  manual:false},
+  {name:'opencenter', req:true,  note:'Cluster metadata',        manual:true},
+  {name:'helm',       req:false, note:'Helm chart validation',   manual:false},
+  {name:'yq',         req:false, note:'YAML processing',         manual:false},
+  {name:'kustomize',  req:false, note:'Kustomize validation',    manual:false}
 ];
 var R6P_STEPS=[{n:0,label:'Preflight',title:'Preflight Requirements Check',desc:'Verify CLI tools, credentials, and GitOps access before running the refactor workflow.'},{n:1,label:'Input',title:'Select FLEX Business System / App Input',desc:'Select a migrated FLEX Business System or a single FLEX VM / DB. Only FLEX workloads are accepted.'},{n:2,label:'Discovery',title:'Discover FLEX Snapshots',desc:'Discover private FLEX VM images, VM snapshots, and volume snapshots as safe read-only capture sources.'},{n:3,label:'Snapshot',title:'Select Snapshot / Volume Snapshot',desc:'Select snapshots for Smart Snapshot or Full Snapshot capture.'},{n:4,label:'Mapping',title:'Map Snapshot to Business System Component',desc:'Link selected snapshots to business system components.'},{n:5,label:'Method',title:'Choose Capture and Conversion Method',desc:'Smart Snapshot (recommended) or Full Snapshot Compatibility (legacy fallback).'},{n:6,label:'Scan',title:'Snapshot Mount and Scan',desc:'Mount snapshot read-only. Scan OS, runtime, ports, services, volumes, config, secrets.'},{n:7,label:'Classify',title:'App Detection and File Classification',desc:'Identify real application content and classify all files.'},{n:8,label:'Readiness',title:'Container Readiness Assessment',desc:'Score each component: CLOUD_NATIVE_READY, READY_WITH_EXTERNALIZATION, KEEP_ON_FLEX, BLOCKED.'},{n:9,label:'Build',title:'Container Build Plan',desc:'Generate Dockerfile, image plan, base image, build/start command, health check, CPU/memory.'},{n:10,label:'GitOps',title:'Kubernetes YAML / Helm / Kustomize / Flux',desc:'Generate all Kubernetes and GitOps artifacts.'},{n:11,label:'Bundle',title:'OpenCenter Import Bundle',desc:'Assemble the final OpenCenter-ready application bundle.'},{n:12,label:'OpenCenter',title:'Send to OpenCenter GitOps',desc:'Import bundle, generate commit commands, trigger Flux reconciliation.'}];
 
-window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);};
+window.r6pInit=function(){r6pRenderProgress();r6pRenderStages();r6pGoTo(0);setTimeout(r6pLoadBiz,350);setTimeout(r6pLoadCredCache,200);};
 window.r6aceInit=window.r6pInit;
 
 window.r6pRenderProgress=function(){
@@ -409,28 +410,48 @@ window.r6pStage0=function(){
     +'<div><div style="font-weight:700;font-size:13px;">1. FLEX / OpenStack Cloud Credentials</div>'
     +'<div style="font-size:11px;color:#64748b;">Application Credential recommended for automation</div></div>'
     +statusBadge(csStatus)+'</div>'
-    +'<div id="r6p-cred-cloud" style="display:none;padding:14px;">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_AUTH_URL</label><input id="r6p-c-authurl" placeholder="https://identity.{region}.rackspacecloud.com/v3" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'authUrl\',this.value)"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_REGION_NAME</label><input id="r6p-c-region" placeholder="IAD" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'region\',this.value)"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">Application Credential ID</label><input id="r6p-c-credid" placeholder="OS_APPLICATION_CREDENTIAL_ID" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'credId\',this.value)"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">Application Credential Secret</label><input id="r6p-c-secret" type="password" placeholder="OS_APPLICATION_CREDENTIAL_SECRET" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_PROJECT_ID / OS_TENANT_ID</label><input id="r6p-c-proj" placeholder="project ID or name" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;" onchange="r6pSaveCred(\'cloud\',\'projectId\',this.value)"></div>'
+    +'<div id="r6p-cred-cloud" style="display:block;padding:16px;">'
+    +'<div style="font-size:13px;font-weight:800;color:#0f172a;margin-bottom:12px;">V3 FLEX Cloud Credentials <span style="font-size:11px;font-weight:400;color:#64748b;">(FLEX v3 auth)</span></div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Auth URL</label><input id="r6p-c-authurl" placeholder="https://keystone.api.iad3.rackspacecloud.com/v3/" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()" onchange="r6pSaveCred(\'cloud\',\'authUrl\',this.value)"></div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Type of Auth</label>'
+    +'<select id="r6p-c-authtype" onchange="r6pAuthTypeChange(this.value);r6pSaveCredCache();" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;">'
+    +'<option value="password">Username / Password</option>'
+    +'<option value="appcred">Application Credential</option>'
+    +'</select></div>'
+    /* Username/Password fields */
+    +'<div id="r6p-c-pw-fields">'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Username</label><input id="r6p-c-username" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Password</label><input id="r6p-c-password" type="password" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>'
     +'</div>'
-    /* v2/v3 password row — hidden until OpenRC import detects password auth */
-    +'<div id="r6p-c-pw-row" style="display:none;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">'
-    +'<div><label style="font-size:11px;font-weight:700;color:#d97706;">OS_USERNAME</label><input id="r6p-c-username" placeholder="username" style="width:100%;padding:6px 8px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#d97706;">OS_PASSWORD</label><input id="r6p-c-password" type="password" placeholder="password" style="width:100%;padding:6px 8px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
-    +'<div><label style="font-size:11px;font-weight:700;color:#475569;">OS_USER_DOMAIN_NAME</label><input id="r6p-c-domain" value="Default" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;margin-top:3px;"></div>'
+    /* App Credential fields */
+    +'<div id="r6p-c-appcred-fields" style="display:none;">'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">OS_APPLICATION_CREDENTIAL_ID</label><input id="r6p-c-credid" placeholder="OS_APPLICATION_CREDENTIAL_ID" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()" onchange="r6pSaveCred(\'cloud\',\'credId\',this.value)"></div>'
+    +'<div style="margin-bottom:8px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">OS_APPLICATION_CREDENTIAL_SECRET</label><input id="r6p-c-secret" type="password" placeholder="OS_APPLICATION_CREDENTIAL_SECRET" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;"></div>'
+    +'<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;padding:8px 10px;font-size:11px;color:#0369a1;margin-bottom:10px;">Uses OS_AUTH_TYPE=v3applicationcredential. Project and domain can remain for compatibility, but Keystone scopes the application credential.</div>'
     +'</div>'
-    +'<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:5px;padding:6px 10px;font-size:11px;color:#92400e;margin-bottom:10px;display:none;" id="r6p-c-pw-warn">Password auth detected. Consider creating an Application Credential for automation.</div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Project ID</label><input id="r6p-c-proj" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()" onchange="r6pSaveCred(\'cloud\',\'projectId\',this.value)"></div>'
+    +'<div style="margin-bottom:10px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Domain</label><input id="r6p-c-domain" value="rackspace_cloud_domain" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;box-sizing:border-box;" oninput="r6pSaveCredCache()"></div>'
+    +'<div style="margin-bottom:14px;"><label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:4px;">Target Region <span style="font-size:10px;font-weight:400;color:#94a3b8;">(FLEX Glance upload destination)</span></label>'
+    +'<select id="r6p-c-region" onchange="r6pSaveCred(\'cloud\',\'region\',this.value);r6pSaveCredCache();" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:5px;font-size:13px;">'
+    +'<option value="">-- Select Region --</option>'
+    +'<option value="IAD">us IAD3 — Northern Virginia Legacy (US)</option>'
+    +'<option value="IAD3">us IAD3 — Northern Virginia (US)</option>'
+    +'<option value="DFW">us DFW1 — Dallas/Fort Worth Legacy (US)</option>'
+    +'<option value="DFW3">us DFW3 — Dallas/Fort Worth Legacy (US)</option>'
+    +'<option value="ORD">us ORD1 — Chicago Legacy (US)</option>'
+    +'<option value="SYD">ap SYD2 — Sydney (AU)</option>'
+    +'<option value="LON">eu LON3 — London (UK)</option>'
+    +'<option value="HKG">ap HKG1 — Hong Kong</option>'
+    +'</select></div>'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'
-    +'<label style="display:flex;gap:6px;align-items:center;font-size:11px;cursor:pointer;"><input type="file" accept=".sh,.rc,.env,.txt" style="display:none;" onchange="r6pImportOpenRC(event)"><button onclick="this.previousSibling.click()" style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-radius:5px;padding:6px 12px;font-size:11px;cursor:pointer;">Import OpenRC</button></label>'
-    +'<button onclick="r6pTestCloud()" style="background:#0369a1;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">Test Cloud Login</button>'
-    +'<span style="font-size:10px;color:#94a3b8;">Supports v2 password, v3 password, v3 app credential</span>'
+    +'<label style="display:flex;align-items:center;gap:6px;cursor:pointer;border:1px solid #e2e8f0;border-radius:5px;padding:6px 12px;font-size:12px;background:#f8fafc;">'
+    +'<input type="file" accept=".sh,.rc,.env,.txt" style="display:none;" onchange="r6pImportOpenRC(event);var n=this.files[0];document.getElementById(\'r6p-c-fname\').textContent=n?n.name:\'No file chosen\'">'
+    +'<span>Choose File</span></label>'
+    +'<span id="r6p-c-fname" style="font-size:11px;color:#64748b;">No file chosen</span>'
+    +'<button onclick="this.previousSibling.previousSibling.querySelector(\'input\').click()" style="background:#dc2626;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Import OpenRC File</button>'
+    +'<button onclick="r6pTestCloud()" style="background:#dc2626;color:#fff;border:none;border-radius:5px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Test Cloud Login</button>'
     +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
-    +'<div id="r6p-cloud-result" style="font-size:11px;color:#64748b;padding:4px 0;min-height:16px;"></div>'
+    +'<div id="r6p-cloud-result" style="font-size:12px;min-height:18px;margin-top:4px;"></div>'
     +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Secrets stored session-only. Never committed to GitOps repo or evidence bundles.</div>'
     +'</div></div>'
 
@@ -483,15 +504,15 @@ window.r6pStage0=function(){
 window.r6pRunPreflight=function(){
   var out=document.getElementById('r6p-preflight-out');if(out)out.style.display='block';
   R6P_TOOLS.forEach(function(t){r6pSetToolStatus(t.name,'checking','—');});
-  var cmd='for t in git curl jq kubectl flux helm yq kustomize; do'
+  var cmd='for t in git curl jq kubectl flux openstack helm yq kustomize; do'
     +' if command -v "$t" &>/dev/null; then echo "OK:$t:$(${t} --version 2>/dev/null | head -1 | tr -d \'\\n\')";'
     +' else echo "MISSING:$t"; fi; done;'
     +' if command -v opencenter &>/dev/null; then echo "OK:opencenter:$(opencenter version 2>/dev/null | head -1)"; else echo "MISSING:opencenter"; fi';
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
-  var buf='';
+  var buf='',_done=false;
   es.onmessage=function(e){
-    if(e.data==='[DONE]'){es.close();r6pCheckContinue();return;}
+    if(e.data==='[DONE]'){_done=true;es.close();r6pCheckContinue();return;}
     buf+=e.data+'\n';
     if(out){out.textContent=buf;out.scrollTop=out.scrollHeight;}
     var m=e.data.match(/^(OK|MISSING):([^:]+):?(.*)?$/);
@@ -502,7 +523,7 @@ window.r6pRunPreflight=function(){
       if(name==='opencenter'&&status==='missing'){var w=document.getElementById('r6p-oc-missing-warn');if(w)w.style.display='block';}
     }
   };
-  es.onerror=function(){es.close();r6pCheckContinue();};
+  es.onerror=function(){if(!_done)r6pCheckContinue();es.close();};
 };
 
 window.r6pSetToolStatus=function(name,status,ver){
@@ -593,18 +614,68 @@ window.r6pDoInstall=function(){
 
   var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
   var es=new EventSource(url);
+  var _done=false;
   es.onmessage=function(e){
-    if(e.data==='[DONE]'){es.close();setTimeout(r6pRunPreflight,800);return;}
-    /* Suppress any line that might contain the temp file path or pass reference */
+    if(e.data==='[DONE]'){_done=true;es.close();setTimeout(r6pRunPreflight,800);return;}
     var line=e.data.replace(/r6p_sp_\d+/g,'[sudo-auth-file]');
     if(out){out.textContent+=line+'\n';out.scrollTop=out.scrollHeight;}
   };
-  es.onerror=function(){if(out)out.textContent+='[connection error]\n';es.close();};
+  /* onerror fires when server closes the stream (normal after [DONE]) — ignore if already done */
+  es.onerror=function(){if(!_done&&out)out.textContent+='[stream closed]\n';es.close();};
+};
+
+/* Credential cache — persists non-secret fields across sessions */
+var R6P_CACHE_KEY='r6p_cred_cache';
+var R6P_SECRET_FIELDS=['secret','password']; /* never cached */
+
+window.r6pSaveCredCache=function(){
+  var cache={
+    authUrl:   (document.getElementById('r6p-c-authurl')||{}).value||'',
+    authType:  (document.getElementById('r6p-c-authtype')||{}).value||'appcred',
+    credId:    (document.getElementById('r6p-c-credid')||{}).value||'',
+    username:  (document.getElementById('r6p-c-username')||{}).value||'',
+    proj:      (document.getElementById('r6p-c-proj')||{}).value||'',
+    domain:    (document.getElementById('r6p-c-domain')||{}).value||'',
+    region:    (document.getElementById('r6p-c-region')||{}).value||''
+  };
+  try{localStorage.setItem(R6P_CACHE_KEY,JSON.stringify(cache));}catch(e){}
+};
+
+window.r6pLoadCredCache=function(){
+  var raw;
+  try{raw=localStorage.getItem(R6P_CACHE_KEY);}catch(e){return;}
+  if(!raw)return;
+  var c;try{c=JSON.parse(raw);}catch(e){return;}
+  function set(id,val){if(!val)return;var el=document.getElementById(id);if(el)el.value=val;}
+  set('r6p-c-authurl',  c.authUrl);
+  set('r6p-c-credid',   c.credId);
+  set('r6p-c-username', c.username);
+  set('r6p-c-proj',     c.proj);
+  set('r6p-c-domain',   c.domain);
+  /* auth type dropdown + show correct fields */
+  if(c.authType){
+    var dt=document.getElementById('r6p-c-authtype');
+    if(dt){dt.value=c.authType;r6pAuthTypeChange(c.authType);}
+  }
+  /* region dropdown */
+  if(c.region){
+    var rs=document.getElementById('r6p-c-region');
+    if(rs){for(var i=0;i<rs.options.length;i++){if(rs.options[i].value===c.region){rs.selectedIndex=i;break;}}}
+  }
+  /* restore R6P state (no secrets) */
+  R6P.creds.cloud.authUrl=c.authUrl||'';
+  R6P.creds.cloud.credId=c.credId||'';
+  R6P.creds.cloud.projectId=c.proj||'';
+  R6P.creds.cloud.region=c.region||'';
 };
 
 /* Credential helpers */
 window.r6pToggleCred=function(key){var el=document.getElementById('r6p-cred-'+key);if(el)el.style.display=el.style.display==='none'?'block':'none';};
-window.r6pSaveCred=function(section,field,value){if(R6P.creds[section])R6P.creds[section][field]=value;};
+window.r6pSaveCred=function(section,field,value){
+  if(R6P.creds[section])R6P.creds[section][field]=value;
+  /* persist non-secret fields immediately */
+  if(R6P_SECRET_FIELDS.indexOf(field)<0)r6pSaveCredCache();
+};
 window.r6pGitopsMethodChange=function(m){
   var ssh=document.getElementById('r6p-gs-ssh-fields'),https=document.getElementById('r6p-gs-https-fields');
   if(ssh)ssh.style.display=m==='ssh'?'block':'none';
@@ -614,57 +685,67 @@ window.r6pGitopsMethodChange=function(m){
 
 window.r6pTestCloud=function(){
   function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
-  var authUrl=v('r6p-c-authurl'),region=v('r6p-c-region');
+  var authUrl=v('r6p-c-authurl').replace(/\/+$/,'');
+  var authType=v('r6p-c-authtype')||'password';
   var credId=v('r6p-c-credid'),secret=v('r6p-c-secret');
-  var username=v('r6p-c-username'),password=v('r6p-c-password'),domain=v('r6p-c-domain')||'Default';
+  var username=v('r6p-c-username'),password=v('r6p-c-password');
+  var domain=v('r6p-c-domain')||'rackspace_cloud_domain';
   var proj=v('r6p-c-proj');
   var res=document.getElementById('r6p-cloud-result');
-  if(!authUrl){if(res){res.style.color='#dc2626';res.textContent='Fill in OS_AUTH_URL first.';}return;}
-  var cmd,authDesc;
-  if(credId&&secret){
-    /* v3 application credential */
+
+  if(!authUrl){if(res){res.style.color='#dc2626';res.textContent='Fill in Auth URL first.';}return;}
+
+  /* Build Keystone v3 token request body — no shell, no CLI needed */
+  var tokenUrl=authUrl+'/auth/tokens';
+  var body,authDesc;
+
+  if(authType==='appcred'||credId){
+    if(!credId||!secret){if(res){res.style.color='#dc2626';res.textContent='Fill Application Credential ID and Secret.';}return;}
     authDesc='v3 Application Credential';
-    cmd='export OS_AUTH_URL='+shellescape(authUrl)
-      +' OS_AUTH_TYPE=v3applicationcredential'
-      +' OS_APPLICATION_CREDENTIAL_ID='+shellescape(credId)
-      +' OS_APPLICATION_CREDENTIAL_SECRET='+shellescape(secret)
-      +(region?' OS_REGION_NAME='+shellescape(region):'')
-      +'; openstack token issue 2>&1 | head -20';
-  } else if(username&&password){
-    /* v2 or v3 password */
-    var isV2=authUrl.indexOf('/v2')>=0;
-    authDesc=isV2?'v2 Password':'v3 Password';
-    if(isV2){
-      cmd='export OS_AUTH_URL='+shellescape(authUrl)
-        +' OS_USERNAME='+shellescape(username)
-        +' OS_PASSWORD='+shellescape(password)
-        +(proj?' OS_TENANT_ID='+shellescape(proj):'')
-        +(region?' OS_REGION_NAME='+shellescape(region):'')
-        +' OS_AUTH_TYPE=password OS_IDENTITY_API_VERSION=2'
-        +'; openstack token issue 2>&1 | head -20';
-    } else {
-      cmd='export OS_AUTH_URL='+shellescape(authUrl)
-        +' OS_USERNAME='+shellescape(username)
-        +' OS_PASSWORD='+shellescape(password)
-        +' OS_USER_DOMAIN_NAME='+shellescape(domain)
-        +(proj?' OS_PROJECT_ID='+shellescape(proj):'')
-        +(region?' OS_REGION_NAME='+shellescape(region):'')
-        +' OS_AUTH_TYPE=password OS_IDENTITY_API_VERSION=3'
-        +'; openstack token issue 2>&1 | head -20';
-    }
+    body={auth:{identity:{methods:['application_credential'],application_credential:{id:credId,secret:secret}}}};
   } else {
-    if(res){res.style.color='#dc2626';res.textContent='Fill App Credential ID+Secret or Username+Password.';}return;
+    if(!username||!password){if(res){res.style.color='#dc2626';res.textContent='Fill Username and Password.';}return;}
+    var isV2=authUrl.indexOf('/v2')>=0;
+    if(isV2){
+      /* Rackspace v2 identity */
+      tokenUrl=authUrl.replace(/\/v2.*$/,'')+'/v2.0/tokens';
+      authDesc='v2 Password';
+      body={auth:{passwordCredentials:{username:username,password:password},tenantId:proj||undefined}};
+    } else {
+      authDesc='v3 Password';
+      var scope=proj?{project:{id:proj}}:{};
+      body={auth:{identity:{methods:['password'],password:{user:{name:username,domain:{name:domain},password:password}}},scope:scope}};
+    }
   }
+
   if(res){res.style.color='#d97706';res.textContent='Testing '+authDesc+' login...';}
-  var out='';var url='/api/stream/run-cmd?cmd='+encodeURIComponent(cmd);
-  var es=new EventSource(url);
-  es.onmessage=function(e){
-    if(e.data==='[DONE]'){es.close();
-      var ok=out.indexOf('expires')>=0||out.indexOf('user_id')>=0||out.indexOf('token')>=0;
-      R6P.creds.cloud.status=ok?'connected':'failed';
-      if(res){res.style.color=ok?'#16a34a':'#dc2626';res.textContent=ok?'Connected ('+authDesc+')':'Login failed. Check credentials and auth URL.';}
-      return;}out+=e.data+'\n';};
-  es.onerror=function(){es.close();if(res){res.style.color='#dc2626';res.textContent='Connection error.';}};
+
+  /* Use /api/uat/test-proxy — server-side POST, avoids CORS and shell quoting */
+  fetch('/api/uat/test-proxy',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({url:tokenUrl,method:'POST',body:body,headers:{'Content-Type':'application/json'},timeout:12})
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var ok=d.status===201||d.status===200||(d.ok&&d.body&&d.body.indexOf('token')>=0);
+    R6P.creds.cloud.status=ok?'connected':'failed';
+    if(res){
+      res.style.color=ok?'#16a34a':'#dc2626';
+      if(ok){
+        var proj_info='';
+        try{var t=JSON.parse(d.body);proj_info=' — project: '+(t.token&&t.token.project&&t.token.project.name||'');}catch(e){}
+        res.textContent='Connected ('+authDesc+')'+proj_info;
+      } else {
+        var errMsg=d.body?d.body.substring(0,200):'HTTP '+d.status;
+        res.textContent='Login failed ('+d.status+'): '+errMsg;
+      }
+    }
+  })
+  .catch(function(e){
+    R6P.creds.cloud.status='failed';
+    if(res){res.style.color='#dc2626';res.textContent='Request failed: '+(e.message||e);}
+  });
 };
 
 window.r6pTestOC=function(){
@@ -901,20 +982,23 @@ window.r6pImportOpenRC=function(evt){
 
     /* show username/password fields if v2/password auth detected */
     var pwRow=document.getElementById('r6p-c-pw-row');
+    var dt=document.getElementById('r6p-c-authtype');
     if(p.isAppCred){
+      if(dt){dt.value='appcred';r6pAuthTypeChange('appcred');}
       set('r6p-c-credid',  v.OS_APPLICATION_CREDENTIAL_ID);
       set('r6p-c-secret',  v.OS_APPLICATION_CREDENTIAL_SECRET);
-      if(pwRow)pwRow.style.display='none';
       r6pShowCredResult('cloud','Detected: v3 Application Credential. Fields populated.','#16a34a');
     } else {
-      /* v2 or v3 password — show username/password row */
-      if(pwRow)pwRow.style.display='grid';
+      if(dt){dt.value='password';r6pAuthTypeChange('password');}
       set('r6p-c-username',v.OS_USERNAME);
       set('r6p-c-password',v.OS_PASSWORD);
-      set('r6p-c-domain',  v.OS_USER_DOMAIN_NAME||v.OS_PROJECT_DOMAIN_NAME||'Default');
+      set('r6p-c-domain',  v.OS_USER_DOMAIN_NAME||v.OS_PROJECT_DOMAIN_NAME||'rackspace_cloud_domain');
       var authVer=p.isV2?'v2 Password':'v3 Password';
-      r6pShowCredResult('cloud','Detected: '+authVer+' auth. Fields populated. Consider creating an Application Credential for automation.','#d97706');
+      r6pShowCredResult('cloud','Detected: '+authVer+'. Fields populated. Consider an Application Credential for automation.','#d97706');
     }
+    /* set region dropdown if detected */
+    var reg=v.OS_REGION_NAME;
+    if(reg){var rs=document.getElementById('r6p-c-region');if(rs){for(var i=0;i<rs.options.length;i++){if(rs.options[i].value===reg){rs.selectedIndex=i;break;}}}}
 
     /* save to R6P state (no secret stored) */
     R6P.creds.cloud.authUrl=v.OS_AUTH_URL||'';
@@ -922,6 +1006,8 @@ window.r6pImportOpenRC=function(evt){
     R6P.creds.cloud.projectId=v.OS_PROJECT_ID||v.OS_TENANT_ID||'';
     R6P.creds.cloud.credId=v.OS_APPLICATION_CREDENTIAL_ID||'';
     R6P.creds.cloud.status='configured';
+    /* persist non-secret fields */
+    r6pSaveCredCache();
     /* also fill clf-* and ocqs-* for OpenCenter stage */
     r6pFillClfFields(v,p.isAppCred);
   };
@@ -939,6 +1025,13 @@ function r6pFillClfFields(v,isAppCred){
   set('ocqs-authUrl',v.OS_AUTH_URL);set('ocqs-region',v.OS_REGION_NAME);
   if(typeof ocqsUpdate==='function')ocqsUpdate();
 }
+
+window.r6pAuthTypeChange=function(val){
+  var pw=document.getElementById('r6p-c-pw-fields');
+  var ac=document.getElementById('r6p-c-appcred-fields');
+  if(pw)pw.style.display=val==='appcred'?'none':'block';
+  if(ac)ac.style.display=val==='appcred'?'block':'none';
+};
 
 function r6pShowCredResult(block,msg,color){
   var el=document.getElementById('r6p-'+block+'-result');

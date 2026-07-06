@@ -10,8 +10,9 @@ if [ "${#TOOLS[@]}" -eq 0 ]; then
 fi
 
 # ── sudo helper ────────────────────────────────────────────────────────────
-# Each call pipes the password from SUDO_PASS_FILE via sudo -S.
-# This avoids needing a TTY and works in non-interactive SSE subprocesses.
+# Pipes password from SUDO_PASS_FILE to sudo -S on every call.
+# IMPORTANT: Never pipe a remote script directly to _sudo bash — download
+# to a tmpfile first so the password pipe and the script pipe don't conflict.
 _sudo() {
   if [ -n "${SUDO_PASS_FILE:-}" ] && [ -f "$SUDO_PASS_FILE" ]; then
     cat "$SUDO_PASS_FILE" | sudo -S -p '' "$@" 2>/dev/null
@@ -39,7 +40,7 @@ echo ""
 
 has_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-# ── Validate sudo access before touching anything ──────────────────────────
+# ── Validate sudo access ───────────────────────────────────────────────────
 echo "Validating sudo access..."
 if ! _sudo true; then
   echo "[ERROR] sudo authentication failed. Check your password."
@@ -64,6 +65,11 @@ install_jq() {
   _sudo apt-get install -y jq
 }
 
+install_openstack() {
+  # Install via apt (python3-openstackclient) — most reliable on Ubuntu/Debian
+  _sudo apt-get install -y python3-openstackclient
+}
+
 install_kubectl() {
   echo "Fetching latest kubectl version..."
   local VER
@@ -75,11 +81,31 @@ install_kubectl() {
 }
 
 install_flux() {
-  curl -s https://fluxcd.io/install.sh | _sudo bash
+  # Download script to tmpfile first — do NOT pipe curl directly to _sudo bash
+  # because the password pipe and the script pipe would conflict for stdin
+  local TMP
+  TMP=$(mktemp /tmp/flux_install_XXXXXX.sh)
+  echo "Downloading flux install script..."
+  curl -s -o "$TMP" https://fluxcd.io/install.sh
+  chmod +x "$TMP"
+  _sudo bash "$TMP"
+  rm -f "$TMP"
 }
 
 install_helm() {
-  curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  # Download and extract manually so _sudo only runs for the final mv
+  # The official get-helm-3 script calls sudo internally which breaks _sudo
+  echo "Fetching latest helm version..."
+  local VER
+  VER=$(curl -s https://api.github.com/repos/helm/helm/releases/latest 2>/dev/null \
+    | grep '"tag_name"' | head -1 | cut -d'"' -f4)
+  VER="${VER:-v3.17.0}"
+  echo "helm version: $VER"
+  curl -sL "https://get.helm.sh/helm-${VER}-linux-amd64.tar.gz" -o /tmp/helm.tar.gz
+  tar -xzf /tmp/helm.tar.gz -C /tmp
+  _sudo mv /tmp/linux-amd64/helm /usr/local/bin/helm
+  _sudo chmod +x /usr/local/bin/helm
+  rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
 }
 
 install_yq() {
@@ -89,8 +115,20 @@ install_yq() {
 }
 
 install_kustomize() {
-  curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-  _sudo mv kustomize /usr/local/bin/kustomize
+  # Download and extract manually — the official install script calls sudo internally
+  echo "Fetching latest kustomize version..."
+  local VER
+  VER=$(curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases/latest 2>/dev/null \
+    | grep '"tag_name"' | grep 'kustomize/' | head -1 | cut -d'"' -f4)
+  VER="${VER:-kustomize/v5.4.3}"
+  local VER_NUM="${VER#kustomize/}"
+  echo "kustomize version: $VER_NUM"
+  curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/${VER}/kustomize_${VER_NUM}_linux_amd64.tar.gz" \
+    -o /tmp/kustomize.tar.gz
+  tar -xzf /tmp/kustomize.tar.gz -C /tmp
+  _sudo mv /tmp/kustomize /usr/local/bin/kustomize
+  _sudo chmod +x /usr/local/bin/kustomize
+  rm -f /tmp/kustomize.tar.gz
 }
 
 install_opencenter() {
@@ -103,7 +141,12 @@ install_opencenter() {
     echo "  sudo cp ./bin/opencenter /usr/local/bin/opencenter"
     return 2
   fi
-  curl -fsSL "$OPENCENTER_INSTALL_URL" | _sudo bash
+  local TMP
+  TMP=$(mktemp /tmp/opencenter_install_XXXXXX.sh)
+  curl -fsSL "$OPENCENTER_INSTALL_URL" -o "$TMP"
+  chmod +x "$TMP"
+  _sudo bash "$TMP"
+  rm -f "$TMP"
 }
 
 # ── Main loop ───────────────────────────────────────────────────────────────
@@ -128,6 +171,7 @@ for tool in "${TOOLS[@]}"; do
     git)        install_git ;;
     curl)       install_curl ;;
     jq)         install_jq ;;
+    openstack)  install_openstack ;;
     kubectl)    install_kubectl ;;
     flux)       install_flux ;;
     helm)       install_helm ;;
