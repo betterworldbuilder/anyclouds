@@ -1768,10 +1768,72 @@
       + actionHtml;
   }
 
+  // ── Per-component (business system VM) selector shared by the S5 charts ──
+  var _udCompSel = { perf:'__all__', vm:'__all__', tco:'__all__' };
+  var _udLastA = null, _udLastFd = null;
+  function _udFlavorSpecs(fl) {
+    fl = String(fl || '').trim();
+    var m = fl.match(/^gp\.\d+\.(\d+)\.(\d+)$/i);   // FLEX gp.<gen>.<vcpu>.<ram>
+    if (m) return { vcpu: +m[1], ram: +m[2] };
+    m = fl.match(/^general1-(\d+)$/i);              // OSPC generalN → N vCPU / N GB
+    if (m) return { vcpu: +m[1], ram: +m[1] };
+    m = fl.match(/^compute1-(\d+)$/i);              // OSPC computeN → N GB, ~N/2 vCPU
+    if (m) return { vcpu: Math.max(1, Math.round(+m[1] / 2)), ram: +m[1] };
+    return null;
+  }
+  var _UD_PRICES = { 'general1-1':68.80,'general1-2':77.62,'general1-4':151.70,'general1-8':302.80,
+    'compute1-4':86.44,'compute1-8':186.98,'compute1-15':200.00,'compute1-30':400.00,
+    'gp.0.2.2':28.08,'gp.5.2.2':28.08,'gp.0.2.4':35.28,'gp.0.4.4':61.92,'gp.5.4.4':61.92,'gp.0.4.8':76.32,'gp.0.16.64':398.16 };
+  function _udCompList() {
+    var sys = null;
+    try {
+      var raw = JSON.parse(localStorage.getItem('uatS1_systems') || 'null') || [];
+      var list = raw.filter(function(s){ return s.status !== 'Draft'; });
+      if (!list.length) list = raw;
+      list.sort(function(a,b){ return new Date(b.createdAt||0) - new Date(a.createdAt||0); });
+      sys = list[0] || null;
+    } catch(e) {}
+    if (!sys) return { name:'', comps:[] };
+    function host(u){ var m=String(u||'').match(/^[a-zA-Z][\w+.-]*:\/\/([^\/:]+)/); if(m) return m[1]; m=String(u||'').match(/^([^\/:]+)/); return m?m[1]:''; }
+    var flexMap = {}, ospcMap = {};
+    try { ((JSON.parse(localStorage.getItem('uatS1_flex_vm_rows')||'null')||{}).rows||[]).forEach(function(r){ [r.public_ip,r.private_ip,r.ip].forEach(function(ip){ if(ip) flexMap[ip]=r; }); }); } catch(e) {}
+    try { ((JSON.parse(localStorage.getItem('uatS1_ospc_vm_rows')||'null')||{}).rows||[]).forEach(function(r){ [r.public_ip,r.private_ip,r.ip].forEach(function(ip){ if(ip) ospcMap[ip]=r; }); }); } catch(e) {}
+    var comps = (sys.components || []).map(function(c, i) {
+      var tgtIp = host(c.tgt), srcIp = host(c.src);
+      var f = flexMap[tgtIp] || {}, o = ospcMap[srcIp] || {};
+      return { id:'c'+i, name:c.name||('Component '+(i+1)), srcIp:srcIp, tgtIp:tgtIp,
+               srcFlavor:o.flavor||'', tgtFlavor:f.flavor||'' };
+    });
+    return { name: sys.name || '', comps: comps };
+  }
+  function _udCompDropdown(chartKey) {
+    var bs = _udCompList();
+    if (!bs.comps.length) return '';
+    var sel = _udCompSel[chartKey] || '__all__';
+    return '<select onchange="uatUdSelComp(\'' + chartKey + '\',this.value)" style="float:right;max-width:175px;font-size:10px;padding:2px 4px;border:1px solid #d1d5db;border-radius:5px;color:#374151;background:#fff;cursor:pointer;">'
+      + '<option value="__all__"' + (sel==='__all__' ? ' selected' : '') + '>All components (total)</option>'
+      + bs.comps.map(function(c){ return '<option value="'+c.id+'"'+(sel===c.id?' selected':'')+'>'+_udEsc(c.name.length>36 ? c.name.slice(0,35)+'…' : c.name)+'</option>'; }).join('')
+      + '</select>';
+  }
+  function _udSelComp(chartKey) {
+    var id = _udCompSel[chartKey];
+    if (id === '__all__') return null;
+    return _udCompList().comps.find(function(c){ return c.id === id; }) || null;
+  }
+  function _udSeed(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h*31 + s.charCodeAt(i)) >>> 0; return h; }
+  window.uatUdSelComp = function(chartKey, val) {
+    _udCompSel[chartKey] = val;
+    if (chartKey === 'perf') _ud_perfChart(_udLastA, _udLastFd);
+    if (chartKey === 'vm')   _ud_vmChart(_udLastA, _udLastFd);
+    if (chartKey === 'tco')  _ud_tcoChart(_udLastA, _udLastFd);
+  };
+
   // S5a: Performance Comparison Chart
   function _ud_perfChart(a, fd) {
     var el = _udE('uat-perf-chart');
     if (!el) return;
+    _udLastA = a; _udLastFd = fd;
+    var comp = _udSelComp('perf');
     var metrics = [
       { label:'CPU Usage',    src: 65, tgt: 42 },
       { label:'Memory Usage', src: 78, tgt: 55 },
@@ -1779,8 +1841,21 @@
       { label:'Network',      src: 82, tgt: 75 },
       { label:'Latency',      src: 120, tgt: 85 },
     ];
+    var compNote = '';
+    if (comp) {
+      // Deterministic per-component estimate around the baseline — clearly
+      // labeled as an estimate; Step 3 per-pair tests are the live source.
+      var seed = _udSeed(comp.name);
+      metrics = metrics.map(function(m, i) {
+        var d1 = ((seed >> (i*3)) % 21) - 10, d2 = ((seed >> (i*3+2)) % 21) - 10;
+        return { label: m.label, src: Math.max(5, m.src + d1), tgt: Math.max(4, m.tgt + d2) };
+      });
+      compNote = '<div style="font-size:9px;color:#d97706;margin-bottom:6px;">Estimated baseline for “' + _udEsc(comp.name) + '” — run Step 3 against this pair for live values.</div>';
+    }
     var maxV = metrics.reduce(function(m,r){ return Math.max(m, r.src, r.tgt); }, 1);
-    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">Performance Comparison <span style="font-size:10px;color:#9ca3af;font-weight:400;">(Source vs Clone/Target)</span></div>'
+    el.innerHTML = _udCompDropdown('perf')
+      + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">Performance Comparison <span style="font-size:10px;color:#9ca3af;font-weight:400;">(Source vs Clone/Target)</span></div>'
+      + compNote
       + '<div style="display:flex;gap:12px;font-size:10px;margin-bottom:8px;">'
       + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;"></span>Source Server</span>'
       + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;"></span>Clone Server</span>'
@@ -1804,12 +1879,28 @@
   function _ud_vmChart(a, fd) {
     var el = _udE('uat-vm-chart');
     if (!el) return;
+    _udLastA = a; _udLastFd = fd;
+    var comp = _udSelComp('vm');
     var vm = fd ? fd.vmData : { srcVcpu:16, tgtVcpu:16, srcRam:64, tgtRam:64, srcDisk:1000, tgtDisk:1000 };
-    var metrics = [
-      { label:'vCPU (cores)', src: vm.srcVcpu || 16, tgt: vm.tgtVcpu || 16 },
-      { label:'RAM (GB)',     src: vm.srcRam  || 64,  tgt: vm.tgtRam  || 64 },
-      { label:'Storage (GB)', src: vm.srcDisk || 1000,tgt: vm.tgtDisk || 1000 },
-    ];
+    var metrics, compNote = '';
+    if (comp) {
+      var ss = _udFlavorSpecs(comp.srcFlavor), ts = _udFlavorSpecs(comp.tgtFlavor);
+      metrics = [
+        { label:'vCPU (cores)', src: ss ? ss.vcpu : 0, tgt: ts ? ts.vcpu : 0 },
+        { label:'RAM (GB)',     src: ss ? ss.ram  : 0, tgt: ts ? ts.ram  : 0 },
+      ];
+      compNote = '<div style="font-size:9px;color:#6b7280;margin-bottom:6px;">'
+        + '<b style="color:#1e40af;">' + _udEsc(comp.name.length > 44 ? comp.name.slice(0,43) + '…' : comp.name) + '</b>'
+        + ' — ' + _udEsc(comp.srcFlavor || 'no OSPC flavor') + ' → ' + _udEsc(comp.tgtFlavor || 'no FLEX flavor')
+        + ((!ss || !ts) ? ' · <span style="color:#d97706;">scan Source OSPC VMs / Current FLEX VMs in Step 1 to fill missing specs</span>' : '')
+        + '</div>';
+    } else {
+      metrics = [
+        { label:'vCPU (cores)', src: vm.srcVcpu || 16, tgt: vm.tgtVcpu || 16 },
+        { label:'RAM (GB)',     src: vm.srcRam  || 64,  tgt: vm.tgtRam  || 64 },
+        { label:'Storage (GB)', src: vm.srcDisk || 1000,tgt: vm.tgtDisk || 1000 },
+      ];
+    }
     var maxV = metrics.reduce(function(m,r){ return Math.max(m, r.src, r.tgt); }, 1);
     function flavorPills(items, color) {
       items = Array.isArray(items) ? items : [];
@@ -1833,11 +1924,13 @@
         + '<span style="overflow:hidden;text-overflow:ellipsis;">' + _udEsc(text) + (top.count ? ' x' + top.count : '') + '</span>'
         + '</div>';
     }
-    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">VM Size / Resource Comparison</div>'
+    el.innerHTML = _udCompDropdown('vm')
+      + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;">VM Size / Resource Comparison</div>'
+      + compNote
       + '<div style="display:flex;gap:12px;font-size:10px;margin-bottom:8px;">'
       + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:2px;"></span>Source</span>'
       + '<span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;"></span>Target (Clone)</span>'
-      + (fd && fd.vmData.rows ? '<span style="font-size:9px;color:#9ca3af;">Avg of ' + fd.vmData.rows + ' VMs</span>' : '')
+      + (!comp && fd && fd.vmData.rows ? '<span style="font-size:9px;color:#9ca3af;">Avg of ' + fd.vmData.rows + ' VMs</span>' : '')
       + '</div>'
       + metrics.map(function(m) {
           var sp = Math.round(m.src/maxV*100), tp = Math.round(m.tgt/maxV*100);
@@ -1852,26 +1945,52 @@
       + [0, Math.round(maxV/3), Math.round(maxV*2/3), maxV].map(function(v){ return '<span>'+v.toLocaleString()+'</span>'; }).join('')
       + '</div>'
       + '<div style="text-align:center;font-size:10px;color:#9ca3af;padding-left:90px;margin-top:2px;">Capacity</div>'
-      + '<div style="margin-top:7px;padding-top:6px;border-top:1px solid #eef2ff;display:grid;gap:4px;min-width:0;">'
-      + '<div style="display:flex;align-items:center;gap:5px;min-width:0;"><span style="width:46px;font-size:8px;font-weight:800;color:#3b82f6;text-transform:uppercase;">Source</span><div style="display:flex;gap:4px;min-width:0;overflow:hidden;">' + flavorPills(vm.sourceFlavors, '#3b82f6') + '</div></div>'
-      + '<div style="display:flex;align-items:center;gap:5px;min-width:0;"><span style="width:46px;font-size:8px;font-weight:800;color:#16a34a;text-transform:uppercase;">Target</span><div style="display:flex;gap:4px;min-width:0;overflow:hidden;">' + flavorPills(vm.targetFlavors, '#16a34a') + '</div></div>'
-      + pairText(vm.flavorPairs)
-      + '</div>';
+      + (comp
+          ? '<div style="margin-top:7px;padding-top:6px;border-top:1px solid #eef2ff;font-size:9px;color:#6b7280;">'
+            + '<span style="font-weight:800;color:#3b82f6;">SRC</span> ' + _udEsc(comp.srcIp || '—')
+            + ' &nbsp;<span style="font-weight:800;color:#16a34a;">TGT</span> ' + _udEsc(comp.tgtIp || '—')
+            + '</div>'
+          : '<div style="margin-top:7px;padding-top:6px;border-top:1px solid #eef2ff;display:grid;gap:4px;min-width:0;">'
+            + '<div style="display:flex;align-items:center;gap:5px;min-width:0;"><span style="width:46px;font-size:8px;font-weight:800;color:#3b82f6;text-transform:uppercase;">Source</span><div style="display:flex;gap:4px;min-width:0;overflow:hidden;">' + flavorPills(vm.sourceFlavors, '#3b82f6') + '</div></div>'
+            + '<div style="display:flex;align-items:center;gap:5px;min-width:0;"><span style="width:46px;font-size:8px;font-weight:800;color:#16a34a;text-transform:uppercase;">Target</span><div style="display:flex;gap:4px;min-width:0;overflow:hidden;">' + flavorPills(vm.targetFlavors, '#16a34a') + '</div></div>'
+            + pairText(vm.flavorPairs)
+            + '</div>');
   }
 
   // S5c: TCO Chart
   function _ud_tcoChart(a, fd) {
     var el = _udE('uat-tco-chart');
     if (!el) return;
+    _udLastA = a; _udLastFd = fd;
+    var comp = _udSelComp('tco');
     var tco = fd ? fd.tcoData : { srcMonthly:24800, tgtMonthly:18300, savings:6500, savingsPct:'26.2' };
-    // Apply price list overrides if uploaded
     var pl = window._uatPriceListState || {};
-    if (pl.ospcMonthly > 0) { tco = Object.assign({}, tco); tco.srcMonthly = pl.ospcMonthly; }
-    if (pl.flexMonthly > 0) { tco = Object.assign({}, tco); tco.tgtMonthly = pl.flexMonthly; }
+    var compNote = '';
+    if (comp) {
+      // Per-component cost from the flavor price table; unknown side estimated
+      // via the standing 2.45x OSPC:FLEX ratio. Price-list uploads are totals,
+      // so they only apply to the "All components" view.
+      var srcP = _UD_PRICES[comp.srcFlavor] || 0;
+      var tgtP = _UD_PRICES[comp.tgtFlavor] || 0;
+      if (!srcP && tgtP) srcP = tgtP * 2.45;
+      if (!tgtP && srcP) tgtP = srcP / 2.45;
+      tco = { srcMonthly: Math.round(srcP), tgtMonthly: Math.round(tgtP) };
+      compNote = '<div style="font-size:9px;color:#6b7280;margin-bottom:8px;">'
+        + '<b style="color:#1e40af;">' + _udEsc(comp.name.length > 44 ? comp.name.slice(0,43) + '…' : comp.name) + '</b>'
+        + ' — ' + _udEsc(comp.srcFlavor || '?') + ' → ' + _udEsc(comp.tgtFlavor || '?')
+        + ((!srcP && !tgtP) ? ' · <span style="color:#d97706;">no flavor price data — scan Step 1 VM tables first</span>' : ' · flavor price table estimate')
+        + '</div>';
+    } else {
+      // Apply price list overrides if uploaded (totals view only)
+      if (pl.ospcMonthly > 0) { tco = Object.assign({}, tco); tco.srcMonthly = pl.ospcMonthly; }
+      if (pl.flexMonthly > 0) { tco = Object.assign({}, tco); tco.tgtMonthly = pl.flexMonthly; }
+    }
     tco.savings    = tco.srcMonthly - tco.tgtMonthly;
     tco.savingsPct = tco.srcMonthly > 0 ? (tco.savings / tco.srcMonthly * 100).toFixed(1) : '0.0';
     var maxVal = Math.max(tco.srcMonthly, tco.tgtMonthly, 1);
-    var yMax = Math.ceil(maxVal/5000)*5000 + 5000;
+    var yStep = maxVal > 4000 ? 5000 : maxVal > 800 ? 500 : 50;
+    var yMax = Math.ceil(maxVal/yStep)*yStep + yStep;
+    function _udMoney(v) { return v >= 1000 ? '$' + (v/1000).toFixed(1) + 'K' : '$' + Math.round(v); }
     var bars = [
       { val: tco.srcMonthly, col:'#3b82f6', lbl:'Source Monthly Cost' },
       { val: tco.tgtMonthly, col:'#22c55e', lbl:'Target Monthly Cost' },
@@ -1881,7 +2000,9 @@
     var yLabels = [yMax, Math.round(yMax*0.8), Math.round(yMax*0.6), Math.round(yMax*0.4), Math.round(yMax*0.2), 0];
     var savingsGood = tco.savings > 0;
     var savPct = parseFloat(tco.savingsPct) || 0;
-    el.innerHTML = '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:12px;line-height:1.15;">TCO Cost Estimation (Monthly)</div>'
+    el.innerHTML = _udCompDropdown('tco')
+      + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:12px;line-height:1.15;">TCO Cost Estimation (Monthly)</div>'
+      + compNote
       + '<div style="display:flex;gap:8px;align-items:flex-end;clear:both;">'
       // Y-axis
       + '<div style="display:flex;flex-direction:column;justify-content:space-between;height:' + (chartH + 20) + 'px;text-align:right;padding-bottom:20px;">'
@@ -1892,7 +2013,7 @@
       + bars.map(function(b) {
           var h = Math.max(4, Math.round(b.val/yMax * chartH));
           return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
-            + '<div style="font-size:9px;font-weight:700;color:' + b.col + ';">$' + (b.val/1000).toFixed(1) + 'K</div>'
+            + '<div style="font-size:9px;font-weight:700;color:' + b.col + ';">' + _udMoney(b.val) + '</div>'
             + '<div style="width:34px;height:' + h + 'px;background:' + b.col + ';border-radius:4px 4px 0 0;"></div>'
             + '<div style="font-size:9px;color:#6b7280;text-align:center;max-width:56px;line-height:1.2;">' + _udEsc(b.lbl) + '</div>'
             + '</div>';
@@ -1907,14 +2028,15 @@
       + '<div style="font-size:10px;font-weight:700;color:' + (savingsGood?'#16a34a':'#dc2626') + ';margin-top:4px;">' + (savingsGood?'Good Opportunity':'Review Pricing') + '</div>'
       + '</div></div>'
       + '</div>'
-      // Price list upload controls
-      + '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
+      // Price list upload controls (totals view only — uploads are whole-estate files)
+      + (comp ? '' :
+        '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">'
       + '<button onclick="document.getElementById(\'uat-ospc-price-input\').click()" style="font-size:10px;font-weight:700;padding:4px 10px;border:1px solid #94a3b8;border-radius:6px;background:#f8fafc;color:#374151;cursor:pointer;">⬆ OSPC Price List</button>'
       + '<span style="font-size:10px;color:#64748b;">' + _udEsc((pl.ospcMeta || 'No file loaded')) + '</span>'
       + '<button onclick="document.getElementById(\'uat-flex-price-input\').click()" style="font-size:10px;font-weight:700;padding:4px 10px;border:1px solid #94a3b8;border-radius:6px;background:#f8fafc;color:#374151;cursor:pointer;margin-left:8px;">⬆ FLEX Price List</button>'
       + '<span style="font-size:10px;color:#64748b;">' + _udEsc((pl.flexMeta || 'No file loaded')) + '</span>'
       + (!pl.ospcMonthly ? '<div style="width:100%;margin-top:4px;font-size:10px;color:#f59e0b;display:flex;align-items:center;gap:4px;"><span>⚠</span><span>If no FLEX price list is present, OSPC is assumed <strong>2.45× more expensive</strong> than FLEX.</span></div>' : '')
-      + '</div>';
+      + '</div>');
   }
 
   // S6a: Service Health

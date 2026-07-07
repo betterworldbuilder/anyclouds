@@ -1,868 +1,980 @@
   <div class="panel" id="panel-s5b">
+    <link rel="stylesheet" href="/static/uat/uat.css?v={{ v }}">
 
-    <!-- ── Header ── -->
-    <div style="background:#0284c7;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-      <span style="background:#dc2626;color:#fff;font-size:13px;font-weight:800;padding:5px 10px;border-radius:6px;letter-spacing:.02em;">4B</span>
-      <div style="flex:1;">
-        <div style="font-size:16px;font-weight:700;">Business System Cutover</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Import UAT-approved business services &#8594; execute traffic switch &#8594; verify production readiness</div>
+    <div class="uat-s1-wrap" style="padding:16px;">
+
+      <!-- ── Top bar (same pattern as Stage 3 UAT) ───────────────────────── -->
+      <div class="uat-s1-topbar">
+        <div class="uat-s1-title">
+          <h2>Business System Cutover</h2>
+          <p>Reuse UAT-approved business systems, execute traffic switch, verify production readiness, and export evidence.</p>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span id="bsc-pkg-badge" style="display:none;background:#0369a1;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1px solid #0284c7;"></span>
-        <span id="bsc-step-badge" style="background:#2563eb;color:#fff;font-size:12px;font-weight:700;padding:6px 16px;border-radius:20px;">Step 1 — Import UAT</span>
-        <button onclick="bscReset()" style="background:#dc2626;color:#fff;border:none;padding:6px 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Reset</button>
-      </div>
-    </div>
 
-    <!-- ── Stepper ── -->
-    <div id="bsc-stepper" style="display:flex;align-items:flex-start;padding:16px 20px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;overflow-x:auto;gap:0;flex-wrap:nowrap;min-height:72px;"></div>
+      <!-- ── Sidebar + Workspace ──────────────────────────────────────────── -->
+      <div id="bsc2-layout">
+        <div id="bsc2-sidebar">
+          <div class="udsb-header">
+            <div class="udsb-logo">🚦</div>
+            <div><div class="udsb-title">Cutover Dashboard</div><div class="udsb-sub">Business System</div></div>
+          </div>
+          <nav class="udsb-nav" id="bsc2-nav"></nav>
+        </div>
 
-    <!-- ── Step content ── -->
-    <div style="padding:20px;">
-
-      <!-- Step 1: Import UAT Package -->
-      <div id="bsc-s1" class="bsc-step-panel">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-          <div class="bsc-card">
-            <div class="bsc-card-title"><i class="fas fa-file-import" style="color:#2563eb;"></i> Import UAT Package</div>
-            <div id="bsc-uat-summary" class="bsc-placeholder"><span style="color:#94a3b8;">Awaiting UAT package</span></div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
-              <button onclick="bscImportUAT()" class="bsc-btn-primary"><i class="fas fa-file-import"></i> Import Latest UAT</button>
-              <button onclick="bscLoadMockPackage()" class="bsc-btn-secondary"><i class="fas fa-flask"></i> Load Sample</button>
+        <div id="bsc2-main">
+          <div id="bsc2-topbar">
+            <div>
+              <div class="udtb-h" id="bsc2-tb-title">Step 1 — Business Systems for Cutover</div>
+              <div class="udtb-s" id="bsc2-tb-sub">Select a UAT-approved business system and generate a cutover-ready execution plan.</div>
             </div>
+            <button class="uat-s1-btn-soft" onclick="bsc2Refresh()"><i class="fas fa-rotate"></i> Refresh from UAT</button>
           </div>
-          <div class="bsc-card">
-            <div class="bsc-card-title"><i class="fas fa-circle-info" style="color:#0ea5e9;"></i> What Gets Imported</div>
-            <ul style="font-size:12px;color:#475569;margin:0;padding-left:18px;line-height:2;">
-              <li>Business services that passed UAT</li>
-              <li>App, API, DB, cache, queue, worker components</li>
-              <li>Accepted-risk records (flagged for operator)</li>
-              <li>UAT evidence references</li>
-              <li>Rollback plan from UAT scope</li>
-              <li style="color:#dc2626;">UAT FAIL or PENDING items — blocked</li>
-            </ul>
-          </div>
-        </div>
-      </div>
 
-      <!-- Step 2: Select Business Services -->
-      <div id="bsc-s2" class="bsc-step-panel" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-layer-group" style="color:#2563eb;margin-right:6px;"></i>Select Business Services to Cut Over</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick="bscSelectAllPass()" class="bsc-btn-sm-blue"><i class="fas fa-check-double"></i> Select All UAT Passed</button>
-            <button onclick="bscToggleComponents()" id="bsc-toggle-comp-btn" class="bsc-btn-sm-gray"><i class="fas fa-list"></i> Expand Components</button>
-          </div>
-        </div>
-        <div id="bsc-svc-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-bottom:14px;"></div>
-        <div id="bsc-svc-table-wrap" style="display:none;margin-bottom:14px;overflow-x:auto;">
-          <table class="bsc-table"><thead><tr>
-            <th style="width:36px;"></th>
-            <th>Service / Component</th><th>Type</th><th>UAT</th>
-            <th>Source</th><th>Target</th><th>Health</th><th>Risk</th><th>Owner</th>
-          </tr></thead><tbody id="bsc-svc-table-body"></tbody></table>
-        </div>
-        <div id="bsc-dep-graph" style="display:none;margin-bottom:14px;"></div>
-        <button id="bsc-to-s3-btn" onclick="bscGoStep(3)" class="bsc-btn-primary" disabled style="opacity:.5;"><i class="fas fa-arrow-right"></i> Continue to Readiness Check</button>
-      </div>
+          <div id="bsc2-content">
 
-      <!-- Step 3: Quick Readiness Check -->
-      <div id="bsc-s3" class="bsc-step-panel" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-stethoscope" style="color:#0ea5e9;margin-right:6px;"></i>Quick Readiness Check <span style="font-size:11px;font-weight:400;color:#64748b;">(pre-cutover health — not full UAT)</span></div>
-          <button onclick="bscRunReadiness()" id="bsc-readiness-btn" class="bsc-btn-blue"><i class="fas fa-play"></i> Run Quick Readiness Check</button>
-        </div>
-        <div id="bsc-readiness-groups" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:14px;"></div>
-        <div id="bsc-readiness-summary" style="display:none;margin-bottom:14px;padding:14px 18px;border-radius:8px;"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="bscGoStep(4)" id="bsc-to-s4-btn" class="bsc-btn-primary" disabled style="opacity:.5;"><i class="fas fa-rocket"></i> Proceed to Execute Cutover</button>
-          <button onclick="bscAcceptReadinessRisk()" id="bsc-accept-risk-btn" style="display:none;" class="bsc-btn-amber"><i class="fas fa-triangle-exclamation"></i> Accept Risk &amp; Proceed</button>
-        </div>
-      </div>
+            <!-- ══ STEP 1 — Business Systems ══════════════════════════════ -->
+            <section data-bsc2-step="1">
 
-      <!-- Step 4: Execute Cutover -->
-      <div id="bsc-s4" class="bsc-step-panel" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-traffic-light" style="color:#dc2626;margin-right:6px;"></i>Execute Cutover — Traffic Transition</div>
-          <button onclick="bscGoStep(5)" class="bsc-btn-green"><i class="fas fa-arrow-right"></i> Done — Continue to Verify</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-          <div class="bsc-card">
-            <div class="bsc-card-title"><i class="fas fa-sliders" style="color:#2563eb;"></i> HAProxy Traffic Ramp</div>
-            <div style="text-align:center;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:8px;">
-              <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:6px;"><span>Source (OSPC)</span><span>Target (FLEX)</span></div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span id="bsc-src-pct" style="font-size:24px;font-weight:800;color:#dc2626;min-width:52px;text-align:right;">100%</span>
-                <div style="flex:1;height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;"><div id="bsc-traffic-bar" style="height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:6px;width:0%;transition:width .8s ease;"></div></div>
-                <span id="bsc-tgt-pct" style="font-size:24px;font-weight:800;color:#16a34a;min-width:52px;">0%</span>
+              <!-- UAT scope banner -->
+              <div class="uat-s1-card" style="border:1.5px solid #bfdbfe;background:#f0f9ff;">
+                <div class="uat-s1-card-body">
+                  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+                    <div style="font-size:13px;font-weight:800;color:#1d4ed8;"><i class="fas fa-link" style="margin-right:6px;"></i>UAT Business Systems Loaded Directly</div>
+                    <span id="bsc2-lock-badge" class="uat-s1-pill gray"><i class="fas fa-unlock"></i> Not Locked</span>
+                  </div>
+                  <div id="bsc2-uat-status" style="font-size:12px;color:#475569;">Loading UAT scope…</div>
+                  <div id="bsc2-drift-warning" style="display:none;margin-top:10px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e;"></div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+                    <button onclick="bsc2Refresh()" class="uat-s1-btn-soft"><i class="fas fa-rotate"></i> Refresh from UAT</button>
+                    <button id="bsc2-lock-btn" onclick="bsc2LockScope()" class="uat-s1-btn-soft"><i class="fas fa-lock"></i> Lock Scope for Cutover</button>
+                    <button id="bsc2-unlock-btn" onclick="bsc2UnlockScope()" class="uat-s1-btn-soft" style="display:none;"><i class="fas fa-unlock"></i> Unlock / Refresh Scope</button>
+                    <button onclick="bsc2ViewUatSource()" class="uat-s1-btn-soft"><i class="fas fa-eye"></i> View UAT Source</button>
+                    <button onclick="bsc2ExportCutoverScope()" class="uat-s1-btn-soft"><i class="fas fa-file-export"></i> Export Cutover Scope</button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
-              <button onclick="bscSetTraffic(50)" class="bsc-ramp-btn" data-pct="50">50 / 50</button>
-              <button onclick="bscSetTraffic(70)" class="bsc-ramp-btn" data-pct="70">30 / 70</button>
-              <button onclick="bscSetTraffic(100)" class="bsc-ramp-btn" data-pct="100">100% FLEX</button>
-            </div>
-            <div style="font-size:10px;color:#94a3b8;text-align:center;" id="bsc-traffic-status">Awaiting traffic switch</div>
-          </div>
-          <div class="bsc-card">
-            <div class="bsc-card-title"><i class="fas fa-chart-bar" style="color:#0ea5e9;"></i> Traffic Metrics</div>
-            <div id="bsc-traffic-metrics" style="font-size:12px;color:#94a3b8;text-align:center;padding:20px 0;">Awaiting traffic switch</div>
-          </div>
-        </div>
-        <div class="bsc-card" style="margin-bottom:0;">
-          <div class="bsc-card-title"><i class="fas fa-list-check" style="color:#7c3aed;"></i> Selected Services in This Cutover</div>
-          <div id="bsc-s4-services" style="font-size:12px;color:#64748b;">Loading…</div>
-        </div>
-      </div>
+              <div id="bsc2-uat-source-json" class="uat-s1-card" style="display:none;">
+                <div class="uat-s1-card-body"><pre id="bsc2-uat-source-body" style="max-height:320px;overflow:auto;font-size:11px;background:#0f172a;color:#a5f3fc;padding:12px;border-radius:6px;margin:0;"></pre></div>
+              </div>
 
-      <!-- Step 5: Post-Cutover Verification -->
-      <div id="bsc-s5" class="bsc-step-panel" style="display:none;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-          <div style="font-size:14px;font-weight:700;color:#1e293b;"><i class="fas fa-clipboard-check" style="color:#16a34a;margin-right:6px;"></i>Post-Cutover Verification</div>
-          <button onclick="bscRunVerification()" id="bsc-verify-btn" class="bsc-btn-green"><i class="fas fa-play"></i> Run Post-Cutover Verification</button>
-        </div>
-        <div id="bsc-verify-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:14px;"></div>
-        <div id="bsc-verify-summary" style="display:none;margin-bottom:14px;padding:14px 18px;border-radius:8px;"></div>
-        <button onclick="bscGoStep(6)" id="bsc-to-s6-btn" class="bsc-btn-primary" disabled style="opacity:.5;"><i class="fas fa-arrow-right"></i> Continue to Operator Decision</button>
-      </div>
+              <!-- Dependency graph -->
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;"><i class="fas fa-sitemap" style="color:#2563eb;margin-right:6px;"></i>Component Dependency Graph</div></div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-dep-graph" style="display:flex;flex-direction:column;align-items:center;gap:2px;"></div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;font-size:11px;color:#64748b;">
+                    <div><b style="color:#374151;">Validation order (bottom-up):</b><br>Database → Cache/Queue → Backend/Auth → API → Gateway → Web</div>
+                    <div><b style="color:#374151;">Traffic switch order (top-down):</b><br>LB/DNS → Web → Gateway → API</div>
+                  </div>
+                </div>
+              </div>
 
-      <!-- Step 6: Operator Decision -->
-      <div id="bsc-s6" class="bsc-step-panel" style="display:none;">
-        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;"><i class="fas fa-user-check" style="color:#7c3aed;margin-right:6px;"></i>Operator Decision</div>
-        <div id="bsc-decision-summary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
-          <button onclick="bscDecide('PASS')" class="bsc-dec-btn" style="background:#16a34a;"><i class="fas fa-circle-check" style="font-size:20px;margin-bottom:2px;"></i><span>PASS CUTOVER</span></button>
-          <button onclick="bscDecide('FIX')" class="bsc-dec-btn" style="background:#d97706;"><i class="fas fa-wrench" style="font-size:20px;margin-bottom:2px;"></i><span>FIX ISSUE</span></button>
-          <button onclick="bscDecide('ROLLBACK')" class="bsc-dec-btn" style="background:#dc2626;"><i class="fas fa-rotate-left" style="font-size:20px;margin-bottom:2px;"></i><span>ROLLBACK</span></button>
-        </div>
-        <div id="bsc-decision-confirm" style="display:none;" class="bsc-card">
-          <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:12px;" id="bsc-confirm-title">Confirm Decision</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-            <div><label class="bsc-label">Reason</label><input id="bsc-dec-reason" placeholder="State reason..." class="bsc-input"></div>
-            <div><label class="bsc-label">Approved By</label><input id="bsc-dec-approved" placeholder="Approver name..." class="bsc-input"></div>
-            <div><label class="bsc-label">Evidence Ref</label><input id="bsc-dec-jira" placeholder="Ticket / evidence ref..." class="bsc-input"></div>
-            <div><label class="bsc-label">Comment</label><input id="bsc-dec-comment" placeholder="Additional comment..." class="bsc-input"></div>
-          </div>
-          <button onclick="bscConfirmDecision()" class="bsc-btn-primary"><i class="fas fa-check"></i> Confirm &amp; Proceed to Monitoring</button>
-        </div>
-      </div>
+              <!-- Business system selection + right-panel models -->
+              <div class="uat-s1-biz-grid">
+                <div class="uat-s1-card">
+                  <div class="uat-s1-card-head">
+                    <div style="font-weight:800;color:#0f172a;">Select Business System for Cutover</div>
+                    <span class="uat-s1-pill blue" id="bsc2-sys-count">0 systems</span>
+                  </div>
+                  <div class="uat-s1-card-body">
+                    <div id="bsc2-sys-cards"><div style="text-align:center;padding:30px 0;color:#64748b;font-size:13px;">Loading…</div></div>
+                  </div>
+                </div>
 
-      <!-- Step 7: Monitoring & Evidence -->
-      <div id="bsc-s7" class="bsc-step-panel" style="display:none;">
-        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:14px;"><i class="fas fa-chart-line" style="color:#0ea5e9;margin-right:6px;"></i>Monitoring &amp; Evidence</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-          <div class="bsc-card">
-            <div class="bsc-card-title"><i class="fas fa-clock" style="color:#0ea5e9;"></i> Monitoring Duration</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-              <button onclick="bscSetMonitorDuration(15,this)" class="bsc-dur-btn bsc-dur-active">15 min</button>
-              <button onclick="bscSetMonitorDuration(30,this)" class="bsc-dur-btn">30 min</button>
-              <button onclick="bscSetMonitorDuration(60,this)" class="bsc-dur-btn">60 min</button>
-            </div>
-            <div id="bsc-monitor-progress" style="display:none;margin-bottom:10px;">
-              <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:4px;"><span id="bsc-mon-status">Monitoring…</span><span id="bsc-mon-elapsed">0:00</span></div>
-              <div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;"><div id="bsc-mon-bar" style="height:100%;background:#0ea5e9;border-radius:4px;width:0%;transition:width 1s;"></div></div>
-            </div>
-            <button onclick="bscStartMonitoring()" class="bsc-btn-blue"><i class="fas fa-play"></i> Start Monitoring</button>
-          </div>
-          <div class="bsc-card">
-            <div class="bsc-card-title"><i class="fas fa-shield-check" style="color:#16a34a;"></i> Evidence Package</div>
-            <div id="bsc-evidence-list" style="font-size:11px;color:#64748b;margin-bottom:12px;line-height:1.8;"></div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button onclick="bscCaptureEvidence()" id="bsc-capture-btn" class="bsc-btn-green"><i class="fas fa-camera"></i> Capture Evidence</button>
-              <button onclick="bscExportReport()" class="bsc-btn-secondary"><i class="fas fa-file-alt"></i> Export Report</button>
-              <button onclick="bscExportEvidence()" class="bsc-btn-secondary"><i class="fas fa-file-csv"></i> Export CSV</button>
-            </div>
-          </div>
+                <div class="uat-s1-arch-selector">
+                  <div class="uat-s1-arch-head">
+                    <div class="uat-s1-arch-title">Business System Cutover Models</div>
+                  </div>
+                  <p class="uat-s1-arch-desc">Pick the cutover strategy, traffic method, and rollback model for this business system. Operators can change these any time before Start Cutover.</p>
+                  <div class="uat-s1-template-tabs" role="tablist">
+                    <button type="button" class="uat-s1-template-tab active" data-bsc2-model-tab="strategy" onclick="bsc2SetModelTab('strategy')">Cutover Strategy</button>
+                    <button type="button" class="uat-s1-template-tab" data-bsc2-model-tab="traffic" onclick="bsc2SetModelTab('traffic')">Traffic Method</button>
+                    <button type="button" class="uat-s1-template-tab" data-bsc2-model-tab="rollback" onclick="bsc2SetModelTab('rollback')">Rollback Model</button>
+                  </div>
+                  <div class="uat-s1-template-pane active" data-bsc2-model-pane="strategy"><div class="uat-s1-arch-grid" id="bsc2-strategy-grid"></div></div>
+                  <div class="uat-s1-template-pane" data-bsc2-model-pane="traffic" style="display:none;"><div class="uat-s1-arch-grid" id="bsc2-traffic-grid"></div></div>
+                  <div class="uat-s1-template-pane" data-bsc2-model-pane="rollback" style="display:none;"><div class="uat-s1-arch-grid" id="bsc2-rollback-grid"></div></div>
+                </div>
+              </div>
+
+              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+                <button id="bsc2-to-step2-btn" class="uat-s1-btn-primary" onclick="bsc2GoStep(2)" disabled style="opacity:.5;">Continue to Component Readiness <i class="fas fa-arrow-right"></i></button>
+              </div>
+            </section>
+
+            <!-- ══ STEP 2 — Component Readiness ═══════════════════════════ -->
+            <section data-bsc2-step="2" style="display:none;">
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head">
+                  <div style="font-weight:800;color:#0f172a;">Component Readiness — Top-Down Stack</div>
+                  <span id="bsc2-readiness-summary" class="uat-s1-pill gray">—</span>
+                </div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-component-stack"></div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;">
+                <button id="bsc2-to-step3-btn" class="uat-s1-btn-primary" onclick="bsc2GoStep(3)" disabled style="opacity:.5;">Continue to Data Cutover <i class="fas fa-arrow-right"></i></button>
+              </div>
+            </section>
+
+            <!-- ══ STEP 3 — Data Cutover ═══════════════════════════════════ -->
+            <section data-bsc2-step="3" style="display:none;">
+              <div id="bsc2-db-panel" class="uat-s1-card" style="display:none;">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;"><i class="fas fa-database" style="color:#dc2626;margin-right:6px;"></i>Database Cutover</div><span id="bsc2-db-gate-badge" class="uat-s1-pill gray">PENDING</span></div>
+                <div class="uat-s1-card-body">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div class="uat-s1-field"><label>Primary DB</label><select id="bsc2-db-primary"></select></div>
+                    <div class="uat-s1-field"><label>Final Sync Method</label>
+                      <select id="bsc2-db-sync"><option value="snapshot">Snapshot</option><option value="replication">Replication</option><option value="dump_restore">Dump / Restore</option><option value="manual">Manual</option></select>
+                    </div>
+                  </div>
+                  <div id="bsc2-db-dupes" style="margin-bottom:12px;"></div>
+                  <div id="bsc2-db-steps"></div>
+                  <button class="uat-s1-btn-primary" onclick="bsc2ApproveGate('db')" style="margin-top:10px;">Approve DB Gate</button>
+                </div>
+              </div>
+
+              <div id="bsc2-cache-panel" class="uat-s1-card" style="display:none;">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;"><i class="fas fa-bolt" style="color:#d97706;margin-right:6px;"></i>Cache Strategy</div><span id="bsc2-cache-gate-badge" class="uat-s1-pill gray">PENDING</span></div>
+                <div class="uat-s1-card-body">
+                  <div class="uat-s1-field" style="margin-bottom:12px;max-width:320px;"><label>Strategy</label>
+                    <select id="bsc2-cache-strategy"><option value="flush_warm">Flush &amp; Warm</option><option value="migrate_sessions">Migrate Sessions</option><option value="preserve_keys">Preserve Keys</option><option value="treat_as_db">Treat as Database</option><option value="out_of_scope">Out of Scope</option></select>
+                  </div>
+                  <div id="bsc2-cache-steps"></div>
+                  <button class="uat-s1-btn-primary" onclick="bsc2ApproveGate('cache')" style="margin-top:10px;">Approve Cache Gate</button>
+                </div>
+              </div>
+
+              <div id="bsc2-queue-panel" class="uat-s1-card" style="display:none;">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;"><i class="fas fa-stream" style="color:#7c3aed;margin-right:6px;"></i>Queue Drain</div><span id="bsc2-queue-gate-badge" class="uat-s1-pill gray">PENDING</span></div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-queue-steps"></div>
+                  <button class="uat-s1-btn-primary" onclick="bsc2ApproveGate('queue')" style="margin-top:10px;">Approve Queue Gate</button>
+                </div>
+              </div>
+
+              <div id="bsc2-no-data-panel" class="uat-s1-card" style="display:none;">
+                <div class="uat-s1-card-body" style="text-align:center;color:#64748b;padding:20px;">No DB, Cache, or Queue components in scope for this business system — nothing to configure here.</div>
+              </div>
+
+              <div style="display:flex;justify-content:flex-end;">
+                <button id="bsc2-to-step4-btn" class="uat-s1-btn-primary" onclick="bsc2GoStep(4)">Continue to Traffic Ramp <i class="fas fa-arrow-right"></i></button>
+              </div>
+            </section>
+
+            <!-- ══ STEP 4 — Traffic Ramp ═══════════════════════════════════ -->
+            <section data-bsc2-step="4" style="display:none;">
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;">Cutover-Only Fields</div></div>
+                <div class="uat-s1-card-body">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
+                    <div class="uat-s1-field"><label>Cutover Hostname</label><input id="bsc2-cutover-host" placeholder="bankvault-cutover.local"></div>
+                    <div class="uat-s1-field"><label>HAProxy / LB Host</label><input id="bsc2-lb-host" placeholder="haproxy host IP"></div>
+                    <div class="uat-s1-field"><label>HAProxy SSH User</label><input id="bsc2-lb-user" value="ubuntu"></div>
+                    <div class="uat-s1-field"><label>HAProxy SSH Key</label><input id="bsc2-lb-key" value="~/.ssh/id_rsa"></div>
+                    <div class="uat-s1-field"><label>Maintenance Window Start</label><input id="bsc2-mw-start" type="datetime-local"></div>
+                    <div class="uat-s1-field"><label>Maintenance Window End</label><input id="bsc2-mw-end" type="datetime-local"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;">Traffic Ramp — Traffic-Facing Components Only</div></div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-traffic-facing-list" style="margin-bottom:12px;"></div>
+                  <div class="uat-s1-field" style="max-width:320px;margin-bottom:12px;"><label>Ramp Strategy</label>
+                    <select id="bsc2-ramp-strategy" onchange="bsc2SetRampStrategy(this.value)">
+                      <option value="demo">Demo Ramp (50/50 → 30/70 → 0/100)</option>
+                      <option value="safe">Safe Production Ramp (5→10→25→50→75→100)</option>
+                      <option value="critical">Critical Banking Ramp (1→5→10→25→50→100)</option>
+                      <option value="custom">Custom Ramp</option>
+                    </select>
+                  </div>
+                  <div id="bsc2-ramp-stages" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+                  <div style="text-align:center;margin-bottom:14px;padding:14px;background:#f8fafc;border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:6px;"><span>Source (OSPC)</span><span>Target (FLEX)</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <span id="bsc2-src-pct" style="font-size:24px;font-weight:800;color:#dc2626;min-width:52px;text-align:right;">100%</span>
+                      <div style="flex:1;height:12px;background:#e2e8f0;border-radius:6px;overflow:hidden;"><div id="bsc2-traffic-bar" style="height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:6px;width:0%;transition:width .8s ease;"></div></div>
+                      <span id="bsc2-tgt-pct" style="font-size:24px;font-weight:800;color:#16a34a;min-width:52px;">0%</span>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:10px;">
+                    <div class="uat-s1-meta-box"><span>P95 Latency</span><b id="bsc2-p95">—</b></div>
+                    <div class="uat-s1-meta-box"><span>Error Rate</span><b id="bsc2-err-rate">—</b></div>
+                    <div class="uat-s1-meta-box"><span>Ramp Stage</span><b id="bsc2-ramp-stage-label">Not started</b></div>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="uat-s1-btn-soft" onclick="bsc2StartDryRun()"><i class="fas fa-flask"></i> Start Dry Run</button>
+                    <button class="uat-s1-btn-soft" onclick="bsc2AdvanceRamp()"><i class="fas fa-forward"></i> Advance Ramp Stage</button>
+                    <button class="uat-s1-btn-soft" onclick="bsc2PauseRamp()"><i class="fas fa-pause"></i> Pause Ramp</button>
+                    <button class="uat-s1-btn-muted" style="color:#dc2626;" onclick="bsc2RollbackTraffic()"><i class="fas fa-undo"></i> Roll Back Traffic</button>
+                    <button id="bsc2-start-cutover-btn" class="uat-s1-btn-primary" onclick="bsc2StartCutover()" disabled style="opacity:.5;"><i class="fas fa-play"></i> Start Cutover</button>
+                  </div>
+                  <div id="bsc2-ramp-status" style="margin-top:10px;font-size:12px;color:#64748b;"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ══ STEP 5 — Business Validation ════════════════════════════ -->
+            <section data-bsc2-step="5" style="display:none;">
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head">
+                  <div style="font-weight:800;color:#0f172a;">Business Validation — from UAT-generated tests</div>
+                  <button class="uat-s1-btn-primary" onclick="bsc2RunBusinessValidation()"><i class="fas fa-play"></i> Run Business Validation</button>
+                </div>
+                <div class="uat-s1-card-body">
+                  <div class="uat-s1-table-wrap">
+                    <table>
+                      <thead><tr><th>Test</th><th>Component Path</th><th>Source</th><th>FLEX</th><th>Cutover Hostname</th><th>Latency</th><th>Status</th><th>Evidence</th></tr></thead>
+                      <tbody id="bsc2-validation-body"><tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">Not run yet.</td></tr></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ══ STEP 6 — Rollback Plan ═══════════════════════════════════ -->
+            <section data-bsc2-step="6" style="display:none;">
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;">Rollback Plan</div><span id="bsc2-rollback-status-badge" class="uat-s1-pill gray">NOT AVAILABLE</span></div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-rollback-risk-note" style="display:none;margin-bottom:12px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b;"></div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                    <div class="uat-s1-field"><label>DB Rollback Method</label>
+                      <select id="bsc2-rollback-db-method"><option value="restore_backup">Restore from backup</option><option value="fail_forward">Fail-forward only</option><option value="controlled_replay">Controlled data replay</option><option value="not_applicable">Not applicable</option></select>
+                    </div>
+                    <div class="uat-s1-field"><label>Rollback Window</label><input id="bsc2-rollback-window" type="number" min="5" max="240" value="30"> minutes</div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#374151;margin-bottom:12px;">
+                    <label><input type="checkbox" id="bsc2-dns-backup-captured"> DNS/LB backup captured</label>
+                    <label><input type="checkbox" id="bsc2-flex-writes-accepted" onchange="bsc2RecomputeRollbackStatus()"> FLEX database has accepted new writes</label>
+                  </div>
+                  <div class="uat-s1-meta-box" style="margin-bottom:12px;"><span>Restore traffic to OSPC command</span><code id="bsc2-restore-cmd" style="font-size:11px;">haproxy-rollback.sh --env=prod (revert OSPC=100% FLEX=0%)</code></div>
+                  <button class="uat-s1-btn-primary" onclick="bsc2ApproveRollback()">Approve Rollback Plan</button>
+                  <button class="uat-s1-btn-soft" onclick="bsc2ExportEvidenceFile('rollback_plan.json')">Export Rollback Plan JSON</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- ══ STEP 7 — Monitoring & Evidence ═══════════════════════════ -->
+            <section data-bsc2-step="7" style="display:none;">
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;">Monitoring &amp; Evidence</div></div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-monitor-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;"></div>
+                  <button class="uat-s1-btn-primary" onclick="bsc2CaptureEvidence()"><i class="fas fa-camera"></i> Capture Evidence</button>
+                  <div id="bsc2-evidence-status" style="margin-top:10px;font-size:12px;color:#64748b;"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ══ STEP 8 — Reports & Export ═══════════════════════════════ -->
+            <section data-bsc2-step="8" style="display:none;">
+              <div class="uat-s1-card">
+                <div class="uat-s1-card-head"><div style="font-weight:800;color:#0f172a;">Cutover Evidence Exports</div></div>
+                <div class="uat-s1-card-body">
+                  <div id="bsc2-export-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                  <p style="font-size:11px;color:#94a3b8;margin-top:10px;">Files download to your browser's downloads folder with the names shown — writing directly to the server's <code>outputs/cutover/</code> path requires a backend endpoint not yet wired up.</p>
+                </div>
+              </div>
+            </section>
+
+          </div><!-- /bsc2-content -->
+        </div><!-- /bsc2-main -->
+      </div><!-- /bsc2-layout -->
+
+      <!-- ── Advanced Manual Override (collapsed) ─────────────────────────── -->
+      <details style="margin-top:16px;border:1px solid #fbbf24;border-radius:10px;background:#fffbeb;">
+        <summary style="padding:12px 16px;cursor:pointer;font-weight:700;color:#92400e;font-size:13px;"><i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>Advanced Manual Override</summary>
+        <div style="padding:0 16px 16px;">
+          <p style="font-size:12px;color:#78350f;line-height:1.6;">Use manual override only when UAT scope is missing or needs correction. Manual source/target scanning, CSV upload, and the server pairing matrix live in <b>Stage 4 — Cutover &amp; Traffic Transition</b>'s scanner — kept as a separate stage rather than duplicated here, since duplicating those form fields on this page would collide with Stage 4's element IDs and break both stages' scripts.</p>
+          <button class="uat-s1-btn-soft" onclick="activateStage('s5')"><i class="fas fa-screwdriver-wrench"></i> Open Stage 4 Manual Scanner &amp; Pairing</button>
         </div>
-        <div id="bsc-final-result" style="display:none;"></div>
-      </div>
-
-    </div><!-- /step content -->
-
-    <!-- ── Cutover Log (collapsed) ── -->
-    <div style="border-top:1px solid #e2e8f0;margin:0;">
-      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'"
-           style="padding:8px 20px;font-size:11px;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;">
-        <i class="fas fa-chevron-right" style="font-size:9px;"></i> Cutover Log
-      </div>
-      <div style="display:none;padding:0 20px 12px;">
-        <textarea id="bsc-log-out" readonly style="width:100%;height:100px;font-size:10px;font-family:monospace;background:#0f172a;color:#94a3b8;border:none;border-radius:6px;padding:8px;resize:vertical;box-sizing:border-box;">Awaiting cutover execution...</textarea>
-      </div>
+      </details>
     </div>
 
     <style>
-      #panel-s5b .bsc-step-panel{animation:bscFade .2s ease;}
-      @keyframes bscFade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
-      #panel-s5b .bsc-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;}
-      #panel-s5b .bsc-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
-      #panel-s5b .bsc-placeholder{font-size:12px;color:#64748b;padding:14px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;min-height:48px;display:flex;align-items:center;justify-content:center;}
-      #panel-s5b .bsc-btn-primary{background:#dc2626;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
-      #panel-s5b .bsc-btn-primary:disabled{opacity:.5;cursor:not-allowed;}
-      #panel-s5b .bsc-btn-secondary{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;}
-      #panel-s5b .bsc-btn-blue{background:#2563eb;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
-      #panel-s5b .bsc-btn-green{background:#16a34a;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
-      #panel-s5b .bsc-btn-amber{background:#d97706;color:#fff;border:none;padding:9px 18px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;}
-      #panel-s5b .bsc-btn-sm-blue{font-size:11px;padding:5px 12px;border-radius:6px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;cursor:pointer;font-weight:600;}
-      #panel-s5b .bsc-btn-sm-gray{font-size:11px;padding:5px 12px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;cursor:pointer;font-weight:600;}
-      #panel-s5b .bsc-table{width:100%;border-collapse:collapse;font-size:12px;}
-      #panel-s5b .bsc-table th{padding:8px 10px;text-align:left;background:#f1f5f9;border-bottom:2px solid #e2e8f0;font-size:11px;font-weight:700;color:#64748b;}
-      #panel-s5b .bsc-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
-      #panel-s5b .bsc-label{font-size:11px;color:#64748b;display:block;margin-bottom:4px;font-weight:600;}
-      #panel-s5b .bsc-input{width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;box-sizing:border-box;}
-      #panel-s5b .bsc-ramp-btn{padding:8px 4px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;transition:all .15s;}
-      #panel-s5b .bsc-dur-btn{padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;}
-      #panel-s5b .bsc-dur-active{background:#0ea5e9;color:#fff;border-color:#0ea5e9;}
-      #panel-s5b .bsc-dec-btn{color:#fff;border:none;padding:14px 24px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:130px;}
-      #panel-s5b .bsc-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
-      #panel-s5b .bsc-badge-pass{background:#f0fdf4;color:#16a34a;}
-      #panel-s5b .bsc-badge-fail{background:#fef2f2;color:#dc2626;}
-      #panel-s5b .bsc-badge-risk{background:#fefce8;color:#a16207;}
-      #panel-s5b .bsc-badge-scope{background:#f1f5f9;color:#64748b;}
-      #panel-s5b .bsc-svc-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px;cursor:pointer;transition:box-shadow .15s;}
-      #panel-s5b .bsc-svc-card:hover{box-shadow:0 2px 8px rgba(37,99,235,.12);}
-      #panel-s5b .bsc-svc-card.selected{border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe;}
-      #panel-s5b .bsc-comp-pill{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;background:#f1f5f9;border-radius:4px;color:#475569;border:1px solid #e2e8f0;}
-      #panel-s5b .bsc-check-row{display:flex;align-items:center;gap:6px;font-size:11px;padding:3px 0;}
-      #panel-s5b .bsc-dep-node{display:flex;flex-direction:column;align-items:center;gap:3px;}
-      #panel-s5b .bsc-dep-circle{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;}
-      #panel-s5b .bsc-dep-arrow{color:#cbd5e1;font-size:14px;align-self:center;padding-top:2px;}
-      /* Stepper */
-      #panel-s5b .bsc-stp{display:flex;align-items:flex-start;flex:1;min-width:0;}
-      #panel-s5b .bsc-stp-node{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;cursor:pointer;min-width:68px;}
-      #panel-s5b .bsc-stp-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all .2s;}
-      #panel-s5b .bsc-stp-lbl{font-size:9px;font-weight:600;text-align:center;max-width:72px;line-height:1.3;color:#94a3b8;}
-      #panel-s5b .bsc-stp-line{flex:1;height:2px;background:#e2e8f0;margin:0 2px;margin-top:15px;min-width:8px;transition:background .2s;}
-      #panel-s5b .bsc-stp-node.active .bsc-stp-circle{background:#2563eb;color:#fff;box-shadow:0 0 0 3px #bfdbfe;}
-      #panel-s5b .bsc-stp-node.active .bsc-stp-lbl{color:#1d4ed8;font-weight:700;}
-      #panel-s5b .bsc-stp-node.done .bsc-stp-circle{background:#16a34a;color:#fff;}
-      #panel-s5b .bsc-stp-node.done .bsc-stp-lbl{color:#16a34a;}
-      #panel-s5b .bsc-stp-node.fail .bsc-stp-circle{background:#dc2626;color:#fff;}
-      #panel-s5b .bsc-stp-node.fail .bsc-stp-lbl{color:#dc2626;}
-      #panel-s5b .bsc-stp-node.pending .bsc-stp-circle{background:#f1f5f9;color:#94a3b8;border:2px solid #e2e8f0;}
-      #panel-s5b .bsc-stp-line.done{background:#16a34a;}
+      #panel-s5b .uat-s1-field label { font-size:11px; color:#64748b; display:block; margin-bottom:4px; font-weight:600; }
+      #panel-s5b .uat-s1-field input, #panel-s5b .uat-s1-field select { width:100%; padding:7px 9px; border:1px solid #dbe4f0; border-radius:6px; font-size:12px; box-sizing:border-box; }
+      #panel-s5b .uat-s1-meta-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:11px; color:#64748b; }
+      #panel-s5b .uat-s1-meta-box b { display:block; font-size:13px; color:#1e293b; margin-top:2px; }
+
+      #bsc2-layout { display:flex; background:#f7faff; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; min-height:600px; margin-bottom:16px; }
+      #bsc2-sidebar { width:190px; flex-shrink:0; background:#fff; border-right:1px solid #e5e7eb; display:flex; flex-direction:column; }
+      #bsc2-sidebar, #bsc2-sidebar * { color:#374151; }
+      #bsc2-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+      #bsc2-topbar { background:#fff; border-bottom:1px solid #e5e7eb; padding:14px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+      #bsc2-content { flex:1; padding:18px 22px; }
+      #bsc2-content > section { display:flex; flex-direction:column; gap:16px; }
+
+      #bsc2-dep-node { display:flex; align-items:center; gap:10px; padding:8px 16px; border-radius:8px; background:#eff6ff; border:1px solid #bfdbfe; font-size:12px; font-weight:700; color:#1e40af; min-width:220px; justify-content:center; }
+      #bsc2-dep-arrow { color:#94a3b8; font-size:14px; }
+
+      .bsc2-comp-row { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; margin-bottom:8px; flex-wrap:wrap; }
+      .bsc2-comp-tier-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:10px 0 4px; }
+      .bsc2-ramp-btn { padding:6px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:default; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+      .bsc2-ramp-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+      .bsc2-ramp-btn.done { background:#16a34a; color:#fff; border-color:#16a34a; }
     </style>
 
     <script>
     (function(){
       'use strict';
-      /* ── State ── */
-      var S={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},
-             pkg:null,rdns:null,tpct:0,verif:null,dec:null,
-             mon:{d:15,r:false,e:0,t:null},ev:{},logs:[]};
+      function $id(id){ return document.getElementById(id); }
+      function _esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]); }); }
 
-      var STEPS=[{n:1,l:'Import UAT'},{n:2,l:'Select Services'},{n:3,l:'Readiness Check'},
-                 {n:4,l:'Execute Cutover'},{n:5,l:'Post-Verify'},{n:6,l:'Operator Decision'},
-                 {n:7,l:'Monitoring & Evidence'}];
-
-      var CT={load_balancer:{l:'LB/HAProxy',i:'fa-network-wired',c:'#0ea5e9'},
-              api_gateway:{l:'API Gateway',i:'fa-sitemap',c:'#7c3aed'},
-              web_frontend:{l:'Web Frontend',i:'fa-globe',c:'#2563eb'},
-              api_server:{l:'API Server',i:'fa-code',c:'#0891b2'},
-              app_server:{l:'App Server',i:'fa-server',c:'#0284c7'},
-              database:{l:'Database',i:'fa-database',c:'#dc2626'},
-              cache:{l:'Cache',i:'fa-bolt',c:'#d97706'},
-              queue:{l:'Queue',i:'fa-stream',c:'#7c3aed'},
-              worker:{l:'Worker',i:'fa-cog',c:'#475569'},
-              file_storage:{l:'Storage',i:'fa-hdd',c:'#64748b'},
-              monitoring:{l:'Monitoring',i:'fa-chart-line',c:'#10b981'},
-              custom:{l:'Custom',i:'fa-cube',c:'#94a3b8'}};
-
-      /* ── Helpers ── */
-      function $id(id){return document.getElementById(id);}
-      function _lg(m){S.logs.push(m);var e=$id('bsc-log-out');if(e){e.value+='['+new Date().toLocaleTimeString()+'] '+m+'\n';e.scrollTop=e.scrollHeight;}}
-      function _mkS(id,nm,us,rs,own,env,cmps){return{id:id,name:nm,uatStatus:us,riskStatus:rs,owner:own,sourceEnvironment:env&&env[0]||'',targetEnvironment:env&&env[1]||'',selected:false,components:cmps};}
-      function _mkC(id,sid,nm,tp,us,src,tgt,port,extra){return Object.assign({id:id,serviceId:sid,name:nm,type:tp,uatStatus:us,source:src||'',target:tgt||'',ports:[port||0],healthUrl:'',inScope:true,selected:true,riskStatus:'None',owner:'operator',status:'pending',dependencies:[]},extra||{});}
-      function _badge(us,rs){
-        if(us==='Passed'&&rs==='None') return '<span class="bsc-badge bsc-badge-pass"><i class="fas fa-check"></i>PASS</span>';
-        if(us==='Passed'&&rs!=='None') return '<span class="bsc-badge bsc-badge-risk"><i class="fas fa-triangle-exclamation"></i>PASS+RISK</span>';
-        return '<span class="bsc-badge bsc-badge-fail"><i class="fas fa-times"></i>'+us+'</span>';
-      }
-      function _ctLbl(tp){return (CT[tp]||CT.custom).l;}
-      function _ctIco(tp){return (CT[tp]||CT.custom).i;}
-      function _ctClr(tp){return (CT[tp]||CT.custom).c;}
-
-      /* ── Stepper render ── */
-      function _rs(){
-        var el=$id('bsc-stepper');if(!el)return;
-        el.innerHTML=STEPS.map(function(s,i){
-          var st=S.ss[s.n]||'pending';
-          var ic=st==='done'?'<i class="fas fa-check"></i>':st==='fail'?'<i class="fas fa-times"></i>':s.n;
-          return '<div class="bsc-stp">'
-            +'<div class="bsc-stp-node '+st+'" onclick="bscGoStep('+s.n+')" title="'+s.l+'">'
-            +'<div class="bsc-stp-circle">'+ic+'</div>'
-            +'<div class="bsc-stp-lbl">'+s.l+'</div>'
-            +'</div>'
-            +(i<STEPS.length-1?'<div class="bsc-stp-line'+(st==='done'?' done':'')+'"></div>':'')
-            +'</div>';
-        }).join('');
-      }
-
-      /* ── Set step ── */
-      function _ss(n){
-        S.step=n;
-        STEPS.forEach(function(s){
-          if(s.n<n&&S.ss[s.n]!=='fail')S.ss[s.n]='done';
-          if(s.n===n)S.ss[s.n]='active';
-          if(s.n>n&&S.ss[s.n]!=='fail')S.ss[s.n]='pending';
-          var el=$id('bsc-s'+s.n);if(el)el.style.display=s.n===n?'':'none';
-        });
-        _rs();
-        var b=$id('bsc-step-badge');if(b)b.textContent='Stage '+n+' — '+STEPS[n-1].l;
-        if(n===2)_rc2();
-        if(n===3)_rc3();
-        if(n===4)_rc4();
-        if(n===5)_rc5();
-        if(n===6)_rc6();
-      }
-      window.bscGoStep=function(n){_ss(n);};
-
-      /* ── Step 1: Import UAT ── */
-      function _pic(){
-        var pkg=S.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices||[];
-        var tot=svcs.reduce(function(a,s){return a+(s.components?s.components.length:0);},0);
-        var passed=svcs.filter(function(s){return s.uatStatus==='Passed';}).length;
-        var risks=pkg.acceptedRisks&&pkg.acceptedRisks.length||0;
-        var su=$id('bsc-uat-summary');
-        if(su)su.innerHTML='<div style="width:100%;">'
-          +'<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px;">'+pkg.customerName+'</div>'
-          +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
-          +'<span class="bsc-badge bsc-badge-pass"><i class="fas fa-layer-group"></i>'+passed+'/'+svcs.length+' Services</span>'
-          +'<span class="bsc-badge" style="background:#eff6ff;color:#1d4ed8;"><i class="fas fa-cubes"></i>'+tot+' Components</span>'
-          +(risks?'<span class="bsc-badge bsc-badge-risk"><i class="fas fa-triangle-exclamation"></i>'+risks+' Risk(s)</span>':'')
-          +'<span class="bsc-badge bsc-badge-scope">'+pkg.uatRunId+'</span>'
-          +'</div>'
-          +'<div style="font-size:10px;color:#94a3b8;margin-top:6px;">Imported '+pkg.importedAt+'</div>'
-          +'</div>';
-        var pb=$id('bsc-pkg-badge');
-        if(pb){pb.style.display='inline-flex';pb.textContent=pkg.migrationId;}
-        S.ss[1]='done';_rs();
-        setTimeout(function(){_ss(2);},400);
-      }
-
-      window.bscImportUAT=function(){
-        var sEl=$id('bsc-uat-summary');
-        if(sEl)sEl.innerHTML='<i class="fas fa-spinner fa-spin" style="color:#2563eb;margin-right:6px;"></i> Importing from Stage 3 UAT…';
-        _lg('Importing UAT package from Stage 3…');
-        var scope=[];
-        if(window.UAT&&window.UAT.scope&&window.UAT.scope.length){scope=window.UAT.scope;}
-        else if(typeof cutoverBlueGreenRows!=='undefined'&&cutoverBlueGreenRows.length){
-          scope=cutoverBlueGreenRows.map(function(r,i){return{system_id:'svc-'+i,business_system_name:r.source_server_name||('Service '+(i+1)),source_host:r.source_server_ip||'',target_ip:r.target_server_ip||'',uat_status:'Passed',owner:'operator'};});
-        }
-        if(!scope.length){
-          if(sEl)sEl.innerHTML='<span style="color:#dc2626;"><i class="fas fa-triangle-exclamation"></i> No UAT-approved services found. Complete Stage 3 first or use <b>Load Sample</b>.</span>';
-          _lg('No UAT scope found');return;
-        }
-        var svcs=scope.map(function(r,i){
-          var st=['Passed','passed','pass','PASS'].indexOf(r.uat_status||'Passed')>=0?'Passed':'Failed';
-          return _mkS('svc-'+i,r.business_system_name||('Service '+(i+1)),st,'None',r.owner||'operator',[r.source_host,r.target_ip],[
-            _mkC('lb-'+i,'svc-'+i,'LB/HAProxy','load_balancer',st,r.source_host,r.target_ip,80),
-            _mkC('gw-'+i,'svc-'+i,'API Gateway','api_gateway',st,r.source_host,r.target_ip,443),
-            _mkC('app-'+i,'svc-'+i,'App Server','app_server',st,r.source_host,r.target_ip,8080),
-            _mkC('db-'+i,'svc-'+i,'Database','database',st,r.source_host,r.target_ip,5432)
-          ]);
-        });
-        S.pkg={migrationId:'MIG-'+new Date().toISOString().slice(0,10),customerName:(scope[0]&&scope[0].business_system_name)||'Customer',
-               uatRunId:'UAT-'+new Date().toISOString().slice(0,10),importedAt:new Date().toLocaleString(),
-               importedBy:'operator',businessServices:svcs,acceptedRisks:[],evidenceRefs:[],
-               rollbackPlan:'Revert HAProxy: OSPC=100%, FLEX=0%'};
-        _pic();_lg('Imported '+svcs.length+' service(s) from Stage 3');
+      var NAV_ITEMS = [
+        {n:1, l:'Business Systems'}, {n:2, l:'Component Readiness'}, {n:3, l:'Data Cutover'},
+        {n:4, l:'Traffic Ramp'}, {n:5, l:'Business Validation'}, {n:6, l:'Rollback Plan'},
+        {n:7, l:'Monitoring & Evidence'}, {n:8, l:'Reports & Export'}
+      ];
+      var TITLES = {
+        1: ['Step 1 — Business Systems for Cutover', 'Select a UAT-approved business system and generate a cutover-ready execution plan.'],
+        2: ['Step 2 — Component Readiness', 'Top-down component stack generated from UAT — not a VM scanner table.'],
+        3: ['Step 3 — Data Cutover', 'DB / Cache / Queue controls, shown only when those components are in UAT scope.'],
+        4: ['Step 4 — Traffic Ramp', 'Traffic-facing components only — Web Frontend, API Gateway, public API endpoints.'],
+        5: ['Step 5 — Business Validation', 'Reuses UAT-generated tests against source, FLEX, and the cutover hostname.'],
+        6: ['Step 6 — Rollback Plan', 'Always reviewed before Start Cutover.'],
+        7: ['Step 7 — Monitoring & Evidence', 'Live health snapshot and evidence capture.'],
+        8: ['Step 8 — Reports & Export', 'Final cutover evidence package.']
       };
-
-      window.bscLoadMockPackage=function(){
-        var svcs=[
-          _mkS('svc-001','Mobile Banking App','Passed','None','platform-team',['192.168.10.0','10.0.10.0'],[
-            _mkC('lb-001','svc-001','HAProxy / LB','load_balancer','Passed','192.168.10.1','10.0.10.1',80,{healthUrl:'http://192.168.10.1:8404/stats'}),
-            _mkC('gw-001','svc-001','API Gateway','api_gateway','Passed','192.168.10.2','10.0.10.2',443,{healthUrl:'https://10.0.10.2/health',apiBaseUrl:'https://10.0.10.2/api'}),
-            _mkC('web-001','svc-001','Mobile Web Frontend','web_frontend','Passed','192.168.10.3','10.0.10.3',80,{healthUrl:'http://10.0.10.3/'}),
-            _mkC('api-001','svc-001','Core Banking API','api_server','Passed','192.168.10.4','10.0.10.4',8080,{healthUrl:'http://10.0.10.4:8080/health',apiBaseUrl:'http://10.0.10.4:8080/api/v1'}),
-            _mkC('app-001','svc-001','Banking App Server','app_server','Passed','192.168.10.5','10.0.10.5',8443),
-            _mkC('db-001','svc-001','PostgreSQL (Accounts)','database','Passed','192.168.10.6','10.0.10.6',5432,{dbEngine:'PostgreSQL 15'}),
-            _mkC('rc-001','svc-001','Redis Cache (Sessions)','cache','Passed','192.168.10.7','10.0.10.7',6379,{cacheType:'Redis 7'}),
-            _mkC('mq-001','svc-001','RabbitMQ (Transactions)','queue','Passed','192.168.10.8','10.0.10.8',5672,{queueType:'RabbitMQ 3.12'}),
-            _mkC('wk-001','svc-001','Payment Worker','worker','Passed','192.168.10.9','10.0.10.9',0),
-            _mkC('mon-001','svc-001','Prometheus / Grafana','monitoring','Passed','192.168.10.10','10.0.10.10',9090,{healthUrl:'http://10.0.10.10:9090/-/healthy'})
-          ]),
-          _mkS('svc-002','Customer Auth Service','Passed','None','security-team',['192.168.11.0','10.0.11.0'],[
-            _mkC('gw-002','svc-002','Auth API Gateway','api_gateway','Passed','192.168.11.1','10.0.11.1',443,{healthUrl:'https://10.0.11.1/health'}),
-            _mkC('api-002','svc-002','OAuth2 API Server','api_server','Passed','192.168.11.2','10.0.11.2',8080,{healthUrl:'http://10.0.11.2:8080/health'}),
-            _mkC('db-002','svc-002','PostgreSQL (Auth DB)','database','Passed','192.168.11.3','10.0.11.3',5432,{dbEngine:'PostgreSQL 15'}),
-            _mkC('rc-002','svc-002','Redis (Token Store)','cache','Passed','192.168.11.4','10.0.11.4',6379,{cacheType:'Redis 7'}),
-            _mkC('wk-002','svc-002','Token Refresh Worker','worker','Passed','192.168.11.5','10.0.11.5',0)
-          ]),
-          _mkS('svc-003','Payment Processing','Passed','Accepted Risk','payments-team',['192.168.12.0','10.0.12.0'],[
-            _mkC('api-003','svc-003','Payment API','api_server','Passed','192.168.12.1','10.0.12.1',8080,{healthUrl:'http://10.0.12.1:8080/health',apiBaseUrl:'http://10.0.12.1:8080/api/v2'}),
-            _mkC('app-003','svc-003','Payment App Server','app_server','Passed','192.168.12.2','10.0.12.2',8443),
-            _mkC('db-003','svc-003','PostgreSQL (Ledger)','database','Passed','192.168.12.3','10.0.12.3',5432,{dbEngine:'PostgreSQL 15'}),
-            _mkC('mq-003','svc-003','Kafka (Payment Events)','queue','Passed','192.168.12.4','10.0.12.4',9092,{queueType:'Kafka 3.6',riskStatus:'Accepted Risk'}),
-            _mkC('wk-003','svc-003','Settlement Worker','worker','Passed','192.168.12.5','10.0.12.5',0),
-            _mkC('rc-003','svc-003','Redis (Rate Limiting)','cache','Passed','192.168.12.6','10.0.12.6',6379,{cacheType:'Redis 7'})
-          ]),
-          _mkS('svc-004','Notification Service','Passed','None','platform-team',['192.168.13.0','10.0.13.0'],[
-            _mkC('api-004','svc-004','Notification API','api_server','Passed','192.168.13.1','10.0.13.1',8080,{healthUrl:'http://10.0.13.1:8080/health'}),
-            _mkC('mq-004','svc-004','RabbitMQ (Alerts)','queue','Passed','192.168.13.2','10.0.13.2',5672,{queueType:'RabbitMQ 3.12'}),
-            _mkC('wk-004','svc-004','Email Worker','worker','Passed','192.168.13.3','10.0.13.3',0),
-            _mkC('wk-005','svc-004','SMS Worker','worker','Passed','192.168.13.4','10.0.13.4',0),
-            _mkC('rc-004','svc-004','Redis (Dedup Cache)','cache','Passed','192.168.13.5','10.0.13.5',6379,{cacheType:'Redis 7'})
-          ])
-        ];
-        S.pkg={migrationId:'MIG-BANK-MOBILE-001',customerName:'BankCore Mobile Platform',
-               uatRunId:'UAT-2026-06-29-PASS',importedAt:new Date().toLocaleString(),
-               importedBy:'platform-team',businessServices:svcs,
-               acceptedRisks:['Kafka replication lag <50ms during cutover window — accepted by payments-team'],
-               evidenceRefs:['UAT Run #2026-06-29 (47 tests passed, 0 failed)','Performance baseline report','Security scan'],
-               rollbackPlan:'haproxy-rollback.sh --env=prod  (revert OSPC=100% FLEX=0%)'};
-        _pic();
-        _lg('Sample: BankCore Mobile Platform ('+svcs.length+' services, '+svcs.reduce(function(a,s){return a+s.components.length;},0)+' components)');
+      var ORDER = ['web_frontend','api_gateway','api_server','app_server','database','cache','queue','worker','monitoring','file_storage','custom'];
+      var TIER_LABEL = {web_frontend:'Web Frontend', api_gateway:'API Gateway', api_server:'API Server', app_server:'Core Backend / Auth',
+        database:'Database', cache:'Cache', queue:'Queue', worker:'Workers', monitoring:'Monitoring', file_storage:'Storage', custom:'Other'};
+      var TRAFFIC_FACING = {web_frontend:1, api_gateway:1, api_server:1};
+      var STATEFUL = {database:1, cache:1, queue:1};
+      var RAMP_STAGES = {
+        demo:    [50,70,100],
+        safe:    [5,10,25,50,75,100],
+        critical:[1,5,10,25,50,100],
+        custom:  [25,50,100]
       };
+      var DEFAULT_TESTS = {
+        banking: ['Load mobile app','Register test user','Login','View account dashboard','Validate recipient','Submit safe test transfer','Audit event created','Notification created','Balance refreshed','Cache/session check'],
+        generic: ['Load application','Login','Core workflow smoke test','API health check','Database read check']
+      };
+      var TMPL_COLORS = ['banking','ecommerce','crm','erp','saas','api','reporting','batch','data','custom'];
 
-      /* ── Step 2: Select Business Services ── */
-      function _rc2(){
-        var pkg=S.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices||[];
-        var el=$id('bsc-svc-cards');if(!el)return;
-        el.innerHTML=svcs.map(function(s,i){
-          var pass=s.uatStatus==='Passed';
-          var risk=s.riskStatus&&s.riskStatus!=='None';
-          var bc=pass?(risk?'#d97706':'#16a34a'):'#dc2626';
-          var cmps=s.components||[];
-          var compPills=cmps.map(function(c){
-            return '<span class="bsc-comp-pill"><i class="fas '+_ctIco(c.type)+'" style="color:'+_ctClr(c.type)+';font-size:9px;"></i>'+_ctLbl(c.type)+'</span>';
-          }).join('');
-          var sel=s.selected;
-          return '<div class="bsc-svc-card'+(sel?' selected':'')+'" id="bsc-svc-'+i+'" onclick="bscToggleSvc('+i+')">'
-            +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'
-            +'<input type="checkbox" '+(sel?'checked':'')
-            +' onclick="event.stopPropagation();bscToggleSvc('+i+',null,this.checked);"'
-            +' style="width:15px;height:15px;cursor:pointer;margin-top:1px;accent-color:'+bc+';">'
-            +'<div style="flex:1;">'
-            +'<div style="font-size:13px;font-weight:700;color:#1e293b;">'+s.name+'</div>'
-            +'<div style="font-size:10px;color:#64748b;margin-top:1px;">'+s.owner+' &middot; '+cmps.length+' components</div>'
-            +'</div>'
-            +_badge(s.uatStatus,s.riskStatus)
-            +'</div>'
-            +(risk?'<div class="bsc-badge bsc-badge-risk" style="margin-bottom:6px;"><i class="fas fa-triangle-exclamation"></i> '+s.riskStatus+'</div>':'')
-            +'<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">'+compPills+'</div>'
-            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">'
-            +'<div style="font-size:10px;color:#64748b;"><i class="fas fa-circle-dot" style="color:#dc2626;font-size:8px;"></i> '+s.sourceEnvironment+'</div>'
-            +'<div style="font-size:10px;color:#64748b;"><i class="fas fa-circle-dot" style="color:#16a34a;font-size:8px;"></i> '+s.targetEnvironment+'</div>'
-            +'</div>'
-            +'</div>';
-        }).join('');
-        _renderSvcTable(svcs);
-        _rc2Btn();
+      var B = {
+        step: 1,
+        status: {1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending',8:'pending'},
+        systems: [], selectedId: null, locked: false, lockedScope: null,
+        cutoverStrategy: 'blue_green', trafficMethod: 'haproxy', rollbackModel: 'safe',
+        rampStrategy: 'demo', rampStageIdx: -1, rampPct: 0,
+        dataGates: { db:'PENDING', cache:'PENDING', queue:'PENDING' },
+        businessValidation: null, dismissed: {}
+      };
+      try {
+        var _prevLock = JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope')||'null');
+        if (_prevLock) { B.lockedScope = _prevLock; B.locked = true; }
+      } catch(e){}
+
+      /* ── UAT data: role -> type, host/port extraction, VM status, load systems ── */
+      function _typeFromRole(role){
+        var r=(role||'').toLowerCase();
+        if(r.indexOf('frontend')>=0) return 'web_frontend';
+        if(r.indexOf('gateway')>=0) return 'api_gateway';
+        if(r.indexOf('api')>=0) return 'api_server';
+        if(r.indexOf('database')>=0) return 'database';
+        if(r.indexOf('cache')>=0) return 'cache';
+        if(r.indexOf('queue')>=0) return 'queue';
+        if(r.indexOf('worker')>=0||r.indexOf('batch')>=0) return 'worker';
+        if(r.indexOf('monitoring')>=0) return 'monitoring';
+        if(r.indexOf('storage')>=0) return 'file_storage';
+        if(r.indexOf('backend')>=0||r.indexOf('auth')>=0) return 'app_server';
+        return 'custom';
       }
-      function _renderSvcTable(svcs){
-        var tb=$id('bsc-svc-table-body');if(!tb)return;
-        var rows=[];
-        svcs.forEach(function(s,si){
-          rows.push('<tr style="background:#f8fafc;font-weight:600;">'
-            +'<td><input type="checkbox" '+(s.selected?'checked':'')
-            +' onchange="bscToggleSvc('+si+',null,this.checked);" style="accent-color:#2563eb;"></td>'
-            +'<td colspan="8" style="color:#1e293b;">'+s.name+' '+_badge(s.uatStatus,s.riskStatus)+'</td>'
-            +'</tr>');
-          (s.components||[]).forEach(function(c){
-            rows.push('<tr>'
-              +'<td></td>'
-              +'<td style="padding-left:20px;"><i class="fas '+_ctIco(c.type)+'" style="color:'+_ctClr(c.type)+';margin-right:4px;"></i>'+c.name+'</td>'
-              +'<td><span class="bsc-comp-pill">'+_ctLbl(c.type)+'</span></td>'
-              +'<td>'+_badge(c.uatStatus,'None')+'</td>'
-              +'<td style="font-size:10px;color:#64748b;">'+c.source+'</td>'
-              +'<td style="font-size:10px;color:#64748b;">'+c.target+'</td>'
-              +'<td style="font-size:10px;color:#0ea5e9;">'+(c.healthUrl?'<a href="'+c.healthUrl+'" target="_blank" style="color:#0ea5e9;">health</a>':'—')+'</td>'
-              +'<td>'+_badge(c.uatStatus,c.riskStatus||'None')+'</td>'
-              +'<td style="font-size:10px;color:#64748b;">'+c.owner+'</td>'
-              +'</tr>');
+      function _extractHost(url){
+        var u=String(url||'').trim(); if(!u) return '';
+        var m=u.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/([^\/:]+)/); if(m) return m[1];
+        m=u.match(/^([^\/:]+)/); return m?m[1]:u;
+      }
+      function _extractPort(url){
+        var u=String(url||'').trim();
+        var m=u.match(/:(\d+)(?:\/|$)/); return m?m[1]:'';
+      }
+      function _flexVmStatusMap(){
+        var map={};
+        try{
+          var saved=JSON.parse(localStorage.getItem('uatS1_flex_vm_rows')||'null');
+          (saved&&saved.rows||[]).forEach(function(r){
+            var st=String(r.status||'').toUpperCase();
+            var norm=(st.indexOf('ACTIVE')>=0)?'ACTIVE':(st.indexOf('ERROR')>=0||st.indexOf('SHUTOFF')>=0||st.indexOf('FAIL')>=0)?'ERROR':'UNKNOWN';
+            [r.public_ip,r.private_ip,r.ip].forEach(function(ip){ if(ip) map[ip]=norm; });
           });
+        }catch(e){}
+        return map;
+      }
+      function _loadAllUatSystems(){
+        var raw=null;
+        try{ raw=JSON.parse(localStorage.getItem('uatS1_systems')||'null'); }catch(e){}
+        if(!raw||!raw.length) return [];
+        var list=raw.filter(function(s){return s.status!=='Draft';});
+        if(!list.length) list=raw;
+        return list.slice().sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
+      }
+      function _normalizeSystem(sys){
+        var vmMap=_flexVmStatusMap();
+        var comps=sys.components||[];
+        var dbCount=comps.filter(function(c){return _typeFromRole(c.name)==='database';}).length;
+        var dupDbUnclassified=dbCount>1;
+        var normComps=comps.map(function(c,i){
+          var tp=_typeFromRole(c.name);
+          var tgtHost=_extractHost(c.tgt), srcHost=_extractHost(c.src);
+          return {
+            id:'c-'+i, name:c.name, type:tp, role:TIER_LABEL[tp]||c.name,
+            source:srcHost, target:tgtHost, port:_extractPort(c.tgt)||_extractPort(c.src)||'',
+            healthUrl:c.path||'', critical:(sys.criticality==='Critical')||tp==='database',
+            vmStatus:vmMap[tgtHost]||'UNKNOWN', dbRole: tp==='database'&&!dupDbUnclassified?'Primary':'',
+            trafficFacing: !!TRAFFIC_FACING[tp], stateful: !!STATEFUL[tp]
+          };
         });
-        tb.innerHTML=rows.join('');
+        return {
+          id: sys.id, name: sys.name, archetype: sys.archetype||'custom', criticality: sys.criticality||'Critical',
+          wave: sys.wave||'Wave 1', uatStatus: sys.status==='Active'?'READY_FOR_CUTOVER':'NEEDS_REVIEW',
+          components: normComps, componentCount: normComps.length, generatedTests: normComps.length*3,
+          dbInScope: normComps.some(function(c){return c.type==='database';}),
+          cacheInScope: normComps.some(function(c){return c.type==='cache';}),
+          queueInScope: normComps.some(function(c){return c.type==='queue';}),
+          dupDbUnclassified: dupDbUnclassified, createdAt: sys.createdAt||''
+        };
       }
-      function _rc2Btn(){
-        var pkg=S.pkg;if(!pkg)return;
-        var sel=pkg.businessServices.filter(function(s){return s.selected;}).length;
-        var btn=$id('bsc-to-s3-btn');
-        if(btn){btn.disabled=sel===0;btn.style.opacity=sel?'1':'0.5';}
+      function _cutoverStatus(c){
+        if(c.critical && c.vmStatus==='ERROR') return 'BLOCKER';
+        if(!c.target) return 'NEEDS_INPUT';
+        if(c.type==='database' && _selectedSys() && _selectedSys().dupDbUnclassified && !c.dbRole) return 'REVIEW';
+        return 'READY';
       }
-      window.bscToggleSvc=function(i,el,checked){
-        var pkg=S.pkg;if(!pkg)return;
-        var s=pkg.businessServices[i];if(!s)return;
-        s.selected=(typeof checked==='boolean')?checked:!s.selected;
-        _rc2();
-      };
-      window.bscSelectAllPass=function(){
-        var pkg=S.pkg;if(!pkg)return;
-        pkg.businessServices.forEach(function(s){s.selected=s.uatStatus==='Passed';});
-        _rc2();_lg('Selected all UAT-passed business services');
-      };
-      window.bscToggleComponents=function(){
-        var cards=$id('bsc-svc-cards'),table=$id('bsc-svc-table-wrap');
-        var btn=$id('bsc-toggle-comp-btn');
-        var show=table&&table.style.display==='none';
-        if(cards)cards.style.display=show?'none':'grid';
-        if(table)table.style.display=show?'block':'none';
-        if(btn)btn.innerHTML=show?'<i class="fas fa-th-large"></i> Card View':'<i class="fas fa-list"></i> Expand Components';
-      };
+      function _statusBadge(st){
+        var m={READY:{c:'#16a34a',bg:'#eafaf0',l:'READY'}, NEEDS_INPUT:{c:'#9a5b00',bg:'#fff7df',l:'NEEDS INPUT'},
+          BLOCKER:{c:'#dc2626',bg:'#fff0f0',l:'BLOCKER'}, REVIEW:{c:'#7c3aed',bg:'#f4efff',l:'REVIEW'}, OUT_OF_SCOPE:{c:'#475569',bg:'#f1f5f9',l:'OUT OF SCOPE'}};
+        var s=m[st]||m.NEEDS_INPUT;
+        return '<span class="uat-s1-pill" style="color:'+s.c+';background:'+s.bg+';border-color:'+s.c+'33;">'+s.l+'</span>';
+      }
+      function _selectedSys(){ return B.systems.find(function(s){return s.id===B.selectedId;}) || null; }
 
-      /* ── Step 3: Readiness Check ── */
-      function _rc3(){
-        var pkg=S.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var el=$id('bsc-readiness-groups');if(!el)return;
-        /* Determine which component types are in scope */
-        var inScope={};
-        svcs.forEach(function(s){(s.components||[]).forEach(function(c){inScope[c.type]=true;});});
-        var GROUPS=[
-          {k:'global',l:'Global',ic:'fa-globe',c:'#2563eb',checks:['UAT package valid','Rollback plan present','No open critical blockers','Operator acknowledged']},
-          {k:'load_balancer',l:'LB / HAProxy',ic:'fa-network-wired',c:'#0ea5e9',checks:['HAProxy reachable','Backend pool visible','Target backend exists','Health checks green','Rollback route available']},
-          {k:'api_gateway',l:'API Gateway',ic:'fa-sitemap',c:'#7c3aed',checks:['Gateway reachable','TLS certificate valid','Health endpoint responds','Routing to backend works','No 5xx from gateway health']},
-          {k:'web_frontend',l:'Web / App',ic:'fa-globe',c:'#2563eb',checks:['Required ports open','Health URL responds','App process running','Static assets reachable']},
-          {k:'api_server',l:'API Server',ic:'fa-code',c:'#0891b2',checks:['API base URL reachable','GET /health responds','GET /ready responds','Auth endpoint available']},
-          {k:'database',l:'Database',ic:'fa-database',c:'#dc2626',checks:['DB host reachable','DB port open','DB connect works','Read query works','Replication status healthy']},
-          {k:'cache',l:'Cache',ic:'fa-bolt',c:'#d97706',checks:['Cache reachable','PING works','SET/GET smoke test','TTL check works']},
-          {k:'queue',l:'Queue',ic:'fa-stream',c:'#7c3aed',checks:['Broker reachable','Queue/topic exists','Queue depth readable','Publish/consume test']},
-          {k:'worker',l:'Worker',ic:'fa-cog',c:'#475569',checks:['Worker process running','Queue consumer connected','Last heartbeat recent','No critical worker errors']},
-          {k:'monitoring',l:'Monitoring',ic:'fa-chart-line',c:'#10b981',checks:['Monitoring endpoint reachable','Logs accessible','No active critical alerts']}
-        ];
-        el.innerHTML=GROUPS.map(function(g){
-          var os=g.k==='global'||inScope[g.k];
-          return '<div class="bsc-card" style="'+(os?'':'opacity:.5;')+'">'
-            +'<div class="bsc-card-title" style="color:'+g.c+'"><i class="fas '+g.ic+'"></i> '+g.l
-            +(os?'':'<span class="bsc-badge bsc-badge-scope" style="margin-left:auto;">Out of Scope</span>')+'</div>'
-            +'<div id="bsc-rdns-'+g.k+'">'+g.checks.map(function(ch){
-              return '<div class="bsc-check-row '+(os?'':'bsc-scope-gray')+'" style="color:'+(os?'#94a3b8':'#cbd5e1')+';">'
-                +'<i class="fas fa-circle" style="font-size:5px;margin-top:3px;"></i>'+ch+'</div>';
-            }).join('')+'</div>'
-            +'</div>';
-        }).join('');
-        var btn=$id('bsc-to-s4-btn');if(btn){btn.disabled=true;btn.style.opacity='0.5';}
-      }
-      window.bscRunReadiness=function(){
-        var pkg=S.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var inScope={};
-        svcs.forEach(function(s){(s.components||[]).forEach(function(c){inScope[c.type]=true;});});
-        var btn=$id('bsc-readiness-btn');
-        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Running…';}
-        _lg('Running quick readiness check for '+svcs.length+' service(s)…');
-        var GROUPS=['global','load_balancer','api_gateway','web_frontend','api_server','database','cache','queue','worker','monitoring'];
-        var delay=0;var warns=0;var fails=0;
-        GROUPS.forEach(function(gk){
-          var el=$id('bsc-rdns-'+gk);if(!el)return;
-          var os=gk==='global'||inScope[gk];
-          if(!os)return;
-          el.querySelectorAll('.bsc-check-row').forEach(function(row){
-            delay+=200;
-            setTimeout(function(){
-              var r=Math.random();
-              var st=r>0.1?'pass':r>0.05?'warn':'fail';
-              if(st==='warn')warns++;if(st==='fail')fails++;
-              var clr=st==='pass'?'#16a34a':st==='warn'?'#d97706':'#dc2626';
-              var ic=st==='pass'?'fa-check-circle':st==='warn'?'fa-exclamation-circle':'fa-times-circle';
-              row.innerHTML='<i class="fas '+ic+'" style="color:'+clr+';"></i><span style="color:'+clr+';">'+row.textContent.trim()+'</span>';
-            },delay);
-          });
-        });
-        setTimeout(function(){
-          S.rdns={passed:fails===0,warns:warns,fails:fails,ts:new Date().toLocaleString()};
-          var sumEl=$id('bsc-readiness-summary');
-          if(sumEl){
-            sumEl.style.display='block';
-            if(fails===0&&warns===0){
-              sumEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;';
-              sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>All readiness checks passed — system GO for cutover</span>';
-              var toBtn=$id('bsc-to-s4-btn');if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
-            } else if(warns>0&&fails===0){
-              sumEl.style.cssText='display:block;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;';
-              sumEl.innerHTML='<span style="color:#d97706;font-weight:700;"><i class="fas fa-triangle-exclamation" style="margin-right:6px;"></i>'+warns+' warning(s) — acknowledge to proceed</span>';
-              var rBtn=$id('bsc-accept-risk-btn');if(rBtn)rBtn.style.display='inline-flex';
-            } else {
-              sumEl.style.cssText='display:block;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;';
-              sumEl.innerHTML='<span style="color:#dc2626;font-weight:700;"><i class="fas fa-times-circle" style="margin-right:6px;"></i>'+fails+' check(s) failed — fix before cutover or accept risk</span>';
-              var rBtn2=$id('bsc-accept-risk-btn');if(rBtn2)rBtn2.style.display='inline-flex';
-            }
+      /* ── Section 0: load + banner ── */
+      function bsc2Load(){
+        $id('bsc2-uat-status').innerHTML='<span style="color:#94a3b8;">Loading UAT scope…</span>';
+        var all=_loadAllUatSystems();
+        B.systems = all.map(_normalizeSystem).filter(function(s){ return !B.dismissed[s.id]; });
+        if(!B.systems.length){
+          if(B.lockedScope){
+            $id('bsc2-uat-status').innerHTML='<span style="color:#92400e;"><i class="fas fa-triangle-exclamation"></i> Live UAT source unavailable — using previously locked scope for "'+_esc(B.lockedScope.business_system_name||'')+'".</span>';
+          } else {
+            $id('bsc2-uat-status').innerHTML='<span style="color:#dc2626;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> No UAT business system found. Complete Stage 3 UAT Step 1 first.</span>';
           }
-          if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-redo"></i> Re-run';}
-          _lg('Readiness: '+fails+' fail(s), '+warns+' warning(s)');
-        },delay+300);
+        } else {
+          $id('bsc2-uat-status').innerHTML=B.systems.length+' UAT business system(s) available — auto-loaded directly from Stage 3, no re-entry required.';
+          if(!B.selectedId || !_selectedSys()) B.selectedId=null;
+        }
+        _renderLockBadge();
+        _renderSysCards();
+        _renderDepGraph();
+        bsc2RenderNav();
+      }
+      window.bsc2Refresh=function(){
+        var before=B.selectedId, prevSys=_selectedSys();
+        bsc2Load();
+        if(B.locked && prevSys){
+          var fresh=B.systems.find(function(s){return s.id===B.lockedScope.business_system_id;});
+          var differs = !fresh || fresh.componentCount!==B.lockedScope.component_count;
+          var dw=$id('bsc2-drift-warning');
+          if(differs){ if(dw){ dw.style.display='block'; dw.textContent='UAT scope has changed since cutover lock. Refresh or continue with locked scope.'; } }
+          else if(dw){ dw.style.display='none'; }
+        }
       };
-      window.bscAcceptReadinessRisk=function(){
-        S.rdns={passed:true,acceptedRisk:true,ts:new Date().toLocaleString()};
-        var toBtn=$id('bsc-to-s4-btn');if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
-        var rBtn=$id('bsc-accept-risk-btn');if(rBtn)rBtn.style.display='none';
-        S.ss[3]='done';_rs();_ss(4);
-        _lg('Readiness risk accepted — proceeding to cutover');
+      function _renderLockBadge(){
+        var lb=$id('bsc2-lock-badge');
+        if(lb){
+          lb.className='uat-s1-pill '+(B.locked?'green':'gray');
+          lb.innerHTML=B.locked?'<i class="fas fa-lock"></i> Locked'+(B.lockedScope&&B.lockedScope.locked_at?(' @ '+_esc(B.lockedScope.locked_at)):''):'<i class="fas fa-unlock"></i> Not Locked';
+        }
+        var lockBtn=$id('bsc2-lock-btn'), unlockBtn=$id('bsc2-unlock-btn');
+        if(lockBtn) lockBtn.style.display=B.locked?'none':'';
+        if(unlockBtn) unlockBtn.style.display=B.locked?'':'none';
+      }
+      window.bsc2LockScope=function(){
+        var sys=_selectedSys();
+        if(!sys){ alert('Select a business system for cutover first.'); return; }
+        B.lockedScope={
+          business_system_id:sys.id, business_system_name:sys.name, archetype:sys.archetype, criticality:sys.criticality,
+          wave:sys.wave, component_count:sys.componentCount, generated_uat_tests:sys.generatedTests,
+          db_in_scope:sys.dbInScope, cache_in_scope:sys.cacheInScope, queue_in_scope:sys.queueInScope,
+          components:sys.components, locked_at:new Date().toLocaleString()
+        };
+        B.locked=true;
+        try{ localStorage.setItem('outputs_cutover_locked_business_system_scope', JSON.stringify(B.lockedScope)); }catch(e){}
+        $id('bsc2-drift-warning').style.display='none';
+        _renderLockBadge();
+      };
+      window.bsc2UnlockScope=function(){
+        B.locked=false; B.lockedScope=null;
+        try{ localStorage.removeItem('outputs_cutover_locked_business_system_scope'); }catch(e){}
+        $id('bsc2-drift-warning').style.display='none';
+        _renderLockBadge();
+        bsc2Refresh();
+      };
+      window.bsc2ViewUatSource=function(){
+        var box=$id('bsc2-uat-source-json'), body=$id('bsc2-uat-source-body');
+        var show=box.style.display==='none';
+        box.style.display=show?'block':'none';
+        if(show) body.textContent=JSON.stringify(B.locked?B.lockedScope:B.systems, null, 2);
+      };
+      window.bsc2ExportCutoverScope=function(){
+        var sys=_selectedSys()||B.lockedScope;
+        if(!sys){ alert('Select or lock a business system first.'); return; }
+        _downloadJson('generated_from_uat_cutover_plan.json', sys);
+      };
+      function _downloadJson(name, obj){
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));
+        a.download=name; a.click();
+      }
+      function _downloadCsv(name, rows){
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
+        a.download=name; a.click();
+      }
+
+      /* ── Dependency graph ── */
+      function _renderDepGraph(){
+        var el=$id('bsc2-dep-graph'); if(!el) return;
+        var tiers=['Web Frontend','API Gateway','API Server','Core Backend / Auth','Database','Cache','Queue','Workers','Monitoring'];
+        el.innerHTML=tiers.map(function(t,i){
+          return '<div id="bsc2-dep-node" style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe;font-size:12px;font-weight:700;color:#1e40af;min-width:220px;justify-content:center;">'+t+'</div>'
+            + (i<tiers.length-1?'<div id="bsc2-dep-arrow" style="color:#94a3b8;font-size:14px;">↓</div>':'');
+        }).join('');
+      }
+
+      /* ── Step 1: business system cards ── */
+      function _renderSysCards(){
+        var el=$id('bsc2-sys-cards'); if(!el) return;
+        $id('bsc2-sys-count').textContent=B.systems.length+' system'+(B.systems.length===1?'':'s');
+        if(!B.systems.length){
+          el.innerHTML='<div style="text-align:center;padding:30px 0;color:#64748b;font-size:13px;">No UAT business systems available.</div>';
+          _updateStep1Gate();
+          return;
+        }
+        el.innerHTML=B.systems.map(function(sys){
+          var sel=sys.id===B.selectedId;
+          var comps=sys.components;
+          var readyCount=comps.filter(function(c){return _cutoverStatusFor(sys,c)==='READY';}).length;
+          var blockerCount=comps.filter(function(c){return _cutoverStatusFor(sys,c)==='BLOCKER';}).length;
+          var cutoverReady = blockerCount===0 ? 'Ready after UAT' : 'Blocked — '+blockerCount+' component blocker(s)';
+          return '<div class="uat-s1-sa-card" style="'+(sel?'border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe;':'')+'">'
+            + '<div style="display:flex;align-items:center;justify-content:space-between;">'
+            + '<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+_esc(sys.name)+'</div>'
+            + '<div style="font-size:11px;color:#64748b;margin-top:2px;">'+_esc(sys.archetype)+' &bull; '+_esc(sys.criticality)+' &bull; '+_esc(sys.wave)+'</div></div>'
+            + '<span class="uat-s1-pill '+(sys.uatStatus==='READY_FOR_CUTOVER'?'green':'orange')+'">'+(sys.uatStatus==='READY_FOR_CUTOVER'?'UAT Passed':'Needs Review')+'</span>'
+            + '</div>'
+            + '<div style="font-size:11px;color:#64748b;">Status: '+(sys.uatStatus==='READY_FOR_CUTOVER'?'UAT Passed / Ready for Cutover':'UAT incomplete')+'</div>'
+            + '<div class="uat-s1-pill-row">' + comps.map(function(c){ return '<span class="uat-s1-pill blue">'+_esc(c.name)+'</span>'; }).join('') + '</div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;border-top:1px solid #eef2f7;padding-top:8px;margin-top:4px;">'
+            + '<span>Generated tests: <b style="color:#1e293b;">'+sys.generatedTests+'</b></span>'
+            + '<span>DB: <b style="color:#1e293b;">'+(sys.dbInScope?'In Scope':'Out of Scope')+'</b></span>'
+            + '<span>Cutover: <b style="color:'+(blockerCount?'#dc2626':'#16a34a')+';">'+cutoverReady+'</b></span>'
+            + '</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+            + '<button class="uat-s1-btn-primary" style="font-size:11px;padding:6px 10px;" onclick="bsc2SelectSystem(\''+sys.id+'\')">Select for Cutover</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:6px 10px;" onclick="bsc2ToggleComponents(\''+sys.id+'\')">View Components</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:6px 10px;" onclick="bsc2ViewTests(\''+sys.id+'\')">View UAT Tests</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:6px 10px;" onclick="bsc2SelectSystem(\''+sys.id+'\');bsc2LockScope();">Lock Scope</button>'
+            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:6px 10px;color:#dc2626;" onclick="bsc2DismissSystem(\''+sys.id+'\')" title="Removes from this cutover list only — does not delete the UAT business system.">Remove</button>'
+            + '</div>'
+            + '<div id="bsc2-sys-detail-'+sys.id+'" style="display:none;"></div>'
+            + '</div>';
+        }).join('');
+        _updateStep1Gate();
+      }
+      function _cutoverStatusFor(sys, c){
+        if(c.critical && c.vmStatus==='ERROR') return 'BLOCKER';
+        if(!c.target) return 'NEEDS_INPUT';
+        if(c.type==='database' && sys.dupDbUnclassified && !c.dbRole) return 'REVIEW';
+        return 'READY';
+      }
+      window.bsc2SelectSystem=function(id){
+        B.selectedId=id; _renderSysCards(); _updateStep1Gate(); bsc2RenderNav();
+      };
+      window.bsc2DismissSystem=function(id){
+        if(!confirm('Remove this business system from the cutover list? This does not delete it from UAT.')) return;
+        B.dismissed[id]=true;
+        if(B.selectedId===id) B.selectedId=null;
+        _renderSysCards();
+      };
+      window.bsc2ToggleComponents=function(id){
+        var sys=B.systems.find(function(s){return s.id===id;}); if(!sys) return;
+        var el=$id('bsc2-sys-detail-'+id); if(!el) return;
+        var show=el.style.display==='none';
+        el.style.display=show?'block':'none';
+        if(show){
+          el.innerHTML='<div class="uat-s1-table-wrap" style="margin-top:8px;"><table><thead><tr><th>Role</th><th>Source</th><th>Target</th><th>Port</th><th>Health</th><th>Status</th></tr></thead><tbody>'
+            + sys.components.map(function(c){
+              return '<tr><td>'+_esc(c.name)+'</td><td>'+_esc(c.source||'—')+'</td><td>'+_esc(c.target||'—')+'</td><td>'+_esc(c.port||'—')+'</td><td>'+_esc(c.healthUrl||'—')+'</td><td>'+_statusBadge(_cutoverStatusFor(sys,c))+'</td></tr>';
+            }).join('') + '</tbody></table></div>';
+        }
+      };
+      window.bsc2ViewTests=function(id){
+        var sys=B.systems.find(function(s){return s.id===id;}); if(!sys) return;
+        var tests=DEFAULT_TESTS[sys.archetype]||DEFAULT_TESTS.generic;
+        alert(sys.name+' — '+sys.generatedTests+' generated UAT test(s)\n\nSample business tests for this archetype:\n- '+tests.join('\n- '));
+      };
+      function _updateStep1Gate(){
+        var btn=$id('bsc2-to-step2-btn');
+        var ok=!!_selectedSys();
+        if(btn){ btn.disabled=!ok; btn.style.opacity=ok?'1':'0.5'; }
+      }
+
+      /* ── Right panel: cutover models ── */
+      var STRATEGIES=[
+        {k:'blue_green', l:'Blue/Green Cutover', s:'Web + API traffic switch with FLEX validation'},
+        {k:'canary', l:'Canary Cutover', s:'Gradual 1%, 5%, 10%, 25%, 50%, 100%'},
+        {k:'maintenance', l:'Maintenance Window Cutover', s:'Freeze writes, final DB sync, full switch'},
+        {k:'db_led', l:'Database-Led Cutover', s:'DB sync/promote first, traffic second'},
+        {k:'api_gateway', l:'API Gateway Cutover', s:'Switch gateway routes first, then frontend'},
+        {k:'custom', l:'Custom', s:'Operator-defined gates and ramp'}
+      ];
+      var TRAFFIC_METHODS=[
+        {k:'haproxy', l:'HAProxy Weighted Traffic', s:'Existing HAProxy blue/green engine'},
+        {k:'dns', l:'DNS Switch', s:'Cut over via DNS record change'},
+        {k:'lb_vip', l:'Load Balancer VIP Switch', s:'Move VIP to FLEX pool'},
+        {k:'gateway_route', l:'API Gateway Route Switch', s:'Route-level cutover at the gateway'},
+        {k:'manual', l:'Manual Operator Switch', s:'Operator manually flips traffic'}
+      ];
+      var ROLLBACK_MODELS=[
+        {k:'safe', l:'Safe Rollback', s:'No writes accepted on FLEX yet'},
+        {k:'risky', l:'Risky Rollback', s:'FLEX has accepted writes — needs care'},
+        {k:'fail_forward', l:'Fail-Forward Only', s:'Cannot revert — must fix forward'},
+        {k:'manual', l:'Manual Rollback', s:'Operator-driven, no automation'}
+      ];
+      function _renderModelGrid(gridId, items, groupKey){
+        var el=$id(gridId); if(!el) return;
+        el.innerHTML=items.map(function(it,i){
+          var sel=B[groupKey]===it.k;
+          var color=TMPL_COLORS[i%TMPL_COLORS.length];
+          return '<div class="uat-s1-arch-card tmpl-'+color+(sel?' selected':'')+'" data-model-key="'+it.k+'" onclick="bsc2SelectModel(\''+groupKey+'\',\''+it.k+'\',\''+gridId+'\')">'
+            + '<div class="uat-s1-arch-card-name">'+it.l+'</div>'
+            + '<div class="uat-s1-arch-card-sub">'+it.s+'</div></div>';
+        }).join('');
+      }
+      window.bsc2SelectModel=function(groupKey, key, gridId){
+        B[groupKey]=key;
+        if(groupKey==='cutoverStrategy') _renderModelGrid('bsc2-strategy-grid', STRATEGIES, 'cutoverStrategy');
+        if(groupKey==='trafficMethod') _renderModelGrid('bsc2-traffic-grid', TRAFFIC_METHODS, 'trafficMethod');
+        if(groupKey==='rollbackModel') _renderModelGrid('bsc2-rollback-grid', ROLLBACK_MODELS, 'rollbackModel');
+      };
+      window.bsc2SetModelTab=function(tab){
+        document.querySelectorAll('[data-bsc2-model-tab]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-bsc2-model-tab')===tab); });
+        document.querySelectorAll('[data-bsc2-model-pane]').forEach(function(p){ p.style.display = p.getAttribute('data-bsc2-model-pane')===tab ? '' : 'none'; });
       };
 
-      /* ── Step 4: Execute Cutover ── */
-      function _rc4(){
-        S.tpct=S.tpct||0;
-        _updateTrafficUI(S.tpct);
-        var pkg=S.pkg;if(!pkg)return;
-        var el=$id('bsc-s4-services');if(!el)return;
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        el.innerHTML=svcs.map(function(s){
-          var cmps=s.components||[];
-          var inScope={};cmps.forEach(function(c){inScope[c.type]=true;});
-          var pills=Object.keys(inScope).map(function(t){
-            return '<span class="bsc-comp-pill"><i class="fas '+_ctIco(t)+'" style="color:'+_ctClr(t)+';font-size:9px;"></i>'+_ctLbl(t)+'</span>';
-          }).join('');
-          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">'
-            +'<i class="fas fa-layer-group" style="color:#2563eb;"></i>'
-            +'<div style="flex:1;font-size:12px;font-weight:600;color:#1e293b;">'+s.name+'</div>'
-            +'<div style="display:flex;flex-wrap:wrap;gap:3px;">'+pills+'</div>'
-            +'</div>';
+      /* ── Step 2: component readiness stack ── */
+      function _renderComponentStack(){
+        var el=$id('bsc2-component-stack'); if(!el) return;
+        var sys=_selectedSys();
+        if(!sys){ el.innerHTML='<div style="text-align:center;color:#64748b;padding:20px;">Select a business system in Step 1 first.</div>'; return; }
+        var byTier={};
+        sys.components.forEach(function(c){ (byTier[c.type]=byTier[c.type]||[]).push(c); });
+        var html='';
+        ORDER.forEach(function(tp, idx){
+          var list=byTier[tp]; if(!list||!list.length) return;
+          html += '<div class="bsc2-comp-tier-label">'+TIER_LABEL[tp]+'</div>';
+          list.forEach(function(c){
+            var st=_cutoverStatus(c);
+            html += '<div class="bsc2-comp-row">'
+              + '<div style="flex:2;min-width:180px;"><b style="color:#0f172a;">'+_esc(c.name)+'</b><div style="font-size:11px;color:#64748b;">'+_esc(c.source||'—')+' &rarr; '+_esc(c.target||'—')+(c.port?(':'+_esc(c.port)):'')+'</div></div>'
+              + '<div style="font-size:11px;color:#64748b;min-width:120px;">Health: '+_esc(c.healthUrl||'—')+'</div>'
+              + '<span class="uat-s1-pill '+(c.trafficFacing?'blue':'gray')+'">'+(c.trafficFacing?'Traffic-facing':'Backend-only')+'</span>'
+              + '<span class="uat-s1-pill '+(c.stateful?'purple':'gray')+'">'+(c.stateful?'Stateful':'Stateless')+'</span>'
+              + _statusBadge(st)
+              + '<span style="font-size:11px;color:#64748b;">Issues: '+(st==='READY'?0:1)+'</span>'
+              + (st==='REVIEW'?'<select onchange="bsc2ClassifyDb(\''+sys.id+'\',\''+c.id+'\',this.value)" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid #dbe4f0;"><option value="">Classify DB…</option><option value="Primary">Primary</option><option value="Standby">Standby</option><option value="Test">Test</option><option value="Out of Scope">Out of Scope</option></select>':'')
+              + '</div>';
+          });
+          if(idx<ORDER.length-1 && Object.keys(byTier).some(function(k){return ORDER.indexOf(k)>idx;})) html+='<div style="text-align:center;color:#94a3b8;">↓</div>';
+        });
+        el.innerHTML=html;
+        var blockers=sys.components.filter(function(c){return _cutoverStatus(c)==='BLOCKER';}).length;
+        var badge=$id('bsc2-readiness-summary');
+        if(badge){
+          badge.className='uat-s1-pill '+(blockers?'red':'green');
+          badge.textContent=blockers?blockers+' blocker(s)':'All components ready';
+        }
+        var btn=$id('bsc2-to-step3-btn');
+        if(btn){ btn.disabled=!!blockers; btn.style.opacity=blockers?'0.5':'1'; btn.title=blockers?'Blocked: a critical target VM is in ERROR state.':''; }
+      }
+      window.bsc2ClassifyDb=function(sysId, compId, role){
+        var sys=B.systems.find(function(s){return s.id===sysId;}); if(!sys) return;
+        var c=sys.components.find(function(x){return x.id===compId;}); if(!c) return;
+        c.dbRole=role;
+        if(sys.components.filter(function(x){return x.type==='database';}).every(function(x){return x.dbRole;})) sys.dupDbUnclassified=false;
+        _renderComponentStack(); _renderSysCards();
+      };
+
+      /* ── Step 3: data cutover ── */
+      var DB_STEPS=['Confirm DB backup','Freeze writes / maintenance mode','Final sync','Validate schema','Validate row counts/checksum','Promote FLEX DB','Enable FLEX writes'];
+      var CACHE_STEPS=['Redis PING test','Session behavior test'];
+      var QUEUE_STEPS=['Pause new producers','Drain OSPC queue','Check queue depth','Check DLQ','Stop OSPC workers','Start FLEX consumers','Publish/consume test'];
+      function _renderChecklist(containerId, steps, prefix){
+        var el=$id(containerId); if(!el) return;
+        el.innerHTML=steps.map(function(s,i){
+          return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#374151;padding:4px 0;">'
+            + '<input type="checkbox" id="'+prefix+'-'+i+'"> '+s+'</label>';
+        }).join('');
+      }
+      function _renderDataCutover(){
+        var sys=_selectedSys();
+        var dbP=$id('bsc2-db-panel'), cacheP=$id('bsc2-cache-panel'), queueP=$id('bsc2-queue-panel'), noneP=$id('bsc2-no-data-panel');
+        if(!sys){ [dbP,cacheP,queueP].forEach(function(p){p.style.display='none';}); noneP.style.display='block'; return; }
+        var any=false;
+        if(sys.dbInScope){
+          dbP.style.display='block'; any=true;
+          var sel=$id('bsc2-db-primary');
+          var dbs=sys.components.filter(function(c){return c.type==='database';});
+          sel.innerHTML=dbs.map(function(c){ return '<option value="'+c.id+'">'+_esc(c.name)+'</option>'; }).join('');
+          var dupEl=$id('bsc2-db-dupes');
+          if(dbs.length>1){
+            dupEl.innerHTML='<div style="font-size:12px;color:#7c3aed;background:#f4efff;border:1px solid #ddd6fe;border-radius:6px;padding:8px 10px;">Duplicate DB components detected — classify each as Primary / Standby / Test / Out of Scope in Step 2 before approving this gate.</div>';
+          } else dupEl.innerHTML='';
+          _renderChecklist('bsc2-db-steps', DB_STEPS, 'bsc2-db-step');
+        } else dbP.style.display='none';
+        if(sys.cacheInScope){ cacheP.style.display='block'; any=true; _renderChecklist('bsc2-cache-steps', CACHE_STEPS, 'bsc2-cache-step'); } else cacheP.style.display='none';
+        if(sys.queueInScope){ queueP.style.display='block'; any=true; _renderChecklist('bsc2-queue-steps', QUEUE_STEPS, 'bsc2-queue-step'); } else queueP.style.display='none';
+        noneP.style.display=any?'none':'block';
+      }
+      window.bsc2ApproveGate=function(which){
+        var sys=_selectedSys(); if(!sys) return;
+        if(which==='db' && sys.dupDbUnclassified){ alert('Classify all duplicate DB components (Primary/Standby/Test/Out of Scope) in Step 2 before approving this gate.'); return; }
+        B.dataGates[which]='PASS';
+        var badge=$id('bsc2-'+which+'-gate-badge');
+        if(badge){ badge.className='uat-s1-pill green'; badge.textContent='PASS'; }
+        bsc2RenderNav();
+      };
+
+      /* ── Step 4: traffic ramp ── */
+      function _renderTrafficFacing(){
+        var el=$id('bsc2-traffic-facing-list'); var sys=_selectedSys();
+        if(!el) return;
+        if(!sys){ el.innerHTML=''; return; }
+        var list=sys.components.filter(function(c){return c.trafficFacing;});
+        el.innerHTML='<div style="font-size:11px;color:#64748b;margin-bottom:6px;">Traffic will only be switched for these components — Database, Cache, Queue, and backend/monitoring-only services are excluded:</div>'
+          + '<div class="uat-s1-pill-row">' + list.map(function(c){return '<span class="uat-s1-pill blue">'+_esc(c.name)+'</span>';}).join('') + '</div>';
+      }
+      window.bsc2SetRampStrategy=function(v){
+        B.rampStrategy=v; B.rampStageIdx=-1; B.rampPct=0;
+        _renderRampStages(); _updateTrafficUI(0);
+      };
+      function _renderRampStages(){
+        var el=$id('bsc2-ramp-stages'); if(!el) return;
+        var stages=RAMP_STAGES[B.rampStrategy]||RAMP_STAGES.demo;
+        el.innerHTML=stages.map(function(pct,i){
+          var cls = i<B.rampStageIdx ? 'done' : (i===B.rampStageIdx ? 'active' : '');
+          return '<span class="bsc2-ramp-btn '+cls+'">'+pct+'% FLEX</span>';
         }).join('');
       }
       function _updateTrafficUI(pct){
-        var src=$id('bsc-src-pct'),tgt=$id('bsc-tgt-pct'),bar=$id('bsc-traffic-bar'),st=$id('bsc-traffic-status');
-        if(src)src.textContent=(100-pct)+'%';
-        if(tgt)tgt.textContent=pct+'%';
-        if(bar)bar.style.width=pct+'%';
-        if(st){
-          if(pct===0)st.textContent='Awaiting traffic switch';
-          else if(pct<100)st.textContent='Traffic ramp in progress — '+pct+'% on FLEX target';
-          else st.textContent='100% traffic on FLEX — cutover complete';
+        $id('bsc2-src-pct').textContent=(100-pct)+'%';
+        $id('bsc2-tgt-pct').textContent=pct+'%';
+        $id('bsc2-traffic-bar').style.width=pct+'%';
+        $id('bsc2-ramp-stage-label').textContent = pct===0 ? 'Not started' : (pct+'% FLEX');
+        if(pct>0){
+          $id('bsc2-p95').textContent = Math.round(80+Math.random()*40)+' ms';
+          $id('bsc2-err-rate').textContent = (Math.random()*1).toFixed(2)+'%';
         }
-        var mm=$id('bsc-traffic-metrics');
-        if(mm&&pct>0){
-          var h2xx=Math.round(95+Math.random()*4);
-          var e5xx=Math.round(Math.random()*2);
-          var p95=Math.round(80+Math.random()*40);
-          mm.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'
-            +_metricBox('2xx Rate',h2xx+'%','#16a34a')
-            +_metricBox('5xx Rate',e5xx+'%',e5xx>1?'#dc2626':'#16a34a')
-            +_metricBox('P95 Latency',p95+'ms',p95>150?'#d97706':'#16a34a')
-            +_metricBox('FLEX Traffic',pct+'%','#2563eb')
-            +_metricBox('Source Traffic',(100-pct)+'%','#64748b')
-            +_metricBox('Status',pct===100?'COMPLETE':'RAMP',pct===100?'#16a34a':'#d97706')
-            +'</div>';
-        } else if(mm&&pct===0){mm.innerHTML='<div style="font-size:12px;color:#94a3b8;text-align:center;padding:20px;">Awaiting traffic switch</div>';}
-        document.querySelectorAll('.bsc-ramp-btn').forEach(function(b){
-          var active=parseInt(b.getAttribute('data-pct'))===pct;
-          b.style.background=active?'#2563eb':'';b.style.color=active?'#fff':'';b.style.borderColor=active?'#2563eb':'';
-        });
-        if(pct===100){S.ss[4]='done';_rs();}
       }
-      function _metricBox(l,v,c){
-        return '<div style="background:#f8fafc;border-radius:6px;padding:8px;text-align:center;">'
-          +'<div style="font-size:16px;font-weight:700;color:'+c+';">'+v+'</div>'
-          +'<div style="font-size:10px;color:#64748b;">'+l+'</div>'
-          +'</div>';
-      }
-      window.bscSetTraffic=function(pct){
-        S.tpct=pct;_updateTrafficUI(pct);
-        _lg('Traffic ramp: FLEX='+pct+'% OSPC='+(100-pct)+'%');
-      };
-
-      /* ── Step 5: Post-Cutover Verification ── */
-      function _rc5(){
-        var pkg=S.pkg;if(!pkg)return;
-        var el=$id('bsc-verify-results');if(!el)return;
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        el.innerHTML=svcs.map(function(s){
-          var cmps=s.components||[];
-          var rows=cmps.map(function(c){
-            return '<div class="bsc-check-row" id="bsc-vc-'+c.id+'" style="color:#94a3b8;">'
-              +'<i class="fas '+_ctIco(c.type)+'" style="color:'+_ctClr(c.type)+';font-size:10px;"></i>'
-              +'<span style="flex:1;">'+c.name+'</span>'
-              +'<span style="font-size:10px;">'+_ctLbl(c.type)+'</span>'
-              +'</div>';
-          }).join('');
-          return '<div class="bsc-card">'
-            +'<div class="bsc-card-title"><i class="fas fa-layer-group" style="color:#2563eb;"></i>'+s.name+'</div>'
-            +rows+'</div>';
-        }).join('');
-        var btn=$id('bsc-to-s6-btn');if(btn){btn.disabled=true;btn.style.opacity='0.5';}
-      }
-      window.bscRunVerification=function(){
-        var pkg=S.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var btn=$id('bsc-verify-btn');
-        if(btn){btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Verifying…';}
-        _lg('Running post-cutover verification for '+svcs.length+' service(s)…');
-        var delay=0;var fails=0;
-        svcs.forEach(function(s){
-          (s.components||[]).forEach(function(c){
-            delay+=180;
-            setTimeout(function(){
-              var pass=Math.random()>0.04;
-              if(!pass)fails++;
-              var row=$id('bsc-vc-'+c.id);
-              if(row){
-                var clr=pass?'#16a34a':'#dc2626';
-                row.style.color=clr;
-                row.querySelector('span:last-child').innerHTML=(pass
-                  ?'<i class="fas fa-check-circle" style="color:#16a34a;"></i> PASS'
-                  :'<i class="fas fa-times-circle" style="color:#dc2626;"></i> FAIL');
-              }
-            },delay);
-          });
-        });
+      window.bsc2StartDryRun=function(){
+        var sys=_selectedSys(); if(!sys){ alert('Select a business system first.'); return; }
+        $id('bsc2-ramp-status').innerHTML='<span style="color:#2563eb;">Dry run: testing source URL, FLEX target URL, health path, smoke path, Host-header routing for traffic-facing components…</span>';
         setTimeout(function(){
-          S.verif={passed:fails===0,fails:fails,ts:new Date().toLocaleString()};
-          var sumEl=$id('bsc-verify-summary');
-          if(sumEl){
-            sumEl.style.display='block';
-            if(fails===0){
-              sumEl.style.cssText='display:block;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;';
-              sumEl.innerHTML='<span style="color:#16a34a;font-weight:700;"><i class="fas fa-check-circle" style="margin-right:6px;"></i>All selected services verified healthy on FLEX</span>';
-            } else {
-              sumEl.style.cssText='display:block;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;';
-              sumEl.innerHTML='<span style="color:#dc2626;font-weight:700;"><i class="fas fa-times-circle" style="margin-right:6px;"></i>'+fails+' component(s) failed verification — review before decision</span>';
-            }
-          }
-          var toBtn=$id('bsc-to-s6-btn');if(toBtn){toBtn.disabled=false;toBtn.style.opacity='1';}
-          if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-redo"></i> Re-run';}
-          S.ss[5]='done';_rs();
-          _lg('Verification complete: '+fails+' failure(s)');
-        },delay+300);
+          $id('bsc2-ramp-status').innerHTML='<span style="color:#16a34a;">✓ Dry run passed — no traffic touched.</span>';
+        }, 900);
       };
-
-      /* ── Step 6: Operator Decision ── */
-            window.bscDecide=function(d){
-        S.dec=d;
-        var conf=$id('bsc-decision-confirm');if(conf)conf.style.display='block';
-        var title=$id('bsc-confirm-title');
-        var clrs={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'};
-        var ics={PASS:'fa-circle-check',FIX:'fa-wrench',ROLLBACK:'fa-rotate-left'};
-        if(title)title.innerHTML='<i class="fas '+ics[d]+'" style="color:'+clrs[d]+';margin-right:6px;"></i>Confirm: '+d;
-        _lg('Decision selected: '+d);
-      };
-      window.bscConfirmDecision=function(){
-        S.ev.decision={d:S.dec,reason:($id('bsc-dec-reason')||{}).value,approvedBy:($id('bsc-dec-approved')||{}).value,ts:new Date().toLocaleString()};
-        S.ss[6]='done';_rs();
-        _lg('Decision confirmed: '+S.dec+' by '+((($id('bsc-dec-approved')||{}).value)||'operator'));
-        _ss(7);
-      };
-
-      /* ── Step 7: Monitoring & Evidence ── */
-      window.bscSetMonitorDuration=function(d,btn){
-        S.mon.d=d;
-        document.querySelectorAll('.bsc-dur-btn').forEach(function(b){b.className='bsc-dur-btn';});
-        if(btn)btn.className='bsc-dur-btn bsc-dur-active';
-        _lg('Monitor duration: '+d+' min');
-      };
-      window.bscStartMonitoring=function(){
-        if(S.mon.r)return;
-        S.mon.r=true;S.mon.e=0;
-        var total=S.mon.d*60;
-        var prog=$id('bsc-monitor-progress');if(prog)prog.style.display='block';
-        _lg('Monitoring started ('+S.mon.d+' min)');
-        S.mon.t=setInterval(function(){
-          S.mon.e++;
-          var pct=Math.min(100,Math.round(S.mon.e/total*100));
-          var bar=$id('bsc-mon-bar'),st=$id('bsc-mon-status'),el=$id('bsc-mon-elapsed');
-          if(bar)bar.style.width=pct+'%';
-          var mm=Math.floor(S.mon.e/60),ss2=S.mon.e%60;
-          if(el)el.textContent=mm+':'+(ss2<10?'0':'')+ss2;
-          if(pct>=100){
-            clearInterval(S.mon.t);S.mon.r=false;
-            if(st)st.textContent='Monitoring complete';
-            if(bar)bar.style.background='#16a34a';
-            S.ss[7]='done';_rs();_lg('Monitoring complete');
-          } else {if(st)st.textContent='Monitoring… '+pct+'%';}
-        },1000);
-      };
-      window.bscCaptureEvidence=function(){
-        var pkg=S.pkg;if(!pkg)return;
-        var evList=$id('bsc-evidence-list');
-        var items=['<i class="fas fa-check-circle" style="color:#16a34a;"></i> UAT Package: '+pkg.uatRunId,
-          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Business services: '+pkg.businessServices.filter(function(s){return s.selected;}).length+' selected',
-          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Readiness: '+(S.rdns?S.rdns.ts:'—'),
-          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Traffic: '+(S.tpct||0)+'% FLEX',
-          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Verification: '+(S.verif?S.verif.ts:'—'),
-          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Decision: '+(S.dec||'—'),
-          '<i class="fas fa-check-circle" style="color:#16a34a;"></i> Captured: '+new Date().toLocaleString()];
-        if(evList)evList.innerHTML=items.join('<br>');
-        S.ev.captured=true;S.ev.ts=new Date().toLocaleString();
-        var res=$id('bsc-final-result');
-        if(res){
-          res.style.display='block';
-          var d=S.dec||'PASS';
-          var clr={PASS:'#16a34a',FIX:'#d97706',ROLLBACK:'#dc2626'}[d]||'#2563eb';
-          res.style.cssText='display:block;margin-top:14px;background:#f0fdf4;border:2px solid #bbf7d0;border-radius:10px;padding:18px 22px;';
-          res.innerHTML='<div style="font-size:15px;font-weight:800;color:'+clr+';margin-bottom:6px;"><i class="fas fa-flag-checkered" style="margin-right:8px;"></i>Cutover Evidence Captured</div>'
-            +'<div style="font-size:12px;color:#475569;">'+pkg.customerName+' | Decision: <b style="color:'+clr+';">'+d+'</b> | '+new Date().toLocaleString()+'</div>';
+      window.bsc2AdvanceRamp=function(){
+        var stages=RAMP_STAGES[B.rampStrategy]||RAMP_STAGES.demo;
+        var nextIdx=B.rampStageIdx+1;
+        if(nextIdx>=stages.length){ $id('bsc2-ramp-status').textContent='Already at final ramp stage.'; return; }
+        var pct=stages[nextIdx];
+        if(pct>=100 && !_canRampTo100()){
+          $id('bsc2-ramp-status').innerHTML='<span style="color:#dc2626;">Blocked: cannot ramp to 100% until DB/Queue/Cache gates (if in scope), business validation, and rollback approval all pass.</span>';
+          return;
         }
-        _lg('Evidence captured');
+        B.rampStageIdx=nextIdx; B.rampPct=pct;
+        _renderRampStages(); _updateTrafficUI(pct);
+        if(pct>0) $id('bsc2-flex-writes-accepted') && ($id('bsc2-flex-writes-accepted').checked = pct>0) ;
+        bsc2RecomputeRollbackStatus();
+        $id('bsc2-start-cutover-btn').disabled=false; $id('bsc2-start-cutover-btn').style.opacity='1';
       };
-      window.bscExportReport=function(){
-        var pkg=S.pkg;if(!pkg){alert('No package loaded');return;}
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var lines=['# Cutover Execution Report','Customer: '+pkg.customerName,'Migration: '+pkg.migrationId,
-          'UAT Run: '+pkg.uatRunId,'Decision: '+(S.dec||'—'),'Date: '+new Date().toLocaleString(),'',
-          '## Selected Business Services'];
-        svcs.forEach(function(s){
-          lines.push('### '+s.name+' ['+s.uatStatus+']');
-          (s.components||[]).forEach(function(c){lines.push('  - '+c.name+' ('+_ctLbl(c.type)+')');});
-        });
-        if(pkg.acceptedRisks&&pkg.acceptedRisks.length){lines.push('','## Accepted Risks');pkg.acceptedRisks.forEach(function(r){lines.push('- '+r);});}
-        lines.push('','## Rollback Plan',pkg.rollbackPlan||'—');
-        var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));
-        a.download='cutover-report-'+pkg.migrationId+'.txt';a.click();_lg('Report exported');
+      window.bsc2PauseRamp=function(){ $id('bsc2-ramp-status').textContent='Ramp paused at '+B.rampPct+'% FLEX.'; };
+      window.bsc2RollbackTraffic=function(){
+        if(!confirm('Roll back traffic to 100% OSPC / 0% FLEX?')) return;
+        B.rampStageIdx=-1; B.rampPct=0; _renderRampStages(); _updateTrafficUI(0);
+        $id('bsc2-ramp-status').innerHTML='<span style="color:#dc2626;">Traffic rolled back to source (OSPC).</span>';
       };
-      window.bscExportEvidence=function(){
-        var pkg=S.pkg;if(!pkg){alert('No package loaded');return;}
-        var rows=['Service,Component,Type,Source,Target,UAT Status,Health URL'];
-        pkg.businessServices.filter(function(s){return s.selected;}).forEach(function(s){
-          (s.components||[]).forEach(function(c){
-            rows.push([s.name,c.name,_ctLbl(c.type),c.source,c.target,c.uatStatus,c.healthUrl||''].join(','));
-          });
-        });
-        var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'}));
-        a.download='cutover-evidence-'+pkg.migrationId+'.csv';a.click();_lg('Evidence CSV exported');
+      function _canRampTo100(){
+        var sys=_selectedSys(); if(!sys) return false;
+        if(sys.dbInScope && B.dataGates.db!=='PASS') return false;
+        if(sys.queueInScope && B.dataGates.queue!=='PASS') return false;
+        if(sys.cacheInScope && B.dataGates.cache!=='PASS') return false;
+        if(!B.businessValidation || B.businessValidation.failed>0) return false;
+        if(B.status[6]!=='done') return false;
+        return true;
+      }
+      window.bsc2StartCutover=function(){
+        var sys=_selectedSys(); if(!sys) return;
+        var blockers=sys.components.filter(function(c){return _cutoverStatus(c)==='BLOCKER';}).length;
+        if(blockers){ alert('Start Cutover is blocked: '+blockers+' critical component(s) have a target VM in ERROR state.'); return; }
+        bsc2AdvanceRamp();
       };
 
-      /* ── Lifecycle ── */
-      window.bscReset=function(){
-        if(!confirm('Reset all Stage 4B cutover progress?'))return;
-        S={step:1,ss:{1:'active',2:'pending',3:'pending',4:'pending',5:'pending',6:'pending',7:'pending'},
-           pkg:null,rdns:null,tpct:0,verif:null,dec:null,mon:{d:15,r:false,e:0,t:null},ev:{},logs:[]};
-        var su=$id('bsc-uat-summary');if(su)su.innerHTML='<span style="color:#94a3b8;">Awaiting UAT package</span>';
-        var pb=$id('bsc-pkg-badge');if(pb)pb.style.display='none';
-        var lo=$id('bsc-log-out');if(lo)lo.value='Awaiting cutover execution...';
-        _ss(1);
+      /* ── Step 5: business validation ── */
+      window.bsc2RunBusinessValidation=function(){
+        var sys=_selectedSys(); if(!sys){ alert('Select a business system first.'); return; }
+        var tests=DEFAULT_TESTS[sys.archetype]||DEFAULT_TESTS.generic;
+        var body=$id('bsc2-validation-body');
+        body.innerHTML=tests.map(function(t){ return '<tr><td>'+_esc(t)+'</td><td colspan="7" style="color:#94a3b8;">Running…</td></tr>'; }).join('');
+        setTimeout(function(){
+          var failed=0;
+          body.innerHTML=tests.map(function(t){
+            var pass=Math.random()>0.08;
+            if(!pass) failed++;
+            var lat=Math.round(80+Math.random()*220);
+            return '<tr><td>'+_esc(t)+'</td><td style="font-size:11px;color:#64748b;">Full stack</td>'
+              + '<td>'+(pass?'PASS':'FAIL')+'</td><td>'+(pass?'PASS':'FAIL')+'</td><td>'+(pass?'PASS':'FAIL')+'</td>'
+              + '<td>'+lat+' ms</td><td>'+(pass?'<span style="color:#16a34a;font-weight:700;">PASS</span>':'<span style="color:#dc2626;font-weight:700;">FAIL</span>')+'</td>'
+              + '<td><a href="#" onclick="return false;" style="font-size:11px;">log</a></td></tr>';
+          }).join('');
+          B.businessValidation={ total:tests.length, failed:failed, ts:new Date().toLocaleString() };
+          bsc2RenderNav();
+        }, 900);
       };
-      window.bscOnActivate=function(){
-        _ss(1);
-        if(!S.pkg){
-          var hasScope=false;
-          if(window.UAT&&window.UAT.scope&&window.UAT.scope.length)hasScope=true;
-          if(!hasScope&&typeof cutoverBlueGreenRows!=='undefined'&&cutoverBlueGreenRows.length)hasScope=true;
-          setTimeout(function(){
-            if(hasScope){_lg('Auto-importing from Stage 3 UAT…');bscImportUAT();}
-            else{_lg('Loading BankCore Mobile Platform sample…');bscLoadMockPackage();}
-          },350);
+
+      /* ── Step 6: rollback ── */
+      window.bsc2RecomputeRollbackStatus=function(){
+        var accepted=$id('bsc2-flex-writes-accepted') && $id('bsc2-flex-writes-accepted').checked;
+        var note=$id('bsc2-rollback-risk-note'), badge=$id('bsc2-rollback-status-badge');
+        var status = accepted ? 'RISKY' : (B.rampPct>0 ? 'SAFE' : 'NOT_AVAILABLE');
+        B.rollbackStatus=status;
+        if(badge){ badge.className='uat-s1-pill '+(status==='SAFE'?'green':status==='RISKY'?'orange':'gray'); badge.textContent=status.replace('_',' '); }
+        if(note){
+          if(accepted){ note.style.display='block'; note.textContent='Rollback status: Risky. FLEX database has accepted new writes. Use fail-forward or controlled data replay.'; }
+          else note.style.display='none';
         }
       };
+      window.bsc2ApproveRollback=function(){
+        if(!$id('bsc2-dns-backup-captured').checked){ alert('Capture the DNS/LB backup before approving the rollback plan.'); return; }
+        bsc2RecomputeRollbackStatus();
+        B.status[6]='done';
+        bsc2RenderNav();
+        alert('Rollback plan approved. Rollback status: '+(B.rollbackStatus||'NOT_AVAILABLE'));
+      };
 
-      /* ── Fix _rc6 summary cards (clean version) ── */
-      function _rc6(){
-        var pkg=S.pkg;if(!pkg)return;
-        var svcs=pkg.businessServices.filter(function(s){return s.selected;});
-        var tot=svcs.reduce(function(a,s){return a+(s.components?s.components.length:0);},0);
-        var el=$id('bsc-decision-summary');if(!el)return;
-        var cards=[
-          {l:'Services',v:svcs.length,c:'#2563eb',bg:'#eff6ff',ic:'fa-layer-group'},
-          {l:'Components',v:tot,c:'#7c3aed',bg:'#f5f3ff',ic:'fa-cubes'},
-          {l:'FLEX Traffic',v:(S.tpct||0)+'%',c:'#16a34a',bg:'#f0fdf4',ic:'fa-traffic-light'},
-          {l:'Readiness',v:S.rdns?(S.rdns.passed?'PASS':'RISK'):'—',c:S.rdns&&S.rdns.passed?'#16a34a':'#94a3b8',bg:'#f0f9ff',ic:'fa-stethoscope'},
-          {l:'Verification',v:S.verif?(S.verif.passed?'PASS':'FAIL'):'—',c:S.verif?(S.verif.passed?'#16a34a':'#dc2626'):'#94a3b8',bg:S.verif&&!S.verif.passed?'#fef2f2':'#f0fdf4',ic:'fa-clipboard-check'},
-          {l:'Accepted Risks',v:(pkg.acceptedRisks&&pkg.acceptedRisks.length)||0,c:'#d97706',bg:'#fffbeb',ic:'fa-triangle-exclamation'}
+      /* ── Step 7: monitoring & evidence ── */
+      function _renderMonitorGrid(){
+        var el=$id('bsc2-monitor-grid'); var sys=_selectedSys(); if(!el) return;
+        var tiles=[
+          ['Component Health', sys? (sys.components.filter(function(c){return _cutoverStatus(c)==='READY';}).length+'/'+sys.componentCount+' ready') : '—'],
+          ['Business Txn Health', B.businessValidation ? ((B.businessValidation.total-B.businessValidation.failed)+'/'+B.businessValidation.total+' passed') : 'Not run'],
+          ['Error Rate', $id('bsc2-err-rate')?$id('bsc2-err-rate').textContent:'—'],
+          ['P95 Latency', $id('bsc2-p95')?$id('bsc2-p95').textContent:'—'],
+          ['DB Status', sys&&sys.dbInScope ? B.dataGates.db : 'Out of scope'],
+          ['Queue Status', sys&&sys.queueInScope ? B.dataGates.queue : 'Out of scope'],
+          ['Cache Status', sys&&sys.cacheInScope ? B.dataGates.cache : 'Out of scope'],
+          ['Rollback', B.rollbackStatus||'NOT_AVAILABLE']
         ];
-        el.innerHTML=cards.map(function(m){
-          return '<div style="background:'+m.bg+';border-radius:8px;padding:12px 14px;text-align:center;">'
-            +'<i class="fas '+m.ic+'" style="color:'+m.c+';font-size:18px;margin-bottom:4px;display:block;"></i>'
-            +'<div style="font-size:18px;font-weight:800;color:'+m.c+';">'+m.v+'</div>'
-            +'<div style="font-size:10px;color:#64748b;font-weight:600;">'+m.l+'</div>'
-            +'</div>';
+        el.innerHTML=tiles.map(function(t){ return '<div class="uat-s1-meta-box"><span>'+t[0]+'</span><b>'+t[1]+'</b></div>'; }).join('');
+      }
+      window.bsc2CaptureEvidence=function(){
+        var sys=_selectedSys();
+        $id('bsc2-evidence-status').innerHTML='<span style="color:#16a34a;"><i class="fas fa-check-circle"></i> Evidence captured '+new Date().toLocaleString()+' for "'+_esc(sys?sys.name:'—')+'".</span>';
+        B.status[7]='done'; bsc2RenderNav();
+      };
+
+      /* ── Step 8: exports ── */
+      var EXPORT_FILES=[
+        'locked_business_system_scope.json','generated_from_uat_cutover_plan.json','generated_from_uat_cutover_plan.md',
+        'component_dependency_graph.json','cutover_gate_matrix.csv','business_validation_results.csv',
+        'traffic_ramp_results.csv','rollback_plan.json','final_cutover_evidence.json','final_cutover_report.md'
+      ];
+      function _renderExportList(){
+        var el=$id('bsc2-export-list'); if(!el) return;
+        el.innerHTML=EXPORT_FILES.map(function(f){
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;">'
+            + '<code style="font-size:12px;color:#334155;">outputs/cutover/'+f+'</code>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="bsc2ExportEvidenceFile(\''+f+'\')">Export</button></div>';
         }).join('');
       }
+      window.bsc2ExportEvidenceFile=function(name){
+        var sys=_selectedSys();
+        var payload={ business_system: sys, locked_scope: B.lockedScope, cutover_strategy:B.cutoverStrategy, traffic_method:B.trafficMethod,
+          rollback_model:B.rollbackModel, ramp_strategy:B.rampStrategy, ramp_pct:B.rampPct, data_gates:B.dataGates,
+          business_validation:B.businessValidation, rollback_status:B.rollbackStatus, generated_at:new Date().toISOString() };
+        if(name.indexOf('.csv')>=0){
+          _downloadCsv(name, ['field,value'].concat(Object.keys(payload).map(function(k){ return k+','+JSON.stringify(payload[k]); })));
+        } else if(name.indexOf('.md')>=0){
+          var a=document.createElement('a');
+          a.href=URL.createObjectURL(new Blob(['# Cutover Report\n\n```json\n'+JSON.stringify(payload,null,2)+'\n```'],{type:'text/markdown'}));
+          a.download=name; a.click();
+        } else {
+          _downloadJson(name, payload);
+        }
+      };
+
+      /* ── Left nav + step navigation ── */
+      function _navIconFor(n){
+        if(n===1){
+          if(!B.systems.length && !B.locked) return {bg:'#e5e7eb', fg:'#9ca3af', ic:''};
+          return B.selectedId ? {bg:'#16a34a', fg:'#fff', ic:'✓'} : {bg:'#e5e7eb', fg:'#9ca3af', ic:''};
+        }
+        if(n===2){ var sys=_selectedSys(); if(!sys) return {bg:'#e5e7eb', fg:'#9ca3af', ic:''};
+          var blockers=sys.components.filter(function(c){return _cutoverStatus(c)==='BLOCKER';}).length;
+          return blockers ? {bg:'#dc2626', fg:'#fff', ic:'!'} : {bg:'#16a34a', fg:'#fff', ic:'✓'}; }
+        if(n===3){ var s=B.dataGates; var vals=[s.db,s.cache,s.queue];
+          if(vals.every(function(v){return v==='PASS';})) return {bg:'#16a34a', fg:'#fff', ic:'✓'};
+          return {bg:'#e5e7eb', fg:'#9ca3af', ic:''}; }
+        if(n===5){ return B.businessValidation ? (B.businessValidation.failed?{bg:'#f59e0b',fg:'#fff',ic:'!'}:{bg:'#16a34a',fg:'#fff',ic:'✓'}) : {bg:'#e5e7eb', fg:'#9ca3af', ic:''}; }
+        if(n===6){ return B.status[6]==='done' ? {bg:'#16a34a', fg:'#fff', ic:'✓'} : {bg:'#e5e7eb', fg:'#9ca3af', ic:''}; }
+        if(n===7){ return B.status[7]==='done' ? {bg:'#16a34a', fg:'#fff', ic:'✓'} : {bg:'#e5e7eb', fg:'#9ca3af', ic:''}; }
+        return {bg:'#e5e7eb', fg:'#9ca3af', ic:''};
+      }
+      function bsc2RenderNav(){
+        var el=$id('bsc2-nav'); if(!el) return;
+        el.innerHTML=NAV_ITEMS.map(function(it){
+          var active=it.n===B.step;
+          var icon=_navIconFor(it.n);
+          var bg=active?'#2563eb':icon.bg, fg=active?'#fff':icon.fg, ic=active?'🛡':icon.ic;
+          return '<button class="udsb-item'+(active?' udsb-active':'')+'" onclick="bsc2GoStep('+it.n+')">'
+            + '<span class="udsb-ic" style="background:'+bg+';color:'+fg+';">'+ic+'</span>'
+            + '<span class="udsb-item-text"><em>Step '+it.n+'</em>'+it.l+'</span></button>';
+        }).join('');
+      }
+      window.bsc2GoStep=function(n){
+        B.step=n;
+        document.querySelectorAll('#bsc2-content > section').forEach(function(sec){
+          sec.style.display = Number(sec.getAttribute('data-bsc2-step'))===n ? '' : 'none';
+        });
+        var t=TITLES[n]||TITLES[1];
+        $id('bsc2-tb-title').textContent=t[0]; $id('bsc2-tb-sub').textContent=t[1];
+        if(n===2) _renderComponentStack();
+        if(n===3) _renderDataCutover();
+        if(n===4) { _renderTrafficFacing(); _renderRampStages(); }
+        if(n===7) _renderMonitorGrid();
+        if(n===8) _renderExportList();
+        bsc2RenderNav();
+      };
 
       /* ── Init ── */
-      _ss(1);
+      function _init(){
+        bsc2Load();
+        _renderModelGrid('bsc2-strategy-grid', STRATEGIES, 'cutoverStrategy');
+        _renderModelGrid('bsc2-traffic-grid', TRAFFIC_METHODS, 'trafficMethod');
+        _renderModelGrid('bsc2-rollback-grid', ROLLBACK_MODELS, 'rollbackModel');
+        bsc2GoStep(1);
+      }
+      window.bscOnActivate = function(){ _init(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _init);
+      else _init();
     })();
     </script>
   </div>
-
-  <!-- Stage 5 — Stabilization & Handover -->

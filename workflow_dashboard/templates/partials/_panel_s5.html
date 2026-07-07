@@ -7,6 +7,11 @@
         <h1 style="font-size:22px;font-weight:800;color:#1f2937;margin:0;text-shadow:none;">Stage 4 &mdash; Cutover &amp; Traffic Transition</h1>
       </div>
 
+      <!-- Manual credentials/scanner/pairing live here on Stage 4; while
+           Stage 4C is active this whole block is relocated into 4C's
+           "Advanced Manual Override" section (see activateStage()). -->
+      <div id="s5-manual-scope-anchor" style="display:none;"></div>
+      <div id="s5-manual-scope-home">
       <!-- 0. Cloud Credentials -->
       <div class="section-card">
         <div class="section-header">
@@ -219,6 +224,16 @@
           </div>
           <div class="sub-section" style="margin-top:4px;">
             <div class="sub-section-title"><i class="fas fa-table"></i> Cutover Pairing Matrix</div>
+            <!-- Horizontal Pair Selector Slider -->
+            <div id="cutover_pair_slider_container" style="margin:10px 0 14px;padding:10px 12px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border:1px solid rgba(148,163,184,.15);display:none;">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <label style="font-size:12px;font-weight:600;color:#94a3b8;white-space:nowrap;"><i class="fas fa-sliders-h"></i> Quick Jump:</label>
+                <select id="cutover_pair_selector" style="min-width:350px;padding:6px 10px;border-radius:6px;border:1px solid rgba(148,163,184,.3);background:rgba(30,41,59,0.8);color:#e2e8f0;font-size:12px;" onchange="cutoverSelectPair(this.value)">
+                  <option value="">— Select a pair —</option>
+                </select>
+                <button class="btn btn-secondary light" style="font-size:11px;padding:5px 12px;" onclick="cutoverJumpToPair()">Jump to Row</button>
+              </div>
+            </div>
             <div class="table-scroll-shell">
               <div class="table-scroll-x">
                 <table class="matrix-table">
@@ -237,7 +252,13 @@
           <div class="artifact-list" id="cutover_artifacts"><span style="color:#6b7280;">No cutover artifacts exported yet.</span></div>
         </div>
       </div>
+      </div><!-- /s5-manual-scope-home -->
 
+      <!-- Tester + cockpit + validation bench live here on Stage 4; while
+           Stage 4C is active this whole block is relocated into 4C
+           (see activateStage()). -->
+      <div id="s5-tester-cockpit-anchor" style="display:none;"></div>
+      <div id="s5-tester-cockpit-home">
       <!-- 3. Cutover Test -->
       <div class="section-card">
         <div class="section-header">
@@ -3346,6 +3367,7 @@
         </script>
 
       </div>
+      </div><!-- /s5-tester-cockpit-home -->
 
 
     </div>

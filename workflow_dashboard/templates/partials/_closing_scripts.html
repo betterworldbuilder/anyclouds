@@ -1959,7 +1959,131 @@
     'amazon-ssm-agent.service': 'AWS SSM agent — check if intentional; may be from base image.',
   };
 
+  /* ── Multi-server "Compare Servers" support: when a business system with
+     several components is selected in Step 2, compare EVERY component's
+     source/target pair instead of only the single top-level IP fields. ── */
+  function _svcExtractHost(url) {
+    var u = String(url || '').trim();
+    if (!u) return '';
+    var m = u.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/([^\/:]+)/);
+    if (m) return m[1];
+    m = u.match(/^([^\/:]+)/);
+    return m ? m[1] : u;
+  }
+  function _svcEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+    });
+  }
+  function _svcGetBsComponentsForCompare() {
+    var wrap = document.getElementById('svc-compare-bs-components');
+    if (!wrap || wrap.style.display === 'none') return null;
+    var body = document.getElementById('svc-compare-bs-components-body');
+    if (!body) return null;
+    var out = Array.from(body.querySelectorAll('tr')).map(function(tr) {
+      var nameCell = tr.querySelector('td');
+      var srcInput = tr.querySelector('[data-bs-comp-field="src"]');
+      var tgtInput = tr.querySelector('[data-bs-comp-field="tgt"]');
+      return {
+        name: nameCell ? nameCell.textContent.trim() : 'Component',
+        srcHost: _svcExtractHost(srcInput ? srcInput.value : ''),
+        tgtHost: _svcExtractHost(tgtInput ? tgtInput.value : '')
+      };
+    }).filter(function(c) { return c.srcHost && c.tgtHost; });
+    return out.length ? out : null;
+  }
+  async function _svcCompareOnePair(srcIp, tgtIp, user, key, port, container) {
+    container.innerHTML = '<span style="color:#64748b;font-size:12px;">Comparing…</span>';
+    try {
+      var res = await fetch('/api/uat/service_compare', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ source_ip: srcIp, target_ip: tgtIp, ssh_user: user, ssh_key: key, ssh_port: port })
+      });
+      var data = await res.json();
+      if (data.error) { container.innerHTML = '<span style="color:#ef4444;font-size:12px;">Error: ' + _svcEsc(data.error) + '</span>'; return null; }
+      var summaryHtml =
+        '<span style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#166534;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;">✓ Match: ' + data.summary.match + '</span> ' +
+        '<span style="background:rgba(239,68,68,.15);border:1px solid #ef4444;color:#991b1b;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;">✗ Missing: ' + data.summary.missing + '</span> ' +
+        '<span style="background:rgba(251,191,36,.15);border:1px solid #fbbf24;color:#92400e;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;">+ Extra: ' + data.summary.extra + '</span> ' +
+        '<span style="color:#64748b;font-size:11px;">OSPC: ' + data.source_count + ' | FLEX: ' + data.target_count + '</span>';
+      var rowsHtml = (data.comparison || []).map(function(row) {
+        var badge;
+        if (row.status === 'match') badge = '<span style="color:#22c55e;font-weight:700;">MATCH</span>';
+        else if (row.status === 'missing_on_target') badge = SVC_EXPECTED_MISSING[row.service] ? '<span style="color:#94a3b8;font-weight:700;">EXPECTED ABSENT</span>' : '<span style="color:#ef4444;font-weight:700;">MISSING — REVIEW</span>';
+        else badge = SVC_EXPECTED_EXTRA[row.service] ? '<span style="color:#22c55e;font-weight:700;">EXPECTED ON FLEX</span>' : '<span style="color:#fbbf24;font-weight:700;">EXTRA — CHECK</span>';
+        return '<tr><td>' + _svcEsc(row.service) + '</td>' +
+          '<td style="text-align:center;">' + (row.on_source ? '✓' : '—') + '</td>' +
+          '<td style="text-align:center;">' + (row.on_target ? '✓' : '✗') + '</td>' +
+          '<td>' + badge + '</td></tr>';
+      }).join('');
+      var warn = data.source_error ? 'Source SSH error: ' + data.source_error : data.target_error ? 'Target SSH error: ' + data.target_error : '';
+      container.innerHTML =
+        (warn ? '<div style="color:#b45309;font-size:11px;margin-bottom:6px;">' + _svcEsc(warn) + '</div>' : '') +
+        '<div style="margin-bottom:8px;">' + summaryHtml + '</div>' +
+        '<div class="uat-table-wrap"><table class="uat-table"><thead><tr><th>Service</th><th style="text-align:center;">OSPC</th><th style="text-align:center;">FLEX</th><th>Status</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+      return data;
+    } catch (e) {
+      container.innerHTML = '<span style="color:#ef4444;font-size:12px;">Request failed: ' + _svcEsc(e.message) + '</span>';
+      return null;
+    }
+  }
+  async function svcCompareRunMulti(components) {
+    var user = document.getElementById('svc-ssh-user').value.trim() || 'ubuntu';
+    var key  = document.getElementById('svc-ssh-key').value.trim() || '~/.ssh/id_rsa';
+    var port = document.getElementById('svc-ssh-port').value.trim() || '22';
+    var status = document.getElementById('svc-status');
+    document.getElementById('svc-table-wrap').style.display = 'none';
+    document.getElementById('svc-analysis').style.display = 'none';
+    document.getElementById('svc-next-step').style.display = 'none';
+    document.getElementById('svc-summary').style.display = 'none';
+    var multiWrap = document.getElementById('svc-compare-multi-results');
+    if (!multiWrap) return;
+    status.innerHTML = '<span style="color:#f59e0b;font-weight:700;font-size:13px;">&#9650; Comparing ' + components.length + ' server(s)...</span>';
+    multiWrap.style.display = '';
+    multiWrap.innerHTML = components.map(function(c, idx) {
+      return '<div style="margin-bottom:12px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">'
+        + '<h4 style="margin:0;font-size:13px;font-weight:700;color:#0f172a;">' + _svcEsc(c.name) + '</h4>'
+        + '<span style="font-size:11px;font-weight:600;color:#475569;white-space:nowrap;">' + _svcEsc(c.srcHost) + ' &rarr; ' + _svcEsc(c.tgtHost) + '</span></div>'
+        + '<div style="padding:14px;" id="svc-multi-body-' + idx + '"></div></div>';
+    }).join('');
+
+    var allRows = [];
+    for (var i = 0; i < components.length; i++) {
+      var container = document.getElementById('svc-multi-body-' + i);
+      var data = await _svcCompareOnePair(components[i].srcHost, components[i].tgtHost, user, key, port, container);
+      if (data && data.comparison) allRows = allRows.concat(data.comparison);
+    }
+
+    if (allRows.length && typeof window.uatSetServiceComparison === 'function') {
+      var matched = allRows.filter(function(r){ return r.status === 'match'; }).length;
+      var expectedAbsent = allRows.filter(function(r){ return r.status === 'missing_on_target' && SVC_EXPECTED_MISSING[r.service]; }).length;
+      var expectedFlexOnly = allRows.filter(function(r){ return r.status === 'extra_on_target' && SVC_EXPECTED_EXTRA[r.service]; }).length;
+      var reviewGaps = allRows.filter(function(r){ return r.status === 'missing_on_target' && !SVC_EXPECTED_MISSING[r.service]; });
+      var warningsArr = allRows.filter(function(r){ return r.status === 'extra_on_target' && !SVC_EXPECTED_EXTRA[r.service]; });
+      window.uatSetServiceComparison({
+        ran: true,
+        rows: allRows,
+        total: allRows.length,
+        acceptable: matched + expectedAbsent + expectedFlexOnly,
+        matched: matched,
+        expectedAbsent: expectedAbsent,
+        expectedFlexOnly: expectedFlexOnly,
+        reviewGaps: reviewGaps.map(function(r){ return { service: r.service, status: 'Missing on FLEX — Not a known platform difference — needs review or acceptance' }; }),
+        warnings: warningsArr.map(function(r){ return { service: r.service, status: 'Extra on FLEX — Verify whether expected' }; }),
+        blockingGaps: [],
+      });
+    }
+
+    status.innerHTML = '<span style="color:#22c55e;font-weight:700;font-size:13px;">Comparison complete for ' + components.length + ' server(s) — ' + allRows.length + ' total services compared.</span>';
+  }
+
   async function svcCompareRun() {
+    var multiComponents = _svcGetBsComponentsForCompare();
+    if (multiComponents) { return svcCompareRunMulti(multiComponents); }
+    var multiWrap = document.getElementById('svc-compare-multi-results');
+    if (multiWrap) multiWrap.style.display = 'none';
     const srcIp  = document.getElementById('svc-source-ip').value.trim();
     const tgtIp  = document.getElementById('svc-target-ip').value.trim();
     const user   = document.getElementById('svc-ssh-user').value.trim() || 'ubuntu';
@@ -2188,7 +2312,9 @@
     if (typeof window.uatSetPerfMetrics === 'function') window.uatSetPerfMetrics(metricsArr, overall);
   }
 
-  function buildPerfTable(srcRaw, tgtRaw) {
+  function buildPerfTable(srcRaw, tgtRaw, containerId, pushGlobal) {
+    containerId = containerId || 'perf-parsed-result';
+    pushGlobal = pushGlobal !== false;
     var s = parsePerfLog(srcRaw);
     var t = parsePerfLog(tgtRaw);
 
@@ -2217,8 +2343,11 @@
     };
 
     // Write all parsed values into UAT.performance so Calculate & Save picks them up
-    Object.keys(s).forEach(function(k) { if (SRC_MAP[k] && window.UAT) UAT.performance[SRC_MAP[k]] = s[k]; });
-    Object.keys(t).forEach(function(k) { if (TGT_MAP[k] && window.UAT) UAT.performance[TGT_MAP[k]] = t[k]; });
+    // (only for the primary/first component when comparing several servers at once)
+    if (pushGlobal) {
+      Object.keys(s).forEach(function(k) { if (SRC_MAP[k] && window.UAT) UAT.performance[SRC_MAP[k]] = s[k]; });
+      Object.keys(t).forEach(function(k) { if (TGT_MAP[k] && window.UAT) UAT.performance[TGT_MAP[k]] = t[k]; });
+    }
 
     // Metric definitions — unit, description, dir, inScope, absLow (if both values < absLow → INFO not FAIL)
     var groups = [
@@ -2419,8 +2548,8 @@
     var perfOBg     = '#ffffff';
     var perfOBorder = perfFails > 0 ? '#fca5a5' : perfWarns > 0 ? '#fcd34d' : '#86efac';
 
-    // Push live metrics into Step 5 Cutover Readiness
-    if (typeof window.uatSetPerfMetrics === 'function') {
+    // Push live metrics into Step 5 Cutover Readiness (primary component only)
+    if (pushGlobal && typeof window.uatSetPerfMetrics === 'function') {
       window.uatSetPerfMetrics(metricsArr, perfOverall);
     }
 
@@ -2442,11 +2571,130 @@
           + '<li style="color:#6b7280;">Lower-is-better: response time, error rate, CPU, memory, I/O wait, latency, DB connect · Higher-is-better: upload/download throughput</li>'
           + '</ul></div>';
 
-    var container = document.getElementById('perf-parsed-result');
+    var container = document.getElementById(containerId);
     if (container) { container.style.display = 'block'; container.innerHTML = html; }
   }
 
+  /* ── Multi-server Performance Validation: when a business system with several
+     components is selected in Step 2, run the SSH performance test against
+     EVERY component's source/target pair instead of only one server. ── */
+  function _perfGetBsComponentsForTest() {
+    var wrap = document.getElementById('svc-compare-bs-components');
+    if (!wrap || wrap.style.display === 'none') return null;
+    var body = document.getElementById('svc-compare-bs-components-body');
+    if (!body) return null;
+    var out = Array.from(body.querySelectorAll('tr')).map(function(tr) {
+      var nameCell = tr.querySelector('td');
+      var srcInput = tr.querySelector('[data-bs-comp-field="src"]');
+      var tgtInput = tr.querySelector('[data-bs-comp-field="tgt"]');
+      return {
+        name: nameCell ? nameCell.textContent.trim() : 'Component',
+        srcHost: _svcExtractHost(srcInput ? srcInput.value : ''),
+        tgtHost: _svcExtractHost(tgtInput ? tgtInput.value : '')
+      };
+    }).filter(function(c) { return c.srcHost && c.tgtHost; });
+    return out.length ? out : null;
+  }
+  async function _perfStreamOnePair(srcIp, tgtIp, sshUser, sshKey, sshPort, appPort, dbPort, logSrcEl, logTgtEl, statusCb) {
+    var srcOut = '', tgtOut = '', warns = [];
+    var res = await fetch('/api/uat/performance/stream', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ source_ip: srcIp, target_ip: tgtIp, ssh_user: sshUser,
+                             ssh_key: sshKey, ssh_port: sshPort, app_port: appPort, db_port: dbPort })
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    var reader  = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = '';
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buf += decoder.decode(chunk.value, { stream: true });
+      var parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (var i = 0; i < parts.length; i++) {
+        var part = parts[i].trim();
+        if (!part.startsWith('data: ')) continue;
+        var ev;
+        try { ev = JSON.parse(part.slice(6)); } catch(e) { continue; }
+        if (ev.type === 'status') { if (statusCb) statusCb(ev.msg); }
+        else if (ev.type === 'src') { srcOut = ev.out || ''; if (logSrcEl) logSrcEl.textContent = srcOut || '(no output)'; if (ev.err) warns.push('Source SSH: ' + ev.err); }
+        else if (ev.type === 'tgt') { tgtOut = ev.out || ''; if (logTgtEl) logTgtEl.textContent = tgtOut || '(no output)'; if (ev.err) warns.push('Target SSH: ' + ev.err); }
+      }
+    }
+    return { srcOut: srcOut, tgtOut: tgtOut, warns: warns };
+  }
+  async function perfRunSSHTestsMulti(components) {
+    var btn      = document.getElementById('perf-run-btn');
+    var statusEl = document.getElementById('perf-run-status');
+    var logWrap  = document.getElementById('perf-log-wrap');
+    var parsed   = document.getElementById('perf-parsed-result');
+    var multiWrap = document.getElementById('perf-multi-results');
+    if (logWrap) logWrap.style.display = 'none';
+    if (parsed)  parsed.style.display  = 'none';
+    if (!multiWrap) return;
+
+    var sshUser = 'ubuntu', sshKey = '~/.ssh/id_rsa', sshPort = '22';
+    if (window.UAT && UAT.scope && UAT.scope.length) {
+      var s0 = UAT.scope[0];
+      sshUser = s0.ssh_user || 'ubuntu'; sshKey = s0.ssh_key_path || '~/.ssh/id_rsa'; sshPort = s0.ssh_port || '22';
+    } else {
+      sshUser = (document.getElementById('svc-ssh-user') || {}).value || 'ubuntu';
+      sshKey  = (document.getElementById('svc-ssh-key')  || {}).value || '~/.ssh/id_rsa';
+      sshPort = (document.getElementById('svc-ssh-port') || {}).value || '22';
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Running…';
+    statusEl.style.display = 'block';
+    statusEl.style.color   = '#93c5fd';
+    statusEl.textContent   = 'Running SSH performance tests on ' + components.length + ' server(s)...';
+    multiWrap.style.display = '';
+    multiWrap.innerHTML = components.map(function(c, idx) {
+      return '<div style="margin-bottom:14px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;">'
+        + '<h4 style="margin:0;font-size:13px;font-weight:700;color:#0f172a;">' + _svcEsc(c.name) + '</h4>'
+        + '<span style="font-size:11px;font-weight:600;color:#475569;white-space:nowrap;">' + _svcEsc(c.srcHost) + ' &rarr; ' + _svcEsc(c.tgtHost) + '</span></div>'
+        + '<div style="padding:14px;">'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'
+        + '<pre id="perf-multi-log-src-' + idx + '" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:8px 10px;font-family:monospace;font-size:10px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto;">Connecting…</pre>'
+        + '<pre id="perf-multi-log-tgt-' + idx + '" style="margin:0;background:#0a0f1e;border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:8px 10px;font-family:monospace;font-size:10px;color:#a5f3fc;white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto;">Connecting…</pre>'
+        + '</div>'
+        + '<div id="perf-multi-parsed-' + idx + '" style="display:none;"></div>'
+        + '<div id="perf-multi-status-' + idx + '" style="font-size:11px;color:#64748b;"></div>'
+        + '</div></div>';
+    }).join('');
+
+    var overallWarns = [];
+    for (var i = 0; i < components.length; i++) {
+      var logSrcEl    = document.getElementById('perf-multi-log-src-' + i);
+      var logTgtEl    = document.getElementById('perf-multi-log-tgt-' + i);
+      var statusLine  = document.getElementById('perf-multi-status-' + i);
+      try {
+        var result = await _perfStreamOnePair(components[i].srcHost, components[i].tgtHost, sshUser, sshKey, sshPort, '80', '0',
+          logSrcEl, logTgtEl, function(msg) { if (statusLine) statusLine.textContent = msg; });
+        buildPerfTable(result.srcOut, result.tgtOut, 'perf-multi-parsed-' + i, i === 0);
+        if (result.warns.length) { overallWarns = overallWarns.concat(result.warns); if (statusLine) statusLine.textContent = '⚠ ' + result.warns.join(' | '); }
+        else if (statusLine) statusLine.textContent = '✓ Test complete.';
+      } catch (e) {
+        if (statusLine) { statusLine.style.color = '#fca5a5'; statusLine.textContent = '✗ ' + e.message; }
+      }
+    }
+
+    btn.disabled    = false;
+    btn.textContent = '▶ SERVER TESTS';
+    statusEl.style.color = overallWarns.length ? '#fde68a' : '#86efac';
+    statusEl.textContent = overallWarns.length
+      ? '⚠ Completed ' + components.length + ' server test(s) with warnings: ' + overallWarns.join(' | ')
+      : '✓ Completed performance tests for ' + components.length + ' server(s). Step 5 readiness reflects "' + components[0].name + '" (first component) — review each panel above individually.';
+  }
+
   async function perfRunSSHTests() {
+    var multiComponents = _perfGetBsComponentsForTest();
+    if (multiComponents) { return perfRunSSHTestsMulti(multiComponents); }
+    var multiWrap = document.getElementById('perf-multi-results');
+    if (multiWrap) multiWrap.style.display = 'none';
     var btn      = document.getElementById('perf-run-btn');
     var statusEl = document.getElementById('perf-run-status');
     var logWrap  = document.getElementById('perf-log-wrap');
@@ -2473,7 +2721,7 @@
     if (!srcIp && !tgtIp) {
       statusEl.style.display = 'block';
       statusEl.style.color   = '#fecaca';
-      statusEl.textContent   = 'Enter source and target IPs in Step 1 — Server Targets first.';
+      statusEl.textContent   = 'Enter source and target IPs in Step 1 — Select Business System for UAT first.';
       return;
     }
 
@@ -3134,6 +3382,7 @@
     const rows = cutoverBlueGreenRows || [];
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="30" style="color:#64748b;font-style:italic;">No source/target scanner matrix yet.</td></tr>';
+      renderCutoverPairSlider();
       return;
     }
     tbody.innerHTML = rows.map((r, idx) => {
@@ -3170,6 +3419,66 @@
         appdepHtmlCell(migrationBadge(r.status)) +
         '</tr>';
     }).join('');
+    renderCutoverPairSlider();
+  }
+
+  // Render horizontal pair selector slider - populates the pair dropdown at top of matrix
+  function renderCutoverPairSlider() {
+    const container = document.getElementById('cutover_pair_slider_container');
+    const selector = document.getElementById('cutover_pair_selector');
+    if (!container || !selector) return;
+    const rows = cutoverBlueGreenRows || [];
+    if (!rows.length) {
+      container.style.display = 'none';
+      return;
+    }
+    // Show slider and populate options
+    container.style.display = 'flex';
+    selector.innerHTML = '<option value="">— Select a pair —</option>' +
+      rows.map((r, i) => {
+        const label = r.pair_key || ('Pair ' + (i+1));
+        const desc = r.source_server_name && r.target_server_name ? 
+          ': ' + r.source_server_name + ' → ' + r.target_server_name : '';
+        return '<option value="' + i + '">' + label + desc + '</option>';
+      }).join('');
+  }
+
+  // Jump to selected pair: populate tester inputs, mark as selected, scroll into view
+  function cutoverSelectPair(idx) {
+    idx = Number(idx);
+    if (!Number.isFinite(idx) || idx < 0 || !cutoverBlueGreenRows || !cutoverBlueGreenRows[idx]) return;
+    const row = cutoverBlueGreenRows[idx];
+    const tbody = document.getElementById('cutover_bluegreen_body');
+    if (!tbody) return;
+    // Mark row as selected in model
+    cutoverBlueGreenRows = cutoverBlueGreenRows.map((r, i) => ({...r, selected: i === idx}));
+    renderCutoverBlueGreenRows();
+    // Populate cutover tester URL inputs from selected pair data
+    const sourceUrl = document.getElementById('cutover_tester_source_url');
+    const targetUrl = document.getElementById('cutover_tester_target_url');
+    const srcIpDisplay = document.getElementById('co-src-ip');
+    const tgtIpDisplay = document.getElementById('co-tgt-ip');
+    const port = row.app_port || 80;
+    if (sourceUrl && row.source_server_ip) sourceUrl.value = 'http://' + row.source_server_ip + ':' + port;
+    if (targetUrl && row.target_server_ip) targetUrl.value = 'http://' + row.target_server_ip + ':' + port;
+    if (srcIpDisplay) srcIpDisplay.textContent = row.source_server_ip || '—';
+    if (tgtIpDisplay) tgtIpDisplay.textContent = row.target_server_ip || '—';
+    // Sync dropdown to current selection
+    const selector = document.getElementById('cutover_pair_selector');
+    if (selector) selector.value = idx;
+    // Scroll selected row into view after small delay to allow render
+    setTimeout(() => {
+      const trs = Array.from(tbody.querySelectorAll('tr'));
+      if (trs[idx]) trs[idx].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'center'});
+    }, 50);
+    // Persist matrix cache
+    cutoverSaveMatrixCache();
+  }
+
+  // Jump button click handler
+  function cutoverJumpToPair() {
+    const selector = document.getElementById('cutover_pair_selector');
+    if (selector && selector.value) cutoverSelectPair(selector.value);
   }
 
   async function cutoverBlueGreenScan() {
@@ -6136,6 +6445,29 @@ ${certContent}
         // Restore display to match saved tab mode
         var savedMode = localStorage.getItem('cutoverDashboardMode');
         advDash.style.display = (savedMode === 'advanced') ? 'block' : 'none';
+      }
+    }
+    // Stage 4C: relocate Stage 4's live sections into 4C (single live copy —
+    // same pattern as co-adv-dash above — so all tester/cockpit/scanner JS
+    // keeps working against its original element IDs with no duplicates).
+    if (stageId === 's5c') {
+      var s5cManualHome  = document.getElementById('s5-manual-scope-home');
+      var s5cManualMount = document.getElementById('s5c-manual-override-mount');
+      if (s5cManualHome && s5cManualMount && s5cManualHome.parentNode !== s5cManualMount) s5cManualMount.appendChild(s5cManualHome);
+      var s5cTesterHome  = document.getElementById('s5-tester-cockpit-home');
+      var s5cTesterMount = document.getElementById('s5c-tester-cockpit-mount');
+      if (s5cTesterHome && s5cTesterMount && s5cTesterHome.parentNode !== s5cTesterMount) s5cTesterMount.appendChild(s5cTesterHome);
+      setTimeout(function() { try { if (typeof s5cOnActivate === 'function') s5cOnActivate(); } catch(e) {} }, 200);
+    } else {
+      var s5cManualHome2  = document.getElementById('s5-manual-scope-home');
+      var s5cManualAnchor = document.getElementById('s5-manual-scope-anchor');
+      if (s5cManualHome2 && s5cManualAnchor && s5cManualHome2.parentNode !== s5cManualAnchor.parentNode) {
+        s5cManualAnchor.parentNode.insertBefore(s5cManualHome2, s5cManualAnchor.nextSibling);
+      }
+      var s5cTesterHome2  = document.getElementById('s5-tester-cockpit-home');
+      var s5cTesterAnchor = document.getElementById('s5-tester-cockpit-anchor');
+      if (s5cTesterHome2 && s5cTesterAnchor && s5cTesterHome2.parentNode !== s5cTesterAnchor.parentNode) {
+        s5cTesterAnchor.parentNode.insertBefore(s5cTesterHome2, s5cTesterAnchor.nextSibling);
       }
     }
     requestAnimationFrame(syncVisibleIframeHeights);
@@ -9201,6 +9533,8 @@ ${certContent}
     try { localStorage.setItem('uatS1_standalones', JSON.stringify(_state.standalones)); } catch(e) {}
     if (window.UAT) { window.UAT.businessSystems = _state.systems; window.UAT.standaloneItems = _state.standalones; }
     _renderCustomerTemplates();
+    if (window.uatS1PopulateCompareTargets) window.uatS1PopulateCompareTargets();
+    if (window.uatLivePopulateComponents) try { window.uatLivePopulateComponents(); } catch(e) {}
   }
   window.uatS1ReloadFromStorage = function() {
     try { var d = localStorage.getItem('uatS1_systems'); _state.systems = d ? (JSON.parse(d) || []) : []; } catch(e) { _state.systems = []; }
@@ -9419,6 +9753,141 @@ ${certContent}
     return '/health';
   }
 
+  /* ── Automatic Business System Mapping from Existing (scanned) FLEX VMs ── */
+  function _uatS1NormToken(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  }
+  /* Match a scanned VM name to ONE OR MORE components — a single VM can carry
+     several roles in its name (e.g. "3Auth_Identity_Service_Core_Banking_Backend"
+     is both an Auth service AND the Core Banking Backend). Each matched role
+     becomes its own business-system component, all sharing that VM's IP.
+     Tier 1: full component library, most specific match per role wins (so
+     "Core Banking Backend" is used instead of a generic "Backend App Server").
+     Tier 2: generic keyword groups (frontend/backend/api/gateway/db/database/
+     sql/cache/auth) — skipped per-group if a tier-1 match already covers that
+     same keyword, so we don't also emit a redundant generic "Backend App Server"
+     next to "Core Banking Backend". Independent roles (e.g. "auth") are never
+     skipped just because a different role also matched. */
+  function _uatS1MatchVmComponents(vmName) {
+    var normVm = _uatS1NormToken(vmName);
+    if (!normVm) return [];
+    var results = [];
+    var seen = {};
+    function addResult(name) { if (name && !seen[name]) { seen[name] = true; results.push(name); } }
+
+    var tier1 = [];
+    _compLib.forEach(function(compName) {
+      var normComp = _uatS1NormToken(compName);
+      if (normComp && normVm.indexOf(normComp) !== -1) tier1.push({ name: compName, norm: normComp });
+    });
+    /* drop tier-1 matches that are themselves wholly contained in a longer tier-1
+       match, e.g. don't keep "Backend Service" alongside "Core Banking Backend" */
+    tier1 = tier1.filter(function(m, i) {
+      return !tier1.some(function(other, j) { return i !== j && other.norm.length > m.norm.length && other.norm.indexOf(m.norm) !== -1; });
+    });
+    tier1.forEach(function(m) { addResult(m.name); });
+
+    var groups = [
+      { keys: ['gateway', 'api'],          names: { gateway: 'API Gateway', api: 'API Server' } },
+      { keys: ['frontend'],                names: { frontend: 'Web Frontend' } },
+      { keys: ['backend'],                 names: { backend: 'Backend App Server' } },
+      { keys: ['database', 'db', 'sql'],   names: { database: 'Database', db: 'Database', sql: 'Database' } },
+      { keys: ['cache'],                   names: { cache: 'Cache' } },
+      { keys: ['auth'],                    names: { auth: 'Auth / SSO' } }
+    ];
+    var tier1Norms = tier1.map(function(m) { return m.norm; });
+    groups.forEach(function(group) {
+      for (var i = 0; i < group.keys.length; i++) {
+        var key = group.keys[i];
+        if (normVm.indexOf(key) === -1) continue;
+        var coveredByTier1 = tier1Norms.some(function(n) { return n.indexOf(key) !== -1; });
+        if (!coveredByTier1) addResult(group.names[key]);
+        return; /* first matching key within this group decides the group's role */
+      }
+    });
+    return results;
+  }
+  function _uatS1TgtWithIp(component, ip) {
+    var tgt = _sTgt(component);
+    if (!ip) return tgt;
+    if (tgt.indexOf('FLEX-IP') !== -1) return tgt.replace('FLEX-IP', ip);
+    /* API Gateway's placeholder is a domain name, not the FLEX-IP token */
+    return tgt.replace(/gateway\.flex\.cloud/, ip);
+  }
+  function _uatS1SrcWithIp(component, ip) {
+    var src = _sSrc(component);
+    if (!ip) return src;
+    if (src.indexOf('OSPC-IP') !== -1) return src.replace('OSPC-IP', ip);
+    return src.replace(/gateway\.ospc\.local/, ip);
+  }
+  /* Role -> source OSPC IP map, built from the Source OSPC VMs scan using the
+     same multi-role name matcher (one OSPC VM can carry several roles). */
+  function _uatS1SourceRoleIpMap() {
+    var map = {};
+    (window._uatS1OspcVmRows || []).forEach(function(r) {
+      var ip = r.public_ip || r.private_ip || r.ip || '';
+      if (!ip) return;
+      _uatS1MatchVmComponents(r.name || r.id || '').forEach(function(role) {
+        if (!map[role]) map[role] = ip;
+      });
+    });
+    return map;
+  }
+  window.uatS1AutoMapFromFlexVms = function() {
+    var rows = window._uatS1FlexVmRows || [];
+    if (!rows.length) {
+      alert('No FLEX VMs scanned yet. Run "Scan FLEX Region" in the Current FLEX VMs section above first.');
+      return;
+    }
+    var matched = [];       /* one entry per matched (VM, role) pair */
+    var matchedVmNames = [];
+    rows.forEach(function(row) {
+      var compNames = _uatS1MatchVmComponents(row.name || row.id || '');
+      if (!compNames.length) return;
+      matchedVmNames.push(row.name || row.id);
+      compNames.forEach(function(compName) { matched.push({ row: row, component: compName }); });
+    });
+    if (!matched.length) {
+      alert('None of the ' + rows.length + ' scanned VM name(s) matched frontend/backend/api/gateway/db/database/sql/cache/auth keywords.');
+      return;
+    }
+    var srcRoleIp = _uatS1SourceRoleIpMap();
+    var comps = matched.map(function(m) {
+      /* Same VM -> same IP for every role that VM's name resolves to. */
+      var ip = m.row.public_ip || m.row.private_ip || m.row.ip || '';
+      var tgt = _uatS1TgtWithIp(m.component, ip);
+      return {
+        name: m.component + ' — ' + (m.row.name || m.row.id || 'vm'),
+        type: _sType(m.component),
+        src:  _uatS1SrcWithIp(m.component, srcRoleIp[m.component] || ''),
+        tgt:  tgt,
+        path: _sPath(m.component)
+      };
+    });
+    var sysName = 'Automatic Business System from Existing VMs';
+    var newSystem = {
+      id: _id(),
+      name: sysName,
+      archetype: 'custom',
+      criticality: 'Critical',
+      bowner: '', towner: '',
+      wave: 'Wave 1', risk: 'Medium',
+      desc: 'Auto-generated from ' + matchedVmNames.length + ' matched FLEX VM(s) (' + comps.length + ' component role(s) total): ' + matchedVmNames.join(', '),
+      env: 'UAT',
+      status: 'Active',
+      components: comps,
+      createdAt: new Date().toLocaleString()
+    };
+    /* _save() dedupes/merges by system name, so re-running this on a fresh scan
+       updates the same "Automatic Business System from Existing VMs" entry
+       instead of piling up duplicates. */
+    _state.systems.push(newSystem);
+    _save();
+    _render();
+    _renderKpis();
+    alert('Added "' + sysName + '" to Business Systems with ' + comps.length + ' component role(s) from ' + matchedVmNames.length + ' matched VM(s) out of ' + rows.length + ' scanned.');
+  };
+
   function _collectModalComponents() {
     var _editor = document.getElementById('uatS1CompEditor');
     var _rows = _editor ? Array.from(_editor.querySelectorAll('.uat-s1-comp-row')) : [];
@@ -9607,47 +10076,31 @@ ${certContent}
     window.uatS1SelectTemplateFromDas = selectArch;
   }
 
+  /* Same 10 gradient keys the Business System Models grid uses, cycled by index
+     so customer templates get the same colorful card look, not the old dark theme. */
+  var _customerTemplateColorKeys = ['banking','ecommerce','crm','erp','saas','api','reporting','batch','data','custom'];
   function _renderCustomerTemplates() {
     var el = document.getElementById('uatS1CustomerTemplateList');
     if (!el) return;
     var custom = (_customerTemplates || []);
-    var head = '<div class="uat-s1-customer-template-flight-head">'
-      + '<div class="uat-s1-customer-template-flight-title">Customer Real Business Systems</div>'
-      + '<div class="uat-s1-customer-template-header-line"></div>'
-      + '<div class="uat-s1-customer-template-flight-subtitle">Flight Deck Configuration System v2.4</div>'
-      + '</div>';
     if (!custom.length) {
-      el.innerHTML = head + '<div class="uat-s1-customer-template-panel-frame">'
-        + '<div class="uat-s1-customer-template-panel-label">Saved Custom Systems</div>'
-        + '<div class="uat-s1-customer-template-empty">'
-        + '<div><strong>No customer custom templates saved yet.</strong><br>'
-        + 'Create a business system from the Custom model, save it, and it will appear here.</div>'
-        + '</div></div>';
+      el.innerHTML = '<div style="text-align:center;padding:40px 0;color:#64748b;font-size:14px;">'
+        + 'No customer custom templates saved yet.<br><br>'
+        + 'Create a business system from the Custom model, save it, and it will appear here.'
+        + '</div>';
       return;
     }
-    el.innerHTML = head + '<div class="uat-s1-customer-template-panel-frame">'
-      + '<div class="uat-s1-customer-template-panel-label">Saved Custom Systems</div>'
-      + '<div class="uat-s1-customer-template-grid">' + custom.map(function(sys) {
+    el.innerHTML = '<div class="uat-s1-arch-grid">' + custom.map(function(sys, idx) {
       var comps = (sys.components || []).map(function(c){ return c.name; }).filter(Boolean);
       var sysName = sys.name || 'Unnamed Business System';
-      return '<div class="uat-s1-customer-template-card selected" data-customer-template-open="'+_h(sys.id)+'" data-sound="click" role="button" tabindex="0" title="Open '+_h(sysName)+' in edit mode">'
-        + '<div class="uat-s1-customer-template-icon"><i class="fas fa-magic"></i></div>'
-        + '<div class="uat-s1-customer-template-content">'
-        + '<div class="uat-s1-customer-template-title">'+_h(sysName)+'</div>'
-        + '<div class="uat-s1-customer-template-desc">'+_h(sys.desc || 'Custom customer business system')+'</div>'
-        + '<div class="uat-s1-customer-template-meta">'
-        + '<span class="uat-s1-customer-template-meta-tag">'+_h(sys.criticality || 'Critical')+'</span>'
-        + '<span class="uat-s1-customer-template-meta-tag">'+_h(sys.wave || 'Wave 1')+'</span>'
-        + '<span class="uat-s1-customer-template-meta-tag">'+comps.length+' Components</span>'
-        + comps.slice(0,3).map(function(n){ return '<span class="uat-s1-customer-template-meta-tag">'+_h(n)+'</span>'; }).join('')
-        + '</div>'
-        + '<div class="uat-s1-customer-template-actions">'
-        + '<button class="uat-s1-btn-muted" data-customer-template-remove="'+_h(sys.id)+'" style="font-size:11px;padding:6px 10px;color:#dc2626;">Remove</button>'
-        + '</div>'
-        + '</div>'
-        + '<div class="uat-s1-customer-template-led"></div>'
+      var colorKey = _customerTemplateColorKeys[idx % _customerTemplateColorKeys.length];
+      return '<div class="uat-s1-arch-card tmpl-'+colorKey+'" data-customer-template-open="'+_h(sys.id)+'" data-sound="click" role="button" tabindex="0" title="Open '+_h(sysName)+' in edit mode">'
+        + '<div class="uat-s1-arch-card-icon" aria-hidden="true">&#10024;</div>'
+        + '<div class="uat-s1-arch-card-name">'+_h(sysName)+'</div>'
+        + '<div class="uat-s1-arch-card-sub">'+comps.length+' Component'+(comps.length===1?'':'s')+' &bull; '+_h(sys.criticality || 'Critical')+' &bull; '+_h(sys.wave || 'Wave 1')+'</div>'
+        + '<button class="uat-s1-btn-muted" data-customer-template-remove="'+_h(sys.id)+'" style="margin-top:12px;font-size:11px;padding:5px 10px;background:rgba(255,255,255,.16);color:var(--tmpl-fg,#fff);border-color:rgba(255,255,255,.35);position:relative;z-index:1;">Remove</button>'
         + '</div>';
-    }).join('') + '</div></div>';
+    }).join('') + '</div>';
     el.querySelectorAll('[data-customer-template-open]').forEach(function(card) {
       card.addEventListener('mouseenter', function() { _uatS1PlayBip(900); });
       card.addEventListener('click', function(e) {
@@ -9826,18 +10279,154 @@ ${certContent}
     return item;
   }
   window.uatS1SaveSa = function(draft) {
-    var item = _buildSaItem(!!draft);
-    if (!item.name) { alert('Please enter a name.'); return; }
-    if (_state.editSaId) {
-      var idx = _state.standalones.findIndex(function(i){ return i.id===_state.editSaId; });
-      if(idx>=0) _state.standalones[idx]=item; else _state.standalones.push(item);
-    } else {
-      _state.standalones.push(item);
+    try {
+      var item = _buildSaItem(!!draft);
+      if (!item.name) { alert('Please enter a name.'); return; }
+      if (_state.editSaId) {
+        var idx = _state.standalones.findIndex(function(i){ return i.id===_state.editSaId; });
+        if(idx>=0) _state.standalones[idx]=item; else _state.standalones.push(item);
+      } else {
+        _state.standalones.push(item);
+      }
+      _save(); uatS1CloseSaModal(); _renderSa(); _renderKpis();
+      _syncScopeRow(item); _renderScopeRows();
+    } catch (e) {
+      console.error('uatS1SaveSa failed', e);
+      try { alert('Failed to save standalone item: ' + (e && e.message ? e.message : String(e))); } catch (e2) {}
     }
-    _save(); uatS1CloseSaModal(); _renderSa(); _renderKpis();
   };
+
+  /* keep the Raw Server Targets table (uat_scope) in sync with standalone add/edit/remove */
+  function _syncScopeRow(item, remove) {
+    var scope = [];
+    try { var _r = localStorage.getItem('uat_scope'); if (_r) scope = JSON.parse(_r) || []; } catch(e) {}
+    var idx = scope.findIndex(function(r){ return r.id === item.id; });
+    if (remove) {
+      if (idx >= 0) scope.splice(idx, 1);
+    } else {
+      var isDB = item.itemType === 'db';
+      var row = {
+        id: item.id,
+        system_type: isDB ? 'DB' : 'APP',
+        business_system_name: item.name,
+        tier: item.criticality || 'Standard',
+        source_host: item.source || '',
+        target_ip: item.target || '',
+        app_port: isDB ? '' : (item.appPort || '80'),
+        db_port: isDB ? (item.dbPort || '') : '',
+        db_engine: isDB ? (item.dbEngine || '') : '',
+        ssh_user: item.sshUser || 'ubuntu',
+        ssh_key_path: item.sshKey || '~/.ssh/id_rsa'
+      };
+      if (idx >= 0) scope[idx] = row; else scope.push(row);
+    }
+    try { localStorage.setItem('uat_scope', JSON.stringify(scope)); } catch(e) {}
+    if (window.UAT) window.UAT.scope = scope;
+  }
   window.uatS1SaveSaDraft   = function(){ uatS1SaveSa(true); };
   window.uatS1GenSaTestsOnly = function(){ _updateSaPreview(); alert('Test preview updated above.'); };
+
+  /* ── Step 2 "Apps Server Systems Comparisons": fed by Business Systems + Standalone Servers/Databases ── */
+  function _uatS1ExtractHost(url) {
+    var u = String(url || '').trim();
+    if (!u) return '';
+    var m = u.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/([^\/:]+)/);
+    if (m) return m[1];
+    m = u.match(/^([^\/:]+)/);
+    return m ? m[1] : u;
+  }
+  function _uatS1CompareTargets() {
+    var items = [];
+    _state.systems.forEach(function(sys) {
+      items.push({
+        id: 'bs:' + sys.id,
+        group: 'Business Systems',
+        label: sys.name,
+        isSystem: true,
+        components: (sys.components || []).map(function(c) {
+          return {
+            name: c.name || '',
+            sourceUrl: c.src || '', targetUrl: c.tgt || '', path: c.path || '',
+            source: _uatS1ExtractHost(c.src), target: _uatS1ExtractHost(c.tgt)
+          };
+        })
+      });
+    });
+    _state.standalones.forEach(function(item) {
+      var sys = item.mappedBsId ? _state.systems.find(function(s){ return s.id === item.mappedBsId; }) : null;
+      items.push({
+        id: 'sa:' + item.id,
+        group: 'Standalone Servers & Databases',
+        label: (sys ? sys.name + ' — ' : '') + item.name + (item.itemType === 'db' ? ' (DB)' : ''),
+        isSystem: false,
+        source: item.source || '',
+        target: item.target || '',
+        sshUser: item.sshUser || 'ubuntu',
+        sshKey: item.sshKey || '~/.ssh/id_rsa'
+      });
+    });
+    return items;
+  }
+  window.uatS1PopulateCompareTargets = function() {
+    var sel = document.getElementById('svc-compare-target');
+    if (!sel) return;
+    var cur = sel.value;
+    var items = _uatS1CompareTargets();
+    var groups = {};
+    var order = [];
+    items.forEach(function(t) {
+      if (!groups[t.group]) { groups[t.group] = []; order.push(t.group); }
+      groups[t.group].push(t);
+    });
+    var html = '<option value="">— Select a standalone app/DB or a business system —</option>';
+    order.forEach(function(g) {
+      html += '<optgroup label="' + _h(g) + '">'
+        + groups[g].map(function(t){ return '<option value="'+_h(t.id)+'">'+_h(t.label)+'</option>'; }).join('')
+        + '</optgroup>';
+    });
+    sel.innerHTML = html;
+    if (cur && items.some(function(t){ return t.id === cur; })) {
+      sel.value = cur;
+      window.uatS1FillCompareFromTarget(cur);
+    } else if (items.length) {
+      sel.value = items[0].id;
+      window.uatS1FillCompareFromTarget(items[0].id);
+    }
+  };
+  function _uatS1RenderBsComponents(components) {
+    var body = document.getElementById('svc-compare-bs-components-body');
+    if (!body) return;
+    if (!components.length) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:10px;">No components in this business system.</td></tr>';
+      return;
+    }
+    body.innerHTML = components.map(function(c, idx) {
+      return '<tr>'
+        + '<td style="font-weight:700;color:#0f172a;white-space:nowrap;">' + _h(c.name || '—') + '</td>'
+        + '<td><input class="uat-input" style="width:100%;" data-bs-comp-field="src" data-bs-comp-idx="' + idx + '" value="' + _h(c.sourceUrl || '') + '" placeholder="http://OSPC-IP:PORT"></td>'
+        + '<td><input class="uat-input" style="width:100%;" data-bs-comp-field="tgt" data-bs-comp-idx="' + idx + '" value="' + _h(c.targetUrl || '') + '" placeholder="http://FLEX-IP:PORT"></td>'
+        + '<td><input class="uat-input" style="width:100%;" data-bs-comp-field="path" data-bs-comp-idx="' + idx + '" value="' + _h(c.path || '') + '" placeholder="/health"></td>'
+        + '</tr>';
+    }).join('');
+  }
+  window.uatS1FillCompareFromTarget = function(id) {
+    var t = _uatS1CompareTargets().find(function(x){ return x.id === id; });
+    var compWrap = document.getElementById('svc-compare-bs-components');
+    if (!t) { if (compWrap) compWrap.style.display = 'none'; return; }
+    if (t.isSystem) {
+      var first = t.components[0] || {};
+      _sv2('svc-source-ip', first.source || '');
+      _sv2('svc-target-ip', first.target || '');
+      _uatS1RenderBsComponents(t.components);
+      if (compWrap) compWrap.style.display = '';
+    } else {
+      _sv2('svc-source-ip', t.source);
+      _sv2('svc-target-ip', t.target);
+      _sv2('svc-ssh-user',  t.sshUser);
+      _sv2('svc-ssh-key',   t.sshKey);
+      if (compWrap) compWrap.style.display = 'none';
+    }
+  };
 
   /* auto-map from raw scope rows */
   window.uatS1AutoMapStandalones = function() {
@@ -9866,6 +10455,7 @@ ${certContent}
 
   /* render standalone cards */
   function _renderSa() {
+    if (window.uatS1PopulateCompareTargets) window.uatS1PopulateCompareTargets();
     var grid  = document.getElementById('uatS1SaCards');
     var empty = document.getElementById('uatS1SaEmpty');
     if (!grid) return;
@@ -9900,6 +10490,7 @@ ${certContent}
         var did=this.getAttribute('data-sa-del');
         _state.standalones=_state.standalones.filter(function(i){ return i.id!==did; });
         _save(); _renderSa(); _renderKpis();
+        _syncScopeRow({id:did}, true); _renderScopeRows();
       });
       grid.appendChild(div);
     });
@@ -9951,6 +10542,7 @@ ${certContent}
     _renderCustomerTemplates();
     _renderSa();
     _renderKpis();
+    _renderScopeRows();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _init);
@@ -9960,6 +10552,167 @@ ${certContent}
 })();
 </script>
 
+<script>
+/* ── Stage 3 UAT: "Current FLEX VMs" live scanner (no credentials/jump host shown here) ── */
+(function() {
+  function _fh(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+    });
+  }
+  function _renderFlexVmRows(rows) {
+    var body = document.getElementById('uatS1FlexVmBody');
+    if (!body) return;
+    if (!rows || !rows.length) {
+      body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">No VMs found in this region.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(function(r) {
+      return '<tr>'
+        + '<td>' + _fh(r.region || '—') + '</td>'
+        + '<td>' + _fh(r.name || '—') + '</td>'
+        + '<td>' + _fh(r.id || '—') + '</td>'
+        + '<td>' + _fh(r.public_ip || '—') + '</td>'
+        + '<td>' + _fh(r.private_ip || '—') + '</td>'
+        + '<td>' + _fh(r.flavor || '—') + '</td>'
+        + '<td>' + _fh(r.networks || '—') + '</td>'
+        + '<td>' + _fh(r.status || '—') + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+  window.uatS1ScanFlexVms = function() {
+    var statusEl = document.getElementById('uatS1FlexVmStatus');
+    var region = (document.getElementById('uatS1FlexVmRegion') || {}).value || '';
+    var cached = {};
+    try { cached = JSON.parse(localStorage.getItem('cutover_cloud_credentials') || '{}'); } catch (e) {}
+    var targetFlex = (cached && cached.target_flex) || {};
+    if (!targetFlex.auth_url || !targetFlex.username) {
+      if (statusEl) statusEl.textContent = 'No FLEX credentials cached yet. Enter them once in Stage 4 — Cutover & Traffic Transition, then come back here to scan.';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Scanning FLEX region ' + (region || targetFlex.region || 'default') + ' for running VMs...';
+    var body = document.getElementById('uatS1FlexVmBody');
+    if (body) body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">Scanning...</td></tr>';
+    fetch('/api/cutover-bluegreen/live-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'flex2flex',
+        source_region: region || targetFlex.region || '',
+        target_region: region || targetFlex.region || '',
+        source_flex: targetFlex,
+        target_flex: targetFlex,
+        lb_option: 'source_haproxy',
+        green_weight: 10
+      })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (!data.ok) throw new Error(data.error || 'FLEX VM scan failed');
+      var rows = data.target_rows || [];
+      window._uatS1FlexVmRows = rows;
+      try { localStorage.setItem('uatS1_flex_vm_rows', JSON.stringify({ rows: rows, region: region || targetFlex.region || '', ts: new Date().toLocaleString() })); } catch (e) {}
+      _renderFlexVmRows(rows);
+      var count = document.getElementById('uatS1FlexVmCount');
+      if (count) count.textContent = rows.length;
+      if (statusEl) statusEl.textContent = rows.length + ' VM(s) found in ' + (region || targetFlex.region || 'the target region') + '.';
+    }).catch(function(err) {
+      if (statusEl) statusEl.textContent = 'Scan failed: ' + (err && err.message ? err.message : String(err));
+      var b = document.getElementById('uatS1FlexVmBody');
+      if (b) b.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc2626;padding:16px;">Scan failed.</td></tr>';
+    });
+  };
+
+  /* ── Source OSPC VM scan — same live-scan engine, source side ── */
+  function _renderOspcVmRows(rows) {
+    var body = document.getElementById('uatS1OspcVmBody');
+    if (!body) return;
+    if (!rows || !rows.length) {
+      body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">No VMs found in this region.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map(function(r) {
+      return '<tr>'
+        + '<td>' + _fh(r.region || '—') + '</td>'
+        + '<td>' + _fh(r.name || '—') + '</td>'
+        + '<td>' + _fh(r.id || '—') + '</td>'
+        + '<td>' + _fh(r.public_ip || '—') + '</td>'
+        + '<td>' + _fh(r.private_ip || '—') + '</td>'
+        + '<td>' + _fh(r.flavor || '—') + '</td>'
+        + '<td>' + _fh(r.networks || '—') + '</td>'
+        + '<td>' + _fh(r.status || '—') + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+  window.uatS1ScanOspcVms = function() {
+    var statusEl = document.getElementById('uatS1OspcVmStatus');
+    var region = (document.getElementById('uatS1OspcVmRegion') || {}).value || '';
+    var cached = {};
+    try { cached = JSON.parse(localStorage.getItem('cutover_cloud_credentials') || '{}'); } catch (e) {}
+    var ospc = (cached && cached.ospc) || {};
+    var targetFlex = (cached && cached.target_flex) || {};
+    if (!ospc.username || !ospc.api_key) {
+      if (statusEl) statusEl.textContent = 'No OSPC credentials cached yet. Enter them once in Stage 4 — Cutover & Traffic Transition, then come back here to scan.';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Scanning OSPC region ' + (region || ospc.region || 'default') + ' for source VMs...';
+    var body = document.getElementById('uatS1OspcVmBody');
+    if (body) body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">Scanning...</td></tr>';
+    fetch('/api/cutover-bluegreen/live-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'ospc2flex',
+        source_region: region || ospc.region || '',
+        target_region: targetFlex.region || '',
+        ospc: ospc,
+        target_flex: targetFlex,
+        lb_option: 'source_haproxy',
+        green_weight: 10
+      })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (!data.ok) throw new Error(data.error || 'OSPC VM scan failed');
+      var rows = data.source_rows || [];
+      window._uatS1OspcVmRows = rows;
+      try { localStorage.setItem('uatS1_ospc_vm_rows', JSON.stringify({ rows: rows, region: region || ospc.region || '', ts: new Date().toLocaleString() })); } catch (e) {}
+      _renderOspcVmRows(rows);
+      var count = document.getElementById('uatS1OspcVmCount');
+      if (count) count.textContent = rows.length;
+      if (statusEl) statusEl.textContent = rows.length + ' source VM(s) found in ' + (region || ospc.region || 'the source region') + '.';
+    }).catch(function(err) {
+      if (statusEl) statusEl.textContent = 'Scan failed: ' + (err && err.message ? err.message : String(err));
+      var b = document.getElementById('uatS1OspcVmBody');
+      if (b) b.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc2626;padding:16px;">Scan failed.</td></tr>';
+    });
+  };
+  (function _restoreOspcVmRows() {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem('uatS1_ospc_vm_rows') || 'null'); } catch (e) {}
+    if (!saved || !saved.rows || !saved.rows.length) return;
+    window._uatS1OspcVmRows = saved.rows;
+    _renderOspcVmRows(saved.rows);
+    var count = document.getElementById('uatS1OspcVmCount');
+    if (count) count.textContent = saved.rows.length;
+    var regionSel = document.getElementById('uatS1OspcVmRegion');
+    if (regionSel && saved.region) regionSel.value = saved.region;
+    var statusEl = document.getElementById('uatS1OspcVmStatus');
+    if (statusEl) statusEl.textContent = saved.rows.length + ' source VM(s) from last scan' + (saved.ts ? ' (' + saved.ts + ')' : '') + '.';
+  })();
+
+  /* Restore the last scanned table on page load so it survives reloads/navigation. */
+  (function _restoreFlexVmRows() {
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem('uatS1_flex_vm_rows') || 'null'); } catch (e) {}
+    if (!saved || !saved.rows || !saved.rows.length) return;
+    window._uatS1FlexVmRows = saved.rows;
+    _renderFlexVmRows(saved.rows);
+    var count = document.getElementById('uatS1FlexVmCount');
+    if (count) count.textContent = saved.rows.length;
+    var regionSel = document.getElementById('uatS1FlexVmRegion');
+    if (regionSel && saved.region) regionSel.value = saved.region;
+    var statusEl = document.getElementById('uatS1FlexVmStatus');
+    if (statusEl) statusEl.textContent = saved.rows.length + ' VM(s) from last scan' + (saved.ts ? ' (' + saved.ts + ')' : '') + '.';
+  })();
+})();
+</script>
 
 <script>
 /* ── Stage 3 UAT: Source/Target Mobile + Dev View Test Bench ───────────── */
@@ -10096,13 +10849,72 @@ ${certContent}
     appendLog(side, 'HTTP ' + res.status + ' token acquired in ' + res.elapsed_ms + ' ms');
     return tokens[side];
   }
+  /* ── Business-system components in the Type dropdown ──
+     Each component (VM/DB) of the latest UAT business system appears as an
+     option with its source→target IPs; selecting one auto-fills this side's
+     IP/host, port, and path from the component's own URLs. */
+  var _liveComps = [];
+  function _liveHost(u){ var m=String(u||'').match(/^[a-zA-Z][\w+.-]*:\/\/([^\/:]+)/); if(m) return m[1]; m=String(u||'').match(/^([^\/:]+)/); return m?m[1]:''; }
+  function _livePort(u){ var m=String(u||'').match(/:(\d+)(?:\/|$)/); return m?m[1]:''; }
+  function _liveKind(name){
+    var n=(name||'').toLowerCase();
+    if(n.indexOf('database')>=0) return 'db';
+    if(n.indexOf('gateway')>=0||n.indexOf('api')>=0) return 'api';
+    if(n.indexOf('frontend')>=0) return 'frontend';
+    return 'backend';
+  }
+  window.uatLivePopulateComponents = function() {
+    var sys=null;
+    try {
+      var raw=JSON.parse(localStorage.getItem('uatS1_systems')||'null')||[];
+      var list=raw.filter(function(s){return s.status!=='Draft';}); if(!list.length) list=raw;
+      list.sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
+      sys=list[0]||null;
+    } catch(e){}
+    _liveComps=(sys&&sys.components||[]).map(function(c,i){
+      return { idx:i, name:c.name||('Component '+(i+1)), kind:_liveKind(c.name),
+               srcHost:_liveHost(c.src), tgtHost:_liveHost(c.tgt),
+               srcPort:_livePort(c.src), tgtPort:_livePort(c.tgt),
+               path:(String(c.path||'').charAt(0)==='/')?c.path:'' };
+    });
+    ['source','target'].forEach(function(side){
+      var sel=el('uatLive-'+side+'-type'); if(!sel) return;
+      var cur=sel.value;
+      var base='<option value="frontend">Frontend Mobile UI</option>'
+        +'<option value="api">API Gateway</option>'
+        +'<option value="backend">Backend Service</option>'
+        +'<option value="db">Database API</option>';
+      var compOpts=_liveComps.map(function(c){
+        var label=c.name+(c.srcHost||c.tgtHost?('  ['+(c.srcHost||'?')+' → '+(c.tgtHost||'?')+']'):'');
+        if(label.length>70) label=label.slice(0,69)+'…';
+        return '<option value="comp:'+c.idx+'">'+label.replace(/</g,'&lt;')+'</option>';
+      }).join('');
+      sel.innerHTML=base+(compOpts?'<optgroup label="Business System Components">'+compOpts+'</optgroup>':'');
+      if(cur&&sel.querySelector('option[value="'+cur+'"]')) sel.value=cur;
+    });
+  };
   window.uatLiveTypeChanged = function(side) {
     var type = val('uatLive-' + side + '-type') || 'frontend';
+    if (type.indexOf('comp:') === 0) {
+      var c = _liveComps[parseInt(type.slice(5), 10)];
+      if (c) {
+        var host = side === 'source' ? c.srcHost : c.tgtHost;
+        var port = (side === 'source' ? c.srcPort : c.tgtPort) || (TYPE_DEFAULTS[c.kind] || TYPE_DEFAULTS.frontend).port;
+        var path = c.path || (TYPE_DEFAULTS[c.kind] || TYPE_DEFAULTS.frontend).path;
+        if (host && host.indexOf('-IP') === -1 && host !== 'gateway.ospc.local' ) setVal('uatLive-' + side + '-host', host);
+        setVal('uatLive-' + side + '-port', port);
+        setVal('uatLive-' + side + '-path', path);
+        appendLog(side, '[mode] ' + c.name + ' selected. ' + (side === 'source' ? 'Source' : 'Target') + ' host ' + (host || 'n/a') + ', port ' + port + ', path ' + path);
+        return;
+      }
+    }
     var d = TYPE_DEFAULTS[type] || TYPE_DEFAULTS.frontend;
     setVal('uatLive-' + side + '-port', d.port);
     setVal('uatLive-' + side + '-path', d.path);
     appendLog(side, '[mode] ' + d.label + ' selected. Default port ' + d.port + ', path ' + d.path);
   };
+  if (document.readyState !== 'loading') { try { uatLivePopulateComponents(); } catch(e) {} }
+  else document.addEventListener('DOMContentLoaded', function(){ try { uatLivePopulateComponents(); } catch(e) {} });
   window.uatLiveLoadMobile = function(side) {
     var url = fullUrl(side, val('uatLive-' + side + '-path') || '/#');
     var frame = el('uatLive-' + side + '-frame');
@@ -10167,7 +10979,7 @@ ${certContent}
       }
     } catch(e) {}
     renderRows(side, side === 'source' ? '1' : '');
-    if ((side === 'source' || side === 'cutover-source') && val('uatLive-' + side + '-host')) window.uatLiveLoadMobile(side);
+    if ((side === 'source' || side === 'cutover-source' || side === 'cutoverc-source') && val('uatLive-' + side + '-host')) window.uatLiveLoadMobile(side);
     else appendLog(side, '[ready] Enter endpoint, load mobile, or run a service test.');
   }
   function retargetCloneIds(root, fromSide, toSide) {
@@ -10217,6 +11029,28 @@ ${certContent}
       cutoverBody.appendChild(cutTitle);
       cutoverBody.appendChild(cutBench);
     }
+    var cutoverCPanel = el('panel-s5c');
+    var cutoverCBody = cutoverCPanel && cutoverCPanel.querySelector('.info-panel');
+    if (bench && cutoverCBody && !el('uatLiveCompareBenchCutoverC')) {
+      var cutCTitle = document.createElement('div');
+      cutCTitle.id = 'uatLiveCutoverCBottomTitle';
+      cutCTitle.className = 'uat-live-bottom-title';
+      cutCTitle.innerHTML = '<div>Source vs Target Business System Live Test</div><span>Stage 4C bottom validation bench</span>';
+      var cutCBench = bench.cloneNode(true);
+      cutCBench.id = 'uatLiveCompareBenchCutoverC';
+      retargetCloneIds(cutCBench, 'source', 'cutoverc-source');
+      retargetCloneIds(cutCBench, 'target', 'cutoverc-target');
+      var sHeadC = cutCBench.querySelector('.uat-live-side--source h3');
+      var tHeadC = cutCBench.querySelector('.uat-live-side--target h3');
+      var sBadgeC = cutCBench.querySelector('.uat-live-side--source .uat-live-badge');
+      var tBadgeC = cutCBench.querySelector('.uat-live-side--target .uat-live-badge');
+      if (sHeadC) sHeadC.textContent = 'Stage 4C Source Mobile UI';
+      if (tHeadC) tHeadC.textContent = 'Stage 4C Target Mobile UI';
+      if (sBadgeC) sBadgeC.textContent = 'STAGE 4C SOURCE';
+      if (tBadgeC) tBadgeC.textContent = 'STAGE 4C TARGET';
+      cutoverCBody.appendChild(cutCTitle);
+      cutoverCBody.appendChild(cutCBench);
+    }
   }
   function init() {
     if (!el('uatLiveCompareBench')) return;
@@ -10227,13 +11061,290 @@ ${certContent}
       restoreSide('cutover-source');
       restoreSide('cutover-target');
     }
+    if (el('uatLiveCompareBenchCutoverC')) {
+      restoreSide('cutoverc-source');
+      restoreSide('cutoverc-target');
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
 </script>
 
+<script>
+/* ── Stage 3 UAT: Component Test Lab — source-vs-target device mockups
+   for every non-frontend business-system component. Web Frontend / Mobile
+   UI keeps the existing phone mockup above, untouched. ──────────────────── */
+(function() {
+  'use strict';
+  function $id(id){ return document.getElementById(id); }
+  function _esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]); }); }
+  function _host(u){ var m=String(u||'').match(/^[a-zA-Z][\w+.-]*:\/\/([^\/:]+)/); if(m) return m[1]; m=String(u||'').match(/^([^\/:]+)/); return m?m[1]:''; }
+  function _port(u){ var m=String(u||'').match(/:(\d+)(?:\/|$)/); return m?m[1]:''; }
+  function _scheme(u){ var m=String(u||'').match(/^([a-zA-Z][\w+.-]*):\/\//); return m?m[1]:'http'; }
 
+  /* Device type detection — same rules as spec's getComponentDeviceType() */
+  function _deviceType(role) {
+    var r = (role || '').toLowerCase();
+    if (r.indexOf('frontend') >= 0 || r.indexOf('mobile') >= 0 || (r.indexOf('web') >= 0 && r.indexOf('gateway') < 0)) return 'mobile_phone';
+    if (r.indexOf('gateway') >= 0) return 'api_console_tablet';
+    if (r.indexOf('auth') >= 0 || r.indexOf('sso') >= 0 || r.indexOf('identity') >= 0) return 'auth_security_device';
+    if (r.indexOf('backend') >= 0 || r.indexOf('core') >= 0 || r.indexOf('ledger') >= 0) return 'backend_engine_rack';
+    if (r.indexOf('database') >= 0 || r.indexOf('postgres') >= 0 || r.indexOf('mysql') >= 0 || r.indexOf('db') >= 0) return 'database_console';
+    if (r.indexOf('cache') >= 0 || r.indexOf('redis') >= 0) return 'cache_memory_chip';
+    if (r.indexOf('queue') >= 0 || r.indexOf('rabbit') >= 0 || r.indexOf('kafka') >= 0) return 'queue_conveyor';
+    if (r.indexOf('worker') >= 0 || r.indexOf('cron') >= 0 || r.indexOf('batch') >= 0) return 'worker_factory';
+    if (r.indexOf('monitor') >= 0 || r.indexOf('observ') >= 0 || r.indexOf('logging') >= 0) return 'monitoring_noc_wall';
+    if (r.indexOf('api') >= 0 || r.indexOf('service') >= 0) return 'service_console';
+    return 'service_console';
+  }
+  /* HTTP-testable device types run real Health/Ready/Smoke/Perf through the
+     server-side probe below. Everything else needs a protocol-specific
+     client (psql/redis-cli/rabbitmqctl/ssh) this app doesn't run yet, so
+     those show a copyable command + a manual PASS/WARNING/BLOCKED verdict —
+     the "simulated until the command API is wired" fallback the spec allows. */
+  var HTTP_TYPES = { api_console_tablet:1, service_console:1, backend_engine_rack:1, auth_security_device:1 };
+  var THEMES = {
+    api_console_tablet:  { icon:'📶', color:'#7c3aed', bg:'#f5f3ff', label:'API Console Tablet' },
+    service_console:      { icon:'🖥️', color:'#0891b2', bg:'#ecfeff', label:'Service Console' },
+    backend_engine_rack:  { icon:'⚙️', color:'#475569', bg:'#f1f5f9', label:'Backend Engine Rack' },
+    auth_security_device: { icon:'🔒', color:'#b45309', bg:'#fffbeb', label:'Security Lock Device' },
+    database_console:     { icon:'🗄️', color:'#dc2626', bg:'#fef2f2', label:'Database Console' },
+    cache_memory_chip:    { icon:'⚡', color:'#d97706', bg:'#fff7ed', label:'Cache Memory Chip' },
+    queue_conveyor:       { icon:'📦', color:'#7c3aed', bg:'#f5f3ff', label:'Queue Conveyor Belt' },
+    worker_factory:       { icon:'🏭', color:'#334155', bg:'#f8fafc', label:'Worker Factory' },
+    monitoring_noc_wall:  { icon:'📊', color:'#059669', bg:'#ecfdf5', label:'NOC Wall Dashboard' }
+  };
+  var STATUS_PILL = {
+    NOT_RUN:{c:'#64748b',bg:'#f1f5f9',l:'NOT RUN'}, PASS:{c:'#16a34a',bg:'#eafaf0',l:'PASS'},
+    WARNING:{c:'#9a5b00',bg:'#fff7df',l:'WARNING'}, BLOCKED:{c:'#dc2626',bg:'#fff0f0',l:'BLOCKED'}
+  };
+  function _pill(st){ var s=STATUS_PILL[st]||STATUS_PILL.NOT_RUN; return '<span style="display:inline-flex;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:800;color:'+s.c+';background:'+s.bg+';border:1px solid '+s.c+'33;">'+s.l+'</span>'; }
+
+  var CTL = { components: [], results: {}, sysId: '' };
+  try { CTL.results = JSON.parse(localStorage.getItem('uatComponentTestResults') || '{}'); } catch(e) {}
+
+  function _loadComponents() {
+    var sys = null;
+    try {
+      var raw = JSON.parse(localStorage.getItem('uatS1_systems') || 'null') || [];
+      var list = raw.filter(function(s){ return s.status !== 'Draft'; }); if (!list.length) list = raw;
+      list.sort(function(a,b){ return new Date(b.createdAt||0) - new Date(a.createdAt||0); });
+      sys = list[0] || null;
+    } catch(e) {}
+    if (!sys) { CTL.components = []; CTL.sysId = ''; return; }
+    CTL.sysId = sys.id || sys.name || '';
+    CTL.components = (sys.components || []).map(function(c, i) {
+      var type = _deviceType(c.name);
+      return {
+        id: 'c' + i, name: c.name || ('Component ' + (i+1)), type: type,
+        sourceUrl: c.src || '', targetUrl: c.tgt || '',
+        sourceHost: _host(c.src), targetHost: _host(c.tgt),
+        port: _port(c.tgt) || _port(c.src) || '',
+        healthPath: (String(c.path||'').charAt(0) === '/') ? c.path : '/health',
+        sshUser: 'ubuntu', sshKey: '~/.ssh/id_rsa'
+      };
+    }).filter(function(c){ return c.type !== 'mobile_phone'; }); // frontend keeps the existing bench
+  }
+
+  function _resultKey(compId){ return CTL.sysId + '::' + compId; }
+  function _setStatus(comp, status) {
+    CTL.results[_resultKey(comp.id)] = { status: status, ts: new Date().toLocaleString(), name: comp.name };
+    try { localStorage.setItem('uatComponentTestResults', JSON.stringify(CTL.results)); } catch(e) {}
+    var badge = $id('uatCtlStatus-' + comp.id);
+    if (badge) badge.innerHTML = _pill(status);
+  }
+  function _getStatus(comp) { return (CTL.results[_resultKey(comp.id)] || {}).status || 'NOT_RUN'; }
+
+  /* Real server-side probe — avoids browser CORS, same endpoint the tester
+     UI already uses elsewhere in this app. */
+  function _probe(url) {
+    return fetch('/api/uat/test-proxy', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url: url, method: 'GET', timeout: 6 })
+    }).then(function(r){ return r.json(); }).catch(function(e){ return { ok:false, error:String(e) }; });
+  }
+  function _verdictFromProbes(srcRes, tgtRes) {
+    var srcOk = srcRes && srcRes.ok && [200,204,301,302].indexOf(srcRes.status) >= 0;
+    var tgtOk = tgtRes && tgtRes.ok && [200,204,301,302].indexOf(tgtRes.status) >= 0;
+    if (!tgtOk) return 'BLOCKED';
+    if (!srcOk) return 'WARNING';
+    if (srcRes.elapsed_ms && tgtRes.elapsed_ms && tgtRes.elapsed_ms > srcRes.elapsed_ms * 1.25) return 'WARNING';
+    return 'PASS';
+  }
+  function _resultCell(res) {
+    if (!res) return '<span style="color:#94a3b8;">—</span>';
+    if (res.error) return '<span style="color:#dc2626;">' + _esc(res.error) + '</span>';
+    var ok = res.ok && [200,204,301,302].indexOf(res.status) >= 0;
+    return '<span style="font-weight:700;color:' + (ok?'#16a34a':'#dc2626') + ';">' + (res.status||'—') + '</span>'
+      + ' <span style="color:#64748b;">' + (res.elapsed_ms!=null?res.elapsed_ms+'ms':'') + '</span>';
+  }
+
+  function _runHttpStep(comp, path, termId, tableId) {
+    var term = $id(termId), table = $id(tableId);
+    var srcUrl = comp.sourceUrl ? (_scheme(comp.sourceUrl) + '://' + comp.sourceHost + (comp.port?':'+comp.port:'') + path) : '';
+    var tgtUrl = _scheme(comp.targetUrl||'http') + '://' + comp.targetHost + (comp.port?':'+comp.port:'') + path;
+    if (term) term.textContent += '\n$ probe SOURCE ' + (srcUrl||'(no source host)') + '\n$ probe TARGET ' + tgtUrl + '\n';
+    return Promise.all([ srcUrl ? _probe(srcUrl) : Promise.resolve(null), _probe(tgtUrl) ]).then(function(r) {
+      var src = r[0], tgt = r[1];
+      if (term) term.textContent += 'source: ' + JSON.stringify({status:src&&src.status, ms:src&&src.elapsed_ms, error:src&&src.error}) + '\n'
+        + 'target: ' + JSON.stringify({status:tgt&&tgt.status, ms:tgt&&tgt.elapsed_ms, error:tgt&&tgt.error}) + '\n';
+      if (table) {
+        table.style.display = '';
+        table.innerHTML = (table.innerHTML.indexOf('<thead') >= 0 ? table.innerHTML.replace(/<tbody.*<\/tbody>/s, '') : '<thead><tr><th>Test</th><th>Source</th><th>Target</th></tr></thead>')
+          + '<tbody>' + (table.querySelector('tbody')?table.querySelector('tbody').innerHTML:'')
+          + '<tr><td>' + path + '</td><td>' + _resultCell(src) + '</td><td>' + _resultCell(tgt) + '</td></tr></tbody>';
+      }
+      var v = _verdictFromProbes(src, tgt);
+      _setStatus(comp, v);
+      return v;
+    });
+  }
+  window.uatCtlRunTest = function(compId, kind) {
+    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
+    var termId = 'uatCtlTerm-'+compId, tableId = 'uatCtlTable-'+compId;
+    var term = $id(termId); if (term) term.style.display = '';
+    if (kind === 'health') return _runHttpStep(comp, comp.healthPath || '/health', termId, tableId);
+    if (kind === 'ready')  return _runHttpStep(comp, '/ready', termId, tableId);
+    if (kind === 'smoke')  return _runHttpStep(comp, '/', termId, tableId);
+    if (kind === 'perf') {
+      if (term) term.textContent += '\n$ perf loop (5 requests) against TARGET ' + comp.targetHost + '\n';
+      var url = _scheme(comp.targetUrl||'http') + '://' + comp.targetHost + (comp.port?':'+comp.port:'') + (comp.healthPath||'/health');
+      var times = [], errs = 0, n = 5, i = 0;
+      function next() {
+        if (i >= n) {
+          times.sort(function(a,b){return a-b;});
+          var avg = times.length ? Math.round(times.reduce(function(a,b){return a+b;},0)/times.length) : 0;
+          var p95 = times.length ? times[Math.min(times.length-1, Math.ceil(times.length*0.95)-1)] : 0;
+          var errPct = ((errs/n)*100).toFixed(0);
+          if (term) term.textContent += 'avg=' + avg + 'ms p95=' + p95 + 'ms error%=' + errPct + '\n';
+          var table = $id(tableId);
+          if (table) { table.style.display=''; table.innerHTML='<thead><tr><th colspan="3">Perf (5 req)</th></tr></thead><tbody><tr><td>avg '+avg+'ms</td><td>p95 '+p95+'ms</td><td>error '+errPct+'%</td></tr></tbody>'; }
+          _setStatus(comp, errs > 0 ? 'WARNING' : 'PASS');
+          return;
+        }
+        i++;
+        _probe(url).then(function(res) {
+          if (res && res.ok) times.push(res.elapsed_ms||0); else errs++;
+          next();
+        });
+      }
+      next();
+      return;
+    }
+  };
+  window.uatCtlCompare = function(compId) {
+    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
+    Promise.resolve(uatCtlRunTest(compId, 'health'));
+  };
+  window.uatCtlCopyCommand = function(compId) {
+    var pre = $id('uatCtlCmd-' + compId);
+    if (!pre) return;
+    var text = pre.textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function(){});
+    var status = $id('uatCtlManualStatus-' + compId);
+    if (status) status.textContent = 'Command copied — run on the tester/HAProxy host.';
+  };
+  window.uatCtlSetManualStatus = function(compId, status) {
+    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
+    _setStatus(comp, status);
+    var el = $id('uatCtlManualStatus-' + compId);
+    if (el) el.textContent = 'Marked ' + status + ' by operator at ' + new Date().toLocaleString() + '.';
+  };
+  window.uatCtlSaveEvidence = function(compId) {
+    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
+    var evidence = {
+      business_system_id: CTL.sysId, component_id: comp.id, component_name: comp.name, component_type: comp.type,
+      source_url: comp.sourceUrl, target_url: comp.targetUrl, status: _getStatus(comp),
+      terminal_log: ($id('uatCtlTerm-'+compId)||{}).textContent || '', saved_at: new Date().toISOString()
+    };
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(evidence,null,2)],{type:'application/json'}));
+    a.download = (comp.name||'component').replace(/[^a-z0-9]+/ig,'_') + '_evidence.json';
+    a.click();
+    var status = $id('uatCtlManualStatus-' + compId) || $id('uatCtlHttpStatus-' + compId);
+    if (status) status.textContent = 'Evidence saved ' + new Date().toLocaleString() + '.';
+  };
+
+  function _manualCommand(comp) {
+    var t = comp.type;
+    if (t === 'database_console') {
+      return 'SOURCE_DB_HOST="'+comp.sourceHost+'"\nTARGET_DB_HOST="'+comp.targetHost+'"\nDB_PORT="'+(comp.port||5432)+'"\n\n'
+        + 'echo "Source SELECT 1"\nPGPASSWORD="$DB_PASSWORD" psql -h "$SOURCE_DB_HOST" -p "$DB_PORT" -U "$DB_USER" -c "SELECT 1;"\n\n'
+        + 'echo "Target SELECT 1"\nPGPASSWORD="$DB_PASSWORD" psql -h "$TARGET_DB_HOST" -p "$DB_PORT" -U "$DB_USER" -c "SELECT 1;"';
+    }
+    if (t === 'cache_memory_chip') {
+      return 'SOURCE_REDIS="'+comp.sourceHost+'"\nTARGET_REDIS="'+comp.targetHost+'"\nREDIS_PORT="'+(comp.port||6379)+'"\n\n'
+        + 'redis-cli -h "$SOURCE_REDIS" -p "$REDIS_PORT" PING\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" PING\n\n'
+        + 'redis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" SET cutover:test "ok"\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" GET cutover:test\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" DEL cutover:test';
+    }
+    if (t === 'queue_conveyor') {
+      return 'TARGET_HOST="'+comp.targetHost+'"\nPORT="'+(comp.port||5672)+'"\n\n'
+        + 'nc -vz "$TARGET_HOST" "$PORT"\ncurl -u "$RABBIT_USER:$RABBIT_PASS" "http://$TARGET_HOST:15672/api/queues" | jq \'.[] | {name, messages, consumers}\'';
+    }
+    if (t === 'worker_factory') {
+      return 'ssh -i "'+comp.sshKey+'" -o StrictHostKeyChecking=no "'+comp.sshUser+'@'+(comp.targetHost||'TARGET-IP')+'" \'\n'
+        + '  echo "Worker services:"; systemctl --type=service --state=running | egrep "worker|celery|cron|scheduler|batch" || true\n'
+        + '  echo "Cron entries:"; crontab -l || true\n\'';
+    }
+    if (t === 'monitoring_noc_wall') {
+      return 'ssh -i "'+comp.sshKey+'" -o StrictHostKeyChecking=no "'+comp.sshUser+'@'+(comp.targetHost||'TARGET-IP')+'" \'\n'
+        + '  uptime; free -h; df -h\n  sudo journalctl -p warning -n 80 --no-pager || true\n\'';
+    }
+    return '# no command template for this component type';
+  }
+
+  function _render() {
+    _loadComponents();
+    var count = $id('uatCtlCount'); if (count) count.textContent = CTL.components.length + ' component' + (CTL.components.length===1?'':'s');
+    var el = $id('uatCtlCards'); if (!el) return;
+    if (!CTL.components.length) { el.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">No non-frontend components in the current business system yet.</div>'; return; }
+    el.innerHTML = CTL.components.map(function(c) {
+      var theme = THEMES[c.type] || THEMES.service_console;
+      var isHttp = !!HTTP_TYPES[c.type];
+      var status = _getStatus(c);
+      return '<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:'+theme.bg+';border-bottom:1px solid #e2e8f0;">'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
+        + '<span style="font-size:16px;">'+theme.icon+'</span>'
+        + '<div><div style="font-weight:800;color:#0f172a;">'+_esc(c.name)+'</div>'
+        + '<div style="font-size:10px;color:'+theme.color+';font-weight:700;text-transform:uppercase;letter-spacing:.04em;">'+theme.label+'</div></div>'
+        + '</div>'
+        + '<div style="text-align:right;font-size:11px;color:#64748b;">'
+        + _esc(c.sourceHost||'—')+' → '+_esc(c.targetHost||'—')+(c.port?(':'+_esc(c.port)):'')
+        + '<div id="uatCtlStatus-'+c.id+'" style="margin-top:3px;">'+_pill(status)+'</div></div>'
+        + '</div>'
+        + '<div style="padding:12px 14px;">'
+        + (isHttp
+          ? ('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'
+            + '<button class="uat-s1-btn-primary" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'health\')">Health</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'ready\')">Ready</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'smoke\')">Smoke</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'perf\')">Perf</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlCompare(\''+c.id+'\')">Compare</button>'
+            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSaveEvidence(\''+c.id+'\')">Save Evidence</button>'
+            + '</div>'
+            + '<pre id="uatCtlTerm-'+c.id+'" style="display:none;margin:0 0 8px;background:#0f172a;color:#a5f3fc;font-size:10px;padding:8px;border-radius:6px;max-height:110px;overflow:auto;white-space:pre-wrap;"></pre>'
+            + '<table id="uatCtlTable-'+c.id+'" style="display:none;width:100%;font-size:11px;border-collapse:collapse;"></table>'
+            + '<div id="uatCtlHttpStatus-'+c.id+'" style="font-size:11px;color:#64748b;margin-top:6px;"></div>')
+          : ('<div style="font-size:11px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;margin-bottom:8px;">Run on tester host — no in-app runner for this protocol yet.</div>'
+            + '<pre id="uatCtlCmd-'+c.id+'" style="margin:0 0 8px;background:#0f172a;color:#a5f3fc;font-size:10px;padding:8px;border-radius:6px;max-height:130px;overflow:auto;white-space:pre-wrap;">'+_esc(_manualCommand(c))+'</pre>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlCopyCommand(\''+c.id+'\')">Copy Command</button>'
+            + '<button class="uat-s1-btn-primary" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSetManualStatus(\''+c.id+'\',\'PASS\')">Mark PASS</button>'
+            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSetManualStatus(\''+c.id+'\',\'WARNING\')">Mark WARNING</button>'
+            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;color:#dc2626;" onclick="uatCtlSetManualStatus(\''+c.id+'\',\'BLOCKED\')">Mark BLOCKED</button>'
+            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSaveEvidence(\''+c.id+'\')">Save Evidence</button>'
+            + '</div>'
+            + '<div id="uatCtlManualStatus-'+c.id+'" style="font-size:11px;color:#64748b;"></div>'))
+        + '</div></div>';
+    }).join('');
+  }
+  window.uatCtlRefresh = _render;
+  if (document.readyState !== 'loading') _render();
+  else document.addEventListener('DOMContentLoaded', _render);
+})();
+</script>
 
 <script>
 /* ── Stage 0: 3D Cloud Fly-Through ─────────────────────────────────────── */

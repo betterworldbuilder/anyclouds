@@ -1,0 +1,56 @@
+{
+  "source": "flex_business_system",
+  "sourcePlatform": "flex",
+  "captureMethod": "SMART_SNAPSHOT_CAPTURE",
+  "businessSystem": "Amazon",
+  "conversionEngine": "APPS_to_Container_Refactor_Engine",
+  "cloudNativeStatus": "CLOUD_NATIVE_READY",
+  "workloads": [
+    {
+      "name": "Web Frontend",
+      "kind": "Deployment"
+    },
+    {
+      "name": "API Gateway",
+      "kind": "Deployment"
+    },
+    {
+      "name": "API Server",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Product Catalog Backend",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Database",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Cache",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Queue",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Payment Connector",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Order Worker",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Search Service",
+      "kind": "Deployment"
+    },
+    {
+      "name": "Monitoring",
+      "kind": "Deployment"
+    }
+  ],
+  "externalServices": [],
+  "warnings": []
+}

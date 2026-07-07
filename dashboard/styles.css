@@ -714,6 +714,7 @@ body.tco-compare-mode .component-scroll .tco-table {
 
 .tco-compare-mode .summary,
 .tco-compare-mode #ospcDetailTcoPanel,
+.tco-compare-mode #ospcPerCompPanel,
 .tco-compare-mode #sourceChartPanel,
 .tco-compare-mode #tablePanel,
 .tco-compare-mode .upload-panel,

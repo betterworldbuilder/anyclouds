@@ -98,8 +98,8 @@
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <div class="ud-mode-pill">
-                    <button id="uat-mode-compact" class="ud-mode-btn ud-mode-btn--on" onclick="uatSetMode('compact')">Compact</button>
-                    <button id="uat-mode-detailed" class="ud-mode-btn" onclick="uatSetMode('detailed')">Detailed</button>
+                    <button id="uat-mode-compact" class="ud-mode-btn" onclick="uatSetMode('compact')">Compact</button>
+                    <button id="uat-mode-detailed" class="ud-mode-btn ud-mode-btn--on" onclick="uatSetMode('detailed')">Detailed</button>
                   </div>
                   <button class="ud-export-btn" onclick="uatDownloadFullCsv ? uatDownloadFullCsv() : null">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -122,17 +122,8 @@
   <!-- ── Top bar ───────────────────────────────────────────── -->
   <div class="uat-s1-topbar">
     <div class="uat-s1-title">
-      <h2>Stage 3 — UAT Validation &amp; Business System Scope</h2>
+      <h2>Select Business System for UAT</h2>
       <p>Define complete business systems, generate component tests, and export a cutover-ready package.</p>
-    </div>
-    <div class="uat-s1-toolbar">
-      <div class="uat-s1-views">
-        <button class="uat-s1-tab active" onclick="uatS1SetView('systems')">Business System Target List</button>
-        <button class="uat-s1-tab" onclick="uatS1SetView('servers')">Server DB Target List</button>
-      </div>
-      <button class="uat-s1-btn-primary" onclick="uatS1OpenModal()">+ Add Business System</button>
-      <button class="uat-s1-btn-soft"    onclick="uatS1OpenSaModal()">+ Add Server / DB</button>
-      <button class="uat-s1-btn-soft"    onclick="uatS1ExportPackage()">Export UAT Package</button>
     </div>
   </div>
 
@@ -287,6 +278,90 @@
     </div>
   </div>
 
+  <!-- ══ Component Test Lab — source-vs-target test bench per component,
+       one themed device mockup per component type. The mobile phone mockup
+       above (Web Frontend) is untouched; this covers every other role. ══ -->
+  <div class="uat-s1-card">
+    <div class="uat-s1-card-head">
+      <div>
+        <div style="font-weight:800;color:#0f172a;">Component Test Lab</div>
+        <div style="font-size:12px;color:#64748b;">Run source-vs-target terminal tests for each business system component and save cutover evidence.</div>
+      </div>
+      <span class="uat-s1-pill blue" id="uatCtlCount">0 components</span>
+    </div>
+    <div class="uat-s1-card-body">
+      <div id="uatCtlCards" style="display:flex;flex-direction:column;gap:12px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Current FLEX VMs (live FLEX2FLEX scanner, no credentials/jump host shown) ── -->
+  <!-- ── Source OSPC VMs (live scan — reuses Stage 4's scanner engine) ── -->
+  <div class="uat-s1-card" id="uatS1OspcVmSection">
+    <div class="uat-s1-card-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;border-radius:10px;background:#fff0f0;color:#dc2626;display:grid;place-items:center;font-weight:900;font-size:11px;">VM</div>
+        <div>
+          <div style="font-weight:800;color:#0f172a;">Source OSPC VMs</div>
+          <div style="font-size:12px;color:#64748b;">Live OSPC region scan — source VM names and IPs so Automatic Business System Mapping can fill both source and target per component. Uses the OSPC credentials cached from Stage 4 — Cutover &amp; Traffic Transition.</div>
+        </div>
+      </div>
+      <span class="uat-s1-pill red"><span id="uatS1OspcVmCount">0</span> VMs</span>
+    </div>
+    <div class="uat-s1-card-body">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Region
+          <select class="uat-input" id="uatS1OspcVmRegion" style="min-width:160px;">
+            <option value="">All / cached region</option>
+            <option value="IAD">IAD</option><option value="DFW">DFW</option><option value="ORD">ORD</option>
+            <option value="HKG">HKG</option><option value="SYD">SYD</option><option value="LON">LON</option>
+            <option value="SJC">SJC</option>
+          </select>
+        </label>
+        <button class="uat-s1-btn-primary" onclick="uatS1ScanOspcVms()">Scan OSPC Region</button>
+        <span class="uat-note" id="uatS1OspcVmStatus" style="align-self:center;">Not scanned yet.</span>
+      </div>
+      <div class="uat-s1-table-wrap">
+        <table>
+          <thead><tr><th>Region</th><th>Name</th><th>Server ID</th><th>Public IP</th><th>Private IP</th><th>Flavor</th><th>Networks</th><th>Status</th></tr></thead>
+          <tbody id="uatS1OspcVmBody"><tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">No scan run yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="uat-s1-card" id="uatS1FlexVmSection">
+    <div class="uat-s1-card-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;border-radius:10px;background:#eef2ff;color:#4338ca;display:grid;place-items:center;font-weight:900;font-size:11px;">VM</div>
+        <div>
+          <div style="font-weight:800;color:#0f172a;">Current FLEX VMs</div>
+          <div style="font-size:12px;color:#64748b;">Live FLEX2FLEX scan — shows the running VMs and IP addresses already in a FLEX region. Uses the FLEX credentials cached from Stage 4 — Cutover &amp; Traffic Transition.</div>
+        </div>
+      </div>
+      <span class="uat-s1-pill blue"><span id="uatS1FlexVmCount">0</span> VMs</span>
+    </div>
+    <div class="uat-s1-card-body">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Region
+          <select class="uat-input" id="uatS1FlexVmRegion" style="min-width:160px;">
+            <option value="">All / cached region</option>
+            <option value="IAD3">IAD3</option><option value="DFW3">DFW3</option><option value="DFW">DFW</option>
+            <option value="IAD">IAD</option><option value="ORD">ORD</option><option value="SJC3">SJC3</option>
+            <option value="LON">LON</option><option value="SYD">SYD</option><option value="HKG">HKG</option>
+          </select>
+        </label>
+        <button class="uat-s1-btn-primary" onclick="uatS1ScanFlexVms()">Scan FLEX Region</button>
+        <span class="uat-note" id="uatS1FlexVmStatus" style="align-self:center;">Not scanned yet.</span>
+      </div>
+      <div class="uat-s1-table-wrap">
+        <table>
+          <thead><tr><th>Region</th><th>Name</th><th>Server ID</th><th>Public IP</th><th>Private IP</th><th>Flavor</th><th>Networks</th><th>Status</th></tr></thead>
+          <tbody id="uatS1FlexVmBody"><tr><td colspan="8" style="text-align:center;color:#64748b;padding:16px;">No scan run yet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Business Systems view ─────────────────────────────── -->
   <div id="uatS1SystemsView">
     <div class="uat-s1-card">
@@ -294,13 +369,12 @@
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="width:32px;height:32px;border-radius:10px;background:#eafaf0;color:#16a34a;display:grid;place-items:center;font-weight:900;">✓</div>
           <div>
-            <div style="font-weight:800;color:#0f172a;">Business Systems</div>
+            <div style="font-weight:800;color:#0f172a;">Select Business System for UAT</div>
             <div style="font-size:12px;color:#64748b;">Default view. Select or expand a business system to inspect components and generated UAT tests.</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="uat-s1-btn-muted" onclick="uatS1ImportJSON()">Import JSON</button>
-          <button class="uat-s1-btn-soft"  onclick="uatS1ExportSystems()">Export Systems</button>
+          <button class="uat-s1-btn-soft" onclick="uatS1AutoMapFromFlexVms()">Automatic Business System Mapping from Existing VMs</button>
         </div>
       </div>
       <div class="uat-s1-card-body">
@@ -397,13 +471,36 @@
 
               </section>
 
+              <div class="uat-s1-toolbar" style="margin:0 0 14px;">
+                <div class="uat-s1-views">
+                  <button class="uat-s1-tab active" onclick="uatS1SetView('systems')">Business System Target List</button>
+                  <button class="uat-s1-tab" onclick="uatS1SetView('servers')">Server DB Target List</button>
+                </div>
+                <button class="uat-s1-btn-primary" onclick="uatS1OpenModal()">+ Add Business System</button>
+                <button class="uat-s1-btn-soft"    onclick="uatS1OpenSaModal()">+ Add Server / DB</button>
+                <button class="uat-s1-btn-soft"    onclick="uatS1ExportPackage()">Export UAT Package</button>
+              </div>
+
                 <!-- STEP 2 -->
                 <section class="uat-panel" data-uat-step="2" style="display:none;">
                   <div class="uat-panel-header">
-                    <h3>Step 2 — Service Comparison: OSPC → FLEX</h3>
-                    <span class="uat-note">Auto-filled from Step 1 · SSH compares running systemd services</span>
+                    <h3>Step 2 — Apps Server Systems Comparisons</h3>
+                    <span class="uat-note">Auto-fed from Business Systems &amp; Standalone Servers/Databases (Step 1) · SSH compares running systemd services</span>
                   </div>
                   <div class="uat-panel-body">
+                    <div style="display:flex;flex-direction:column;gap:4px;font-size:13px;margin-bottom:12px;max-width:420px;">
+                      <label for="svc-compare-target">App / System to compare</label>
+                      <select class="uat-input" id="svc-compare-target" onchange="uatS1FillCompareFromTarget(this.value)">
+                        <option value="">— Select a standalone app/DB or a business system —</option>
+                      </select>
+                    </div>
+                    <div id="svc-compare-bs-components" class="uat-table-wrap" style="display:none;margin-bottom:12px;">
+                      <div class="uat-note" style="margin-bottom:6px;">Business system components — edit and confirm the source/target before comparing. Prefilled from the business system's saved IPs.</div>
+                      <table class="uat-table">
+                        <thead><tr><th>Component</th><th>OSPC Source IP / URL</th><th>FLEX Target IP / URL</th><th>Health / Test Path</th></tr></thead>
+                        <tbody id="svc-compare-bs-components-body"></tbody>
+                      </table>
+                    </div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px;">
                       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Source OSPC IP<input class="uat-input" id="svc-source-ip" placeholder="e.g. 10.1.2.100"></label>
                       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Target FLEX IP<input class="uat-input" id="svc-target-ip" placeholder="e.g. 10.2.3.200"></label>
@@ -416,6 +513,7 @@
                       <button class="uat-btn" onclick="uatCompareDbGlobal()" id="svc-compare-db-btn" style="background:#0e7490;border-color:#0891b2;">Compare DB</button>
                     </div>
                     <div id="svc-status" class="uat-note" style="margin-bottom:10px;min-height:18px;"></div>
+                    <div id="svc-compare-multi-results" style="display:none;margin-bottom:12px;"></div>
                     <div id="svc-summary" style="display:none;gap:10px;flex-wrap:wrap;margin-bottom:12px;"></div>
                     <div id="svc-analysis" style="display:none;margin-bottom:12px;"></div>
                     <div class="uat-table-wrap" id="svc-table-wrap" style="display:none;">
@@ -467,6 +565,9 @@
 
                     <!-- Parsed SSH results table — injected by buildPerfTable() -->
                     <div id="perf-parsed-result" style="display:none;margin-bottom:16px;background:rgba(8,16,48,0.7);border:1px solid rgba(148,163,184,0.15);border-radius:8px;overflow:hidden;"></div>
+
+                    <!-- Multi-server results — one card per business-system component, injected by perfRunSSHTestsMulti() -->
+                    <div id="perf-multi-results" style="display:none;margin-bottom:16px;"></div>
                   </div>
                 </section>
 
@@ -626,8 +727,8 @@
         window.uatNavTo = function(step, instant) {
           /* Update topbar title to reflect current step */
           var _TITLES = {
-            1: ['Stage 1 — Server Targets',           'Define business systems, standalone servers, and databases'],
-            2: ['Stage 2 — Service Comparison',     'OSPC → FLEX service-by-service comparison and validation'],
+            1: ['Select Business System for UAT',     'Define business systems, standalone servers, and databases'],
+            2: ['Stage 2 — Apps Server Systems Comparisons', 'Fed by Business Systems & Standalone Servers/Databases from Step 1'],
             3: ['Stage 3 — Performance Validation', 'Performance benchmarks and baseline comparison'],
             4: ['Stage 4 — Issues Tracker',         'Issue tracking, risk assessment and remediation'],
             5: ['Stage 5 — Cutover Readiness',      'Post-migration acceptance testing summary and decision']
@@ -640,16 +741,21 @@
           document.body.classList.add('uat-dashboard-active');
           var content = document.getElementById('uat-content');
           if (!content) return;
-          content.setAttribute('data-uat-mode', 'compact');
-          ['compact','detailed'].forEach(function(m) {
-            var btn = document.getElementById('uat-mode-' + m);
-            if (btn) btn.classList.toggle('ud-mode-btn--on', m === 'compact');
-          });
-          content.querySelectorAll('[data-uat-step]').forEach(function(panel) {
-            panel.style.display = Number(panel.getAttribute('data-uat-step')) === Number(step) ? '' : 'none';
-          });
-          var msg = document.getElementById('uat-message');
-          if (msg) msg.style.display = step === 5 ? 'none' : '';
+          /* Detailed mode: every step stays visible, jumping to a step just
+             scrolls to it. Compact mode: only the target step is shown —
+             this is how the sidebar step-links behave while Compact is on. */
+          var mode = content.getAttribute('data-uat-mode') || 'detailed';
+          if (mode === 'compact') {
+            content.querySelectorAll('[data-uat-step]').forEach(function(panel) {
+              panel.style.display = Number(panel.getAttribute('data-uat-step')) === Number(step) ? '' : 'none';
+            });
+            var msg = document.getElementById('uat-message');
+            if (msg) msg.style.display = step === 5 ? 'none' : '';
+          } else {
+            content.querySelectorAll('[data-uat-step]').forEach(function(panel) { panel.style.display = ''; });
+            var msg = document.getElementById('uat-message');
+            if (msg) msg.style.display = '';
+          }
           var theme = document.getElementById('top-theme-dropdown');
           if (theme) theme.style.display = 'none';
           document.querySelectorAll('#uat-sidebar .udsb-item').forEach(function(btn, idx) {
@@ -664,7 +770,7 @@
           content.scrollTo({ top: top - 10, behavior: instant ? 'auto' : 'smooth' });
         };
 
-        setTimeout(function() { if (window.uatSetMode) window.uatSetMode('compact', true); }, 0);
+        setTimeout(function() { if (window.uatSetMode) window.uatSetMode('detailed', true); }, 0);
 
         window.uatToggleSection = function(id) {
           var el = document.getElementById(id);
@@ -2788,6 +2894,17 @@ kubectl get pods,pvc,ingress -n &lt;namespace&gt;</pre>
     #panel-s4 .uat-panel [style*="color:#bfdbfe"],
     #panel-s4 .uat-panel [style*="color:#cbd5e1"],
     #panel-s4 .uat-panel [style*="color:#a0aec0"] { color: #ffffff !important; }
+
+    /* EXCEPTION: multi-server result cards + business-system component table
+       sit on white/light-gray sub-cards inside the dark step panels — their
+       text must stay dark or it's invisible (white on light gray). */
+    #panel-s4 .uat-panel #svc-compare-multi-results h4,
+    #panel-s4 .uat-panel #perf-multi-results h4 { color: #0f172a !important; }
+    #panel-s4 .uat-panel #svc-compare-multi-results p,
+    #panel-s4 .uat-panel #perf-multi-results p { color: #334155 !important; }
+    #panel-s4 .uat-panel #svc-compare-bs-components .uat-note,
+    #panel-s4 .uat-panel #svc-compare-multi-results .uat-note,
+    #panel-s4 .uat-panel #perf-multi-results .uat-note { color: #334155 !important; }
   </style>
 
   <!-- Stage 4 — Cutover & Traffic Transition -->
