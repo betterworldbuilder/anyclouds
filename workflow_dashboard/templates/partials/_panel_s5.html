@@ -7,11 +7,6 @@
         <h1 style="font-size:22px;font-weight:800;color:#1f2937;margin:0;text-shadow:none;">Stage 4 &mdash; Cutover &amp; Traffic Transition</h1>
       </div>
 
-      <!-- Manual credentials/scanner/pairing live here on Stage 4; while
-           Stage 4C is active this whole block is relocated into 4C's
-           "Advanced Manual Override" section (see activateStage()). -->
-      <div id="s5-manual-scope-anchor" style="display:none;"></div>
-      <div id="s5-manual-scope-home">
       <!-- 0. Cloud Credentials -->
       <div class="section-card">
         <div class="section-header">
@@ -252,13 +247,300 @@
           <div class="artifact-list" id="cutover_artifacts"><span style="color:#6b7280;">No cutover artifacts exported yet.</span></div>
         </div>
       </div>
-      </div><!-- /s5-manual-scope-home -->
 
-      <!-- Tester + cockpit + validation bench live here on Stage 4; while
-           Stage 4C is active this whole block is relocated into 4C
-           (see activateStage()). -->
-      <div id="s5-tester-cockpit-anchor" style="display:none;"></div>
+      <!-- Stage 4 → 4C single-live-copy relocation: everything from
+           "3. Cutover Test & Result CSV" through the Advanced Cutover
+           Dashboard moves into #s5c-tester-cockpit-mount while Stage 4C is
+           active and returns here (after the anchor) when leaving — see
+           activateStage() in _closing_scripts.html. -->
+      <div id="s5-tester-cockpit-anchor"></div>
       <div id="s5-tester-cockpit-home">
+
+      <!-- ── 3A. Business System Test Plan ──
+           Auto-generated from the locked UAT business-system scope: one row
+           per component (HTTP health for traffic-facing/backend, TCP probe
+           for stateful) plus system-level ramp/journey rows fed LIVE from
+           the monitor. The full config+perf frontend test stays in the
+           Cutover Tester below (section 3) — this plan links to it. -->
+      <div class="section-card" id="bstp-card">
+        <div class="section-header">
+          <div class="section-header-left">
+            <div class="section-icon"><i class="fas fa-list-check"></i></div>
+            <div class="section-title-group">
+              <h3>3A. Business System Test Plan</h3>
+              <p>One row per component of the selected business system. Frontend keeps its full test in the Cutover Tester below.</p>
+            </div>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" onclick="bstpBuildPlan(true)"><i class="fas fa-rotate"></i> Refresh Plan</button>
+            <button class="btn btn-primary" id="bstp-run-btn" onclick="bstpRunAll()"><i class="fas fa-play"></i> Run All Component Tests</button>
+            <button class="btn btn-warning" id="bstp-stop-btn" onclick="bstpStop()" style="display:none;"><i class="fas fa-stop"></i> Stop</button>
+            <button class="btn btn-secondary light" onclick="bstpExportCsv()"><i class="fas fa-file-csv"></i> Export Result CSV</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div id="bstp-status" style="font-size:13px;color:#6b7280;">No plan built yet.</div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#374151;">
+              <input type="checkbox" id="bstp-failfast"> Stop on first critical failure
+            </label>
+          </div>
+          <div id="bstp-verdict" style="display:none;margin-bottom:12px;padding:12px 16px;border-radius:8px;font-size:14px;font-weight:800;"></div>
+          <div class="table-scroll-shell">
+            <div class="table-scroll-x">
+              <table class="matrix-table" style="font-size:12px;">
+                <thead><tr>
+                  <th>#</th><th>component</th><th>tier</th><th>test</th>
+                  <th>source</th><th>target</th>
+                  <th>source result</th><th>target result</th>
+                  <th>status</th><th>detail</th><th>action</th>
+                </tr></thead>
+                <tbody id="bstp-rows"><tr><td colspan="11"><div class="empty-state">Lock or select a business system, then Refresh Plan.</div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <p style="font-size:12px;color:#6b7280;margin-top:10px;line-height:1.5;">
+            <i class="fas fa-info-circle" style="color:var(--co-red);margin-right:6px;"></i>
+            <b>PASS</b> = target answered. Traffic-facing rows probe the health path over HTTP; stateful rows (DB / cache / queue) prove the target port is open via TCP.
+            The <b>Traffic Ramp</b> and <b>E2E Journey</b> rows are filled live by the Cutover Tester (Phase&nbsp;2) and the Live Mobile Cutover Monitor.
+          </p>
+        </div>
+      </div>
+      <script>
+      (function(){
+        'use strict';
+        function $id(x){ return document.getElementById(x); }
+        function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+        var TRAFFIC = {web_frontend:1, api_gateway:1, api_server:1};
+        var STATEFUL = {database:1, cache:1, queue:1};
+        var P = { rows:[], running:false, stopFlag:false, runId:null, system:'' };
+
+        function typeFromRole(role){
+          var r=(role||'').toLowerCase();
+          if(r.indexOf('frontend')>=0||r.indexOf('mobile')>=0) return 'web_frontend';
+          if(r.indexOf('gateway')>=0) return 'api_gateway';
+          if(r.indexOf('api')>=0) return 'api_server';
+          if(r.indexOf('database')>=0||r.indexOf('db')>=0) return 'database';
+          if(r.indexOf('cache')>=0) return 'cache';
+          if(r.indexOf('queue')>=0) return 'queue';
+          return 'app_server';
+        }
+        function hostOf(v){
+          var m=String(v||'').trim().match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/([^\/:]+)/);
+          if(m) return m[1];
+          m=String(v||'').trim().match(/^([^\/:]+)/); return m?m[1]:'';
+        }
+        function badTarget(t){ return !t || /^(flex-ip|tbd|todo|-+)$/i.test(String(t).trim()); }
+
+        function loadScope(){
+          var scope=null;
+          try{ scope=JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope')||'null'); }catch(e){}
+          if(scope && scope.components && scope.components.length) return scope;
+          /* fallback: newest UAT system, minimally normalized */
+          var raw=null;
+          try{ raw=JSON.parse(localStorage.getItem('uatS1_systems')||'null'); }catch(e){}
+          if(!raw||!raw.length) return null;
+          var sys=raw.slice().sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); })[0];
+          return { business_system_name: sys.name, components:(sys.components||[]).map(function(c){
+            var tp=typeFromRole(c.name);
+            var pm=String(c.tgt||c.src||'').match(/:(\d+)(?:\/|$)/);
+            return { name:c.name, type:tp, source:hostOf(c.src), target:hostOf(c.tgt),
+              port:pm?pm[1]:'', healthUrl:c.path||'', selected:true, critical:tp==='database',
+              trafficFacing:!!TRAFFIC[tp], stateful:!!STATEFUL[tp] };
+          })};
+        }
+        function liveGate(key){
+          try{
+            var s=JSON.parse(localStorage.getItem('outputs_cutover_live_gate_snapshot')||'null');
+            return (s&&s[key])||'NOT RUN';
+          }catch(e){ return 'NOT RUN'; }
+        }
+
+        window.bstpBuildPlan = function(announce){
+          var scope=loadScope();
+          if(!scope){
+            $id('bstp-status').innerHTML='<span style="color:#dc2626;font-weight:600;">No business system found — lock a scope in "Select Business System for Cutover" first.</span>';
+            $id('bstp-rows').innerHTML='<tr><td colspan="11"><div class="empty-state">No business system available.</div></td></tr>';
+            return;
+          }
+          P.system=scope.business_system_name||'business system';
+          P.rows=(scope.components||[]).filter(function(c){ return c.selected!==false; }).map(function(c,i){
+            var tp=c.type||typeFromRole(c.name);
+            var stateful=('stateful' in c)?!!c.stateful:!!STATEFUL[tp];
+            var traffic=('trafficFacing' in c)?!!c.trafficFacing:!!TRAFFIC[tp];
+            return { n:i+1, kind:'component', name:c.name, tier:traffic?'traffic-facing':(stateful?'stateful':'backend'),
+              test:stateful?'TCP port probe':'HTTP health check',
+              source:c.source||'', target:c.target||'', port:c.port||'',
+              path:(String(c.healthUrl||'').charAt(0)==='/')?c.healthUrl:'/health',
+              stateful:stateful, traffic:traffic, critical:!!c.critical||stateful,
+              status:'PENDING', srcRes:'-', tgtRes:'-', detail:'' };
+          });
+          P.rows.push({ n:P.rows.length+1, kind:'ramp', name:'Traffic Ramp Proof (whole system)', tier:'system',
+            test:'Phase 2 in Cutover Tester below', source:'—', target:'—',
+            status:liveGate('traffic_ramp'), srcRes:'-', tgtRes:'-', detail:'One HAProxy ramp covers every component. LIVE from tester/monitor.' });
+          P.rows.push({ n:P.rows.length+1, kind:'journey', name:'End-to-End Mobile Journey', tier:'system',
+            test:'Live Mobile Cutover Monitor', source:'—', target:'—',
+            status:liveGate('business_validation'), srcRes:'-', tgtRes:'-', detail:'Login → summary → transfer → balance through the cutover URL. LIVE from monitor.' });
+          $id('bstp-status').textContent='Plan for "'+P.system+'" — '+(P.rows.length-2)+' component test(s) + ramp + journey.';
+          $id('bstp-verdict').style.display='none';
+          render();
+          if(announce) $id('bstp-status').textContent += ' (refreshed '+new Date().toLocaleTimeString()+')';
+        };
+
+        function chip(st){
+          var m={ PASS:['#16a34a','#eafaf0'], FAIL:['#dc2626','#fff0f0'], BLOCKED:['#dc2626','#fff0f0'],
+            RUNNING:['#1d4ed8','#eaf2ff'], PENDING:['#475569','#f1f5f9'], SKIPPED:['#475569','#f1f5f9'],
+            'NEEDS INPUT':['#9a5b00','#fff7df'], WARNING:['#9a5b00','#fff7df'], 'NOT RUN':['#475569','#f1f5f9'] };
+          var c=m[st]||m['NOT RUN'];
+          return '<span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:800;color:'+c[0]+';background:'+c[1]+';border:1px solid '+c[0]+'33;white-space:nowrap;">'+esc(st)+'</span>';
+        }
+        function sideRes(v){
+          if(v==='-'||v==null) return '<span style="color:#94a3b8;">—</span>';
+          var ok=String(v).indexOf('✓')===0;
+          return '<span style="font-weight:700;color:'+(ok?'#16a34a':'#dc2626')+';white-space:nowrap;">'+esc(v)+'</span>';
+        }
+        function render(){
+          var tb=$id('bstp-rows'); if(!tb) return;
+          tb.innerHTML=P.rows.map(function(r,idx){
+            var sys=r.kind!=='component';
+            var action=sys?'':('<button class="btn btn-secondary light" style="font-size:10px;padding:3px 8px;" onclick="bstpRunRow('+idx+')">Run</button>'
+              +(r.traffic?' <button class="btn btn-secondary light" style="font-size:10px;padding:3px 8px;" onclick="bstpFeedTester('+idx+')" title="Fill the Cutover Tester below with this pair — full config+perf test kept as-is.">Feed Tester</button>':''));
+            return '<tr style="'+(sys?'background:#f8fafc;':'')+'">'
+              + '<td>'+r.n+'</td>'
+              + '<td style="font-weight:700;color:#0f172a;">'+esc(r.name)+(r.critical&&!sys?' <span title="critical" style="color:#dc2626;">*</span>':'')+'</td>'
+              + '<td>'+esc(r.tier)+'</td><td style="font-size:11px;">'+esc(r.test)+'</td>'
+              + '<td style="white-space:nowrap;">'+esc(sys?'—':(r.source||'—')+(r.port&&r.source?':'+r.port:''))+'</td>'
+              + '<td style="white-space:nowrap;">'+esc(sys?'—':(r.target||'—')+(r.port&&r.target?':'+r.port:''))+'</td>'
+              + '<td>'+sideRes(r.srcRes)+'</td><td>'+sideRes(r.tgtRes)+'</td>'
+              + '<td>'+chip(r.status)+'</td>'
+              + '<td style="font-size:11px;color:#6b7280;max-width:260px;">'+esc(r.detail)+'</td>'
+              + '<td style="white-space:nowrap;">'+action+'</td></tr>';
+          }).join('');
+        }
+
+        async function probe(url){
+          var res=await fetch('/api/uat/test-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,timeout:8})});
+          return res.json();
+        }
+        async function runRow(r){
+          if(r.kind!=='component') return;
+          if(badTarget(r.target)){ r.status='NEEDS INPUT'; r.detail='Target endpoint missing — fill FLEX target IP in the matrix.'; return; }
+          if(!r.source){ r.status='NEEDS INPUT'; r.detail='Source endpoint missing.'; return; }
+          r.status='RUNNING'; r.detail=''; render();
+          var mk=r.stateful
+            ? function(h){ return 'tcp://'+h+':'+(r.port||'3306'); }
+            : function(h){ return 'http://'+h+(r.port?':'+r.port:'')+r.path; };
+          try{
+            var s=await probe(mk(r.source));
+            r.srcRes=(s.ok?'✓ ':'✗ ')+(r.stateful?(s.status||''):('HTTP '+(s.status||'ERR')))+' '+(s.elapsed_ms||0)+'ms';
+            var t=await probe(mk(r.target));
+            r.tgtRes=(t.ok?'✓ ':'✗ ')+(r.stateful?(t.status||''):('HTTP '+(t.status||'ERR')))+' '+(t.elapsed_ms||0)+'ms';
+            if(t.ok){ r.status='PASS'; r.detail=s.ok?'Source and target both answered.':'Target ready (source did not answer — verify if expected).'; if(!s.ok) r.status='WARNING'; }
+            else { r.status='FAIL'; r.detail='Target not answering: '+(t.reason||t.error||('HTTP '+(t.status||'ERR'))); }
+          }catch(e){ r.status='FAIL'; r.srcRes=r.srcRes==='-'?'✗ proxy error':r.srcRes; r.tgtRes='✗ proxy error'; r.detail='Probe failed: '+e.message; }
+        }
+        window.bstpRunRow = async function(idx){
+          var r=P.rows[idx]; if(!r||P.running) return;
+          await runRow(r); render(); verdict(); publishGates();
+        };
+        window.bstpRunAll = async function(){
+          if(P.running) return;
+          if(!P.rows.length || !P.rows.some(function(r){return r.kind==='component';})) bstpBuildPlan();
+          if(!P.rows.length) return;
+          P.running=true; P.stopFlag=false; P.runId='run_'+Date.now();
+          $id('bstp-run-btn').style.display='none'; $id('bstp-stop-btn').style.display='';
+          var failfast=!!($id('bstp-failfast')||{}).checked;
+          for(var i=0;i<P.rows.length;i++){
+            var r=P.rows[i];
+            if(r.kind!=='component') continue;
+            if(P.stopFlag){ if(r.status==='PENDING') { r.status='SKIPPED'; r.detail='Stopped by operator.'; } continue; }
+            await runRow(r); render();
+            if(failfast && r.critical && r.status==='FAIL'){
+              P.stopFlag=true; r.detail+=' — critical failure, remaining tests skipped.';
+            }
+          }
+          P.running=false;
+          $id('bstp-run-btn').style.display=''; $id('bstp-stop-btn').style.display='none';
+          verdict(); publishGates(); render();
+        };
+        window.bstpStop = function(){ P.stopFlag=true; };
+
+        function verdict(){
+          var comps=P.rows.filter(function(r){return r.kind==='component';});
+          if(!comps.length || comps.every(function(r){return r.status==='PENDING';})) return;
+          var v=$id('bstp-verdict'); if(!v) return;
+          var failCrit=comps.some(function(r){return r.critical&&(r.status==='FAIL');});
+          var anyFail=comps.some(function(r){return r.status==='FAIL';});
+          var pendingOrInput=comps.some(function(r){return r.status==='PENDING'||r.status==='NEEDS INPUT'||r.status==='SKIPPED';});
+          var warn=comps.some(function(r){return r.status==='WARNING';});
+          var txt, fg, bg;
+          if(failCrit){ txt='BLOCKED — critical component failed. Do not cut over. Fix targets, then re-run.'; fg='#991b1b'; bg='#fef2f2'; }
+          else if(anyFail){ txt='REVIEW — non-critical component failed. Cutover possible, review details below.'; fg='#92400e'; bg='#fffbeb'; }
+          else if(pendingOrInput){ txt='INCOMPLETE — some component tests have not run (or need target IPs).'; fg='#92400e'; bg='#fffbeb'; }
+          else if(warn){ txt='REVIEW — all targets ready, but some sources did not answer. Verify before ramping.'; fg='#92400e'; bg='#fffbeb'; }
+          else { txt='COMPONENTS READY — all '+comps.length+' component tests passed. Run Phase 2 ramp + mobile journey to finish.'; fg='#065f46'; bg='#ecfdf5'; }
+          v.textContent=txt; v.style.color=fg; v.style.background=bg; v.style.border='1px solid '+fg+'33'; v.style.display='block';
+        }
+
+        /* Publish stateful/backend aggregates into the shared live-gate snapshot
+           the Cutover Gates table already listens to (s5cSyncLiveGates). */
+        function publishGates(){
+          function agg(filter){
+            var rows=P.rows.filter(function(r){return r.kind==='component'&&filter(r);});
+            if(!rows.length) return null;
+            if(rows.some(function(r){return r.status==='FAIL';})) return 'BLOCKED';
+            if(rows.every(function(r){return r.status==='PASS';})) return 'PASS';
+            if(rows.some(function(r){return r.status==='WARNING';})) return 'WARNING';
+            return null;
+          }
+          var snap;
+          try{ snap=JSON.parse(localStorage.getItem('outputs_cutover_live_gate_snapshot')||'{}')||{}; }catch(e){ snap={}; }
+          var db=agg(function(r){return /database/i.test(r.name)||(r.stateful&&/db/i.test(r.name));});
+          var backend=agg(function(r){return !r.stateful&&!r.traffic;});
+          if(db) snap.db=db;
+          if(backend) snap.backend=backend;
+          snap.updated_at=new Date().toLocaleString();
+          try{ localStorage.setItem('outputs_cutover_live_gate_snapshot', JSON.stringify(snap)); }catch(e){}
+          try{ if(typeof window.s5cSyncLiveGates==='function') window.s5cSyncLiveGates(snap); }catch(e){}
+        }
+
+        window.bstpFeedTester = function(idx){
+          var r=P.rows[idx]; if(!r) return;
+          function set(id,v){ var n=$id(id); if(n) n.value=v; }
+          set('cutover_tester_source_url','http://'+r.source+(r.port?':'+r.port:''));
+          set('cutover_tester_target_url','http://'+r.target+(r.port?':'+r.port:''));
+          set('cutover_tester_health_path', r.path||'/health');
+          set('cutover_source_cutover_host', r.target);
+          try{ if(typeof cutoverSaveHaproxyConfigCache==='function') cutoverSaveHaproxyConfigCache(); }catch(e){}
+          try{ if(typeof cutoverTesterSyncHaproxyDisplay==='function') cutoverTesterSyncHaproxyDisplay(); }catch(e){}
+          $id('bstp-status').innerHTML='<span style="color:#16a34a;">✓ Fed "'+esc(r.name)+'" into the Cutover Tester below — run Dry Run / Cut over TEST there (full test kept as-is).</span>';
+        };
+
+        /* Read-only view of the plan state for the Stage 4C validation report. */
+        window.bstpGetResults = function(){ return { system:P.system, runId:P.runId, rows:P.rows.slice() }; };
+        window.bstpExportCsv = function(){
+          var head='run_id,timestamp,business_system,component,tier,test,source,target,source_result,target_result,status,detail';
+          var ts=new Date().toISOString();
+          var lines=P.rows.map(function(r){
+            return [P.runId||'', ts, P.system, r.name, r.tier, r.test,
+              r.source+(r.port&&r.source?':'+r.port:''), r.target+(r.port&&r.target?':'+r.port:''),
+              r.srcRes, r.tgtRes, r.status, r.detail].map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(',');
+          });
+          var comps=P.rows.filter(function(r){return r.kind==='component';});
+          var vd=comps.some(function(r){return r.critical&&r.status==='FAIL';})?'BLOCKED'
+            :comps.some(function(r){return r.status!=='PASS';})?'REVIEW':'READY';
+          lines.push('"'+(P.runId||'')+'","'+ts+'","'+P.system.replace(/"/g,'""')+'","SYSTEM_VERDICT","system","aggregate","","","","","'+vd+'",""');
+          var a=document.createElement('a');
+          a.href=URL.createObjectURL(new Blob([head+'\n'+lines.join('\n')+'\n'],{type:'text/csv'}));
+          a.download='business_system_test_plan_'+(P.runId||Date.now())+'.csv';
+          a.click();
+        };
+
+        if(document.readyState!=='loading') bstpBuildPlan();
+        else document.addEventListener('DOMContentLoaded', function(){ bstpBuildPlan(); });
+      })();
+      </script>
+
       <!-- 3. Cutover Test -->
       <div class="section-card">
         <div class="section-header">
@@ -1021,9 +1303,7 @@
             <button id="btn_ab_deploy" onclick="executeStage5Task('ab_strategy')">⚙️ 1. PROVISION HAPROXY VM</button>
             <button onclick="executeStage5Task('ghost_traffic')">👻 2. INJECT GHOST TRAFFIC TEST</button>
             <button onclick="executeStage5Task('db_health')">💓 3. VERIFY HEALTH CHECK</button>
-            <input type="range" id="traffic_slider" min="0" max="100" value="0" oninput="document.getElementById('flex_weight_label').innerText = this.value + '%'">
-            <span id="flex_weight_label">0%</span>
-            <button onclick="applyTrafficWeight()">APPLY TRAFFIC WEIGHT</button>
+            <!-- traffic slider moved into Cutover Traffic panel (relocated by JS) -->
             <button onclick="executeStage5Task('rollback')">🚨 PANIC: INSTANT ROLLBACK TO OSPC</button>
             <button onclick="executeStage5Task('db_init')">⚙️ 1. INITIALIZE DB REPLICATION</button>
             <button onclick="executeStage5Task('db_lag')">⏱️ 2. VERIFY REPLICATION LAG</button>
@@ -2328,6 +2608,44 @@
           })();
           </script>
 
+          <script>
+            // Relocate the global traffic slider into the Cutover Traffic (Current Ramp Stage) panel
+            function relocateTrafficSliderIntoRampPanel() {
+              try {
+                const slider = document.getElementById('traffic_slider');
+                const label = document.getElementById('flex_weight_label');
+                if (!slider) return;
+                // find the cutmob panel whose summary contains 'Traffic Ramp Control'
+                const panels = Array.from(document.querySelectorAll('.cutmob-diag-panel'));
+                let target = null;
+                for (const p of panels) {
+                  const s = p.querySelector('summary');
+                  if (s && s.textContent && s.textContent.indexOf('Traffic Ramp Control') !== -1) { target = p; break; }
+                }
+                if (!target) return;
+                let controls = target.querySelector('.cutmob-ramp-controls');
+                if (!controls) {
+                  controls = document.createElement('div');
+                  controls.className = 'cutmob-ramp-controls';
+                  target.appendChild(controls);
+                }
+                // move slider and label
+                if (slider.parentElement) slider.parentElement.removeChild(slider);
+                controls.appendChild(slider);
+                if (label) { if (label.parentElement) label.parentElement.removeChild(label); controls.appendChild(label); }
+                // wire updates
+                slider.oninput = function() {
+                  if (label) label.textContent = this.value + '%';
+                  try { const badge = target.querySelector('[id$="-ramp-badge"]') || document.querySelector('[id$="-ramp-badge"]'); if (badge) badge.textContent = 'Current Ramp Stage: ' + cutMobRampText(Number(this.value)); } catch(e){}
+                };
+                // init label
+                if (label) label.textContent = slider.value + '%';
+              } catch (err) { console.error('relocateTrafficSliderIntoRampPanel', err); }
+            }
+            window.addEventListener('load', function() { setTimeout(relocateTrafficSliderIntoRampPanel, 200); });
+            new MutationObserver(function(){ relocateTrafficSliderIntoRampPanel(); }).observe(document.body, { childList: true, subtree: true });
+          </script>
+
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -2525,7 +2843,7 @@
               <div class="adv-nav-item" id="adv-nav-traf" onclick="coAdvNav('adv-sec-traffic',this)"><i class="fas fa-arrow-right-arrow-left"></i> Traffic &amp; Perf</div>
               <div class="adv-nav-item" id="adv-nav-health" onclick="coAdvNav('adv-sec-health',this)"><i class="fas fa-heart-pulse"></i> Services Health</div>
               <div class="adv-nav-item" id="adv-nav-system" onclick="coAdvNav('adv-sec-system',this)"><i class="fas fa-server"></i> System Health</div>
-              <div class="adv-nav-item" id="adv-nav-txns" onclick="coAdvNav('adv-sec-txns',this)"><i class="fas fa-list-check"></i> Top Transactions</div>
+              <div class="adv-nav-item" id="adv-nav-txns" onclick="coAdvNav('adv-sec-txns',this)"><i class="fas fa-coins"></i> Trend &amp; TCO</div>
               <div class="adv-nav-item" id="adv-nav-blockers" onclick="coAdvNav('adv-sec-blockers',this)"><i class="fas fa-triangle-exclamation"></i> Blockers &amp; Review</div>
               <div class="adv-nav-item" id="adv-nav-actions" onclick="coAdvNav('adv-sec-actions',this)"><i class="fas fa-layer-group"></i> Action Queue</div>
               <div class="adv-nav-item" id="adv-nav-matrix" onclick="coAdvNav('adv-sec-matrix',this)"><i class="fas fa-table-cells"></i> Readiness Matrix</div>
@@ -2596,7 +2914,7 @@
                 </div>
                 <div style="display:flex;flex-direction:column;gap:10px;">
                   <div class="adv-card" id="adv-sec-comp-health">
-                    <div class="adv-sec-hdr"><span class="adv-sec-title">Service Component Health</span></div>
+                    <div class="adv-sec-hdr"><span class="adv-sec-title">Service Component Health</span><span id="adv-health-sys" style="font-size:10px;color:#94a3b8;"></span></div>
                     <div style="display:flex;gap:10px;font-size:10px;margin-bottom:8px;flex-wrap:wrap;">
                       <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span>Pass</span>
                       <span style="display:flex;align-items:center;gap:3px;"><span style="width:8px;height:8px;border-radius:50%;background:#ca8a04;display:inline-block;"></span>Warning</span>
@@ -2621,25 +2939,26 @@
               <!-- BOTTOM SECTION (4 cols) -->
               <div class="adv-bot">
                 <div class="adv-card adv-sec-anchor" id="adv-sec-perf">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Server Performance Comparison</div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:10px;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Server Performance Comparison</span><span id="adv-dd-perf"></span></div>
                   <div class="adv-clegend"><span><span class="adv-ldot" style="background:#dc2626;"></span>Source (OSPC)</span><span><span class="adv-ldot" style="background:#16a34a;"></span>Target (FLEX)</span></div>
                   <div id="adv-perf-comp"></div>
                   <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Last 15 min average</div>
                 </div>
                 <div class="adv-card" id="adv-sec-radar">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">System Health Radar</div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">System Health Radar</span><span id="adv-dd-radar"></span></div>
                   <div class="adv-clegend"><span><span class="adv-ldot" style="background:#dc2626;"></span>Source</span><span><span class="adv-ldot" style="background:#16a34a;"></span>Target</span></div>
+                  <div id="adv-radar-note" style="font-size:9px;color:#d97706;"></div>
                   <div style="height:160px;display:flex;align-items:center;justify-content:center;"><canvas id="adv-radar-chart"></canvas></div>
                 </div>
                 <div class="adv-card adv-sec-anchor" id="adv-sec-txns">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Performance Trend (24H)</div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Performance Trend (24H)</span><span id="adv-dd-trend"></span></div>
                   <div class="adv-clegend"><span><span class="adv-ldot" style="background:#dc2626;"></span>SRC CPU</span><span><span class="adv-ldot" style="background:#16a34a;"></span>TGT CPU</span><span><span class="adv-ldot" style="background:#94a3b8;"></span>SRC Lat</span><span><span class="adv-ldot" style="background:#22c55e;"></span>TGT Lat</span></div>
+                  <div id="adv-trend-note" style="font-size:9px;color:#d97706;"></div>
                   <div style="height:160px;"><canvas id="adv-trend-chart"></canvas></div>
                 </div>
                 <div class="adv-card" id="adv-sec-top-txns">
-                  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Top Transactions (24H)</div>
-                  <table class="adv-table"><thead><tr><th>Transaction</th><th>Success Rate</th><th>P95 Latency</th></tr></thead><tbody id="adv-txn-body"><tr><td colspan="3" style="color:#94a3b8;text-align:center;padding:12px 0;">Mockup data</td></tr></tbody></table>
-                  <div style="font-size:10px;color:#94a3b8;margin-top:8px;"><div>Success Rate Target: &ge; 99%</div><div>Latency Target: &le; 500 ms</div></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:10px;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">TCO Cost Estimation (Monthly)</span><span id="adv-dd-tco"></span></div>
+                  <div id="adv-tco-chart"><div style="color:#94a3b8;font-size:11px;padding:12px 0;text-align:center;">Awaiting data</div></div>
                 </div>
               </div>
 
@@ -3020,7 +3339,7 @@
             _advRenderHealth(d.health);
             _advRenderWindow();
             _advRenderPerfComp(d.perf);
-            _advRenderTxns(d.txns);
+            _advRenderTco();
             _advRenderBlockers(d.blockers, d.reviews, d.goodNews, d.actions);
             _advRenderMatrix(d.matrix);
             _advRenderEvidence();
@@ -3111,17 +3430,164 @@
             if (lbEl) lbEl.innerHTML = '<strong>HAProxy:</strong> '+(t.haproxyHost||'—') + ' &nbsp; <strong>Cutover Host:</strong> '+(t.cutoverHost||'—') + ' &nbsp; <strong>LB Config:</strong> '+(t.lbConfig||'—');
           }
 
+          /* ── Business-system component selector + per-component stats
+             (mirrors the UAT chart dropdowns: "Global metrics" = totals,
+             or one estimate per component of the system being cut over) ── */
+          var _advCompSel = { perf:'__all__', radar:'__all__', trend:'__all__', tco:'__all__' };
+          var _ADV_PRICES = { 'general1-1':68.80,'general1-2':77.62,'general1-4':151.70,'general1-8':302.80,
+            'compute1-4':86.44,'compute1-8':186.98,'compute1-15':200.00,'compute1-30':400.00,
+            'gp.0.2.2':28.08,'gp.5.2.2':28.08,'gp.0.2.4':35.28,'gp.0.4.4':61.92,'gp.5.4.4':61.92,'gp.0.4.8':76.32,'gp.0.16.64':398.16 };
+          function _advEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}); }
+          function _advSeed(s){ var h=0; for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
+          function _advCompList() {
+            var name='', comps=[];
+            function host(u){ var m=String(u||'').match(/^[a-zA-Z][\w+.-]*:\/\/([^\/:]+)/); if(m) return m[1]; m=String(u||'').match(/^([^\/:]+)/); return m?m[1]:''; }
+            try {
+              var sc = JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope')||'null');
+              if (sc && sc.components && sc.components.length) {
+                name = sc.business_system_name || '';
+                comps = sc.components.map(function(c,i){ return { id:'c'+i, name:c.name||('Component '+(i+1)),
+                  srcIp:c.source||'', tgtIp:c.target||'', traffic:!!c.trafficFacing, stateful:!!c.stateful,
+                  selected:c.selected!==false, vmStatus:c.vmStatus||'UNKNOWN' }; });
+              }
+            } catch(e) {}
+            if (!comps.length) {
+              try {
+                var raw = JSON.parse(localStorage.getItem('uatS1_systems')||'null')||[];
+                var list = raw.filter(function(s){return s.status!=='Draft';}); if(!list.length) list=raw;
+                list.sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
+                var sys = list[0];
+                if (sys) {
+                  name = sys.name||'';
+                  comps = (sys.components||[]).map(function(c,i){
+                    var r=(c.name||'').toLowerCase();
+                    var traffic = r.indexOf('frontend')>=0||r.indexOf('gateway')>=0||r.indexOf('api')>=0;
+                    var stateful = r.indexOf('database')>=0||r.indexOf('cache')>=0||r.indexOf('queue')>=0;
+                    return { id:'c'+i, name:c.name||('Component '+(i+1)), srcIp:host(c.src), tgtIp:host(c.tgt),
+                      traffic:traffic&&!stateful, stateful:stateful, selected:true, vmStatus:'UNKNOWN' };
+                  });
+                }
+              } catch(e) {}
+            }
+            /* attach flavors from the UAT VM scans for TCO pricing */
+            var flexMap={}, ospcMap={};
+            try { ((JSON.parse(localStorage.getItem('uatS1_flex_vm_rows')||'null')||{}).rows||[]).forEach(function(r){ [r.public_ip,r.private_ip,r.ip].forEach(function(ip){ if(ip) flexMap[ip]=r; }); }); } catch(e) {}
+            try { ((JSON.parse(localStorage.getItem('uatS1_ospc_vm_rows')||'null')||{}).rows||[]).forEach(function(r){ [r.public_ip,r.private_ip,r.ip].forEach(function(ip){ if(ip) ospcMap[ip]=r; }); }); } catch(e) {}
+            comps.forEach(function(c){
+              c.srcFlavor=(ospcMap[c.srcIp]||{}).flavor||'';
+              c.tgtFlavor=(flexMap[c.tgtIp]||{}).flavor||'';
+            });
+            return { name:name, comps:comps };
+          }
+          function _advCompDropdown(key) {
+            var bs = _advCompList();
+            if (!bs.comps.length) return '';
+            var sel = _advCompSel[key]||'__all__';
+            return '<select onchange="coAdvSelComp(\''+key+'\',this.value)" style="max-width:150px;font-size:10px;padding:2px 4px;border:1px solid #d1d5db;border-radius:5px;color:#374151;background:#fff;cursor:pointer;">'
+              + '<option value="__all__"'+(sel==='__all__'?' selected':'')+'>Global metrics (all components)</option>'
+              + bs.comps.map(function(c){ return '<option value="'+c.id+'"'+(sel===c.id?' selected':'')+'>'+_advEsc(c.name.length>34?c.name.slice(0,33)+'…':c.name)+'</option>'; }).join('')
+              + '</select>';
+          }
+          function _advSelComp(key) {
+            var id=_advCompSel[key];
+            if(id==='__all__') return null;
+            return _advCompList().comps.find(function(c){return c.id===id;})||null;
+          }
+          window.coAdvSelComp = function(key, val) {
+            _advCompSel[key]=val;
+            var d=_advData();
+            if (key==='perf') _advRenderPerfComp(d.perf);
+            else if (key==='tco') _advRenderTco();
+            else _advInitCharts(d.radar, d.trend);
+          };
+          function _advCompNote(comp) {
+            return comp ? '<div style="font-size:9px;color:#d97706;margin-bottom:4px;">Estimated for &ldquo;'+_advEsc(comp.name.length>44?comp.name.slice(0,43)+'…':comp.name)+'&rdquo; &mdash; run the Test Plan / Step 3 against this pair for live values.</div>' : '';
+          }
+
           function _advRenderHealth(h) {
             var el = document.getElementById('adv-health-diag');
             if (!el) return;
-            if (!h) h = _ADV_MOCK.health;
+            var sysLbl = document.getElementById('adv-health-sys');
+            var bs = _advCompList();
+            if (bs.comps.length) {
+              /* Live view: tiers built from the business system being cut over. */
+              if (sysLbl) sysLbl.textContent = bs.name || '';
+              function cls(c){
+                if (!c.selected) return 'adv-hn-scope';
+                if (c.vmStatus==='ERROR') return 'adv-hn-fail';
+                if (c.vmStatus==='ACTIVE') return 'adv-hn-pass';
+                return 'adv-hn-pend';
+              }
+              function nodes(list){ return list.map(function(c){ return {label:c.name.length>26?c.name.slice(0,25)+'…':c.name, cls:cls(c)}; }); }
+              var t1 = bs.comps.filter(function(c){return c.traffic;});
+              var t3 = bs.comps.filter(function(c){return c.stateful;});
+              var t2 = bs.comps.filter(function(c){return !c.traffic && !c.stateful;});
+              h = { app: bs.name || 'Business System',
+                tier1: nodes(t1.length?t1:bs.comps.slice(0,3)),
+                tier2: nodes(t2), tier3: nodes(t3) };
+            } else if (!h) h = _ADV_MOCK.health;
             var iconMap = {'adv-hn-pass':'fa-circle-check','adv-hn-warn':'fa-triangle-exclamation','adv-hn-fail':'fa-circle-xmark','adv-hn-scope':'fa-minus-circle','adv-hn-pend':'fa-clock'};
             function tier(nodes) {
-              return '<div class="adv-health-tier">'+nodes.map(function(n){
-                return '<div class="adv-health-node '+n.cls+'"><i class="fas '+(iconMap[n.cls]||'fa-circle')+'" style="font-size:10px;"></i> '+n.label+'</div>';
+              if (!nodes || !nodes.length) return '';
+              return '<div class="adv-conn"></div><div class="adv-health-tier">'+nodes.map(function(n){
+                return '<div class="adv-health-node '+n.cls+'"><i class="fas '+(iconMap[n.cls]||'fa-circle')+'" style="font-size:10px;"></i> '+_advEsc(n.label)+'</div>';
               }).join('')+'</div>';
             }
-            el.innerHTML = '<div class="adv-health-top"><i class="fas fa-globe"></i> '+h.app+'</div><div class="adv-conn"></div>'+tier(h.tier1)+'<div class="adv-conn"></div>'+tier(h.tier2)+'<div class="adv-conn"></div>'+tier(h.tier3);
+            el.innerHTML = '<div class="adv-health-top"><i class="fas fa-globe"></i> '+_advEsc(h.app)+'</div>'+tier(h.tier1)+tier(h.tier2)+tier(h.tier3);
+          }
+
+          /* TCO card (replaces Top Transactions) — same estimator as the UAT
+             TCO chart: flavor price table per component, 2.45x OSPC:FLEX
+             ratio when one side's flavor price is unknown. */
+          function _advRenderTco() {
+            var el = document.getElementById('adv-tco-chart');
+            if (!el) return;
+            var dd = document.getElementById('adv-dd-tco');
+            if (dd) dd.innerHTML = _advCompDropdown('tco');
+            var bs = _advCompList();
+            var comp = _advSelComp('tco');
+            var src=0, tgt=0, known=0, note='';
+            function price(c){
+              var s=_ADV_PRICES[c.srcFlavor]||0, t=_ADV_PRICES[c.tgtFlavor]||0;
+              if(!s&&t) s=t*2.45;
+              if(!t&&s) t=s/2.45;
+              if(s||t) known++;
+              return {s:s,t:t};
+            }
+            if (comp) {
+              var p=price(comp);
+              src=p.s; tgt=p.t;
+              note='<b style="color:#1e40af;">'+_advEsc(comp.name.length>40?comp.name.slice(0,39)+'…':comp.name)+'</b> — '
+                + _advEsc(comp.srcFlavor||'?')+' &rarr; '+_advEsc(comp.tgtFlavor||'?')
+                + (!src&&!tgt ? ' · <span style="color:#d97706;">no flavor price — scan VM tables in UAT Step 1</span>' : ' · flavor price table estimate');
+            } else if (bs.comps.length) {
+              bs.comps.filter(function(c){return c.selected;}).forEach(function(c){ var p=price(c); src+=p.s; tgt+=p.t; });
+              note='<b style="color:#1e40af;">'+_advEsc(bs.name||'Business system')+'</b> — sum of '+known+' priced component(s)'
+                + (known ? ' · flavor price table estimate' : ' · <span style="color:#d97706;">no flavor prices — scan VM tables in UAT Step 1</span>');
+            }
+            src=Math.round(src); tgt=Math.round(tgt);
+            var sav=src-tgt;
+            var pct=src>0?(sav/src*100):0;
+            var maxV=Math.max(src,tgt,1), chartH=58;
+            function money(v){ return v>=1000?'$'+(v/1000).toFixed(1)+'K':'$'+Math.round(v); }
+            var bars=[{v:src,c:'#3b82f6',l:'Source Monthly'},{v:tgt,c:'#22c55e',l:'Target Monthly'},{v:Math.max(sav,0),c:'#8b5cf6',l:'Monthly Savings'}];
+            el.innerHTML='<div style="font-size:9px;color:#6b7280;margin-bottom:8px;">'+note+'</div>'
+              + '<div style="display:flex;gap:10px;align-items:flex-end;">'
+              + '<div style="display:flex;align-items:flex-end;gap:8px;height:'+(chartH+20)+'px;">'
+              + bars.map(function(b){
+                  var hh=Math.max(4,Math.round(b.v/maxV*chartH));
+                  return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
+                    + '<div style="font-size:9px;font-weight:700;color:'+b.c+';">'+money(b.v)+'</div>'
+                    + '<div style="width:30px;height:'+hh+'px;background:'+b.c+';border-radius:4px 4px 0 0;"></div>'
+                    + '<div style="font-size:9px;color:#6b7280;text-align:center;max-width:52px;line-height:1.2;">'+b.l+'</div></div>';
+                }).join('')
+              + '</div>'
+              + '<div style="flex:1;min-width:0;"><div style="background:'+(sav>=0?'#f0fdf4;border:1px solid #bbf7d0':'#fef2f2;border:1px solid #fca5a5')+';border-radius:8px;padding:8px 10px;">'
+              + '<div style="font-size:9px;color:#6b7280;">Estimated Monthly Savings</div>'
+              + '<div style="font-size:20px;font-weight:900;color:'+(sav>=0?'#16a34a':'#dc2626')+';">$'+sav.toLocaleString()+'</div>'
+              + '<div style="font-size:10px;color:#6b7280;">'+Math.abs(pct).toFixed(1)+'% '+(sav>=0?'lower':'higher')+' than source</div>'
+              + '<div style="font-size:10px;font-weight:700;color:'+(sav>=0?'#16a34a':'#dc2626')+';margin-top:3px;">'+(sav>=0?'Good Opportunity':'Review Pricing')+'</div>'
+              + '</div></div></div>';
           }
 
           function _advRenderWindow() {
@@ -3150,8 +3616,24 @@
           function _advRenderPerfComp(perf) {
             var el = document.getElementById('adv-perf-comp');
             if (!el) return;
+            var dd = document.getElementById('adv-dd-perf');
+            if (dd) dd.innerHTML = _advCompDropdown('perf');
             if (!perf || !perf.length) { el.innerHTML = '<div style="color:#94a3b8;font-size:11px;padding:12px 0;text-align:center;">Awaiting run</div>'; return; }
-            el.innerHTML = perf.map(function(p) {
+            var comp = _advSelComp('perf'), note = '';
+            if (comp) {
+              /* deterministic per-component estimate around the global baseline —
+                 same approach as the UAT charts; Test Plan runs give live values */
+              var seed = _advSeed(comp.name);
+              perf = perf.map(function(p, i) {
+                var d1=((seed>>(i*3))%21)-10, d2=((seed>>(i*3+2))%21)-10;
+                var sv=parseInt(p.srcV,10)||0, tv=parseInt(p.tgtV,10)||0;
+                var unit=String(p.srcV).replace(/^[\d.\s]+/,'');
+                sv=Math.max(4,sv+d1); tv=Math.max(3,tv+d2);
+                return { label:p.label, srcW:Math.min(100,sv), srcV:sv+unit, tgtW:Math.min(100,tv), tgtV:tv+unit };
+              });
+              note = _advCompNote(comp);
+            }
+            el.innerHTML = note + perf.map(function(p) {
               return '<div class="adv-bar-row">'+
                 '<span class="adv-bar-lbl">'+p.label+'</span>'+
                 '<div class="adv-bar-track"><div class="adv-bar-src" style="width:'+p.srcW+'%;"></div></div>'+
@@ -3159,15 +3641,6 @@
                 '<div class="adv-bar-track"><div class="adv-bar-tgt" style="width:'+p.tgtW+'%;"></div></div>'+
                 '<span class="adv-bar-val" style="color:#16a34a;">'+p.tgtV+'</span>'+
               '</div>';
-            }).join('');
-          }
-
-          function _advRenderTxns(txns) {
-            var el = document.getElementById('adv-txn-body');
-            if (!el) return;
-            if (!txns || !txns.length) { el.innerHTML = '<tr><td colspan="3" style="color:#94a3b8;text-align:center;padding:12px 0;">Awaiting run</td></tr>'; return; }
-            el.innerHTML = txns.map(function(t) {
-              return '<tr><td style="font-weight:500;">'+t.name+'</td><td style="color:#16a34a;font-weight:600;">'+t.rate+'</td><td style="font-weight:500;'+(t.warn?'color:#ea580c;':'')+'">'+t.lat+'</td></tr>';
             }).join('');
           }
 
@@ -3225,6 +3698,23 @@
             if (typeof Chart === 'undefined') return;
             if (!radar) radar = _ADV_MOCK.radar;
             if (!trend) trend = _ADV_MOCK.trend;
+            var ddR = document.getElementById('adv-dd-radar');
+            if (ddR) ddR.innerHTML = _advCompDropdown('radar');
+            var ddT = document.getElementById('adv-dd-trend');
+            if (ddT) ddT.innerHTML = _advCompDropdown('trend');
+            var compR = _advSelComp('radar'), compT = _advSelComp('trend');
+            var noteR = document.getElementById('adv-radar-note');
+            if (noteR) noteR.innerHTML = compR ? _advCompNote(compR) : '';
+            var noteT = document.getElementById('adv-trend-note');
+            if (noteT) noteT.innerHTML = compT ? _advCompNote(compT) : '';
+            function vary(arr, name, lo, hi) {
+              var seed=_advSeed(name);
+              return arr.map(function(v,i){ var d=((seed>>(i*2))%17)-8; return Math.min(hi, Math.max(lo, v+d)); });
+            }
+            if (compR) radar = { src: vary(radar.src, compR.name, 5, 100), tgt: vary(radar.tgt, compR.name+'|t', 5, 100) };
+            if (compT) trend = { labels: trend.labels,
+              srcCpu: vary(trend.srcCpu, compT.name, 5, 100), tgtCpu: vary(trend.tgtCpu, compT.name+'|t', 5, 100),
+              srcLat: vary(trend.srcLat, compT.name+'|sl', 20, 200), tgtLat: vary(trend.tgtLat, compT.name+'|tl', 20, 200) };
             if (_advCharts.radar) { try { _advCharts.radar.destroy(); } catch(e){} }
             var rCtx = document.getElementById('adv-radar-chart');
             if (rCtx) {
@@ -3353,7 +3843,7 @@
             _advRenderGauge(d.readiness);
             _advRenderKpis(d.kpis);
             _advRenderPerfComp(d.perf);
-            _advRenderTxns(d.txns);
+            _advRenderTco();
             var saved = localStorage.getItem('cutoverDashboardMode');
             if (saved === 'advanced') {
               setTimeout(function() {
@@ -3367,8 +3857,8 @@
         </script>
 
       </div>
-      </div><!-- /s5-tester-cockpit-home -->
 
+      </div><!-- /s5-tester-cockpit-home -->
 
     </div>
   </div>

@@ -5,13 +5,63 @@
       <div style="display:flex;align-items:center;gap:12px;padding:24px 28px 16px;background:linear-gradient(135deg,#f0f2f5 0%,#e8ecf1 50%,#f5f7fa 100%);">
         <div style="width:14px;height:14px;background:#27ae60;border-radius:50%;box-shadow:0 0 0 4px rgba(39,174,96,.2);"></div>
         <div>
-          <h1 style="font-size:22px;font-weight:800;color:#1f2937;margin:0;text-shadow:none;">Stage 4C &mdash; UAT-Driven Business System Cutover</h1>
+          <h1 style="font-size:22px;font-weight:800;color:#1f2937;margin:0;text-shadow:none;">Stage 4 &mdash; Business System Cut Over</h1>
           <p style="margin:4px 0 0;font-size:13px;color:#4b5563;">Reuse UAT-approved business systems and prepare the complete service stack &mdash; VMs, DBs, cache, queue &mdash; for traffic transition. No manual scan or re-entry required.</p>
         </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
+           SECTION 1B — Edit / Add Business Systems (relocated UAT Step 1)
+           The full "Select Business System for UAT" section (cards with
+           Edit/Remove, Business System Templates, Automatic Mapping from
+           Existing VMs) is moved into the mount below whenever Stage 4C is
+           active and returned to UAT when leaving — single live copy, same
+           pattern as s5c-tester-cockpit-mount; see activateStage().
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-header-left">
+            <div class="section-icon"><i class="fas fa-pen-to-square"></i></div>
+            <div class="section-title-group">
+              <h3>Select Business System for CUT OVER from UAT</h3>
+              <p>Full UAT business-system editor &mdash; edit or add systems imported from UAT (templates and automatic VM mapping included) without leaving the cutover stage.</p>
+            </div>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" id="s5c-uat-expand-btn" onclick="s5cToggleUatDetails()"><i class="fas fa-chevron-down"></i> Expand UAT Details</button>
+          </div>
+        </div>
+        <div class="section-body" style="padding:0;">
+          <div id="s5c-bizsystem-mount"></div>
+        </div>
+      </div>
+      <style>
+        /* Stage 4C-scoped trims of the relocated UAT Step 1 editor: hide the
+           duplicate inner title, the Business-System-Aware UAT hero (incl.
+           KPIs) and both VM scan tables ONLY while mounted here — the UAT
+           stage keeps all of them (single live copy, relocated back on exit). */
+        #s5c-bizsystem-mount:not(.s5c-uat-expanded) .uat-s1-topbar,
+        #s5c-bizsystem-mount:not(.s5c-uat-expanded) .ud-bottom-row,
+        #s5c-bizsystem-mount:not(.s5c-uat-expanded) .uat-s1-hero,
+        #s5c-bizsystem-mount:not(.s5c-uat-expanded) #uatS1OspcVmSection,
+        #s5c-bizsystem-mount:not(.s5c-uat-expanded) #uatS1FlexVmSection { display: none !important; }
+      </style>
+      <script>
+        function s5cToggleUatDetails() {
+          var mount = document.getElementById('s5c-bizsystem-mount');
+          var btn = document.getElementById('s5c-uat-expand-btn');
+          if (!mount) return;
+          var expanded = mount.classList.toggle('s5c-uat-expanded');
+          if (btn) btn.innerHTML = expanded
+            ? '<i class="fas fa-chevron-up"></i> Collapse UAT Details'
+            : '<i class="fas fa-chevron-down"></i> Expand UAT Details';
+        }
+      </script>
+
+      <!-- ══════════════════════════════════════════════════════════════
            SECTION 1 — Select Business System for Cutover
+           Moved below the editor per operator request (2026-07-08): the
+           editor above is the entry point; this locked-scope view follows.
            ══════════════════════════════════════════════════════════════ -->
       <div class="section-card">
         <div class="section-header">
@@ -54,6 +104,9 @@
               <h3>Business System Cutover Matrix</h3>
               <p>Auto-filled from UAT Step 2 &mdash; Apps Server Systems Comparisons.</p>
             </div>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" id="s5c-sections-toggle-btn" onclick="s5cToggleSections()"><i class="fas fa-eye-slash"></i> Hide Matrix / Gates / Feed Sections</button>
           </div>
         </div>
         <div class="section-body">
@@ -129,6 +182,39 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════
+           CUTOVER VALIDATION — PASS / FIX (replaces the relocated UAT
+           PASS/FIX strip, which is hidden while mounted in Stage 4C).
+           FIX lists every open cutover issue (UAT-style); PASS CUTOVER
+           validates the gates and downloads the full cutover report CSV.
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="section-card" id="s5c-validation-card">
+        <div class="section-header">
+          <div class="section-header-left">
+            <div class="section-icon"><i class="fas fa-clipboard-check"></i></div>
+            <div class="section-title-group">
+              <h3>Cutover Validation</h3>
+              <p>Aggregates every open issue from the gates, component matrix, test plan and live monitor for the selected business system.</p>
+            </div>
+          </div>
+        </div>
+        <div class="section-body">
+          <div id="s5c-val-summary" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#374151;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <button onclick="s5cPassCutover()" style="display:flex;align-items:center;gap:12px;padding:14px 24px;border:none;border-radius:8px;cursor:pointer;background:#16a34a;color:#fff;flex:1;min-width:220px;text-align:left;">
+              <span style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;">&#10003;</span>
+              <span style="display:flex;flex-direction:column;"><b style="font-size:20px;letter-spacing:.02em;line-height:1.1;">PASS CUTOVER</b><small style="font-size:10px;opacity:.9;">Validate all gates &amp; download the full cutover report CSV</small></span>
+            </button>
+            <button onclick="s5cFixIssues()" style="display:flex;align-items:center;gap:12px;padding:14px 24px;border:none;border-radius:8px;cursor:pointer;background:#dc2626;color:#fff;flex:1;min-width:220px;text-align:left;">
+              <span style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;">!</span>
+              <span style="display:flex;flex-direction:column;"><b style="font-size:20px;letter-spacing:.02em;line-height:1.1;">FIX</b><small style="font-size:10px;opacity:.9;">Show every issue to fix before cutover</small></span>
+            </button>
+          </div>
+          <div id="s5c-val-decision" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:800;"></div>
+          <div id="s5c-val-issues"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════
            SECTION 5 — Existing Cutover Test / Traffic Ramp
            Stage 4's REAL tester + execution cockpit + validation bench is
            relocated into the mount below whenever Stage 4C is active (and
@@ -137,7 +223,7 @@
            its existing JS (Dry Run, Cut over TEST, ramp proof, cockpit,
            evidence export) keeps working here unmodified.
            ══════════════════════════════════════════════════════════════ -->
-      <div class="section-card">
+      <div class="section-card" id="s5c-feed-card">
         <div class="section-header">
           <div class="section-header-left">
             <div class="section-icon"><i class="fas fa-arrow-down"></i></div>
@@ -154,7 +240,6 @@
           <div id="s5c-tester-feed-status" style="font-size:13px;color:#6b7280;"></div>
         </div>
       </div>
-      <div id="s5c-tester-cockpit-mount"></div>
 
       <!-- ══════════════════════════════════════════════════════════════
            SECTION 6 — Advanced Manual Override (collapsed)
@@ -162,13 +247,19 @@
            pairing matrix are relocated into the mount below while Stage
            4C is active — same single-live-copy pattern as Section 5.
            ══════════════════════════════════════════════════════════════ -->
-      <details style="border-top:1px solid #e5e7eb;">
+      <details id="s5c-advanced-override" style="border-top:1px solid #e5e7eb;">
         <summary style="padding:16px 28px;cursor:pointer;font-weight:700;color:#92400e;background:#fffbeb;">
           <i class="fas fa-triangle-exclamation" style="margin-right:8px;"></i>Advanced Manual Override
           <div style="font-weight:400;font-size:12px;color:#78350f;margin-top:4px;">Use only when UAT scope is missing, incomplete, or needs correction. Contains cloud credentials, source/target region scans, CSV upload, manual pairing, blue-green script generation, and cutover command export.</div>
         </summary>
         <div id="s5c-manual-override-mount"></div>
       </details>
+
+      <!-- Stage 4's relocated cutover suite (3. Cutover Test & Result CSV →
+           Advanced Cutover Dashboard) lands here — directly above the
+           Live Mobile Cutover Monitor, which is appended after this mount
+           by installCutoverMobileBench(). -->
+      <div id="s5c-tester-cockpit-mount"></div>
 
     </div>
 
@@ -184,11 +275,15 @@
       var STATEFUL = {database:1, cache:1, queue:1};
       var GATE_FOR_TYPE = {database:'Database Gate', cache:'Cache Gate', queue:'Queue Gate', worker:'Worker Gate'};
 
-      var C = { systems:[], selectedId:null, locked:false, lockedScope:null, gates:{}, dismissed:{} };
+      var C = { systems:[], selectedId:null, locked:false, lockedScope:null, gates:{}, dismissed:{}, liveGates:null };
       try {
         var _prevLock = JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope')||'null');
         if (_prevLock) { C.lockedScope=_prevLock; C.locked=true; }
       } catch(e){}
+      try { C.gates = JSON.parse(localStorage.getItem('outputs_cutover_gate_approvals')||'{}') || {}; } catch(e){}
+      try { C.liveGates = JSON.parse(localStorage.getItem('outputs_cutover_live_gate_snapshot')||'null'); } catch(e){}
+      /* Called by the Live Mobile Cutover Monitor on every decision change. */
+      window.s5cSyncLiveGates = function(snap){ C.liveGates = snap; try { _renderGates(); } catch(e){} };
 
       /* ── UAT data loading (same source as Stage 3) ── */
       function _typeFromRole(role){
@@ -310,6 +405,7 @@
         _renderLockBadge();
         _renderCards();
         if (C.selectedId) s5cSelectSystem(C.selectedId, true);
+        _applySectionsVisibility();
       };
       function _renderLockBadge(){
         var lb=$id('s5c-lock-badge');
@@ -355,6 +451,7 @@
         el.innerHTML = C.systems.map(function(sys){
           var sel = sys.id===C.selectedId;
           var blockers = sys.components.filter(function(c){ return _rowStatus(sys,c)==='BLOCKED'; }).length;
+          if (sys.id===C.editingId) return _renderEditCard(sys);
           return '<div class="sub-section" style="'+(sel?'border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe;':'')+'margin-bottom:10px;">'
             + '<div style="display:flex;align-items:center;justify-content:space-between;">'
             + '<div><div style="font-weight:800;color:#0f172a;font-size:14px;">'+_esc(sys.name)+'</div>'
@@ -370,12 +467,71 @@
             + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
             + '<button class="btn btn-primary" style="font-size:11px;padding:6px 10px;" onclick="s5cSelectSystem(\''+sys.id+'\')">Select for Cutover</button>'
             + '<button class="btn btn-secondary" style="font-size:11px;padding:6px 10px;" onclick="s5cSelectSystem(\''+sys.id+'\');s5cLockScope();">Lock Scope</button>'
+            + '<button class="btn btn-secondary" style="font-size:11px;padding:6px 10px;" onclick="s5cEdit(\''+sys.id+'\')"><i class="fas fa-pen"></i> Edit</button>'
             + '<button class="btn btn-secondary" style="font-size:11px;padding:6px 10px;" onclick="s5cSelectSystem(\''+sys.id+'\')">View Components</button>'
             + '<button class="btn btn-secondary" style="font-size:11px;padding:6px 10px;" onclick="s5cViewTests()">View UAT Tests</button>'
             + '<button class="btn btn-danger" style="font-size:11px;padding:6px 10px;" onclick="s5cDismiss(\''+sys.id+'\')" title="Removes from this cutover list only — does not delete the UAT business system.">Remove</button>'
             + '</div></div>';
         }).join('');
       }
+      /* ── Inline edit: writes back to the same uatS1_systems store the UAT
+         editor uses, so both stages stay on one source of truth. ── */
+      function _rawSystems(){ try{ return JSON.parse(localStorage.getItem('uatS1_systems')||'[]')||[]; }catch(e){ return []; } }
+      function _renderEditCard(sys){
+        var raw=_rawSystems().find(function(s){return s.id===sys.id;}) || {name:sys.name, components:[]};
+        var inp='border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box;';
+        var rows=(raw.components||[]).map(function(c){
+          return '<tr data-s5c-edit-row>'
+            + '<td><input style="'+inp+'" data-f="name" value="'+_esc(c.name||'')+'" placeholder="Component name / role"></td>'
+            + '<td><input style="'+inp+'" data-f="src" value="'+_esc(c.src||'')+'" placeholder="Source OSPC IP / URL"></td>'
+            + '<td><input style="'+inp+'" data-f="tgt" value="'+_esc(c.tgt||'')+'" placeholder="Target FLEX IP / URL"></td>'
+            + '<td><input style="'+inp+'" data-f="path" value="'+_esc(c.path||'')+'" placeholder="/health"></td>'
+            + '<td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px;" onclick="this.closest(\'tr\').remove()">&times;</button></td></tr>';
+        }).join('');
+        return '<div class="sub-section" id="s5c-edit-card" style="border-color:#2563eb;box-shadow:0 0 0 2px #bfdbfe;margin-bottom:10px;">'
+          + '<div style="font-weight:800;color:#0f172a;font-size:13px;margin-bottom:8px;"><i class="fas fa-pen"></i> Edit Business System</div>'
+          + '<label style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;">System name<input id="s5c-edit-name" style="'+inp+'margin:3px 0 10px;" value="'+_esc(raw.name||sys.name)+'"></label>'
+          + '<div class="table-scroll-x"><table class="matrix-table" style="font-size:11px;">'
+          + '<thead><tr><th>component</th><th>source OSPC IP / URL</th><th>target FLEX IP / URL</th><th>health / test path</th><th></th></tr></thead>'
+          + '<tbody id="s5c-edit-rows">'+rows+'</tbody></table></div>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">'
+          + '<button class="btn btn-secondary" style="font-size:11px;padding:6px 10px;" onclick="s5cEditAddRow()"><i class="fas fa-plus"></i> Add Component</button>'
+          + '<button class="btn btn-primary" style="font-size:11px;padding:6px 10px;" onclick="s5cEditSave(\''+sys.id+'\')"><i class="fas fa-check"></i> Save Changes</button>'
+          + '<button class="btn btn-secondary" style="font-size:11px;padding:6px 10px;" onclick="s5cEditCancel()">Cancel</button>'
+          + '</div>'
+          + '<div style="font-size:11px;color:#64748b;margin-top:6px;">Saved changes update the shared UAT business-system store — the UAT stage and all cutover matrices below refresh from it.</div>'
+          + '</div>';
+      }
+      window.s5cEdit = function(id){ C.editingId=id; _renderCards(); };
+      window.s5cEditCancel = function(){ C.editingId=null; _renderCards(); };
+      window.s5cEditAddRow = function(){
+        var body=$id('s5c-edit-rows'); if(!body) return;
+        var tr=document.createElement('tr'); tr.setAttribute('data-s5c-edit-row','');
+        var inp='border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box;';
+        tr.innerHTML='<td><input style="'+inp+'" data-f="name" placeholder="Component name / role"></td>'
+          + '<td><input style="'+inp+'" data-f="src" placeholder="Source OSPC IP / URL"></td>'
+          + '<td><input style="'+inp+'" data-f="tgt" placeholder="Target FLEX IP / URL"></td>'
+          + '<td><input style="'+inp+'" data-f="path" placeholder="/health"></td>'
+          + '<td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px;" onclick="this.closest(\'tr\').remove()">&times;</button></td>';
+        body.appendChild(tr);
+      };
+      window.s5cEditSave = function(id){
+        var card=$id('s5c-edit-card'); if(!card) return;
+        var comps=Array.prototype.map.call(card.querySelectorAll('[data-s5c-edit-row]'), function(tr){
+          function v(f){ var n=tr.querySelector('[data-f="'+f+'"]'); return n?String(n.value||'').trim():''; }
+          return {name:v('name'), src:v('src'), tgt:v('tgt'), path:v('path')};
+        }).filter(function(c){ return c.name; });
+        if(!comps.length){ alert('Keep at least one named component.'); return; }
+        var all=_rawSystems();
+        var raw=all.find(function(s){return s.id===id;});
+        if(!raw){ alert('Business system not found in the UAT store — refresh from UAT first.'); return; }
+        raw.name=String(($id('s5c-edit-name')||{}).value||raw.name).trim()||raw.name;
+        raw.components=comps;
+        try{ localStorage.setItem('uatS1_systems', JSON.stringify(all)); }catch(e){ alert('Could not save: '+e.message); return; }
+        C.editingId=null;
+        s5cRefresh();
+        try{ if(typeof uatS1ReloadFromStorage==='function') uatS1ReloadFromStorage(); }catch(e){}
+      };
       window.s5cDismiss = function(id){
         if(!confirm('Remove from this cutover list? This does not delete it from UAT.')) return;
         C.dismissed[id]=true;
@@ -388,9 +544,37 @@
         _renderMatrix();
         _renderPairing();
         _renderGates();
-        $id('s5c-matrix-card').style.display='';
-        $id('s5c-pairing-card').style.display='';
-        $id('s5c-gates-card').style.display='';
+        _applySectionsVisibility();
+      };
+
+      /* ── One-button hide/show of the matrix / gates / feed / override sections.
+         The toggle button lives in the matrix card's header, so that header
+         always stays visible (only its body collapses) — otherwise hiding
+         would remove the button itself. ── */
+      var S5C_TOGGLE_SECTIONS = ['s5c-pairing-card','s5c-gates-card','s5c-feed-card','s5c-advanced-override'];
+      var S5C_SELECTION_SECTIONS = {'s5c-pairing-card':1,'s5c-gates-card':1};
+      /* Hidden (collapsed) by default — only an explicit Show ('0') keeps them open. */
+      try { C.sectionsHidden = localStorage.getItem('s5c_sections_hidden')!=='0'; } catch(e){ C.sectionsHidden = true; }
+      function _applySectionsVisibility(){
+        var matrix=$id('s5c-matrix-card');
+        if(matrix){
+          matrix.style.display = C.selectedId ? '' : 'none';
+          var body=matrix.querySelector('.section-body');
+          if(body) body.style.display = C.sectionsHidden ? 'none' : '';
+        }
+        S5C_TOGGLE_SECTIONS.forEach(function(x){
+          var n=$id(x); if(!n) return;
+          n.style.display = (C.sectionsHidden || (S5C_SELECTION_SECTIONS[x] && !C.selectedId)) ? 'none' : '';
+        });
+        var btn=$id('s5c-sections-toggle-btn');
+        if(btn) btn.innerHTML = C.sectionsHidden
+          ? '<i class="fas fa-eye"></i> Show Matrix / Gates / Feed Sections'
+          : '<i class="fas fa-eye-slash"></i> Hide Matrix / Gates / Feed Sections';
+      }
+      window.s5cToggleSections = function(){
+        C.sectionsHidden = !C.sectionsHidden;
+        try{ localStorage.setItem('s5c_sections_hidden', C.sectionsHidden?'1':'0'); }catch(e){}
+        _applySectionsVisibility();
       };
 
       /* ── Section 2: Business System Cutover Matrix (editable inline) ── */
@@ -455,41 +639,61 @@
         tb.innerHTML = html || '<tr><td colspan="15"><div class="empty-state">No components in scope.</div></td></tr>';
       }
 
-      /* ── Section 4: Cutover Gates ── */
-      function _gateRow(key, label, status){ return {key:key, label:label, status:status}; }
+      /* ── Section 4: Cutover Gates ──
+         Wired to the Live Mobile Cutover Monitor: Business Validation,
+         Traffic Ramp, Backend, Evidence Export (and DB/Cache/Queue via the
+         direct backend proofs) are auto-filled from real monitor results
+         published in outputs_cutover_live_gate_snapshot. Approve remains
+         only for the two human gates: Rollback Plan and Sign-Off. */
+      var LIVE_GATE_KEYS = {db:1, cache:1, queue:1, backend:1, business_validation:1, traffic_ramp:1, evidence:1};
+      function _gateRow(key, label, status, live){ return {key:key, label:label, status:status, live:!!live}; }
+      function _liveGate(key){
+        var L = C.liveGates;
+        return (L && L[key]) ? L[key] : null;
+      }
       function _computeGates(sys){
         var blockers = sys.components.some(function(c){ return c.selected && _rowStatus(sys,c)==='BLOCKED'; });
         var needsInput = sys.components.some(function(c){ return c.selected && _rowStatus(sys,c)==='NEEDS_INPUT'; });
         var review = sys.components.some(function(c){ return c.selected && _rowStatus(sys,c)==='REVIEW'; });
         var hasTraffic = sys.components.some(function(c){ return c.selected && c.trafficFacing; });
         var g = C.gates;
+        function live(key, fallback){ var v=_liveGate(key); return {status: v || fallback, isLive: !!v}; }
+        var db=live('db','NOT_RUN'), cache=live('cache','NOT_RUN'), queue=live('queue','NOT_RUN'),
+            backend=live('backend','NOT_RUN'), biz=live('business_validation','NOT_RUN'),
+            ramp=live('traffic_ramp','NOT_RUN'), ev=live('evidence','NOT_RUN');
         return [
           _gateRow('uat_lock','UAT Scope Locked', C.locked?'PASS':'NEEDS_INPUT'),
           _gateRow('component_health','Component Health', blockers?'BLOCKED':(needsInput||review?'NEEDS_INPUT':'PASS')),
-          _gateRow('db','Database Gate', !sys.dbInScope?'OUT_OF_SCOPE':(g.db||'NOT_RUN')),
-          _gateRow('cache','Cache Gate', !sys.cacheInScope?'OUT_OF_SCOPE':(g.cache||'NOT_RUN')),
-          _gateRow('queue','Queue Gate', !sys.queueInScope?'OUT_OF_SCOPE':(g.queue||'NOT_RUN')),
-          _gateRow('backend','Backend Gate', g.backend||'NOT_RUN'),
-          _gateRow('business_validation','Business Validation', g.business_validation||'NOT_RUN'),
-          _gateRow('traffic_ramp','Traffic Ramp', !hasTraffic?'OUT_OF_SCOPE':(g.traffic_ramp||'NOT_RUN')),
+          _gateRow('db','Database Gate', !sys.dbInScope?'OUT_OF_SCOPE':db.status, db.isLive),
+          _gateRow('cache','Cache Gate', !sys.cacheInScope?'OUT_OF_SCOPE':cache.status, cache.isLive),
+          _gateRow('queue','Queue Gate', !sys.queueInScope?'OUT_OF_SCOPE':queue.status, queue.isLive),
+          _gateRow('backend','Backend Gate', backend.status, backend.isLive),
+          _gateRow('business_validation','Business Validation', biz.status, biz.isLive),
+          _gateRow('traffic_ramp','Traffic Ramp', !hasTraffic?'OUT_OF_SCOPE':ramp.status, ramp.isLive),
           _gateRow('rollback','Rollback Plan', g.rollback||'NEEDS_INPUT'),
           _gateRow('sign_off','Sign-Off', g.sign_off||'NEEDS_INPUT'),
-          _gateRow('evidence','Evidence Export', g.evidence||'NOT_RUN')
+          _gateRow('evidence','Evidence Export', ev.status, ev.isLive)
         ];
       }
       function _renderGates(){
         var sys=_sys(); var tb=$id('s5c-gates-body'); if(!sys||!tb) return;
         var rows=_computeGates(sys);
+        var L=C.liveGates;
         tb.innerHTML = rows.map(function(r){
-          var actionable = ['db','cache','queue','backend','business_validation','traffic_ramp','rollback','sign_off','evidence'].indexOf(r.key)>=0 && r.status!=='OUT_OF_SCOPE';
-          return '<tr><td>'+r.label+'</td><td>'+_pill(r.status)+'</td>'
+          var actionable = ['rollback','sign_off'].indexOf(r.key)>=0 && r.status!=='OUT_OF_SCOPE';
+          var src = r.live ? '<span title="Auto-filled from the Live Mobile Cutover Monitor'+(L&&L.updated_at?(' @ '+_esc(L.updated_at)):'')+'" style="margin-left:6px;font-size:9px;font-weight:800;color:#0891b2;background:#ecfeff;border:1px solid #67e8f9;border-radius:8px;padding:1px 6px;vertical-align:middle;">LIVE</span>'
+            : (LIVE_GATE_KEYS[r.key] && r.status!=='OUT_OF_SCOPE' ? '<span title="Waiting for live monitor results — run the mobile journey / batch proof / backend proofs." style="margin-left:6px;font-size:9px;font-weight:700;color:#94a3b8;">awaiting monitor</span>' : '');
+          return '<tr><td>'+r.label+src+'</td><td>'+_pill(r.status)+'</td>'
             + '<td>'+(actionable?'<button class="btn btn-secondary light" style="font-size:10px;padding:4px 10px;" onclick="s5cApproveGate(\''+r.key+'\')">Approve</button>':'')+'</td></tr>';
-        }).join('');
+        }).join('')
+        + (L&&L.decision?'<tr><td colspan="3" style="font-size:11px;color:'+(L.decision==='SAFE TO CONTINUE'?'#16a34a':'#b45309')+';font-weight:700;">Live monitor decision: '+_esc(L.decision)+(L.reason?(' — '+_esc(L.reason)):'')+' <span style="color:#94a3b8;font-weight:600;">(updated '+_esc(L.updated_at||'')+')</span></td></tr>':'');
+        try{ _s5cValRefresh(); }catch(e){}
       }
       window.s5cApproveGate = function(key){
         var sys=_sys(); if(!sys) return;
         if (key==='db' && sys.dupDbUnclassified){ alert('Classify all duplicate DB components before approving the Database Gate.'); return; }
         C.gates[key]='PASS';
+        try{ localStorage.setItem('outputs_cutover_gate_approvals', JSON.stringify(C.gates)); }catch(e){}
         _renderGates();
       };
 
@@ -507,6 +711,145 @@
         try { if (typeof cutoverTesterSyncHaproxyDisplay === 'function') cutoverTesterSyncHaproxyDisplay(); } catch(e){}
         $id('s5c-tester-feed-status').innerHTML='<span style="color:#16a34a;">✓ Fed "'+_esc(primary.name)+'" ('+_esc(primary.source)+' → '+_esc(primary.target)+') into the cutover tester below. Run Dry Run / Cut over TEST there as usual.</span>';
       };
+
+      /* ── Cutover Validation: PASS CUTOVER / FIX (UAT-style issue list) ── */
+      var GATE_FIX_HINTS = {
+        uat_lock: 'Click "Lock Scope for Cutover" in the business-system selector above.',
+        component_health: 'Fix BLOCKED / NEEDS INPUT components in the Business System Cutover Matrix.',
+        db: 'Run the DB rows in the Business System Test Plan (TCP probe) or the monitor’s direct backend proofs.',
+        cache: 'Run the cache proof in the Test Plan / monitor.',
+        queue: 'Run the queue proof in the Test Plan / monitor.',
+        backend: 'Run the backend component tests in the Test Plan or the monitor’s direct backend proofs.',
+        business_validation: 'Run the Full Mobile Journey in the Live Mobile Cutover Monitor.',
+        traffic_ramp: 'Apply a ramp and run the batch proof in the Cutover Tester / monitor.',
+        rollback: 'Approve the Rollback Plan gate after documenting the rollback procedure.',
+        sign_off: 'Approve the Sign-Off gate (human approval).',
+        evidence: 'Click Save Evidence in the Live Mobile Cutover Monitor.'
+      };
+      function _s5cCollectIssues(){
+        var issues=[];
+        var sys=_sys();
+        if(!sys){
+          issues.push({severity:'block', title:'No business system selected', source:'Cutover scope',
+            fix:'Select and lock a business system in the selector above.'});
+          return issues;
+        }
+        _computeGates(sys).forEach(function(g){
+          if(g.status==='PASS'||g.status==='OUT_OF_SCOPE') return;
+          issues.push({
+            severity:(g.status==='BLOCKED'||g.status==='NEEDS_INPUT')?'block':'review',
+            title:g.label+' gate: '+g.status.replace(/_/g,' '),
+            source:'Cutover Gates', fix:GATE_FIX_HINTS[g.key]||'Resolve and re-run.'
+          });
+        });
+        sys.components.forEach(function(c){
+          if(!c.selected) return;
+          var st=_rowStatus(sys,c);
+          if(st==='READY'||st==='OUT_OF_SCOPE') return;
+          issues.push({
+            severity:(st==='BLOCKED'||st==='NEEDS_INPUT')?'block':'review',
+            title:c.name+' — '+st.replace(/_/g,' '),
+            source:'Business System Cutover Matrix',
+            fix:st==='BLOCKED'?'Target VM is in ERROR — fix or replace the FLEX VM.'
+              :st==='NEEDS_INPUT'?'Fill the missing FLEX target IP / URL in the matrix.'
+              :'Classify the duplicate database component (Primary / Standby / Test).'
+          });
+        });
+        try{
+          var plan=(typeof window.bstpGetResults==='function')?window.bstpGetResults():null;
+          (plan&&plan.rows||[]).forEach(function(r){
+            if(r.kind!=='component') return;
+            if(r.status==='FAIL') issues.push({severity:'block', title:'Test Plan: '+r.name+' FAILED', source:'Business System Test Plan', fix:r.detail||'Re-run the component test.'});
+            else if(r.status==='NEEDS INPUT'||r.status==='WARNING') issues.push({severity:'review', title:'Test Plan: '+r.name+' — '+r.status, source:'Business System Test Plan', fix:r.detail||'Review and re-run.'});
+          });
+        }catch(e){}
+        if(C.liveGates&&C.liveGates.decision&&C.liveGates.decision!=='SAFE TO CONTINUE'){
+          issues.push({severity:'block', title:'Live monitor decision: '+C.liveGates.decision, source:'Live Mobile Cutover Monitor', fix:C.liveGates.reason||'Resolve the monitor blockers and re-run the journey.'});
+        }
+        return issues;
+      }
+      function _s5cValRefresh(){
+        var el=$id('s5c-val-summary'); if(!el) return;
+        var issues=_s5cCollectIssues();
+        var blocks=issues.filter(function(i){return i.severity==='block';}).length;
+        var reviews=issues.length-blocks;
+        el.innerHTML='<span style="color:'+(blocks?'#dc2626':'#16a34a')+';">'+blocks+' blocker(s)</span>'
+          +'<span style="color:'+(reviews?'#d97706':'#16a34a')+';">'+reviews+' review item(s)</span>'
+          +'<span style="color:#64748b;font-weight:600;">'+(blocks?'Resolve blockers before cutover.':(reviews?'Review items open — cutover possible with sign-off.':'All checks clear — ready to PASS CUTOVER.'))+'</span>';
+      }
+      function _s5cRenderIssues(issues){
+        var el=$id('s5c-val-issues'); if(!el) return;
+        if(!issues.length){ el.innerHTML='<div style="padding:12px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;font-size:13px;font-weight:700;color:#166534;">✓ No open issues — all gates, components and tests are clear.</div>'; return; }
+        el.innerHTML='<div style="display:grid;gap:8px;">'+issues.map(function(i){
+          var block=i.severity==='block';
+          return '<div style="display:flex;gap:10px;align-items:flex-start;border:1px solid '+(block?'#fca5a5':'#fde68a')+';background:'+(block?'#fff5f5':'#fffbeb')+';border-radius:8px;padding:10px 12px;">'
+            +'<span style="font-size:10px;font-weight:900;padding:3px 9px;border-radius:10px;white-space:nowrap;color:#fff;background:'+(block?'#dc2626':'#d97706')+';">'+(block?'BLOCKER':'REVIEW')+'</span>'
+            +'<span style="min-width:0;"><b style="font-size:13px;color:#0f172a;">'+_esc(i.title)+'</b>'
+            +'<span style="display:block;font-size:11px;color:#64748b;">'+_esc(i.source)+'</span>'
+            +'<span style="display:block;font-size:12px;color:#374151;margin-top:2px;"><b>Fix:</b> '+_esc(i.fix)+'</span></span></div>';
+        }).join('')+'</div>';
+      }
+      window.s5cFixIssues = function(){
+        var issues=_s5cCollectIssues().sort(function(a,b){ return a.severity==='block'?-1:1; });
+        _s5cRenderIssues(issues);
+        _s5cValRefresh();
+        var el=$id('s5c-val-issues'); if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+      };
+      window.s5cPassCutover = function(){
+        var issues=_s5cCollectIssues();
+        var blocks=issues.filter(function(i){return i.severity==='block';});
+        var decision='PASS CUTOVER', by='operator', reason='';
+        if(blocks.length){
+          _s5cRenderIssues(issues.sort(function(a,b){ return a.severity==='block'?-1:1; }));
+          reason=prompt('There are '+blocks.length+' unresolved blocker(s) — listed below the buttons.\n\nTo accept the risk and pass anyway, enter your reason (Cancel to abort):');
+          if(!reason) return;
+          by=prompt('Approver name:')||'';
+          if(!by) return;
+          decision='PASS WITH ACCEPTED RISK';
+        }
+        var dec={decision:decision, by:by, reason:reason, at:new Date().toLocaleString(),
+          blockers:blocks.length, reviews:issues.length-blocks.length};
+        try{ localStorage.setItem('outputs_cutover_final_decision', JSON.stringify(dec)); }catch(e){}
+        var d=$id('s5c-val-decision');
+        if(d){
+          var ok=decision==='PASS CUTOVER';
+          d.style.display='block';
+          d.style.background=ok?'#ecfdf5':'#fffbeb'; d.style.border='1px solid '+(ok?'#6ee7b7':'#fcd34d');
+          d.style.color=ok?'#065f46':'#92400e';
+          d.textContent=decision+' — validated by '+by+' at '+dec.at+(reason?(' — risk accepted: '+reason):'');
+        }
+        _s5cExportFullReport(dec, issues);
+      };
+      function _s5cExportFullReport(dec, issues){
+        var sys=_sys();
+        var rows=[['section','item','detail','status','extra']];
+        rows.push(['decision', dec.decision, 'by '+dec.by+(dec.reason?' — '+dec.reason:''), String(dec.blockers)+' blocker(s), '+dec.reviews+' review(s)', dec.at]);
+        if(sys){
+          rows.push(['business_system', sys.name, sys.archetype+' / '+sys.criticality+' / '+sys.wave, sys.uatStatus, sys.componentCount+' components']);
+          _computeGates(sys).forEach(function(g){ rows.push(['gate', g.label, g.live?'live from monitor':'', g.status, '']); });
+          sys.components.forEach(function(c){
+            rows.push(['component', c.name, (c.source||'-')+' -> '+(c.target||'-')+(c.port?(':'+c.port):''), _rowStatus(sys,c), c.role]);
+          });
+        }
+        try{
+          var plan=(typeof window.bstpGetResults==='function')?window.bstpGetResults():null;
+          (plan&&plan.rows||[]).forEach(function(r){
+            rows.push(['test_plan', r.name, (r.source||'-')+' -> '+(r.target||'-')+' | src '+r.srcRes+' | tgt '+r.tgtRes, r.status, r.detail||'']);
+          });
+        }catch(e){}
+        if(C.liveGates){
+          Object.keys(C.liveGates).forEach(function(k){
+            if(k==='updated_at') return;
+            rows.push(['live_monitor', k, '', String(C.liveGates[k]), C.liveGates.updated_at||'']);
+          });
+        }
+        (issues||[]).forEach(function(i){ rows.push(['open_issue', i.title, i.fix, i.severity.toUpperCase(), i.source]); });
+        var csv=rows.map(function(r){ return r.map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n')+'\n';
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+        a.download='cutover_full_report_'+(sys?sys.name.replace(/[^a-z0-9]+/gi,'_'):'no_system')+'_'+Date.now()+'.csv';
+        a.click();
+      }
 
       /* ── Activation entry point (called from activateStage()) ── */
       window.s5cOnActivate = function(){ s5cRefresh(); };

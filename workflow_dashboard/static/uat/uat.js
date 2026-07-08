@@ -2939,7 +2939,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     if ($('uat-console')) {
-      setTimeout(function() { window.uatSetMode('compact', true); }, 0);
+      setTimeout(function() { window.uatSetMode('detailed', true); }, 0);
       window.uatLoadFlavorData().catch(function() {});
       loadUAT().then(() => { const m=$('uat-message'); if(m) m.style.display='none'; }).catch(err => setMessage(err.message, false));
     }

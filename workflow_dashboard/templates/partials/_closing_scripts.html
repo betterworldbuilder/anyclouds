@@ -6426,26 +6426,14 @@ ${certContent}
       try { cutoverTesterLoadResultsCache(); } catch(e) { console.warn('Tester results cache restore failed', e); }
       try { _coMonLoadCache(); } catch(e) { console.warn('Monitor cache restore failed', e); }
     }
-    // Stage 4B: move co-adv-dash into panel-s5b and always show in advanced mode
-    if (stageId === 's5b') {
-      var advDash = document.getElementById('co-adv-dash');
-      var home    = document.getElementById('co-adv-home');
-      if (advDash && home && advDash.parentNode !== home) {
-        home.appendChild(advDash);
-        var savedMode = localStorage.getItem('cutoverDashboardMode');
-        advDash.style.display = (savedMode === 'advanced') ? 'block' : 'none';
-      }
-      setTimeout(function() { try { if (typeof bscOnActivate==='function') bscOnActivate(); } catch(e) {} }, 200);
-    } else {
-      // Any other stage: ensure co-adv-dash is back in its home inside panel-s5
-      var advDash = document.getElementById('co-adv-dash');
-      var home    = document.getElementById('co-adv-home');
-      if (advDash && home && advDash.parentNode !== home) {
-        home.appendChild(advDash);
-        // Restore display to match saved tab mode
-        var savedMode = localStorage.getItem('cutoverDashboardMode');
-        advDash.style.display = (savedMode === 'advanced') ? 'block' : 'none';
-      }
+    // Stage 4B removed — always keep co-adv-dash in its home inside panel-s5
+    var advDash = document.getElementById('co-adv-dash');
+    var home    = document.getElementById('co-adv-home');
+    if (advDash && home && advDash.parentNode !== home) {
+      home.appendChild(advDash);
+      // Restore display to match saved tab mode
+      var savedMode = localStorage.getItem('cutoverDashboardMode');
+      advDash.style.display = (savedMode === 'advanced') ? 'block' : 'none';
     }
     // Stage 4C: relocate Stage 4's live sections into 4C (single live copy —
     // same pattern as co-adv-dash above — so all tester/cockpit/scanner JS
@@ -6457,6 +6445,12 @@ ${certContent}
       var s5cTesterHome  = document.getElementById('s5-tester-cockpit-home');
       var s5cTesterMount = document.getElementById('s5c-tester-cockpit-mount');
       if (s5cTesterHome && s5cTesterMount && s5cTesterHome.parentNode !== s5cTesterMount) s5cTesterMount.appendChild(s5cTesterHome);
+      var s5cBizHome  = document.getElementById('uat-s1-bizsystem-home');
+      var s5cBizMount = document.getElementById('s5c-bizsystem-mount');
+      if (s5cBizHome && s5cBizMount && s5cBizHome.parentNode !== s5cBizMount) {
+        s5cBizMount.appendChild(s5cBizHome);
+        s5cBizHome.style.display = 'block';
+      }
       setTimeout(function() { try { if (typeof s5cOnActivate === 'function') s5cOnActivate(); } catch(e) {} }, 200);
     } else {
       var s5cManualHome2  = document.getElementById('s5-manual-scope-home');
@@ -6468,6 +6462,12 @@ ${certContent}
       var s5cTesterAnchor = document.getElementById('s5-tester-cockpit-anchor');
       if (s5cTesterHome2 && s5cTesterAnchor && s5cTesterHome2.parentNode !== s5cTesterAnchor.parentNode) {
         s5cTesterAnchor.parentNode.insertBefore(s5cTesterHome2, s5cTesterAnchor.nextSibling);
+      }
+      var s5cBizHome2  = document.getElementById('uat-s1-bizsystem-home');
+      var s5cBizAnchor = document.getElementById('uat-s1-bizsystem-anchor');
+      if (s5cBizHome2 && s5cBizAnchor && s5cBizHome2.parentNode !== s5cBizAnchor.parentNode) {
+        s5cBizAnchor.parentNode.insertBefore(s5cBizHome2, s5cBizAnchor.nextSibling);
+        s5cBizHome2.style.display = 'none';
       }
     }
     requestAnimationFrame(syncVisibleIframeHeights);
@@ -8470,7 +8470,6 @@ ${certContent}
         {id:'panel-s2',  key:'s2',  label:'Stage 2 — Migrations',                         vidKey:'pnl-s2',  vidTitle:'Stage 2 \u2014 Migrations Tutorial'},
         {id:'panel-s4',  key:'s4',  label:'Stage 3 — Validation \u0026 UAT',             vidKey:'pnl-s4',  vidTitle:'Stage 3 \u2014 Validation \u0026 UAT Tutorial'},
         {id:'panel-s5',  key:'s5',  label:'Stage 4 — Cutover \u0026 Traffic Transition', vidKey:'pnl-s5',  vidTitle:'Stage 4 \u2014 Cutover \u0026 Traffic Transition Tutorial'},
-        {id:'panel-s5b', key:'s5b', label:'Stage 4B — Business System Cutover',           vidKey:'pnl-s5b', vidTitle:'Stage 4B \u2014 Business System Cutover Tutorial'},
         {id:'panel-s6',  key:'s6',  label:'Stage 5 — Stabilization \u0026 Handover',     vidKey:'pnl-s6',  vidTitle:'Stage 5 \u2014 Stabilization \u0026 Handover Tutorial'},
         {id:'panel-s7',  key:'s7',  label:'Stage 6 — FinOps \u0026 Cost Optimization',   vidKey:'pnl-s7',  vidTitle:'Stage 6 \u2014 FinOps \u0026 Cost Optimization Tutorial'},
         {id:'panel-s7a', key:'s7a', label:'Stage 6A — Performance Gain',                  vidKey:'pnl-s7a', vidTitle:'Stage 6A \u2014 Performance Gain Tutorial'},
@@ -10745,6 +10744,117 @@ ${certContent}
   };
   var tokens = { source: '', target: '' };
 
+  /* ── Component Test Lab (device-mockup testing), embedded into these same
+     phones: selecting a real business-system component in the Type dropdown
+     skins the phone as that component's device and swaps the action buttons
+     to its test set. Plain Frontend/API/Backend/DB canned types keep the
+     original behavior untouched. ─────────────────────────────────────────── */
+  var _sideState = { source: { mode: 'legacy' }, target: { mode: 'legacy' } };
+  var _liveSysId = '';
+  var _ctlResults = {};
+  try { _ctlResults = JSON.parse(localStorage.getItem('uatComponentTestResults') || '{}'); } catch(e) {}
+  var HTTP_DEVICE_TYPES = { mobile_phone: 1, api_console_tablet: 1, service_console: 1, backend_engine_rack: 1, auth_security_device: 1 };
+  var DEVICE_THEMES = {
+    mobile_phone:        { icon: '📱', bg: '#1d4ed8', label: 'Mobile UI Test Console' },
+    api_console_tablet:  { icon: '📶', bg: '#7c3aed', label: 'API Console Tablet' },
+    service_console:      { icon: '🖥️', bg: '#0891b2', label: 'Service Console' },
+    backend_engine_rack:  { icon: '⚙️', bg: '#475569', label: 'Backend Engine Rack' },
+    auth_security_device: { icon: '🔒', bg: '#b45309', label: 'Security Lock Device' },
+    database_console:     { icon: '🗄️', bg: '#b91c1c', label: 'Database Console' },
+    cache_memory_chip:    { icon: '⚡', bg: '#c2410c', label: 'Cache Memory Chip' },
+    queue_conveyor:       { icon: '📦', bg: '#6d28d9', label: 'Queue Conveyor Belt' },
+    worker_factory:       { icon: '🏭', bg: '#334155', label: 'Worker Factory' },
+    monitoring_noc_wall:  { icon: '📊', bg: '#047857', label: 'NOC Wall Dashboard' }
+  };
+  var STATUS_PILL = {
+    NOT_RUN: { c: '#cbd5e1', l: 'NOT RUN' }, PASS: { c: '#4ade80', l: 'PASS' },
+    WARNING: { c: '#fbbf24', l: 'WARNING' }, BLOCKED: { c: '#f87171', l: 'BLOCKED' }
+  };
+  function _devPill(status) {
+    var s = STATUS_PILL[status] || STATUS_PILL.NOT_RUN;
+    return '<span style="display:inline-flex;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:900;color:#0f172a;background:' + s.c + ';">' + s.l + '</span>';
+  }
+  function _deviceType(role) {
+    var r = (role || '').toLowerCase();
+    if (r.indexOf('frontend') >= 0 || r.indexOf('mobile') >= 0 || (r.indexOf('web') >= 0 && r.indexOf('gateway') < 0)) return 'mobile_phone';
+    if (r.indexOf('gateway') >= 0) return 'api_console_tablet';
+    if (r.indexOf('auth') >= 0 || r.indexOf('sso') >= 0 || r.indexOf('identity') >= 0) return 'auth_security_device';
+    if (r.indexOf('backend') >= 0 || r.indexOf('core') >= 0 || r.indexOf('ledger') >= 0) return 'backend_engine_rack';
+    if (r.indexOf('database') >= 0 || r.indexOf('postgres') >= 0 || r.indexOf('mysql') >= 0 || r.indexOf('db') >= 0) return 'database_console';
+    if (r.indexOf('cache') >= 0 || r.indexOf('redis') >= 0) return 'cache_memory_chip';
+    if (r.indexOf('queue') >= 0 || r.indexOf('rabbit') >= 0 || r.indexOf('kafka') >= 0) return 'queue_conveyor';
+    if (r.indexOf('worker') >= 0 || r.indexOf('cron') >= 0 || r.indexOf('batch') >= 0) return 'worker_factory';
+    if (r.indexOf('monitor') >= 0 || r.indexOf('observ') >= 0 || r.indexOf('logging') >= 0) return 'monitoring_noc_wall';
+    if (r.indexOf('api') >= 0 || r.indexOf('service') >= 0) return 'service_console';
+    return 'service_console';
+  }
+  function _httpCommand(comp) {
+    var sHost = comp.srcHost || 'SOURCE-IP';
+    var tHost = comp.tgtHost || 'TARGET-IP';
+    var sPort = comp.srcPort || comp.tgtPort || '80';
+    var tPort = comp.tgtPort || comp.srcPort || '80';
+    var path = comp.path || '/health';
+    return 'SOURCE_URL="http://' + sHost + ':' + sPort + '"\n'
+      + 'TARGET_URL="http://' + tHost + ':' + tPort + '"\n'
+      + 'TEST_PATH="' + path + '"\n\n'
+      + 'echo "Source health"\n'
+      + 'curl -sk -w "\\nHTTP %{http_code} in %{time_total}s\\n" "$SOURCE_URL$TEST_PATH"\n\n'
+      + 'echo "Target health"\n'
+      + 'curl -sk -w "\\nHTTP %{http_code} in %{time_total}s\\n" "$TARGET_URL$TEST_PATH"\n\n'
+      + 'echo "Target readiness"\n'
+      + 'curl -sk -w "\\nHTTP %{http_code} in %{time_total}s\\n" "$TARGET_URL/ready"\n\n'
+      + 'echo "Target smoke"\n'
+      + 'curl -sk -I "$TARGET_URL/"';
+  }
+  function _manualCommand(comp) {
+    var t = comp.deviceType, sHost = comp.srcHost || 'SOURCE-IP', tHost = comp.tgtHost || 'TARGET-IP', port = comp.tgtPort || comp.srcPort || '';
+    if (t === 'database_console') {
+      return 'SOURCE_DB_HOST="' + sHost + '"\nTARGET_DB_HOST="' + tHost + '"\nDB_PORT="' + (port || 5432) + '"\n\n'
+        + 'echo "Source SELECT 1"\nPGPASSWORD="$DB_PASSWORD" psql -h "$SOURCE_DB_HOST" -p "$DB_PORT" -U "$DB_USER" -c "SELECT 1;"\n\n'
+        + 'echo "Target SELECT 1"\nPGPASSWORD="$DB_PASSWORD" psql -h "$TARGET_DB_HOST" -p "$DB_PORT" -U "$DB_USER" -c "SELECT 1;"';
+    }
+    if (t === 'cache_memory_chip') {
+      return 'SOURCE_REDIS="' + sHost + '"\nTARGET_REDIS="' + tHost + '"\nREDIS_PORT="' + (port || 6379) + '"\n\n'
+        + 'redis-cli -h "$SOURCE_REDIS" -p "$REDIS_PORT" PING\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" PING\n\n'
+        + 'redis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" SET cutover:test "ok"\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" GET cutover:test\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" DEL cutover:test';
+    }
+    if (t === 'queue_conveyor') {
+      return 'TARGET_HOST="' + tHost + '"\nPORT="' + (port || 5672) + '"\n\n'
+        + 'nc -vz "$TARGET_HOST" "$PORT"\ncurl -u "$RABBIT_USER:$RABBIT_PASS" "http://$TARGET_HOST:15672/api/queues" | jq \'.[] | {name, messages, consumers}\'';
+    }
+    if (t === 'worker_factory') {
+      return 'ssh -i "~/.ssh/id_rsa" -o StrictHostKeyChecking=no "ubuntu@' + tHost + '" \'\n'
+        + '  echo "Worker services:"; systemctl --type=service --state=running | egrep "worker|celery|cron|scheduler|batch" || true\n'
+        + '  echo "Cron entries:"; crontab -l || true\n\'';
+    }
+    if (t === 'monitoring_noc_wall') {
+      return 'ssh -i "~/.ssh/id_rsa" -o StrictHostKeyChecking=no "ubuntu@' + tHost + '" \'\n'
+        + '  uptime; free -h; df -h\n  sudo journalctl -p warning -n 80 --no-pager || true\n\'';
+    }
+    return '# no command template for this component type';
+  }
+  function _verdictFromProbes(s, t) {
+    var sOk = s && s.ok && [200, 204, 301, 302].indexOf(s.status) >= 0;
+    var tOk = t && t.ok && [200, 204, 301, 302].indexOf(t.status) >= 0;
+    if (!tOk) return 'BLOCKED';
+    if (!sOk) return 'WARNING';
+    if (s.elapsed_ms && t.elapsed_ms && t.elapsed_ms > s.elapsed_ms * 1.25) return 'WARNING';
+    return 'PASS';
+  }
+  function _setDeviceStatus(comp, status) {
+    var key = _liveSysId + '::' + comp.idx;
+    _ctlResults[key] = { status: status, ts: new Date().toLocaleString(), name: comp.name };
+    try { localStorage.setItem('uatComponentTestResults', JSON.stringify(_ctlResults)); } catch(e) {}
+    Object.keys(_sideState).forEach(function(side) {
+      var st = _sideState[side];
+      if (st && st.comp && st.comp.idx === comp.idx) {
+        var badge = el('uatLive-' + side + '-devstatus');
+        if (badge) badge.innerHTML = _devPill(status);
+      }
+    });
+  }
+  function _getDeviceStatus(comp) { return (_ctlResults[_liveSysId + '::' + comp.idx] || {}).status || 'NOT_RUN'; }
+
   function el(id) { return document.getElementById(id); }
   function val(id) { var n = el(id); return n ? String(n.value || '').trim() : ''; }
   function setVal(id, value) { var n = el(id); if (n) n.value = value; }
@@ -10863,6 +10973,35 @@ ${certContent}
     if(n.indexOf('frontend')>=0) return 'frontend';
     return 'backend';
   }
+  function _selectedTypeText(side) {
+    var sel = el('uatLive-' + side + '-type');
+    return sel && sel.options && sel.selectedIndex >= 0 ? String(sel.options[sel.selectedIndex].text || '') : '';
+  }
+  function _kindFromTypeText(type, text) {
+    var raw = (String(type || '') + ' ' + String(text || '')).toLowerCase();
+    if (raw.indexOf('database') >= 0 || raw.indexOf('postgres') >= 0 || raw.indexOf('mysql') >= 0 || raw.indexOf('db') >= 0) return 'db';
+    if (raw.indexOf('gateway') >= 0 || raw.indexOf('api') >= 0) return 'api';
+    if (raw.indexOf('frontend') >= 0 || raw.indexOf('mobile') >= 0 || raw.indexOf('web') >= 0) return 'frontend';
+    return 'backend';
+  }
+  function _componentFromCurrentInputs(side, type, text) {
+    var kind = _kindFromTypeText(type, text);
+    var d = TYPE_DEFAULTS[kind] || TYPE_DEFAULTS.backend;
+    var deviceType = kind === 'frontend' ? 'mobile_phone'
+      : (kind === 'api' ? 'api_console_tablet'
+      : (kind === 'db' ? 'database_console' : 'backend_engine_rack'));
+    return {
+      idx: 'current-' + side + '-' + kind,
+      name: text || d.label,
+      kind: kind,
+      deviceType: deviceType,
+      srcHost: val('uatLive-source-host'),
+      tgtHost: val('uatLive-target-host'),
+      srcPort: val('uatLive-source-port') || d.port,
+      tgtPort: val('uatLive-target-port') || d.port,
+      path: val('uatLive-' + side + '-path') || d.path
+    };
+  }
   window.uatLivePopulateComponents = function() {
     var sys=null;
     try {
@@ -10871,8 +11010,9 @@ ${certContent}
       list.sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
       sys=list[0]||null;
     } catch(e){}
+    _liveSysId = sys ? (sys.id || sys.name || '') : '';
     _liveComps=(sys&&sys.components||[]).map(function(c,i){
-      return { idx:i, name:c.name||('Component '+(i+1)), kind:_liveKind(c.name),
+      return { idx:i, name:c.name||('Component '+(i+1)), kind:_liveKind(c.name), deviceType:_deviceType(c.name),
                srcHost:_liveHost(c.src), tgtHost:_liveHost(c.tgt),
                srcPort:_livePort(c.src), tgtPort:_livePort(c.tgt),
                path:(String(c.path||'').charAt(0)==='/')?c.path:'' };
@@ -10895,6 +11035,7 @@ ${certContent}
   };
   window.uatLiveTypeChanged = function(side) {
     var type = val('uatLive-' + side + '-type') || 'frontend';
+    var selectedText = _selectedTypeText(side);
     if (type.indexOf('comp:') === 0) {
       var c = _liveComps[parseInt(type.slice(5), 10)];
       if (c) {
@@ -10904,15 +11045,191 @@ ${certContent}
         if (host && host.indexOf('-IP') === -1 && host !== 'gateway.ospc.local' ) setVal('uatLive-' + side + '-host', host);
         setVal('uatLive-' + side + '-port', port);
         setVal('uatLive-' + side + '-path', path);
+        _sideState[side] = { mode: HTTP_DEVICE_TYPES[c.deviceType] ? 'http-device' : 'manual-device', comp: c };
+        _applySideMode(side);
         appendLog(side, '[mode] ' + c.name + ' selected. ' + (side === 'source' ? 'Source' : 'Target') + ' host ' + (host || 'n/a') + ', port ' + port + ', path ' + path);
         return;
       }
     }
-    var d = TYPE_DEFAULTS[type] || TYPE_DEFAULTS.frontend;
+    _sideState[side] = { mode: 'legacy', comp: null };
+    var inferredKind = _kindFromTypeText(type, selectedText);
+    var d = TYPE_DEFAULTS[inferredKind] || TYPE_DEFAULTS.frontend;
     setVal('uatLive-' + side + '-port', d.port);
     setVal('uatLive-' + side + '-path', d.path);
+    if (inferredKind !== 'frontend' || type !== 'frontend') {
+      var comp = _componentFromCurrentInputs(side, type, selectedText || d.label);
+      _sideState[side] = { mode: HTTP_DEVICE_TYPES[comp.deviceType] ? 'http-device' : 'manual-device', comp: comp };
+    }
+    _applySideMode(side);
     appendLog(side, '[mode] ' + d.label + ' selected. Default port ' + d.port + ', path ' + d.path);
   };
+
+  var LEGACY_ACTIONS_HTML = {
+    source: '<button type="button" onclick="uatLiveLoadMobile(\'source\')">Load Mobile</button>'
+      + '<button type="button" onclick="uatLiveRun(\'source\',\'health\')">Health</button>'
+      + '<button type="button" onclick="uatLiveRun(\'source\',\'ready\')">Ready</button>'
+      + '<button type="button" onclick="uatLiveRun(\'source\',\'login\')">Login</button>'
+      + '<button type="button" onclick="uatLiveRun(\'source\',\'summary\')">Summary</button>'
+      + '<button type="button" onclick="uatLiveRun(\'source\',\'recipients\')">Users</button>',
+    target: '<button type="button" onclick="uatLiveLoadMobile(\'target\')">Load Mobile</button>'
+      + '<button type="button" onclick="uatLiveRun(\'target\',\'health\')">Health</button>'
+      + '<button type="button" onclick="uatLiveRun(\'target\',\'ready\')">Ready</button>'
+      + '<button type="button" onclick="uatLiveRun(\'target\',\'login\')">Login</button>'
+      + '<button type="button" onclick="uatLiveRun(\'target\',\'summary\')">Summary</button>'
+      + '<button type="button" onclick="uatLiveRun(\'target\',\'recipients\')">Users</button>'
+  };
+  function _httpActionsHtml(side) {
+    return ['devRunCmd','devHealth','devReady','devSmoke','devPerf','devCompare','devCopyCmd','devEvidence'].map(function(kind) {
+      var labels = { devRunCmd:'Run Test Cmd', devHealth:'Health', devReady:'Ready', devSmoke:'Smoke', devPerf:'Perf', devCompare:'Compare', devCopyCmd:'Copy Command', devEvidence:'Save Evidence' };
+      return '<button type="button" onclick="uatLiveRun(\'' + side + '\',\'' + kind + '\')">' + labels[kind] + '</button>';
+    }).join('');
+  }
+  function _manualActionsHtml(side) {
+    return ['devRunCmd','devPort','devComparePorts','devCopyCmd','devMarkPass','devMarkWarn','devMarkBlocked','devEvidence'].map(function(kind) {
+      var labels = { devRunCmd:'Run Test Cmd', devPort:'Test Port', devComparePorts:'Compare Ports', devCopyCmd:'Copy Command', devMarkPass:'Mark PASS', devMarkWarn:'Mark WARNING', devMarkBlocked:'Mark BLOCKED', devEvidence:'Save Evidence' };
+      return '<button type="button" onclick="uatLiveRun(\'' + side + '\',\'' + kind + '\')">' + labels[kind] + '</button>';
+    }).join('');
+  }
+  function _applySideMode(side) {
+    var state = _sideState[side] || { mode: 'legacy' };
+    var frame = el('uatLive-' + side + '-frame');
+    var skin = el('uatLive-' + side + '-skin');
+    var actions = el('uatLive-' + side + '-actions');
+    var devTitle = el('uatLive-' + side + '-devtitle');
+    var routeEl = el('uatLive-' + side + '-route');
+    var tableWrap = el('uatLive-' + side + '-tablewrap');
+    var logEl = el('uatLive-' + side + '-log');
+    var sideEl = document.querySelector('[data-uat-live-side="' + side + '"]');
+    if (state.mode === 'legacy') {
+      if (sideEl) sideEl.classList.remove('uat-live-side--component-mode');
+      if (frame) frame.style.display = '';
+      if (skin) { skin.style.display = 'none'; skin.innerHTML = ''; }
+      if (routeEl) routeEl.style.display = '';
+      if (tableWrap) tableWrap.style.display = '';
+      if (devTitle) devTitle.textContent = 'Dev View - Live Data Movement';
+      if (actions) actions.innerHTML = LEGACY_ACTIONS_HTML[side];
+      return;
+    }
+    var comp = state.comp;
+    var theme = DEVICE_THEMES[comp.deviceType] || DEVICE_THEMES.service_console;
+    if (sideEl) sideEl.classList.add('uat-live-side--component-mode');
+    if (frame) frame.style.display = 'none';
+    if (routeEl) routeEl.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = 'none';
+    if (skin) {
+      skin.style.display = 'flex';
+      skin.style.background = theme.bg;
+      skin.innerHTML = '<div class="uat-live-device-icon">' + theme.icon + '</div>'
+        + '<div class="uat-live-device-label">' + theme.label + '</div>'
+        + '<div class="uat-live-device-name">' + comp.name.replace(/</g,'&lt;') + '</div>'
+        + '<div class="uat-live-device-hosts">' + (comp.srcHost||'?') + ' → ' + (comp.tgtHost||'?') + (comp.tgtPort?(':'+comp.tgtPort):'') + '</div>'
+        + '<div class="uat-live-device-status" id="uatLive-' + side + '-devstatus">' + _devPill(_getDeviceStatus(comp)) + '</div>';
+    }
+    if (devTitle) devTitle.textContent = theme.label + ' Test Bench';
+    if (actions) actions.innerHTML = state.mode === 'http-device' ? _httpActionsHtml(side) : _manualActionsHtml(side);
+    if (logEl) {
+      if (state.mode === 'manual-device') {
+        logEl.textContent = '# Component test terminal — Run Test Cmd performs a live TCP probe; protocol commands are below.\n\n' + _manualCommand(comp) + '\n';
+      } else {
+        logEl.textContent = '# Component test terminal — Run Test Cmd executes source/target probes through the dashboard proxy.\n\n' + _httpCommand(comp) + '\n';
+      }
+    }
+  }
+  async function _probeBoth(comp, path, side) {
+    var srcUrl = comp.srcHost ? ('http://' + comp.srcHost + (comp.srcPort ? ':' + comp.srcPort : '') + path) : '';
+    var tgtUrl = comp.tgtHost ? ('http://' + comp.tgtHost + (comp.tgtPort ? ':' + comp.tgtPort : '') + path) : '';
+    appendLog(side, '$ probe SOURCE ' + (srcUrl || '(no source host)'));
+    appendLog(side, '$ probe TARGET ' + (tgtUrl || '(no target host)'));
+    var s = srcUrl ? await proxy(side, { method: 'GET', url: srcUrl, timeout: 6 }) : null;
+    var t = tgtUrl ? await proxy(side, { method: 'GET', url: tgtUrl, timeout: 6 }) : null;
+    appendLog(side, 'source: ' + JSON.stringify({ status: s && s.status, ms: s && s.elapsed_ms, error: s && s.error }));
+    appendLog(side, 'target: ' + JSON.stringify({ status: t && t.status, ms: t && t.elapsed_ms, error: t && t.error }));
+    var verdict = _verdictFromProbes(s, t);
+    _setDeviceStatus(comp, verdict);
+    return verdict;
+  }
+  async function _perfBoth(comp, side) {
+    if (!comp.tgtHost) { appendLog(side, '[error] No target host to run perf against.'); return; }
+    var url = 'http://' + comp.tgtHost + (comp.tgtPort ? ':' + comp.tgtPort : '') + (comp.path || '/health');
+    appendLog(side, '$ perf loop (5 requests) against TARGET ' + comp.tgtHost);
+    var times = [], errs = 0;
+    for (var i = 0; i < 5; i++) {
+      var res = await proxy(side, { method: 'GET', url: url, timeout: 6 });
+      if (res && res.ok) times.push(res.elapsed_ms || 0); else errs++;
+    }
+    times.sort(function(a, b) { return a - b; });
+    var avg = times.length ? Math.round(times.reduce(function(a, b) { return a + b; }, 0) / times.length) : 0;
+    var p95 = times.length ? times[Math.min(times.length - 1, Math.ceil(times.length * 0.95) - 1)] : 0;
+    appendLog(side, 'avg=' + avg + 'ms p95=' + p95 + 'ms error%=' + ((errs / 5) * 100).toFixed(0));
+    _setDeviceStatus(comp, errs > 0 ? 'WARNING' : 'PASS');
+  }
+  async function _tcpProbe(side, host, port, label) {
+    if (!host || !port) {
+      appendLog(side, '[error] Missing ' + label + ' host or port.');
+      return null;
+    }
+    var url = 'tcp://' + host + ':' + port;
+    appendLog(side, '$ tcp probe ' + label + ' ' + url);
+    var res = await proxy(side, { method: 'TCP', url: url, timeout: 6 });
+    appendLog(side, label + ': ' + JSON.stringify({ status: res && res.status, ms: res && res.elapsed_ms, reason: res && (res.reason || res.error) }));
+    return res;
+  }
+  async function _portProbe(comp, side, compareBoth) {
+    var currentHost = side === 'source' ? comp.srcHost : comp.tgtHost;
+    var currentPort = side === 'source' ? comp.srcPort : comp.tgtPort;
+    if (!compareBoth) {
+      var single = await _tcpProbe(side, currentHost, currentPort, side);
+      _setDeviceStatus(comp, single && single.ok ? 'PASS' : 'BLOCKED');
+      return;
+    }
+    var src = await _tcpProbe(side, comp.srcHost, comp.srcPort || comp.tgtPort, 'source');
+    var tgt = await _tcpProbe(side, comp.tgtHost, comp.tgtPort || comp.srcPort, 'target');
+    _setDeviceStatus(comp, tgt && tgt.ok ? ((src && src.ok) ? 'PASS' : 'WARNING') : 'BLOCKED');
+  }
+  function _saveDeviceEvidence(comp, side) {
+    var logEl = el('uatLive-' + side + '-log');
+    var evidence = {
+      business_system_id: _liveSysId, component_name: comp.name, component_type: comp.deviceType,
+      source_host: comp.srcHost, target_host: comp.tgtHost, status: _getDeviceStatus(comp),
+      terminal_log: logEl ? logEl.textContent : '', saved_at: new Date().toISOString()
+    };
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(evidence, null, 2)], { type: 'application/json' }));
+    a.download = (comp.name || 'component').replace(/[^a-z0-9]+/ig, '_') + '_evidence.json';
+    a.click();
+    appendLog(side, '[evidence] saved ' + a.download);
+  }
+  async function _deviceRun(side, kind) {
+    var state = _sideState[side];
+    if (!state || !state.comp) return;
+    var comp = state.comp;
+    if (kind === 'devRunCmd') {
+      if (state.mode === 'manual-device') return _portProbe(comp, side, true);
+      await _probeBoth(comp, comp.path || '/health', side);
+      await _probeBoth(comp, '/ready', side);
+      return _perfBoth(comp, side);
+    }
+    if (kind === 'devHealth') return _probeBoth(comp, comp.path || '/health', side);
+    if (kind === 'devReady') return _probeBoth(comp, '/ready', side);
+    if (kind === 'devSmoke') return _probeBoth(comp, '/', side);
+    if (kind === 'devCompare') return _probeBoth(comp, comp.path || '/health', side);
+    if (kind === 'devPerf') return _perfBoth(comp, side);
+    if (kind === 'devPort') return _portProbe(comp, side, false);
+    if (kind === 'devComparePorts') return _portProbe(comp, side, true);
+    if (kind === 'devCopyCmd') {
+      var logEl = el('uatLive-' + side + '-log');
+      if (logEl && navigator.clipboard) navigator.clipboard.writeText(logEl.textContent).catch(function() {});
+      appendLog(side, '[copied] command copied to clipboard.');
+      return;
+    }
+    if (kind === 'devMarkPass' || kind === 'devMarkWarn' || kind === 'devMarkBlocked') {
+      var st = kind === 'devMarkPass' ? 'PASS' : kind === 'devMarkWarn' ? 'WARNING' : 'BLOCKED';
+      _setDeviceStatus(comp, st);
+      appendLog(side, '[manual] marked ' + st + ' by operator at ' + now() + '.');
+      return;
+    }
+    if (kind === 'devEvidence') return _saveDeviceEvidence(comp, side);
+  }
   if (document.readyState !== 'loading') { try { uatLivePopulateComponents(); } catch(e) {} }
   else document.addEventListener('DOMContentLoaded', function(){ try { uatLivePopulateComponents(); } catch(e) {} });
   window.uatLiveLoadMobile = function(side) {
@@ -10943,6 +11260,13 @@ ${certContent}
     } catch(e) {}
   };
   window.uatLiveRun = async function(side, kind) {
+    if (kind && kind.indexOf('dev') === 0) return _deviceRun(side, kind);
+    var selectedKind = _kindFromTypeText(val('uatLive-' + side + '-type'), _selectedTypeText(side));
+    if (selectedKind !== 'frontend') {
+      if (window.uatLiveTypeChanged) uatLiveTypeChanged(side);
+      var mapped = kind === 'ready' ? 'devReady' : (kind === 'summary' || kind === 'login' || kind === 'recipients' ? 'devRunCmd' : 'devHealth');
+      return _deviceRun(side, mapped);
+    }
     var test = TESTS[kind] || TESTS.health;
     try {
       var headers = {};
@@ -10971,15 +11295,16 @@ ${certContent}
     try {
       var raw = localStorage.getItem('uatLiveBench.' + side);
       var data = raw ? JSON.parse(raw) : null;
+      if (data) setVal('uatLive-' + side + '-type', data.type || 'frontend');
       if (data) {
-        setVal('uatLive-' + side + '-type', data.type || 'frontend');
         setVal('uatLive-' + side + '-host', data.host || (side === 'source' ? '23.253.159.71' : ''));
         setVal('uatLive-' + side + '-port', data.port || '8080');
         setVal('uatLive-' + side + '-path', data.path || '/#');
       }
+      if (window.uatLiveTypeChanged) uatLiveTypeChanged(side);
     } catch(e) {}
     renderRows(side, side === 'source' ? '1' : '');
-    if ((side === 'source' || side === 'cutover-source' || side === 'cutoverc-source') && val('uatLive-' + side + '-host')) window.uatLiveLoadMobile(side);
+    if ((side === 'source' || side === 'cutover-source' || side === 'cutoverc-source') && val('uatLive-' + side + '-host') && (!_sideState[side] || _sideState[side].mode === 'legacy')) window.uatLiveLoadMobile(side);
     else appendLog(side, '[ready] Enter endpoint, load mobile, or run a service test.');
   }
   function retargetCloneIds(root, fromSide, toSide) {
@@ -10996,6 +11321,1075 @@ ${certContent}
       });
     });
   }
+  var cutMobState = {};
+  function cutMobEsc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  var LCV_STOPS = [0, 10, 25, 50, 75, 100];
+  var LCV_STEPS = [['load','Load Mobile'],['health','Health'],['ready','Ready'],['login','Login'],['summary','Account Summary'],['users','Users API'],['transfer','Transfer Test'],['balance','Balance Refresh']];
+  function cutMobPhoneHtml(id) {
+    var steps = LCV_STEPS.map(function(s){
+      return '<div class="lcv-step" id="' + id + '-cutover-result-' + s[0] + '" data-status="NOT RUN"><span>' + s[1] + '</span><b>NOT RUN</b></div>';
+    }).join('');
+    var actions = [['health','Health'],['ready','Ready'],['login','Login'],['summary','Summary'],['users','Users']].map(function(a){
+      return '<button type="button" onclick="cutMobRun(\'' + id + '\',\'cutover\',\'' + a[0] + '\')">' + a[1] + '</button>';
+    }).join('');
+    return '<div class="uat-live-side uat-live-side--source lcv-phone-wrap" data-uat-live-side="source">'
+      + '<div class="uat-live-head"><div><div class="uat-live-kicker">Source OSPC</div><h3>Source Mobile UI</h3><p>Validate the current production/source frontend and service path.</p></div><span class="uat-live-badge">LEFT</span></div>'
+      + '<div class="uat-live-controls">'
+      + '<label>Type<select id="' + id + '-mob-type"><option value="frontend">Frontend Mobile UI</option><option value="api">API Gateway</option><option value="backend">Backend Service</option><option value="db">Database API</option></select></label>'
+      + '<label>IP / Host<input id="' + id + '-mob-host" value="23.253.159.71" placeholder="23.253.159.71"></label>'
+      + '<label>Port<input id="' + id + '-mob-port" value="8080" placeholder="8080"></label>'
+      + '<label>Path<input id="' + id + '-mob-path" value="/#" placeholder="/#"></label>'
+      + '</div>'
+      + '<div class="uat-live-actions"><button type="button" onclick="cutMobLoadMobile(\'' + id + '\')">Load Mobile</button>' + actions + '</div>'
+      + '<div class="uat-live-phone" id="' + id + '-cutover-phone">'
+      +   '<div class="uat-live-notch"></div>'
+      +   '<iframe id="' + id + '-cutover-frame" title="Cutover app preview" src="about:blank"></iframe>'
+      +   '<div class="uat-live-device-skin" id="' + id + '-cutover-skin"></div>'
+      + '</div>'
+      + '<div class="lcv-phone-block" id="' + id + '-lcv-block" hidden></div>'
+      + '<div class="lcv-phone-meta" id="' + id + '-cutover-overlay"></div>'
+      + '<div class="lcv-phone-steps lcv-steps-flat">' + steps + '</div>'
+      + '<div class="lcv-phone-caption">One phone = one real user path &mdash; connected only to the public cutover URL.</div>'
+      + '<div class="cutmob-status-strip lcv-phone-strip" id="' + id + '-cutover-strip"></div>'
+      + '<span id="' + id + '-cutover-status" hidden></span>'
+      + '</div>';
+  }
+  var LCV_DEVFLOW = [
+    ['1','Open mobile app via cutover URL','DNS / LB / HAProxy','nginx serves banking_app.html and bankvault_api_adapter.js via the cutover hostname','No banking data created. App loads UI and API config through the cutover path.'],
+    ['2','Health / readiness probes','API Gateway :8100','Core Banking :8102 / Auth :8101 respond to /health and /ready','Reads service health only. Proves this backend can take ramped traffic.'],
+    ['3','Log in','API Gateway :8100','Auth Service :8101 -> Database Service :8106','Reads user credentials. Creates signed login token returned to the mobile app.'],
+    ['4','View account summary','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Reads customer profile, accounts, balances, recent transactions.'],
+    ['5','Users / recipients API','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Reads recipient customers and default accounts. No money moved.'],
+    ['6','Submit money transfer','API Gateway :8100','Ledger / Transfer :8103 -> Database Service :8106','Creates transfer transaction. Debits source account, credits destination account.'],
+    ['7','Refresh balance','API Gateway :8100','Core Banking :8102 -> Database Service :8106','Reads updated balances and transaction history after the transfer.'],
+    ['8','Ramp proof batch','DNS / LB / HAProxy','Weighted split across Source OSPC and Target FLEX backends','Reads /health repeatedly to prove the observed traffic split matches the applied ramp.']
+  ];
+  var LCV_DEVSTEP = {load:'1', health:'2', ready:'2', login:'3', summary:'4', users:'5', transfer:'6', balance:'7', batch:'8'};
+  function lcvDevViewHtml(id, side) {
+    var label = side === 'source' ? 'Source OSPC' : 'Target FLEX';
+    return '<div class="uat-live-dev lcv-dev lcv-dev--' + side + '">'
+      + '<div class="uat-live-dev-head"><strong>' + label + ' &mdash; Dev View - Live Data Movement</strong><span id="' + id + '-lcv-dev-' + side + '-current">Waiting for cutover traffic</span></div>'
+      + '<div class="uat-live-route" id="' + id + '-lcv-dev-' + side + '-route"></div>'
+      + '<pre id="' + id + '-lcv-dev-' + side + '-log" class="uat-live-log"></pre>'
+      + '<div class="uat-live-table-wrap"><table>'
+      + '<thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>'
+      + '<tbody id="' + id + '-lcv-dev-' + side + '-rows"></tbody></table></div>'
+      + '</div>';
+  }
+  function lcvDevLog(id, side, text) {
+    var out = el(id + '-lcv-dev-' + side + '-log');
+    if (!out) return;
+    out.textContent += '[' + now() + '] ' + text + '\n';
+    out.scrollTop = out.scrollHeight;
+  }
+  function lcvDevRows(id, side, activeStep) {
+    var body = el(id + '-lcv-dev-' + side + '-rows');
+    if (!body) return;
+    body.innerHTML = LCV_DEVFLOW.map(function(row){
+      return '<tr class="' + (row[0] === String(activeStep) ? 'uat-live-active' : '') + '">'
+        + '<td><span class="uat-live-step-dot">' + row[0] + '</span></td>'
+        + '<td>' + row[1] + '</td><td>' + row[2] + '</td><td>' + row[3] + '</td><td>' + row[4] + '</td></tr>';
+    }).join('');
+  }
+  function lcvDevBadge(id, side, text) {
+    var c = el(id + '-lcv-dev-' + side + '-current');
+    if (c) c.textContent = text;
+  }
+  function lcvDevRoute(id, side) {
+    var route = el(id + '-lcv-dev-' + side + '-route');
+    if (!route) return;
+    var lb = cutMobVal(id, 'cutover', 'lbhost') || 'LB/HAProxy';
+    var port = cutMobVal(id, 'cutover', 'port') || '80';
+    route.innerHTML = '<span>Mobile App</span><b>&rarr;</b><span>LB/HAProxy ' + cutMobEsc(lb) + ':' + cutMobEsc(port) + '</span><b>&rarr;</b><span>API Gateway :8100</span><b>&rarr;</b><span>Core/Auth/Ledger</span><b>&rarr;</b><span>Database :8106</span>';
+  }
+  function lcvDevInit(id) {
+    ['source','target'].forEach(function(side){
+      lcvDevRoute(id, side);
+      lcvDevRows(id, side, '');
+      lcvDevLog(id, side, '[mode] Cutover live monitor. Traffic served by ' + (side === 'source' ? 'Source OSPC' : 'Target FLEX') + ' appears here.');
+      lcvDevLog(id, side, '[ready] Apply a ramp and run the mobile journey to see live data movement.');
+    });
+  }
+  var LCV_INAPP_PATHS = [
+    [/\/api\/login/, 'login'], [/\/api\/transfers/, 'transfer'], [/\/api\/(recipients|users)/, 'users'],
+    [/\/api\/mobile\/summary|\/api\/(accounts|dashboard)/, 'summary'], [/\/ready/, 'ready'], [/\/health/, 'health']
+  ];
+  function lcvInApp(id, path, status, ms, headers) {
+    var action = '';
+    for (var i = 0; i < LCV_INAPP_PATHS.length; i++) if (LCV_INAPP_PATHS[i][0].test(path)) { action = LCV_INAPP_PATHS[i][1]; break; }
+    if (!action) return;
+    var st = lcv(id);
+    if (action === 'summary' && st.journey.summary === 'PASS') action = 'balance';
+    var ok = status >= 200 && status < 300;
+    var det = cutMobDetectServed({headers: headers, body: ''}, id);
+    var state = cutMobEnsure(id);
+    state.lastOk = ok; state.lastStatus = status; state.lastMs = ms; state.lastServed = det.served;
+    state.results.push({role:'cutover', action:action, ok:ok, status:status, ms:ms, served:det.served, backendIp:cutMobHeader(headers,'X-Backend-IP') || '', backendRegion:cutMobHeader(headers,'X-Backend-Region') || '', headers:headers, reason:det.reason, at:new Date().toISOString()});
+    cutMobLog(id, 'cutover', '[in-app] ' + path + ' HTTP ' + status + ' ' + ms + ' ms served=' + det.served);
+    cutMobResultStrip(id, action, ok ? 'PASS' : (status ? 'FAIL' : 'BLOCKED'));
+    cutMobStatusStrip(id, {online: ok ? 'ONLINE' : 'OFFLINE', status: status, served: det.served, ms: ms, ramp: st.currentRampFlexPercent + '% FLEX'});
+    cutMobOverlay(id, 'cutover', {ok:ok, status:status, ms:ms, served:det.served});
+    cutMobUpdateHeaderInspector(id, headers, det.reason);
+    lcvDevFeed(id, action, {served: det.served, status: status, ms: ms, path: path});
+    lcvIdentityRender(id, det, {headers: headers});
+    lcvTrafficRender(id);
+    if (action === 'login' && !ok) lcvPhoneBlock(id, det.served === 'UNKNOWN' ? 'Login blocked — backend identity missing' : 'Login blocked — HTTP ' + status);
+    else if (action === 'login' && ok) lcvPhoneBlock(id, '');
+    lcvTimeline(id, 'In-app ' + action + ' — ' + (ok ? 'PASS' : 'FAIL') + ' (real user action in phone)', {http:status, latency:ms, status: ok ? 'PASS' : 'FAIL'}, ok ? 'ok' : 'bad');
+    lcvGateRender(id);
+  }
+  function lcvHeadersFromFetch(resp) {
+    var h = {};
+    try { resp.headers.forEach(function(v, k){ h[k] = v; }); } catch(e) {}
+    return h;
+  }
+  function lcvInstrumentFrame(id, frame) {
+    try {
+      var w = frame.contentWindow;
+      if (!w || w.__lcvInstrumented) return;
+      w.__lcvInstrumented = true;
+      var origFetch = w.fetch;
+      if (origFetch) w.fetch = function(input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        var t0 = Date.now();
+        return origFetch.apply(w, arguments).then(function(resp){
+          try { lcvInApp(id, url, resp.status, Date.now() - t0, lcvHeadersFromFetch(resp)); } catch(e) {}
+          return resp;
+        }, function(err){ try { lcvInApp(id, url, 0, Date.now() - t0, {}); } catch(e) {} throw err; });
+      };
+      var XHR = w.XMLHttpRequest;
+      if (XHR) {
+        var open = XHR.prototype.open, send = XHR.prototype.send;
+        XHR.prototype.open = function(m, u) { this.__lcvUrl = u; return open.apply(this, arguments); };
+        XHR.prototype.send = function() {
+          var self = this, t0 = Date.now();
+          this.addEventListener('loadend', function(){
+            try {
+              var h = {};
+              String(self.getAllResponseHeaders() || '').split(/\r?\n/).forEach(function(l){ var i = l.indexOf(':'); if (i > 0) h[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });
+              lcvInApp(id, self.__lcvUrl || '', self.status, Date.now() - t0, h);
+            } catch(e) {}
+          });
+          return send.apply(this, arguments);
+        };
+      }
+      cutMobLog(id, 'cutover', '[in-app] phone instrumented — real app usage now drives the journey');
+    } catch(e) { cutMobLog(id, 'cutover', '[in-app] cannot instrument phone frame: ' + e.message); }
+  }
+  function lcvDevFeed(id, action, info) {
+    var step = LCV_DEVSTEP[action] || '';
+    var flow = LCV_DEVFLOW.filter(function(r){ return r[0] === step; })[0];
+    var stageText = 'Stage ' + (step || '?') + ': ' + (flow ? flow[1] : action) + ' — ramp ' + cutMobRampText(lcv(id).currentRampFlexPercent);
+    var line = 'HTTP ' + (info.status || 'ERR') + ' ' + (info.path || '') + ' ' + (info.ms || 0) + ' ms served=' + (info.served || 'UNKNOWN');
+    var served = String(info.served || 'UNKNOWN').toUpperCase();
+    if (served.indexOf('OSPC') >= 0) {
+      lcvDevLog(id, 'source', line);
+      lcvDevBadge(id, 'source', stageText);
+      lcvDevRows(id, 'source', step);
+    } else if (served.indexOf('FLEX') >= 0) {
+      lcvDevLog(id, 'target', line);
+      lcvDevBadge(id, 'target', stageText);
+      lcvDevRows(id, 'target', step);
+    } else {
+      lcvDevLog(id, 'source', '[UNKNOWN backend] ' + line);
+      lcvDevLog(id, 'target', '[UNKNOWN backend] ' + line);
+      lcvDevBadge(id, 'source', 'UNKNOWN backend — identity missing');
+      lcvDevBadge(id, 'target', 'UNKNOWN backend — identity missing');
+    }
+  }
+  function cutMobBackendPanelHtml(id, role, title, accent) {
+    var prefix = role === 'source' ? 'OSPC' : 'FLEX';
+    var groups = [
+      ['api_gateway','API Gateway','8080','/health'],
+      ['api_server','API Server','8100','/ready'],
+      ['core_backend','Core Backend','8102','/health'],
+      ['auth_sso','Auth / SSO','8101','/health'],
+      ['database','Database','5432','SELECT 1'],
+      ['cache','Cache','6379','PING'],
+      ['queue','Queue','5672','depth / dlq'],
+      ['workers','Workers','22','systemctl'],
+      ['monitoring','Monitoring','22','journalctl']
+    ];
+    var rows = groups.map(function(g) {
+      return '<tr data-cutmob-backend-row="' + role + '-' + g[0] + '"><td>' + g[1] + '</td>'
+        + '<td><input id="' + id + '-' + role + '-' + g[0] + '-endpoint" value="' + prefix.toLowerCase() + '-' + g[0].replace(/_/g,'-') + '.local"></td>'
+        + '<td><input id="' + id + '-' + role + '-' + g[0] + '-port" value="' + g[2] + '"></td>'
+        + '<td><input id="' + id + '-' + role + '-' + g[0] + '-path" value="' + g[3] + '"></td>'
+        + '<td data-col="status">NOT RUN</td><td data-col="latency">-</td><td data-col="last">-</td><td data-col="evidence">-</td></tr>';
+    }).join('');
+    var actions = [
+      ['all','Run All'],['health','Health'],['ready','Ready'],['db','DB Test'],['cache','Cache Test'],['queue','Queue Test'],['worker','Worker Test'],['logs','Logs'],['evidence','Save Evidence']
+    ].map(function(a){ return '<button type="button" onclick="cutMobBackendRun(\'' + id + '\',\'' + role + '\',\'' + a[0] + '\')">' + a[1] + '</button>'; }).join('');
+    return '<div class="cutmob-backend-panel" style="border-left-color:' + accent + '"><div class="cutmob-backend-head"><div><div class="uat-live-kicker">' + (role === 'source' ? 'Direct Source Proof' : 'Direct FLEX Proof') + '</div><h3>' + title + '</h3><p>Compare direct backend readiness outside the user cutover hostname.</p></div><span>' + prefix + '</span></div>'
+      + '<div class="uat-live-actions">' + actions + '</div>'
+      + '<div class="uat-table-wrap"><table class="uat-table cutmob-backend-table"><thead><tr><th>Test Group</th><th>Endpoint</th><th>Port</th><th>Health / command</th><th>Status</th><th>Latency</th><th>Last Run</th><th>Evidence</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="uat-live-dev cutmob-terminal"><div class="uat-live-dev-head"><strong>' + title + ' Terminal</strong><span id="' + id + '-' + role + '-backend-status">NOT RUN</span></div><pre id="' + id + '-' + role + '-backend-log" class="uat-live-log"></pre></div>'
+      + '</div>';
+  }
+  function cutMobCommandBarHtml(id) {
+    var fields = [['hostname','Cutover hostname','bankmobile.prod'],['lbhost','LB / HAProxy host','23.253.159.45'],['port','Port','80'],['path','Path','/#'],['hostheader','Host header','bankmobile.prod']].map(function(f){
+      return '<label>' + f[1] + '<input id="' + id + '-cutover-' + f[0] + '" value="' + cutMobEsc(f[2]) + '" oninput="lcvSyncHeader(\'' + id + '\')"></label>';
+    }).join('')
+      + '<label>Current ramp stage<input id="' + id + '-cutover-ramp" value="0% FLEX / 100% OSPC" readonly></label>'
+      + '<label>Expected backend<select id="' + id + '-cutover-expected"><option selected>OSPC</option><option>FLEX</option><option>Mixed</option></select></label>';
+    var buttons = [
+      ['cutMobRun(\'' + id + '\',\'cutover\',\'load\')','Load App',''],
+      ['cutMobStageRun(\'' + id + '\',\'journey\')','Run Full Mobile Journey','lcv-btn-primary'],
+      ['cutMobRun(\'' + id + '\',\'cutover\',\'login\')','Run Login Only',''],
+      ['cutMobRun(\'' + id + '\',\'cutover\',\'transfer\')','Run Transfer Only',''],
+      ['cutMobSaveEvidence(\'' + id + '\')','Save Evidence','']
+    ].map(function(b){ return '<button type="button" class="lcv-btn ' + b[2] + '" onclick="' + b[0] + '">' + b[1] + '</button>'; }).join('');
+    return '<div class="lcv-card"><div class="lcv-kicker">Mobile App Under Test</div>'
+      + '<div class="lcv-appurl" id="' + id + '-lcv-appurl">-</div>'
+      + '<div class="lcv-route">Route: DNS/LB/HAProxy &rarr; API Gateway &rarr; Backend</div>'
+      + '<div class="lcv-fields">' + fields + '</div>'
+      + '<div class="lcv-actions">' + buttons + '</div></div>';
+  }
+  function lcvStatTiles(pairs) {
+    return pairs.map(function(p){ return '<span class="lcv-tile"><b id="' + p[0] + '">' + (p[2] || '-') + '</b><small>' + p[1] + '</small></span>'; }).join('');
+  }
+  function cutMobDiagnosticsHtml(id) {
+    var ramp = '<div class="lcv-card lcv-rampcard"><div class="lcv-kicker">Live Ramp Switch</div>'
+      + '<div class="lcv-rampbig"><b id="' + id + '-lcv-pendingbig">0% FLEX</b><span>pending ramp &mdash; production traffic changes only on Apply</span></div>'
+      + '<div class="lcv-slider-row"><span class="lcv-endlbl"><i class="lcv-dot lcv-b-ospc"></i>OSPC <b id="' + id + '-lcv-endospc">100%</b></span>'
+      + '<input type="range" class="lcv-slider" id="' + id + '-ramp-slider" min="0" max="5" step="1" value="0" oninput="cutMobRampSlider(\'' + id + '\', this.value)">'
+      + '<span class="lcv-endlbl"><i class="lcv-dot lcv-b-flex"></i>FLEX <b id="' + id + '-lcv-endflex">0%</b></span></div>'
+      + '<div class="lcv-ticks"><span>0%</span><span>10% Canary</span><span>25%</span><span>50%</span><span>75%</span><span>100% FLEX</span></div>'
+      + '<label class="lcv-check"><input type="checkbox" id="' + id + '-ramp-auto"> Run mobile journey automatically after ramp apply</label>'
+      + '<div class="lcv-actions"><button type="button" class="lcv-btn" onclick="cutMobPreviewRamp(\'' + id + '\')">Preview Ramp</button>'
+      + '<button type="button" class="lcv-btn lcv-btn-primary" id="' + id + '-lcv-applybtn" onclick="cutMobApplyRamp(\'' + id + '\')">Apply Ramp</button>'
+      + '<button type="button" class="lcv-btn lcv-btn-amber" onclick="cutMobHoldRamp(\'' + id + '\')">Hold</button>'
+      + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">Rollback to OSPC</button>'
+      + '<button type="button" class="lcv-btn" onclick="cutMobPromoteRamp(\'' + id + '\')">Promote to 100% FLEX</button></div>'
+      + '<div class="lcv-stats lcv-stats6">' + lcvStatTiles([[id + '-lcv-current','Current ramp','0% FLEX'],[id + '-lcv-pending','Pending ramp','0% FLEX'],[id + '-lcv-wospc','Source OSPC weight','100%'],[id + '-lcv-wflex','Target FLEX weight','0%'],[id + '-lcv-applied','Last applied','-'],[id + '-lcv-appliedby','Applied by','-']]) + '</div>'
+      + '<div class="lcv-reason" id="' + id + '-lcv-rampmsg"></div></div>';
+    var traffic = '<div class="lcv-card"><div class="lcv-kicker">Live Traffic Mix <em>last 60 s</em></div>'
+      + '<div class="lcv-bigbar" id="' + id + '-lcv-trafficbar"><i class="lcv-b-ospc" style="width:100%"></i><i class="lcv-b-flex" style="width:0%"></i><i class="lcv-b-unk" style="width:0%"></i></div>'
+      + '<div class="lcv-barleg"><span><i class="lcv-dot lcv-b-ospc"></i>OSPC <b id="' + id + '-lcv-tospc">0%</b></span><span><i class="lcv-dot lcv-b-flex"></i>FLEX <b id="' + id + '-lcv-tflex">0%</b></span><span><i class="lcv-dot lcv-b-unk"></i>UNKNOWN <b id="' + id + '-lcv-tunk">0%</b></span></div>'
+      + '<div class="lcv-stats lcv-stats9">' + lcvStatTiles([[id + '-lcv-rospc','OSPC requests','0'],[id + '-lcv-rflex','FLEX requests','0'],[id + '-lcv-runk','Unknown requests','0'],[id + '-lcv-h2','HTTP 2xx','0'],[id + '-lcv-h4','HTTP 4xx','0'],[id + '-lcv-h5','HTTP 5xx','0'],[id + '-lcv-err','Error rate','0%'],[id + '-lcv-avg','Avg latency','-'],[id + '-lcv-p95','P95 latency','-']]) + '</div>'
+      + '<div class="lcv-drift" id="' + id + '-lcv-drift" data-status="OK">Expected FLEX 0% &middot; Observed 0% &middot; Drift 0% &middot; OK</div></div>';
+    var proof = '<div class="lcv-card"><div class="lcv-kicker">10 Connection Proof</div>'
+      + '<div class="lcv-actions lcv-proofctl"><label>Requests<select id="' + id + '-batch-count"><option>5</option><option selected>10</option><option>20</option><option>50</option></select></label><label>Path<input id="' + id + '-batch-path" value="/health"></label><button type="button" class="lcv-btn lcv-btn-primary" onclick="cutMobRunBatch(\'' + id + '\')">Run Batch Test</button><button type="button" class="lcv-btn" onclick="cutMobClearBatch(\'' + id + '\')">Clear</button></div>'
+      + '<div class="cutmob-summary" id="' + id + '-batch-summary">' + ['Total Requests','OSPC Hits','FLEX Hits','Unknown Hits','Errors','Avg Latency','P95 Latency'].map(function(x){return '<span><b>0</b><small>' + x + '</small></span>';}).join('') + '</div>'
+      + '<div class="cutmob-dist" id="' + id + '-batch-dist"><span>OSPC 0</span><i style="width:0%"></i><span>FLEX 0</span><i style="width:0%"></i><span>UNKNOWN 0</span></div>'
+      + '<details class="lcv-adv-sub"><summary>Individual requests</summary><div class="uat-table-wrap"><table class="uat-table cutmob-req-table"><thead><tr><th>#</th><th>HTTP Status</th><th>Response Time</th><th>Served By</th><th>Backend IP</th><th>Backend Region</th><th>Result</th></tr></thead><tbody id="' + id + '-batch-rows"><tr><td colspan="7">No batch run yet.</td></tr></tbody></table></div></details></div>';
+    var identity = '<div class="lcv-card"><div class="lcv-kicker">Backend Identity <span class="lcv-pill" id="' + id + '-header-warning">Header Detection Missing</span></div>'
+      + '<div class="lcv-served" id="' + id + '-lcv-served" data-val="UNKNOWN">UNKNOWN</div>'
+      + '<div class="lcv-stats lcv-stats6">' + lcvStatTiles([[id + '-lcv-id-ip','Backend IP','-'],[id + '-lcv-id-region','Backend Region','-'],[id + '-lcv-id-app','App Server','-'],[id + '-lcv-id-conf','Identity confidence','UNKNOWN'],[id + '-lcv-id-status','Identity status','NOT RUN'],[id + '-lcv-id-ramp','X-Ramp-Stage','-']]) + '</div>'
+      + '<div class="lcv-hdrchk" id="' + id + '-lcv-hdrchk"></div>'
+      + '<div class="lcv-reason" id="' + id + '-lcv-idmsg"></div></div>';
+    var gate = '<div class="lcv-card"><div class="lcv-kicker">Mobile Journey Gate</div>'
+      + '<div class="lcv-gatelist" id="' + id + '-lcv-gate"></div>'
+      + '<div class="lcv-reason" id="' + id + '-lcv-gatereason">No mobile journey run yet.</div></div>';
+    var timeline = '<div class="lcv-card"><div class="lcv-kicker">Evidence Timeline</div>'
+      + '<div class="uat-table-wrap lcv-tl-wrap"><table class="uat-table lcv-tl-table">'
+      + '<thead><tr><th>Time</th><th>Event</th><th>Ramp</th><th>Served By</th><th>Status</th><th>Latency</th><th>HTTP</th><th>Evidence</th></tr></thead>'
+      + '<tbody id="' + id + '-lcv-timeline"><tr class="lcv-tl-empty"><td colspan="8">No events yet. Load the app or apply a ramp to begin.</td></tr></tbody></table></div>'
+      + '<div class="cutmob-evidence-row"><button type="button" class="lcv-btn" onclick="cutMobSaveEvidence(\'' + id + '\')">Save Evidence</button><span id="' + id + '-evidence-last">No evidence saved yet.</span></div>'
+      + '<details class="lcv-adv-sub"><summary>View raw command / terminal output</summary><pre id="' + id + '-terminal" class="uat-live-log lcv-term"></pre></details></div>';
+    var advanced = '<details class="lcv-card lcv-advanced"><summary>Advanced Details &mdash; direct backend proofs, header inspector, full tables &amp; logs</summary>'
+      + '<details class="lcv-adv-sub"><summary>Direct Source Proof / Direct FLEX Proof</summary><div class="cutmob-backend-grid">' + cutMobBackendPanelHtml(id, 'source', 'Source OSPC Backend Test', '#2563eb') + cutMobBackendPanelHtml(id, 'target', 'Target FLEX Backend Test', '#16a34a') + '</div></details>'
+      + '<details class="lcv-adv-sub"><summary>Header Inspector full details</summary><div class="cutmob-header-grid" id="' + id + '-header-grid"></div><textarea id="' + id + '-header-raw" readonly>No response captured yet.</textarea></details>'
+      + '<details class="lcv-adv-sub"><summary>Last 10 requests</summary><div class="uat-table-wrap"><table class="uat-table cutmob-req-table"><thead><tr><th>Time</th><th>Path</th><th>Status</th><th>Latency</th><th>Served By</th><th>Backend IP</th></tr></thead><tbody id="' + id + '-last-rows"><tr><td colspan="6">No requests yet.</td></tr></tbody></table></div></details>'
+      + '</details>';
+    return {ramp: ramp, traffic: traffic, proof: proof, identity: identity, gate: gate, timeline: timeline, advanced: advanced};
+  }
+  function cutMobBenchHtml(id, label) {
+    var rows = ['Load Mobile','Health','Ready','Login','Summary','Users','Transfer Test','Balance Refresh','Ramp Proof','API Gateway','API Server','Database','Cache','Queue','Workers','Monitoring'].map(function(r){
+      var key = r.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+      return '<tr data-cutmob-row="' + key + '"><td>' + r + '</td><td data-col="source">-</td><td data-col="cutover">-</td><td data-col="target">-</td><td data-col="served">-</td><td data-col="latency">-</td><td data-col="status">NOT RUN</td><td data-col="evidence">-</td></tr>';
+    }).join('');
+    var cards = cutMobDiagnosticsHtml(id);
+    var head = '<div class="lcv-card lcv-header"><div class="lcv-header-top"><div><div class="lcv-title">' + cutMobEsc(label) + ' &mdash; Live Mobile Cutover Monitor <span class="lcv-live-pill">&#9679; LIVE</span></div><div class="lcv-sub">Validate the real mobile app URL while traffic ramps from Source OSPC to Target FLEX.</div></div>'
+      + '<div class="lcv-decision-row"><span class="lcv-decision-lbl">Decision:</span>'
+      + '<div class="lcv-decision" id="' + id + '-lcv-decision" data-val="HOLD">HOLD</div>'
+      + '<span class="lcv-decision-reason" id="' + id + '-lcv-hd-reason"></span>'
+      + '<button type="button" class="lcv-btn" onclick="lcvWhyHold(\'' + id + '\')">Why Hold?</button>'
+      + '<span class="lcv-hd-upd">Last Updated: <b id="' + id + '-lcv-hd-upd2">-</b> <em class="lcv-live-pill">&#9679; LIVE</em></span>'
+      + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">&#8630; Rollback to OSPC</button></div></div>'
+      + '<div class="lcv-header-grid">' + [['hd-url','App URL'],['hd-lb','LB / HAProxy'],['hd-hh','Host header'],['hd-ramp','Current ramp'],['hd-obs','Observed traffic'],['hd-rb','Rollback'],['hd-upd','Last updated']].map(function(c){
+        return '<span class="lcv-hcell"><small>' + c[1] + '</small><b id="' + id + '-lcv-' + c[0] + '">-</b></span>';
+      }).join('') + '</div></div>';
+    var gates = '<div class="cutmob-gates"><span id="' + id + '-gate-component" data-status="NOT RUN">Component Health Gate: NOT RUN</span><span id="' + id + '-gate-database" data-status="NOT RUN">Database Gate: NOT RUN</span><span id="' + id + '-gate-cache" data-status="NOT RUN">Cache Gate: NOT RUN</span><span id="' + id + '-gate-queue" data-status="NOT RUN">Queue Gate: NOT RUN</span><span id="' + id + '-gate-worker" data-status="NOT RUN">Worker Gate: NOT RUN</span><span id="' + id + '-gate-business" data-status="NOT RUN">Business Validation Gate: NOT RUN</span><span id="' + id + '-gate-ramp" data-status="NOT RUN">Traffic Ramp Gate: NOT RUN</span><span id="' + id + '-gate-evidence" data-status="NOT RUN">Evidence Gate: NOT RUN</span></div>';
+    return '<div class="cutmob-bench lcv-bench" id="' + id + '" data-cutmob-stage="' + label + '">'
+      + head
+      + '<div class="lcv-main"><div class="lcv-col-phone">' + cutMobPhoneHtml(id) + '</div>'
+      + '<div class="lcv-col-cards">' + cutMobCommandBarHtml(id) + cards.ramp + cards.traffic + cards.proof + cards.timeline + advancedWrap() + '</div></div>'
+      + '<details class="lcv-card lcv-advanced"><summary>Dev View &mdash; Live Data Movement (Source OSPC / Target FLEX)</summary>'
+      + '<div class="lcv-devpair" style="margin-top:12px;">' + lcvDevViewHtml(id, 'source') + lcvDevViewHtml(id, 'target') + '</div>'
+      + '</details>'
+      + '</div>';
+    function advancedWrap() {
+      var extra = '<details class="lcv-adv-sub"><summary>Full result table</summary><div class="uat-table-wrap cutmob-results"><table class="uat-table"><thead><tr><th>Test</th><th>Source Backend</th><th>Cutover Mobile UI</th><th>Target Backend</th><th>Served By</th><th>Latency</th><th>Status</th><th>Evidence</th></tr></thead><tbody>' + rows + '</tbody></table></div></details><details class="lcv-adv-sub"><summary>Gate status chips</summary>' + gates + '</details>';
+      return cards.advanced.replace(/<\/details>$/, extra + '</details>');
+    }
+  }
+  function cutMobInstallStyles() {
+    if (el('cutmob-style')) return;
+    var style = document.createElement('style');
+    style.id = 'cutmob-style';
+    style.textContent = '.cutmob-toolbar,.cutmob-commandbar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 12px}.cutmob-command-group{border:1px solid #d8e2f0;background:#f8fafc;border-radius:8px;padding:9px}.cutmob-command-group>b{display:block;font-size:10px;text-transform:uppercase;color:#475569;margin-bottom:7px}.cutmob-command-group>div{display:flex;gap:7px;flex-wrap:wrap}.cutmob-toolbar button,.cutmob-command-group button,.cutmob-ramp-controls button,.cutmob-batch-controls button,.cutmob-evidence-row button{border:0;border-radius:7px;background:#b23a3a;color:#fff;padding:8px 11px;font-size:11px;font-weight:900;cursor:pointer}.cutmob-gates{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.cutmob-gates span{border:1px solid #d8e2f0;background:#fff;border-radius:999px;padding:6px 10px;font-size:10px;font-weight:900;color:#475569}.cutmob-gates span[data-status="PASS"]{background:#ecfdf5;border-color:#86efac;color:#166534}.cutmob-gates span[data-status="WARNING"]{background:#fffbeb;border-color:#fcd34d;color:#92400e}.cutmob-gates span[data-status="BLOCKED"]{background:#fef2f2;border-color:#fca5a5;color:#991b1b}.cutmob-gates span[data-status="RUNNING"]{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}.cutmob-gates span[data-status="NOT RUN"]{background:#f8fafc;border-color:#cbd5e1;color:#475569}.cutmob-single-phone{display:flex;justify-content:center;margin:10px 0 16px}.cutmob-single-phone>.cutmob-side{width:min(100%,800px)}.cutmob-status-strip,.cutmob-result-strip{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.cutmob-status-strip span,.cutmob-result-strip span{border:1px solid #cbd5e1;border-radius:999px;background:#fff;padding:5px 9px;font-size:10px;font-weight:900;color:#334155}.cutmob-status-strip span:first-child{background:#f1f5f9}.cutmob-diagnostics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:8px 0 14px}.cutmob-diag-panel{border:1px solid #d9e5f7;background:#fff;border-radius:8px;padding:10px;min-width:0}.cutmob-diag-panel summary{font-weight:900;cursor:pointer}.cutmob-diag-panel summary span{float:right;border:1px solid #cbd5e1;border-radius:999px;padding:3px 8px;font-size:10px;color:#475569}.cutmob-ramp-controls,.cutmob-batch-controls{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:10px}.cutmob-ramp-controls input[type=range]{width:min(100%,340px)}.cutmob-ramp-ticks{display:flex;justify-content:space-between;width:min(100%,340px);font-size:10px;font-weight:900;color:#64748b}.cutmob-toggle{font-size:11px;font-weight:900;color:#334155}.cutmob-summary{display:grid;grid-template-columns:repeat(7,minmax(80px,1fr));gap:8px;margin:10px 0}.cutmob-summary span{border:1px solid #d8e2f0;border-radius:8px;padding:8px;background:#f8fafc}.cutmob-summary b{display:block;font-size:18px}.cutmob-summary small{font-size:10px;color:#64748b}.cutmob-dist{display:grid;grid-template-columns:auto 1fr auto 1fr auto;gap:6px;align-items:center;margin-bottom:8px;font-size:10px;font-weight:900;color:#475569}.cutmob-dist i{height:8px;border-radius:999px;background:#2563eb;display:block}.cutmob-dist i:nth-of-type(2){background:#16a34a}.cutmob-header-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}.cutmob-header-grid span{border:1px solid #d8e2f0;border-radius:7px;padding:7px;background:#f8fafc;font-size:11px}.cutmob-header-grid b{display:block;font-size:10px;color:#64748b}.cutmob-diag-panel textarea{width:100%;min-height:96px;border:1px solid #cbd5e1;border-radius:7px;padding:8px;font-family:monospace;font-size:11px}.cutmob-backend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.cutmob-backend-panel{background:#fff;border:1px solid #d9e5f7;border-left:4px solid #64748b;border-radius:8px;padding:14px;min-width:0}.cutmob-backend-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.cutmob-backend-head h3{margin:2px 0 2px;font-size:18px}.cutmob-backend-head p{margin:0;color:#475569;font-size:12px}.cutmob-backend-head span{border:1px solid #cbd5e1;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:900;color:#334155}.cutmob-backend-table input{width:100%;min-width:92px;border:1px solid #cbd5e1;border-radius:4px;padding:6px;font-size:11px}.cutmob-controls{grid-template-columns:repeat(2,minmax(0,1fr))!important}.cutmob-phone{height:520px!important;width:min(100%,360px)!important;box-shadow:0 0 0 3px rgba(245,158,11,.25),0 24px 52px rgba(15,23,42,.35)!important}.cutmob-phone-overlay{position:absolute;inset:46px 16px 16px;z-index:2;display:grid;align-content:center;gap:6px;text-align:center;color:#fff;background:rgba(2,6,23,.58);border-radius:24px;padding:14px;font-size:12px;pointer-events:none}.cutmob-terminal{margin-top:10px}.cutmob-master-log{margin-top:12px;background:#020617;color:#a7f3d0;border-radius:10px;padding:12px;min-height:90px;max-height:220px;overflow:auto}.cutmob-results{margin-top:14px}@media(max-width:1200px){.cutmob-diagnostics,.cutmob-backend-grid{grid-template-columns:1fr}.cutmob-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.cutmob-dist{grid-template-columns:1fr}.cutmob-phone{height:400px!important}}';
+    style.textContent += '.lcv-bench{font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;background:linear-gradient(180deg,#f1f5f9,#e8eef7);border:1px solid #dbe4f0;border-radius:18px;padding:18px;display:grid;gap:16px}.lcv-card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 28px -18px rgba(15,23,42,.25);min-width:0}.lcv-kicker{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:10px;display:flex;align-items:center;gap:8px}.lcv-kicker em{font-style:normal;font-weight:700;color:#94a3b8;text-transform:none;letter-spacing:0}.lcv-header-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.lcv-title{font-size:20px;font-weight:800;color:#0f172a}.lcv-sub{font-size:12.5px;color:#64748b;margin-top:2px}.lcv-decision{border-radius:12px;padding:10px 18px;font-size:15px;font-weight:900;letter-spacing:.04em;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;white-space:nowrap}.lcv-decision[data-val="SAFE TO CONTINUE"]{background:#ecfdf5;border-color:#6ee7b7;color:#065f46}.lcv-decision[data-val="BLOCKED"],.lcv-decision[data-val="ROLLBACK REQUIRED"]{background:#fef2f2;border-color:#fca5a5;color:#991b1b}.lcv-header-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-top:14px}.lcv-hcell{background:#f8fafc;border:1px solid #eaf0f7;border-radius:10px;padding:8px 10px;min-width:0}.lcv-hcell small{display:block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8}.lcv-hcell b{display:block;font-size:12px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-main{display:grid;grid-template-columns:440px minmax(0,1fr);gap:16px;align-items:start}.lcv-col-cards{display:grid;gap:16px;min-width:0}.lcv-row3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.lcv-appurl{font-family:ui-monospace,monospace;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;overflow-wrap:anywhere}.lcv-route{font-size:11px;font-weight:700;color:#64748b;margin:8px 0 10px}.lcv-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}.lcv-fields label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:grid;gap:3px}.lcv-fields input,.lcv-fields select{border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font-size:12px;color:#0f172a;background:#fff}.lcv-fields input:focus,.lcv-fields select:focus{outline:2px solid #93c5fd;border-color:#3b82f6}.lcv-fields input[readonly]{background:#f8fafc;color:#475569}.lcv-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:end}.lcv-btn{border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#334155;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s}.lcv-btn:hover{border-color:#94a3b8;background:#f8fafc}.lcv-btn-primary{background:linear-gradient(180deg,#3b82f6,#2563eb);border-color:#2563eb;color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.35)}.lcv-btn-primary:hover{background:linear-gradient(180deg,#2563eb,#1d4ed8)}.lcv-btn-danger{background:#fff;border-color:#fca5a5;color:#b91c1c}.lcv-btn-danger:hover{background:#fef2f2}.lcv-btn-amber{background:#fff;border-color:#fcd34d;color:#92400e}.lcv-btn[disabled]{opacity:.45;cursor:not-allowed}.lcv-rampbig{display:flex;align-items:baseline;gap:12px;margin:2px 0 10px}.lcv-rampbig b{font-size:34px;font-weight:900;color:#1d4ed8}.lcv-rampbig span{font-size:11px;color:#94a3b8;font-weight:600}.lcv-slider{width:100%;accent-color:#2563eb;height:26px}.lcv-ticks{display:flex;justify-content:space-between;font-size:10px;font-weight:800;color:#64748b;margin:2px 0 8px}.lcv-check{display:flex;gap:7px;align-items:center;font-size:12px;font-weight:700;color:#334155;margin:6px 0}.lcv-stats{display:grid;gap:8px;margin-top:12px}.lcv-stats6,.lcv-stats9{grid-template-columns:repeat(3,minmax(0,1fr))}.lcv-tile{background:#f8fafc;border:1px solid #eaf0f7;border-radius:10px;padding:8px 10px;min-width:0}.lcv-tile b{display:block;font-size:15px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-tile small{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#94a3b8}.lcv-bigbar{display:flex;height:26px;border-radius:999px;overflow:hidden;background:#e2e8f0}.lcv-bigbar i{display:block;height:100%;transition:width .4s}.lcv-b-ospc{background:#2563eb}.lcv-b-flex{background:#16a34a}.lcv-b-unk{background:#94a3b8}.lcv-barleg{display:flex;gap:16px;font-size:11px;font-weight:800;color:#475569;margin-top:8px}.lcv-dot{width:9px;height:9px;border-radius:99px;display:inline-block;margin-right:5px}.lcv-drift{margin-top:12px;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:800;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46}.lcv-drift[data-status="WARNING"]{background:#fffbeb;border-color:#fcd34d;color:#92400e}.lcv-drift[data-status="BLOCKED"]{background:#fef2f2;border-color:#fca5a5;color:#991b1b}.lcv-served{font-size:30px;font-weight:900;color:#64748b;letter-spacing:.03em}.lcv-served[data-val="OSPC"]{color:#1d4ed8}.lcv-served[data-val="FLEX"]{color:#15803d}.lcv-pill{border:1px solid #cbd5e1;border-radius:999px;padding:3px 9px;font-size:10px;font-weight:800;color:#475569;background:#f8fafc;text-transform:none;letter-spacing:0}.lcv-reason{margin-top:10px;font-size:12px;font-weight:700;color:#64748b;min-height:16px}.lcv-reason[data-tone="bad"]{color:#b91c1c}.lcv-reason[data-tone="ok"]{color:#15803d}.lcv-reason[data-tone="warn"]{color:#92400e}.lcv-gatelist{display:grid;gap:6px}.lcv-gaterow{display:flex;justify-content:space-between;align-items:center;border:1px solid #eaf0f7;background:#f8fafc;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:700;color:#334155}.lcv-gaterow b{font-size:10px;font-weight:900;border-radius:999px;padding:3px 9px;background:#e2e8f0;color:#475569}.lcv-gaterow[data-status="PASS"] b{background:#dcfce7;color:#166534}.lcv-gaterow[data-status="FAIL"] b,.lcv-gaterow[data-status="BLOCKED"] b{background:#fee2e2;color:#991b1b}.lcv-tl{list-style:none;margin:0;padding:0;display:grid;max-height:340px;overflow:auto}.lcv-tl li{position:relative;padding:8px 8px 8px 26px;border-left:2px solid #e2e8f0;margin-left:8px;font-size:12px;color:#334155}.lcv-tl li:before{content:"";position:absolute;left:-6px;top:13px;width:10px;height:10px;border-radius:99px;background:#94a3b8;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1}.lcv-tl li[data-tone="ok"]:before{background:#16a34a}.lcv-tl li[data-tone="bad"]:before{background:#dc2626}.lcv-tl li[data-tone="warn"]:before{background:#f59e0b}.lcv-tl b{color:#0f172a}.lcv-tl small{display:block;color:#94a3b8;font-size:10.5px}.lcv-tl-empty{color:#94a3b8;font-style:italic}.lcv-term{background:#0b1220;color:#a7f3d0;border-radius:10px;padding:12px;min-height:80px;max-height:240px;overflow:auto;margin-top:8px}.lcv-advanced>summary,.lcv-adv-sub>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#475569}.lcv-adv-sub{margin-top:10px;border:1px solid #eaf0f7;border-radius:10px;padding:10px;background:#fbfdff}.lcv-proofctl label{font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;display:grid;gap:3px}.lcv-proofctl input,.lcv-proofctl select{border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font-size:12px}.lcv-phone-wrap{display:grid;justify-items:stretch;gap:10px;align-content:start}.lcv-phone{position:relative;width:330px;height:700px;border-radius:54px;background:linear-gradient(160deg,#3a3f47,#14161a);padding:12px;box-shadow:0 30px 60px -18px rgba(15,23,42,.55),inset 0 0 0 2px #565b64,inset 0 0 0 6px #0b0d10}.lcv-phone-island{position:absolute;top:24px;left:50%;transform:translateX(-50%);width:112px;height:30px;border-radius:20px;background:#000;z-index:5}.lcv-phone-statusbar{position:absolute;top:26px;left:36px;right:36px;display:flex;justify-content:space-between;color:#fff;font-size:12px;font-weight:800;z-index:4}.lcv-phone-sig{font-size:9px;letter-spacing:1px}.lcv-phone-screen{position:relative;width:100%;height:100%;border-radius:42px;background:#f8fafc;overflow:hidden;display:flex;flex-direction:column;padding-top:56px}.lcv-phone-apphead{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px}.lcv-phone-apphead b{font-size:15px;font-weight:900}.lcv-phone-apphead span{font-size:9px;font-weight:900;border-radius:999px;padding:3px 8px;background:rgba(255,255,255,.18)}.lcv-phone-apphead span[data-status="ONLINE"]{background:#16a34a}.lcv-phone-apphead span[data-status="OFFLINE"]{background:#dc2626}.lcv-phone-url{font-family:ui-monospace,monospace;font-size:9.5px;color:#475569;background:#eef2f7;padding:5px 12px;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lcv-phone-screen iframe{width:100%;flex:0 0 200px;border:0;background:#fff}.lcv-phone-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:8px 12px;font-size:10px;color:#334155;background:#fff;border-top:1px solid #eef2f7}.lcv-phone-meta span{display:flex;justify-content:space-between;gap:6px;min-width:0}.lcv-phone-meta b{color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-phone-block{margin:8px 12px 0;border-radius:10px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:11px;font-weight:800;padding:8px 10px}.lcv-phone-steps{flex:1;overflow:auto;padding:6px 12px 16px;display:grid;gap:4px;background:#f8fafc;align-content:start}.lcv-step{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #eef2f7;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:700;color:#334155}.lcv-step b{font-size:9px;font-weight:900;border-radius:999px;padding:2px 7px;background:#e2e8f0;color:#475569}.lcv-step[data-status="PASS"] b{background:#dcfce7;color:#166534}.lcv-step[data-status="FAIL"] b,.lcv-step[data-status="BLOCKED"] b{background:#fee2e2;color:#991b1b}.lcv-step[data-status="RUNNING"] b{background:#dbeafe;color:#1d4ed8}.lcv-phone-home{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);width:120px;height:5px;border-radius:99px;background:#0f172a;opacity:.85;z-index:5}.lcv-phone-caption{font-size:11px;color:#64748b;font-weight:700;text-align:center;max-width:330px}.lcv-phone-strip{justify-content:center}@media(max-width:1250px){.lcv-main{grid-template-columns:1fr}.lcv-row3{grid-template-columns:1fr}.lcv-header-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lcv-col-phone{display:flex;justify-content:center}}';
+    style.textContent += '.lcv-devpair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.lcv-devpair .uat-live-dev{margin-top:0;min-width:0}.lcv-dev--source{border-left:4px solid #2563eb;border-radius:12px}.lcv-dev--target{border-left:4px solid #16a34a;border-radius:12px}.lcv-steps-flat{grid-template-columns:1fr 1fr;background:transparent;padding:6px 0 0}.lcv-phone-wrap .lcv-phone-meta{border:1px solid #eef2f7;border-radius:10px;margin-top:8px}@media(max-width:1250px){.lcv-devpair{grid-template-columns:1fr}}';
+    style.textContent += '.lcv-live-pill{display:inline-block;font-size:10px;font-weight:900;color:#15803d;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;vertical-align:middle;margin-left:6px;font-style:normal}.lcv-decision-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.lcv-decision-lbl{font-size:12px;font-weight:800;color:#475569}.lcv-decision-reason{font-size:12px;font-weight:800;color:#b91c1c;max-width:320px}.lcv-hd-upd{font-size:11px;font-weight:700;color:#64748b;white-space:nowrap}.lcv-hd-upd b{color:#0f172a}.lcv-slider-row{display:flex;align-items:center;gap:10px}.lcv-endlbl{font-size:11px;font-weight:900;color:#334155;white-space:nowrap}.lcv-slider{-webkit-appearance:none!important;appearance:none;flex:1;height:14px;border-radius:999px;background:transparent!important;border:none!important;outline:none;padding:0!important}.lcv-slider::-webkit-slider-runnable-track{-webkit-appearance:none;height:14px;border-radius:999px;border:none;background:var(--lcv-fill,linear-gradient(90deg,#2563eb,#06b6d4))!important;box-shadow:inset 0 1px 3px rgba(8,51,68,.35),inset 0 0 0 1px rgba(6,182,212,.35)}.lcv-slider::-moz-range-track{height:14px;border-radius:999px;border:none;background:var(--lcv-fill,linear-gradient(90deg,#2563eb,#06b6d4))!important;box-shadow:inset 0 1px 3px rgba(8,51,68,.35)}.lcv-slider::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-6px;border-radius:99px;background:rgba(30,58,138,.72);border:2px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(30,58,138,.45),inset 0 1px 2px rgba(255,255,255,.35);backdrop-filter:blur(2px);cursor:pointer}.lcv-slider::-moz-range-thumb{width:20px;height:20px;border-radius:99px;background:rgba(30,58,138,.72);border:2px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(30,58,138,.45);cursor:pointer}.lcv-hdrchk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:10px}.lcv-hdrchk-row{display:flex;justify-content:space-between;gap:8px;border:1px solid #eaf0f7;background:#f8fafc;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;color:#475569;min-width:0}.lcv-hdrchk-row b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lcv-hdrchk-row[data-ok="1"] b{color:#15803d}.lcv-hdrchk-row[data-ok="0"] b{color:#b91c1c}.lcv-tl-wrap{max-height:320px;overflow:auto}.lcv-tl-table{font-size:12px}.lcv-tl-table td{white-space:nowrap}.lcv-tl-table td.lcv-tl-event{white-space:normal;min-width:200px}.lcv-tl-status{font-size:10px;font-weight:900;border-radius:999px;padding:2px 8px;background:#e2e8f0;color:#475569}.lcv-tl-table tr[data-tone="ok"] .lcv-tl-status{background:#dcfce7;color:#166534}.lcv-tl-table tr[data-tone="bad"] .lcv-tl-status{background:#fee2e2;color:#991b1b}.lcv-tl-table tr[data-tone="warn"] .lcv-tl-status{background:#fef3c7;color:#92400e}.lcv-tl-view{color:#2563eb;font-weight:800;text-decoration:none}.lcv-tl-empty td{color:#94a3b8;font-style:italic}';
+    document.head.appendChild(style);
+  }
+  function cutMobVal(id, role, key) { var n = el(id + '-' + role + '-' + key); return n ? String(n.value || '').trim() : ''; }
+  function cutMobEnsure(id) {
+    cutMobState[id] = cutMobState[id] || {results: [], gates: {}, backend: {}, lastRequests: [], lastResults: {}, rampPercent: 25};
+    cutMobState[id].results = cutMobState[id].results || [];
+    cutMobState[id].gates = cutMobState[id].gates || {};
+    cutMobState[id].backend = cutMobState[id].backend || {};
+    cutMobState[id].lastRequests = cutMobState[id].lastRequests || [];
+    cutMobState[id].lastResults = cutMobState[id].lastResults || {};
+    return cutMobState[id];
+  }
+  function cutMobLog(id, role, text) {
+    var line = '[' + now() + '] ' + text;
+    var l = el(id + '-' + role + '-log'); if (l) { l.textContent += line + '\n'; l.scrollTop = l.scrollHeight; }
+    var m = el(id + '-terminal'); if (m) { m.textContent += '[' + role + '] ' + text + '\n'; m.scrollTop = m.scrollHeight; }
+    var p = el(id + '-terminal-preview'); if (p) { p.textContent = ((m && m.textContent) || '').slice(-2400); p.scrollTop = p.scrollHeight; }
+  }
+  function cutMobRampText(percent) {
+    percent = Math.max(0, Math.min(100, parseInt(percent || 0, 10) || 0));
+    return percent + '% FLEX / ' + (100 - percent) + '% OSPC';
+  }
+  function lcv(id) {
+    var s = cutMobEnsure(id);
+    if (!s.lcv) s.lcv = {currentRampFlexPercent:0, pendingRampFlexPercent:0, servedBy:'UNKNOWN', backendIp:'-', backendRegion:'-', appServer:'-', backendIdentityStatus:'NOT RUN', identityConfidence:'UNKNOWN', journey:{}, globalDecision:'HOLD', blockingReason:'No mobile journey run yet.', rollbackReady:true, lastAppliedAt:'-', appliedBy:'-', lastUpdatedAt:'-', events:[]};
+    window.liveCutoverState = s.lcv;
+    return s.lcv;
+  }
+  function lcvSet(id, elId, text) { var n = el(id + '-lcv-' + elId); if (n) n.textContent = text; }
+  function lcvSyncHeader(id) {
+    var st = lcv(id);
+    var url = cutMobUrl(id, 'cutover', cutMobVal(id, 'cutover', 'path') || '/#') || '-';
+    st.appUrl = url; st.cutoverHostname = cutMobVal(id,'cutover','hostname'); st.lbHost = cutMobVal(id,'cutover','lbhost'); st.port = cutMobVal(id,'cutover','port'); st.path = cutMobVal(id,'cutover','path'); st.hostHeader = cutMobVal(id,'cutover','hostheader'); st.lastUpdatedAt = now();
+    lcvSet(id, 'hd-url', url);
+    lcvSet(id, 'hd-lb', (st.lbHost || '-') + ':' + (st.port || '80'));
+    lcvSet(id, 'hd-hh', st.hostHeader || '-');
+    lcvSet(id, 'hd-ramp', cutMobRampText(st.currentRampFlexPercent));
+    lcvSet(id, 'hd-obs', 'OSPC ' + (st.observedSourcePercent || 0) + '% / FLEX ' + (st.observedTargetPercent || 0) + '%');
+    lcvSet(id, 'hd-rb', st.rollbackReady ? 'READY' : 'NOT READY');
+    lcvSet(id, 'hd-upd', st.lastUpdatedAt);
+    lcvSet(id, 'appurl', url);
+    var u = el(id + '-lcv-url'); if (u) u.textContent = url;
+    var d = el(id + '-lcv-decision');
+    if (d) { d.textContent = st.globalDecision; d.setAttribute('data-val', st.globalDecision); d.title = st.blockingReason || ''; }
+    lcvSet(id, 'hd-reason', st.blockingReason || '');
+    lcvSet(id, 'hd-upd2', st.lastUpdatedAt);
+  }
+  window.lcvSyncHeader = lcvSyncHeader;
+  window.lcvWhyHold = function(id) {
+    var st = lcv(id);
+    lcvTimeline(id, 'Why ' + st.globalDecision + '? ' + (st.blockingReason || 'All promotion criteria satisfied.'), {status: st.globalDecision}, st.globalDecision === 'SAFE TO CONTINUE' ? 'ok' : 'warn');
+    alert('Decision: ' + st.globalDecision + '\n\n' + (st.blockingReason || 'All promotion criteria satisfied.'));
+  };
+  function lcvTimeline(id, label, meta, tone) {
+    var st = lcv(id);
+    meta = meta || {};
+    st.events.unshift({at: now(), label: label, ramp: cutMobRampText(st.currentRampFlexPercent), served: st.servedBy, ip: st.backendIp, http: meta.http || '-', latency: meta.latency != null ? meta.latency + ' ms' : '-', status: meta.status || '-', evidence: meta.evidence || '-', tone: tone || ''});
+    st.events = st.events.slice(0, 60);
+    var body = el(id + '-lcv-timeline');
+    if (body) body.innerHTML = st.events.map(function(e){
+      return '<tr data-tone="' + e.tone + '"><td>' + cutMobEsc(e.at) + '</td><td class="lcv-tl-event">' + cutMobEsc(e.label) + '</td>'
+        + '<td>' + cutMobEsc(e.ramp) + '</td><td>' + cutMobEsc(e.served) + '</td>'
+        + '<td><b class="lcv-tl-status">' + cutMobEsc(e.status) + '</b></td>'
+        + '<td>' + cutMobEsc(e.latency) + '</td><td>' + cutMobEsc(e.http) + '</td>'
+        + '<td><a href="#" class="lcv-tl-view" onclick="alert(this.closest(\'tr\').innerText);return false;">View</a></td></tr>';
+    }).join('');
+  }
+  function cutMobRampPercent(id) { return lcv(id).currentRampFlexPercent || 0; }
+  function lcvRampRender(id) {
+    var st = lcv(id);
+    lcvSet(id, 'pendingbig', st.pendingRampFlexPercent + '% FLEX');
+    lcvSet(id, 'pending', st.pendingRampFlexPercent + '% FLEX');
+    lcvSet(id, 'current', st.currentRampFlexPercent + '% FLEX');
+    lcvSet(id, 'wospc', (100 - st.currentRampFlexPercent) + '%');
+    lcvSet(id, 'wflex', st.currentRampFlexPercent + '%');
+    lcvSet(id, 'applied', st.lastAppliedAt);
+    lcvSet(id, 'appliedby', st.appliedBy);
+    lcvSet(id, 'endospc', (100 - st.pendingRampFlexPercent) + '%');
+    lcvSet(id, 'endflex', st.pendingRampFlexPercent + '%');
+    var slider = el(id + '-ramp-slider');
+    if (slider) {
+      var p = st.pendingRampFlexPercent, cut = (100 - p) + '%';
+      slider.style.setProperty('--lcv-fill',
+        'linear-gradient(90deg,#1d4ed8 0%,#0891b2 ' + cut + ',rgba(34,211,238,.28) ' + cut + ',rgba(103,232,249,.35) 100%)');
+    }
+    var ramp = el(id + '-cutover-ramp'); if (ramp) ramp.value = cutMobRampText(st.currentRampFlexPercent);
+    var expected = el(id + '-cutover-expected'); if (expected) expected.value = st.currentRampFlexPercent === 0 ? 'OSPC' : (st.currentRampFlexPercent === 100 ? 'FLEX' : 'Mixed');
+    var blockedUp = st.backendIdentityStatus === 'BLOCKED' && st.pendingRampFlexPercent > st.currentRampFlexPercent;
+    var apply = el(id + '-lcv-applybtn'); if (apply) apply.disabled = blockedUp;
+    var msg = el(id + '-lcv-rampmsg');
+    if (msg) {
+      if (blockedUp) { msg.textContent = 'Backend identity missing — cannot promote ramp. Rollback and Retry only.'; msg.setAttribute('data-tone','bad'); }
+      else if (st.pendingRampFlexPercent !== st.currentRampFlexPercent) { msg.textContent = 'Pending ' + cutMobRampText(st.pendingRampFlexPercent) + ' — click Apply Ramp to change production traffic.'; msg.setAttribute('data-tone','warn'); }
+      else { msg.textContent = ''; msg.removeAttribute('data-tone'); }
+    }
+    lcvSyncHeader(id);
+  }
+  window.cutMobRampSlider = function(id, idx) {
+    lcv(id).pendingRampFlexPercent = LCV_STOPS[Math.max(0, Math.min(5, parseInt(idx || 0, 10) || 0))];
+    lcvRampRender(id);
+  };
+  async function lcvPostRamp(id, pct, previewOnly) {
+    var resp = await fetch('/api/stage4c/ramp/set', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({flex_percent:pct, ospc_percent:100-pct, lb_host:cutMobVal(id,'cutover','lbhost'), cutover_hostname:cutMobVal(id,'cutover','hostname'), preview_only:!!previewOnly})});
+    return resp.json();
+  }
+  window.cutMobPreviewRamp = async function(id) {
+    var pct = lcv(id).pendingRampFlexPercent;
+    cutMobLog(id, 'cutover', '$ preview ramp ' + cutMobRampText(pct) + ' on ' + cutMobVal(id,'cutover','lbhost'));
+    try {
+      var data = await lcvPostRamp(id, pct, true);
+      cutMobLog(id, 'cutover', 'Ramp preview: ' + (data.message || data.error || cutMobRampText(pct)));
+      lcvTimeline(id, 'Ramp previewed: ' + cutMobRampText(pct), {status: data.ok ? 'OK' : 'CHECK'}, 'warn');
+    } catch(e) { cutMobLog(id, 'cutover', '[ramp preview error] ' + e.message); lcvTimeline(id, 'Ramp preview failed: ' + e.message, {status:'FAIL'}, 'bad'); }
+  };
+  window.cutMobApplyRamp = async function(id) {
+    var st = lcv(id), pct = st.pendingRampFlexPercent;
+    if (st.backendIdentityStatus === 'BLOCKED' && pct > st.currentRampFlexPercent) {
+      lcvTimeline(id, 'Ramp apply blocked — backend identity missing', {status:'BLOCKED'}, 'bad');
+      return lcvRampRender(id);
+    }
+    cutMobGate(id, 'ramp', 'RUNNING');
+    cutMobLog(id, 'cutover', '$ apply ramp ' + cutMobRampText(pct) + ' to ' + cutMobVal(id, 'cutover', 'lbhost') + ' host=' + cutMobVal(id, 'cutover', 'hostname'));
+    try {
+      var data = await lcvPostRamp(id, pct, false);
+      cutMobLog(id, 'cutover', (data.ok ? 'Ramp accepted: ' : 'Ramp error: ') + (data.message || data.error || cutMobRampText(pct)));
+      cutMobGate(id, 'ramp', data.ok ? 'WARNING' : 'BLOCKED');
+      st.currentRampFlexPercent = pct;
+      st.lastAppliedAt = now(); st.appliedBy = 'operator';
+      st.expectedSourcePercent = 100 - pct; st.expectedTargetPercent = pct;
+      lcvTimeline(id, 'Ramp applied: ' + cutMobRampText(pct), {status: data.ok ? 'APPLIED' : 'CHECK'}, data.ok ? 'ok' : 'warn');
+      lcvRampRender(id);
+      if ((el(id + '-ramp-auto') || {}).checked) await window.cutMobStageRun(id, 'journey');
+    } catch(e) { cutMobLog(id, 'cutover', '[ramp apply error] ' + e.message); cutMobGate(id, 'ramp', 'WARNING'); lcvTimeline(id, 'Ramp apply failed: ' + e.message, {status:'FAIL'}, 'bad'); }
+  };
+  window.cutMobHoldRamp = function(id) {
+    var st = lcv(id);
+    st.globalDecision = 'HOLD'; st.blockingReason = 'Operator hold requested.';
+    lcvTimeline(id, 'Hold requested by operator', {status:'HOLD'}, 'warn');
+    lcvSyncHeader(id);
+  };
+  window.cutMobResetRamp = async function(id) {
+    lcv(id).pendingRampFlexPercent = 0;
+    var slider = el(id + '-ramp-slider'); if (slider) slider.value = 0;
+    lcvTimeline(id, 'Rollback to OSPC triggered', {status:'ROLLBACK'}, 'bad');
+    await window.cutMobApplyRamp(id);
+  };
+  window.cutMobPromoteRamp = async function(id) {
+    var st = lcv(id);
+    if (st.backendIdentityStatus === 'BLOCKED' || st.globalDecision === 'BLOCKED') {
+      lcvTimeline(id, 'Promote blocked: ' + (st.blockingReason || 'gate not satisfied'), {status:'BLOCKED'}, 'bad');
+      return lcvRampRender(id);
+    }
+    st.pendingRampFlexPercent = 100;
+    var slider = el(id + '-ramp-slider'); if (slider) slider.value = 5;
+    await window.cutMobApplyRamp(id);
+  };
+  function cutMobStatusStrip(id, data) {
+    var strip = el(id + '-cutover-strip'); if (!strip) return;
+    strip.innerHTML = '<span>' + cutMobEsc(data.online || 'OFFLINE') + '</span><span>HTTP ' + cutMobEsc(data.status || '-') + '</span><span>SERVED BY ' + cutMobEsc(data.served || 'UNKNOWN') + '</span><span>' + cutMobEsc(data.ms || '-') + ' ms</span><span>' + cutMobEsc(data.ramp || cutMobRampText(cutMobRampPercent(id))) + '</span>';
+    var conn = el(id + '-lcv-conn');
+    if (conn) { conn.textContent = data.online || 'OFFLINE'; conn.setAttribute('data-status', data.online === 'ONLINE' ? 'ONLINE' : 'OFFLINE'); }
+  }
+  function cutMobResultStrip(id, action, status) {
+    var key = action === 'transfer' ? 'transfer' : action;
+    cutMobEnsure(id).lastResults[key] = status;
+    var st = lcv(id);
+    st.journey[key] = status;
+    var n = el(id + '-cutover-result-' + key);
+    if (n) { n.setAttribute('data-status', status); var b = n.querySelector('b'); if (b) b.textContent = status; }
+    lcvGateRender(id);
+  }
+  function lcvGateRender(id) {
+    var st = lcv(id);
+    var box = el(id + '-lcv-gate');
+    if (box) box.innerHTML = LCV_STEPS.map(function(s){
+      var v = st.journey[s[0]] || 'NOT RUN';
+      return '<div class="lcv-gaterow" data-status="' + v + '"><span>' + s[1] + '</span><b>' + v + '</b></div>';
+    }).join('');
+    lcvDecide(id);
+  }
+  function lcvDecide(id) {
+    var st = lcv(id), j = st.journey;
+    var missing = [];
+    if (st.backendIdentityStatus === 'BLOCKED' || st.servedBy === 'UNKNOWN') missing.push('backend identity is UNKNOWN');
+    ['load','login','summary'].forEach(function(k){
+      var labels = {load:'Load Mobile', login:'Login', summary:'Account Summary'};
+      if (j[k] !== 'PASS') missing.push(labels[k] + ' = ' + (j[k] || 'NOT RUN'));
+    });
+    if (j.transfer !== 'PASS' && j.balance !== 'PASS') missing.push('no business transaction or balance refresh PASS');
+    if (st.p95Latency != null && st.p95Latency > 2000) missing.push('P95 latency ' + st.p95Latency + ' ms above threshold (2000 ms)');
+    if (st.errorRate != null && st.errorRate > 5) missing.push('error rate ' + st.errorRate + '% above threshold (5%)');
+    var hardFail = st.backendIdentityStatus === 'BLOCKED'
+      || ['load','login','summary','transfer','balance'].some(function(k){ return j[k] === 'FAIL' || j[k] === 'BLOCKED'; })
+      || (st.errorRate != null && st.errorRate > 5);
+    if (!missing.length) { st.globalDecision = 'SAFE TO CONTINUE'; st.blockingReason = ''; }
+    else { st.globalDecision = hardFail ? 'BLOCKED' : 'HOLD'; st.blockingReason = missing.join('; '); }
+    var reason = el(id + '-lcv-gatereason');
+    if (reason) {
+      reason.textContent = missing.length ? 'Decision: ' + st.globalDecision + ' — ' + st.blockingReason : 'All promotion criteria satisfied — SAFE TO CONTINUE.';
+      reason.setAttribute('data-tone', missing.length ? (hardFail ? 'bad' : 'warn') : 'ok');
+    }
+    lcvRampRender(id);
+    lcvPublishGates(id);
+  }
+  /* Publish live results for the Stage 4C "Cutover Gates" sign-off table:
+     Business Validation / Traffic Ramp / Backend / Evidence (+ DB/cache/queue
+     from the direct backend proofs) are auto-filled from real monitor state. */
+  function lcvPublishGates(id) {
+    var st = lcv(id), state = cutMobEnsure(id), j = st.journey;
+    function js(k) { return j[k] || 'NOT RUN'; }
+    var bizFail = ['login','summary','transfer','balance'].some(function(k){ return js(k) === 'FAIL' || js(k) === 'BLOCKED'; });
+    var biz = (js('login') === 'PASS' && js('summary') === 'PASS' && (js('transfer') === 'PASS' || js('balance') === 'PASS')) ? 'PASS'
+      : (bizFail ? 'BLOCKED' : 'NOT_RUN');
+    var proof = state.batchProof;
+    var ramp = proof ? (proof.gate_status === 'PASS' ? 'PASS' : (proof.gate_status === 'WARNING' ? 'NEEDS_INPUT' : 'BLOCKED')) : 'NOT_RUN';
+    var backend = st.backendIdentityStatus === 'BLOCKED' ? 'BLOCKED'
+      : (st.servedBy !== 'UNKNOWN' && js('health') === 'PASS' && js('ready') === 'PASS') ? 'PASS'
+      : (st.backendIdentityStatus === 'NOT RUN' ? 'NOT_RUN' : 'NEEDS_INPUT');
+    function bg(group) {
+      var rows = [(state.backend.target || {})[group], (state.backend.source || {})[group]].filter(Boolean);
+      if (!rows.length) return 'NOT_RUN';
+      return rows.every(function(r){ return r.ok; }) ? 'PASS' : 'BLOCKED';
+    }
+    var snap = {
+      business_validation: biz, traffic_ramp: ramp, backend: backend,
+      evidence: state.lastEvidence ? 'PASS' : 'NOT_RUN',
+      db: bg('database'), cache: bg('cache'), queue: bg('queue'),
+      decision: st.globalDecision, reason: st.blockingReason || '',
+      updated_at: new Date().toLocaleString(), bench: id
+    };
+    try { localStorage.setItem('outputs_cutover_live_gate_snapshot', JSON.stringify(snap)); } catch(e) {}
+    try { if (typeof window.s5cSyncLiveGates === 'function') window.s5cSyncLiveGates(snap); } catch(e) {}
+  }
+  function cutMobHeadersRaw(headers) {
+    headers = headers || {};
+    return Object.keys(headers).sort().map(function(k){ return k + ': ' + headers[k]; }).join('\n');
+  }
+  function cutMobUpdateHeaderInspector(id, headers, reason) {
+    headers = headers || {};
+    var wanted = ['X-Cutover-Backend','X-Backend-IP','X-Backend-Region','Server','Via','Date'];
+    var grid = el(id + '-header-grid');
+    if (grid) grid.innerHTML = wanted.map(function(k){ return '<span><b>' + k + '</b>' + cutMobEsc(cutMobHeader(headers, k) || '-') + '</span>'; }).join('');
+    var raw = el(id + '-header-raw'); if (raw) raw.value = cutMobHeadersRaw(headers) || 'No response headers captured.';
+    var warn = el(id + '-header-warning');
+    if (warn) warn.textContent = cutMobHeader(headers, 'X-Cutover-Backend') ? 'Header Detection OK' : (reason || 'Header Detection Missing');
+  }
+  function lcvVmNameMatch(appServer, storeKey) {
+    function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    var app = norm(appServer);
+    if (!app) return false;
+    try {
+      var saved = JSON.parse(localStorage.getItem(storeKey) || 'null');
+      return ((saved && saved.rows) || []).some(function(r){
+        var n = norm(r.name || '');
+        return n && (app.indexOf(n) >= 0 || n.indexOf(app) >= 0);
+      });
+    } catch(e) { return false; }
+  }
+  function cutMobDetectServed(res, id) {
+    var headers = (res && res.headers) || {};
+    var served = String(cutMobHeader(headers, 'X-Cutover-Backend') || cutMobHeader(headers, 'X-Backend-Origin') || '').toUpperCase();
+    var appServer = cutMobHeader(headers, 'X-App-Server') || '';
+    var confidence = '', reason = '';
+    if (served === 'OSPC' || served === 'FLEX') confidence = 'HEADER';
+    else if (appServer) {
+      var app = appServer.toLowerCase();
+      var srcHost = (id ? String((el('uatLive-source-host') || {}).value || '') : '').toLowerCase();
+      var tgtHost = (id ? String((el('uatLive-target-host') || {}).value || '') : '').toLowerCase();
+      if ((srcHost && app.indexOf(srcHost) >= 0) || app.indexOf('ospc') >= 0) { served = 'OSPC'; confidence = 'MAPPED'; }
+      else if ((tgtHost && app.indexOf(tgtHost) >= 0) || app.indexOf('flex') >= 0) { served = 'FLEX'; confidence = 'MAPPED'; }
+      else if (lcvVmNameMatch(app, 'uatS1_flex_vm_rows')) { served = 'FLEX'; confidence = 'MAPPED'; }
+      else if (lcvVmNameMatch(app, 'uatS1_ospc_vm_rows')) { served = 'OSPC'; confidence = 'MAPPED'; }
+      else if (app.indexOf('linsnap') >= 0) { served = 'FLEX'; confidence = 'MAPPED'; reason = 'X-App-Server has FLEX snapshot naming (linsnap-*)'; }
+      else { served = 'UNKNOWN'; confidence = 'UNKNOWN'; reason = 'X-App-Server "' + appServer + '" does not map to the selected source/target pair'; }
+    }
+    if (served !== 'OSPC' && served !== 'FLEX') {
+      var body = String((res && res.body) || '').toUpperCase();
+      if (body.indexOf('FLEX') >= 0) { served = 'FLEX'; confidence = confidence || 'BODY'; }
+      else if (body.indexOf('OSPC') >= 0) { served = 'OSPC'; confidence = confidence || 'BODY'; }
+      else { served = 'UNKNOWN'; confidence = 'UNKNOWN'; reason = reason || 'No backend identity headers detected'; }
+    }
+    return {served: served, reason: reason, confidence: confidence || 'UNKNOWN', appServer: appServer, rampStage: cutMobHeader(headers, 'X-Ramp-Stage') || '-'};
+  }
+  function lcvIdentityRender(id, det, res) {
+    var st = lcv(id);
+    st.servedBy = det.served; st.appServer = det.appServer || '-';
+    st.backendIp = cutMobHeader((res || {}).headers, 'X-Backend-IP') || '-';
+    st.backendRegion = cutMobHeader((res || {}).headers, 'X-Backend-Region') || '-';
+    st.identityConfidence = det.confidence;
+    st.backendIdentityStatus = det.served === 'UNKNOWN' ? 'BLOCKED' : (det.confidence === 'HEADER' ? 'OK' : 'PARTIAL');
+    var big = el(id + '-lcv-served'); if (big) { big.textContent = det.served; big.setAttribute('data-val', det.served); }
+    lcvSet(id, 'id-ip', st.backendIp); lcvSet(id, 'id-region', st.backendRegion); lcvSet(id, 'id-app', st.appServer);
+    lcvSet(id, 'id-conf', st.identityConfidence); lcvSet(id, 'id-status', st.backendIdentityStatus); lcvSet(id, 'id-ramp', det.rampStage);
+    var msg = el(id + '-lcv-idmsg');
+    if (msg) {
+      if (st.backendIdentityStatus === 'BLOCKED') { msg.textContent = 'Backend identity missing — cannot promote ramp. ' + (det.reason || ''); msg.setAttribute('data-tone','bad'); }
+      else { msg.textContent = det.confidence === 'MAPPED' ? 'Identity mapped from X-App-Server "' + det.appServer + '".' : ''; msg.setAttribute('data-tone','ok'); }
+    }
+    lcvHdrChk(id, (res || {}).headers || {});
+  }
+  function lcvHdrChk(id, headers) {
+    var box = el(id + '-lcv-hdrchk');
+    if (!box) return;
+    box.innerHTML = ['X-Cutover-Backend','X-Backend-Origin','X-Backend-IP','X-Backend-Region','X-App-Server','X-Ramp-Stage'].map(function(h){
+      var v = cutMobHeader(headers, h);
+      return '<span class="lcv-hdrchk-row" data-ok="' + (v ? '1' : '0') + '"><span>' + h + '</span><b>' + (v ? '&#10003; ' + cutMobEsc(String(v).slice(0, 28)) : '&#10007; Missing') + '</b></span>';
+    }).join('');
+  }
+  function lcvTrafficRender(id) {
+    var st = lcv(id), state = cutMobEnsure(id);
+    var cutoff = Date.now() - 60000;
+    var win = (state.results || []).filter(function(r){ return r.role === 'cutover' && r.at && Date.parse(r.at) >= cutoff && String(r.action).indexOf('backend:') < 0; });
+    var ospc = 0, flex = 0, unk = 0, h2 = 0, h4 = 0, h5 = 0, times = [];
+    win.forEach(function(r){
+      var s = String(r.served || 'UNKNOWN').toUpperCase();
+      if (s.indexOf('OSPC') >= 0) ospc++; else if (s.indexOf('FLEX') >= 0) flex++; else unk++;
+      var code = parseInt(r.status, 10) || 0;
+      if (code >= 200 && code < 300) h2++; else if (code >= 400 && code < 500) h4++; else if (code >= 500) h5++;
+      times.push(r.ms || 0);
+    });
+    var total = Math.max(1, win.length);
+    times.sort(function(a,b){ return a - b; });
+    st.sourceRequestsLast60s = ospc; st.targetRequestsLast60s = flex; st.unknownRequestsLast60s = unk;
+    st.observedSourcePercent = Math.round(ospc / total * 100); st.observedTargetPercent = Math.round(flex / total * 100); st.observedUnknownPercent = Math.round(unk / total * 100);
+    st.http2xx = h2; st.http4xx = h4; st.http5xx = h5;
+    st.errorRate = win.length ? Math.round((h4 + h5) / total * 100) : 0;
+    st.avgLatency = win.length ? Math.round(times.reduce(function(a,b){ return a + b; }, 0) / times.length) : 0;
+    st.p95Latency = win.length ? (times[Math.min(times.length - 1, Math.ceil(times.length * .95) - 1)] || 0) : 0;
+    lcvSet(id, 'rospc', ospc); lcvSet(id, 'rflex', flex); lcvSet(id, 'runk', unk);
+    lcvSet(id, 'h2', h2); lcvSet(id, 'h4', h4); lcvSet(id, 'h5', h5);
+    lcvSet(id, 'err', st.errorRate + '%'); lcvSet(id, 'avg', st.avgLatency + ' ms'); lcvSet(id, 'p95', st.p95Latency + ' ms');
+    lcvSet(id, 'tospc', st.observedSourcePercent + '%'); lcvSet(id, 'tflex', st.observedTargetPercent + '%'); lcvSet(id, 'tunk', st.observedUnknownPercent + '%');
+    var bar = el(id + '-lcv-trafficbar');
+    if (bar) bar.innerHTML = '<i class="lcv-b-ospc" style="width:' + (win.length ? st.observedSourcePercent : 100) + '%"></i><i class="lcv-b-flex" style="width:' + st.observedTargetPercent + '%"></i><i class="lcv-b-unk" style="width:' + st.observedUnknownPercent + '%"></i>';
+    var expected = st.currentRampFlexPercent || 0;
+    var drift = win.length ? Math.abs(st.observedTargetPercent - expected) : 0;
+    var driftStatus = !win.length ? 'OK' : (st.observedUnknownPercent > 0 || drift > 25 ? 'BLOCKED' : (drift > 10 ? 'WARNING' : 'OK'));
+    var dn = el(id + '-lcv-drift');
+    if (dn) { dn.textContent = 'Expected FLEX ' + expected + '% · Observed FLEX ' + st.observedTargetPercent + '% · Drift ' + drift + '% · ' + driftStatus; dn.setAttribute('data-status', driftStatus); }
+  }
+  function cutMobRememberRequest(id, item) {
+    var state = cutMobEnsure(id);
+    state.lastRequests.unshift(item);
+    state.lastRequests = state.lastRequests.slice(0, 10);
+    var tbody = el(id + '-last-rows');
+    if (tbody) tbody.innerHTML = state.lastRequests.map(function(r){
+      return '<tr><td>' + cutMobEsc(r.time) + '</td><td>' + cutMobEsc(r.path) + '</td><td>' + cutMobEsc(r.status) + '</td><td>' + cutMobEsc(r.ms) + ' ms</td><td>' + cutMobEsc(r.served) + '</td><td>' + cutMobEsc(r.backendIp || '-') + '</td></tr>';
+    }).join('');
+  }
+  function cutMobUrl(id, role, path) {
+    if (role === 'cutover') {
+      var lb = cutMobVal(id, role, 'lbhost'), port = cutMobVal(id, role, 'port');
+      return lb ? 'http://' + lb + (port ? ':' + port : '') + cleanPath(path || cutMobVal(id, role, 'path') || '/') : '';
+    }
+    var host = cutMobVal(id, role, 'host'), p = cutMobVal(id, role, 'port');
+    return host ? 'http://' + host + (p ? ':' + p : '') + cleanPath(path || cutMobVal(id, role, 'path') || '/') : '';
+  }
+  function cutMobHeaders(id, role) {
+    return role === 'cutover' && cutMobVal(id, role, 'hostheader') ? {'Host': cutMobVal(id, role, 'hostheader')} : {};
+  }
+  var CUTMOB_BACKEND_LABELS = {api_gateway:'API Gateway',api_server:'API Server',core_backend:'Core Backend',auth_sso:'Auth / SSO',database:'Database',cache:'Cache',queue:'Queue',workers:'Workers',monitoring:'Monitoring'};
+  function cutMobBackendGroups(action) {
+    if (action === 'all') return ['api_gateway','api_server','core_backend','auth_sso','database','cache','queue','workers','monitoring'];
+    if (action === 'health') return ['api_gateway','core_backend','auth_sso'];
+    if (action === 'ready') return ['api_server','core_backend'];
+    if (action === 'db') return ['database'];
+    if (action === 'cache') return ['cache'];
+    if (action === 'queue') return ['queue'];
+    if (action === 'worker') return ['workers'];
+    if (action === 'logs') return ['monitoring'];
+    return [];
+  }
+  function cutMobBackendVal(id, role, group, key) {
+    var n = el(id + '-' + role + '-' + group + '-' + key);
+    return n ? String(n.value || '').trim() : '';
+  }
+  function cutMobBackendUrl(id, role, group) {
+    var host = cutMobBackendVal(id, role, group, 'endpoint'), port = cutMobBackendVal(id, role, group, 'port'), path = cutMobBackendVal(id, role, group, 'path');
+    if (!host) return '';
+    if (group === 'api_gateway' || group === 'api_server' || group === 'core_backend' || group === 'auth_sso') {
+      return 'http://' + host.replace(/^\/+|\/+$/g, '') + (port ? ':' + port : '') + cleanPath(path || '/health');
+    }
+    return 'tcp://' + host.replace(/^\/+|\/+$/g, '') + (port ? ':' + port : '');
+  }
+  function cutMobBackendCmd(id, role, group, url) {
+    var path = cutMobBackendVal(id, role, group, 'path');
+    if (group === 'database') return 'pg_isready -h ' + cutMobBackendVal(id, role, group, 'endpoint') + ' -p ' + cutMobBackendVal(id, role, group, 'port') + ' && psql -c "SELECT 1"';
+    if (group === 'cache') return 'redis-cli -h ' + cutMobBackendVal(id, role, group, 'endpoint') + ' -p ' + cutMobBackendVal(id, role, group, 'port') + ' PING';
+    if (group === 'queue') return 'rabbitmq-diagnostics -q ping || nc -vz ' + cutMobBackendVal(id, role, group, 'endpoint') + ' ' + cutMobBackendVal(id, role, group, 'port');
+    if (group === 'workers') return 'ssh app@' + cutMobBackendVal(id, role, group, 'endpoint') + ' "systemctl --failed --no-pager"';
+    if (group === 'monitoring') return 'ssh app@' + cutMobBackendVal(id, role, group, 'endpoint') + ' "journalctl -u app --since -15min --no-pager | tail -40"';
+    return 'curl -k -i ' + url + (path ? ' # ' + path : '');
+  }
+  function cutMobSetBackendRow(id, role, group, status, latency, evidence) {
+    var tr = document.querySelector('#' + id + ' [data-cutmob-backend-row="' + role + '-' + group + '"]'); if (!tr) return;
+    var st = tr.querySelector('[data-col="status"]'); if (st) st.textContent = status || 'NOT RUN';
+    var lt = tr.querySelector('[data-col="latency"]'); if (lt) lt.textContent = latency == null ? '-' : latency + ' ms';
+    var last = tr.querySelector('[data-col="last"]'); if (last) last.textContent = now();
+    var ev = tr.querySelector('[data-col="evidence"]'); if (ev) ev.textContent = evidence || '-';
+  }
+  function cutMobHeader(headers, name) {
+    headers = headers || {}; var target = name.toLowerCase();
+    for (var k in headers) if (String(k).toLowerCase() === target) return headers[k];
+    return '';
+  }
+  function cutMobRow(id, test, role, text, status, meta) {
+    var key = test.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+    var tr = document.querySelector('#' + id + ' [data-cutmob-row="' + key + '"]'); if (!tr) return;
+    var col = tr.querySelector('[data-col="' + (role === 'target' ? 'target' : role) + '"]'); if (col) col.textContent = text;
+    var st = tr.querySelector('[data-col="status"]'); if (st) st.textContent = status || 'PASS';
+    if (meta && meta.served) { var s = tr.querySelector('[data-col="served"]'); if (s) s.textContent = meta.served; }
+    if (meta && meta.latency != null) { var l = tr.querySelector('[data-col="latency"]'); if (l) l.textContent = meta.latency + ' ms'; }
+    var ev = tr.querySelector('[data-col="evidence"]'); if (ev && status === 'PASS') ev.textContent = 'captured';
+  }
+  function cutMobOverlay(id, role, data) {
+    if (role !== 'cutover') return;
+    var st = lcv(id);
+    var served = data.served || st.servedBy || 'UNKNOWN';
+    var journeyDone = LCV_STEPS.filter(function(s){ return (st.journey[s[0]] || 'NOT RUN') !== 'NOT RUN'; }).length;
+    var journeyStatus = journeyDone === 0 ? 'NOT RUN' : (LCV_STEPS.some(function(s){ return st.journey[s[0]] === 'FAIL' || st.journey[s[0]] === 'BLOCKED'; }) ? 'BLOCKED' : (journeyDone === LCV_STEPS.length ? 'PASS' : 'RUNNING'));
+    st.mobileJourneyStatus = journeyStatus;
+    var o = el(id + '-' + role + '-overlay');
+    if (o) o.innerHTML = '<span>Served by<b>' + cutMobEsc(served) + '</b></span>'
+      + '<span>Ramp<b>' + cutMobEsc(cutMobRampText(st.currentRampFlexPercent)) + '</b></span>'
+      + '<span>Latency<b>' + cutMobEsc(data.ms || '-') + ' ms</b></span>'
+      + '<span>HTTP<b>' + cutMobEsc(data.status || '-') + '</b></span>'
+      + '<span>Journey<b>' + cutMobEsc(journeyStatus) + '</b></span>'
+      + '<span>Evidence<b>' + cutMobEsc(data.evidence || st.lastEvidence || 'not saved') + '</b></span>';
+    var s = el(id + '-' + role + '-status'); if (s) s.textContent = data.ok ? 'PASS' : 'CHECK';
+  }
+  function lcvPhoneBlock(id, text) {
+    var b = el(id + '-lcv-block'); if (!b) return;
+    if (text) { b.textContent = text; b.hidden = false; } else { b.hidden = true; }
+  }
+  async function cutMobRequest(id, role, action, overridePath) {
+    var paths = {load: cutMobVal(id, role, 'path') || '/#', health: cutMobVal(id, role, 'health') || '/health', ready: '/ready', smoke: cutMobVal(id, role, 'smoke') || '/', summary: '/api/mobile/summary', users: '/api/recipients/list', balance: '/api/mobile/summary'};
+    var method = action === 'login' || action === 'transfer' ? 'POST' : 'GET';
+    var path = overridePath || (action === 'login' ? '/api/login' : (action === 'transfer' ? '/api/transfers' : (paths[action] || '/health')));
+    var url = cutMobUrl(id, role, path);
+    var body = action === 'login' ? {username:'alex',password:'demo'} : (action === 'transfer' ? {from_account:'TEST-CHECKING',to_account:'TEST-SAVINGS',amount:1,reference:'cutover-mobile-test'} : null);
+    if (!url) throw new Error('Missing endpoint for ' + role);
+    cutMobGate(id, action === 'transfer' || action === 'login' || action === 'summary' ? 'business' : 'component', 'RUNNING');
+    cutMobLog(id, role, '$ curl -k -sS ' + (role === 'cutover' ? '-H "Host: ' + cutMobVal(id, role, 'hostheader') + '" -D /tmp/cutover_headers.txt -o /tmp/cutover_body.html -w "http=%{http_code} time=%{time_total} ip=%{remote_ip}\\n" ' : '') + url);
+    var res = await proxy(role, {method: method, url: url, body: body, headers: cutMobHeaders(id, role), timeout: 8});
+    var detected = cutMobDetectServed(res, id);
+    var served = detected.served || (role === 'source' ? 'OSPC' : role === 'target' ? 'FLEX' : 'UNKNOWN');
+    var backendIp = cutMobHeader(res.headers, 'X-Backend-IP') || '';
+    var backendRegion = cutMobHeader(res.headers, 'X-Backend-Region') || '';
+    var component = cutMobHeader(res.headers, 'X-Component') || cutMobHeader(res.headers, 'X-Business-System') || '';
+    var ok = !!(res && res.ok);
+    var state = cutMobEnsure(id);
+    state.lastOk = ok; state.lastStatus = res.status || 'ERR'; state.lastMs = res.elapsed_ms || 0; state.lastServed = served; state.lastBackendIp = backendIp; state.lastBackendRegion = backendRegion;
+    cutMobLog(id, role, 'HTTP ' + (res.status || 'ERR') + ' ' + (ok ? 'PASS' : 'CHECK') + ' ' + (res.elapsed_ms || 0) + ' ms served=' + served + (detected.reason ? ' reason="' + detected.reason + '"' : '') + (component ? ' component=' + component : ''));
+    cutMobUpdateHeaderInspector(id, res.headers || {}, detected.reason);
+    cutMobOverlay(id, role, {ok: ok, status: res.status || 'ERR', ms: res.elapsed_ms || 0, served: served, backendIp: backendIp, backendRegion: backendRegion, errors: ok ? 0 : 1, reason: detected.reason, login: action === 'login' ? (ok ? 'PASS' : (res.status ? 'FAILED' : 'ERROR')) : (state.lastResults.login || 'NOT RUN'), txn: action === 'transfer' ? (ok ? 'PASS' : 'FAILED') : (state.lastResults.transfer || 'NOT RUN'), evidence:'capturing'});
+    cutMobStatusStrip(id, {online: ok ? 'ONLINE' : 'OFFLINE', status: res.status || 'ERR', served: served, ms: res.elapsed_ms || 0, ramp: cutMobRampPercent(id) + '% FLEX'});
+    if (['health','ready','login','summary','users','transfer','balance'].indexOf(action) >= 0) cutMobResultStrip(id, action, ok ? 'PASS' : (res.status ? 'FAIL' : 'BLOCKED'));
+    cutMobRememberRequest(id, {time:now(), path:path, status:res.status || 'ERR', ms:res.elapsed_ms || 0, served:served, backendIp:backendIp});
+    cutMobRow(id, action === 'balance' ? 'Balance Refresh' : action === 'transfer' ? 'Transfer Test' : action.charAt(0).toUpperCase() + action.slice(1), role, ok ? 'PASS' : 'CHECK', ok ? 'PASS' : 'BLOCKED', {served: served, latency: res.elapsed_ms || 0});
+    state.results.push({role: role, action: action, ok: ok, status: res.status, ms: res.elapsed_ms, served: served, backendIp: backendIp, backendRegion: backendRegion, component: component, headers:res.headers || {}, reason:detected.reason, at: new Date().toISOString()});
+    if (role === 'cutover') {
+      lcvDevFeed(id, action, {served: served, status: res.status, ms: res.elapsed_ms || 0, path: path});
+      lcvIdentityRender(id, detected, res);
+      lcvTrafficRender(id);
+      if (action === 'login' && !ok) lcvPhoneBlock(id, detected.served === 'UNKNOWN' ? 'Login blocked — backend identity missing' : 'Login blocked — ' + (detected.reason || 'HTTP ' + (res.status || 'ERR')));
+      else if (action === 'login' && ok) lcvPhoneBlock(id, '');
+      var tlNames = {login:'Login tested', summary:'Account summary tested', transfer:'Transfer tested', health:'Health checked', ready:'Ready checked', users:'Users API tested', balance:'Balance refreshed', batch:'Proof request'};
+      if (tlNames[action] && action !== 'batch') lcvTimeline(id, tlNames[action] + ' — ' + (ok ? 'PASS' : 'FAIL'), {http:res.status || 'ERR', latency:res.elapsed_ms || 0, status: ok ? 'PASS' : 'FAIL'}, ok ? 'ok' : 'bad');
+      if (detected.served !== 'UNKNOWN' && !lcv(id).identityAnnounced) { lcv(id).identityAnnounced = true; lcvTimeline(id, 'Backend identity detected: ' + detected.served + ' (' + detected.confidence + ')', {http:res.status || '-', status:'DETECTED'}, 'ok'); }
+      lcvGateRender(id);
+    }
+    return {ok: ok, served: served, ms: res.elapsed_ms || 0, status:res.status, backendIp:backendIp, backendRegion:backendRegion, reason:detected.reason};
+  }
+  /* Load the mobile app directly from the Source Mobile UI controls
+     (same behavior as the UAT bench phone: direct host/port/path). */
+  window.cutMobLoadMobile = function(id) {
+    var f = el(id + '-cutover-frame');
+    if (!f) return;
+    var host = (el(id + '-mob-host') || {}).value || '';
+    var port = (el(id + '-mob-port') || {}).value || '';
+    var path = (el(id + '-mob-path') || {}).value || '/#';
+    if (!String(host).trim()) { cutMobLog(id, 'cutover', '[load] missing IP / Host'); return; }
+    var url = 'http://' + String(host).trim() + (String(port).trim() ? ':' + String(port).trim() : '') + cleanPath(path);
+    f.onload = function(){ lcvInstrumentFrame(id, f); };
+    f.src = previewUrl(url);
+    cutMobResultStrip(id, 'load', 'PASS');
+    lcvTimeline(id, 'App loaded in mobile frame', {status:'LOADED'}, 'ok');
+    cutMobLog(id, 'cutover', '$ open ' + url);
+    lcvSyncHeader(id);
+  };
+  window.cutMobRun = async function(id, role, action) {
+    try {
+      if (action === 'evidence') return cutMobSaveEvidence(id);
+      if (action === 'ramp') return cutMobRampProof(id);
+      if (action === 'load') {
+        var f = el(id + '-' + role + '-frame');
+        if (f) {
+          f.onload = function(){ lcvInstrumentFrame(id, f); };
+          var hostHdr = role === 'cutover' ? cutMobVal(id, role, 'hostheader') : '';
+          f.src = previewUrl(cutMobUrl(id, role, cutMobVal(id, role, 'path') || '/#'))
+            + (hostHdr ? '&host=' + encodeURIComponent(hostHdr) : '');
+        }
+        if (role === 'cutover') {
+          cutMobResultStrip(id, 'load', 'PASS');
+          lcvTimeline(id, 'App loaded in mobile frame', {status:'LOADED'}, 'ok');
+          var openUrl = cutMobUrl(id, 'cutover', cutMobVal(id, 'cutover', 'path') || '/#');
+          ['source','target'].forEach(function(side){
+            lcvDevRoute(id, side);
+            lcvDevLog(id, side, '[mode] Frontend Mobile UI via cutover URL. Ramp ' + cutMobRampText(lcv(id).currentRampFlexPercent));
+            lcvDevLog(id, side, '$ open ' + openUrl);
+            lcvDevRows(id, side, '1');
+          });
+          lcvDevBadge(id, 'source', 'Stage 1: frontend loaded from ' + openUrl);
+          lcvDevBadge(id, 'target', 'Stage 1: frontend loaded from ' + openUrl);
+          lcvSyncHeader(id);
+        }
+        return;
+      }
+      await cutMobRequest(id, role, action);
+      cutMobUpdateGates(id);
+    } catch(e) { cutMobLog(id, role, '[error] ' + e.message); cutMobOverlay(id, role, {ok:false,status:'ERR',ms:'-',served:'UNKNOWN',errors:1,txn:'FAILED'}); }
+  };
+  async function cutMobSequence(id, role, actions) { for (var i=0;i<actions.length;i++) await window.cutMobRun(id, role, actions[i]); }
+  window.cutMobStageRun = async function(id, kind) {
+    if (kind === 'journey') return cutMobSequence(id, 'cutover', ['load','health','ready','login','summary','users','transfer','balance']);
+    if (kind === 'baseline') return cutMobBackendRun(id, 'source', 'all');
+    if (kind === 'flex') return cutMobBackendRun(id, 'target', 'all');
+    if (kind === 'cutover') return cutMobSequence(id, 'cutover', ['load','health','ready','login','summary','users']);
+    if (kind === 'canary') return cutMobSequence(id, 'cutover', ['health','summary','transfer','balance']);
+    if (kind === 'rollback') { var e = el(id + '-cutover-expected'); if (e) e.value = 'OSPC'; cutMobGate(id,'ramp','ROLLBACK TO OSPC'); await cutMobSequence(id, 'cutover', ['health','login','summary']); return; }
+    if (kind === 'save') return cutMobSaveEvidence(id);
+    if (kind === 'ramp') return cutMobRampProof(id);
+  };
+  async function cutMobBackendTest(id, role, group) {
+    var label = CUTMOB_BACKEND_LABELS[group] || group;
+    var url = cutMobBackendUrl(id, role, group);
+    if (!url) throw new Error('Missing ' + label + ' endpoint for ' + role);
+    cutMobSetBackendRow(id, role, group, 'RUNNING', null, 'capturing');
+    var statusNode = el(id + '-' + role + '-backend-status'); if (statusNode) statusNode.textContent = 'RUNNING';
+    var cmd = cutMobBackendCmd(id, role, group, url);
+    cutMobLog(id, role + '-backend', '$ ' + cmd);
+    var started = Date.now();
+    var res = await proxy(role + '-backend', {method:'GET', url:url, timeout:8});
+    var ms = res.elapsed_ms != null ? res.elapsed_ms : (Date.now() - started);
+    var ok = !!(res && res.ok);
+    var status = ok ? 'PASS' : 'BLOCKED';
+    cutMobLog(id, role + '-backend', label + ' ' + status + ' in ' + ms + ' ms (' + (res.status || res.reason || 'no response') + ')');
+    cutMobSetBackendRow(id, role, group, status, ms, ok ? 'captured' : 'review');
+    cutMobRow(id, label, role, status, status, {served: role === 'source' ? 'OSPC' : 'FLEX', latency: ms});
+    cutMobState[id] = cutMobState[id] || {results: [], gates: {}, backend: {}};
+    cutMobState[id].backend = cutMobState[id].backend || {};
+    cutMobState[id].backend[role] = cutMobState[id].backend[role] || {};
+    cutMobState[id].backend[role][group] = {ok:ok,status:res.status || status,reason:res.reason || res.error || '',ms:ms,url:url,command:cmd,at:new Date().toISOString()};
+    cutMobState[id].results.push({role:role, action:'backend:' + group, ok:ok, status:res.status || status, ms:ms, served:role === 'source' ? 'OSPC' : 'FLEX', backendIp:cutMobBackendVal(id, role, group, 'endpoint'), at:new Date().toISOString()});
+    if (statusNode) statusNode.textContent = ok ? 'PASS' : 'CHECK';
+    cutMobUpdateGates(id);
+    return ok;
+  }
+  window.cutMobBackendRun = async function(id, role, action) {
+    try {
+      if (action === 'evidence') return cutMobSaveEvidence(id);
+      var groups = cutMobBackendGroups(action);
+      for (var i=0;i<groups.length;i++) await cutMobBackendTest(id, role, groups[i]);
+      cutMobUpdateGates(id);
+    } catch(e) {
+      cutMobLog(id, role + '-backend', '[error] ' + e.message);
+      var statusNode = el(id + '-' + role + '-backend-status'); if (statusNode) statusNode.textContent = 'CHECK';
+    }
+  };
+  function cutMobExpectedRange(percent, total) {
+    var ideal = Math.round((percent / 100) * total);
+    if (percent === 0) return {min:0,max:0};
+    if (percent === 100) return {min:total,max:total};
+    return {min:Math.max(0, ideal - 1), max:Math.min(total, ideal + 1)};
+  }
+  function cutMobRenderBatch(id, summary, rows) {
+    var cards = el(id + '-batch-summary');
+    if (cards) {
+      var vals = [
+        [summary.total,'Total Requests'],[summary.ospc_hits,'OSPC Hits'],[summary.flex_hits,'FLEX Hits'],[summary.unknown_hits,'Unknown Hits'],[summary.errors,'Errors'],[summary.avg_latency_ms + ' ms','Avg Latency'],[summary.p95_latency_ms + ' ms','P95 Latency']
+      ];
+      cards.innerHTML = vals.map(function(v){return '<span><b>' + cutMobEsc(v[0]) + '</b><small>' + cutMobEsc(v[1]) + '</small></span>';}).join('');
+    }
+    var dist = el(id + '-batch-dist');
+    if (dist) {
+      var total = Math.max(1, summary.total || 0);
+      dist.innerHTML = '<span>OSPC ' + summary.ospc_hits + '</span><i style="width:' + Math.round(summary.ospc_hits / total * 100) + '%"></i><span>FLEX ' + summary.flex_hits + '</span><i style="width:' + Math.round(summary.flex_hits / total * 100) + '%"></i><span>UNKNOWN ' + summary.unknown_hits + '</span>';
+    }
+    var body = el(id + '-batch-rows');
+    if (body) body.innerHTML = rows.map(function(r){
+      return '<tr><td>' + r.request_id + '</td><td>' + cutMobEsc(r.http_status || 'ERR') + '</td><td>' + cutMobEsc(r.latency_ms || 0) + ' ms</td><td>' + cutMobEsc(r.served_by || 'UNKNOWN') + '</td><td>' + cutMobEsc(r.backend_ip || '-') + '</td><td>' + cutMobEsc(r.backend_region || '-') + '</td><td>' + cutMobEsc(r.result || 'CHECK') + '</td></tr>';
+    }).join('');
+  }
+  function cutMobBatchGateStatus(id, summary) {
+    var pct = cutMobRampPercent(id);
+    var range = cutMobExpectedRange(pct, summary.total || 0);
+    if (summary.errors > 0) return 'BLOCKED';
+    if (summary.unknown_hits === summary.total && pct > 0) return 'BLOCKED';
+    if (summary.unknown_hits > 0) return 'WARNING';
+    if (summary.flex_hits < range.min || summary.flex_hits > range.max) return Math.abs(summary.flex_hits - Math.round((pct / 100) * summary.total)) <= 2 ? 'WARNING' : 'BLOCKED';
+    if (summary.p95_latency_ms > 2000) return 'WARNING';
+    return 'PASS';
+  }
+  window.cutMobClearBatch = function(id) {
+    var body = el(id + '-batch-rows'); if (body) body.innerHTML = '<tr><td colspan="7">No batch run yet.</td></tr>';
+    cutMobRenderBatch(id, {total:0,ospc_hits:0,flex_hits:0,unknown_hits:0,errors:0,avg_latency_ms:0,p95_latency_ms:0}, []);
+    cutMobEnsure(id).batchProof = null;
+    cutMobGate(id, 'ramp', 'NOT RUN');
+  };
+  window.cutMobRunBatch = async function(id) {
+    var count = parseInt(((el(id + '-batch-count') || {}).value || 10), 10) || 10;
+    var path = ((el(id + '-batch-path') || {}).value || '/health').trim() || '/health';
+    var rows = [], times = [], summary = {total:count, ospc_hits:0, flex_hits:0, unknown_hits:0, errors:0, avg_latency_ms:0, p95_latency_ms:0};
+    cutMobGate(id, 'ramp', 'RUNNING');
+    cutMobLog(id, 'cutover', '$ for i in $(seq 1 "' + count + '"); do curl -k -sS -H "Host: ' + cutMobVal(id,'cutover','hostheader') + '" -D "/tmp/headers_$i.txt" -o /dev/null -w "$i,http=%{http_code},time=%{time_total},ip=%{remote_ip}\\n" "' + cutMobUrl(id,'cutover',path) + '"; done');
+    for (var i=1;i<=count;i++) {
+      var r;
+      try {
+        r = await cutMobRequest(id, 'cutover', 'batch', path);
+      } catch(e) {
+        cutMobLog(id, 'cutover', '[batch #' + i + ' error] ' + e.message);
+        r = {ok:false, status:'ERR', ms:0, served:'UNKNOWN'};
+      }
+      times.push(r.ms || 0);
+      var s = String(r.served || 'UNKNOWN').toUpperCase();
+      if (s.indexOf('OSPC') >= 0) summary.ospc_hits++;
+      else if (s.indexOf('FLEX') >= 0) summary.flex_hits++;
+      else summary.unknown_hits++;
+      if (!r.ok) summary.errors++;
+      rows.push({request_id:i,http_status:r.status || 'ERR',latency_ms:r.ms || 0,served_by:r.served || 'UNKNOWN',backend_ip:r.backendIp || '-',backend_region:r.backendRegion || '-',result:r.ok ? 'PASS' : 'BLOCKED'});
+    }
+    times.sort(function(a,b){return a-b;});
+    summary.avg_latency_ms = Math.round(times.reduce(function(a,b){return a+b;},0)/(times.length||1));
+    summary.p95_latency_ms = times[Math.min(times.length-1, Math.ceil(times.length*.95)-1)] || 0;
+    cutMobRenderBatch(id, summary, rows);
+    var status = cutMobBatchGateStatus(id, summary);
+    cutMobEnsure(id).batchProof = {summary:summary, requests:rows, expected_flex_percent:cutMobRampPercent(id), gate_status:status, at:new Date().toISOString()};
+    cutMobGate(id, 'ramp', status);
+    cutMobRow(id, 'Ramp Proof', 'cutover', 'OSPC ' + summary.ospc_hits + ' / FLEX ' + summary.flex_hits + ' / UNKNOWN ' + summary.unknown_hits, status, {served:'MIXED', latency:summary.p95_latency_ms});
+    cutMobLog(id, 'cutover', 'Batch proof ' + status + ': OSPC=' + summary.ospc_hits + ' FLEX=' + summary.flex_hits + ' UNKNOWN=' + summary.unknown_hits + ' ERR=' + summary.errors + ' avg=' + summary.avg_latency_ms + 'ms p95=' + summary.p95_latency_ms + 'ms');
+    lcvTimeline(id, count + ' connection proof completed — OSPC ' + summary.ospc_hits + ' / FLEX ' + summary.flex_hits + ' / UNKNOWN ' + summary.unknown_hits, {latency:summary.p95_latency_ms, status:status}, status === 'PASS' ? 'ok' : (status === 'WARNING' ? 'warn' : 'bad'));
+    lcvTrafficRender(id);
+    lcvGateRender(id);
+  };
+  async function cutMobRampProof(id) {
+    var sel = el(id + '-batch-count'); if (sel) sel.value = sel.value || '10';
+    return window.cutMobRunBatch(id);
+  }
+  function cutMobGate(id, gate, status) {
+    cutMobEnsure(id);
+    cutMobState[id].gates[gate] = status;
+    var names = {component:'component',database:'database',cache:'cache',queue:'queue',worker:'worker',business:'business',ramp:'ramp',evidence:'evidence'};
+    var elg = el(id + '-gate-' + names[gate]); if (elg) { elg.textContent = elg.textContent.split(':')[0] + ': ' + status; elg.setAttribute('data-status', status); }
+    try { localStorage.setItem('cutoverMobileGates.' + id, JSON.stringify(cutMobState[id].gates)); } catch(e) {}
+  }
+  function cutMobUpdateGates(id) {
+    var state = cutMobEnsure(id);
+    var r = state.results || [];
+    var backend = state.backend || {};
+    function groupStatus(groups) {
+      var seen = false, failed = false;
+      ['source','target'].forEach(function(role){
+        groups.forEach(function(g){
+          var row = backend[role] && backend[role][g];
+          if (row) { seen = true; if (!row.ok) failed = true; }
+        });
+      });
+      return !seen ? '' : (failed ? 'BLOCKED' : 'PASS');
+    }
+    var componentStatus = groupStatus(['api_gateway','api_server','core_backend','auth_sso']);
+    var dbStatus = groupStatus(['database']);
+    var cacheStatus = groupStatus(['cache']);
+    var queueStatus = groupStatus(['queue']);
+    var workerStatus = groupStatus(['workers','monitoring']);
+    var healthOk = r.some(function(x){return x.role==='cutover' && x.action==='health' && x.ok;});
+    var readyOk = r.some(function(x){return x.role==='cutover' && x.action==='ready' && x.ok;});
+    var cutOk = r.some(function(x){return x.role==='cutover' && x.ok;});
+    var loginOk = r.some(function(x){return x.role==='cutover' && x.action==='login' && x.ok;});
+    var summaryOk = r.some(function(x){return x.role==='cutover' && x.action==='summary' && x.ok;});
+    var txnOk = r.some(function(x){return x.role==='cutover' && x.action==='transfer' && x.ok;});
+    var txnFail = r.some(function(x){return x.role==='cutover' && x.action==='transfer' && !x.ok;});
+    if (componentStatus) cutMobGate(id,'component',componentStatus);
+    else if (healthOk && readyOk) cutMobGate(id,'component','PASS');
+    if (dbStatus) cutMobGate(id,'database',dbStatus);
+    if (cacheStatus) cutMobGate(id,'cache',cacheStatus);
+    if (queueStatus) cutMobGate(id,'queue',queueStatus);
+    if (workerStatus) cutMobGate(id,'worker',workerStatus);
+    if (loginOk && summaryOk && txnOk) cutMobGate(id,'business','PASS');
+    else if (txnFail) cutMobGate(id,'business','BLOCKED');
+    if (cutOk) cutMobGate(id,'evidence','RUNNING');
+    lcvPublishGates(id);
+  }
+  function cutMobSaveEvidence(id) {
+    cutMobGate(id,'evidence','PASS');
+    var terminal = (el(id + '-terminal')||{}).textContent || '';
+    var prefix = String(id).toLowerCase().indexOf('s5c') >= 0 ? 'stage4c' : 'stage4';
+    var outputs = ['outputs/cutover/' + prefix + '_cutover_mobile_results.json','outputs/cutover/' + prefix + '_backend_source_results.json','outputs/cutover/' + prefix + '_backend_target_results.json','outputs/cutover/' + prefix + '_ramp_proof_results.json','outputs/cutover/' + prefix + '_live_validation_results.csv','outputs/cutover/' + prefix + '_terminal.log','outputs/cutover/' + prefix + '_evidence.json','outputs/cutover/final_cutover_evidence.json'];
+    var payload = {kind:'CutoverLiveValidationEvidence', outputs:outputs, bench:id, saved_at:new Date().toISOString(), state:cutMobState[id] || {}, terminal:terminal};
+    try {
+      localStorage.setItem(outputs[0], JSON.stringify(((payload.state || {}).results || []).filter(function(r){return r.role==='cutover';}), null, 2));
+      localStorage.setItem(outputs[1], JSON.stringify((((payload.state || {}).backend || {}).source || {}), null, 2));
+      localStorage.setItem(outputs[2], JSON.stringify((((payload.state || {}).backend || {}).target || {}), null, 2));
+      localStorage.setItem(outputs[3], JSON.stringify(((payload.state || {}).batchProof || (payload.state || {}).rampProof || {}), null, 2));
+      localStorage.setItem(outputs[5], terminal);
+      localStorage.setItem(outputs[6], JSON.stringify(payload, null, 2));
+      localStorage.setItem('outputs/cutover/final_cutover_evidence.json', JSON.stringify(payload));
+    } catch(e) {}
+    function download(name, text, type) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], {type:type}));
+      a.download = name;
+      a.click();
+    }
+    var rows = ((cutMobState[id] || {}).results || []);
+    var csv = 'role,action,ok,status,ms,served,backendIp,at\n' + rows.map(function(r){
+      return [r.role,r.action,r.ok,r.status,r.ms,r.served,r.backendIp,r.at].map(function(v){ return '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"'; }).join(',');
+    }).join('\n') + '\n';
+    try { localStorage.setItem(outputs[4], csv); } catch(e) {}
+    download(prefix + '_evidence_' + id + '.json', JSON.stringify(payload,null,2), 'application/json');
+    download(prefix + '_live_validation_results_' + id + '.csv', csv, 'text/csv');
+    download(prefix + '_terminal_' + id + '.log', terminal, 'text/plain');
+    var last = el(id + '-evidence-last'); if (last) last.textContent = 'Last saved: ' + prefix + '_evidence_' + id + '.json at ' + now();
+    cutMobEnsure(id).lastEvidence = 'saved ' + now();
+    lcvTimeline(id, 'Evidence saved', {status:'SAVED', evidence: prefix + '_evidence_' + id + '.json'}, 'ok');
+    lcvPublishGates(id);
+    cutMobOverlay(id, 'cutover', {ok:cutMobEnsure(id).lastOk,status:cutMobEnsure(id).lastStatus || '-',ms:cutMobEnsure(id).lastMs || '-',served:cutMobEnsure(id).lastServed || 'UNKNOWN',backendIp:cutMobEnsure(id).lastBackendIp || '-',backendRegion:cutMobEnsure(id).lastBackendRegion || '-',login:cutMobEnsure(id).lastResults.login || 'NOT RUN',txn:cutMobEnsure(id).lastResults.transfer || 'NOT RUN',evidence:cutMobEnsure(id).lastEvidence});
+  }
+  function installCutoverMobileBench(panelId, id, label) {
+    var panel = el(panelId), body = panel && panel.querySelector('.info-panel');
+    if (!body || el(id)) return;
+    cutMobInstallStyles();
+    var box = document.createElement('div');
+    box.innerHTML = cutMobBenchHtml(id, label);
+    body.appendChild(box.firstChild);
+    cutMobEnsure(id);
+    lcv(id);
+    cutMobUpdateHeaderInspector(id, {}, 'Header Detection Missing');
+    cutMobRenderBatch(id, {total:0,ospc_hits:0,flex_hits:0,unknown_hits:0,errors:0,avg_latency_ms:0,p95_latency_ms:0}, []);
+    cutMobOverlay(id, 'cutover', {ok:false,status:'-',ms:'-',served:'UNKNOWN',errors:0,evidence:'not saved'});
+    cutMobStatusStrip(id, {online:'OFFLINE', status:'-', served:'UNKNOWN', ms:'-', ramp:'0% FLEX'});
+    lcvGateRender(id);
+    lcvTrafficRender(id);
+    lcvRampRender(id);
+    lcvDevInit(id);
+    lcvHdrChk(id, {});
+    /* Pre-load the real source app into the phone (same behavior as the UAT
+       bench phone). Gates stay NOT RUN until the operator runs the journey. */
+    try {
+      var frame = el(id + '-cutover-frame');
+      var host = (el(id + '-mob-host') || {}).value || '';
+      var port = (el(id + '-mob-port') || {}).value || '';
+      var path = (el(id + '-mob-path') || {}).value || '/#';
+      if (frame && String(host).trim()) {
+        frame.onload = function(){ lcvInstrumentFrame(id, frame); };
+        frame.src = previewUrl('http://' + String(host).trim() + (String(port).trim() ? ':' + String(port).trim() : '') + cleanPath(path));
+      }
+    } catch(e) {}
+  }
   function installBenchPlacement() {
     var bench = el('uatLiveCompareBench');
     var uatContent = el('uat-content');
@@ -11007,50 +12401,8 @@ ${certContent}
       uatContent.appendChild(title);
       uatContent.appendChild(bench);
     }
-    var cutoverPanel = el('panel-s5');
-    var cutoverBody = cutoverPanel && cutoverPanel.querySelector('.info-panel');
-    if (bench && cutoverBody && !el('uatLiveCompareBenchCutover')) {
-      var cutTitle = document.createElement('div');
-      cutTitle.id = 'uatLiveCutoverBottomTitle';
-      cutTitle.className = 'uat-live-bottom-title';
-      cutTitle.innerHTML = '<div>Source vs Target Business System Live Test</div><span>Cutover bottom validation bench</span>';
-      var cutBench = bench.cloneNode(true);
-      cutBench.id = 'uatLiveCompareBenchCutover';
-      retargetCloneIds(cutBench, 'source', 'cutover-source');
-      retargetCloneIds(cutBench, 'target', 'cutover-target');
-      var sHead = cutBench.querySelector('.uat-live-side--source h3');
-      var tHead = cutBench.querySelector('.uat-live-side--target h3');
-      var sBadge = cutBench.querySelector('.uat-live-side--source .uat-live-badge');
-      var tBadge = cutBench.querySelector('.uat-live-side--target .uat-live-badge');
-      if (sHead) sHead.textContent = 'Cutover Source Mobile UI';
-      if (tHead) tHead.textContent = 'Cutover Target Mobile UI';
-      if (sBadge) sBadge.textContent = 'CUTOVER SOURCE';
-      if (tBadge) tBadge.textContent = 'CUTOVER TARGET';
-      cutoverBody.appendChild(cutTitle);
-      cutoverBody.appendChild(cutBench);
-    }
-    var cutoverCPanel = el('panel-s5c');
-    var cutoverCBody = cutoverCPanel && cutoverCPanel.querySelector('.info-panel');
-    if (bench && cutoverCBody && !el('uatLiveCompareBenchCutoverC')) {
-      var cutCTitle = document.createElement('div');
-      cutCTitle.id = 'uatLiveCutoverCBottomTitle';
-      cutCTitle.className = 'uat-live-bottom-title';
-      cutCTitle.innerHTML = '<div>Source vs Target Business System Live Test</div><span>Stage 4C bottom validation bench</span>';
-      var cutCBench = bench.cloneNode(true);
-      cutCBench.id = 'uatLiveCompareBenchCutoverC';
-      retargetCloneIds(cutCBench, 'source', 'cutoverc-source');
-      retargetCloneIds(cutCBench, 'target', 'cutoverc-target');
-      var sHeadC = cutCBench.querySelector('.uat-live-side--source h3');
-      var tHeadC = cutCBench.querySelector('.uat-live-side--target h3');
-      var sBadgeC = cutCBench.querySelector('.uat-live-side--source .uat-live-badge');
-      var tBadgeC = cutCBench.querySelector('.uat-live-side--target .uat-live-badge');
-      if (sHeadC) sHeadC.textContent = 'Stage 4C Source Mobile UI';
-      if (tHeadC) tHeadC.textContent = 'Stage 4C Target Mobile UI';
-      if (sBadgeC) sBadgeC.textContent = 'STAGE 4C SOURCE';
-      if (tBadgeC) tBadgeC.textContent = 'STAGE 4C TARGET';
-      cutoverCBody.appendChild(cutCTitle);
-      cutoverCBody.appendChild(cutCBench);
-    }
+    installCutoverMobileBench('panel-s5', 'cutoverMobileBenchS5', 'Stage 4');
+    installCutoverMobileBench('panel-s5c', 'cutoverMobileBenchS5C', 'Stage 4C');
   }
   function init() {
     if (!el('uatLiveCompareBench')) return;
@@ -11061,288 +12413,9 @@ ${certContent}
       restoreSide('cutover-source');
       restoreSide('cutover-target');
     }
-    if (el('uatLiveCompareBenchCutoverC')) {
-      restoreSide('cutoverc-source');
-      restoreSide('cutoverc-target');
-    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
-})();
-</script>
-
-<script>
-/* ── Stage 3 UAT: Component Test Lab — source-vs-target device mockups
-   for every non-frontend business-system component. Web Frontend / Mobile
-   UI keeps the existing phone mockup above, untouched. ──────────────────── */
-(function() {
-  'use strict';
-  function $id(id){ return document.getElementById(id); }
-  function _esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]); }); }
-  function _host(u){ var m=String(u||'').match(/^[a-zA-Z][\w+.-]*:\/\/([^\/:]+)/); if(m) return m[1]; m=String(u||'').match(/^([^\/:]+)/); return m?m[1]:''; }
-  function _port(u){ var m=String(u||'').match(/:(\d+)(?:\/|$)/); return m?m[1]:''; }
-  function _scheme(u){ var m=String(u||'').match(/^([a-zA-Z][\w+.-]*):\/\//); return m?m[1]:'http'; }
-
-  /* Device type detection — same rules as spec's getComponentDeviceType() */
-  function _deviceType(role) {
-    var r = (role || '').toLowerCase();
-    if (r.indexOf('frontend') >= 0 || r.indexOf('mobile') >= 0 || (r.indexOf('web') >= 0 && r.indexOf('gateway') < 0)) return 'mobile_phone';
-    if (r.indexOf('gateway') >= 0) return 'api_console_tablet';
-    if (r.indexOf('auth') >= 0 || r.indexOf('sso') >= 0 || r.indexOf('identity') >= 0) return 'auth_security_device';
-    if (r.indexOf('backend') >= 0 || r.indexOf('core') >= 0 || r.indexOf('ledger') >= 0) return 'backend_engine_rack';
-    if (r.indexOf('database') >= 0 || r.indexOf('postgres') >= 0 || r.indexOf('mysql') >= 0 || r.indexOf('db') >= 0) return 'database_console';
-    if (r.indexOf('cache') >= 0 || r.indexOf('redis') >= 0) return 'cache_memory_chip';
-    if (r.indexOf('queue') >= 0 || r.indexOf('rabbit') >= 0 || r.indexOf('kafka') >= 0) return 'queue_conveyor';
-    if (r.indexOf('worker') >= 0 || r.indexOf('cron') >= 0 || r.indexOf('batch') >= 0) return 'worker_factory';
-    if (r.indexOf('monitor') >= 0 || r.indexOf('observ') >= 0 || r.indexOf('logging') >= 0) return 'monitoring_noc_wall';
-    if (r.indexOf('api') >= 0 || r.indexOf('service') >= 0) return 'service_console';
-    return 'service_console';
-  }
-  /* HTTP-testable device types run real Health/Ready/Smoke/Perf through the
-     server-side probe below. Everything else needs a protocol-specific
-     client (psql/redis-cli/rabbitmqctl/ssh) this app doesn't run yet, so
-     those show a copyable command + a manual PASS/WARNING/BLOCKED verdict —
-     the "simulated until the command API is wired" fallback the spec allows. */
-  var HTTP_TYPES = { api_console_tablet:1, service_console:1, backend_engine_rack:1, auth_security_device:1 };
-  var THEMES = {
-    api_console_tablet:  { icon:'📶', color:'#7c3aed', bg:'#f5f3ff', label:'API Console Tablet' },
-    service_console:      { icon:'🖥️', color:'#0891b2', bg:'#ecfeff', label:'Service Console' },
-    backend_engine_rack:  { icon:'⚙️', color:'#475569', bg:'#f1f5f9', label:'Backend Engine Rack' },
-    auth_security_device: { icon:'🔒', color:'#b45309', bg:'#fffbeb', label:'Security Lock Device' },
-    database_console:     { icon:'🗄️', color:'#dc2626', bg:'#fef2f2', label:'Database Console' },
-    cache_memory_chip:    { icon:'⚡', color:'#d97706', bg:'#fff7ed', label:'Cache Memory Chip' },
-    queue_conveyor:       { icon:'📦', color:'#7c3aed', bg:'#f5f3ff', label:'Queue Conveyor Belt' },
-    worker_factory:       { icon:'🏭', color:'#334155', bg:'#f8fafc', label:'Worker Factory' },
-    monitoring_noc_wall:  { icon:'📊', color:'#059669', bg:'#ecfdf5', label:'NOC Wall Dashboard' }
-  };
-  var STATUS_PILL = {
-    NOT_RUN:{c:'#64748b',bg:'#f1f5f9',l:'NOT RUN'}, PASS:{c:'#16a34a',bg:'#eafaf0',l:'PASS'},
-    WARNING:{c:'#9a5b00',bg:'#fff7df',l:'WARNING'}, BLOCKED:{c:'#dc2626',bg:'#fff0f0',l:'BLOCKED'}
-  };
-  function _pill(st){ var s=STATUS_PILL[st]||STATUS_PILL.NOT_RUN; return '<span style="display:inline-flex;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:800;color:'+s.c+';background:'+s.bg+';border:1px solid '+s.c+'33;">'+s.l+'</span>'; }
-
-  var CTL = { components: [], results: {}, sysId: '' };
-  try { CTL.results = JSON.parse(localStorage.getItem('uatComponentTestResults') || '{}'); } catch(e) {}
-
-  function _loadComponents() {
-    var sys = null;
-    try {
-      var raw = JSON.parse(localStorage.getItem('uatS1_systems') || 'null') || [];
-      var list = raw.filter(function(s){ return s.status !== 'Draft'; }); if (!list.length) list = raw;
-      list.sort(function(a,b){ return new Date(b.createdAt||0) - new Date(a.createdAt||0); });
-      sys = list[0] || null;
-    } catch(e) {}
-    if (!sys) { CTL.components = []; CTL.sysId = ''; return; }
-    CTL.sysId = sys.id || sys.name || '';
-    CTL.components = (sys.components || []).map(function(c, i) {
-      var type = _deviceType(c.name);
-      return {
-        id: 'c' + i, name: c.name || ('Component ' + (i+1)), type: type,
-        sourceUrl: c.src || '', targetUrl: c.tgt || '',
-        sourceHost: _host(c.src), targetHost: _host(c.tgt),
-        port: _port(c.tgt) || _port(c.src) || '',
-        healthPath: (String(c.path||'').charAt(0) === '/') ? c.path : '/health',
-        sshUser: 'ubuntu', sshKey: '~/.ssh/id_rsa'
-      };
-    }).filter(function(c){ return c.type !== 'mobile_phone'; }); // frontend keeps the existing bench
-  }
-
-  function _resultKey(compId){ return CTL.sysId + '::' + compId; }
-  function _setStatus(comp, status) {
-    CTL.results[_resultKey(comp.id)] = { status: status, ts: new Date().toLocaleString(), name: comp.name };
-    try { localStorage.setItem('uatComponentTestResults', JSON.stringify(CTL.results)); } catch(e) {}
-    var badge = $id('uatCtlStatus-' + comp.id);
-    if (badge) badge.innerHTML = _pill(status);
-  }
-  function _getStatus(comp) { return (CTL.results[_resultKey(comp.id)] || {}).status || 'NOT_RUN'; }
-
-  /* Real server-side probe — avoids browser CORS, same endpoint the tester
-     UI already uses elsewhere in this app. */
-  function _probe(url) {
-    return fetch('/api/uat/test-proxy', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ url: url, method: 'GET', timeout: 6 })
-    }).then(function(r){ return r.json(); }).catch(function(e){ return { ok:false, error:String(e) }; });
-  }
-  function _verdictFromProbes(srcRes, tgtRes) {
-    var srcOk = srcRes && srcRes.ok && [200,204,301,302].indexOf(srcRes.status) >= 0;
-    var tgtOk = tgtRes && tgtRes.ok && [200,204,301,302].indexOf(tgtRes.status) >= 0;
-    if (!tgtOk) return 'BLOCKED';
-    if (!srcOk) return 'WARNING';
-    if (srcRes.elapsed_ms && tgtRes.elapsed_ms && tgtRes.elapsed_ms > srcRes.elapsed_ms * 1.25) return 'WARNING';
-    return 'PASS';
-  }
-  function _resultCell(res) {
-    if (!res) return '<span style="color:#94a3b8;">—</span>';
-    if (res.error) return '<span style="color:#dc2626;">' + _esc(res.error) + '</span>';
-    var ok = res.ok && [200,204,301,302].indexOf(res.status) >= 0;
-    return '<span style="font-weight:700;color:' + (ok?'#16a34a':'#dc2626') + ';">' + (res.status||'—') + '</span>'
-      + ' <span style="color:#64748b;">' + (res.elapsed_ms!=null?res.elapsed_ms+'ms':'') + '</span>';
-  }
-
-  function _runHttpStep(comp, path, termId, tableId) {
-    var term = $id(termId), table = $id(tableId);
-    var srcUrl = comp.sourceUrl ? (_scheme(comp.sourceUrl) + '://' + comp.sourceHost + (comp.port?':'+comp.port:'') + path) : '';
-    var tgtUrl = _scheme(comp.targetUrl||'http') + '://' + comp.targetHost + (comp.port?':'+comp.port:'') + path;
-    if (term) term.textContent += '\n$ probe SOURCE ' + (srcUrl||'(no source host)') + '\n$ probe TARGET ' + tgtUrl + '\n';
-    return Promise.all([ srcUrl ? _probe(srcUrl) : Promise.resolve(null), _probe(tgtUrl) ]).then(function(r) {
-      var src = r[0], tgt = r[1];
-      if (term) term.textContent += 'source: ' + JSON.stringify({status:src&&src.status, ms:src&&src.elapsed_ms, error:src&&src.error}) + '\n'
-        + 'target: ' + JSON.stringify({status:tgt&&tgt.status, ms:tgt&&tgt.elapsed_ms, error:tgt&&tgt.error}) + '\n';
-      if (table) {
-        table.style.display = '';
-        table.innerHTML = (table.innerHTML.indexOf('<thead') >= 0 ? table.innerHTML.replace(/<tbody.*<\/tbody>/s, '') : '<thead><tr><th>Test</th><th>Source</th><th>Target</th></tr></thead>')
-          + '<tbody>' + (table.querySelector('tbody')?table.querySelector('tbody').innerHTML:'')
-          + '<tr><td>' + path + '</td><td>' + _resultCell(src) + '</td><td>' + _resultCell(tgt) + '</td></tr></tbody>';
-      }
-      var v = _verdictFromProbes(src, tgt);
-      _setStatus(comp, v);
-      return v;
-    });
-  }
-  window.uatCtlRunTest = function(compId, kind) {
-    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
-    var termId = 'uatCtlTerm-'+compId, tableId = 'uatCtlTable-'+compId;
-    var term = $id(termId); if (term) term.style.display = '';
-    if (kind === 'health') return _runHttpStep(comp, comp.healthPath || '/health', termId, tableId);
-    if (kind === 'ready')  return _runHttpStep(comp, '/ready', termId, tableId);
-    if (kind === 'smoke')  return _runHttpStep(comp, '/', termId, tableId);
-    if (kind === 'perf') {
-      if (term) term.textContent += '\n$ perf loop (5 requests) against TARGET ' + comp.targetHost + '\n';
-      var url = _scheme(comp.targetUrl||'http') + '://' + comp.targetHost + (comp.port?':'+comp.port:'') + (comp.healthPath||'/health');
-      var times = [], errs = 0, n = 5, i = 0;
-      function next() {
-        if (i >= n) {
-          times.sort(function(a,b){return a-b;});
-          var avg = times.length ? Math.round(times.reduce(function(a,b){return a+b;},0)/times.length) : 0;
-          var p95 = times.length ? times[Math.min(times.length-1, Math.ceil(times.length*0.95)-1)] : 0;
-          var errPct = ((errs/n)*100).toFixed(0);
-          if (term) term.textContent += 'avg=' + avg + 'ms p95=' + p95 + 'ms error%=' + errPct + '\n';
-          var table = $id(tableId);
-          if (table) { table.style.display=''; table.innerHTML='<thead><tr><th colspan="3">Perf (5 req)</th></tr></thead><tbody><tr><td>avg '+avg+'ms</td><td>p95 '+p95+'ms</td><td>error '+errPct+'%</td></tr></tbody>'; }
-          _setStatus(comp, errs > 0 ? 'WARNING' : 'PASS');
-          return;
-        }
-        i++;
-        _probe(url).then(function(res) {
-          if (res && res.ok) times.push(res.elapsed_ms||0); else errs++;
-          next();
-        });
-      }
-      next();
-      return;
-    }
-  };
-  window.uatCtlCompare = function(compId) {
-    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
-    Promise.resolve(uatCtlRunTest(compId, 'health'));
-  };
-  window.uatCtlCopyCommand = function(compId) {
-    var pre = $id('uatCtlCmd-' + compId);
-    if (!pre) return;
-    var text = pre.textContent;
-    if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function(){});
-    var status = $id('uatCtlManualStatus-' + compId);
-    if (status) status.textContent = 'Command copied — run on the tester/HAProxy host.';
-  };
-  window.uatCtlSetManualStatus = function(compId, status) {
-    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
-    _setStatus(comp, status);
-    var el = $id('uatCtlManualStatus-' + compId);
-    if (el) el.textContent = 'Marked ' + status + ' by operator at ' + new Date().toLocaleString() + '.';
-  };
-  window.uatCtlSaveEvidence = function(compId) {
-    var comp = CTL.components.find(function(c){ return c.id===compId; }); if (!comp) return;
-    var evidence = {
-      business_system_id: CTL.sysId, component_id: comp.id, component_name: comp.name, component_type: comp.type,
-      source_url: comp.sourceUrl, target_url: comp.targetUrl, status: _getStatus(comp),
-      terminal_log: ($id('uatCtlTerm-'+compId)||{}).textContent || '', saved_at: new Date().toISOString()
-    };
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(evidence,null,2)],{type:'application/json'}));
-    a.download = (comp.name||'component').replace(/[^a-z0-9]+/ig,'_') + '_evidence.json';
-    a.click();
-    var status = $id('uatCtlManualStatus-' + compId) || $id('uatCtlHttpStatus-' + compId);
-    if (status) status.textContent = 'Evidence saved ' + new Date().toLocaleString() + '.';
-  };
-
-  function _manualCommand(comp) {
-    var t = comp.type;
-    if (t === 'database_console') {
-      return 'SOURCE_DB_HOST="'+comp.sourceHost+'"\nTARGET_DB_HOST="'+comp.targetHost+'"\nDB_PORT="'+(comp.port||5432)+'"\n\n'
-        + 'echo "Source SELECT 1"\nPGPASSWORD="$DB_PASSWORD" psql -h "$SOURCE_DB_HOST" -p "$DB_PORT" -U "$DB_USER" -c "SELECT 1;"\n\n'
-        + 'echo "Target SELECT 1"\nPGPASSWORD="$DB_PASSWORD" psql -h "$TARGET_DB_HOST" -p "$DB_PORT" -U "$DB_USER" -c "SELECT 1;"';
-    }
-    if (t === 'cache_memory_chip') {
-      return 'SOURCE_REDIS="'+comp.sourceHost+'"\nTARGET_REDIS="'+comp.targetHost+'"\nREDIS_PORT="'+(comp.port||6379)+'"\n\n'
-        + 'redis-cli -h "$SOURCE_REDIS" -p "$REDIS_PORT" PING\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" PING\n\n'
-        + 'redis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" SET cutover:test "ok"\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" GET cutover:test\nredis-cli -h "$TARGET_REDIS" -p "$REDIS_PORT" DEL cutover:test';
-    }
-    if (t === 'queue_conveyor') {
-      return 'TARGET_HOST="'+comp.targetHost+'"\nPORT="'+(comp.port||5672)+'"\n\n'
-        + 'nc -vz "$TARGET_HOST" "$PORT"\ncurl -u "$RABBIT_USER:$RABBIT_PASS" "http://$TARGET_HOST:15672/api/queues" | jq \'.[] | {name, messages, consumers}\'';
-    }
-    if (t === 'worker_factory') {
-      return 'ssh -i "'+comp.sshKey+'" -o StrictHostKeyChecking=no "'+comp.sshUser+'@'+(comp.targetHost||'TARGET-IP')+'" \'\n'
-        + '  echo "Worker services:"; systemctl --type=service --state=running | egrep "worker|celery|cron|scheduler|batch" || true\n'
-        + '  echo "Cron entries:"; crontab -l || true\n\'';
-    }
-    if (t === 'monitoring_noc_wall') {
-      return 'ssh -i "'+comp.sshKey+'" -o StrictHostKeyChecking=no "'+comp.sshUser+'@'+(comp.targetHost||'TARGET-IP')+'" \'\n'
-        + '  uptime; free -h; df -h\n  sudo journalctl -p warning -n 80 --no-pager || true\n\'';
-    }
-    return '# no command template for this component type';
-  }
-
-  function _render() {
-    _loadComponents();
-    var count = $id('uatCtlCount'); if (count) count.textContent = CTL.components.length + ' component' + (CTL.components.length===1?'':'s');
-    var el = $id('uatCtlCards'); if (!el) return;
-    if (!CTL.components.length) { el.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;">No non-frontend components in the current business system yet.</div>'; return; }
-    el.innerHTML = CTL.components.map(function(c) {
-      var theme = THEMES[c.type] || THEMES.service_console;
-      var isHttp = !!HTTP_TYPES[c.type];
-      var status = _getStatus(c);
-      return '<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:'+theme.bg+';border-bottom:1px solid #e2e8f0;">'
-        + '<div style="display:flex;align-items:center;gap:8px;">'
-        + '<span style="font-size:16px;">'+theme.icon+'</span>'
-        + '<div><div style="font-weight:800;color:#0f172a;">'+_esc(c.name)+'</div>'
-        + '<div style="font-size:10px;color:'+theme.color+';font-weight:700;text-transform:uppercase;letter-spacing:.04em;">'+theme.label+'</div></div>'
-        + '</div>'
-        + '<div style="text-align:right;font-size:11px;color:#64748b;">'
-        + _esc(c.sourceHost||'—')+' → '+_esc(c.targetHost||'—')+(c.port?(':'+_esc(c.port)):'')
-        + '<div id="uatCtlStatus-'+c.id+'" style="margin-top:3px;">'+_pill(status)+'</div></div>'
-        + '</div>'
-        + '<div style="padding:12px 14px;">'
-        + (isHttp
-          ? ('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">'
-            + '<button class="uat-s1-btn-primary" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'health\')">Health</button>'
-            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'ready\')">Ready</button>'
-            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'smoke\')">Smoke</button>'
-            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlRunTest(\''+c.id+'\',\'perf\')">Perf</button>'
-            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlCompare(\''+c.id+'\')">Compare</button>'
-            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSaveEvidence(\''+c.id+'\')">Save Evidence</button>'
-            + '</div>'
-            + '<pre id="uatCtlTerm-'+c.id+'" style="display:none;margin:0 0 8px;background:#0f172a;color:#a5f3fc;font-size:10px;padding:8px;border-radius:6px;max-height:110px;overflow:auto;white-space:pre-wrap;"></pre>'
-            + '<table id="uatCtlTable-'+c.id+'" style="display:none;width:100%;font-size:11px;border-collapse:collapse;"></table>'
-            + '<div id="uatCtlHttpStatus-'+c.id+'" style="font-size:11px;color:#64748b;margin-top:6px;"></div>')
-          : ('<div style="font-size:11px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 10px;margin-bottom:8px;">Run on tester host — no in-app runner for this protocol yet.</div>'
-            + '<pre id="uatCtlCmd-'+c.id+'" style="margin:0 0 8px;background:#0f172a;color:#a5f3fc;font-size:10px;padding:8px;border-radius:6px;max-height:130px;overflow:auto;white-space:pre-wrap;">'+_esc(_manualCommand(c))+'</pre>'
-            + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">'
-            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlCopyCommand(\''+c.id+'\')">Copy Command</button>'
-            + '<button class="uat-s1-btn-primary" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSetManualStatus(\''+c.id+'\',\'PASS\')">Mark PASS</button>'
-            + '<button class="uat-s1-btn-soft" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSetManualStatus(\''+c.id+'\',\'WARNING\')">Mark WARNING</button>'
-            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;color:#dc2626;" onclick="uatCtlSetManualStatus(\''+c.id+'\',\'BLOCKED\')">Mark BLOCKED</button>'
-            + '<button class="uat-s1-btn-muted" style="font-size:11px;padding:5px 10px;" onclick="uatCtlSaveEvidence(\''+c.id+'\')">Save Evidence</button>'
-            + '</div>'
-            + '<div id="uatCtlManualStatus-'+c.id+'" style="font-size:11px;color:#64748b;"></div>'))
-        + '</div></div>';
-    }).join('');
-  }
-  window.uatCtlRefresh = _render;
-  if (document.readyState !== 'loading') _render();
-  else document.addEventListener('DOMContentLoaded', _render);
 })();
 </script>
 

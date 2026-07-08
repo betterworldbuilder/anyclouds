@@ -114,8 +114,10 @@
                 <!-- ── STEPS 1-4 (inside the full-page overlay) ── -->
                 <div id="uat-message" class="uat-note" style="display:none;margin-bottom:10px;">Loading UAT state...</div>
 
-                <!-- STEP 1 -->
-                <section class="uat-panel" data-uat-step="1" style="display:none;">
+                <!-- STEP 1 (relocatable: moves into Stage 4C via activateStage, same
+                     single-live-copy pattern as s5-tester-cockpit-home) -->
+                <div id="uat-s1-bizsystem-anchor" style="display:none;"></div>
+                <section class="uat-panel" id="uat-s1-bizsystem-home" data-uat-step="1" style="display:none;">
 
 <div class="uat-s1-wrap">
 
@@ -193,7 +195,7 @@
           <input id="uatLive-source-path" value="/#" placeholder="/#">
         </label>
       </div>
-      <div class="uat-live-actions">
+      <div class="uat-live-actions" id="uatLive-source-actions">
         <button type="button" onclick="uatLiveLoadMobile('source')">Load Mobile</button>
         <button type="button" onclick="uatLiveRun('source','health')">Health</button>
         <button type="button" onclick="uatLiveRun('source','ready')">Ready</button>
@@ -201,18 +203,19 @@
         <button type="button" onclick="uatLiveRun('source','summary')">Summary</button>
         <button type="button" onclick="uatLiveRun('source','recipients')">Users</button>
       </div>
-      <div class="uat-live-phone">
+      <div class="uat-live-phone" id="uatLive-source-phone">
         <div class="uat-live-notch"></div>
         <iframe id="uatLive-source-frame" title="Source mobile frontend preview" src="http://23.253.159.71:8080/#"></iframe>
+        <div class="uat-live-device-skin" id="uatLive-source-skin"></div>
       </div>
       <div class="uat-live-dev">
         <div class="uat-live-dev-head">
-          <strong>Dev View - Live Data Movement</strong>
+          <strong id="uatLive-source-devtitle">Dev View - Live Data Movement</strong>
           <span id="uatLive-source-current">Step 1: frontend loaded</span>
         </div>
         <div class="uat-live-route" id="uatLive-source-route"></div>
         <pre id="uatLive-source-log" class="uat-live-log"></pre>
-        <div class="uat-live-table-wrap">
+        <div class="uat-live-table-wrap" id="uatLive-source-tablewrap">
           <table>
             <thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>
             <tbody id="uatLive-source-rows"></tbody>
@@ -249,7 +252,7 @@
           <input id="uatLive-target-path" value="/#" placeholder="/#">
         </label>
       </div>
-      <div class="uat-live-actions">
+      <div class="uat-live-actions" id="uatLive-target-actions">
         <button type="button" onclick="uatLiveLoadMobile('target')">Load Mobile</button>
         <button type="button" onclick="uatLiveRun('target','health')">Health</button>
         <button type="button" onclick="uatLiveRun('target','ready')">Ready</button>
@@ -257,40 +260,25 @@
         <button type="button" onclick="uatLiveRun('target','summary')">Summary</button>
         <button type="button" onclick="uatLiveRun('target','recipients')">Users</button>
       </div>
-      <div class="uat-live-phone">
+      <div class="uat-live-phone" id="uatLive-target-phone">
         <div class="uat-live-notch"></div>
         <iframe id="uatLive-target-frame" title="Target mobile frontend preview" src="about:blank"></iframe>
+        <div class="uat-live-device-skin" id="uatLive-target-skin"></div>
       </div>
       <div class="uat-live-dev">
         <div class="uat-live-dev-head">
-          <strong>Dev View - Live Data Movement</strong>
+          <strong id="uatLive-target-devtitle">Dev View - Live Data Movement</strong>
           <span id="uatLive-target-current">Waiting for FLEX endpoint</span>
         </div>
         <div class="uat-live-route" id="uatLive-target-route"></div>
         <pre id="uatLive-target-log" class="uat-live-log"></pre>
-        <div class="uat-live-table-wrap">
+        <div class="uat-live-table-wrap" id="uatLive-target-tablewrap">
           <table>
             <thead><tr><th>Step</th><th>Mobile App Action</th><th>Main Component Hit First</th><th>Backend Components Used</th><th>Data Created / Read / Updated</th></tr></thead>
             <tbody id="uatLive-target-rows"></tbody>
           </table>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ══ Component Test Lab — source-vs-target test bench per component,
-       one themed device mockup per component type. The mobile phone mockup
-       above (Web Frontend) is untouched; this covers every other role. ══ -->
-  <div class="uat-s1-card">
-    <div class="uat-s1-card-head">
-      <div>
-        <div style="font-weight:800;color:#0f172a;">Component Test Lab</div>
-        <div style="font-size:12px;color:#64748b;">Run source-vs-target terminal tests for each business system component and save cutover evidence.</div>
-      </div>
-      <span class="uat-s1-pill blue" id="uatCtlCount">0 components</span>
-    </div>
-    <div class="uat-s1-card-body">
-      <div id="uatCtlCards" style="display:flex;flex-direction:column;gap:12px;"></div>
     </div>
   </div>
 
@@ -1033,8 +1021,8 @@
           display: block !important;
           gap: 0 !important;
           color: #0f172a !important;
-          width: min(100vw, 1692px) !important;
-          max-width: 1692px !important;
+          width: 80vw !important;
+          max-width: none !important;
           margin: 0 auto !important;
         }
         /* Hide hero from original DOM position — it's now inside the overlay */
@@ -1388,6 +1376,15 @@
             inset 0 0 0 1px rgba(255,255,255,.08);
           overflow: hidden;
         }
+        .uat-live-side.uat-live-side--component-mode .uat-live-dev {
+          order: 4;
+          margin-bottom: 12px;
+        }
+        .uat-live-side.uat-live-side--component-mode .uat-live-phone {
+          order: 5;
+          height: 300px;
+          width: min(100%, 360px);
+        }
         .uat-live-phone::before {
           content: "13:23";
           position: absolute;
@@ -1434,6 +1431,27 @@
           background: #13233d;
           border-radius: 38px;
         }
+        .uat-live-device-skin {
+          display: none;
+          width: 100%;
+          height: 100%;
+          border-radius: 38px;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          text-align: center;
+          padding: 28px;
+          box-sizing: border-box;
+          color: #fff;
+        }
+        .uat-live-device-skin .uat-live-device-icon { font-size: 48px; line-height: 1; }
+        .uat-live-device-skin .uat-live-device-label {
+          font-size: 15px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .uat-live-device-skin .uat-live-device-name { font-size: 13px; font-weight: 700; opacity: .95; word-break: break-word; }
+        .uat-live-device-skin .uat-live-device-hosts { font-size: 11px; opacity: .8; word-break: break-word; }
+        .uat-live-device-skin .uat-live-device-status { margin-top: 6px; }
         .uat-live-bottom-title {
           display: flex;
           align-items: center;
@@ -1644,7 +1662,7 @@
         }
         #uat-dashboard {
           width: 100% !important;
-          max-width: 1692px !important;
+          max-width: none !important;
           border: 1px solid #cbd5e1 !important;
           background: #eef3f8 !important;
           box-shadow: 0 2px 8px rgba(15,23,42,.08) !important;
@@ -2122,7 +2140,7 @@
         #perf-section .uat-stat-value { color: #1e3a6e !important; }
         #perf-section label { color: #475569 !important; }
         /* ── UAT Simple Page ─────────────────────────── */
-        .uat-page { display:flex; flex-direction:column; gap:18px; max-width:1100px; }
+        .uat-page { display:flex; flex-direction:column; gap:18px; width:100%; max-width:none; }
         .uat-section { background:rgba(30,64,130,.55); border:1px solid rgba(147,197,253,.25); border-radius:12px; overflow:hidden; }
         .uat-sec-hdr { display:flex; align-items:center; gap:10px; padding:11px 18px;
           background:rgba(20,50,110,.6); border-bottom:1px solid rgba(147,197,253,.25); }

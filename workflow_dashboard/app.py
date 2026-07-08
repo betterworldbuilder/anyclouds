@@ -3533,6 +3533,29 @@ def uat_test_proxy():
     except Exception:
         timeout = 8
     parsed = urllib.parse.urlparse(url)
+    if parsed.scheme == "tcp" and parsed.hostname and parsed.port:
+        started = time.time()
+        try:
+            import socket
+            with socket.create_connection((parsed.hostname, int(parsed.port)), timeout=timeout):
+                pass
+            return jsonify({
+                "ok": True,
+                "status": "open",
+                "reason": "TCP connection succeeded",
+                "elapsed_ms": int((time.time() - started) * 1000),
+                "url": url,
+                "method": "TCP",
+            })
+        except Exception as e:
+            return jsonify({
+                "ok": False,
+                "status": "closed",
+                "reason": str(e),
+                "elapsed_ms": int((time.time() - started) * 1000),
+                "url": url,
+                "method": "TCP",
+            }), 200
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return jsonify({"ok": False, "error": "Only absolute http/https URLs are allowed.", "url": url}), 400
     if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
@@ -3540,7 +3563,7 @@ def uat_test_proxy():
     payload = None
     req_headers = {"User-Agent": "OSPC2FLEX-UAT-Probe/1.0", "Accept": "application/json,text/plain,*/*"}
     for key, value in headers.items():
-        if str(key).lower() in {"host", "content-length"}:
+        if str(key).lower() in {"content-length"}:
             continue
         req_headers[str(key)] = str(value)
     if body is not None and method != "GET":
@@ -3571,6 +3594,7 @@ def uat_test_proxy():
             "ok": False,
             "status": int(e.code),
             "reason": getattr(e, "reason", ""),
+            "headers": dict(e.headers.items()) if getattr(e, "headers", None) else {},
             "body": raw.decode("utf-8", errors="replace"),
             "elapsed_ms": int((time.time() - started) * 1000),
             "url": url,
@@ -3584,6 +3608,123 @@ def uat_test_proxy():
             "url": url,
             "method": method,
         }), 200
+
+
+def _stage4c_header(headers, name):
+    target = str(name).lower()
+    for key, value in (headers or {}).items():
+        if str(key).lower() == target:
+            return value
+    return ""
+
+
+def _stage4c_detect_backend(headers, body=""):
+    served = _stage4c_header(headers, "X-Cutover-Backend")
+    if served:
+        return str(served).strip().upper(), ""
+    text = str(body or "").upper()
+    if "FLEX" in text:
+        return "FLEX", ""
+    if "OSPC" in text:
+        return "OSPC", ""
+    return "UNKNOWN", "No backend identity headers detected"
+
+
+@app.post("/api/stage4c/ramp/set")
+def stage4c_ramp_set():
+    data = request.get_json(silent=True) or {}
+    try:
+        flex_percent = max(0, min(100, int(data.get("flex_percent", 0))))
+    except Exception:
+        flex_percent = 0
+    ospc_percent = 100 - flex_percent
+    preview_only = bool(data.get("preview_only", True))
+    lb_host = str(data.get("lb_host") or "").strip()
+    cutover_hostname = str(data.get("cutover_hostname") or "").strip()
+    payload = {
+        "ok": True,
+        "preview_only": preview_only,
+        "flex_percent": flex_percent,
+        "ospc_percent": ospc_percent,
+        "lb_host": lb_host,
+        "cutover_hostname": cutover_hostname,
+        "message": f"{'Previewed' if preview_only else 'Recorded'} ramp {flex_percent}% FLEX / {ospc_percent}% OSPC",
+    }
+    try:
+        artifact_dir = BASE_DIR / "outputs" / "cutover"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        (artifact_dir / "stage4c_ramp_set.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return jsonify(payload)
+
+
+@app.post("/api/stage4c/ramp/proof")
+def stage4c_ramp_proof():
+    data = request.get_json(silent=True) or {}
+    cutover_hostname = str(data.get("cutover_hostname") or "").strip()
+    lb_host = str(data.get("lb_host") or "").strip()
+    path = str(data.get("path") or "/health").strip()
+    if not path.startswith("/"):
+        path = "/" + path
+    try:
+        count = max(1, min(50, int(data.get("requests", 10))))
+    except Exception:
+        count = 10
+    port = str(data.get("port") or "80").strip()
+    if not lb_host:
+        return jsonify({"ok": False, "error": "lb_host is required"}), 400
+    url = f"http://{lb_host}{(':' + port) if port else ''}{path}"
+    rows = []
+    times = []
+    summary = {"total": count, "ospc_hits": 0, "flex_hits": 0, "unknown_hits": 0, "errors": 0, "avg_latency_ms": 0, "p95_latency_ms": 0}
+    for idx in range(1, count + 1):
+        started = time.time()
+        headers = {"User-Agent": "OSPC2FLEX-Stage4C-Probe/1.0", "Accept": "application/json,text/plain,*/*"}
+        if cutover_hostname:
+            headers["Host"] = cutover_hostname
+        status = "ERR"
+        body = ""
+        resp_headers = {}
+        ok = False
+        try:
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                body = resp.read(200000).decode("utf-8", errors="replace")
+                resp_headers = dict(resp.headers.items())
+                status = int(resp.status)
+                ok = 200 <= status < 400
+        except urllib.error.HTTPError as e:
+            body = e.read(200000).decode("utf-8", errors="replace")
+            resp_headers = dict(e.headers.items()) if getattr(e, "headers", None) else {}
+            status = int(e.code)
+        except Exception as e:
+            body = str(e)
+        elapsed = int((time.time() - started) * 1000)
+        times.append(elapsed)
+        served_by, reason = _stage4c_detect_backend(resp_headers, body)
+        if served_by == "OSPC":
+            summary["ospc_hits"] += 1
+        elif served_by == "FLEX":
+            summary["flex_hits"] += 1
+        else:
+            summary["unknown_hits"] += 1
+        if not ok:
+            summary["errors"] += 1
+        rows.append({
+            "request_id": idx,
+            "http_status": status,
+            "latency_ms": elapsed,
+            "served_by": served_by,
+            "backend_ip": _stage4c_header(resp_headers, "X-Backend-IP"),
+            "backend_region": _stage4c_header(resp_headers, "X-Backend-Region"),
+            "result": "PASS" if ok else "BLOCKED",
+            "reason": reason,
+        })
+    times.sort()
+    summary["avg_latency_ms"] = int(sum(times) / len(times)) if times else 0
+    summary["p95_latency_ms"] = times[min(len(times) - 1, max(0, int((len(times) * 0.95) - 1)))] if times else 0
+    return jsonify({"ok": summary["errors"] == 0, "summary": summary, "requests": rows})
 
 
 @app.get("/api/uat/mobile-preview")
@@ -3600,9 +3741,16 @@ def uat_mobile_preview():
         return Response("Invalid preview URL. Use an absolute http/https URL.", status=400, mimetype="text/plain")
     origin = f"{parsed.scheme}://{parsed.netloc}"
     started = time.time()
+    # Optional Host header so LB/HAProxy virtual hosts (e.g. bankmobile.prod)
+    # route the preview to the real cutover app instead of a default backend.
+    host_header = str(request.args.get("host") or "").strip()
+    curl_args = ["curl", "-L", "--max-time", "8", "-sS"]
+    if host_header and re.fullmatch(r"[A-Za-z0-9._:-]+", host_header):
+        curl_args += ["-H", f"Host: {host_header}"]
+    curl_args.append(url)
     try:
         curl = subprocess.run(
-            ["curl", "-L", "--max-time", "8", "-sS", url],
+            curl_args,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=12,
