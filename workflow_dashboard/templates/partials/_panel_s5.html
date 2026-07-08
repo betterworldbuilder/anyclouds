@@ -262,7 +262,8 @@
            for stateful) plus system-level ramp/journey rows fed LIVE from
            the monitor. The full config+perf frontend test stays in the
            Cutover Tester below (section 3) — this plan links to it. -->
-      <div class="section-card" id="bstp-card">
+      <!-- 3A UI hidden (2026-07-09): duplicate of the Component Blue/Green Test + Advanced Backend Proof. Engine kept: cbg dropdown, Cutover Validation and gate publishing read this plan state. -->
+      <div class="section-card" id="bstp-card" style="display:none;">
         <div class="section-header">
           <div class="section-header-left">
             <div class="section-icon"><i class="fas fa-list-check"></i></div>
@@ -333,14 +334,19 @@
         function badTarget(t){ return !t || /^(flex-ip|tbd|todo|-+)$/i.test(String(t).trim()); }
 
         function loadScope(){
-          var scope=null;
-          try{ scope=JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope')||'null'); }catch(e){}
-          if(scope && scope.components && scope.components.length) return scope;
-          /* fallback: newest UAT system, minimally normalized */
+          var locked=null;
+          try{ locked=JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope')||'null'); }catch(e){}
+          /* Prefer the LIVE UAT store so Reload Components picks up edits made
+             after the scope was locked (the locked snapshot goes stale). */
           var raw=null;
           try{ raw=JSON.parse(localStorage.getItem('uatS1_systems')||'null'); }catch(e){}
-          if(!raw||!raw.length) return null;
-          var sys=raw.slice().sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); })[0];
+          if(!raw||!raw.length){
+            return (locked && locked.components && locked.components.length) ? locked : null;
+          }
+          var list=raw.filter(function(x){return x.status!=='Draft';}); if(!list.length) list=raw;
+          var sys=(locked && list.find(function(x){return x.id===locked.business_system_id;}))
+            || list.slice().sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); })[0];
+          if(!sys) return (locked && locked.components && locked.components.length) ? locked : null;
           return { business_system_name: sys.name, components:(sys.components||[]).map(function(c){
             var tp=typeFromRole(c.name);
             var pm=String(c.tgt||c.src||'').match(/:(\d+)(?:\/|$)/);
@@ -552,7 +558,8 @@
         }
         window.cbgFillDropdown=function(announce){
           var sel=$id('cbg-comp'); if(!sel) return;
-          if(!P.rows.length) bstpBuildPlan();
+          /* Reload button (announce=true) always rebuilds from the live store. */
+          if(announce || !P.rows.length) bstpBuildPlan();
           var comps=P.rows.filter(function(r){return r.kind==='component';});
           sel.innerHTML=comps.length?comps.map(function(r){
             return '<option value="'+P.rows.indexOf(r)+'">'+esc(r.name.length>44?r.name.slice(0,43)+'…':r.name)+' — '+cbgKind(r).toUpperCase()+'</option>';
@@ -611,6 +618,50 @@
           render(); verdict(); publishGates();
         };
 
+        function cbgAllTable(lines, total){
+          return '<table style="width:100%;border-collapse:collapse;font-size:11px;color:#e2e8f0;">'
+            + '<thead><tr style="color:#7ecfff;text-align:left;"><th style="padding:4px;">Component</th><th>Type</th><th>Blue — OSPC</th><th>Green — FLEX</th><th>Status</th></tr></thead><tbody>'
+            + lines.map(function(l){
+                var col=l.status==='PASS'?'#4ade80':(l.status==='WARNING'?'#facc15':(l.status==='FAIL'?'#f87171':'#94a3b8'));
+                return '<tr style="border-top:1px solid #1e293b;"><td style="padding:4px 6px;">'+esc(l.name.length>46?l.name.slice(0,45)+'…':l.name)+'</td><td>'+l.kind.toUpperCase()+'</td>'
+                  + '<td>'+(l.blue?(l.blue.oks+'/3 · '+l.blue.avg+'ms'):esc(l.skip||'—'))+'</td>'
+                  + '<td>'+(l.green?(l.green.oks+'/3 · '+l.green.avg+'ms'):'—')+'</td>'
+                  + '<td style="color:'+col+';font-weight:800;">'+l.status+'</td></tr>';
+              }).join('')+'</tbody></table>'
+            + '<div style="font-size:10px;color:#94a3b8;margin-top:6px;">'+lines.length+'/'+total+' tested — frontend rows are covered by the full Cut over TEST above.</div>';
+        }
+        /* Runs the blue/green probe on EVERY component (called by Cut over TEST
+           and the Test All Components button). Frontend rows are skipped —
+           the full tester covers them. */
+        window.cbgRunAll = async function(){
+          var out=$id('cbg-results'), st=$id('cbg-status');
+          bstpBuildPlan(); /* always test the CURRENT component list */
+          cbgFillDropdown();
+          var comps=P.rows.filter(function(r){return r.kind==='component';});
+          if(!comps.length){ if(st) st.textContent='No business system components — lock a scope first.'; return; }
+          if(st) st.textContent='Running blue/green tests on '+comps.length+' component(s)…';
+          var lines=[];
+          for(var i=0;i<comps.length;i++){
+            var r=comps[i], kind=cbgKind(r);
+            if(kind==='frontend'){ lines.push({name:r.name, kind:kind, skip:'full Cut over TEST above', status:'TESTER'}); }
+            else if(badTarget(r.target)||!r.source){ r.status='NEEDS INPUT'; lines.push({name:r.name, kind:kind, skip:'missing source / FLEX target', status:'NEEDS INPUT'}); }
+            else {
+              var blue=await cbgProbeSide(r,kind,r.source);
+              var green=await cbgProbeSide(r,kind,r.target);
+              var pass=green.oks===3, warn=green.oks>0&&!pass;
+              r.status=pass?'PASS':(warn?'WARNING':'FAIL');
+              r.srcRes=(blue.oks===3?'✓ ':'✗ ')+blue.oks+'/3 '+blue.avg+'ms';
+              r.tgtRes=(pass?'✓ ':(warn?'△ ':'✗ '))+green.oks+'/3 '+green.avg+'ms';
+              r.detail='Component blue/green test ('+CBG_TESTS[kind]+').';
+              lines.push({name:r.name, kind:kind, blue:blue, green:green, status:r.status});
+            }
+            if(out) out.innerHTML=cbgAllTable(lines, comps.length);
+          }
+          render(); verdict(); publishGates();
+          var fails=lines.filter(function(l){return l.status==='FAIL';}).length;
+          if(st) st.textContent='✓ All-component blue/green test finished — '+fails+' FAIL out of '+lines.length+' component(s).';
+        };
+
         function _bstpInit(){ bstpBuildPlan(); try{ window.cbgFillDropdown(); }catch(e){} }
         if(document.readyState!=='loading') _bstpInit();
         else document.addEventListener('DOMContentLoaded', _bstpInit);
@@ -624,7 +675,7 @@
             <div class="section-icon"><i class="fas fa-vial"></i></div>
             <div class="section-title-group">
               <h3>3. Cutover Test &amp; Result CSV</h3>
-              <p>Phase 1: config + perf validation — Phase 2: traffic ramp proof (50/50 → 30/70 → 0/100)</p>
+              <p>Phase 1: config + perf validation — Phase 2: traffic ramp proof (50/50 → 30/70 → 0/100). <b>Why:</b> proves the traffic-facing pair end-to-end before any live ramp; Cut over TEST also runs the blue/green probe on every other component.</p>
             </div>
           </div>
           <div class="section-actions">
@@ -634,7 +685,7 @@
         <div class="section-body">
           <div class="action-buttons-row" style="flex-wrap:wrap;gap:8px;">
             <button class="btn btn-secondary light" onclick="cutoverTesterDryRun()" title="Validate config + performance only. No HAProxy changes, no traffic touched."><i class="fas fa-flask"></i> Dry Run (Config &amp; Perf)</button>
-            <button class="btn btn-primary" onclick="cutoverTesterRun()"><i class="fas fa-play"></i> Cut over TEST</button>
+            <button class="btn btn-primary" onclick="cutoverTesterRun(); if(window.cbgRunAll) cbgRunAll();" title="Runs the full frontend Cut over TEST and the blue/green probe on every other business-system component."><i class="fas fa-play"></i> Cut over TEST</button>
             <button class="btn btn-danger" onclick="cutoverTesterStop()"><i class="fas fa-stop"></i> Stop Tester</button>
             <button class="btn btn-dark" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Test Report</button>
             <div style="display:flex;align-items:center;gap:7px;padding:5px 12px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.28);border-radius:8px;margin-left:auto;">
@@ -649,6 +700,21 @@
               <button type="button" onclick="jarvisAnnounce('Cutover test audio online, systems standing by.')" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;">Test Voice</button>
             </div>
           </div>
+          <!-- ── Component Blue/Green Test: pick any business-system component;
+               frontend keeps the full tester above, every other type gets its
+               own blue(source)/green(target) probe (HTTP for API/backend,
+               TCP for DB/cache/queue). ── -->
+          <div id="cbg-bar" style="margin:0 0 16px;padding:12px 14px;background:#0f1c2e;border:1px solid #374151;border-radius:8px;">
+            <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;text-transform:uppercase;color:#7ecfff;">Component under test
+                <select id="cbg-comp" style="min-width:280px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:6px;padding:7px 9px;font-size:12px;"></select>
+              </label>
+              <button class="btn btn-secondary" onclick="cbgRunAll()"><i class="fas fa-list-check"></i> Test All Components</button>
+              <button class="btn btn-secondary light" onclick="cbgFillDropdown(true)"><i class="fas fa-rotate"></i> Reload Components</button>
+              <span id="cbg-status" style="font-size:12px;color:#94a3b8;align-self:center;"></span>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:6px;"><b>Why:</b> every non-frontend component gets its own blue (source) / green (target) proof; the frontend keeps the full Cut over TEST above.</div>
+            <div id="cbg-results" style="margin-top:10px;"></div>
           <script>
             (function() {
               var jv = localStorage.getItem('mig_jarvis_voice');
@@ -664,20 +730,7 @@
             <span>Load Stage 2 jumphosts, then run Cut over TEST after LB/HAProxy config is ready.</span>
           </div>
 
-          <!-- ── Component Blue/Green Test: pick any business-system component;
-               frontend keeps the full tester above, every other type gets its
-               own blue(source)/green(target) probe (HTTP for API/backend,
-               TCP for DB/cache/queue). ── -->
-          <div style="margin:0 0 16px;padding:12px 14px;background:#0f1c2e;border:1px solid #374151;border-radius:8px;">
-            <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
-              <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;text-transform:uppercase;color:#7ecfff;">Component under test
-                <select id="cbg-comp" style="min-width:280px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:6px;padding:7px 9px;font-size:12px;"></select>
-              </label>
-              <button class="btn btn-primary" onclick="cbgRun()"><i class="fas fa-vial-circle-check"></i> Run Component Blue/Green Test</button>
-              <button class="btn btn-secondary light" onclick="cbgFillDropdown(true)"><i class="fas fa-rotate"></i> Reload Components</button>
-              <span id="cbg-status" style="font-size:12px;color:#94a3b8;align-self:center;"></span>
-            </div>
-            <div id="cbg-results" style="margin-top:10px;"></div>
+
           </div>
           <div id="cutover-tester-terminal-box" style="margin-bottom:16px;display:none;">
             <div style="display:flex;justify-content:space-between;background:#1a2e3b;padding:8px 12px;border-radius:8px 8px 0 0;border:1px solid #374151;border-bottom:0;">
@@ -688,15 +741,14 @@
             <div id="cutover-tester-log-output" style="height:220px;background:#000;color:#00ff00;font-family:'JetBrains Mono',monospace;font-size:12px;padding:15px;overflow-y:auto;border:1px solid #374151;border-radius:0 0 8px 8px;white-space:pre-wrap;"></div>
           </div>
           <div class="sub-section">
-            <div class="sub-section-title"><i class="fas fa-server"></i> Tester Install Target</div>
-            <p style="font-size:12px;color:#6b7280;margin-bottom:14px;">The cutover tester script is installed and run on the <strong>HAProxy server</strong> (same host used in Step 2). It can reach both OSPC and FLEX from there.</p>
-            <div id="cutover-tester-haproxy-banner" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+            <div class="sub-section-title"><i class="fas fa-server"></i> Tester Install Target <span style="font-weight:400;font-size:11px;color:#6b7280;">— runs on the HAProxy server (Step 2 host); reaches both OSPC and FLEX</span></div>
+            <div id="cutover-tester-haproxy-banner" style="background:#0f172a;border:1px solid #1e3a5f;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;font-size:11px;">
               <span style="color:#38bdf8;font-size:12px;"><i class="fas fa-network-wired" style="margin-right:6px;"></i><strong>HAProxy Host:</strong> <span id="ct-haproxy-host-display" style="font-family:'JetBrains Mono',monospace;color:#e2e8f0;">—</span></span>
               <span style="color:#94a3b8;font-size:12px;"><i class="fas fa-user" style="margin-right:6px;"></i><strong>User:</strong> <span id="ct-haproxy-user-display" style="font-family:'JetBrains Mono',monospace;color:#e2e8f0;">ubuntu</span></span>
               <span style="color:#94a3b8;font-size:12px;"><i class="fas fa-key" style="margin-right:6px;"></i><strong>Key:</strong> <span id="ct-haproxy-key-display" style="font-family:'JetBrains Mono',monospace;color:#e2e8f0;">~/.ssh/id_rsa</span></span>
               <span style="color:#94a3b8;font-size:12px;"><i class="fas fa-plug" style="margin-right:6px;"></i><strong>API:</strong> <span id="ct-haproxy-api-display" style="font-family:'JetBrains Mono',monospace;color:#86efac;">http://…:8000</span></span>
             </div>
-            <div id="cutover_tester_jumphost_status" style="font-size:12px;color:#6b7280;margin-top:8px;">Configure the HAProxy server in the LB/HAProxy section above (Step 2) — it will be used here automatically.</div>
+            <div id="cutover_tester_jumphost_status" style="font-size:11px;color:#6b7280;margin-top:6px;">HAProxy server comes from Step 2 automatically.</div>
             <!-- hidden fields kept for payload compat -->
             <input id="cutover_tester_jumphost_ip" type="hidden">
             <input id="cutover_tester_user" type="hidden" value="ubuntu">
@@ -704,8 +756,8 @@
             <input id="cutover_tester_api_url" type="hidden">
           </div>
           <div class="sub-section">
-            <div class="sub-section-title"><i class="fas fa-cogs"></i> Test Configuration</div>
-            <div class="form-grid" style="grid-template-columns:repeat(3,1fr);">
+            <div class="sub-section-title"><i class="fas fa-cogs"></i> Test Configuration <span style="font-weight:400;font-size:11px;color:#6b7280;">— auto-filled by Feed Tester / component dropdown</span></div>
+            <div class="form-grid" style="grid-template-columns:repeat(5,minmax(0,1fr));gap:8px 10px;font-size:12px;">
               <div class="form-group"><label class="form-label">Migration ID</label>
                 <input id="cutover_tester_migration_id" type="text" class="form-input" value="cutover"></div>
               <div class="form-group"><label class="form-label">Source app URL</label>
@@ -727,28 +779,32 @@
             </div>
           </div>
           <div class="sub-section">
-            <div class="sub-section-title"><i class="fas fa-chart-line"></i> 5. Performance Validation</div>
-            <div class="perf-grid">
-              <div class="perf-field"><label>OSPC AVG RESPONSE MS</label><input id="cutover_perf_ospc_avg_response_ms" type="number" step="0.01" oninput="cutoverTesterCalculatePerformance()"></div>
-              <div class="perf-field"><label>FLEX AVG RESPONSE MS</label><input id="cutover_perf_flex_avg_response_ms" type="number" step="0.01" oninput="cutoverTesterCalculatePerformance()"></div>
+            <div class="sub-section-title"><i class="fas fa-chart-line"></i> Performance Validation <span style="font-weight:400;font-size:11px;color:#6b7280;">— avg / p95 filled by Dry Run; deltas computed automatically</span></div>
+            <div class="perf-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));gap:8px 10px;">
+              <div class="perf-field"><label>OSPC AVG MS</label><input id="cutover_perf_ospc_avg_response_ms" type="number" step="0.01" oninput="cutoverTesterCalculatePerformance()"></div>
+              <div class="perf-field"><label>FLEX AVG MS</label><input id="cutover_perf_flex_avg_response_ms" type="number" step="0.01" oninput="cutoverTesterCalculatePerformance()"></div>
               <div class="perf-field"><label>OSPC P95 MS</label><input id="cutover_perf_ospc_p95_ms" type="number" step="0.01" oninput="cutoverTesterCalculatePerformance()"></div>
               <div class="perf-field"><label>FLEX P95 MS</label><input id="cutover_perf_flex_p95_ms" type="number" step="0.01" oninput="cutoverTesterCalculatePerformance()"></div>
-              <div class="perf-field"><label>TARGET CONCURRENT USERS</label><input id="cutover_perf_target_concurrent_users" type="number" min="1" max="100" value="10"></div>
-              <div class="perf-field"><label>PEAK CONCURRENT USERS TESTED</label><input id="cutover_perf_peak_concurrent_users_tested" type="number" min="1" max="100" value="25"></div>
-              <div class="perf-field"><label>ACTIVE SESSIONS TESTED</label><input id="cutover_perf_active_sessions_tested" type="number" min="1" max="100" value="10"></div>
-              <div class="perf-field"><label>API ERROR RATE PERCENT</label><input id="cutover_perf_api_error_rate_percent" type="number" step="0.01" value="0" oninput="cutoverTesterCalculatePerformance()"></div>
-              <div class="perf-field"><label>DB AVG QUERY MS</label><input id="cutover_perf_db_avg_query_ms" type="number" step="0.01"></div>
-              <div class="perf-field"><label>REPORT GENERATION SECONDS</label><input id="cutover_perf_report_generation_seconds" type="number" step="0.01"></div>
-              <div class="perf-field"><label>MOBILE APP LOAD SECONDS</label><input id="cutover_perf_mobile_app_load_seconds" type="number" step="0.01"></div>
-              <div class="perf-field"><label>MOBILE TAP RESPONSE MS</label><input id="cutover_perf_mobile_tap_response_ms" type="number" step="0.01"></div>
-              <div class="perf-field"><label>NETWORK LATENCY MS</label><input id="cutover_perf_network_latency_ms" type="number" step="0.01"></div>
-              <div class="perf-field"><label>UPLOAD MBPS</label><input id="cutover_perf_upload_mbps" type="number" step="0.01"></div>
-              <div class="perf-field"><label>DOWNLOAD MBPS</label><input id="cutover_perf_download_mbps" type="number" step="0.01"></div>
+              <div class="perf-field"><label>API ERROR RATE %</label><input id="cutover_perf_api_error_rate_percent" type="number" step="0.01" value="0" oninput="cutoverTesterCalculatePerformance()"></div>
               <div class="perf-field"><label>MOBILE LAG STATUS</label>
                 <select id="cutover_perf_mobile_lag_status" onchange="cutoverTesterCalculatePerformance()"><option>Pass</option><option>Review</option><option>Fail</option></select>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px;">
+            <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:#64748b;">More metrics (load, DB, mobile, network — optional)</summary>
+            <div class="perf-grid" style="grid-template-columns:repeat(6,minmax(0,1fr));gap:8px 10px;margin-top:8px;">
+              <div class="perf-field"><label>TARGET CONCURRENT USERS</label><input id="cutover_perf_target_concurrent_users" type="number" min="1" max="100" value="10"></div>
+              <div class="perf-field"><label>PEAK USERS TESTED</label><input id="cutover_perf_peak_concurrent_users_tested" type="number" min="1" max="100" value="25"></div>
+              <div class="perf-field"><label>ACTIVE SESSIONS</label><input id="cutover_perf_active_sessions_tested" type="number" min="1" max="100" value="10"></div>
+              <div class="perf-field"><label>DB AVG QUERY MS</label><input id="cutover_perf_db_avg_query_ms" type="number" step="0.01"></div>
+              <div class="perf-field"><label>REPORT GEN SECONDS</label><input id="cutover_perf_report_generation_seconds" type="number" step="0.01"></div>
+              <div class="perf-field"><label>MOBILE LOAD SECONDS</label><input id="cutover_perf_mobile_app_load_seconds" type="number" step="0.01"></div>
+              <div class="perf-field"><label>MOBILE TAP MS</label><input id="cutover_perf_mobile_tap_response_ms" type="number" step="0.01"></div>
+              <div class="perf-field"><label>NETWORK LATENCY MS</label><input id="cutover_perf_network_latency_ms" type="number" step="0.01"></div>
+              <div class="perf-field"><label>UPLOAD MBPS</label><input id="cutover_perf_upload_mbps" type="number" step="0.01"></div>
+              <div class="perf-field"><label>DOWNLOAD MBPS</label><input id="cutover_perf_download_mbps" type="number" step="0.01"></div>
+            </div>
+            </details>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;">
               <div class="perf-field"><label>AVG RESPONSE DELTA</label><div class="delta-value" id="cutover_perf_avg_response_delta">-</div></div>
               <div class="perf-field"><label>P95 DELTA</label><div class="delta-value" id="cutover_perf_p95_delta">-</div></div>
               <div class="perf-field"><label>PERFORMANCE STATUS</label><div class="pass-status" id="cutover_perf_performance_status" style="color:#f39c12;">REVIEW</div></div>
@@ -763,7 +819,7 @@
               </table>
             </div>
           </div>
-          <div class="artifact-list" id="cutover_tester_artifacts"><span style="color:#6b7280;">No cutover tester artifacts exported yet.</span></div>
+          <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:#64748b;">Exported artifacts</summary><div class="artifact-list" id="cutover_tester_artifacts"><span style="color:#6b7280;">No cutover tester artifacts exported yet.</span></div></details>
           <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
             <button class="btn btn-secondary light" onclick="cutoverTesterRenderResults(cutoverTesterResults)"><i class="fas fa-sync"></i> Refresh</button>
             <button class="btn btn-primary" onclick="cutoverTesterExportResultsCsv()"><i class="fas fa-file-export"></i> Export Cutover Report</button>
@@ -777,8 +833,8 @@
           <div class="section-header-left">
             <div class="section-icon"><i class="fas fa-rocket"></i></div>
             <div class="section-title-group">
-              <h3>4. Cutover Execution Cockpit</h3>
-              <p>Guided step-by-step cutover — run after Cutover TEST passes</p>
+              <h3>Cutover Live Monitor Cockpit</h3>
+              <p>Guided step-by-step cutover — run after Cutover TEST passes. <b>Why:</b> executes and tracks the real cutover once every test above is green.</p>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-right:12px;">
@@ -2883,13 +2939,7 @@
 
           <!-- HEADER BAR -->
           <div class="adv-hdr">
-            <div class="adv-hdr-left">
-              <div class="adv-hdr-logo">4</div>
-              <div>
-                <div class="adv-hdr-title">Advanced Cut over Dashboard</div>
-                <div class="adv-hdr-sub">16-step automated pipeline — run after Cutover TEST passes</div>
-              </div>
-            </div>
+            <div class="adv-hdr-left"></div>
             <div class="adv-hdr-actions">
               <button id="adv-run-btn" class="adv-hbtn adv-hbtn-red" onclick="runAdvancedCutover()" title="Run full 16-step advanced cutover pipeline"><i class="fas fa-rocket"></i> Start Advanced Cutover</button>
               <button id="adv-stop-btn" class="adv-hbtn adv-hbtn-ghost" style="display:none;" onclick="stopAdvancedCutover()"><i class="fas fa-stop"></i> Stop</button>
@@ -3072,28 +3122,9 @@
                 <div id="adv-evidence-body"><div style="color:#94a3b8;font-size:12px;">Evidence will be captured after pipeline run</div></div>
               </div>
 
-              <!-- EXECUTION LOG -->
-              <div class="adv-card adv-sec-anchor" id="adv-sec-log" style="margin-bottom:12px;">
-                <div class="adv-sec-hdr">
-                  <span class="adv-sec-title"><i class="fas fa-terminal"></i> Execution Log</span>
-                  <button onclick="document.getElementById('adv-log-output').textContent=''" style="background:transparent;border:1px solid #e2e8f0;color:#64748b;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">Clear</button>
-                </div>
-                <div class="adv-log-box"><pre id="adv-log-output" style="margin:0;font-family:'Share Tech Mono',monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap;word-break:break-all;max-height:280px;overflow-y:auto;line-height:1.6;"></pre></div>
-              </div>
-
-              <!-- CUTOVER VALIDATION BAR -->
-              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 0 4px 0;">
-                <button onclick="coListIssues()" id="adv-list-issues-btn" style="font-size:13px;padding:11px 22px;font-weight:800;letter-spacing:.3px;background:#a21919;color:#fff;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-list-ul"></i> LIST ISSUES</button>
-                <button onclick="coCutoverValidation()" style="font-size:13px;padding:11px 22px;font-weight:800;letter-spacing:.3px;background:#a21919;color:#fff;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-certificate"></i> CUT OVER VALIDATION</button>
-                <button onclick="coToggleLogs()" style="font-size:12px;padding:10px 18px;font-weight:600;background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;"><i class="fas fa-expand-alt"></i> Show Full Log</button>
-                <button onclick="cutoverTesterExportResultsCsv()" style="font-size:12px;padding:10px 18px;font-weight:600;background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;"><i class="fas fa-download"></i> Export Report</button>
-              </div>
-
-              <!-- DASHBOARD FOOTER -->
-              <div class="adv-dash-foot">
-                <div>Dashboard auto-refresh every 30s &nbsp;&nbsp; Last updated: <span id="adv-last-updated">—</span></div>
-                <div><a onclick="coAdvRefresh()"><i class="fas fa-rotate-right"></i> Refresh Now</a></div>
-              </div>
+              <!-- Execution log / validation bar / footer removed (2026-07-09).
+                   Logs still accumulate in _advRun.logs; renderers null-guard
+                   the removed adv-log-output / adv-last-updated elements. -->
 
             </div>
           </div>
@@ -3525,7 +3556,7 @@
           /* ── Business-system component selector + per-component stats
              (mirrors the UAT chart dropdowns: "Global metrics" = totals,
              or one estimate per component of the system being cut over) ── */
-          var _advCompSel = { perf:'__all__', radar:'__all__', trend:'__all__', tco:'__all__' };
+          var _advCompSelVal = '__all__'; /* one shared selector drives all four charts */
           var _ADV_PRICES = { 'general1-1':68.80,'general1-2':77.62,'general1-4':151.70,'general1-8':302.80,
             'compute1-4':86.44,'compute1-8':186.98,'compute1-15':200.00,'compute1-30':400.00,
             'gp.0.2.2':28.08,'gp.5.2.2':28.08,'gp.0.2.4':35.28,'gp.0.4.4':61.92,'gp.5.4.4':61.92,'gp.0.4.8':76.32,'gp.0.16.64':398.16 };
@@ -3571,26 +3602,27 @@
             });
             return { name:name, comps:comps };
           }
-          function _advCompDropdown(key) {
+          function _advCompDropdown() {
             var bs = _advCompList();
             if (!bs.comps.length) return '';
-            var sel = _advCompSel[key]||'__all__';
-            return '<select onchange="coAdvSelComp(\''+key+'\',this.value)" style="max-width:150px;font-size:10px;padding:2px 4px;border:1px solid #d1d5db;border-radius:5px;color:#374151;background:#fff;cursor:pointer;">'
+            var sel = _advCompSelVal||'__all__';
+            return '<select onchange="coAdvSelComp(this.value)" style="max-width:150px;font-size:10px;padding:2px 4px;border:1px solid #d1d5db;border-radius:5px;color:#374151;background:#fff;cursor:pointer;">'
               + '<option value="__all__"'+(sel==='__all__'?' selected':'')+'>Global metrics (all components)</option>'
               + bs.comps.map(function(c){ return '<option value="'+c.id+'"'+(sel===c.id?' selected':'')+'>'+_advEsc(c.name.length>34?c.name.slice(0,33)+'…':c.name)+'</option>'; }).join('')
               + '</select>';
           }
-          function _advSelComp(key) {
-            var id=_advCompSel[key];
+          function _advSelComp() {
+            var id=_advCompSelVal;
             if(id==='__all__') return null;
             return _advCompList().comps.find(function(c){return c.id===id;})||null;
           }
-          window.coAdvSelComp = function(key, val) {
-            _advCompSel[key]=val;
+          /* One shared dropdown: re-renders all four charts together. */
+          window.coAdvSelComp = function(val) {
+            _advCompSelVal=val;
             var d=_advData();
-            if (key==='perf') _advRenderPerfComp(d.perf);
-            else if (key==='tco') _advRenderTco();
-            else _advInitCharts(d.radar, d.trend);
+            _advRenderPerfComp(d.perf);
+            _advRenderTco();
+            _advInitCharts(d.radar, d.trend);
           };
           function _advCompNote(comp) {
             return comp ? '<div style="font-size:9px;color:#d97706;margin-bottom:4px;">Estimated for &ldquo;'+_advEsc(comp.name.length>44?comp.name.slice(0,43)+'…':comp.name)+'&rdquo; &mdash; run the Test Plan / Step 3 against this pair for live values.</div>' : '';
@@ -3604,11 +3636,10 @@
             if (bs.comps.length) {
               /* Live view: tiers built from the business system being cut over. */
               if (sysLbl) sysLbl.textContent = bs.name || '';
+              /* green = healthy (ACTIVE VM), orange = anything not proven healthy */
               function cls(c){
                 if (!c.selected) return 'adv-hn-scope';
-                if (c.vmStatus==='ERROR') return 'adv-hn-fail';
-                if (c.vmStatus==='ACTIVE') return 'adv-hn-pass';
-                return 'adv-hn-pend';
+                return c.vmStatus==='ACTIVE' ? 'adv-hn-pass' : 'adv-hn-warn';
               }
               function nodes(list){ return list.map(function(c){ return {label:c.name.length>26?c.name.slice(0,25)+'…':c.name, cls:cls(c)}; }); }
               var t1 = bs.comps.filter(function(c){return c.traffic;});
@@ -3635,9 +3666,9 @@
             var el = document.getElementById('adv-tco-chart');
             if (!el) return;
             var dd = document.getElementById('adv-dd-tco');
-            if (dd) dd.innerHTML = _advCompDropdown('tco');
+            if (dd) dd.innerHTML = '';
             var bs = _advCompList();
-            var comp = _advSelComp('tco');
+            var comp = _advSelComp();
             var src=0, tgt=0, known=0, note='';
             function price(c){
               var s=_ADV_PRICES[c.srcFlavor]||0, t=_ADV_PRICES[c.tgtFlavor]||0;
@@ -3709,9 +3740,9 @@
             var el = document.getElementById('adv-perf-comp');
             if (!el) return;
             var dd = document.getElementById('adv-dd-perf');
-            if (dd) dd.innerHTML = _advCompDropdown('perf');
+            if (dd) dd.innerHTML = _advCompDropdown(); /* the one shared selector */
             if (!perf || !perf.length) { el.innerHTML = '<div style="color:#94a3b8;font-size:11px;padding:12px 0;text-align:center;">Awaiting run</div>'; return; }
-            var comp = _advSelComp('perf'), note = '';
+            var comp = _advSelComp(), note = '';
             if (comp) {
               /* deterministic per-component estimate around the global baseline —
                  same approach as the UAT charts; Test Plan runs give live values */
@@ -3791,10 +3822,10 @@
             if (!radar) radar = _ADV_MOCK.radar;
             if (!trend) trend = _ADV_MOCK.trend;
             var ddR = document.getElementById('adv-dd-radar');
-            if (ddR) ddR.innerHTML = _advCompDropdown('radar');
+            if (ddR) ddR.innerHTML = '';
             var ddT = document.getElementById('adv-dd-trend');
-            if (ddT) ddT.innerHTML = _advCompDropdown('trend');
-            var compR = _advSelComp('radar'), compT = _advSelComp('trend');
+            if (ddT) ddT.innerHTML = '';
+            var compR = _advSelComp(), compT = compR;
             var noteR = document.getElementById('adv-radar-note');
             if (noteR) noteR.innerHTML = compR ? _advCompNote(compR) : '';
             var noteT = document.getElementById('adv-trend-note');

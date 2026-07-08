@@ -3641,14 +3641,49 @@ def stage4c_ramp_set():
     preview_only = bool(data.get("preview_only", True))
     lb_host = str(data.get("lb_host") or "").strip()
     cutover_hostname = str(data.get("cutover_hostname") or "").strip()
+    ssh_user = str(data.get("ssh_user") or "ubuntu").strip() or "ubuntu"
+    ssh_key = str(data.get("ssh_key") or "~/.ssh/id_rsa").strip() or "~/.ssh/id_rsa"
+    applied = False
+    apply_output = ""
+    if not preview_only and lb_host:
+        # Really reconfigure HAProxy — same admin-socket mechanism the Cutover
+        # Tester uses. Without this the ramp was only recorded to JSON, so the
+        # LB stayed at whatever Phase 2 last set (usually 0/100 => no OSPC).
+        remote_cmd = (
+            "printf '"
+            f"set server app_blue_green/blue_source weight {ospc_percent}\\n"
+            f"set server app_blue_green/green_flex weight {flex_percent}\\n"
+            "show servers state\\n"
+            "' | sudo socat stdio /run/haproxy/admin.sock"
+        )
+        ssh_cmd = [
+            "ssh", "-i", os.path.expanduser(ssh_key),
+            "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "ConnectTimeout=10", f"{ssh_user}@{lb_host.split(':')[0]}", remote_cmd,
+        ]
+        try:
+            proc = subprocess.run(ssh_cmd, capture_output=True, text=True, timeout=45)
+            apply_output = ((proc.stdout or "") + (proc.stderr or ""))[-2000:]
+            applied = proc.returncode == 0
+        except Exception as exc:
+            apply_output = str(exc)
+            applied = False
     payload = {
-        "ok": True,
+        "ok": True if preview_only else applied,
         "preview_only": preview_only,
+        "applied_to_haproxy": applied,
         "flex_percent": flex_percent,
         "ospc_percent": ospc_percent,
         "lb_host": lb_host,
         "cutover_hostname": cutover_hostname,
-        "message": f"{'Previewed' if preview_only else 'Recorded'} ramp {flex_percent}% FLEX / {ospc_percent}% OSPC",
+        "output": apply_output,
+        "message": (
+            f"Previewed ramp {flex_percent}% FLEX / {ospc_percent}% OSPC" if preview_only
+            else (
+                f"HAProxy weights APPLIED on {lb_host}: blue_source={ospc_percent} green_flex={flex_percent}" if applied
+                else f"HAProxy apply FAILED on {lb_host} — check SSH/socket access ({apply_output[-300:]})"
+            )
+        ),
     }
     try:
         artifact_dir = BASE_DIR / "outputs" / "cutover"

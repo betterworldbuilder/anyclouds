@@ -6451,6 +6451,16 @@ ${certContent}
         s5cBizMount.appendChild(s5cBizHome);
         s5cBizHome.style.display = 'block';
       }
+      /* Fully working UAT mobile UI (source side: action buttons, interactive
+         app iframe, compact dev view) replaces the monitor's mockup phone. */
+      var s5cPhoneMount = document.getElementById('cutoverMobileBenchS5C-uat-phone-mount');
+      var uatSrcSide = document.querySelector('#uatLiveCompareBench .uat-live-side--source')
+        || document.querySelector('.uat-live-side--source[data-uat-live-side="source"]');
+      if (s5cPhoneMount && uatSrcSide && uatSrcSide.parentNode !== s5cPhoneMount) {
+        var hint = s5cPhoneMount.querySelector('.lcv-uat-hint');
+        if (hint) hint.style.display = 'none';
+        s5cPhoneMount.appendChild(uatSrcSide);
+      }
       setTimeout(function() { try { if (typeof s5cOnActivate === 'function') s5cOnActivate(); } catch(e) {} }, 200);
     } else {
       var s5cManualHome2  = document.getElementById('s5-manual-scope-home');
@@ -6469,6 +6479,9 @@ ${certContent}
         s5cBizAnchor.parentNode.insertBefore(s5cBizHome2, s5cBizAnchor.nextSibling);
         s5cBizHome2.style.display = 'none';
       }
+      var uatBenchHome = document.getElementById('uatLiveCompareBench');
+      var movedSide = document.querySelector('.lcv-uat-mount .uat-live-side--source');
+      if (uatBenchHome && movedSide) uatBenchHome.insertBefore(movedSide, uatBenchHome.firstChild);
     }
     requestAnimationFrame(syncVisibleIframeHeights);
   if (stageId === 's7a') { try { s7aRefreshAll(); } catch(e) {} }
@@ -11326,30 +11339,19 @@ ${certContent}
   var LCV_STOPS = [0, 10, 25, 50, 75, 100];
   var LCV_STEPS = [['load','Load Mobile'],['health','Health'],['ready','Ready'],['login','Login'],['summary','Account Summary'],['users','Users API'],['transfer','Transfer Test'],['balance','Balance Refresh']];
   function cutMobPhoneHtml(id) {
-    var steps = LCV_STEPS.map(function(s){
-      return '<div class="lcv-step" id="' + id + '-cutover-result-' + s[0] + '" data-status="NOT RUN"><span>' + s[1] + '</span><b>NOT RUN</b></div>';
+    var steps = LCV_STEPS.map(function(st){
+      return '<div class="lcv-step" id="' + id + '-cutover-result-' + st[0] + '" data-status="NOT RUN"><span>' + st[1] + '</span><b>NOT RUN</b></div>';
     }).join('');
-    var actions = [['health','Health'],['ready','Ready'],['login','Login'],['summary','Summary'],['users','Users']].map(function(a){
-      return '<button type="button" onclick="cutMobRun(\'' + id + '\',\'cutover\',\'' + a[0] + '\')">' + a[1] + '</button>';
-    }).join('');
-    return '<div class="uat-live-side uat-live-side--source lcv-phone-wrap" data-uat-live-side="source">'
-      + '<div class="uat-live-head"><div><div class="uat-live-kicker">Source OSPC</div><h3>Source Mobile UI</h3><p>Validate the current production/source frontend and service path.</p></div><span class="uat-live-badge">LEFT</span></div>'
-      + '<div class="uat-live-controls">'
-      + '<label>Type<select id="' + id + '-mob-type"><option value="frontend">Frontend Mobile UI</option><option value="api">API Gateway</option><option value="backend">Backend Service</option><option value="db">Database API</option></select></label>'
-      + '<label>IP / Host<input id="' + id + '-mob-host" value="23.253.159.71" placeholder="23.253.159.71"></label>'
-      + '<label>Port<input id="' + id + '-mob-port" value="8080" placeholder="8080"></label>'
-      + '<label>Path<input id="' + id + '-mob-path" value="/#" placeholder="/#"></label>'
-      + '</div>'
-      + '<div class="uat-live-actions"><button type="button" onclick="cutMobLoadMobile(\'' + id + '\')">Load Mobile</button>' + actions + '</div>'
+    return '<div class="lcv-phone-wrap">'
+      + '<span hidden><input id="' + id + '-mob-host" value="23.253.159.71"><input id="' + id + '-mob-port" value="8080"><input id="' + id + '-mob-path" value="/#"></span>'
       + '<div class="uat-live-phone" id="' + id + '-cutover-phone">'
       +   '<div class="uat-live-notch"></div>'
       +   '<iframe id="' + id + '-cutover-frame" title="Cutover app preview" src="about:blank"></iframe>'
       +   '<div class="uat-live-device-skin" id="' + id + '-cutover-skin"></div>'
       + '</div>'
-      + '<div class="lcv-phone-block" id="' + id + '-lcv-block" hidden></div>'
       + '<div class="lcv-phone-meta" id="' + id + '-cutover-overlay"></div>'
       + '<div class="lcv-phone-steps lcv-steps-flat">' + steps + '</div>'
-      + '<div class="lcv-phone-caption">One phone = one real user path &mdash; connected only to the public cutover URL.</div>'
+      + '<div class="lcv-phone-block" id="' + id + '-lcv-block" hidden></div>'
       + '<div class="cutmob-status-strip lcv-phone-strip" id="' + id + '-cutover-strip"></div>'
       + '<span id="' + id + '-cutover-status" hidden></span>'
       + '</div>';
@@ -11527,72 +11529,95 @@ ${certContent}
       + '</div>';
   }
   function cutMobCommandBarHtml(id) {
-    var fields = [['hostname','Cutover hostname','bankmobile.prod'],['lbhost','LB / HAProxy host','23.253.159.45'],['port','Port','80'],['path','Path','/#'],['hostheader','Host header','bankmobile.prod']].map(function(f){
-      return '<label>' + f[1] + '<input id="' + id + '-cutover-' + f[0] + '" value="' + cutMobEsc(f[2]) + '" oninput="lcvSyncHeader(\'' + id + '\')"></label>';
+    var fields = [['hostname','Cutover Hostname','bankmobile.prod'],['port','Port','80'],['path','Path','/#'],['hostheader','Host Header','bankmobile.prod'],['lbhost','LB / HAProxy host','23.253.159.45']].map(function(f){
+      return '<div class="lcv-kv"><small>' + f[1] + '</small><input class="lcv-kv-in" id="' + id + '-cutover-' + f[0] + '" value="' + cutMobEsc(f[2]) + '" oninput="lcvSyncHeader(\'' + id + '\')"></div>';
     }).join('')
-      + '<label>Current ramp stage<input id="' + id + '-cutover-ramp" value="0% FLEX / 100% OSPC" readonly></label>'
-      + '<label>Expected backend<select id="' + id + '-cutover-expected"><option selected>OSPC</option><option>FLEX</option><option>Mixed</option></select></label>';
-    var buttons = [
-      ['cutMobRun(\'' + id + '\',\'cutover\',\'load\')','Load App',''],
-      ['cutMobStageRun(\'' + id + '\',\'journey\')','Run Full Mobile Journey','lcv-btn-primary'],
-      ['cutMobRun(\'' + id + '\',\'cutover\',\'login\')','Run Login Only',''],
-      ['cutMobRun(\'' + id + '\',\'cutover\',\'transfer\')','Run Transfer Only',''],
-      ['cutMobSaveEvidence(\'' + id + '\')','Save Evidence','']
-    ].map(function(b){ return '<button type="button" class="lcv-btn ' + b[2] + '" onclick="' + b[0] + '">' + b[1] + '</button>'; }).join('');
-    return '<div class="lcv-card"><div class="lcv-kicker">Mobile App Under Test</div>'
-      + '<div class="lcv-appurl" id="' + id + '-lcv-appurl">-</div>'
-      + '<div class="lcv-route">Route: DNS/LB/HAProxy &rarr; API Gateway &rarr; Backend</div>'
-      + '<div class="lcv-fields">' + fields + '</div>'
-      + '<div class="lcv-actions">' + buttons + '</div></div>';
+      + '<div class="lcv-kv"><small>Current Ramp Stage</small><input class="lcv-kv-in" id="' + id + '-cutover-ramp" value="0% FLEX / 100% OSPC" readonly></div>'
+      + '<div class="lcv-kv"><small>Expected Backend</small><select class="lcv-kv-in" id="' + id + '-cutover-expected"><option selected>OSPC</option><option>FLEX</option><option>Mixed</option></select></div>';
+    return '<div class="lcv-card"><div class="lcv-kicker"><i class="fas fa-mobile-screen" style="color:#2563eb;"></i> Mobile App Under Test</div>'
+      + '<div class="lcv-kv"><small>Full App URL</small><b class="lcv-linkish" id="' + id + '-lcv-appurl">-</b></div>'
+      + fields
+      + '<div class="lcv-stackbtns">'
+      + '<button type="button" class="lcv-btn lcv-btn-primary" onclick="cutMobStageRun(\'' + id + '\',\'journey\')">&#9654;&nbsp; Run Full Mobile Journey (gate + evidence)</button>'
+      + '</div>'
+      /* fully working UAT mobile UI (buttons + interactive app + compact dev
+         view) relocates here while Stage 4C is active — see activateStage() */
+      + '<div class="lcv-uat-mount" id="' + id + '-uat-phone-mount"><div class="lcv-uat-hint">The interactive UAT mobile UI mounts here when this stage is active.</div></div>'
+      + '<div hidden>' + cutMobPhoneHtml(id) + '</div>'
+      + '</div>';
   }
   function lcvStatTiles(pairs) {
     return pairs.map(function(p){ return '<span class="lcv-tile"><b id="' + p[0] + '">' + (p[2] || '-') + '</b><small>' + p[1] + '</small></span>'; }).join('');
   }
   function cutMobDiagnosticsHtml(id) {
-    var ramp = '<div class="lcv-card lcv-rampcard"><div class="lcv-kicker">Live Ramp Switch</div>'
-      + '<div class="lcv-rampbig"><b id="' + id + '-lcv-pendingbig">0% FLEX</b><span>pending ramp &mdash; production traffic changes only on Apply</span></div>'
-      + '<div class="lcv-slider-row"><span class="lcv-endlbl"><i class="lcv-dot lcv-b-ospc"></i>OSPC <b id="' + id + '-lcv-endospc">100%</b></span>'
-      + '<input type="range" class="lcv-slider" id="' + id + '-ramp-slider" min="0" max="5" step="1" value="0" oninput="cutMobRampSlider(\'' + id + '\', this.value)">'
-      + '<span class="lcv-endlbl"><i class="lcv-dot lcv-b-flex"></i>FLEX <b id="' + id + '-lcv-endflex">0%</b></span></div>'
-      + '<div class="lcv-ticks"><span>0%</span><span>10% Canary</span><span>25%</span><span>50%</span><span>75%</span><span>100% FLEX</span></div>'
+    var ramp = '<div class="lcv-card lcv-rampcard"><div class="lcv-kicker"><i class="fas fa-sliders" style="color:#2563eb;"></i> Traffic Ramp Switch</div>'
+      + '<div class="lcv-ramp-sub">Drag to preview traffic ramp. Apply to change LB/HAProxy weights.</div>'
+      + '<div class="lcv-rampbig" style="display:none;"><b id="' + id + '-lcv-pendingbig">0% FLEX</b><span>pending ramp</span></div>'
+      + '<div class="lcv-ramp-ends"><span class="lcv-end-ospc">OSPC <b id="' + id + '-lcv-endospc">100%</b></span><span class="lcv-end-flex">FLEX <b id="' + id + '-lcv-endflex">0%</b></span></div>'
+      + '<input type="range" class="lcv-slider lcv-slider-dots" id="' + id + '-ramp-slider" min="0" max="5" step="1" value="0" oninput="cutMobRampSlider(\'' + id + '\', this.value)">'
+      + '<div class="lcv-ticks"><span>0%</span><span>10%<br>Canary</span><span>25%</span><span>50%</span><span>75%</span><span>100%<br>FLEX</span></div>'
+      + '<div class="lcv-rampstats">'
+      + '<span><small>Current Ramp</small><b class="lcv-green" id="' + id + '-lcv-current">0% FLEX</b></span>'
+      + '<span><small>Pending Ramp</small><b class="lcv-green" id="' + id + '-lcv-pending">0% FLEX</b></span>'
+      + '<span><small>OSPC Weight</small><b class="lcv-blue" id="' + id + '-lcv-wospc">100%</b></span>'
+      + '<span><small>FLEX Weight</small><b class="lcv-green" id="' + id + '-lcv-wflex">0%</b></span>'
+      + '<span><small>Last Applied</small><b id="' + id + '-lcv-applied">-</b><small>by <span id="' + id + '-lcv-appliedby">-</span></small></span>'
+      + '</div>'
       + '<label class="lcv-check"><input type="checkbox" id="' + id + '-ramp-auto"> Run mobile journey automatically after ramp apply</label>'
-      + '<div class="lcv-actions"><button type="button" class="lcv-btn" onclick="cutMobPreviewRamp(\'' + id + '\')">Preview Ramp</button>'
-      + '<button type="button" class="lcv-btn lcv-btn-primary" id="' + id + '-lcv-applybtn" onclick="cutMobApplyRamp(\'' + id + '\')">Apply Ramp</button>'
-      + '<button type="button" class="lcv-btn lcv-btn-amber" onclick="cutMobHoldRamp(\'' + id + '\')">Hold</button>'
-      + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">Rollback to OSPC</button>'
-      + '<button type="button" class="lcv-btn" onclick="cutMobPromoteRamp(\'' + id + '\')">Promote to 100% FLEX</button></div>'
-      + '<div class="lcv-stats lcv-stats6">' + lcvStatTiles([[id + '-lcv-current','Current ramp','0% FLEX'],[id + '-lcv-pending','Pending ramp','0% FLEX'],[id + '-lcv-wospc','Source OSPC weight','100%'],[id + '-lcv-wflex','Target FLEX weight','0%'],[id + '-lcv-applied','Last applied','-'],[id + '-lcv-appliedby','Applied by','-']]) + '</div>'
+      + '<label class="lcv-check">Ramp proof connections&nbsp;<select id="' + id + '-ramp-conns" onchange="var b=el(\'' + id + '-batch-count\'); if(b) b.value=this.value;"><option>5</option><option selected>10</option><option>20</option><option>50</option></select></label>'
+      + '<div class="lcv-actions"><button type="button" class="lcv-btn lcv-btn-blueline" onclick="cutMobPreviewRamp(\'' + id + '\')">&#128065; Preview Ramp</button>'
+      + '<button type="button" class="lcv-btn lcv-btn-primary" id="' + id + '-lcv-applybtn" onclick="cutMobApplyRamp(\'' + id + '\')">&#10003; Apply Ramp</button>'
+      + '<button type="button" class="lcv-btn lcv-btn-amber" onclick="cutMobHoldRamp(\'' + id + '\')">&#10073;&#10073; Hold</button>'
+      + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">&#8634; Rollback to OSPC</button></div>'
       + '<div class="lcv-reason" id="' + id + '-lcv-rampmsg"></div></div>';
-    var traffic = '<div class="lcv-card"><div class="lcv-kicker">Live Traffic Mix <em>last 60 s</em></div>'
+    var traffic = '<div class="lcv-card"><div class="lcv-kicker"><i class="fas fa-chart-column" style="color:#2563eb;"></i> Live Traffic Mix <em>(Last 60 Seconds)</em></div>'
+      + '<div class="lcv-mix-grid">'
+      + '<div class="lcv-mix-legend">'
+      + '<div class="lcv-mix-row"><i class="lcv-dot lcv-b-ospc"></i>OSPC Source <span class="lcv-mix-req"><b id="' + id + '-lcv-rospc">0</b> requests</span><b class="lcv-mix-pct" id="' + id + '-lcv-tospc">0%</b></div>'
+      + '<div class="lcv-mix-row"><i class="lcv-dot lcv-b-flex"></i>FLEX Target <span class="lcv-mix-req"><b id="' + id + '-lcv-rflex">0</b> requests</span><b class="lcv-mix-pct" id="' + id + '-lcv-tflex">0%</b></div>'
+      + '<div class="lcv-mix-row"><i class="lcv-dot lcv-b-unk"></i>Unknown <span class="lcv-mix-req"><b id="' + id + '-lcv-runk">0</b> requests</span><b class="lcv-mix-pct" id="' + id + '-lcv-tunk">0%</b></div>'
+      + '</div>'
+      + '<div class="lcv-mix-kv">'
+      + '<div><small>HTTP 2xx</small><b id="' + id + '-lcv-h2" style="color:#15803d;">0</b></div>'
+      + '<div><small>HTTP 4xx</small><b id="' + id + '-lcv-h4">0</b></div>'
+      + '<div><small>HTTP 5xx</small><b id="' + id + '-lcv-h5">0</b></div>'
+      + '<div><small>Error Rate</small><b id="' + id + '-lcv-err" style="color:#15803d;">0%</b></div>'
+      + '<div><small>Avg Latency</small><b id="' + id + '-lcv-avg">-</b></div>'
+      + '<div><small>P95 Latency</small><b id="' + id + '-lcv-p95">-</b></div>'
+      + '</div></div>'
       + '<div class="lcv-bigbar" id="' + id + '-lcv-trafficbar"><i class="lcv-b-ospc" style="width:100%"></i><i class="lcv-b-flex" style="width:0%"></i><i class="lcv-b-unk" style="width:0%"></i></div>'
-      + '<div class="lcv-barleg"><span><i class="lcv-dot lcv-b-ospc"></i>OSPC <b id="' + id + '-lcv-tospc">0%</b></span><span><i class="lcv-dot lcv-b-flex"></i>FLEX <b id="' + id + '-lcv-tflex">0%</b></span><span><i class="lcv-dot lcv-b-unk"></i>UNKNOWN <b id="' + id + '-lcv-tunk">0%</b></span></div>'
-      + '<div class="lcv-stats lcv-stats9">' + lcvStatTiles([[id + '-lcv-rospc','OSPC requests','0'],[id + '-lcv-rflex','FLEX requests','0'],[id + '-lcv-runk','Unknown requests','0'],[id + '-lcv-h2','HTTP 2xx','0'],[id + '-lcv-h4','HTTP 4xx','0'],[id + '-lcv-h5','HTTP 5xx','0'],[id + '-lcv-err','Error rate','0%'],[id + '-lcv-avg','Avg latency','-'],[id + '-lcv-p95','P95 latency','-']]) + '</div>'
       + '<div class="lcv-drift" id="' + id + '-lcv-drift" data-status="OK">Expected FLEX 0% &middot; Observed 0% &middot; Drift 0% &middot; OK</div></div>';
-    var proof = '<div class="lcv-card"><div class="lcv-kicker">10 Connection Proof</div>'
-      + '<div class="lcv-actions lcv-proofctl"><label>Requests<select id="' + id + '-batch-count"><option>5</option><option selected>10</option><option>20</option><option>50</option></select></label><label>Path<input id="' + id + '-batch-path" value="/health"></label><button type="button" class="lcv-btn lcv-btn-primary" onclick="cutMobRunBatch(\'' + id + '\')">Run Batch Test</button><button type="button" class="lcv-btn" onclick="cutMobClearBatch(\'' + id + '\')">Clear</button></div>'
+    var proof = '<div class="lcv-card"><div class="lcv-kicker"><i class="fas fa-diagram-project" style="color:#2563eb;"></i> 10 Connection Proof</div>'
+      + '<div class="lcv-actions lcv-proofctl" style="margin-top:0;"><label>Requests<select id="' + id + '-batch-count"><option>5</option><option selected>10</option><option>20</option><option>50</option></select></label><label>Path<input id="' + id + '-batch-path" value="/health"></label><button type="button" class="lcv-btn lcv-btn-primary" onclick="cutMobRunBatch(\'' + id + '\')">Run Batch Test</button><button type="button" class="lcv-btn" onclick="cutMobClearBatch(\'' + id + '\')">Clear</button></div>'
       + '<div class="cutmob-summary" id="' + id + '-batch-summary">' + ['Total Requests','OSPC Hits','FLEX Hits','Unknown Hits','Errors','Avg Latency','P95 Latency'].map(function(x){return '<span><b>0</b><small>' + x + '</small></span>';}).join('') + '</div>'
       + '<div class="cutmob-dist" id="' + id + '-batch-dist"><span>OSPC 0</span><i style="width:0%"></i><span>FLEX 0</span><i style="width:0%"></i><span>UNKNOWN 0</span></div>'
-      + '<details class="lcv-adv-sub"><summary>Individual requests</summary><div class="uat-table-wrap"><table class="uat-table cutmob-req-table"><thead><tr><th>#</th><th>HTTP Status</th><th>Response Time</th><th>Served By</th><th>Backend IP</th><th>Backend Region</th><th>Result</th></tr></thead><tbody id="' + id + '-batch-rows"><tr><td colspan="7">No batch run yet.</td></tr></tbody></table></div></details></div>';
-    var identity = '<div class="lcv-card"><div class="lcv-kicker">Backend Identity <span class="lcv-pill" id="' + id + '-header-warning">Header Detection Missing</span></div>'
-      + '<div class="lcv-served" id="' + id + '-lcv-served" data-val="UNKNOWN">UNKNOWN</div>'
-      + '<div class="lcv-stats lcv-stats6">' + lcvStatTiles([[id + '-lcv-id-ip','Backend IP','-'],[id + '-lcv-id-region','Backend Region','-'],[id + '-lcv-id-app','App Server','-'],[id + '-lcv-id-conf','Identity confidence','UNKNOWN'],[id + '-lcv-id-status','Identity status','NOT RUN'],[id + '-lcv-id-ramp','X-Ramp-Stage','-']]) + '</div>'
-      + '<div class="lcv-hdrchk" id="' + id + '-lcv-hdrchk"></div>'
-      + '<div class="lcv-reason" id="' + id + '-lcv-idmsg"></div></div>';
-    var gate = '<div class="lcv-card"><div class="lcv-kicker">Mobile Journey Gate</div>'
+      + '<details class="lcv-adv-sub"><summary>View Request Details</summary><div class="uat-table-wrap"><table class="uat-table cutmob-req-table"><thead><tr><th>#</th><th>HTTP Status</th><th>Response Time</th><th>Served By</th><th>Backend IP</th><th>Backend Region</th><th>Result</th></tr></thead><tbody id="' + id + '-batch-rows"><tr><td colspan="7">No batch run yet.</td></tr></tbody></table></div></details></div>';
+    var identity = '<div class="lcv-card"><div class="lcv-kicker"><i class="fas fa-shield-halved" style="color:#2563eb;"></i> Backend Identity <span class="lcv-pill" id="' + id + '-header-warning">Header Detection Missing</span></div>'
+      + '<div class="lcv-id-grid">'
+      + '<div class="lcv-id-kv">'
+      + '<div class="lcv-kv"><small>Served By</small><b class="lcv-served-chip" id="' + id + '-lcv-served" data-val="UNKNOWN">UNKNOWN</b></div>'
+      + '<div class="lcv-kv"><small>Backend IP</small><b id="' + id + '-lcv-id-ip">-</b></div>'
+      + '<div class="lcv-kv"><small>Backend Region</small><b id="' + id + '-lcv-id-region">-</b></div>'
+      + '<div class="lcv-kv"><small>App Server</small><b id="' + id + '-lcv-id-app">-</b></div>'
+      + '<div class="lcv-kv"><small>Identity Status</small><b class="lcv-amber-chip" id="' + id + '-lcv-id-status">NOT RUN</b></div>'
+      + '<div class="lcv-kv"><small>Identity Confidence</small><b class="lcv-amber-chip" id="' + id + '-lcv-id-conf">UNKNOWN</b></div>'
+      + '<div class="lcv-kv"><small>X-Ramp-Stage</small><b id="' + id + '-lcv-id-ramp">-</b></div>'
+      + '</div>'
+      + '<div><div class="lcv-id-subhead">Header Detection</div><div class="lcv-hdrchk" id="' + id + '-lcv-hdrchk"></div></div>'
+      + '</div>'
+      + '<div class="lcv-reason lcv-idbanner" id="' + id + '-lcv-idmsg"></div></div>';
+    var gate = '<div class="lcv-card"><div class="lcv-kicker"><i class="fas fa-list-check" style="color:#2563eb;"></i> Mobile Journey Gate</div>'
       + '<div class="lcv-gatelist" id="' + id + '-lcv-gate"></div>'
-      + '<div class="lcv-reason" id="' + id + '-lcv-gatereason">No mobile journey run yet.</div></div>';
-    var timeline = '<div class="lcv-card"><div class="lcv-kicker">Evidence Timeline</div>'
+      + '<div class="lcv-gatefoot"><span class="lcv-gatefoot-lbl">Gate Status:</span>'
+      + '<span class="lcv-reason" id="' + id + '-lcv-gatereason" style="flex:1;margin-top:0;">No mobile journey run yet.</span>'
+      + '<button type="button" class="lcv-btn" style="padding:5px 10px;font-size:11px;" onclick="var d=el(\'' + id + '-adv-results\'); if(d){ d.open=true; d.scrollIntoView({behavior:\'smooth\'}); }">Details</button></div></div>';
+    var timeline = '<div class="lcv-card"><div class="lcv-kicker"><i class="fas fa-clock" style="color:#2563eb;"></i> Evidence Timeline</div>'
       + '<div class="uat-table-wrap lcv-tl-wrap"><table class="uat-table lcv-tl-table">'
       + '<thead><tr><th>Time</th><th>Event</th><th>Ramp</th><th>Served By</th><th>Status</th><th>Latency</th><th>HTTP</th><th>Evidence</th></tr></thead>'
       + '<tbody id="' + id + '-lcv-timeline"><tr class="lcv-tl-empty"><td colspan="8">No events yet. Load the app or apply a ramp to begin.</td></tr></tbody></table></div>'
       + '<div class="cutmob-evidence-row"><button type="button" class="lcv-btn" onclick="cutMobSaveEvidence(\'' + id + '\')">Save Evidence</button><span id="' + id + '-evidence-last">No evidence saved yet.</span></div>'
-      + '<details class="lcv-adv-sub"><summary>View raw command / terminal output</summary><pre id="' + id + '-terminal" class="uat-live-log lcv-term"></pre></details></div>';
-    var advanced = '<details class="lcv-card lcv-advanced"><summary>Advanced Details &mdash; direct backend proofs, header inspector, full tables &amp; logs</summary>'
-      + '<details class="lcv-adv-sub"><summary>Direct Source Proof / Direct FLEX Proof</summary><div class="cutmob-backend-grid">' + cutMobBackendPanelHtml(id, 'source', 'Source OSPC Backend Test', '#2563eb') + cutMobBackendPanelHtml(id, 'target', 'Target FLEX Backend Test', '#16a34a') + '</div></details>'
-      + '<details class="lcv-adv-sub"><summary>Header Inspector full details</summary><div class="cutmob-header-grid" id="' + id + '-header-grid"></div><textarea id="' + id + '-header-raw" readonly>No response captured yet.</textarea></details>'
-      + '<details class="lcv-adv-sub"><summary>Last 10 requests</summary><div class="uat-table-wrap"><table class="uat-table cutmob-req-table"><thead><tr><th>Time</th><th>Path</th><th>Status</th><th>Latency</th><th>Served By</th><th>Backend IP</th></tr></thead><tbody id="' + id + '-last-rows"><tr><td colspan="6">No requests yet.</td></tr></tbody></table></div></details>'
-      + '</details>';
-    return {ramp: ramp, traffic: traffic, proof: proof, identity: identity, gate: gate, timeline: timeline, advanced: advanced};
+      + '<div class="lcv-tl-more"><a href="javascript:void(0)" onclick="var d=el(\'' + id + '-adv-results\'); if(d){ d.open=true; d.scrollIntoView({behavior:\'smooth\'}); }">View All Evidence &#8599;</a></div></div>';
+    return {ramp: ramp, traffic: traffic, proof: proof, identity: identity, gate: gate, timeline: timeline};
   }
   function cutMobBenchHtml(id, label) {
     var rows = ['Load Mobile','Health','Ready','Login','Summary','Users','Transfer Test','Balance Refresh','Ramp Proof','API Gateway','API Server','Database','Cache','Queue','Workers','Monitoring'].map(function(r){
@@ -11600,29 +11625,44 @@ ${certContent}
       return '<tr data-cutmob-row="' + key + '"><td>' + r + '</td><td data-col="source">-</td><td data-col="cutover">-</td><td data-col="target">-</td><td data-col="served">-</td><td data-col="latency">-</td><td data-col="status">NOT RUN</td><td data-col="evidence">-</td></tr>';
     }).join('');
     var cards = cutMobDiagnosticsHtml(id);
-    var head = '<div class="lcv-card lcv-header"><div class="lcv-header-top"><div><div class="lcv-title">' + cutMobEsc(label) + ' &mdash; Live Mobile Cutover Monitor <span class="lcv-live-pill">&#9679; LIVE</span></div><div class="lcv-sub">Validate the real mobile app URL while traffic ramps from Source OSPC to Target FLEX.</div></div>'
+    var head = '<div class="lcv-card lcv-header"><div class="lcv-header-top"><div><div class="lcv-title">' + cutMobEsc(label) + ' &mdash; Lean Live Cutover Monitor <span class="lcv-live-pill">&#9679; LIVE</span></div><div class="lcv-sub">Proof that the mobile app stays healthy while traffic moves from Source OSPC to Target FLEX.</div></div>'
       + '<div class="lcv-decision-row"><span class="lcv-decision-lbl">Decision:</span>'
       + '<div class="lcv-decision" id="' + id + '-lcv-decision" data-val="HOLD">HOLD</div>'
       + '<span class="lcv-decision-reason" id="' + id + '-lcv-hd-reason"></span>'
-      + '<button type="button" class="lcv-btn" onclick="lcvWhyHold(\'' + id + '\')">Why Hold?</button>'
-      + '<span class="lcv-hd-upd">Last Updated: <b id="' + id + '-lcv-hd-upd2">-</b> <em class="lcv-live-pill">&#9679; LIVE</em></span>'
-      + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">&#8630; Rollback to OSPC</button></div></div>'
-      + '<div class="lcv-header-grid">' + [['hd-url','App URL'],['hd-lb','LB / HAProxy'],['hd-hh','Host header'],['hd-ramp','Current ramp'],['hd-obs','Observed traffic'],['hd-rb','Rollback'],['hd-upd','Last updated']].map(function(c){
-        return '<span class="lcv-hcell"><small>' + c[1] + '</small><b id="' + id + '-lcv-' + c[0] + '">-</b></span>';
-      }).join('') + '</div></div>';
+      + '<button type="button" class="lcv-btn" onclick="lcvWhyHold(\'' + id + '\')">Why?</button>'
+      + '<span class="lcv-hd-upd">Last Updated: <b id="' + id + '-lcv-hd-upd2">-</b></span>'
+      + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">&#8630;</button></div></div>'
+      + '<div class="lcv-kpis">'
+      + '<span class="lcv-kpi"><i class="fas fa-arrow-trend-up lcv-kpi-ic" style="color:#2563eb;background:#eff6ff;"></i><span><small>Current Ramp</small><b class="lcv-blue" id="' + id + '-lcv-hd-ramp">-</b></span></span>'
+      + '<span class="lcv-kpi"><i class="fas fa-chart-line lcv-kpi-ic" style="color:#16a34a;background:#f0fdf4;"></i><span><small>Observed Traffic</small><b class="lcv-green" id="' + id + '-lcv-hd-obs">-</b></span></span>'
+      + '<span class="lcv-kpi"><i class="fas fa-shield-halved lcv-kpi-ic" style="color:#0d9488;background:#f0fdfa;"></i><span><small>Rollback Ready</small><b class="lcv-green" id="' + id + '-lcv-hd-rb">-</b></span></span>'
+      + '<span class="lcv-kpi"><i class="fas fa-clock lcv-kpi-ic" style="color:#475569;background:#f8fafc;"></i><span><small>Last Updated</small><b id="' + id + '-lcv-hd-upd">-</b></span></span>'
+      + '</div>'
+      + '<div class="lcv-strip">'
+      + '<span class="lcv-hcell"><i class="fas fa-globe lcv-strip-ic"></i><span><small>App URL</small><b class="lcv-linkish" id="' + id + '-lcv-hd-url">-</b></span></span>'
+      + '<span class="lcv-hcell"><i class="fas fa-server lcv-strip-ic"></i><span><small>Host Header</small><b id="' + id + '-lcv-hd-hh">-</b></span></span>'
+      + '<span class="lcv-hcell"><i class="fas fa-network-wired lcv-strip-ic"></i><span><small>LB / HAProxy Host</small><b id="' + id + '-lcv-hd-lb">-</b></span></span>'
+      + '<span class="lcv-hcell"><i class="fas fa-route lcv-strip-ic"></i><span><small>Route</small><b>DNS &rarr; LB/HAProxy &rarr; API Gateway &rarr; Backend</b></span></span>'
+      + '<span class="lcv-hcell"><i class="fas fa-link lcv-strip-ic"></i><span><small>Cutover Pair</small><b>OSPC source &rarr; FLEX target</b></span></span>'
+      + '</div></div>';
     var gates = '<div class="cutmob-gates"><span id="' + id + '-gate-component" data-status="NOT RUN">Component Health Gate: NOT RUN</span><span id="' + id + '-gate-database" data-status="NOT RUN">Database Gate: NOT RUN</span><span id="' + id + '-gate-cache" data-status="NOT RUN">Cache Gate: NOT RUN</span><span id="' + id + '-gate-queue" data-status="NOT RUN">Queue Gate: NOT RUN</span><span id="' + id + '-gate-worker" data-status="NOT RUN">Worker Gate: NOT RUN</span><span id="' + id + '-gate-business" data-status="NOT RUN">Business Validation Gate: NOT RUN</span><span id="' + id + '-gate-ramp" data-status="NOT RUN">Traffic Ramp Gate: NOT RUN</span><span id="' + id + '-gate-evidence" data-status="NOT RUN">Evidence Gate: NOT RUN</span></div>';
-    return '<div class="cutmob-bench lcv-bench" id="' + id + '" data-cutmob-stage="' + label + '">'
-      + head
-      + '<div class="lcv-main"><div class="lcv-col-phone">' + cutMobPhoneHtml(id) + '</div>'
-      + '<div class="lcv-col-cards">' + cutMobCommandBarHtml(id) + cards.ramp + cards.traffic + cards.proof + cards.timeline + advancedWrap() + '</div></div>'
-      + '<details class="lcv-card lcv-advanced"><summary>Dev View &mdash; Live Data Movement (Source OSPC / Target FLEX)</summary>'
-      + '<div class="lcv-devpair" style="margin-top:12px;">' + lcvDevViewHtml(id, 'source') + lcvDevViewHtml(id, 'target') + '</div>'
+    var advanced = '<div class="lcv-adv-stack">'
+      + '<details class="lcv-card lcv-advanced"><summary>Advanced Backend Proof</summary><div class="cutmob-backend-grid" style="margin-top:10px;">' + cutMobBackendPanelHtml(id, 'source', 'Source OSPC Backend Test', '#2563eb') + cutMobBackendPanelHtml(id, 'target', 'Target FLEX Backend Test', '#16a34a') + '</div></details>'
+      + '<details class="lcv-card lcv-advanced"><summary>Header Inspector</summary><div class="cutmob-header-grid" id="' + id + '-header-grid"></div><textarea id="' + id + '-header-raw" readonly>No response captured yet.</textarea></details>'
+      + '<details class="lcv-card lcv-advanced"><summary>Raw Terminal Logs</summary><pre id="' + id + '-terminal" class="uat-live-log lcv-term"></pre></details>'
+      + '<details class="lcv-card lcv-advanced" id="' + id + '-adv-results"><summary>Full Result Table</summary>' + gates
+      + '<div class="uat-table-wrap cutmob-results"><table class="uat-table"><thead><tr><th>Test</th><th>Source Backend</th><th>Cutover Mobile UI</th><th>Target Backend</th><th>Served By</th><th>Latency</th><th>Status</th><th>Evidence</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<details class="lcv-adv-sub"><summary>Last 10 requests</summary><div class="uat-table-wrap"><table class="uat-table cutmob-req-table"><thead><tr><th>Time</th><th>Path</th><th>Status</th><th>Latency</th><th>Served By</th><th>Backend IP</th></tr></thead><tbody id="' + id + '-last-rows"><tr><td colspan="6">No requests yet.</td></tr></tbody></table></div></details>'
       + '</details>'
       + '</div>';
-    function advancedWrap() {
-      var extra = '<details class="lcv-adv-sub"><summary>Full result table</summary><div class="uat-table-wrap cutmob-results"><table class="uat-table"><thead><tr><th>Test</th><th>Source Backend</th><th>Cutover Mobile UI</th><th>Target Backend</th><th>Served By</th><th>Latency</th><th>Status</th><th>Evidence</th></tr></thead><tbody>' + rows + '</tbody></table></div></details><details class="lcv-adv-sub"><summary>Gate status chips</summary>' + gates + '</details>';
-      return cards.advanced.replace(/<\/details>$/, extra + '</details>');
-    }
+    return '<div class="cutmob-bench lcv-bench" id="' + id + '" data-cutmob-stage="' + label + '">'
+      + head
+      + '<div class="lcv-live">'
+      + '<div class="lcv-col">' + cutMobCommandBarHtml(id) + '</div>'
+      + '<div class="lcv-col">' + cards.ramp + cards.timeline + '</div>'
+      + '<div class="lcv-col">' + cards.traffic + cards.proof + '<div class="lcv-midrow">' + cards.identity + cards.gate + '</div>' + advanced + '</div>'
+      + '</div>'
+      + '</div>';
   }
   function cutMobInstallStyles() {
     if (el('cutmob-style')) return;
@@ -11632,6 +11672,10 @@ ${certContent}
     style.textContent += '.lcv-bench{font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;background:linear-gradient(180deg,#f1f5f9,#e8eef7);border:1px solid #dbe4f0;border-radius:18px;padding:18px;display:grid;gap:16px}.lcv-card{background:#fff;border:1px solid #e5eaf1;border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 28px -18px rgba(15,23,42,.25);min-width:0}.lcv-kicker{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:10px;display:flex;align-items:center;gap:8px}.lcv-kicker em{font-style:normal;font-weight:700;color:#94a3b8;text-transform:none;letter-spacing:0}.lcv-header-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.lcv-title{font-size:20px;font-weight:800;color:#0f172a}.lcv-sub{font-size:12.5px;color:#64748b;margin-top:2px}.lcv-decision{border-radius:12px;padding:10px 18px;font-size:15px;font-weight:900;letter-spacing:.04em;background:#fffbeb;border:1px solid #fcd34d;color:#92400e;white-space:nowrap}.lcv-decision[data-val="SAFE TO CONTINUE"]{background:#ecfdf5;border-color:#6ee7b7;color:#065f46}.lcv-decision[data-val="BLOCKED"],.lcv-decision[data-val="ROLLBACK REQUIRED"]{background:#fef2f2;border-color:#fca5a5;color:#991b1b}.lcv-header-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-top:14px}.lcv-hcell{background:#f8fafc;border:1px solid #eaf0f7;border-radius:10px;padding:8px 10px;min-width:0}.lcv-hcell small{display:block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8}.lcv-hcell b{display:block;font-size:12px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-main{display:grid;grid-template-columns:440px minmax(0,1fr);gap:16px;align-items:start}.lcv-col-cards{display:grid;gap:16px;min-width:0}.lcv-row3{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.lcv-appurl{font-family:ui-monospace,monospace;font-size:13px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 10px;overflow-wrap:anywhere}.lcv-route{font-size:11px;font-weight:700;color:#64748b;margin:8px 0 10px}.lcv-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}.lcv-fields label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b;display:grid;gap:3px}.lcv-fields input,.lcv-fields select{border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font-size:12px;color:#0f172a;background:#fff}.lcv-fields input:focus,.lcv-fields select:focus{outline:2px solid #93c5fd;border-color:#3b82f6}.lcv-fields input[readonly]{background:#f8fafc;color:#475569}.lcv-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:end}.lcv-btn{border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#334155;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer;transition:all .15s}.lcv-btn:hover{border-color:#94a3b8;background:#f8fafc}.lcv-btn-primary{background:linear-gradient(180deg,#3b82f6,#2563eb);border-color:#2563eb;color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.35)}.lcv-btn-primary:hover{background:linear-gradient(180deg,#2563eb,#1d4ed8)}.lcv-btn-danger{background:#fff;border-color:#fca5a5;color:#b91c1c}.lcv-btn-danger:hover{background:#fef2f2}.lcv-btn-amber{background:#fff;border-color:#fcd34d;color:#92400e}.lcv-btn[disabled]{opacity:.45;cursor:not-allowed}.lcv-rampbig{display:flex;align-items:baseline;gap:12px;margin:2px 0 10px}.lcv-rampbig b{font-size:34px;font-weight:900;color:#1d4ed8}.lcv-rampbig span{font-size:11px;color:#94a3b8;font-weight:600}.lcv-slider{width:100%;accent-color:#2563eb;height:26px}.lcv-ticks{display:flex;justify-content:space-between;font-size:10px;font-weight:800;color:#64748b;margin:2px 0 8px}.lcv-check{display:flex;gap:7px;align-items:center;font-size:12px;font-weight:700;color:#334155;margin:6px 0}.lcv-stats{display:grid;gap:8px;margin-top:12px}.lcv-stats6,.lcv-stats9{grid-template-columns:repeat(3,minmax(0,1fr))}.lcv-tile{background:#f8fafc;border:1px solid #eaf0f7;border-radius:10px;padding:8px 10px;min-width:0}.lcv-tile b{display:block;font-size:15px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-tile small{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#94a3b8}.lcv-bigbar{display:flex;height:26px;border-radius:999px;overflow:hidden;background:#e2e8f0}.lcv-bigbar i{display:block;height:100%;transition:width .4s}.lcv-b-ospc{background:#2563eb}.lcv-b-flex{background:#16a34a}.lcv-b-unk{background:#94a3b8}.lcv-barleg{display:flex;gap:16px;font-size:11px;font-weight:800;color:#475569;margin-top:8px}.lcv-dot{width:9px;height:9px;border-radius:99px;display:inline-block;margin-right:5px}.lcv-drift{margin-top:12px;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:800;background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46}.lcv-drift[data-status="WARNING"]{background:#fffbeb;border-color:#fcd34d;color:#92400e}.lcv-drift[data-status="BLOCKED"]{background:#fef2f2;border-color:#fca5a5;color:#991b1b}.lcv-served{font-size:30px;font-weight:900;color:#64748b;letter-spacing:.03em}.lcv-served[data-val="OSPC"]{color:#1d4ed8}.lcv-served[data-val="FLEX"]{color:#15803d}.lcv-pill{border:1px solid #cbd5e1;border-radius:999px;padding:3px 9px;font-size:10px;font-weight:800;color:#475569;background:#f8fafc;text-transform:none;letter-spacing:0}.lcv-reason{margin-top:10px;font-size:12px;font-weight:700;color:#64748b;min-height:16px}.lcv-reason[data-tone="bad"]{color:#b91c1c}.lcv-reason[data-tone="ok"]{color:#15803d}.lcv-reason[data-tone="warn"]{color:#92400e}.lcv-gatelist{display:grid;gap:6px}.lcv-gaterow{display:flex;justify-content:space-between;align-items:center;border:1px solid #eaf0f7;background:#f8fafc;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:700;color:#334155}.lcv-gaterow b{font-size:10px;font-weight:900;border-radius:999px;padding:3px 9px;background:#e2e8f0;color:#475569}.lcv-gaterow[data-status="PASS"] b{background:#dcfce7;color:#166534}.lcv-gaterow[data-status="FAIL"] b,.lcv-gaterow[data-status="BLOCKED"] b{background:#fee2e2;color:#991b1b}.lcv-tl{list-style:none;margin:0;padding:0;display:grid;max-height:340px;overflow:auto}.lcv-tl li{position:relative;padding:8px 8px 8px 26px;border-left:2px solid #e2e8f0;margin-left:8px;font-size:12px;color:#334155}.lcv-tl li:before{content:"";position:absolute;left:-6px;top:13px;width:10px;height:10px;border-radius:99px;background:#94a3b8;border:2px solid #fff;box-shadow:0 0 0 1px #cbd5e1}.lcv-tl li[data-tone="ok"]:before{background:#16a34a}.lcv-tl li[data-tone="bad"]:before{background:#dc2626}.lcv-tl li[data-tone="warn"]:before{background:#f59e0b}.lcv-tl b{color:#0f172a}.lcv-tl small{display:block;color:#94a3b8;font-size:10.5px}.lcv-tl-empty{color:#94a3b8;font-style:italic}.lcv-term{background:#0b1220;color:#a7f3d0;border-radius:10px;padding:12px;min-height:80px;max-height:240px;overflow:auto;margin-top:8px}.lcv-advanced>summary,.lcv-adv-sub>summary{cursor:pointer;font-weight:800;font-size:12.5px;color:#475569}.lcv-adv-sub{margin-top:10px;border:1px solid #eaf0f7;border-radius:10px;padding:10px;background:#fbfdff}.lcv-proofctl label{font-size:10px;font-weight:800;text-transform:uppercase;color:#64748b;display:grid;gap:3px}.lcv-proofctl input,.lcv-proofctl select{border:1px solid #cbd5e1;border-radius:8px;padding:7px 9px;font-size:12px}.lcv-phone-wrap{display:grid;justify-items:stretch;gap:10px;align-content:start}.lcv-phone{position:relative;width:330px;height:700px;border-radius:54px;background:linear-gradient(160deg,#3a3f47,#14161a);padding:12px;box-shadow:0 30px 60px -18px rgba(15,23,42,.55),inset 0 0 0 2px #565b64,inset 0 0 0 6px #0b0d10}.lcv-phone-island{position:absolute;top:24px;left:50%;transform:translateX(-50%);width:112px;height:30px;border-radius:20px;background:#000;z-index:5}.lcv-phone-statusbar{position:absolute;top:26px;left:36px;right:36px;display:flex;justify-content:space-between;color:#fff;font-size:12px;font-weight:800;z-index:4}.lcv-phone-sig{font-size:9px;letter-spacing:1px}.lcv-phone-screen{position:relative;width:100%;height:100%;border-radius:42px;background:#f8fafc;overflow:hidden;display:flex;flex-direction:column;padding-top:56px}.lcv-phone-apphead{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;padding:10px 14px}.lcv-phone-apphead b{font-size:15px;font-weight:900}.lcv-phone-apphead span{font-size:9px;font-weight:900;border-radius:999px;padding:3px 8px;background:rgba(255,255,255,.18)}.lcv-phone-apphead span[data-status="ONLINE"]{background:#16a34a}.lcv-phone-apphead span[data-status="OFFLINE"]{background:#dc2626}.lcv-phone-url{font-family:ui-monospace,monospace;font-size:9.5px;color:#475569;background:#eef2f7;padding:5px 12px;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lcv-phone-screen iframe{width:100%;flex:0 0 200px;border:0;background:#fff}.lcv-phone-meta{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:8px 12px;font-size:10px;color:#334155;background:#fff;border-top:1px solid #eef2f7}.lcv-phone-meta span{display:flex;justify-content:space-between;gap:6px;min-width:0}.lcv-phone-meta b{color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-phone-block{margin:8px 12px 0;border-radius:10px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:11px;font-weight:800;padding:8px 10px}.lcv-phone-steps{flex:1;overflow:auto;padding:6px 12px 16px;display:grid;gap:4px;background:#f8fafc;align-content:start}.lcv-step{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #eef2f7;border-radius:8px;padding:5px 9px;font-size:10.5px;font-weight:700;color:#334155}.lcv-step b{font-size:9px;font-weight:900;border-radius:999px;padding:2px 7px;background:#e2e8f0;color:#475569}.lcv-step[data-status="PASS"] b{background:#dcfce7;color:#166534}.lcv-step[data-status="FAIL"] b,.lcv-step[data-status="BLOCKED"] b{background:#fee2e2;color:#991b1b}.lcv-step[data-status="RUNNING"] b{background:#dbeafe;color:#1d4ed8}.lcv-phone-home{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);width:120px;height:5px;border-radius:99px;background:#0f172a;opacity:.85;z-index:5}.lcv-phone-caption{font-size:11px;color:#64748b;font-weight:700;text-align:center;max-width:330px}.lcv-phone-strip{justify-content:center}@media(max-width:1250px){.lcv-main{grid-template-columns:1fr}.lcv-row3{grid-template-columns:1fr}.lcv-header-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lcv-col-phone{display:flex;justify-content:center}}';
     style.textContent += '.lcv-devpair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.lcv-devpair .uat-live-dev{margin-top:0;min-width:0}.lcv-dev--source{border-left:4px solid #2563eb;border-radius:12px}.lcv-dev--target{border-left:4px solid #16a34a;border-radius:12px}.lcv-steps-flat{grid-template-columns:1fr 1fr;background:transparent;padding:6px 0 0}.lcv-phone-wrap .lcv-phone-meta{border:1px solid #eef2f7;border-radius:10px;margin-top:8px}@media(max-width:1250px){.lcv-devpair{grid-template-columns:1fr}}';
     style.textContent += '.lcv-live-pill{display:inline-block;font-size:10px;font-weight:900;color:#15803d;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 8px;vertical-align:middle;margin-left:6px;font-style:normal}.lcv-decision-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.lcv-decision-lbl{font-size:12px;font-weight:800;color:#475569}.lcv-decision-reason{font-size:12px;font-weight:800;color:#b91c1c;max-width:320px}.lcv-hd-upd{font-size:11px;font-weight:700;color:#64748b;white-space:nowrap}.lcv-hd-upd b{color:#0f172a}.lcv-slider-row{display:flex;align-items:center;gap:10px}.lcv-endlbl{font-size:11px;font-weight:900;color:#334155;white-space:nowrap}.lcv-slider{-webkit-appearance:none!important;appearance:none;flex:1;height:14px;border-radius:999px;background:transparent!important;border:none!important;outline:none;padding:0!important}.lcv-slider::-webkit-slider-runnable-track{-webkit-appearance:none;height:14px;border-radius:999px;border:none;background:var(--lcv-fill,linear-gradient(90deg,#2563eb,#06b6d4))!important;box-shadow:inset 0 1px 3px rgba(8,51,68,.35),inset 0 0 0 1px rgba(6,182,212,.35)}.lcv-slider::-moz-range-track{height:14px;border-radius:999px;border:none;background:var(--lcv-fill,linear-gradient(90deg,#2563eb,#06b6d4))!important;box-shadow:inset 0 1px 3px rgba(8,51,68,.35)}.lcv-slider::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-6px;border-radius:99px;background:rgba(30,58,138,.72);border:2px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(30,58,138,.45),inset 0 1px 2px rgba(255,255,255,.35);backdrop-filter:blur(2px);cursor:pointer}.lcv-slider::-moz-range-thumb{width:20px;height:20px;border-radius:99px;background:rgba(30,58,138,.72);border:2px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(30,58,138,.45);cursor:pointer}.lcv-hdrchk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:10px}.lcv-hdrchk-row{display:flex;justify-content:space-between;gap:8px;border:1px solid #eaf0f7;background:#f8fafc;border-radius:8px;padding:5px 9px;font-size:11px;font-weight:700;color:#475569;min-width:0}.lcv-hdrchk-row b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lcv-hdrchk-row[data-ok="1"] b{color:#15803d}.lcv-hdrchk-row[data-ok="0"] b{color:#b91c1c}.lcv-tl-wrap{max-height:320px;overflow:auto}.lcv-tl-table{font-size:12px}.lcv-tl-table td{white-space:nowrap}.lcv-tl-table td.lcv-tl-event{white-space:normal;min-width:200px}.lcv-tl-status{font-size:10px;font-weight:900;border-radius:999px;padding:2px 8px;background:#e2e8f0;color:#475569}.lcv-tl-table tr[data-tone="ok"] .lcv-tl-status{background:#dcfce7;color:#166534}.lcv-tl-table tr[data-tone="bad"] .lcv-tl-status{background:#fee2e2;color:#991b1b}.lcv-tl-table tr[data-tone="warn"] .lcv-tl-status{background:#fef3c7;color:#92400e}.lcv-tl-view{color:#2563eb;font-weight:800;text-decoration:none}.lcv-tl-empty td{color:#94a3b8;font-style:italic}';
+    style.textContent += '.lcv-lean{display:grid;grid-template-columns:400px 1.15fr 1fr;gap:16px;align-items:start}.lcv-col{display:grid;gap:16px;min-width:0}.lcv-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.lcv-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px;min-width:0}.lcv-kpi small{display:block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8}.lcv-kpi b{display:block;font-size:16px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-routes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:10px}.lcv-fields-slim{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}.lcv-fields-slim input,.lcv-fields-slim select{padding:5px 8px;font-size:11px}.lcv-decision[data-val="CUTOVER COMPLETE"]{background:#ecfdf5;border-color:#34d399;color:#065f46}.lcv-adv-stack{display:grid;gap:10px}.lcv-adv-stack>details{padding:12px 16px}.lcv-adv-stack>details>summary{font-size:13px}.lcv-check select{border:1px solid #cbd5e1;border-radius:7px;padding:4px 7px;font-size:11px}@media(max-width:1450px){.lcv-lean{grid-template-columns:380px 1fr}}@media(max-width:1100px){.lcv-lean{grid-template-columns:1fr}.lcv-kpis,.lcv-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}';
+    style.textContent += '.lcv-live{display:grid;grid-template-columns:330px 1.35fr 1fr;gap:16px;align-items:start}.lcv-midrow{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin:16px 0;align-items:start}.lcv-strip{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.4fr 1fr 1fr .8fr;gap:10px;margin-top:14px}.lcv-kv{display:grid;grid-template-columns:130px 1fr;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px}.lcv-kv small{font-size:11px;font-weight:700;color:#64748b}.lcv-kv b{color:#0f172a;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lcv-kv-in{border:none;background:transparent;font-size:12px;font-weight:700;color:#0f172a;padding:2px 4px;border-radius:6px;width:100%}.lcv-kv-in:hover,.lcv-kv-in:focus{background:#f1f5f9;outline:1px solid #bfdbfe}.lcv-linkish{color:#1d4ed8!important;font-family:ui-monospace,monospace;font-size:11.5px}.lcv-stackbtns{display:grid;gap:7px;margin:12px 0}.lcv-stackbtns .lcv-btn{width:100%;text-align:center}.lcv-btn-blueline{border-color:#93c5fd;color:#1d4ed8;background:#fff}.lcv-btn-green{border-color:#86efac;color:#15803d;background:#fff}.lcv-btn-green:hover{background:#f0fdf4}.lcv-stats5{grid-template-columns:repeat(5,minmax(0,1fr))}.lcv-mix-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:8px 14px}.lcv-mix-row{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#334155;padding:6px 0;border-bottom:1px solid #f1f5f9}.lcv-mix-req{color:#64748b;font-weight:600;margin-left:auto}.lcv-mix-req b{color:#0f172a}.lcv-mix-pct{min-width:44px;text-align:right;color:#0f172a}.lcv-mix-kv{display:grid;gap:2px;align-content:start}.lcv-mix-kv div{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #f1f5f9}.lcv-mix-kv small{font-weight:700;color:#64748b}.lcv-mix-kv b{color:#0f172a}.lcv-id-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:8px 16px}.lcv-id-kv .lcv-kv{grid-template-columns:118px 1fr}.lcv-id-subhead{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#94a3b8;margin:4px 0 6px}.lcv-id-grid .lcv-hdrchk{grid-template-columns:1fr;margin-top:0}.lcv-served-chip{display:inline-block;padding:2px 12px;border-radius:8px;font-size:12px;font-weight:900;background:#f1f5f9;color:#475569;width:auto!important}.lcv-served-chip[data-val="FLEX"]{background:#dcfce7;color:#15803d}.lcv-served-chip[data-val="OSPC"]{background:#dbeafe;color:#1d4ed8}.lcv-amber-chip{color:#92400e!important}.lcv-idbanner{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-top:10px}.lcv-idbanner:empty{display:none}.lcv-gatefoot{display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid #f1f5f9;padding-top:10px}.lcv-gatefoot-lbl{font-size:11px;font-weight:800;color:#475569;white-space:nowrap}.lcv-adv-stack{display:grid;gap:10px}.lcv-adv-stack>details{padding:12px 16px}.lcv-adv-stack>details>summary{font-size:12.5px;font-weight:800;color:#334155}.lcv-adv-stack>details>summary em{font-style:normal;font-weight:600;color:#94a3b8}.lcv-phone-wrap{background:linear-gradient(165deg,#232a36,#0b0f18);border-radius:44px;padding:14px 12px;box-shadow:0 28px 56px -20px rgba(15,23,42,.6),inset 0 0 0 2px #3a4150}.lcv-phone-wrap .uat-live-phone{height:430px;border-radius:34px;margin-bottom:0;width:100%}.lcv-phone-wrap .lcv-phone-meta{background:#101a2e;border:1px solid #1e293b!important;color:#cbd5e1;border-radius:12px}.lcv-phone-wrap .lcv-phone-meta b{color:#fff}.lcv-phone-wrap .lcv-phone-steps{background:transparent;padding:6px 2px 2px}.lcv-phone-wrap .lcv-step{background:#101a2e;border-color:#1e293b;color:#cbd5e1}.lcv-phone-wrap .lcv-phone-block{background:#7f1d1d;border-color:#b91c1c;color:#fecaca;border-radius:12px}.lcv-phone-wrap .cutmob-status-strip span{background:#101a2e;border-color:#1e293b;color:#cbd5e1}@media(max-width:1500px){.lcv-live{grid-template-columns:320px 1fr}.lcv-live>.lcv-col:last-child{grid-column:1/-1}}@media(max-width:1100px){.lcv-live{grid-template-columns:1fr}.lcv-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.lcv-midrow{grid-template-columns:1fr}}';
+    style.textContent += '.lcv-blue{color:#1d4ed8!important}.lcv-green{color:#16a34a!important}.lcv-kpis{display:flex;justify-content:flex-end;gap:12px;margin-top:14px;flex-wrap:wrap}.lcv-kpi{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 16px;min-width:170px}.lcv-kpi-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px}.lcv-kpi small{display:block;font-size:10px;font-weight:700;color:#64748b}.lcv-kpi b{display:block;font-size:15px;color:#0f172a}.lcv-strip{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.5fr 1.1fr;gap:10px;margin-top:12px}.lcv-hcell{display:flex;align-items:center;gap:10px}.lcv-strip-ic{color:#475569;font-size:14px;width:28px;height:28px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0}.lcv-ramp-sub{font-size:12px;color:#64748b;margin:-4px 0 10px}.lcv-ramp-ends{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:2px}.lcv-end-ospc{color:#1d4ed8}.lcv-end-flex{color:#16a34a}.lcv-rampstats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid #e2e8f0;border-radius:12px;margin:12px 0 10px;overflow:hidden}.lcv-rampstats>span{padding:10px 12px;border-right:1px solid #eef2f7;min-width:0}.lcv-rampstats>span:last-child{border-right:none}.lcv-rampstats small{display:block;font-size:10px;font-weight:700;color:#64748b}.lcv-rampstats b{display:block;font-size:15px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lcv-slider-dots{-webkit-appearance:none!important;appearance:none;width:100%;height:40px;border-radius:999px;background:transparent!important;border:none!important;padding:0!important}.lcv-slider-dots::-webkit-slider-runnable-track{-webkit-appearance:none;height:36px;border-radius:999px;border:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.9) 0 6px,transparent 6px 16px),linear-gradient(90deg,#dbeafe 0%,#a7f3d0 55%,#22c55e 100%)!important;box-shadow:inset 0 1px 3px rgba(15,23,42,.12)}.lcv-slider-dots::-moz-range-track{height:36px;border-radius:999px;border:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.9) 0 6px,transparent 6px 16px),linear-gradient(90deg,#dbeafe 0%,#a7f3d0 55%,#22c55e 100%)!important;box-shadow:inset 0 1px 3px rgba(15,23,42,.12)}.lcv-slider-dots::-webkit-slider-thumb{-webkit-appearance:none;width:46px;height:46px;margin-top:-5px;border-radius:99px;background:#fff linear-gradient(#94a3b8 0 0) center/16px 2px no-repeat,#fff;background-image:linear-gradient(#94a3b8 0 0),linear-gradient(#94a3b8 0 0),linear-gradient(#94a3b8 0 0);background-size:16px 2px;background-position:center calc(50% - 5px),center,center calc(50% + 5px);background-repeat:no-repeat;background-color:#fff;border:1px solid #e2e8f0;box-shadow:0 6px 18px rgba(15,23,42,.25);cursor:grab}.lcv-slider-dots::-moz-range-thumb{width:42px;height:42px;border-radius:99px;background-color:#fff;border:1px solid #e2e8f0;box-shadow:0 6px 18px rgba(15,23,42,.25);cursor:grab}.lcv-ticks span{text-align:center;line-height:1.25}.lcv-tl-more{text-align:center;margin-top:10px;border-top:1px solid #f1f5f9;padding-top:10px}.lcv-tl-more a{color:#1d4ed8;font-size:12.5px;font-weight:800;text-decoration:none}.lcv-decision[data-val="CUTOVER COMPLETE"]{background:#fff;border:1.5px solid #34d399;color:#047857}.lcv-decision-reason{color:#15803d}.lcv-decision[data-val="HOLD"]~.lcv-decision-reason,.lcv-decision[data-val="BLOCKED"]~.lcv-decision-reason{color:#b91c1c}';
+    style.textContent += '.lcv-uat-mount{margin-top:4px}.lcv-uat-hint{font-size:11px;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:10px;padding:10px;text-align:center}.lcv-uat-mount .uat-live-side{border:none!important;box-shadow:none!important;padding:0!important;border-left:none!important}.lcv-uat-mount .uat-live-head{display:none}.lcv-uat-mount .uat-live-controls{grid-template-columns:1.2fr 1.4fr .7fr .8fr;gap:6px;margin-bottom:8px}.lcv-uat-mount .uat-live-controls label{font-size:9px}.lcv-uat-mount .uat-live-actions{gap:5px;margin-bottom:8px}.lcv-uat-mount .uat-live-actions button{padding:6px 9px;font-size:10.5px}.lcv-uat-mount .uat-live-phone{height:560px;width:100%}.lcv-uat-mount .uat-live-dev{margin-top:10px;border-radius:12px}.lcv-uat-mount .uat-live-table-wrap{max-height:220px;overflow:auto}';
     document.head.appendChild(style);
   }
   function cutMobVal(id, role, key) { var n = el(id + '-' + role + '-' + key); return n ? String(n.value || '').trim() : ''; }
@@ -11734,7 +11778,9 @@ ${certContent}
     lcvRampRender(id);
   };
   async function lcvPostRamp(id, pct, previewOnly) {
-    var resp = await fetch('/api/stage4c/ramp/set', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({flex_percent:pct, ospc_percent:100-pct, lb_host:cutMobVal(id,'cutover','lbhost'), cutover_hostname:cutMobVal(id,'cutover','hostname'), preview_only:!!previewOnly})});
+    var sshUser = (el('cutover_tester_user')||{}).value || 'ubuntu';
+    var sshKey = (el('cutover_tester_key')||{}).value || '~/.ssh/id_rsa';
+    var resp = await fetch('/api/stage4c/ramp/set', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({flex_percent:pct, ospc_percent:100-pct, lb_host:cutMobVal(id,'cutover','lbhost'), cutover_hostname:cutMobVal(id,'cutover','hostname'), ssh_user:sshUser, ssh_key:sshKey, preview_only:!!previewOnly})});
     return resp.json();
   }
   window.cutMobPreviewRamp = async function(id) {
@@ -11758,10 +11804,15 @@ ${certContent}
       var data = await lcvPostRamp(id, pct, false);
       cutMobLog(id, 'cutover', (data.ok ? 'Ramp accepted: ' : 'Ramp error: ') + (data.message || data.error || cutMobRampText(pct)));
       cutMobGate(id, 'ramp', data.ok ? 'WARNING' : 'BLOCKED');
-      st.currentRampFlexPercent = pct;
-      st.lastAppliedAt = now(); st.appliedBy = 'operator';
-      st.expectedSourcePercent = 100 - pct; st.expectedTargetPercent = pct;
-      lcvTimeline(id, 'Ramp applied: ' + cutMobRampText(pct), {status: data.ok ? 'APPLIED' : 'CHECK'}, data.ok ? 'ok' : 'warn');
+      if (data.ok) {
+        /* only trust the ramp when HAProxy really accepted the weights */
+        st.currentRampFlexPercent = pct;
+        st.lastAppliedAt = now(); st.appliedBy = 'operator';
+        st.expectedSourcePercent = 100 - pct; st.expectedTargetPercent = pct;
+        lcvTimeline(id, 'Ramp applied on HAProxy: ' + cutMobRampText(pct), {status:'APPLIED'}, 'ok');
+      } else {
+        lcvTimeline(id, 'Ramp apply FAILED on HAProxy — weights unchanged: ' + (data.message || ''), {status:'FAIL'}, 'bad');
+      }
       lcvRampRender(id);
       if ((el(id + '-ramp-auto') || {}).checked) await window.cutMobStageRun(id, 'journey');
     } catch(e) { cutMobLog(id, 'cutover', '[ramp apply error] ' + e.message); cutMobGate(id, 'ramp', 'WARNING'); lcvTimeline(id, 'Ramp apply failed: ' + e.message, {status:'FAIL'}, 'bad'); }
@@ -11826,11 +11877,14 @@ ${certContent}
     var hardFail = st.backendIdentityStatus === 'BLOCKED'
       || ['load','login','summary','transfer','balance'].some(function(k){ return j[k] === 'FAIL' || j[k] === 'BLOCKED'; })
       || (st.errorRate != null && st.errorRate > 5);
-    if (!missing.length) { st.globalDecision = 'SAFE TO CONTINUE'; st.blockingReason = ''; }
+    if (!missing.length) {
+      st.globalDecision = (st.currentRampFlexPercent === 100) ? 'CUTOVER COMPLETE' : 'SAFE TO CONTINUE';
+      st.blockingReason = '';
+    }
     else { st.globalDecision = hardFail ? 'BLOCKED' : 'HOLD'; st.blockingReason = missing.join('; '); }
     var reason = el(id + '-lcv-gatereason');
     if (reason) {
-      reason.textContent = missing.length ? 'Decision: ' + st.globalDecision + ' — ' + st.blockingReason : 'All promotion criteria satisfied — SAFE TO CONTINUE.';
+      reason.textContent = missing.length ? 'Decision: ' + st.globalDecision + ' — ' + st.blockingReason : (st.globalDecision === 'CUTOVER COMPLETE' ? 'All required checks passed — ready at 100% FLEX.' : 'All promotion criteria satisfied — SAFE TO CONTINUE.');
       reason.setAttribute('data-tone', missing.length ? (hardFail ? 'bad' : 'warn') : 'ok');
     }
     lcvRampRender(id);
@@ -12241,6 +12295,26 @@ ${certContent}
     cutMobEnsure(id).batchProof = null;
     cutMobGate(id, 'ramp', 'NOT RUN');
   };
+  /* Explains in the logs + timeline why the observed split misses a side
+     (e.g. 75% OSPC expected but 0 OSPC hits observed). */
+  function lcvDiagnoseTraffic(id, summary) {
+    var st = lcv(id);
+    var expOspc = 100 - (st.currentRampFlexPercent || 0);
+    if (expOspc <= 0 || summary.ospc_hits > 0) return;
+    var lb = cutMobVal(id, 'cutover', 'lbhost') || 'the LB';
+    cutMobLog(id, 'cutover', '[traffic-diagnosis] Expected ~' + expOspc + '% OSPC (' + cutMobRampText(st.currentRampFlexPercent) + ') but 0/' + summary.total + ' requests were attributed to OSPC.');
+    if (summary.unknown_hits > 0) {
+      cutMobLog(id, 'cutover', '[traffic-diagnosis] ' + summary.unknown_hits + ' response(s) carried NO backend identity headers (X-Cutover-Backend / X-App-Server). If the OSPC backend does not send these headers, its traffic is counted as UNKNOWN — the missing OSPC share is likely hiding in UNKNOWN.');
+      cutMobLog(id, 'cutover', '[traffic-diagnosis] Fix first: enable identity headers on the OSPC backend, then re-run the batch. Compare the backend IPs of UNKNOWN rows (Individual requests) with the OSPC server IP to confirm.');
+    } else {
+      cutMobLog(id, 'cutover', '[traffic-diagnosis] Every request was answered by FLEX — ' + lb + ' is not honoring the ' + expOspc + '% OSPC weight.');
+    }
+    cutMobLog(id, 'cutover', '[traffic-diagnosis] Other causes to check: (1) the ramp shown here was never pushed to HAProxy — look for "Ramp accepted" after the last Apply Ramp; (2) HAProxy weights were changed outside this monitor (earlier Promote to 100% FLEX or the Cutover Tester Phase 2 ramp stages); (3) the OSPC backend is DOWN, so HAProxy fails over all traffic to FLEX — run the OSPC health row in Advanced Backend Proof.');
+    lcvTimeline(id, 'No OSPC traffic despite ' + expOspc + '% OSPC weight — ' + (summary.unknown_hits > 0
+      ? summary.unknown_hits + ' UNKNOWN response(s): OSPC likely missing identity headers (diagnosis in Raw Terminal Logs)'
+      : 'LB routing 100% to FLEX: ramp not applied on HAProxy, changed externally, or OSPC down (diagnosis in Raw Terminal Logs)'),
+      {status:'DIAGNOSIS'}, 'warn');
+  }
   window.cutMobRunBatch = async function(id) {
     var count = parseInt(((el(id + '-batch-count') || {}).value || 10), 10) || 10;
     var path = ((el(id + '-batch-path') || {}).value || '/health').trim() || '/health';
@@ -12273,6 +12347,7 @@ ${certContent}
     cutMobRow(id, 'Ramp Proof', 'cutover', 'OSPC ' + summary.ospc_hits + ' / FLEX ' + summary.flex_hits + ' / UNKNOWN ' + summary.unknown_hits, status, {served:'MIXED', latency:summary.p95_latency_ms});
     cutMobLog(id, 'cutover', 'Batch proof ' + status + ': OSPC=' + summary.ospc_hits + ' FLEX=' + summary.flex_hits + ' UNKNOWN=' + summary.unknown_hits + ' ERR=' + summary.errors + ' avg=' + summary.avg_latency_ms + 'ms p95=' + summary.p95_latency_ms + 'ms');
     lcvTimeline(id, count + ' connection proof completed — OSPC ' + summary.ospc_hits + ' / FLEX ' + summary.flex_hits + ' / UNKNOWN ' + summary.unknown_hits, {latency:summary.p95_latency_ms, status:status}, status === 'PASS' ? 'ok' : (status === 'WARNING' ? 'warn' : 'bad'));
+    lcvDiagnoseTraffic(id, summary);
     lcvTrafficRender(id);
     lcvGateRender(id);
   };
@@ -12359,6 +12434,44 @@ ${certContent}
     lcvPublishGates(id);
     cutMobOverlay(id, 'cutover', {ok:cutMobEnsure(id).lastOk,status:cutMobEnsure(id).lastStatus || '-',ms:cutMobEnsure(id).lastMs || '-',served:cutMobEnsure(id).lastServed || 'UNKNOWN',backendIp:cutMobEnsure(id).lastBackendIp || '-',backendRegion:cutMobEnsure(id).lastBackendRegion || '-',login:cutMobEnsure(id).lastResults.login || 'NOT RUN',txn:cutMobEnsure(id).lastResults.transfer || 'NOT RUN',evidence:cutMobEnsure(id).lastEvidence});
   }
+  /* Fill the Advanced Backend Proof endpoints with the real component IPs
+     from the locked business-system scope. The shipped placeholders
+     (ospc-api-gateway.local, flex-*.local, …) never resolve — that is why
+     every proof row showed BLOCKED. */
+  function cutMobPrefillBackendEndpoints(id) {
+    var comps = [];
+    try {
+      var sc = JSON.parse(localStorage.getItem('outputs_cutover_locked_business_system_scope') || 'null');
+      comps = (sc && sc.components) || [];
+    } catch(e) {}
+    if (!comps.length) return;
+    function pick(types, nameRe) {
+      var list = comps.filter(function(c){ return types.indexOf(c.type) >= 0 && c.source && c.target; });
+      if (nameRe) { var m = list.filter(function(c){ return nameRe.test(c.name || ''); }); if (m.length) list = m; }
+      return list[0] || null;
+    }
+    var map = {
+      api_gateway: pick(['api_gateway']),
+      api_server: pick(['api_server']) || pick(['web_frontend']),
+      core_backend: pick(['app_server'], /core|backend/i) || pick(['app_server']),
+      auth_sso: pick(['app_server'], /auth|sso/i) || pick(['app_server']),
+      database: pick(['database']),
+      cache: pick(['cache']),
+      queue: pick(['queue']),
+      workers: pick(['worker']),
+      monitoring: pick(['monitoring'])
+    };
+    var filled = 0;
+    Object.keys(map).forEach(function(group){
+      var c = map[group]; if (!c) return;
+      [['source', c.source], ['target', c.target]].forEach(function(side){
+        var ep = el(id + '-' + side[0] + '-' + group + '-endpoint');
+        if (ep && side[1] && (!ep.value || /\.local$/.test(ep.value))) { ep.value = side[1]; filled++; }
+        if (c.port && side[1]) { var pt = el(id + '-' + side[0] + '-' + group + '-port'); if (pt) pt.value = c.port; }
+      });
+    });
+    if (filled) cutMobLog(id, 'cutover', '[backend-proof] ' + filled + ' endpoint(s) prefilled from the locked business-system scope — the *.local placeholders never resolve, which is why proof rows showed BLOCKED. Re-run "Run All" on both panels.');
+  }
   function installCutoverMobileBench(panelId, id, label) {
     var panel = el(panelId), body = panel && panel.querySelector('.info-panel');
     if (!body || el(id)) return;
@@ -12377,6 +12490,7 @@ ${certContent}
     lcvRampRender(id);
     lcvDevInit(id);
     lcvHdrChk(id, {});
+    try { cutMobPrefillBackendEndpoints(id); } catch(e) {}
     /* Pre-load the real source app into the phone (same behavior as the UAT
        bench phone). Gates stay NOT RUN until the operator runs the journey. */
     try {

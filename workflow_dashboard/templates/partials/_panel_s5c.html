@@ -1,4 +1,18 @@
   <div class="panel" id="panel-s5c">
+    <style>
+      /* ── Stage 4C visual polish ── */
+      #panel-s5c .section-card{border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.05),0 12px 32px -22px rgba(15,23,42,.35);margin-bottom:16px;}
+      #panel-s5c .section-card:hover{box-shadow:0 1px 2px rgba(15,23,42,.06),0 16px 40px -22px rgba(15,23,42,.45);}
+      #panel-s5c .matrix-table th{position:sticky;top:0;background:#f8fafc;z-index:1;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#64748b;}
+      #panel-s5c .matrix-table tbody tr:nth-child(even){background:#fafbfd;}
+      #panel-s5c .matrix-table tbody tr:hover{background:#f0f6ff;}
+      #panel-s5c .matrix-table td{padding:7px 9px;vertical-align:middle;}
+      #panel-s5c .matrix-table input{border:1px solid #dbe3ee;border-radius:6px;padding:4px 7px;font-size:11px;background:#fff;}
+      #panel-s5c .matrix-table input:focus{outline:2px solid #bfdbfe;border-color:#3b82f6;}
+      #panel-s5c .sub-section{border-radius:12px;transition:box-shadow .15s;}
+      #panel-s5c details.section-card>summary::-webkit-details-marker{display:none;}
+      #panel-s5c details.section-card[open]>summary{border-bottom:1px solid #eef2f7;}
+    </style>
     <div class="info-panel" style="display:flex;flex-direction:column;gap:0;padding:0;">
 
       <!-- Stage Title -->
@@ -18,23 +32,16 @@
            active and returned to UAT when leaving — single live copy, same
            pattern as s5c-tester-cockpit-mount; see activateStage().
            ══════════════════════════════════════════════════════════════ -->
-      <div class="section-card">
-        <div class="section-header">
-          <div class="section-header-left">
-            <div class="section-icon"><i class="fas fa-pen-to-square"></i></div>
-            <div class="section-title-group">
-              <h3>Select Business System for CUT OVER from UAT</h3>
-              <p>Full UAT business-system editor &mdash; edit or add systems imported from UAT (templates and automatic VM mapping included) without leaving the cutover stage.</p>
-            </div>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-secondary" id="s5c-uat-expand-btn" onclick="s5cToggleUatDetails()"><i class="fas fa-chevron-down"></i> Expand UAT Details</button>
-          </div>
-        </div>
-        <div class="section-body" style="padding:0;">
-          <div id="s5c-bizsystem-mount"></div>
-        </div>
-      </div>
+      <!-- Collapsed by default: full UAT editor duplicates the selector below
+           (which has inline Edit). Open only to add systems / use templates. -->
+      <details class="section-card" id="s5c-uat-editor" style="padding:0;">
+        <summary style="padding:14px 24px;cursor:pointer;font-weight:800;color:#0f172a;font-size:14px;display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-pen-to-square" style="color:#64748b;"></i> Edit / Add Business Systems
+          <span style="font-weight:400;font-size:12px;color:#64748b;">full UAT editor — templates &amp; automatic VM mapping</span>
+          <button class="btn btn-secondary" id="s5c-uat-expand-btn" style="margin-left:auto;font-size:11px;padding:5px 10px;" onclick="event.preventDefault();s5cToggleUatDetails();"><i class="fas fa-chevron-down"></i> Expand UAT Details</button>
+        </summary>
+        <div id="s5c-bizsystem-mount"></div>
+      </details>
       <style>
         /* Stage 4C-scoped trims of the relocated UAT Step 1 editor: hide the
            duplicate inner title, the Business-System-Aware UAT hero (incl.
@@ -69,7 +76,7 @@
             <div class="section-icon"><i class="fas fa-layer-group"></i></div>
             <div class="section-title-group">
               <h3>Select Business System for Cutover</h3>
-              <p>Reuse UAT-approved business systems and prepare the complete service stack for traffic transition.</p>
+              <p>Reuse UAT-approved business systems and prepare the complete service stack for traffic transition. <b style="color:#475569;">Why:</b> locks one UAT-validated system as the scope that every matrix row, test and gate below reads.</p>
             </div>
           </div>
           <div class="section-actions">
@@ -102,23 +109,22 @@
             <div class="section-icon"><i class="fas fa-table"></i></div>
             <div class="section-title-group">
               <h3>Business System Cutover Matrix</h3>
-              <p>Auto-filled from UAT Step 2 &mdash; Apps Server Systems Comparisons.</p>
+              <p>Auto-filled from UAT Step 2 &mdash; Apps Server Systems Comparisons. <b style="color:#475569;">Why:</b> the single editable source of truth &mdash; probes, gates and fix links all use these endpoints.</p>
             </div>
           </div>
           <div class="section-actions">
-            <button class="btn btn-secondary" id="s5c-sections-toggle-btn" onclick="s5cToggleSections()"><i class="fas fa-eye-slash"></i> Hide Matrix / Gates / Feed Sections</button>
+            <button class="btn btn-secondary" id="s5c-sections-toggle-btn" onclick="s5cToggleSections()"><i class="fas fa-eye-slash"></i> Hide Matrix &amp; Gates</button>
           </div>
         </div>
         <div class="section-body">
           <div class="table-scroll-shell">
             <div class="table-scroll-x">
-              <table class="matrix-table">
+              <table class="matrix-table" style="font-size:11px;">
                 <thead><tr>
-                  <th>select</th><th>component</th><th>component type</th><th>OSPC source IP / URL</th><th>FLEX target IP / URL</th>
-                  <th>port</th><th>health / test path</th><th>traffic facing</th><th>stateful</th><th>scope</th>
-                  <th>UAT status</th><th>cutover gate</th><th>cutover status</th><th>action</th>
+                  <th>select</th><th>component</th><th>type</th><th>OSPC source IP / URL</th><th>FLEX target IP / URL</th>
+                  <th>port</th><th>health / test path</th><th>traffic</th><th>stateful</th><th>scope</th><th>cutover status</th>
                 </tr></thead>
-                <tbody id="s5c-matrix-body"><tr><td colspan="14"><div class="empty-state">Select a business system above first.</div></td></tr></tbody>
+                <tbody id="s5c-matrix-body"><tr><td colspan="11"><div class="empty-state">Select a business system above first.</div></td></tr></tbody>
               </table>
             </div>
           </div>
@@ -129,34 +135,7 @@
         </div>
       </div>
 
-      <!-- ══════════════════════════════════════════════════════════════
-           SECTION 3 — Auto-Generated Cutover Pairing Matrix
-           ══════════════════════════════════════════════════════════════ -->
-      <div class="section-card" id="s5c-pairing-card" style="display:none;">
-        <div class="section-header">
-          <div class="section-header-left">
-            <div class="section-icon"><i class="fas fa-code-compare"></i></div>
-            <div class="section-title-group">
-              <h3>Generated Cutover Pairing Matrix</h3>
-              <p>Created from the selected UAT business system. Manual pairing is only needed for overrides.</p>
-            </div>
-          </div>
-        </div>
-        <div class="section-body">
-          <div class="table-scroll-shell">
-            <div class="table-scroll-x">
-              <table class="matrix-table">
-                <thead><tr>
-                  <th>pair</th><th>component</th><th>tier</th><th>source endpoint</th><th>target FLEX endpoint</th>
-                  <th>source region</th><th>target region</th><th>source server</th><th>target server</th><th>port</th>
-                  <th>health path</th><th>traffic method</th><th>source %</th><th>target %</th><th>status</th>
-                </tr></thead>
-                <tbody id="s5c-pairing-body"><tr><td colspan="15"><div class="empty-state">Select a business system above first.</div></td></tr></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Generated Cutover Pairing Matrix removed (2026-07-09): derived view duplicating the matrix above. -->
 
       <!-- ══════════════════════════════════════════════════════════════
            SECTION 4 — Cutover Gates From Business System Matrix
@@ -167,7 +146,7 @@
             <div class="section-icon"><i class="fas fa-shield-halved"></i></div>
             <div class="section-title-group">
               <h3>Cutover Gates</h3>
-              <p>Generated from the business system matrix above.</p>
+              <p>Generated from the business system matrix above. <b style="color:#475569;">Why:</b> the go / no-go checklist that PASS CUTOVER validates before declaring the cutover done.</p>
             </div>
           </div>
         </div>
@@ -193,7 +172,7 @@
             <div class="section-icon"><i class="fas fa-clipboard-check"></i></div>
             <div class="section-title-group">
               <h3>Cutover Validation</h3>
-              <p>Aggregates every open issue from the gates, component matrix, test plan and live monitor for the selected business system.</p>
+              <p>Aggregates every open issue from the gates, component matrix, test plan and live monitor for the selected business system. <b style="color:#475569;">Why:</b> the final decision point &mdash; PASS records the approval and downloads the evidence CSV.</p>
             </div>
           </div>
         </div>
@@ -221,46 +200,9 @@
         </div>
       </div>
 
-      <!-- ══════════════════════════════════════════════════════════════
-           SECTION 5 — Existing Cutover Test / Traffic Ramp
-           Stage 4's REAL tester + execution cockpit + validation bench is
-           relocated into the mount below whenever Stage 4C is active (and
-           moved back to Stage 4 when leaving) — see activateStage() in
-           _closing_scripts.html. One live copy, no duplicate IDs, all of
-           its existing JS (Dry Run, Cut over TEST, ramp proof, cockpit,
-           evidence export) keeps working here unmodified.
-           ══════════════════════════════════════════════════════════════ -->
-      <div class="section-card" id="s5c-feed-card">
-        <div class="section-header">
-          <div class="section-header-left">
-            <div class="section-icon"><i class="fas fa-arrow-down"></i></div>
-            <div class="section-title-group">
-              <h3>Feed Cutover Test From Business System</h3>
-              <p>Fills the cutover tester below from the selected business system's traffic-facing component instead of a manual server pair.</p>
-            </div>
-          </div>
-          <div class="section-actions">
-            <button class="btn btn-primary" onclick="s5cFeedTesterFromMatrix()"><i class="fas fa-arrow-down"></i> Feed Tester From Matrix</button>
-          </div>
-        </div>
-        <div class="section-body">
-          <div id="s5c-tester-feed-status" style="font-size:13px;color:#6b7280;"></div>
-        </div>
-      </div>
+      <!-- Feed Cutover Test section removed (2026-07-09): duplicate of the Feed Tester buttons on the Component Blue/Green Test bar. -->
 
-      <!-- ══════════════════════════════════════════════════════════════
-           SECTION 6 — Advanced Manual Override (collapsed)
-           Stage 4's cloud credentials + source/target scanner + manual
-           pairing matrix are relocated into the mount below while Stage
-           4C is active — same single-live-copy pattern as Section 5.
-           ══════════════════════════════════════════════════════════════ -->
-      <details id="s5c-advanced-override" style="border-top:1px solid #e5e7eb;">
-        <summary style="padding:16px 28px;cursor:pointer;font-weight:700;color:#92400e;background:#fffbeb;">
-          <i class="fas fa-triangle-exclamation" style="margin-right:8px;"></i>Advanced Manual Override
-          <div style="font-weight:400;font-size:12px;color:#78350f;margin-top:4px;">Use only when UAT scope is missing, incomplete, or needs correction. Contains cloud credentials, source/target region scans, CSV upload, manual pairing, blue-green script generation, and cutover command export.</div>
-        </summary>
-        <div id="s5c-manual-override-mount"></div>
-      </details>
+      <!-- Advanced Manual Override removed (2026-07-09): its relocation source (s5-manual-scope-home) never existed, so the section was always empty. -->
 
       <!-- Stage 4's relocated cutover suite (3. Cutover Test & Result CSV →
            Advanced Cutover Dashboard) lands here — directly above the
@@ -361,7 +303,13 @@
       function _loadAllUatSystems(){
         var raw=null;
         try{ raw=JSON.parse(localStorage.getItem('uatS1_systems')||'null'); }catch(e){}
-        if(!raw||!raw.length) return [];
+        if(!raw||!raw.length){
+          /* live UAT store unavailable — use the snapshots sent by the UAT
+             PASS button so Refresh from UAT still lists validated systems */
+          var snaps=Object.keys(_uatPassedMap()).map(function(k){ return _uatPassedMap()[k].system; }).filter(Boolean);
+          if(!snaps.length) return [];
+          raw=snaps;
+        }
         var list=raw.filter(function(s){return s.status!=='Draft';});
         if(!list.length) list=raw;
         /* Only list systems validated by the UAT PASS button when any exist. */
@@ -596,7 +544,7 @@
         if(!confirm('Remove from this cutover list? This does not delete it from UAT.')) return;
         var removed=(C.systems.find(function(s){return s.id===id;})||{}).name||'system';
         C.dismissed[id]=true;
-        if (C.selectedId===id){ C.selectedId=null; ['s5c-matrix-card','s5c-pairing-card','s5c-gates-card'].forEach(function(x){$id(x).style.display='none';}); }
+        if (C.selectedId===id){ C.selectedId=null; ['s5c-matrix-card','s5c-gates-card'].forEach(function(x){var n=$id(x); if(n) n.style.display='none';}); }
         s5cRefresh();
         _s5cToast('✓ "'+removed+'" removed from this cutover list (still available in UAT).');
       };
@@ -617,8 +565,8 @@
          The toggle button lives in the matrix card's header, so that header
          always stays visible (only its body collapses) — otherwise hiding
          would remove the button itself. ── */
-      var S5C_TOGGLE_SECTIONS = ['s5c-pairing-card','s5c-gates-card','s5c-feed-card','s5c-advanced-override'];
-      var S5C_SELECTION_SECTIONS = {'s5c-pairing-card':1,'s5c-gates-card':1};
+      var S5C_TOGGLE_SECTIONS = ['s5c-gates-card'];
+      var S5C_SELECTION_SECTIONS = {'s5c-gates-card':1};
       /* Hidden (collapsed) by default — only an explicit Show ('0') keeps them open. */
       try { C.sectionsHidden = localStorage.getItem('s5c_sections_hidden')!=='0'; } catch(e){ C.sectionsHidden = true; }
       function _applySectionsVisibility(){
@@ -634,8 +582,8 @@
         });
         var btn=$id('s5c-sections-toggle-btn');
         if(btn) btn.innerHTML = C.sectionsHidden
-          ? '<i class="fas fa-eye"></i> Show Matrix / Gates / Feed Sections'
-          : '<i class="fas fa-eye-slash"></i> Hide Matrix / Gates / Feed Sections';
+          ? '<i class="fas fa-eye"></i> Show Matrix & Gates'
+          : '<i class="fas fa-eye-slash"></i> Hide Matrix & Gates';
       }
       window.s5cToggleSections = function(){
         C.sectionsHidden = !C.sectionsHidden;
@@ -662,10 +610,7 @@
             + '<td>'+(c.trafficFacing?'Yes':'No')+'</td>'
             + '<td>'+(c.stateful?'Yes':'No')+'</td>'
             + '<td>'+(c.selected?'In Scope':'Out of Scope')+'</td>'
-            + '<td>'+_esc(sys.uatStatus)+'</td>'
-            + '<td style="font-size:11px;">'+_esc(_gateFor(c))+'</td>'
             + '<td>'+_pill(st)+(st==='REVIEW'?'<select onchange="s5cClassifyDb(\''+c.id+'\',this.value)" style="font-size:11px;margin-left:4px;"><option value="">Classify…</option><option value="Primary">Primary</option><option value="Standby">Standby</option><option value="Test">Test</option><option value="Out of Scope">Out of Scope</option></select>':'')+'</td>'
-            + '<td><button class="btn btn-secondary light" style="font-size:10px;padding:3px 8px;" onclick="alert(\'Review '+_esc(c.name)+': status '+st+'\')">Review</button></td>'
             + '</tr>';
         }).join('');
       }
@@ -703,7 +648,6 @@
           return '<tr style="background:#f9fafb;">'
             + '<td colspan="9" style="color:#6b7280;">'+_esc(c.name)+' — no traffic switching row (backend/stateful component)</td>'
             + '<td>'+_esc(c.port||'—')+'</td><td>'+_esc(c.healthUrl||'—')+'</td>'
-            + '<td>'+_esc(_gateFor(c))+'</td><td colspan="2"></td></tr>';
         }).join('');
         tb.innerHTML = html || '<tr><td colspan="15"><div class="empty-state">No components in scope.</div></td></tr>';
       }
@@ -798,7 +742,7 @@
       /* Where each gate is fixed — element ids used by the "Go to fix" links. */
       var GATE_FIX_TARGETS = {
         uat_lock:'s5c-select-card', component_health:'s5c-matrix-card',
-        db:'bstp-card', cache:'bstp-card', queue:'bstp-card', backend:'bstp-card',
+        db:'cbg-bar', cache:'cbg-bar', queue:'cbg-bar', backend:'cbg-bar',
         business_validation:'cutoverMobileBenchS5C', traffic_ramp:'cutoverMobileBenchS5C',
         rollback:'s5c-gates-card', sign_off:'s5c-gates-card', evidence:'cutoverMobileBenchS5C'
       };
@@ -837,8 +781,8 @@
           var plan=(typeof window.bstpGetResults==='function')?window.bstpGetResults():null;
           (plan&&plan.rows||[]).forEach(function(r){
             if(r.kind!=='component') return;
-            if(r.status==='FAIL') issues.push({severity:'block', title:'Test Plan: '+r.name+' FAILED', source:'Business System Test Plan', fix:r.detail||'Re-run the component test.', target:'bstp-card'});
-            else if(r.status==='NEEDS INPUT'||r.status==='WARNING') issues.push({severity:'review', title:'Test Plan: '+r.name+' — '+r.status, source:'Business System Test Plan', fix:r.detail||'Review and re-run.', target:'bstp-card'});
+            if(r.status==='FAIL') issues.push({severity:'block', title:'Test Plan: '+r.name+' FAILED', source:'Business System Test Plan', fix:r.detail||'Re-run the component test.', target:'cbg-bar'});
+            else if(r.status==='NEEDS INPUT'||r.status==='WARNING') issues.push({severity:'review', title:'Test Plan: '+r.name+' — '+r.status, source:'Business System Test Plan', fix:r.detail||'Review and re-run.', target:'cbg-bar'});
           });
         }catch(e){}
         if(C.liveGates&&C.liveGates.decision&&C.liveGates.decision!=='SAFE TO CONTINUE'){
@@ -947,8 +891,15 @@
         a.click();
       }
 
+      /* Keep the Cutover Validation (PASS/FIX) block at the very bottom of
+         the page — after the relocated suite and the appended monitor. */
+      function _s5cMoveValidationToBottom(){
+        var v=$id('s5c-validation-card');
+        if(v && v.parentNode && v.parentNode.lastElementChild!==v) v.parentNode.appendChild(v);
+      }
       /* ── Activation entry point (called from activateStage()) ── */
-      window.s5cOnActivate = function(){ s5cRefresh(); };
+      window.s5cOnActivate = function(){ s5cRefresh(); _s5cMoveValidationToBottom(); };
+      setTimeout(_s5cMoveValidationToBottom, 800);
       if (document.readyState !== 'loading') s5cRefresh();
       else document.addEventListener('DOMContentLoaded', s5cRefresh);
     })();

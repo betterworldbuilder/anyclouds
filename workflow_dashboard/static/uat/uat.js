@@ -2158,7 +2158,10 @@
     if (sys) {
       var passed = {};
       try { passed = JSON.parse(localStorage.getItem('outputs_uat_passed_systems') || '{}') || {}; } catch(e) {}
-      passed[sys.id] = { name: sys.name, decision: decision, by: by, reason: reason, at: new Date().toLocaleString() };
+      if (!sys.id) sys.id = 'sys_' + Date.now();
+      /* full snapshot so the cutover stage can list it even if the live
+         uatS1_systems store is unavailable in that context */
+      passed[sys.id] = { name: sys.name, decision: decision, by: by, reason: reason, at: new Date().toLocaleString(), system: sys };
       try { localStorage.setItem('outputs_uat_passed_systems', JSON.stringify(passed)); } catch(e) {}
     }
     var msg = (decision === 'PASS'
