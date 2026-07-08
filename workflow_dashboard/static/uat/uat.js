@@ -2135,17 +2135,40 @@
     });
   };
 
-  // PASS with risk check
+  // PASS with risk check — on pass, hands the active business system to the
+  // Business System Cut Over stage (s5c) as a UAT-validated system.
   window.uatPassWithRiskCheck = function() {
     var a = calculateUatReadinessAnalysis();
+    var decision = 'PASS', by = 'operator', reason = '';
     if (a.blocking > 0) {
-      var reason = prompt('There are ' + a.blocking + ' unresolved blocker(s).\n\nTo accept risk and proceed, enter your reason:');
+      reason = prompt('There are ' + a.blocking + ' unresolved blocker(s).\n\nTo accept risk and proceed, enter your reason:');
       if (!reason) return;
-      var owner = prompt('Approver name:');
-      if (!owner) return;
-      alert('Risk accepted by ' + owner + '. Final decision: READY WITH CONDITIONS.\n\nRecord this in your change management system before cutover.');
-    } else {
-      alert('All required checks passed or accepted. Proceed with cutover.\n\nExport the UAT Report as evidence before cutover.');
+      by = prompt('Approver name:');
+      if (!by) return;
+      decision = 'READY WITH CONDITIONS';
+    }
+    var sys = null;
+    try {
+      var raw = JSON.parse(localStorage.getItem('uatS1_systems') || '[]') || [];
+      var list = raw.filter(function(s){ return s.status !== 'Draft'; });
+      if (!list.length) list = raw;
+      list.sort(function(x, y){ return new Date(y.createdAt || 0) - new Date(x.createdAt || 0); });
+      sys = list[0] || null;
+    } catch(e) {}
+    if (sys) {
+      var passed = {};
+      try { passed = JSON.parse(localStorage.getItem('outputs_uat_passed_systems') || '{}') || {}; } catch(e) {}
+      passed[sys.id] = { name: sys.name, decision: decision, by: by, reason: reason, at: new Date().toLocaleString() };
+      try { localStorage.setItem('outputs_uat_passed_systems', JSON.stringify(passed)); } catch(e) {}
+    }
+    var msg = (decision === 'PASS'
+      ? 'All required checks passed or accepted.'
+      : 'Risk accepted by ' + by + '. Final decision: READY WITH CONDITIONS.\nRecord this in your change management system before cutover.');
+    if (sys) msg += '\n\n"' + sys.name + '" marked UAT-validated and sent to Stage 4 — Business System Cut Over.';
+    alert(msg);
+    if (sys) {
+      try { if (typeof window.s5cRefresh === 'function') window.s5cRefresh(); } catch(e) {}
+      try { var btn = document.querySelector('.stage-btn[data-stage="s5c"]'); if (btn) btn.click(); } catch(e) {}
     }
   };
 
@@ -2873,7 +2896,7 @@
 
   window.uatSetMode = function(mode, silent) {
     hideGlobalThemeForUat();
-    mode = mode === 'detailed' ? 'detailed' : 'compact';
+    mode = 'detailed'; /* compact view removed — detailed is the only mode */
     ['compact', 'detailed'].forEach(function(m) {
       const btn = document.getElementById('uat-mode-' + m);
       if (btn) btn.classList.toggle('ud-mode-btn--on', m === mode);
@@ -2913,16 +2936,15 @@
     var _ts = document.getElementById('uat-tb-sub');
     if (_th) _th.textContent = _t[0];
     if (_ts) _ts.textContent = _t[1];
-    content.setAttribute('data-uat-mode', 'compact');
-    ['compact', 'detailed'].forEach(function(m) {
-      const btn = document.getElementById('uat-mode-' + m);
-      if (btn) btn.classList.toggle('ud-mode-btn--on', m === 'compact');
-    });
-    content.querySelectorAll('[data-uat-step]').forEach(function(panel) {
-      panel.style.display = Number(panel.getAttribute('data-uat-step')) === step ? '' : 'none';
-    });
+    /* Detailed-only: keep every step visible and scroll to the target step. */
+    content.setAttribute('data-uat-mode', 'detailed');
+    const dbtn = document.getElementById('uat-mode-detailed');
+    if (dbtn) dbtn.classList.add('ud-mode-btn--on');
+    content.querySelectorAll('[data-uat-step]').forEach(function(panel) { panel.style.display = ''; });
+    const tgt = content.querySelector('[data-uat-step="' + step + '"]');
+    if (tgt) tgt.scrollIntoView({ behavior: instant ? 'auto' : 'smooth', block: 'start' });
     const msg = document.getElementById('uat-message');
-    if (msg) msg.style.display = step === 5 ? 'none' : '';
+    if (msg) msg.style.display = '';
     document.querySelectorAll('#uat-sidebar .udsb-item').forEach(function(btn, idx) {
       const isReport = idx > 4;
       btn.classList.toggle('udsb-active', !isReport && idx === step - 1);

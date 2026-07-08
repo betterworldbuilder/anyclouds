@@ -63,7 +63,7 @@
            Moved below the editor per operator request (2026-07-08): the
            editor above is the entry point; this locked-scope view follows.
            ══════════════════════════════════════════════════════════════ -->
-      <div class="section-card">
+      <div class="section-card" id="s5c-select-card">
         <div class="section-header">
           <div class="section-header-left">
             <div class="section-icon"><i class="fas fa-layer-group"></i></div>
@@ -73,7 +73,7 @@
             </div>
           </div>
           <div class="section-actions">
-            <button class="btn btn-secondary" onclick="s5cRefresh()"><i class="fas fa-rotate"></i> Refresh from UAT</button>
+            <button class="btn btn-secondary" onclick="s5cRefresh(true)"><i class="fas fa-rotate"></i> Refresh from UAT</button>
             <button class="btn btn-primary" id="s5c-lock-btn" onclick="s5cLockScope()"><i class="fas fa-lock"></i> Lock Scope for Cutover</button>
             <button class="btn btn-warning" id="s5c-unlock-btn" onclick="s5cUnlockScope()" style="display:none;"><i class="fas fa-unlock"></i> Unlock / Refresh Scope</button>
             <button class="btn btn-secondary" onclick="s5cViewTests()"><i class="fas fa-vial"></i> View UAT Tests</button>
@@ -199,15 +199,22 @@
         </div>
         <div class="section-body">
           <div id="s5c-val-summary" style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#374151;margin-bottom:12px;"></div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-            <button onclick="s5cPassCutover()" style="display:flex;align-items:center;gap:12px;padding:14px 24px;border:none;border-radius:8px;cursor:pointer;background:#16a34a;color:#fff;flex:1;min-width:220px;text-align:left;">
-              <span style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;">&#10003;</span>
-              <span style="display:flex;flex-direction:column;"><b style="font-size:20px;letter-spacing:.02em;line-height:1.1;">PASS CUTOVER</b><small style="font-size:10px;opacity:.9;">Validate all gates &amp; download the full cutover report CSV</small></span>
-            </button>
-            <button onclick="s5cFixIssues()" style="display:flex;align-items:center;gap:12px;padding:14px 24px;border:none;border-radius:8px;cursor:pointer;background:#dc2626;color:#fff;flex:1;min-width:220px;text-align:left;">
-              <span style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;">!</span>
-              <span style="display:flex;flex-direction:column;"><b style="font-size:20px;letter-spacing:.02em;line-height:1.1;">FIX</b><small style="font-size:10px;opacity:.9;">Show every issue to fix before cutover</small></span>
-            </button>
+          <!-- UAT-style bottom row: components-on-FLEX status card + PASS / FIX block -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;margin-bottom:12px;">
+            <div id="s5c-val-comps" style="flex:1.5;min-width:300px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;">
+              <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Components on FLEX</div>
+              <div style="font-size:11px;color:#94a3b8;">Select a business system to see per-component status.</div>
+            </div>
+            <div style="flex:1;min-width:300px;display:flex;gap:10px;">
+              <button onclick="s5cPassCutover()" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border:1px solid #86efac !important;border-radius:8px;cursor:pointer;background:#bbf7d0 !important;color:#065f46 !important;flex:1;text-align:left;">
+                <span style="width:32px;height:32px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;">&#10003;</span>
+                <span style="display:flex;flex-direction:column;"><b style="font-size:19px;letter-spacing:.02em;line-height:1.1;color:#065f46;">PASS CUTOVER</b><small style="font-size:10px;color:#047857;">Validate all gates &amp; download the full cutover report CSV</small></span>
+              </button>
+              <button onclick="s5cFixIssues()" style="display:flex;align-items:center;gap:12px;padding:14px 20px;border:none;border-radius:8px;cursor:pointer;background:#dc2626 !important;color:#fff !important;flex:1;text-align:left;">
+                <span style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;">!</span>
+                <span style="display:flex;flex-direction:column;"><b style="font-size:19px;letter-spacing:.02em;line-height:1.1;color:#fff;">FIX</b><small style="font-size:10px;color:rgba(255,255,255,.88);">Show every issue to fix before cutover</small></span>
+              </button>
+            </div>
           </div>
           <div id="s5c-val-decision" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:800;"></div>
           <div id="s5c-val-issues"></div>
@@ -269,6 +276,38 @@
       function $id(id){ return document.getElementById(id); }
       function _esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(ch){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]); }); }
 
+      /* ── Action feedback toast (bottom-right, auto-hides) ── */
+      function _s5cToast(msg, warn){
+        var t=$id('s5c-toast');
+        if(!t){
+          t=document.createElement('div'); t.id='s5c-toast';
+          t.style.cssText='position:fixed;bottom:24px;right:24px;z-index:99999;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(15,23,42,.25);transition:opacity .3s;max-width:440px;';
+          document.body.appendChild(t);
+        }
+        t.style.background=warn?'#fffbeb':'#ecfdf5';
+        t.style.border='1px solid '+(warn?'#fcd34d':'#6ee7b7');
+        t.style.color=warn?'#92400e':'#065f46';
+        t.textContent=msg; t.style.display='block'; t.style.opacity='1';
+        clearTimeout(t._h);
+        t._h=setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.style.display='none'; },350); },3400);
+      }
+      /* ── Jump to the section where an issue is fixed: un-hides the toggled
+         sections, opens enclosing <details>, scrolls and flashes it. ── */
+      window.s5cGoFix = function(id){
+        if(C.sectionsHidden){
+          C.sectionsHidden=false;
+          try{ localStorage.setItem('s5c_sections_hidden','0'); }catch(e){}
+          _applySectionsVisibility();
+        }
+        var n=$id(id);
+        if(!n){ _s5cToast('Target section not found on this page.', true); return; }
+        var d=n.closest('details'); if(d) d.open=true;
+        n.scrollIntoView({behavior:'smooth',block:'start'});
+        var old=n.style.boxShadow;
+        n.style.boxShadow='0 0 0 3px #f59e0b';
+        setTimeout(function(){ n.style.boxShadow=old; },2400);
+      };
+
       var TIER_LABEL = {web_frontend:'Web Frontend', api_gateway:'API Gateway', api_server:'API Server', app_server:'Core Backend / Auth',
         database:'Database', cache:'Cache', queue:'Queue', worker:'Workers', monitoring:'Monitoring', file_storage:'Storage', custom:'Other'};
       var TRAFFIC_FACING = {web_frontend:1, api_gateway:1, api_server:1};
@@ -318,12 +357,19 @@
         }catch(e){}
         return map;
       }
+      function _uatPassedMap(){ try{ return JSON.parse(localStorage.getItem('outputs_uat_passed_systems')||'{}')||{}; }catch(e){ return {}; } }
       function _loadAllUatSystems(){
         var raw=null;
         try{ raw=JSON.parse(localStorage.getItem('uatS1_systems')||'null'); }catch(e){}
         if(!raw||!raw.length) return [];
         var list=raw.filter(function(s){return s.status!=='Draft';});
         if(!list.length) list=raw;
+        /* Only list systems validated by the UAT PASS button when any exist. */
+        var passed=_uatPassedMap();
+        if(Object.keys(passed).length){
+          var validated=list.filter(function(s){ return passed[s.id]; });
+          if(validated.length) list=validated;
+        }
         return list.slice().sort(function(a,b){ return new Date(b.createdAt||0)-new Date(a.createdAt||0); });
       }
       function _normalizeSystem(sys){
@@ -346,7 +392,7 @@
         });
         return {
           id: sys.id, name: sys.name, archetype: sys.archetype||'custom', criticality: sys.criticality||'Critical',
-          wave: sys.wave||'Wave 1', uatStatus: sys.status==='Active'?'READY_FOR_CUTOVER':'NEEDS_REVIEW',
+          wave: sys.wave||'Wave 1', uatStatus: (_uatPassedMap()[sys.id]||sys.status==='Active')?'READY_FOR_CUTOVER':'NEEDS_REVIEW',
           components: normComps, componentCount: normComps.length, generatedTests: normComps.length*3,
           dbInScope: normComps.some(function(c){return c.type==='database';}),
           cacheInScope: normComps.some(function(c){return c.type==='cache';}),
@@ -378,7 +424,7 @@
       }
 
       /* ── Section 1: load + cards ── */
-      window.s5cRefresh = function(){
+      window.s5cRefresh = function(announce){
         var prevSelected = C.selectedId;
         var all = _loadAllUatSystems();
         C.systems = all.map(_normalizeSystem).filter(function(s){ return !C.dismissed[s.id]; });
@@ -387,7 +433,11 @@
             ? '<span style="color:#92400e;"><i class="fas fa-triangle-exclamation"></i> Live UAT source unavailable — using previously locked scope for "'+_esc(C.lockedScope.business_system_name||'')+'".</span>'
             : '<span style="color:#dc2626;font-weight:600;"><i class="fas fa-triangle-exclamation"></i> No UAT business system found. Complete Stage 3 — Validation &amp; UAT first.</span>';
         } else {
-          $id('s5c-status').textContent = C.systems.length+' UAT business system(s) available — loaded directly from Stage 3.';
+          var _pm=_uatPassedMap();
+          var _nVal=C.systems.filter(function(x){return _pm[x.id];}).length;
+          $id('s5c-status').textContent = _nVal
+            ? _nVal+' UAT-validated business system(s) — sent here by the UAT PASS button.'
+            : C.systems.length+' UAT business system(s) available — none UAT-validated yet (press PASS in UAT to validate).';
           C.selectedId = C.systems.some(function(s){return s.id===prevSelected;}) ? prevSelected : null;
           /* Auto-select so the matrix/pairing/gates sections show immediately:
              prefer the locked system, else the most recent one. */
@@ -406,6 +456,9 @@
         _renderCards();
         if (C.selectedId) s5cSelectSystem(C.selectedId, true);
         _applySectionsVisibility();
+        if (announce===true) _s5cToast(C.systems.length
+          ? '✓ Refreshed from UAT — '+C.systems.length+' business system(s) loaded at '+new Date().toLocaleTimeString()+'.'
+          : 'Refresh done — no UAT business system found. Complete Stage 3 first.', !C.systems.length);
       };
       function _renderLockBadge(){
         var lb=$id('s5c-lock-badge');
@@ -416,7 +469,7 @@
       }
       window.s5cLockScope = function(){
         var sys=_sys();
-        if(!sys){ alert('Select a business system for cutover first.'); return; }
+        if(!sys){ _s5cToast('Select a business system for cutover first.', true); return; }
         C.lockedScope={ business_system_id:sys.id, business_system_name:sys.name, archetype:sys.archetype, criticality:sys.criticality,
           wave:sys.wave, component_count:sys.componentCount, generated_uat_tests:sys.generatedTests,
           db_in_scope:sys.dbInScope, cache_in_scope:sys.cacheInScope, queue_in_scope:sys.queueInScope,
@@ -425,23 +478,29 @@
         try{ localStorage.setItem('outputs_cutover_locked_business_system_scope', JSON.stringify(C.lockedScope)); }catch(e){}
         $id('s5c-drift-warning').style.display='none';
         _renderLockBadge();
-        alert('Cutover scope locked from UAT.');
+        _s5cToast('✓ Cutover scope locked from UAT: "'+sys.name+'" ('+sys.componentCount+' components) at '+C.lockedScope.locked_at+'.');
       };
       window.s5cUnlockScope = function(){
         C.locked=false; C.lockedScope=null;
         try{ localStorage.removeItem('outputs_cutover_locked_business_system_scope'); }catch(e){}
         _renderLockBadge(); s5cRefresh();
+        _s5cToast('✓ Scope unlocked — reloaded live systems from UAT.');
       };
       window.s5cViewTests = function(){
-        var sys=_sys(); if(!sys){ alert('Select a business system first.'); return; }
+        var sys=_sys(); if(!sys){ _s5cToast('Select a business system first.', true); return; }
         var box=$id('s5c-tests-json'), body=$id('s5c-tests-body');
         var show = box.style.display==='none';
         box.style.display = show ? 'block' : 'none';
-        if (show) body.textContent = sys.name+' — '+sys.generatedTests+' generated UAT test(s)\n\n'+JSON.stringify(sys.components.map(function(c){return {component:c.name, role:c.role};}), null, 2);
+        if (show){
+          body.textContent = sys.name+' — '+sys.generatedTests+' generated UAT test(s)\n\n'+JSON.stringify(sys.components.map(function(c){return {component:c.name, role:c.role};}), null, 2);
+          box.scrollIntoView({behavior:'smooth',block:'nearest'});
+          _s5cToast('✓ Showing '+sys.generatedTests+' generated UAT test(s) for "'+sys.name+'".');
+        } else _s5cToast('✓ UAT tests view closed.');
       };
       window.s5cExportScope = function(){
-        var sys=_sys()||C.lockedScope; if(!sys){ alert('Select or lock a business system first.'); return; }
+        var sys=_sys()||C.lockedScope; if(!sys){ _s5cToast('Select or lock a business system first.', true); return; }
         _downloadJson('generated_from_uat_cutover_plan.json', sys);
+        _s5cToast('✓ Exported cutover scope: generated_from_uat_cutover_plan.json downloaded.');
       };
       function _downloadJson(name, obj){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'})); a.download=name; a.click(); }
 
@@ -527,16 +586,19 @@
         if(!raw){ alert('Business system not found in the UAT store — refresh from UAT first.'); return; }
         raw.name=String(($id('s5c-edit-name')||{}).value||raw.name).trim()||raw.name;
         raw.components=comps;
-        try{ localStorage.setItem('uatS1_systems', JSON.stringify(all)); }catch(e){ alert('Could not save: '+e.message); return; }
+        try{ localStorage.setItem('uatS1_systems', JSON.stringify(all)); }catch(e){ _s5cToast('Could not save: '+e.message, true); return; }
         C.editingId=null;
         s5cRefresh();
         try{ if(typeof uatS1ReloadFromStorage==='function') uatS1ReloadFromStorage(); }catch(e){}
+        _s5cToast('✓ Saved "'+raw.name+'" ('+comps.length+' components) — UAT store and all cutover matrices updated.');
       };
       window.s5cDismiss = function(id){
         if(!confirm('Remove from this cutover list? This does not delete it from UAT.')) return;
+        var removed=(C.systems.find(function(s){return s.id===id;})||{}).name||'system';
         C.dismissed[id]=true;
         if (C.selectedId===id){ C.selectedId=null; ['s5c-matrix-card','s5c-pairing-card','s5c-gates-card'].forEach(function(x){$id(x).style.display='none';}); }
         s5cRefresh();
+        _s5cToast('✓ "'+removed+'" removed from this cutover list (still available in UAT).');
       };
       window.s5cSelectSystem = function(id, silent){
         C.selectedId=id;
@@ -545,6 +607,10 @@
         _renderPairing();
         _renderGates();
         _applySectionsVisibility();
+        if (!silent){
+          var s=_sys();
+          if (s) _s5cToast('✓ "'+s.name+'" selected for cutover — matrix, pairing and gates updated below.');
+        }
       };
 
       /* ── One-button hide/show of the matrix / gates / feed / override sections.
@@ -575,6 +641,9 @@
         C.sectionsHidden = !C.sectionsHidden;
         try{ localStorage.setItem('s5c_sections_hidden', C.sectionsHidden?'1':'0'); }catch(e){}
         _applySectionsVisibility();
+        _s5cToast(C.sectionsHidden
+          ? '✓ Matrix, pairing, gates, feed and override sections hidden.'
+          : '✓ Matrix, pairing, gates, feed and override sections shown.');
       };
 
       /* ── Section 2: Business System Cutover Matrix (editable inline) ── */
@@ -726,12 +795,19 @@
         sign_off: 'Approve the Sign-Off gate (human approval).',
         evidence: 'Click Save Evidence in the Live Mobile Cutover Monitor.'
       };
+      /* Where each gate is fixed — element ids used by the "Go to fix" links. */
+      var GATE_FIX_TARGETS = {
+        uat_lock:'s5c-select-card', component_health:'s5c-matrix-card',
+        db:'bstp-card', cache:'bstp-card', queue:'bstp-card', backend:'bstp-card',
+        business_validation:'cutoverMobileBenchS5C', traffic_ramp:'cutoverMobileBenchS5C',
+        rollback:'s5c-gates-card', sign_off:'s5c-gates-card', evidence:'cutoverMobileBenchS5C'
+      };
       function _s5cCollectIssues(){
         var issues=[];
         var sys=_sys();
         if(!sys){
           issues.push({severity:'block', title:'No business system selected', source:'Cutover scope',
-            fix:'Select and lock a business system in the selector above.'});
+            fix:'Select and lock a business system in the selector above.', target:'s5c-select-card'});
           return issues;
         }
         _computeGates(sys).forEach(function(g){
@@ -739,7 +815,8 @@
           issues.push({
             severity:(g.status==='BLOCKED'||g.status==='NEEDS_INPUT')?'block':'review',
             title:g.label+' gate: '+g.status.replace(/_/g,' '),
-            source:'Cutover Gates', fix:GATE_FIX_HINTS[g.key]||'Resolve and re-run.'
+            source:'Cutover Gates', fix:GATE_FIX_HINTS[g.key]||'Resolve and re-run.',
+            target:GATE_FIX_TARGETS[g.key]||'s5c-gates-card'
           });
         });
         sys.components.forEach(function(c){
@@ -750,21 +827,22 @@
             severity:(st==='BLOCKED'||st==='NEEDS_INPUT')?'block':'review',
             title:c.name+' — '+st.replace(/_/g,' '),
             source:'Business System Cutover Matrix',
-            fix:st==='BLOCKED'?'Target VM is in ERROR — fix or replace the FLEX VM.'
-              :st==='NEEDS_INPUT'?'Fill the missing FLEX target IP / URL in the matrix.'
-              :'Classify the duplicate database component (Primary / Standby / Test).'
+            fix:st==='BLOCKED'?'Target VM is in ERROR — fix or replace the FLEX VM, then Refresh from UAT.'
+              :st==='NEEDS_INPUT'?'Fill the missing FLEX target IP / URL inline in the matrix row.'
+              :'Open the matrix row and pick Primary / Standby / Test / Out of Scope in the "Classify…" dropdown (cutover status column).',
+            target:'s5c-matrix-card'
           });
         });
         try{
           var plan=(typeof window.bstpGetResults==='function')?window.bstpGetResults():null;
           (plan&&plan.rows||[]).forEach(function(r){
             if(r.kind!=='component') return;
-            if(r.status==='FAIL') issues.push({severity:'block', title:'Test Plan: '+r.name+' FAILED', source:'Business System Test Plan', fix:r.detail||'Re-run the component test.'});
-            else if(r.status==='NEEDS INPUT'||r.status==='WARNING') issues.push({severity:'review', title:'Test Plan: '+r.name+' — '+r.status, source:'Business System Test Plan', fix:r.detail||'Review and re-run.'});
+            if(r.status==='FAIL') issues.push({severity:'block', title:'Test Plan: '+r.name+' FAILED', source:'Business System Test Plan', fix:r.detail||'Re-run the component test.', target:'bstp-card'});
+            else if(r.status==='NEEDS INPUT'||r.status==='WARNING') issues.push({severity:'review', title:'Test Plan: '+r.name+' — '+r.status, source:'Business System Test Plan', fix:r.detail||'Review and re-run.', target:'bstp-card'});
           });
         }catch(e){}
         if(C.liveGates&&C.liveGates.decision&&C.liveGates.decision!=='SAFE TO CONTINUE'){
-          issues.push({severity:'block', title:'Live monitor decision: '+C.liveGates.decision, source:'Live Mobile Cutover Monitor', fix:C.liveGates.reason||'Resolve the monitor blockers and re-run the journey.'});
+          issues.push({severity:'block', title:'Live monitor decision: '+C.liveGates.decision, source:'Live Mobile Cutover Monitor', fix:C.liveGates.reason||'Resolve the monitor blockers and re-run the journey.', target:'cutoverMobileBenchS5C'});
         }
         return issues;
       }
@@ -776,6 +854,22 @@
         el.innerHTML='<span style="color:'+(blocks?'#dc2626':'#16a34a')+';">'+blocks+' blocker(s)</span>'
           +'<span style="color:'+(reviews?'#d97706':'#16a34a')+';">'+reviews+' review item(s)</span>'
           +'<span style="color:#64748b;font-weight:600;">'+(blocks?'Resolve blockers before cutover.':(reviews?'Review items open — cutover possible with sign-off.':'All checks clear — ready to PASS CUTOVER.'))+'</span>';
+        _s5cValComps();
+      }
+      /* Small UAT-style card: every component's status on FLEX. */
+      function _s5cValComps(){
+        var box=$id('s5c-val-comps'); if(!box) return;
+        var sys=_sys();
+        if(!sys){ box.innerHTML='<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Components on FLEX</div><div style="font-size:11px;color:#94a3b8;">Select a business system to see per-component status.</div>'; return; }
+        var rows=sys.components.filter(function(c){return c.selected;}).map(function(c){
+          var st=_rowStatus(sys,c);
+          return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f3f4f6;min-width:0;">'
+            +'<span style="font-size:11px;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+_esc(c.name.length>42?c.name.slice(0,41)+'…':c.name)+'</span>'
+            +'<span style="font-size:10px;color:#94a3b8;white-space:nowrap;">'+_esc(c.target||'no FLEX target')+'</span>'
+            +_pill(st)+'</div>';
+        }).join('');
+        box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:12px;font-weight:700;color:#374151;">Components on FLEX</span><span style="font-size:10px;color:#94a3b8;">'+_esc(sys.name)+'</span></div>'
+          +'<div style="max-height:150px;overflow:auto;">'+rows+'</div>';
       }
       function _s5cRenderIssues(issues){
         var el=$id('s5c-val-issues'); if(!el) return;
@@ -784,9 +878,11 @@
           var block=i.severity==='block';
           return '<div style="display:flex;gap:10px;align-items:flex-start;border:1px solid '+(block?'#fca5a5':'#fde68a')+';background:'+(block?'#fff5f5':'#fffbeb')+';border-radius:8px;padding:10px 12px;">'
             +'<span style="font-size:10px;font-weight:900;padding:3px 9px;border-radius:10px;white-space:nowrap;color:#fff;background:'+(block?'#dc2626':'#d97706')+';">'+(block?'BLOCKER':'REVIEW')+'</span>'
-            +'<span style="min-width:0;"><b style="font-size:13px;color:#0f172a;">'+_esc(i.title)+'</b>'
+            +'<span style="min-width:0;flex:1;"><b style="font-size:13px;color:#0f172a;">'+_esc(i.title)+'</b>'
             +'<span style="display:block;font-size:11px;color:#64748b;">'+_esc(i.source)+'</span>'
-            +'<span style="display:block;font-size:12px;color:#374151;margin-top:2px;"><b>Fix:</b> '+_esc(i.fix)+'</span></span></div>';
+            +'<span style="display:block;font-size:12px;color:#374151;margin-top:2px;"><b>Fix:</b> '+_esc(i.fix)+'</span></span>'
+            +(i.target?'<button onclick="s5cGoFix(\''+i.target+'\')" style="align-self:center;white-space:nowrap;border:1px solid #2563eb;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:800;padding:6px 12px;border-radius:8px;cursor:pointer;">Go to fix &rarr;</button>':'')
+            +'</div>';
         }).join('')+'</div>';
       }
       window.s5cFixIssues = function(){

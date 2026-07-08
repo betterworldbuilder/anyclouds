@@ -536,8 +536,84 @@
           a.click();
         };
 
-        if(document.readyState!=='loading') bstpBuildPlan();
-        else document.addEventListener('DOMContentLoaded', function(){ bstpBuildPlan(); });
+        /* ── Component Blue/Green Test (dropdown in section 3) ──
+           Frontend keeps the full tester; other types get a type-specific
+           blue(source)/green(target) probe via the same test proxy. */
+        var CBG_TESTS = { frontend:'full blue/green tester above (kept as-is)', api:'HTTP health ×3 per side',
+          backend:'HTTP health ×3 per side', db:'TCP connect ×3 per side', cache:'TCP connect ×3 per side', queue:'TCP connect ×3 per side' };
+        function cbgKind(r){
+          var n=(r.name||'').toLowerCase();
+          if(r.traffic && (n.indexOf('frontend')>=0||n.indexOf('web')>=0||n.indexOf('mobile')>=0)) return 'frontend';
+          if(n.indexOf('cache')>=0||n.indexOf('redis')>=0) return 'cache';
+          if(n.indexOf('queue')>=0||n.indexOf('rabbit')>=0) return 'queue';
+          if(r.stateful) return 'db';
+          if(r.traffic) return 'api';
+          return 'backend';
+        }
+        window.cbgFillDropdown=function(announce){
+          var sel=$id('cbg-comp'); if(!sel) return;
+          if(!P.rows.length) bstpBuildPlan();
+          var comps=P.rows.filter(function(r){return r.kind==='component';});
+          sel.innerHTML=comps.length?comps.map(function(r){
+            return '<option value="'+P.rows.indexOf(r)+'">'+esc(r.name.length>44?r.name.slice(0,43)+'…':r.name)+' — '+cbgKind(r).toUpperCase()+'</option>';
+          }).join(''):'<option value="">No components — lock a business system scope first</option>';
+          if(announce){ var st=$id('cbg-status'); if(st) st.textContent='✓ '+comps.length+' component(s) loaded from "'+(P.system||'')+'".'; }
+        };
+        async function cbgProbeSide(r, kind, host){
+          var url=(kind==='db'||kind==='cache'||kind==='queue')
+            ? 'tcp://'+host+':'+(r.port||(kind==='cache'?'6379':(kind==='queue'?'5672':'3306')))
+            : 'http://'+host+(r.port?':'+r.port:'')+r.path;
+          var oks=0, ms=0, last='';
+          for(var i=0;i<3;i++){
+            try{ var res=await probe(url); if(res.ok) oks++; ms+=(res.elapsed_ms||0); last=res.ok?String(res.status||'open'):String(res.reason||res.error||res.status||'ERR'); }
+            catch(e){ last=e.message; }
+          }
+          return {oks:oks, avg:Math.round(ms/3), last:String(last).slice(0,60), url:url};
+        }
+        window.cbgRun=async function(){
+          var sel=$id('cbg-comp'), out=$id('cbg-results'), st=$id('cbg-status');
+          if(!sel||sel.value===''){ if(st) st.textContent='No component selected.'; return; }
+          var idx=parseInt(sel.value,10), r=P.rows[idx]; if(!r) return;
+          var kind=cbgKind(r);
+          if(kind==='frontend'){
+            bstpFeedTester(idx);
+            if(st) st.textContent='✓ Frontend pair fed into the tester above — run Dry Run / Cut over TEST there (full test kept as-is).';
+            if(out) out.innerHTML='';
+            return;
+          }
+          if(badTarget(r.target)||!r.source){ if(st) st.textContent='Missing source or FLEX target for this component — fill it in the matrix.'; return; }
+          if(st) st.textContent='Running '+CBG_TESTS[kind]+'…';
+          if(out) out.innerHTML='<span style="color:#94a3b8;font-size:12px;">Testing blue (source) and green (target)…</span>';
+          var blue=await cbgProbeSide(r,kind,r.source);
+          var green=await cbgProbeSide(r,kind,r.target);
+          var pass=green.oks===3, warn=green.oks>0&&!pass;
+          var delta=green.avg-blue.avg;
+          function card(lbl,color,res){
+            return '<div style="flex:1;min-width:190px;background:#1e293b;border:1px solid '+color+';border-radius:8px;padding:10px;">'
+              +'<div style="font-size:10px;font-weight:800;color:'+color+';text-transform:uppercase;">'+lbl+'</div>'
+              +'<div style="font-size:18px;font-weight:900;color:'+(res.oks===3?'#4ade80':(res.oks?'#facc15':'#f87171'))+';">'+res.oks+'/3 OK</div>'
+              +'<div style="font-size:11px;color:#94a3b8;">avg '+res.avg+' ms — '+esc(res.last)+'</div>'
+              +'<div style="font-size:10px;color:#64748b;overflow-wrap:anywhere;">'+esc(res.url)+'</div></div>';
+          }
+          if(out) out.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+            +card('Blue — Source OSPC','#3b82f6',blue)
+            +card('Green — Target FLEX','#22c55e',green)
+            +'<div style="flex:1;min-width:190px;background:#1e293b;border:1px solid '+(pass?'#22c55e':(warn?'#facc15':'#ef4444'))+';border-radius:8px;padding:10px;">'
+            +'<div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;">Verdict — '+esc(CBG_TESTS[kind])+'</div>'
+            +'<div style="font-size:18px;font-weight:900;color:'+(pass?'#4ade80':(warn?'#facc15':'#f87171'))+';">'+(pass?'PASS':(warn?'REVIEW':'FAIL'))+'</div>'
+            +'<div style="font-size:11px;color:#94a3b8;">latency delta '+(delta>=0?'+':'')+delta+' ms vs source</div></div></div>';
+          if(st) st.textContent='✓ '+r.name+' — green side '+(pass?'ready.':(warn?'partially answering — review.':'not answering — fix before cutover.'));
+          /* reflect the result into the Test Plan row + gates */
+          r.status=pass?'PASS':(warn?'WARNING':'FAIL');
+          r.srcRes=(blue.oks===3?'✓ ':'✗ ')+blue.oks+'/3 '+blue.avg+'ms';
+          r.tgtRes=(pass?'✓ ':(warn?'△ ':'✗ '))+green.oks+'/3 '+green.avg+'ms';
+          r.detail='Component blue/green test ('+CBG_TESTS[kind]+').';
+          render(); verdict(); publishGates();
+        };
+
+        function _bstpInit(){ bstpBuildPlan(); try{ window.cbgFillDropdown(); }catch(e){} }
+        if(document.readyState!=='loading') _bstpInit();
+        else document.addEventListener('DOMContentLoaded', _bstpInit);
       })();
       </script>
 
@@ -586,6 +662,22 @@
           <div id="cutover-tester-status" class="status-bar">
             <div class="status-dot yellow"></div>
             <span>Load Stage 2 jumphosts, then run Cut over TEST after LB/HAProxy config is ready.</span>
+          </div>
+
+          <!-- ── Component Blue/Green Test: pick any business-system component;
+               frontend keeps the full tester above, every other type gets its
+               own blue(source)/green(target) probe (HTTP for API/backend,
+               TCP for DB/cache/queue). ── -->
+          <div style="margin:0 0 16px;padding:12px 14px;background:#0f1c2e;border:1px solid #374151;border-radius:8px;">
+            <div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;">
+              <label style="display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:800;text-transform:uppercase;color:#7ecfff;">Component under test
+                <select id="cbg-comp" style="min-width:280px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:6px;padding:7px 9px;font-size:12px;"></select>
+              </label>
+              <button class="btn btn-primary" onclick="cbgRun()"><i class="fas fa-vial-circle-check"></i> Run Component Blue/Green Test</button>
+              <button class="btn btn-secondary light" onclick="cbgFillDropdown(true)"><i class="fas fa-rotate"></i> Reload Components</button>
+              <span id="cbg-status" style="font-size:12px;color:#94a3b8;align-self:center;"></span>
+            </div>
+            <div id="cbg-results" style="margin-top:10px;"></div>
           </div>
           <div id="cutover-tester-terminal-box" style="margin-bottom:16px;display:none;">
             <div style="display:flex;justify-content:space-between;background:#1a2e3b;padding:8px 12px;border-radius:8px 8px 0 0;border:1px solid #374151;border-bottom:0;">

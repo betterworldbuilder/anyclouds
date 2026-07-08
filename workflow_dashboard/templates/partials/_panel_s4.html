@@ -98,7 +98,6 @@
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <div class="ud-mode-pill">
-                    <button id="uat-mode-compact" class="ud-mode-btn" onclick="uatSetMode('compact')">Compact</button>
                     <button id="uat-mode-detailed" class="ud-mode-btn ud-mode-btn--on" onclick="uatSetMode('detailed')">Detailed</button>
                   </div>
                   <button class="ud-export-btn" onclick="uatDownloadFullCsv ? uatDownloadFullCsv() : null">
@@ -284,8 +283,15 @@
 
   <!-- ── Current FLEX VMs (live FLEX2FLEX scanner, no credentials/jump host shown) ── -->
   <!-- ── Source OSPC VMs (live scan — reuses Stage 4's scanner engine) ── -->
+  <script>
+  /* OSPC / FLEX VM scan sections are collapsed by default — header click toggles. */
+  function uatS1ToggleVmSection(head){
+    var body = head.parentNode.querySelector('.uat-s1-card-body');
+    if (body) body.style.display = (body.style.display === 'none') ? '' : 'none';
+  }
+  </script>
   <div class="uat-s1-card" id="uatS1OspcVmSection">
-    <div class="uat-s1-card-head">
+    <div class="uat-s1-card-head" style="cursor:pointer;" onclick="uatS1ToggleVmSection(this)" title="Click to expand / collapse">
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:32px;height:32px;border-radius:10px;background:#fff0f0;color:#dc2626;display:grid;place-items:center;font-weight:900;font-size:11px;">VM</div>
         <div>
@@ -295,7 +301,7 @@
       </div>
       <span class="uat-s1-pill red"><span id="uatS1OspcVmCount">0</span> VMs</span>
     </div>
-    <div class="uat-s1-card-body">
+    <div class="uat-s1-card-body" style="display:none;">
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Region
           <select class="uat-input" id="uatS1OspcVmRegion" style="min-width:160px;">
@@ -318,7 +324,7 @@
   </div>
 
   <div class="uat-s1-card" id="uatS1FlexVmSection">
-    <div class="uat-s1-card-head">
+    <div class="uat-s1-card-head" style="cursor:pointer;" onclick="uatS1ToggleVmSection(this)" title="Click to expand / collapse">
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:32px;height:32px;border-radius:10px;background:#eef2ff;color:#4338ca;display:grid;place-items:center;font-weight:900;font-size:11px;">VM</div>
         <div>
@@ -328,7 +334,7 @@
       </div>
       <span class="uat-s1-pill blue"><span id="uatS1FlexVmCount">0</span> VMs</span>
     </div>
-    <div class="uat-s1-card-body">
+    <div class="uat-s1-card-body" style="display:none;">
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;">Region
           <select class="uat-input" id="uatS1FlexVmRegion" style="min-width:160px;">
@@ -692,6 +698,7 @@
         })();
 
         window.uatSetMode = function(mode, silent) {
+          mode = 'detailed'; /* compact view removed — detailed only */
           document.body.classList.add('uat-dashboard-active');
           ['compact','detailed'].forEach(function(m) {
             var btn = document.getElementById('uat-mode-' + m);
