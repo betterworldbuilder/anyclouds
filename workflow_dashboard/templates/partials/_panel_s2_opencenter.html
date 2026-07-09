@@ -1,74 +1,113 @@
     <div id="s2opencenter-pane" class="gov-page" style="display:none;overflow:auto;padding:0;">
-      <div style="padding:12px 18px;">
-        <div class="gov-header">
-          <div class="gov-title-area">
-            <h2>🚀 Flex Apps to Cloud Native Migration Stage</h2>
-            <p>This stage turns the R6 containerization output into an OpenCenter-ready Kubernetes deployment package.</p>
-
-            <!-- ── Stage intro: pipeline + what/how/output ── -->
-            <style>
-              .ocm-pipe { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; margin:14px 0 16px; }
-              .ocm-node { flex:1; min-width:140px; background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:12px 14px; text-align:center; box-shadow:0 1px 3px rgba(15,23,42,.06); transition:transform .2s ease, box-shadow .2s ease; }
-              .ocm-node:hover { transform:translateY(-3px); box-shadow:0 10px 22px -10px rgba(15,23,42,.25); }
-              .ocm-node i { font-style:normal; display:flex; width:38px; height:38px; margin:0 auto 8px; border-radius:11px; align-items:center; justify-content:center; font-size:17px; color:#fff; }
-              .ocm-node b { display:block; font-size:12.5px; color:#0f172a; }
-              .ocm-node small { display:block; font-size:10.5px; color:#64748b; margin-top:2px; }
-              .ocm-arrow { align-self:center; color:#94a3b8; font-size:16px; font-weight:900; }
-              .ocm-cols { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:14px; margin:6px 0 4px; }
-              @media(max-width:1000px){ .ocm-cols{ grid-template-columns:1fr; } }
-              .ocm-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:14px 16px; }
-              .ocm-box h5 { margin:0 0 8px; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#0369a1; }
-              .ocm-box ul { margin:0; padding-left:16px; font-size:12.5px; color:#475569; line-height:1.75; }
-              .ocm-box p { margin:0; font-size:12.5px; color:#475569; line-height:1.7; }
-              .ocm-flow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:6px 0 10px; }
-              .ocm-flow span { background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:800; }
-              .ocm-flow em { font-style:normal; color:#94a3b8; }
-              .ocm-envs span { display:inline-block; background:#fff; border:1px solid #e2e8f0; border-radius:999px; padding:3px 10px; font-size:11px; font-weight:700; color:#334155; margin:3px 4px 0 0; }
-              .ocm-goal { margin-top:12px; background:linear-gradient(90deg,#0f172a,#1e3a5f); border-radius:12px; padding:12px 18px; color:#fff; font-size:13.5px; font-weight:700; }
-              .ocm-goal b { color:#7dd3fc; }
-              .ocm-lead { margin:14px 0 0; font-size:15px; font-weight:800; color:#0f172a; }
-            </style>
-            <p style="color:#475569;font-size:13px;line-height:1.7;margin:8px 0 0;">It imports the R6 bundle, validates the generated Kubernetes assets, maps them into OpenCenter&rsquo;s declarative platform model, and prepares the workload for GitOps reconciliation.</p>
-
-            <div class="ocm-pipe">
-              <div class="ocm-node"><i style="background:linear-gradient(135deg,#64748b,#475569);">&#128451;</i><b>OSPC</b><small>Legacy VM estate</small></div>
-              <div class="ocm-arrow">&rarr;</div>
-              <div class="ocm-node"><i style="background:linear-gradient(135deg,#0ea5e9,#2563eb);">&#9729;</i><b>FLEX</b><small>Modern cloud foundation</small></div>
-              <div class="ocm-arrow">&rarr;</div>
-              <div class="ocm-node"><i style="background:linear-gradient(135deg,#f97316,#f59e0b);">&#128230;</i><b>Containerization</b><small>R6 apps &rarr; containers</small></div>
-              <div class="ocm-arrow">&rarr;</div>
-              <div class="ocm-node"><i style="background:linear-gradient(135deg,#16a34a,#22c55e);">&#9881;</i><b>OpenCenter Cluster</b><small>GitOps-managed Kubernetes</small></div>
-              <div class="ocm-arrow">&rarr;</div>
-              <div class="ocm-node"><i style="background:linear-gradient(135deg,#7c3aed,#6366f1);">&#10024;</i><b>RAX AI Platform</b><small>Private AI &amp; future services</small></div>
+      <style>
+        #s2opencenter-pane .ocm-hero { position:relative; overflow:hidden; margin:28px 28px 26px; border-radius:34px; border:1px solid #bae6fd; background:linear-gradient(135deg,#ffffff 0%,#f0f9ff 58%,#e0f2fe 100%); box-shadow:0 24px 58px -26px rgba(14,165,233,.35),0 8px 20px rgba(2,132,199,.08); color:#0f172a; }
+        #s2opencenter-pane .ocm-hero-bg { position:absolute; inset:0; pointer-events:none; }
+        #s2opencenter-pane .ocm-hero-grid { position:absolute; inset:0; opacity:.68; background:linear-gradient(to right,rgba(14,165,233,.09) 1px,transparent 1px),linear-gradient(to bottom,rgba(14,165,233,.09) 1px,transparent 1px); background-size:54px 54px; }
+        #s2opencenter-pane .ocm-hero-glow { position:absolute; border-radius:999px; filter:blur(58px); }
+        #s2opencenter-pane .ocm-hero-inner { position:relative; display:grid; grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr); gap:38px; padding:48px 44px 38px; align-items:center; }
+        #s2opencenter-pane .ocm-badge { display:inline-flex; width:fit-content; align-items:center; gap:8px; border-radius:999px; border:1px solid #7dd3fc; background:rgba(255,255,255,.86); padding:8px 16px; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:#0369a1; box-shadow:0 1px 3px rgba(14,165,233,.18); backdrop-filter:blur(6px); margin-bottom:20px; }
+        #s2opencenter-pane .ocm-badge i { width:8px; height:8px; border-radius:50%; background:#0ea5e9; }
+        #s2opencenter-pane .ocm-title { margin:0; color:#020617; font-size:46px; line-height:1.08; font-weight:900; letter-spacing:0; }
+        #s2opencenter-pane .ocm-title span { display:block; color:#0284c7; }
+        #s2opencenter-pane .ocm-sub { margin:22px 0 0; max-width:660px; font-size:16px; line-height:1.75; color:#334155; }
+        #s2opencenter-pane .ocm-strat { margin-top:30px; max-width:700px; border-radius:28px; border:1px solid #7dd3fc; background:rgba(255,255,255,.88); padding:24px 26px; box-shadow:0 20px 40px -20px rgba(14,165,233,.5); backdrop-filter:blur(12px); display:flex; gap:20px; }
+        #s2opencenter-pane .ocm-strat-ico { width:56px; height:56px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:18px; background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff; font-size:24px; box-shadow:0 12px 22px -10px rgba(2,132,199,.85); }
+        #s2opencenter-pane .ocm-strat small { display:block; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:#0369a1; }
+        #s2opencenter-pane .ocm-strat p { margin:10px 0 0; font-size:16px; font-weight:800; line-height:1.72; color:#020617; }
+        #s2opencenter-pane .ocm-strat b { color:#0284c7; }
+        #s2opencenter-pane .ocm-chips { margin-top:22px; display:flex; flex-wrap:wrap; gap:8px; }
+        #s2opencenter-pane .ocm-chip { border-radius:999px; border:1px solid #7dd3fc; background:#fff; padding:6px 14px; font-size:12px; font-weight:900; color:#0369a1; box-shadow:0 1px 2px rgba(14,165,233,.14); }
+        #s2opencenter-pane .ocm-status-wrap { margin-top:20px; }
+        #s2opencenter-pane .ocm-status-wrap #s2opencenter-status { display:inline-flex; align-items:center; min-height:30px; border-radius:999px; padding:6px 14px; background:#ecfeff; border:1px solid #67e8f9; color:#0e7490; font-size:11px; font-weight:900; text-transform:uppercase; }
+        #s2opencenter-pane .ocm-visual { border-radius:30px; border:1px solid #bae6fd; background:rgba(255,255,255,.9); padding:22px; box-shadow:0 24px 54px -26px rgba(14,165,233,.52); backdrop-filter:blur(12px); }
+        #s2opencenter-pane .ocm-visual-hd { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:18px; }
+        #s2opencenter-pane .ocm-visual-hd small { display:block; font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:#0369a1; }
+        #s2opencenter-pane .ocm-visual-hd p { margin:4px 0 0; font-size:13px; color:#64748b; }
+        #s2opencenter-pane .ocm-ready { border-radius:999px; border:1px solid #a7f3d0; background:#ecfdf5; padding:5px 13px; font-size:11px; font-weight:900; color:#047857; white-space:nowrap; }
+        #s2opencenter-pane .ocm-node { display:flex; align-items:center; gap:18px; border-radius:22px; border:1px solid #dbeafe; background:#fff; padding:20px 22px; min-height:92px; box-shadow:0 12px 26px -22px rgba(2,132,199,.4); }
+        #s2opencenter-pane .ocm-node.first { border-color:#cbd5e1; background:linear-gradient(135deg,#f8fafc,#e2e8f0); }
+        #s2opencenter-pane .ocm-node.pkg { border-color:#fed7aa; background:linear-gradient(135deg,#fff7ed,#ffedd5); }
+        #s2opencenter-pane .ocm-node.gitops { border-color:#a7f3d0; background:linear-gradient(135deg,#ecfdf5,#d1fae5); }
+        #s2opencenter-pane .ocm-node.final { border-color:#38bdf8; background:linear-gradient(90deg,#0284c7,#0ea5e9,#38bdf8); box-shadow:0 18px 34px -14px rgba(2,132,199,.78); }
+        #s2opencenter-pane .ocm-node-ico { width:62px; height:62px; flex:none; display:flex; align-items:center; justify-content:center; border-radius:20px; background:linear-gradient(135deg,#0284c7,#38bdf8); color:#fff; font-size:28px; box-shadow:0 12px 22px -12px rgba(2,132,199,.86); }
+        #s2opencenter-pane .ocm-node.first .ocm-node-ico { background:linear-gradient(135deg,#475569,#0f172a); }
+        #s2opencenter-pane .ocm-node.pkg .ocm-node-ico { background:linear-gradient(135deg,#f97316,#fbbf24); box-shadow:0 12px 22px -12px rgba(249,115,22,.86); }
+        #s2opencenter-pane .ocm-node.gitops .ocm-node-ico { background:linear-gradient(135deg,#059669,#22c55e); box-shadow:0 12px 22px -12px rgba(5,150,105,.82); }
+        #s2opencenter-pane .ocm-node b { display:block; font-size:16px; font-weight:900; color:#020617; }
+        #s2opencenter-pane .ocm-node span { display:block; font-size:13px; color:#475569; margin-top:4px; line-height:1.35; }
+        #s2opencenter-pane .ocm-node.final .ocm-node-ico { background:rgba(255,255,255,.24); color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 12px 22px -12px rgba(2,132,199,.86); }
+        #s2opencenter-pane .ocm-node.final b { color:#fff; }
+        #s2opencenter-pane .ocm-node.final span { color:#e0f2fe; font-weight:700; }
+        #s2opencenter-pane .ocm-link { margin-left:25px; width:1px; height:16px; background:#7dd3fc; }
+        #s2opencenter-pane .ocm-summary { position:relative; display:grid; grid-template-columns:1.15fr .9fr .95fr; gap:14px; padding:0 44px 38px; }
+        #s2opencenter-pane .ocm-box { background:rgba(255,255,255,.9); border:1px solid #bae6fd; border-radius:24px; padding:20px 22px; box-shadow:0 12px 28px -20px rgba(2,132,199,.36); }
+        #s2opencenter-pane .ocm-box h5 { margin:0 0 10px; font-size:11px; font-weight:900; letter-spacing:.18em; text-transform:uppercase; color:#0369a1; }
+        #s2opencenter-pane .ocm-box p { margin:0; font-size:13px; color:#475569; line-height:1.7; }
+        #s2opencenter-pane .ocm-box ul { margin:0; padding-left:17px; font-size:13px; color:#475569; line-height:1.75; }
+        #s2opencenter-pane .ocm-flow { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin:4px 0 12px; }
+        #s2opencenter-pane .ocm-flow span, #s2opencenter-pane .ocm-envs span { display:inline-flex; align-items:center; border-radius:999px; border:1px solid #7dd3fc; background:#f0f9ff; color:#0369a1; padding:5px 11px; font-size:11px; font-weight:900; }
+        #s2opencenter-pane .ocm-flow em { font-style:normal; color:#0284c7; font-weight:900; }
+        #s2opencenter-pane .ocm-envs { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+        @media(max-width:1180px){ #s2opencenter-pane .ocm-hero-inner{ grid-template-columns:1fr; padding:40px 30px 30px; } #s2opencenter-pane .ocm-summary{ grid-template-columns:1fr; padding:0 30px 32px; } }
+        @media(max-width:760px){ #s2opencenter-pane .ocm-hero{ margin:18px 14px 22px; border-radius:24px; } #s2opencenter-pane .ocm-title{ font-size:30px; } #s2opencenter-pane .ocm-strat{ flex-direction:column; } }
+      </style>
+      <div class="ocm-hero">
+        <div class="ocm-hero-bg">
+          <div class="ocm-hero-glow" style="right:-90px;top:-90px;width:360px;height:360px;background:rgba(56,189,248,.28);"></div>
+          <div class="ocm-hero-glow" style="left:-80px;top:220px;width:320px;height:320px;background:rgba(186,230,253,.45);"></div>
+          <div class="ocm-hero-glow" style="right:34%;bottom:-90px;width:280px;height:280px;background:rgba(125,211,252,.28);"></div>
+          <div class="ocm-hero-grid"></div>
+        </div>
+        <div class="ocm-hero-inner">
+          <div>
+            <div class="ocm-badge"><i></i> Flex Apps Migration</div>
+            <h1 class="ocm-title">Flex Apps to<span>Cloud Native Migration Stage</span></h1>
+            <p class="ocm-sub">Turn R6 containerization output into an OpenCenter-ready Kubernetes deployment package with GitOps, validation, registry planning, and production handoff.</p>
+            <div class="ocm-strat">
+              <div class="ocm-strat-ico">&#128640;</div>
+              <div>
+                <small>Strategic Message</small>
+                <p>Use <b>R6</b> to convert legacy application assets into containers.<br>Use <b>OpenCenter</b> to operate those workloads as secure, auditable, cloud-native services.</p>
+              </div>
             </div>
-
-            <div class="ocm-cols">
-              <div class="ocm-box">
-                <h5>What it does</h5>
-                <p style="margin-bottom:6px;">Converts containerized application outputs into production-ready platform inputs:</p>
-                <ul>
-                  <li>Kubernetes YAML, Helm, Kustomize, or Flux manifests</li>
-                  <li>Container image and registry configuration</li>
-                  <li>Service, ingress, storage, secrets, and runtime settings</li>
-                  <li>GitOps repository structure</li>
-                  <li>Platform dependency checks &amp; deployment readiness status</li>
-                </ul>
-              </div>
-              <div class="ocm-box">
-                <h5>How it works</h5>
-                <div class="ocm-flow"><span>Configure</span><em>&rarr;</em><span>Generate</span><em>&rarr;</em><span>Reconcile</span><em>&rarr;</em><span>Run</span></div>
-                <p>The R6 output is checked, converted into OpenCenter configuration, pushed into GitOps, and reconciled by FluxCD into the target Kubernetes platform.</p>
-              </div>
-              <div class="ocm-box">
-                <h5>Output</h5>
-                <p style="margin-bottom:6px;">A secure, auditable, GitOps-managed deployment package ready to run across:</p>
-                <div class="ocm-envs"><span>FLEX</span><span>OpenStack</span><span>VMware</span><span>AWS</span><span>Bare Metal</span><span>Air-Gapped Sites</span></div>
-              </div>
+            <div class="ocm-chips">
+              <span class="ocm-chip">R6 Bundle Import</span><span class="ocm-chip">Kubernetes Ready</span><span class="ocm-chip">GitOps Handoff</span><span class="ocm-chip">Skyline FLEX Target</span>
             </div>
-            <div class="ocm-goal">The goal is simple: move from <b>containerized application</b> to <b>operated cloud-native platform workload</b>.</div>
-            
+            <div class="ocm-status-wrap"><div class="gov-status-badge status-pending" id="s2opencenter-status">Awaiting R6 Bundle</div></div>
           </div>
-          <div class="gov-status-badge status-pending" id="s2opencenter-status">Awaiting R6 Bundle</div>
+          <div class="ocm-visual">
+            <div class="ocm-visual-hd">
+              <div><small>Migration Flow</small><p>From converted app package to operated Kubernetes workload.</p></div>
+              <div class="ocm-ready">Ready Path</div>
+            </div>
+            <div class="ocm-node first"><div class="ocm-node-ico">&#128451;</div><div><b>OSPC / FLEX App Estate</b><span>Legacy runtime, services, and dependency context</span></div></div>
+            <div class="ocm-link"></div>
+            <div class="ocm-node pkg"><div class="ocm-node-ico">&#128230;</div><div><b>R6 Containerization Output</b><span>Images, manifests, externalization plan, readiness report</span></div></div>
+            <div class="ocm-link"></div>
+            <div class="ocm-node gitops"><div class="ocm-node-ico">&#128260;</div><div><b>OpenCenter GitOps Package</b><span>Helm, Kustomize, Flux, secrets, policies, registry plan</span></div></div>
+            <div class="ocm-link"></div>
+            <div class="ocm-node final"><div class="ocm-node-ico">&#9729;</div><div><b>Cloud-Native FLEX Workload</b><span>Validated, reconciled, monitored, and cutover-ready</span></div></div>
+          </div>
+        </div>
+        <div class="ocm-summary">
+          <div class="ocm-box">
+            <h5>What It Does</h5>
+            <ul>
+              <li>Imports the R6 bundle and validates generated Kubernetes assets</li>
+              <li>Maps service, ingress, storage, secrets, and runtime settings</li>
+              <li>Prepares image, registry, GitOps, and platform dependency evidence</li>
+            </ul>
+          </div>
+          <div class="ocm-box">
+            <h5>How It Works</h5>
+            <div class="ocm-flow"><span>Import</span><em>&rarr;</em><span>Validate</span><em>&rarr;</em><span>Generate</span><em>&rarr;</em><span>Reconcile</span></div>
+            <p>The converter output becomes OpenCenter configuration, lands in GitOps, and is reconciled into the target Kubernetes platform.</p>
+          </div>
+          <div class="ocm-box">
+            <h5>Output</h5>
+            <p>A secure, auditable deployment package ready to run across:</p>
+            <div class="ocm-envs"><span>FLEX</span><span>OpenStack</span><span>VMware</span><span>AWS</span><span>Bare Metal</span><span>Air-Gapped Sites</span></div>
+          </div>
         </div>
       </div>
 
@@ -1767,8 +1806,7 @@ mise run build
 
       <!-- Hidden (2026-07-09): redundant with the green "Deploy Production Cloud
            Native Apps with OpenCenter" section above. Kept in DOM (display:none)
-           because openCenterImportFromR6/upload render into oc-import-status /
-           oc-workload-body, which exist only here. -->
+           because openCenterImportFromR6/upload render into oc-import-status. -->
       <div class="gov-section" style="display:none;border-left:5px solid #16a34a;background:linear-gradient(135deg,#f0fdf4,#ffffff);">
         <h3 style="margin-top:0;">Import R6 Containerization Outputs</h3>
         <p style="color:#334155;line-height:1.6;">R6 Containerization prepares the application workloads. OpenCenter deploys and operates them with GitOps, security, observability, backup, and lifecycle management.</p>
@@ -1781,27 +1819,6 @@ mise run build
         </div>
         <div id="oc-import-status" style="background:#fff;border:1px solid #dbeafe;border-radius:10px;padding:12px;color:#0f172a;font-size:13px;">No R6 Containerization bundle found yet. Complete R6 first or upload an OpenCenter-ready bundle manually.</div>
       </div>
-      <div class="gov-section">
-        <h3>Imported Application Workloads</h3>
-        <div style="overflow:auto;">
-          <table class="gov-table" style="min-width:1080px;">
-            <thead><tr><th>Component</th><th>Layer</th><th>Kubernetes Kind</th><th>Image</th><th>Replicas</th><th>Service</th><th>Ingress/Gateway</th><th>ConfigMap</th><th>Secret</th><th>PVC</th><th>Readiness</th><th>Action Required</th></tr></thead>
-            <tbody id="oc-workload-body"><tr><td colspan="12" style="color:#64748b;">Import an R6 bundle to populate OpenCenter workload metadata.</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="gov-section">
-        <h3>OpenCenter Platform Actions</h3>
-        <div class="stage-fcard-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
-          <div class="gov-section"><h3>OpenCenter CLI</h3><p>Uses imported topology and package metadata as generated YAML input.</p></div>
-          <div class="gov-section"><h3>GitOps Repository</h3><p>Uses imported Kustomize, Helm, Flux, image plans, and README handoff files.</p></div>
-          <div class="gov-section"><h3>Air-Gap Packaging</h3><p>Includes imported images, charts, YAML, SBOM placeholders, and registry plan.</p></div>
-          <div class="gov-section"><h3>Observability & Security</h3><p>Uses ServiceMonitor, OpenTelemetry, NetworkPolicy, Secret, RBAC, and policy requirements.</p></div>
-        </div>
-      </div>
-
-
-
       <script>
       (function() {
         var R6_TEMPLATES = [
@@ -2355,6 +2372,7 @@ mise run build
     {key:'s3',    def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {key:'s4',    def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {key:'start',   def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
+    {key:'flexhowto', def:'https://www.youtube.com/watch?v=AE7Nujk7yV8'},
     {key:'pnl-s1',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {key:'pnl-s2',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
     {key:'pnl-s4',  def:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},
@@ -2371,13 +2389,16 @@ mise run build
   ];
   function tourVidLoad() {
     TOUR_VID_KEYS.forEach(function(v) {
-      var url = localStorage.getItem('tour-vid-' + v.key) || v.def;
+      var saved = localStorage.getItem('tour-vid-' + v.key) || '';
+      var url = saved || v.def;
       var el  = document.getElementById('tour-vid-' + v.key);
       if (el) el.href = url;
       var inp = document.getElementById('tvurl-' + v.key);
-      if (inp) inp.value = localStorage.getItem('tour-vid-' + v.key) || '';
+      if (inp) inp.value = saved || (v.key === 'flexhowto' ? v.def : '');
+      var mgrInp = document.getElementById('tvmgr-' + v.key);
+      if (mgrInp) mgrInp.value = saved || (v.key === 'flexhowto' ? v.def : '');
       var stgInp = document.getElementById('stginp-' + v.key);
-      if (stgInp) { var s = localStorage.getItem('tour-vid-' + v.key); if (s) stgInp.value = s; }
+      if (stgInp) stgInp.value = saved || (v.key === 'flexhowto' ? v.def : '');
     });
   }
   window.tourVidUpdateOne = function(key, url) {
@@ -2386,6 +2407,10 @@ mise run build
     localStorage.setItem('tour-vid-' + key, url);
     var el = document.getElementById('tour-vid-' + key);
     if (el) el.href = url;
+    var mgrInp = document.getElementById('tvmgr-' + key);
+    if (mgrInp) mgrInp.value = url;
+    var stgInp = document.getElementById('stginp-' + key);
+    if (stgInp) stgInp.value = url;
   };
   window.tourVidSaveOne = function(key) {
     var wrap = document.getElementById('tvurl-' + key);
