@@ -6538,7 +6538,20 @@ ${certContent}
       }, 120);
     }
     applyStageGreenRoll();
+    applySkyTopStages();
   }
+
+  function applySkyTopStages() {
+    document.querySelectorAll('#stageBar .stage-btn.sky-top-stage').forEach(function(btn) {
+      btn.style.setProperty('background', 'linear-gradient(135deg, #0369a1, #0ea5e9, #38bdf8)', 'important');
+      btn.style.setProperty('border-color', '#7dd3fc', 'important');
+      btn.style.setProperty('color', '#ffffff', 'important');
+      btn.style.setProperty('box-shadow', '0 0 16px rgba(14,165,233,.55), inset 0 0 12px rgba(255,255,255,.18)', 'important');
+      btn.style.setProperty('text-shadow', '0 0 8px rgba(224,242,254,.5)', 'important');
+      btn.style.setProperty('transform', 'none', 'important');
+    });
+  }
+  window.applySkyTopStages = applySkyTopStages;
 
   function applyStageGreenRoll() {
     var delays = {
@@ -6569,8 +6582,12 @@ ${certContent}
     });
   }
   window.applyStageGreenRoll = applyStageGreenRoll;
-  if (document.readyState !== 'loading') setTimeout(applyStageGreenRoll, 80);
-  else document.addEventListener('DOMContentLoaded', function(){ setTimeout(applyStageGreenRoll, 80); });
+  function applyStageNavStyles() {
+    applySkyTopStages();
+    applyStageGreenRoll();
+  }
+  if (document.readyState !== 'loading') setTimeout(applyStageNavStyles, 80);
+  else document.addEventListener('DOMContentLoaded', function(){ setTimeout(applyStageNavStyles, 80); });
 
   function activateStageFromUrl() {
     var params = new URLSearchParams(window.location.search || '');
