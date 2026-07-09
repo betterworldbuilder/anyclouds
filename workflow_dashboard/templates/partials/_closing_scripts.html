@@ -7881,6 +7881,10 @@ ${certContent}
   // Stage 2 sub-btn clicks
   document.querySelectorAll('#subBar2 .sub-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (btn.dataset.stageTarget) {
+        activateStage(btn.dataset.stageTarget);
+        return;
+      }
       if (btn.dataset.sub === 's2fullmig') {
         const infraPane = document.getElementById('s2rehost_p1-pane');
         if (infraPane) {
