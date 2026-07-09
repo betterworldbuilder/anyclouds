@@ -12,8 +12,8 @@
       {% include "_opencenter_platform.html" %}
 
       <!-- ── OpenCenter Quick Start Guide (collapsed) ── -->
-      <div style="margin-bottom:18px;border:2px solid #0ea5e9;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(14,165,233,.15);">
-        <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#0369a1,#0e7490);cursor:pointer;user-select:none;">
+      <div style="margin-bottom:18px;border:2px solid #f59e0b;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,.2);">
+        <div id="ocqs-inline-toggle" onclick="(function(){var b=document.getElementById('ocqs-inline-body');var a=document.getElementById('ocqs-inline-arrow');var open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▶':'▼';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:linear-gradient(135deg,#b45309,#d97706);cursor:pointer;user-select:none;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:20px;">🚀</span>
             <div>
@@ -1501,12 +1501,12 @@ var c9b=g('ocqs-cmd-9b');
         </div><!-- end inline body -->
       </div><!-- end quick start collapsed -->
       <!-- Clone FLEX Apps to Cluster Containers -->
-      <div style="margin-top:20px;border:2px solid #7c3aed;border-radius:12px;overflow:hidden;">
-        <div id="clf-toggle" onclick="(function(){var b=document.getElementById('clf-body');var a=document.getElementById('clf-arrow');var o=b.style.display!=='none';b.style.display=o?'none':'block';a.textContent=o?'&#9654;':'&#9660;'})()" style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#3b0764,#7c3aed,#6366f1);cursor:pointer;user-select:none;">
+      <div style="margin-top:20px;border:2px solid #16a34a;border-radius:12px;overflow:hidden;">
+        <div id="clf-toggle" onclick="(function(){var b=document.getElementById('clf-body');var a=document.getElementById('clf-arrow');var o=b.style.display!=='none';b.style.display=o?'none':'block';a.textContent=o?'&#9654;':'&#9660;'})()" style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#14532d,#16a34a,#22c55e);cursor:pointer;user-select:none;">
           <div>
-            <div style="font-size:10px;font-weight:800;color:#ddd6fe;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">Deploy Converted Cloud-Native Apps</div>
-            <div style="font-size:18px;font-weight:900;color:#fff;">Clone FLEX Apps to Cluster Containers</div>
-            <div style="font-size:12px;color:#c4b5fd;margin-top:3px;">Apps Container Converter Output &#8594; OpenCenter GitOps &#8594; Kubernetes Platform &#8594; Cloud-Native App</div>
+            <div style="font-size:10px;font-weight:800;color:#bbf7d0;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">Deploy Converted Cloud-Native Apps</div>
+            <div style="font-size:18px;font-weight:900;color:#fff;">Deploy Production Cloud Native Apps with OpenCenter</div>
+            <div style="font-size:12px;color:#bbf7d0;margin-top:3px;">Apps Container Converter Output &#8594; OpenCenter GitOps &#8594; Kubernetes Platform &#8594; Cloud-Native App</div>
           </div>
           <span id="clf-arrow" style="color:#fff;font-size:18px;font-weight:900;">&#9660;</span>
         </div>
@@ -1703,7 +1703,11 @@ mise run build
       <!-- end Clone FLEX Apps to Cluster Containers -->
 
 
-      <div class="gov-section" style="border-left:5px solid #16a34a;background:linear-gradient(135deg,#f0fdf4,#ffffff);">
+      <!-- Hidden (2026-07-09): redundant with the green "Deploy Production Cloud
+           Native Apps with OpenCenter" section above. Kept in DOM (display:none)
+           because openCenterImportFromR6/upload render into oc-import-status /
+           oc-workload-body, which exist only here. -->
+      <div class="gov-section" style="display:none;border-left:5px solid #16a34a;background:linear-gradient(135deg,#f0fdf4,#ffffff);">
         <h3 style="margin-top:0;">Import R6 Containerization Outputs</h3>
         <p style="color:#334155;line-height:1.6;">R6 Containerization prepares the application workloads. OpenCenter deploys and operates them with GitOps, security, observability, backup, and lifecycle management.</p>
         <p style="font-weight:900;color:#0f172a;">R6 Containerization Bundle → OpenCenter Import → GitOps Repository → Flux Reconcile → Production Kubernetes Platform</p>

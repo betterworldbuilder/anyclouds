@@ -412,7 +412,105 @@
           </div>
         </div>
 
+        <!-- HOW TO USE FLEX — Rackspace OpenStack Flex 9-video series -->
+        <div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">
+          <div class="tour-card-hdr" style="background:linear-gradient(135deg,#14532d,#16a34a);padding:16px 20px;">
+            <div style="font-size:28px;margin-bottom:6px;">&#9729;&#65039;</div>
+            <h3 style="margin:0;color:#dcfce7;font-size:16px;">How to use Flex</h3>
+            <p style="margin:4px 0 0;color:#86efac;font-size:12px;">Rackspace OpenStack Flex fundamentals — 9-video series by Rackspace Technology</p>
+          </div>
+          <div style="padding:16px 20px;">
+            <ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:12px;line-height:1.8;max-height:210px;overflow-y:auto;"><li>Video 1/9: How to Login and Navigate the Rackspace OpenStack Flex Dashboard (0:27)</li><li>Video 2/9: How to Build and Upload Custom Images in Rackspace OpenStack Flex (0:45)</li><li>Video 3/9: How to Configure Virtual Networks in Rackspace OpenStack Flex (1:12)</li><li>Video 4/9: How to Provision and Attach Storage Volumes in Rackspace OpenStack Flex (0:58)</li><li>Video 5/9: How to Generate SSH Keypairs for Secure Access in Rackspace OpenStack Flex (0:33)</li><li>Video 6/9: How to Allocate and Associate Floating IPs in Rackspace OpenStack Flex (0:40)</li><li>Video 7/9: How to Configure Security Groups and Rules in Rackspace OpenStack Flex (1:04)</li><li>Video 8/9: How to Deploy Load Balancers in Rackspace OpenStack Flex for High Availability (1:18)</li><li>Video 9/9: How to Launch and Configure Virtual Servers in Rackspace OpenStack Flex (2:12)</li></ul>
+            <div class="tour-video-box" style="margin-top:12px;padding:10px;background:#052e16;border-radius:8px;">
+              <div style="font-size:11px;color:#86efac;font-weight:600;margin-bottom:6px;">&#127909; VIDEO PLAYLIST — one link covers the whole series</div>
+              <a id="tour-vid-flexhowto" href="#" target="_blank" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                <span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>
+                Watch the full "How to use Flex" series
+              </a>
+              <div style="display:flex;gap:6px;">
+                <input id="stginp-flexhowto" type="url" placeholder="Paste the YouTube playlist URL..." style="flex:1;background:rgba(0,0,0,.35);border:1px solid rgba(147,197,253,.25);border-radius:4px;padding:5px 8px;color:#93c5fd;font-size:10px;min-width:0;">
+                <button onclick="stgVidSave('flexhowto')" style="background:rgba(37,99,235,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;">&#10003; Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom operator-added tutorial cards render here -->
+        <div id="tour-custom-cards" style="display:contents;"></div>
+
       </div>
+
+      <!-- ADD VIDEO TUTORIAL -->
+      <div style="text-align:center;margin:-12px 0 28px;">
+        <button onclick="tourAddCard()" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);border:none;border-radius:10px;padding:12px 26px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,.4);">&#65291; Add Video Tutorial</button>
+      </div>
+
+      <script>
+      (function(){
+        'use strict';
+        var KEY='tour_custom_tutorials';
+        function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]')||[]; }catch(e){ return []; } }
+        function save(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
+        function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);}); }
+
+        function cardHtml(c, i){
+          if (c.editing){
+            return '<div class="tour-card" style="background:#1e293b;border:2px dashed #3b82f6;border-radius:12px;padding:16px 20px;">'
+              + '<div style="font-size:11px;color:#93c5fd;font-weight:800;text-transform:uppercase;margin-bottom:10px;">New video tutorial</div>'
+              + '<input id="tcc-title-'+i+'" value="'+esc(c.title||'')+'" placeholder="Title — e.g. Stage 4C Deep Dive" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid #334155;border-radius:6px;padding:8px;color:#e2e8f0;font-size:13px;font-weight:700;margin-bottom:8px;">'
+              + '<input id="tcc-sub-'+i+'" value="'+esc(c.sub||'')+'" placeholder="Subtitle — short description" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid #334155;border-radius:6px;padding:8px;color:#94a3b8;font-size:12px;margin-bottom:8px;">'
+              + '<textarea id="tcc-points-'+i+'" rows="4" placeholder="Bullet points — one per line" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid #334155;border-radius:6px;padding:8px;color:#94a3b8;font-size:12px;margin-bottom:8px;">'+esc(c.points||'')+'</textarea>'
+              + '<input id="tcc-url-'+i+'" value="'+esc(c.url||'')+'" placeholder="Video URL (YouTube...)" style="width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid #334155;border-radius:6px;padding:8px;color:#7dd3fc;font-size:12px;margin-bottom:10px;">'
+              + '<div style="display:flex;gap:8px;">'
+              + '<button onclick="tourSaveCard('+i+')" style="flex:1;background:#16a34a;border:none;border-radius:6px;padding:8px;color:#fff;font-weight:800;font-size:12px;cursor:pointer;">&#10003; Save Tutorial</button>'
+              + '<button onclick="tourDeleteCard('+i+')" style="background:#7f1d1d;border:none;border-radius:6px;padding:8px 14px;color:#fecaca;font-weight:800;font-size:12px;cursor:pointer;">Delete</button>'
+              + '</div></div>';
+          }
+          var pts=(c.points||'').split('\n').filter(function(x){return x.trim();});
+          return '<div class="tour-card" style="background:#1e293b;border:1px solid #334155;border-radius:12px;overflow:hidden;">'
+            + '<div class="tour-card-hdr" style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:16px 20px;position:relative;">'
+            + '<div style="font-size:28px;margin-bottom:6px;">&#127916;</div>'
+            + '<h3 style="margin:0;color:#dbeafe;font-size:16px;">'+esc(c.title||'Untitled tutorial')+'</h3>'
+            + '<p style="margin:4px 0 0;color:#93c5fd;font-size:12px;">'+esc(c.sub||'')+'</p>'
+            + '<button onclick="tourEditCard('+i+')" title="Edit" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,.15);border:none;border-radius:6px;padding:4px 9px;color:#fff;font-size:11px;cursor:pointer;">&#9998;</button>'
+            + '</div><div style="padding:16px 20px;">'
+            + (pts.length?'<ul style="margin:0;padding:0 0 0 16px;color:#94a3b8;font-size:13px;line-height:1.8;">'+pts.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')
+            + '<div class="tour-video-box" style="margin-top:12px;padding:10px;background:#172554;border-radius:8px;">'
+            + '<div style="font-size:11px;color:#93c5fd;font-weight:600;margin-bottom:6px;">&#127909; VIDEO TUTORIAL</div>'
+            + (c.url?'<a href="'+esc(c.url)+'" target="_blank" rel="noopener" style="color:#7dd3fc;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:6px;"><span style="background:#dc2626;border-radius:3px;padding:2px 6px;color:#fff;font-size:10px;font-weight:700;">YT</span>'+esc(c.title||'Watch')+'</a>'
+                   :'<span style="color:#64748b;font-size:12px;">No video linked yet — edit this card.</span>')
+            + '</div></div></div>';
+        }
+        function render(){
+          var host=document.getElementById('tour-custom-cards'); if(!host) return;
+          host.innerHTML=load().map(cardHtml).join('');
+        }
+        window.tourAddCard=function(){
+          var list=load(); list.push({title:'',sub:'',points:'',url:'',editing:true}); save(list); render();
+          var host=document.getElementById('tour-custom-cards');
+          if(host && host.lastElementChild) host.lastElementChild.scrollIntoView({behavior:'smooth',block:'center'});
+        };
+        window.tourEditCard=function(i){ var l=load(); if(l[i]){ l[i].editing=true; save(l); render(); } };
+        window.tourDeleteCard=function(i){ var l=load(); l.splice(i,1); save(l); render(); };
+        window.tourSaveCard=function(i){
+          var l=load(); if(!l[i]) return;
+          function v(id){ var n=document.getElementById(id); return n?n.value:''; }
+          var url=v('tcc-url-'+i).trim();
+          if(url && !/^https?:\/\//i.test(url)) url='https://'+url;
+          l[i]={title:v('tcc-title-'+i).trim()||'Untitled tutorial', sub:v('tcc-sub-'+i).trim(), points:v('tcc-points-'+i), url:url, editing:false};
+          save(l); render();
+        };
+        function initFlexLink(){
+          var url=(localStorage.getItem('tour-vid-flexhowto')||'').trim();
+          var a=document.getElementById('tour-vid-flexhowto');
+          var inp=document.getElementById('stginp-flexhowto');
+          if(a && url) a.href=url;
+          if(inp && url) inp.value=url;
+        }
+        if(document.readyState!=='loading'){ render(); initFlexLink(); }
+        else document.addEventListener('DOMContentLoaded', function(){ render(); initFlexLink(); });
+      })();
+      </script>
 
       <!-- KEYBOARD SHORTCUTS & TIPS -->
       <div id="s-tour-tips" class="tour-section" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:20px;">

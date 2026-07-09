@@ -3772,6 +3772,12 @@ def feedback_submit():
     return jsonify({"ok": True, "id": entry["id"], "email_status": entry["email_status"]})
 
 
+@app.get("/opencenter-intro-light")
+def opencenter_intro_light():
+    """Standalone light-theme OpenCenter intro (IntroLight) — embedded via iframe."""
+    return render_template("opencenter_intro_light.html")
+
+
 @app.post("/api/stage4c/ramp/set")
 def stage4c_ramp_set():
     data = request.get_json(silent=True) or {}

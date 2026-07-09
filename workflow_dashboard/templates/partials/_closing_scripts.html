@@ -11677,6 +11677,7 @@ ${certContent}
       + '<div class="lcv-decision" id="' + id + '-lcv-decision" data-val="HOLD">HOLD</div>'
       + '<span class="lcv-decision-reason" id="' + id + '-lcv-hd-reason"></span>'
       + '<button type="button" class="lcv-btn" onclick="lcvWhyHold(\'' + id + '\')">Why?</button>'
+      + '<button type="button" class="lcv-btn" onclick="lcvResetLayout(\'' + id + '\')" title="Restore the default card arrangement and sizes">&#10226; Reset Layout</button>'
       + '<span class="lcv-hd-upd">Last Updated: <b id="' + id + '-lcv-hd-upd2">-</b></span>'
       + '<button type="button" class="lcv-btn lcv-btn-danger" onclick="cutMobResetRamp(\'' + id + '\')">&#8630;</button></div></div>'
       + '<div class="lcv-kpis">'
@@ -11724,6 +11725,11 @@ ${certContent}
     style.textContent += '.lcv-blue{color:#1d4ed8!important}.lcv-green{color:#16a34a!important}.lcv-kpis{display:flex;justify-content:flex-end;gap:12px;margin-top:14px;flex-wrap:wrap}.lcv-kpi{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 16px;min-width:170px}.lcv-kpi-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px}.lcv-kpi small{display:block;font-size:10px;font-weight:700;color:#64748b}.lcv-kpi b{display:block;font-size:15px;color:#0f172a}.lcv-strip{display:grid;grid-template-columns:1.3fr 1fr 1fr 1.5fr 1.1fr;gap:10px;margin-top:12px}.lcv-hcell{display:flex;align-items:center;gap:10px}.lcv-strip-ic{color:#475569;font-size:14px;width:28px;height:28px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0}.lcv-ramp-sub{font-size:12px;color:#64748b;margin:-4px 0 10px}.lcv-ramp-ends{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:2px}.lcv-end-ospc{color:#1d4ed8}.lcv-end-flex{color:#16a34a}.lcv-rampstats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid #e2e8f0;border-radius:12px;margin:12px 0 10px;overflow:hidden}.lcv-rampstats>span{padding:10px 12px;border-right:1px solid #eef2f7;min-width:0}.lcv-rampstats>span:last-child{border-right:none}.lcv-rampstats small{display:block;font-size:10px;font-weight:700;color:#64748b}.lcv-rampstats b{display:block;font-size:15px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lcv-slider-dots{-webkit-appearance:none!important;appearance:none;width:100%;height:40px;border-radius:999px;background:transparent!important;border:none!important;padding:0!important}.lcv-slider-dots::-webkit-slider-runnable-track{-webkit-appearance:none;height:36px;border-radius:999px;border:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.9) 0 6px,transparent 6px 16px),linear-gradient(90deg,#dbeafe 0%,#a7f3d0 55%,#22c55e 100%)!important;box-shadow:inset 0 1px 3px rgba(15,23,42,.12)}.lcv-slider-dots::-moz-range-track{height:36px;border-radius:999px;border:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.9) 0 6px,transparent 6px 16px),linear-gradient(90deg,#dbeafe 0%,#a7f3d0 55%,#22c55e 100%)!important;box-shadow:inset 0 1px 3px rgba(15,23,42,.12)}.lcv-slider-dots::-webkit-slider-thumb{-webkit-appearance:none;width:46px;height:46px;margin-top:-5px;border-radius:99px;background:#fff linear-gradient(#94a3b8 0 0) center/16px 2px no-repeat,#fff;background-image:linear-gradient(#94a3b8 0 0),linear-gradient(#94a3b8 0 0),linear-gradient(#94a3b8 0 0);background-size:16px 2px;background-position:center calc(50% - 5px),center,center calc(50% + 5px);background-repeat:no-repeat;background-color:#fff;border:1px solid #e2e8f0;box-shadow:0 6px 18px rgba(15,23,42,.25);cursor:grab}.lcv-slider-dots::-moz-range-thumb{width:42px;height:42px;border-radius:99px;background-color:#fff;border:1px solid #e2e8f0;box-shadow:0 6px 18px rgba(15,23,42,.25);cursor:grab}.lcv-ticks span{text-align:center;line-height:1.25}.lcv-tl-more{text-align:center;margin-top:10px;border-top:1px solid #f1f5f9;padding-top:10px}.lcv-tl-more a{color:#1d4ed8;font-size:12.5px;font-weight:800;text-decoration:none}.lcv-decision[data-val="CUTOVER COMPLETE"]{background:#fff;border:1.5px solid #34d399;color:#047857}.lcv-decision-reason{color:#15803d}.lcv-decision[data-val="HOLD"]~.lcv-decision-reason,.lcv-decision[data-val="BLOCKED"]~.lcv-decision-reason{color:#b91c1c}';
     style.textContent += '.lcv-uat-mount{margin-top:4px}.lcv-uat-hint{font-size:11px;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:10px;padding:10px;text-align:center}.lcv-uat-mount .uat-live-side{border:none!important;box-shadow:none!important;padding:0!important;border-left:none!important}.lcv-uat-mount .uat-live-head{display:none}.lcv-uat-mount .uat-live-controls{grid-template-columns:1.2fr 1.4fr .7fr .8fr;gap:6px;margin-bottom:8px}.lcv-uat-mount .uat-live-controls label{font-size:9px}.lcv-uat-mount .uat-live-actions{gap:5px;margin-bottom:8px}.lcv-uat-mount .uat-live-actions button{padding:6px 9px;font-size:10.5px}.lcv-uat-mount .uat-live-phone{height:560px;width:100%}.lcv-uat-mount .uat-live-dev{margin-top:10px;border-radius:12px}.lcv-uat-mount .uat-live-table-wrap{max-height:220px;overflow:auto}';
     style.textContent += '.lcv-bench .lcv-card:not(.lcv-header){resize:both;overflow:auto;min-width:280px;min-height:90px;max-width:100%}.lcv-bench .lcv-card:not(.lcv-header)::-webkit-resizer{border:6px solid transparent;border-right-color:#cbd5e1;border-bottom-color:#cbd5e1;border-radius:0 0 12px 0}';
+    style.textContent += '.lcv-live{display:block!important;column-width:430px;column-gap:16px}.lcv-live .lcv-col{display:contents}.lcv-live .lcv-card,.lcv-live .lcv-midrow,.lcv-live .lcv-adv-stack{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 16px;width:100%;display:inline-block;vertical-align:top}.lcv-live .lcv-midrow{display:grid;grid-template-columns:1fr 1fr;gap:16px}.lcv-live .lcv-adv-stack{display:grid;gap:10px}.lcv-bench .lcv-card:not(.lcv-header),.lcv-adv-stack>details,.lcv-uat-mount .uat-live-dev{resize:both;overflow:auto;min-height:60px;max-width:100%}@media(max-width:1100px){.lcv-live{column-width:auto;column-count:1}}';
+    style.textContent += '.lcv-live{display:flex!important;flex-wrap:wrap;gap:16px;align-items:flex-start;column-width:auto!important}.lcv-live>*{flex:1 1 calc(50% - 16px);min-width:min(480px,100%);width:auto!important;margin:0!important;position:relative;box-sizing:border-box}.lcv-live>.lcv-adv-stack{flex-basis:100%}.lcv-drag-handle{position:absolute;top:8px;right:10px;z-index:6;cursor:grab;color:#94a3b8;font-size:13px;line-height:1;padding:3px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;user-select:none;letter-spacing:-2px}.lcv-drag-handle:hover{color:#334155;border-color:#94a3b8}.lcv-dragging{opacity:.45;outline:2px dashed #3b82f6;outline-offset:2px}@media(max-width:1100px){.lcv-live>*{flex-basis:100%}}';
+    style.textContent += '.lcv-drag-handle{position:static!important;display:block;width:100%;text-align:center;cursor:grab;user-select:none;color:#94a3b8;font-size:10px;font-weight:800;letter-spacing:1px;padding:4px 0;margin:-8px 0 6px;border:none!important;background:linear-gradient(180deg,#f8fafc,#eef2f7);border-radius:8px}.lcv-drag-handle:hover{color:#1d4ed8;background:#eff6ff}.lcv-drag-handle:active{cursor:grabbing}.lcv-drag-active iframe{pointer-events:none}.lcv-uat-mount .uat-live-phone{width:min(100%,430px)!important;margin:0 auto 12px!important}.lcv-uat-mount .uat-live-side,.lcv-uat-mount .uat-live-dev{max-width:100%}.lcv-live>*{flex-grow:1!important}';
+    style.textContent += '.lcv-live>*{max-height:640px;overflow:auto;flex:1 1 calc(50% - 16px)!important;min-width:min(460px,100%)}.lcv-live>.lcv-adv-stack{flex-basis:100%!important;max-height:none}.lcv-live>*::-webkit-scrollbar{width:8px}.lcv-live>*::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}.lcv-dragging{opacity:.5;outline:2px dashed #3b82f6;outline-offset:2px}.lcv-drag-handle{touch-action:none}';
+    style.textContent += '.lcv-live{gap:12px}.lcv-live>*{max-height:540px;min-width:min(410px,100%);flex:1 1 calc(33.3% - 12px)!important;padding:12px 14px}.lcv-live>.lcv-adv-stack{flex-basis:100%!important}.lcv-bench{gap:12px;padding:14px}';
     document.head.appendChild(style);
   }
   function cutMobVal(id, role, key) { var n = el(id + '-' + role + '-' + key); return n ? String(n.value || '').trim() : ''; }
@@ -12525,6 +12531,99 @@ ${certContent}
     });
     if (filled) cutMobLog(id, 'cutover', '[backend-proof] ' + filled + ' endpoint(s) prefilled from the locked business-system scope — the *.local placeholders never resolve, which is why proof rows showed BLOCKED. Re-run "Run All" on both panels.');
   }
+  /* Cards are draggable (handle top-right) and the order persists per bench.
+     Columns are flattened so every card is a direct flex child of .lcv-live —
+     rows fill the full width, 1-2 cards per row, resize reflows neighbours. */
+  /* Every card is a direct flex child (columns and the identity/gate pair
+     are dissolved). Cards cap at a uniform height with internal scroll so
+     rows pack horizontally first with no holes. Reordering is instant
+     pointer-drag from the grab bar (pointer capture keeps working over
+     iframes). */
+  function lcvMakeArrangeable(id) {
+    var bench = el(id); if (!bench) return;
+    var live = bench.querySelector('.lcv-live'); if (!live || live.getAttribute('data-arranged')) return;
+    live.setAttribute('data-arranged', '1');
+    ['.lcv-col', '.lcv-midrow'].forEach(function(sel){
+      Array.prototype.slice.call(live.querySelectorAll(sel)).forEach(function(wrap){
+        while (wrap.firstChild) live.insertBefore(wrap.firstChild, wrap);
+        wrap.parentNode && wrap.parentNode.removeChild(wrap);
+      });
+    });
+    Array.prototype.forEach.call(live.children, function(card, i){ card.setAttribute('data-lcvkey', 'k' + i); });
+    try {
+      var order = JSON.parse(localStorage.getItem('lcv_card_order_' + id) || 'null');
+      if (Array.isArray(order)) order.forEach(function(k){
+        var n = live.querySelector('[data-lcvkey="' + k + '"]');
+        if (n) live.appendChild(n);
+      });
+    } catch(e) {}
+    function saveOrder() {
+      var ks = Array.prototype.map.call(live.children, function(n){ return n.getAttribute('data-lcvkey'); }).filter(Boolean);
+      try { localStorage.setItem('lcv_card_order_' + id, JSON.stringify(ks)); } catch(e) {}
+    }
+    Array.prototype.slice.call(live.children).forEach(function(card){
+      var handle = document.createElement('div');
+      handle.className = 'lcv-drag-handle';
+      handle.title = 'Hold and drag to move this card';
+      handle.innerHTML = '<span>\u2837 \u2837 \u2837&nbsp;&nbsp;drag to move&nbsp;&nbsp;\u2837 \u2837 \u2837</span>';
+      card.insertBefore(handle, card.firstChild);
+      card.addEventListener('mouseup', function(){
+        setTimeout(function(){
+          if (card.style.width) { card.style.flex = '0 1 ' + card.style.width; }
+          if (card.style.height) { card.style.maxHeight = 'none'; }
+        }, 0);
+      });
+      handle.addEventListener('pointerdown', function(ev){
+        ev.preventDefault();
+        try { handle.setPointerCapture(ev.pointerId); } catch(e) {}
+        card.classList.add('lcv-dragging');
+        bench.classList.add('lcv-drag-active');
+        function move(e){
+          var target = null, before = true;
+          Array.prototype.some.call(live.children, function(n){
+            if (n === card) return false;
+            var r = n.getBoundingClientRect();
+            if (e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8 && e.clientX >= r.left - 8 && e.clientX <= r.right + 8) {
+              target = n;
+              before = (e.clientX < r.left + r.width / 2) || (e.clientY < r.top + r.height / 3);
+              return true;
+            }
+            return false;
+          });
+          if (target) live.insertBefore(card, before ? target : target.nextSibling);
+        }
+        function up(e){
+          handle.removeEventListener('pointermove', move);
+          handle.removeEventListener('pointerup', up);
+          handle.removeEventListener('pointercancel', up);
+          try { handle.releasePointerCapture(ev.pointerId); } catch(err) {}
+          card.classList.remove('lcv-dragging');
+          bench.classList.remove('lcv-drag-active');
+          saveOrder();
+        }
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', up);
+        handle.addEventListener('pointercancel', up);
+      });
+    });
+  }
+  /* Restore the default logical card order (phone -> ramp -> timeline ->
+     traffic -> proof -> identity/gate -> advanced), clear manual resizes and
+     let the flex rows refill the full width. */
+  window.lcvResetLayout = function(id) {
+    var bench = el(id); if (!bench) return;
+    var live = bench.querySelector('.lcv-live'); if (!live) return;
+    try { localStorage.removeItem('lcv_card_order_' + id); } catch(e) {}
+    Array.prototype.slice.call(live.children)
+      .sort(function(a, b){
+        return parseInt(String(a.getAttribute('data-lcvkey')||'k999').slice(1), 10)
+             - parseInt(String(b.getAttribute('data-lcvkey')||'k999').slice(1), 10);
+      })
+      .forEach(function(n){ live.appendChild(n); });
+    Array.prototype.forEach.call(bench.querySelectorAll('.lcv-card, .lcv-adv-stack, .lcv-adv-stack > details, .uat-live-dev'), function(n){
+      n.style.width = ''; n.style.height = ''; n.style.flex = ''; n.style.maxHeight = '';
+    });
+  };
   function installCutoverMobileBench(panelId, id, label) {
     var panel = el(panelId), body = panel && panel.querySelector('.info-panel');
     if (!body || el(id)) return;
@@ -12544,6 +12643,7 @@ ${certContent}
     lcvDevInit(id);
     lcvHdrChk(id, {});
     try { cutMobPrefillBackendEndpoints(id); } catch(e) {}
+    try { lcvMakeArrangeable(id); } catch(e) {}
     /* Pre-load the real source app into the phone (same behavior as the UAT
        bench phone). Gates stay NOT RUN until the operator runs the journey. */
     try {
