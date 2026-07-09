@@ -60,10 +60,7 @@
     .card-shimmer:hover::before { left: 100%; }
 
     .card-glow { position: relative; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-    .card-glow::after { content: ''; position: absolute; inset: -2px; border-radius: inherit;
-      background: conic-gradient(from 0deg, transparent, var(--glow-color, #22d3ee), transparent 30%);
-      opacity: 0; transition: opacity 0.4s ease; z-index: -1; filter: blur(8px); }
-    .card-glow:hover::after { opacity: 0.5; animation: borderGlow 2s ease-in-out infinite; }
+    /* radiant conic glow removed per request — hover keeps only lift + shadow */
     .card-glow:hover { transform: translateY(-6px); box-shadow: 0 20px 40px -12px var(--shadow-color, rgba(6,182,212,0.15)); }
 
     .icon-box { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
