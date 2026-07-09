@@ -137,6 +137,45 @@
     .bsc-attr-k { color: #64748b; }
     .bsc-attr-v { font-weight: 700; color: #0f172a; }
 
+    /* ── 7R decision matrix ── */
+    .sevenr-wrap {
+      background: #fff; border: 1px solid #dbeafe; border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(15,23,42,.06); overflow: hidden;
+    }
+    .sevenr-table { width: 100%; border-collapse: collapse; }
+    .sevenr-table th {
+      background: #0f172a; color: #e2e8f0; font-size: 10px; font-weight: 900;
+      text-transform: uppercase; letter-spacing: .08em; padding: 12px 14px; text-align: left;
+    }
+    .sevenr-table td {
+      padding: 13px 14px; font-size: 12px; line-height: 1.45; color: #334155;
+      border-bottom: 1px solid #eef2f7; vertical-align: top;
+    }
+    .sevenr-table tr:last-child td { border-bottom: none; }
+    .sevenr-table tr:nth-child(even) td { background: #f8fafc; }
+    .sevenr-table tr.exec-path td {
+      background: linear-gradient(90deg,#eff6ff 0%,#ffffff 55%) !important;
+      border-top: 1px solid #bfdbfe; border-bottom: 1px solid #bfdbfe;
+    }
+    .sevenr-method { min-width: 160px; font-weight: 900; color: #0f172a; }
+    .r-badge {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 34px;
+      border-radius: 999px; padding: 4px 9px; margin-right: 8px;
+      font-size: 10px; font-weight: 900; color: #fff; box-shadow: 0 4px 12px rgba(15,23,42,.16);
+    }
+    .r1 { background: #475569; } .r2 { background: #64748b; } .r3 { background: #2563eb; }
+    .r4 { background: #0891b2; } .r5 { background: #059669; } .r6 { background: #7c3aed; }
+    .r7 { background: #374151; }
+    .strategy-pill {
+      display: inline-block; border-radius: 6px; padding: 4px 8px;
+      background: #f1f5f9; color: #334155; font-size: 11px; font-weight: 800;
+    }
+    .exec-path .strategy-pill { background: #dbeafe; color: #1e40af; }
+    .sevenr-note {
+      padding: 12px 16px; background: #eff6ff; border-top: 1px solid #bfdbfe;
+      color: #1e3a8a; font-size: 12px; line-height: 1.6; font-weight: 700;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       .pg-header { padding: 20px 20px 18px; }
@@ -144,6 +183,23 @@
       .pg-body { padding: 20px 14px 40px; }
       .wave-card-body { grid-template-columns: 1fr; }
       .p6-banner { flex-direction: column; gap: 12px; }
+      .sevenr-wrap { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+      .sevenr-table, .sevenr-table tbody, .sevenr-table tr, .sevenr-table td { display: block; width: 100%; }
+      .sevenr-table thead { display: none; }
+      .sevenr-table tr {
+        margin-bottom: 12px; border: 1px solid #dbeafe; border-radius: 12px; overflow: hidden;
+        background: #fff; box-shadow: 0 2px 10px rgba(15,23,42,.06);
+      }
+      .sevenr-table tr.exec-path { border-color: #93c5fd; }
+      .sevenr-table td {
+        display: grid; grid-template-columns: 112px 1fr; gap: 12px; padding: 10px 12px;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .sevenr-table td::before {
+        content: attr(data-label); font-size: 10px; font-weight: 900; text-transform: uppercase;
+        letter-spacing: .06em; color: #64748b;
+      }
+      .sevenr-method { min-width: 0; }
     }
   </style>
 </head>
@@ -218,6 +274,87 @@
           <span class="onto-tag" style="--tg-bg:#eff6ff;--tg-c:#1e40af;">Final Cutover</span>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 2: 7R Migration Methods ── -->
+  <div class="section">
+    <div class="sec-title">Migration Method Decision</div>
+    <div class="sec-h2">7R Migration Methods</div>
+    <div class="sec-sub">Each business system is first assigned a 7R migration method. The method defines whether the system should be retained, retired, rehosted, relocated, replatformed, refactored/containerized, or replaced. This prevents every workload from being treated as simple lift-and-shift and helps select the safest wave order.</div>
+
+    <div class="sevenr-wrap">
+      <table class="sevenr-table">
+        <thead>
+          <tr>
+            <th>R-Method</th>
+            <th>Strategy</th>
+            <th>Best used for</th>
+            <th>Typical wave</th>
+            <th>What happens</th>
+            <th>Output</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r1">R1</span>Retain</td>
+            <td data-label="Strategy"><span class="strategy-pill">Keep as-is</span></td>
+            <td data-label="Best used for">Systems not ready, out of scope, or waiting for dependency changes</td>
+            <td data-label="Typical wave">Hold / later wave</td>
+            <td data-label="What happens">Leave workload on current platform and document reason</td>
+            <td data-label="Output">Retain decision + revisit date</td>
+          </tr>
+          <tr>
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r2">R2</span>Retire</td>
+            <td data-label="Strategy"><span class="strategy-pill">Decommission</span></td>
+            <td data-label="Best used for">Unused, duplicated, obsolete, or low-value systems</td>
+            <td data-label="Typical wave">Before Wave 1</td>
+            <td data-label="What happens">Shut down safely after owner approval and backup/export</td>
+            <td data-label="Output">Decommission record</td>
+          </tr>
+          <tr class="exec-path">
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r3">R3</span>Rehost</td>
+            <td data-label="Strategy"><span class="strategy-pill">Lift and shift</span></td>
+            <td data-label="Best used for">VMs, simple apps, internal tools, low-risk systems</td>
+            <td data-label="Typical wave">Wave 1-2</td>
+            <td data-label="What happens">Move VM/image/snapshot to FLEX with minimal change</td>
+            <td data-label="Output">FLEX VM running</td>
+          </tr>
+          <tr>
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r4">R4</span>Relocate</td>
+            <td data-label="Strategy"><span class="strategy-pill">Move platform without app change</span></td>
+            <td data-label="Best used for">Workloads that can move between compatible regions/clusters</td>
+            <td data-label="Typical wave">Wave 2-3</td>
+            <td data-label="What happens">Move workload to another FLEX/OpenStack region or Kubernetes target</td>
+            <td data-label="Output">Same workload in new location</td>
+          </tr>
+          <tr class="exec-path">
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r5">R5</span>Replatform</td>
+            <td data-label="Strategy"><span class="strategy-pill">Improve runtime</span></td>
+            <td data-label="Best used for">Apps needing OS, DB, storage, LB, or config improvement</td>
+            <td data-label="Typical wave">Wave 2-4</td>
+            <td data-label="What happens">Move to FLEX while improving platform services, DB, storage, or runtime</td>
+            <td data-label="Output">Optimized FLEX workload</td>
+          </tr>
+          <tr class="exec-path">
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r6">R6</span>Refactor / Containerize</td>
+            <td data-label="Strategy"><span class="strategy-pill">Modernize app package</span></td>
+            <td data-label="Best used for">Apps suitable for Kubernetes, GitOps, OpenCenter, or AI-ready modernization</td>
+            <td data-label="Typical wave">Wave 3+</td>
+            <td data-label="What happens">Convert app into container image, manifests, Helm/Kustomize/Flux package</td>
+            <td data-label="Output">OpenCenter-ready app package</td>
+          </tr>
+          <tr>
+            <td class="sevenr-method" data-label="R-Method"><span class="r-badge r7">R7</span>Replace / Repurchase</td>
+            <td data-label="Strategy"><span class="strategy-pill">Replace with SaaS/new app</span></td>
+            <td data-label="Best used for">Apps better replaced than migrated</td>
+            <td data-label="Typical wave">Any wave</td>
+            <td data-label="What happens">Move users/data to a new product or SaaS service</td>
+            <td data-label="Output">Replacement plan + migration path</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="sevenr-note">Default recommendation: R3 for low-risk lift-and-shift, R5 for platform optimization, R6 for containerized OpenCenter modernization.</div>
     </div>
   </div>
 
