@@ -234,10 +234,35 @@
       padding: 10px 10px; cursor: pointer; font-weight: 700; font-size: 18px;
       text-align: center; white-space: nowrap; overflow: hidden;
       text-overflow: ellipsis; transition: background .15s, box-shadow .15s;
-      line-height: 1.4;
+      line-height: 1.4; position: relative;
       box-shadow: 0 0 10px rgba(0, 243, 255, 0.4), inset 0 0 10px rgba(0, 243, 255, 0.2);
       text-shadow: 0 0 8px rgba(0,243,255,0.7);
     }
+    .stage-btn.green-roll-stage {
+      border-color: #22c55e !important;
+      background: linear-gradient(100deg, rgba(0,24,70,.78) 0%, rgba(0,24,70,.78) 34%, rgba(34,197,94,.95) 48%, rgba(134,239,172,.92) 52%, rgba(0,24,70,.78) 66%, rgba(0,24,70,.78) 100%) !important;
+      background-size: 260% 100% !important;
+      animation: stageGreenRoll 9.6s linear infinite;
+      animation-delay: var(--green-roll-delay, 0s);
+    }
+    @keyframes stageGreenRoll {
+      0% { background-position: 140% 0; box-shadow: 0 0 8px rgba(34,197,94,.24), inset 0 0 8px rgba(34,197,94,.12); }
+      7% { background-position: 50% 0; box-shadow: 0 0 22px rgba(34,197,94,.95), inset 0 0 16px rgba(187,247,208,.58); }
+      14%, 100% { background-position: -60% 0; box-shadow: 0 0 8px rgba(34,197,94,.24), inset 0 0 8px rgba(34,197,94,.12); }
+    }
+    #stageBar .green-roll-stage[data-stage="s0"] { --green-roll-delay: 0s; }
+    #stageBar .green-roll-stage[data-stage="s1"] { --green-roll-delay: .45s; }
+    #stageBar .green-roll-stage[data-stage="s2"] { --green-roll-delay: .9s; }
+    #stageBar .green-roll-stage[data-stage="s4"] { --green-roll-delay: 1.35s; }
+    #stageBar .green-roll-stage[data-stage="s7"] { --green-roll-delay: 1.8s; }
+    #stageBar .green-roll-stage[data-stage="s7a"] { --green-roll-delay: 2.25s; }
+    #stageBar .green-roll-stage[data-stage="s5"] { --green-roll-delay: 2.7s; }
+    #stageBar .green-roll-stage[data-stage="s5c"] { --green-roll-delay: 3.15s; }
+    #stageBar .green-roll-stage[data-stage="s8"] { --green-roll-delay: 3.6s; }
+    #stageBar .green-roll-stage[data-stage="s6"] { --green-roll-delay: 4.05s; }
+    #stageBar .green-roll-stage[data-stage="s9"] { --green-roll-delay: 4.5s; }
+    #stageBar .green-roll-stage[data-stage="s10"] { --green-roll-delay: 4.95s; }
+    #stageBar .green-roll-stage[data-stage="sai"] { --green-roll-delay: 5.4s; }
     .stage-btn small {
         font-size: 12px; font-weight: normal; text-shadow: none; opacity: 0.8;
     }
@@ -1622,6 +1647,23 @@ body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):
       text-shadow: 0 0 8px rgba(224,242,254,.5) !important;
       transform: none !important;
     }
+    #stageBar .stage-btn.green-roll-stage,
+    #stageBar .stage-btn.green-roll-stage.active,
+    body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage,
+    body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage.active {
+      border-color: #22c55e !important;
+      background: linear-gradient(100deg, rgba(0,24,70,.78) 0%, rgba(0,24,70,.78) 34%, rgba(34,197,94,.95) 48%, rgba(134,239,172,.92) 52%, rgba(0,24,70,.78) 66%, rgba(0,24,70,.78) 100%) !important;
+      background-size: 260% 100% !important;
+      color: #ffffff !important;
+      animation: stageGreenRoll 9.6s linear infinite;
+      animation-delay: var(--green-roll-delay, 0s);
+      transform: none !important;
+    }
+    #stageBar .stage-btn.green-roll-stage small,
+    body.flex-skyline-mode #stageBar .stage-btn.green-roll-stage small {
+      color: #d1fae5 !important;
+      opacity: 1 !important;
+    }
 
 /* ── UAT Step 1 light-theme components ─────────────────────────────── */
 .uat-s1-wrap { padding:18px 0; }
@@ -2210,19 +2252,19 @@ body.flex-skyline-mode .uat-s1-template-tab.active {
   <button class="stage-btn stage-promo-btn sky-top-stage active" data-stage="s_why">Why Who What When to<br>Move to FLEX</button>
   <button class="stage-btn sky-top-stage" data-stage="s_fb">&#128172; Improvement<br>Feedbacks</button>
   <button class="stage-btn stage-tour-btn sky-top-stage" data-stage="s_tour">🎓 Quick Tour</button>
-  <button class="stage-btn stage-tracker-btn" data-stage="s0">📋 Migration Log</button>
-  <button class="stage-btn" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
-  <button class="stage-btn" data-stage="s2">Stage 2<br><small>Migration Strategies Hub</small></button>
-  <button class="stage-btn" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
-  <button class="stage-btn" data-stage="s7">Stage 3a<br><small>Cost Optimization</small></button>
-  <button class="stage-btn" data-stage="s7a">Stage 3b<br><small>Performance Gain</small></button>
-  <button class="stage-btn" data-stage="s5">Stage 4<br><small>Servers Cut Over</small></button>
-  <button class="stage-btn" data-stage="s5c">Stage 4<br><small>Business System Cut Over</small></button>
-  <button class="stage-btn" data-stage="s8">Stage 5<br><small>IaC Backup, DR &amp; Restore</small></button>
-  <button class="stage-btn" data-stage="s6">Stage 6<br><small>Handover and Deliverable</small></button>
-  <button class="stage-btn" data-stage="s9" style="display:none;">Stage 7<br><small>OPENCENTER Migration</small></button>
-  <button class="stage-btn" data-stage="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
-  <button class="stage-btn" data-stage="sai" style="background:linear-gradient(135deg,rgba(109,40,217,.55),rgba(6,182,212,.35));border-color:rgba(139,92,246,.6);">Stage 9<br><small>AI Power Up</small></button>
+  <button class="stage-btn stage-tracker-btn green-roll-stage" data-stage="s0">📋 Migration Log</button>
+  <button class="stage-btn green-roll-stage" data-stage="s1">Stage 1<br><small>Discovery &amp; Assessment</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s2">Stage 2<br><small>Migration Strategies Hub</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s4">Stage 3<br><small>Validation &amp; UAT</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s7">Stage 3a<br><small>Cost Optimization</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s7a">Stage 3b<br><small>Performance Gain</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s5">Stage 4<br><small>Servers Cut Over</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s5c">Stage 4<br><small>Business System Cut Over</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s8">Stage 5<br><small>IaC Backup, DR &amp; Restore</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s6">Stage 6<br><small>Handover and Deliverable</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s9" style="display:none;">Stage 7<br><small>OPENCENTER Migration</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="s10">Stage 8<br><small>AIOps &amp; Continuous Operations</small></button>
+  <button class="stage-btn green-roll-stage" data-stage="sai">Stage 9<br><small>AI Power Up</small></button>
 </div>
 
 <!-- ── Sub-tabs for Stage 1 ─────────────────────────── -->
