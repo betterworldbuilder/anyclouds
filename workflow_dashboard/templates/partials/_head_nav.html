@@ -1609,7 +1609,22 @@ body.flex-skyline-mode button:not(#top-theme-trigger):not(.global-theme-option):
     #stageBar .stage-tracker-btn.active small {
       color: #064e3b !important;
     }
-  
+    #stageBar .stage-promo-btn,
+    #stageBar .stage-btn[data-stage="s_fb"],
+    #stageBar .stage-tour-btn,
+    #stageBar .stage-tracker-btn,
+    #stageBar .stage-promo-btn.active,
+    #stageBar .stage-btn[data-stage="s_fb"].active,
+    #stageBar .stage-tour-btn.active,
+    #stageBar .stage-tracker-btn.active {
+      background: linear-gradient(135deg, #0369a1, #0ea5e9, #38bdf8) !important;
+      border-color: #7dd3fc !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 16px rgba(14,165,233,.55), inset 0 0 12px rgba(255,255,255,.18) !important;
+      text-shadow: 0 0 8px rgba(224,242,254,.5) !important;
+      transform: none !important;
+    }
+
 /* ── UAT Step 1 light-theme components ─────────────────────────────── */
 .uat-s1-wrap { padding:18px 0; }
 .uat-s1-topbar { display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap; }
