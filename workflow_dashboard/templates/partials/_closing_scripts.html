@@ -8530,28 +8530,73 @@ ${certContent}
           var v = document.createElement('div');
           v.className = 'stage-vid-box';
           v.style.cssText = 'padding:9px 24px;background:rgba(0,5,18,0.88);border-bottom:1px solid rgba(0,243,255,0.10);display:flex;align-items:center;gap:10px;';
-          v.innerHTML = '<div style="background:#7f1d1d;border-radius:6px;padding:3px 8px;display:flex;align-items:center;gap:5px;flex-shrink:0;">'
+          /* Badge is an ACTIVE watch link once a URL is saved; input locks
+             after save and unlocks via the Edit button. */
+          v.innerHTML = '<a id="stgbadge-' + p.vidKey + '" target="_blank" rel="noopener" style="border-radius:6px;padding:3px 8px;display:flex;align-items:center;gap:5px;flex-shrink:0;text-decoration:none;">'
             + '<span style="font-size:11px;">📺</span>'
-            + '<span style="color:#fca5a5;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">VIDEO TUTORIAL</span></div>'
+            + '<span id="stgbadgetxt-' + p.vidKey + '" style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">VIDEO TUTORIAL</span></a>'
             + '<div style="background:#172554;border-radius:4px;padding:2px 6px;flex-shrink:0;"><span style="color:#93c5fd;font-size:9px;font-weight:700;">YT</span></div>'
             + '<input id="stginp-' + p.vidKey + '" type="url" value="' + savedUrl.replace(/"/g,'&quot;') + '" placeholder="Paste video URL to link tutorial..." style="flex:1;background:rgba(0,0,0,.35);border:1px solid rgba(147,197,253,.25);border-radius:4px;padding:5px 8px;color:#93c5fd;font-size:10px;box-sizing:border-box;outline:none;min-width:0;" />'
-            + '<button onclick="stgVidSave(\'' + p.vidKey + '\')" style="background:rgba(37,99,235,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#10003; Save</button>';
+            + '<button id="stgedit-' + p.vidKey + '" onclick="stgVidEdit(\'' + p.vidKey + '\')" style="background:rgba(100,116,139,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#9998; Edit</button>'
+            + '<button id="stgsave-' + p.vidKey + '" onclick="stgVidSave(\'' + p.vidKey + '\')" style="background:rgba(37,99,235,.85);border:none;border-radius:4px;padding:5px 10px;color:#fff;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">&#10003; Save</button>';
           panelEl.insertBefore(v, panelEl.firstChild);
+          /* deferred: stgVidApplyState is defined later in this block */
+          (function(k){ setTimeout(function(){ if (window.stgVidApplyState) stgVidApplyState(k); }, 0); })(p.vidKey);
       });
   };
 
   // Run on first load
   renderGlobalStageHeaders();
 
+  /* Locked (saved) vs editing state for every stage video bar. */
+  window.stgVidApplyState = function(key) {
+    var inp = document.getElementById('stginp-' + key);
+    var badge = document.getElementById('stgbadge-' + key);
+    var btxt = document.getElementById('stgbadgetxt-' + key);
+    var eBtn = document.getElementById('stgedit-' + key);
+    var sBtn = document.getElementById('stgsave-' + key);
+    if (!inp || !badge) return;
+    var url = (localStorage.getItem('tour-vid-' + key) || '').trim();
+    var saved = !!url;
+    inp.readOnly = saved;
+    inp.style.opacity = saved ? '.65' : '1';
+    if (eBtn) eBtn.style.display = saved ? '' : 'none';
+    if (sBtn) sBtn.style.display = saved ? 'none' : '';
+    if (saved) {
+      badge.href = url;
+      badge.style.background = '#14532d';
+      badge.style.cursor = 'pointer';
+      badge.title = 'Watch the tutorial video';
+      if (btxt) { btxt.style.color = '#86efac'; btxt.innerHTML = 'VIDEO TUTORIAL &#9654;'; }
+    } else {
+      badge.removeAttribute('href');
+      badge.style.background = '#7f1d1d';
+      badge.style.cursor = 'default';
+      badge.title = 'No video linked yet — paste a URL and Save';
+      if (btxt) { btxt.style.color = '#fca5a5'; btxt.textContent = 'VIDEO TUTORIAL'; }
+    }
+  };
+  window.stgVidEdit = function(key) {
+    var inp = document.getElementById('stginp-' + key);
+    var eBtn = document.getElementById('stgedit-' + key);
+    var sBtn = document.getElementById('stgsave-' + key);
+    if (!inp) return;
+    inp.readOnly = false; inp.style.opacity = '1'; inp.focus(); inp.select();
+    if (eBtn) eBtn.style.display = 'none';
+    if (sBtn) sBtn.style.display = '';
+  };
   window.stgVidSave = function(key) {
     var inp = document.getElementById('stginp-' + key);
-    if (!inp || !inp.value.trim()) return;
+    if (!inp) return;
     var url = inp.value.trim();
-    localStorage.setItem('tour-vid-' + key, url);
+    if (url && !/^https?:\/\//i.test(url)) { url = 'https://' + url; inp.value = url; }
+    if (url) localStorage.setItem('tour-vid-' + key, url);
+    else localStorage.removeItem('tour-vid-' + key);
     var link = document.getElementById('tour-vid-' + key);
-    if (link) link.href = url;
-    var btn = inp.nextElementSibling;
-    if (btn) { btn.textContent = '✓ Saved!'; setTimeout(function() { btn.innerHTML = '&#10003; Save'; }, 1500); }
+    if (link && url) link.href = url;
+    var sBtn = document.getElementById('stgsave-' + key);
+    if (sBtn && url) { sBtn.textContent = '✓ Saved!'; setTimeout(function(){ sBtn.innerHTML = '&#10003; Save'; stgVidApplyState(key); }, 900); }
+    else stgVidApplyState(key);
   };
 
   window.submitStageStatus = function(stageName, status) {
