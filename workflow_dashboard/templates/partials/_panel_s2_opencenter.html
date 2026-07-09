@@ -994,8 +994,31 @@ git push -u origin main</div>
         <!-- Step 9 -->
       <!-- Section G: Safety Checklist -->
       <div class="ocqs-section">
-        <h2>G. Safety Checklist Before Deploy</h2>
-        <div class="ocqs-warn-box" style="font-size:14px;font-weight:700;text-align:center;">
+        <style>
+          @keyframes ocqsCoffeeWarningBlink {
+            0%, 100% { background:#991b1b; box-shadow:0 0 0 rgba(220,38,38,0); }
+            50% { background:#dc2626; box-shadow:0 0 22px rgba(220,38,38,.55); }
+          }
+          .ocqs-coffee-warning {
+            animation:ocqsCoffeeWarningBlink 1.15s ease-in-out infinite;
+            border:2px solid #fecaca;
+            border-radius:8px;
+            color:#fff;
+            font-size:16px;
+            font-weight:900;
+            margin:0 0 10px;
+            padding:12px 16px;
+            text-align:center;
+          }
+          .ocqs-coffee-warning code {
+            background:rgba(255,255,255,.16);
+            color:#fff;
+            padding:2px 5px;
+            border-radius:4px;
+          }
+        </style>
+        <h2 class="ocqs-coffee-warning">Coffe Break Warning : Safety Checklist Before Deploy</h2>
+        <div class="ocqs-coffee-warning" style="font-size:14px;">
           ⛔ Never run <code>opencenter cluster deploy</code> until <code>opencenter cluster validate</code> passes and no critical CHANGEME values remain.
         </div>
         <div class="ocqs-card" id="ocqs-checklist">
